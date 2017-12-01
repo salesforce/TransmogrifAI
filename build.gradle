@@ -312,3 +312,6 @@ artifactoryPublish.skip = true
 if (System.env.TEAMCITY_VERSION) {
     println("##teamcity[setParameter name='env.OP_VERSION' value='$project.version']")
 }
+
+// run by Heroku to build docs
+task stage(dependsOn: ':docs:buildDocs')
