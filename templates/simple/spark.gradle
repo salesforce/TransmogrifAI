@@ -1,0 +1,233 @@
+/**
+ * For below tasks:
+ * Assign an environment variable $CLUSTER_IP for repeated development ease of use
+ * If -Dlabel=yourcustomjars or -Dspark-label is not supplied will default to your system username
+ * with a _projectlibs / _sparklibs suffix for remote upload paths.
+ *
+ * Uploading to hdfs requires a binary distribution of hadoop
+ * available from http://hadoop.apache.org/releases.html
+ * Download, untar, and set HADOOP_HOME to main folder.
+ *
+ * Check the EMR cluster version to find corresponding version of Hadoop.
+ * Available in the about page of the yarn cluster UI on port 8088.
+ *
+ * Current Spark version is 2.0.2 corresponding to Hadoop 2.7.3.
+ * Uploads will overwrite remote files
+ *
+ * EXAMPLE USAGE:
+ *
+ * At beginning of session using a cluster:
+
+ ./gradlew uploadSparkJars
+
+ * To upload all project jars (dependencies):
+
+ ./gradlew uploadProjectJars
+
+ * Example submission:
+
+ ./gradlew sparkSubmit -Duse-hdfs-jars=true ...
+
+ * -Duse-hdfs-jars=true tells spark-submit to prefix all the jar paths with hdfs path, assumes
+ * you've already uploaded jars to cluster
+ *
+ * Another example:
+
+ ./gradlew compileTestScala installDist
+
+ ./gradlew uploadAppJars
+
+ ./gradlew sparkSubmit -Duse-hdfs-jars=true ...
+
+ * This will upload your latest code changes to the cluster before submitting a job.
+ *
+ * By default (unless you add any new arguments,) spark-submit task will work exactly the same
+ * as before, uploading your local spark libs / project libs every time. This is just a precaution
+ * to maintain backwards compatability.
+ */
+
+task copyLog4jToSparkNoInstall(type: Copy) {
+    description 'copy <project>/src/main/resources/log4j.properties to SPARK_HOME/conf folder'
+    from "$project.projectDir.path/src/main/resources/log4j.properties"
+    into "$System.env.SPARK_HOME/conf"
+}
+
+task copyLog4jToSpark(type: Copy, dependsOn: installDist) {
+    description 'copy <project>/src/main/resources/log4j.properties to SPARK_HOME/conf folder'
+    copyLog4jToSparkNoInstall
+}
+
+def hadoop = "$System.env.HADOOP_HOME/bin/hadoop"
+def buildFolderPath = "$project.projectDir.path/build/install/$project.name/lib/"
+def clusterIp = System.getProperty("yarn-res-mngr", System.env.CLUSTER_IP)
+def remotePathLabel = System.getProperty("label", System.env.USER) + "_projectlibs"
+def hdfsPrefix = "hdfs://$clusterIp:8020/tmp"
+def hdfsJarPath = "$hdfsPrefix/$remotePathLabel"
+
+def hadoopMkdir = [hadoop, "fs", "-mkdir", "-p"]
+def hadoopCopy = [hadoop, "fs", "-copyFromLocal", "-f"]
+// ^ This option -f is supposed to overwrite
+// It doesn't seem to always do that, not sure why, just going to call fs -rm before
+def hadoopRm = [hadoop, "fs", "-rm"]
+
+
+task uploadProjectJars(type: Exec, dependsOn: installDist) {
+    description 'Upload all project jars (appJar and dependencies) to a remote cluster, i.e.: ' +
+            '<project>/gradlew uploadProjectJars -Dyarn-res-mngr=10.36.0.89 -Dlabel=customjar5test'
+
+    commandLine hadoopRm + ["-r", hdfsJarPath]
+    commandLine hadoopMkdir + [hdfsJarPath]
+    commandLine hadoopCopy + [buildFolderPath, hdfsJarPath]
+
+}
+
+def sparkHome = "$System.env.SPARK_HOME"
+def remoteSparkPathLabel = System.getProperty("spark-label", System.env.USER) + "_sparklibs"
+def hdfsSparkJarPath = "$hdfsPrefix/$remoteSparkPathLabel"
+
+
+/**
+ * This function should be deprecated as soon as we properly package spark libs on the cluster
+ * Also there's a potential concern about BLAS natives being properly applied with local spark libs
+ */
+task uploadSparkJars(type: Exec) {
+    description 'Upload spark lib jars to a remote cluster, i.e.: ' +
+            '<project>/gradlew uploadSparkJars -Dyarn-res-mngr=10.36.0.89 -Dspark-label=v202'
+
+    commandLine hadoopRm + ["-r", hdfsSparkJarPath]
+    commandLine hadoopMkdir + [hdfsSparkJarPath]
+    commandLine hadoopCopy + ["$sparkHome/jars/", hdfsSparkJarPath]
+
+}
+
+def buildFolder = fileTree(buildFolderPath)
+def appJars = buildFolder.filter { it.isFile() && it.name.contains("$project.name") }.files.path
+
+task uploadAppJars(type: Exec) {
+    description 'Upload only the app jars to a remote cluster, i.e.: ' +
+            '<project>/gradlew uploadAppJars -Dyarn-res-mngr=10.36.0.89 -Dlabel=customjar5test'
+    // println("Uploading app jars to: $hdfsJarPath")
+    commandLine hadoopMkdir + [hdfsJarPath]
+    appJars.forEach{
+        commandLine hadoopRm + [hdfsJarPath + "/" + it.split("/").last()]
+        commandLine hadoopCopy + [it, hdfsJarPath]
+    }
+}
+
+def useHDFSJars = System.getProperty("use-hdfs-jars", "false") == "true"
+
+task sparkSubmit(dependsOn: copyLog4jToSparkNoInstall) {
+    description 'build project and run a Spark submit, i.e.: <project>:sparkSubmit -Dmain=MyMainClass -Dargs="arg1 arg2 arg3"'
+    doLast {
+        def sparkVersion = "$sparkHome-is node determined since SPARK_HOME is not set".split("/").last().split("-").drop(1).head()
+        //    println("Spark version " + sparkVersion)
+
+        buildFolder = fileTree(buildFolderPath)
+        appJars = buildFolder.filter { it.isFile() && it.name.contains("$project.name") }.files.path
+        def wrkDir = System.getProperty("working-dir", sparkHome)
+        def verbose = System.getProperty("verbose", "true") == "true" ? ["-v"] : []
+        def master = System.getProperty("master", "local[4]")
+        def yarnResMngr = System.getProperty("yarn-res-mngr", "")
+        def deployMode = master.endsWith("cluster") ? "cluster" : (master.endsWith("client") ? "client" : System.getProperty("deploy-mode", "client"))
+        def driverCores = System.getProperty("driver-cores", "1")
+        def driverMemory = System.getProperty("driver-memory", "4G")
+        def executorCores = !master.startsWith("local") ? ["--executor-cores", System.getProperty("executor-cores", "1")] : []
+        def executorMemory = System.getProperty("executor-memory", "2G")
+        def extraJavaOpts = "-server -XX:hashCode=0 -XX:+UseG1GC -XX:MaxGCPauseMillis=1000 -XX:InitiatingHeapOccupancyPercent=35 -XX:MaxMetaspaceSize=256m -XX:+UseCompressedOops -XX:+DisableExplicitGC -Djava.awt.headless=true"
+        // -Dlog4j.configuration=file:///home/hadoop/scripts/spark-log4j.properties"
+        def numExecutors = !master.startsWith("local") ? ["--num-executors", System.getProperty("num-executors", "4")] : []
+        def files = System.getProperty("files", "") == "" ? [] : ["--files", System.getProperty("files")]
+        def propertiesFile = System.getProperty("properties-file", "") == "" ? [] : ["--properties-file", System.getProperty("properties-file")]
+        def conf = System.getProperty("conf", "") == "" ? [] : System.getProperty("conf").split(" ").collect {
+            ["--conf", it]
+        }.flatten()
+
+        def args = System.getProperty("args", "") == "" ? [] : Arrays.asList(System.getProperty("args").split(" "))
+        def main = System.getProperty("main", "")
+        def appName = System.getProperty("name", "$project.name:$main")
+        def appJarsAdjusted = useHDFSJars ? appJars.collect { "$hdfsJarPath/" + it.split("/").last() } : appJars
+        def appJar = appJarsAdjusted.join(',')
+        println(appJar)
+        def classPathJars = buildFolder.filter { it.isFile() }.files.path
+        def classPathJarsAdjusted = useHDFSJars ? classPathJars.collect {
+            "$hdfsJarPath/" + it.split("/").last()
+        } : classPathJars
+        def classPath = classPathJarsAdjusted.join(',')
+
+        def kryoConf = ["--conf", "spark.serializer=org.apache.spark.serializer.KryoSerializer"]
+        def sparkLibFolder = fileTree("$sparkHome/jars")
+        def sparkClassPath = sparkLibFolder.filter { it.isFile() }.files.path.collect {
+            "$hdfsSparkJarPath/" + it.split("/").last()
+        }.join(',')
+        def yarnHDFSSparkJarConf = useHDFSJars ? ["--conf", "spark.yarn.jars=$sparkClassPath"] : []
+        def yarnConf = !master.startsWith("yarn") ? [] : [
+                "spark.logConf=true",
+                "spark.eventLog.enabled=true",
+                "spark.eventLog.dir=hdfs:///var/log/spark/apps",
+                "spark.driver.extraClassPath=/usr/lib/hadoop-lzo/lib/*",
+                "spark.driver.extraLibraryPath=/usr/lib64/atlas",
+                "spark.driver.extraJavaOptions=$extraJavaOpts",
+                "spark.executor.extraLibraryPath=/usr/lib64/atlas",
+                "spark.executor.extraJavaOptions=$extraJavaOpts",
+                "spark.task.maxFailures=21",
+                "spark.yarn.maxAppAttempts=3",
+                "spark.yarn.max.executor.failures=25",
+                "spark.yarn.submit.waitAppCompletion=false",
+                "spark.yarn.archive=hdfs://$yarnResMngr:8020/tmp/spark-$sparkVersion-assembly.zip",
+                "spark.dynamicAllocation.enabled=true",
+                "spark.dynamicAllocation.executorIdleTimeout=900s",
+                "spark.shuffle.service.enabled=true",
+                "spark.shuffle.io.maxRetries=120",
+                "spark.sql.avro.compression.codec=deflate",
+                "spark.sql.avro.deflate.level=6",
+                "spark.io.compression.codec=lzf",
+                "spark.hadoop.yarn.resourcemanager.hostname=$yarnResMngr",
+                "spark.hadoop.fs.defaultFS=hdfs://$yarnResMngr:8020/",
+                "spark.hadoop.fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem",
+                "spark.hadoop.fs.file.impl=org.apache.hadoop.fs.LocalFileSystem",
+                "spark.hadoop.fs.AbstractFileSystem.s3a.impl=org.apache.hadoop.fs.s3a.S3AFs",
+                "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
+                "spark.hadoop.fs.s3a.attempts.maximum=20",
+                "spark.hadoop.fs.s3a.fast.upload=true",
+                "spark.hadoop.fs.s3a.fast.buffer.size=10485760",
+                "spark.hadoop.fs.s3a.multipart.size=10485760",
+                "spark.hadoop.fs.s3a.multipart.threshold=104857600",
+                "spark.hadoop.fs.s3a.server-side-encryption-algorithm=AES256",
+                "spark.hadoop.mapred.output.compress=true",
+                "spark.hadoop.avro.output.codec=deflate",
+                "spark.hadoop.avro.mapred.deflate.level=6",
+                "spark.hadoop.validateOutputSpecs=false",
+                "spark.hadoop.mapred.output.committer.class=com.salesforce.op.utils.io.DirectOutputCommitter",
+                "spark.hadoop.spark.sql.sources.outputCommitterClass=com.salesforce.op.utils.io.DirectMapreduceOutputCommitter"
+        ].collect { ["--conf", it] }.flatten()
+
+        def hadoopConfDir = System.env.HOME + "/.fake_hadoop_conf"
+        def ensureEmptyHadoopConfDir = ["mkdir", "-p", hadoopConfDir]
+
+        def command = ["$sparkHome/bin/spark-submit"] + verbose +
+                ["--master", master,
+                 "--deploy-mode", deployMode] + kryoConf + yarnConf + yarnHDFSSparkJarConf +
+                ["--driver-cores", driverCores,
+                 "--driver-memory", driverMemory,
+                 "--executor-memory", executorMemory] + executorCores + numExecutors + propertiesFile + conf +
+                ["--class", main, "--name", appName, "--jars", classPath] + files + [appJar] + args
+
+        exec {
+            commandLine ensureEmptyHadoopConfDir
+
+            environment SPARK_HOME: sparkHome
+            environment HADOOP_CONF_DIR: hadoopConfDir // Could consider using "$sparkHome/conf"
+            // but wanted to eliminate possible extra configs leaking in
+            environment HADOOP_USER_NAME: "hadoop"
+            workingDir wrkDir
+            commandLine command
+            standardOutput = System.out
+            errorOutput = System.out
+        }
+    }
+}
+
+// There's no point doing installDist if we're using an unchanging remote jar
+if (!useHDFSJars) {
+    sparkSubmit.dependsOn(installDist)
+}

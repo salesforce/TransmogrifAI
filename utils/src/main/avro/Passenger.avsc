@@ -1,0 +1,103 @@
+{
+  "type": "record",
+  "name": "Passenger",
+  "namespace": "com.salesforce.op.test",
+  "fields": [
+    {
+      "name": "passengerId",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "age",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "gender",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    {
+      "name": "height",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "weight",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "description",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    {
+      "name": "survived",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "boarded",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "recordDate",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "stringMap",
+      "type": [
+        {
+          "type": "map",
+          "values": [
+            "string",
+            "null"
+          ]
+        },
+        "null"
+      ]
+    },
+    {
+      "name": "numericMap",
+      "type": [
+        {
+          "type": "map",
+          "values": "double"
+        },
+        "null"
+      ]
+    },
+    {
+      "name": "booleanMap",
+      "type": [
+        {
+          "type": "map",
+          "values": "boolean"
+        },
+        "null"
+      ]
+    }
+  ]
+}

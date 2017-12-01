@@ -1,0 +1,622 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ */
+
+package com.salesforce.op.stages.impl.feature
+
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
+import com.salesforce.op.stages.OpPipelineStageBase
+import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
+import com.salesforce.op.utils.text.TextUtils
+import enumeratum._
+import org.apache.spark.ml.PipelineStage
+import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
+import org.apache.spark.ml.param._
+import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.{Dataset, Encoders}
+
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.runtime.universe._
+
+
+/**
+ * Hashing Algorithms
+ */
+sealed trait HashAlgorithm extends EnumEntry with Serializable
+
+object HashAlgorithm extends Enum[HashAlgorithm] {
+  val values = findValues
+  case object MurMur3 extends HashAlgorithm
+  case object Native extends HashAlgorithm
+}
+
+private[op] case object Transmogrifier {
+
+  val NullString = OpVectorColumnMetadata.NullString
+  val OtherString = "OTHER"
+  val DefaultNumOfFeatures = 256
+  val MaxNumOfFeatures = 8192
+  val DateListDefault = DateListPivot.SinceLast
+  val ReferenceDate = DateTimeUtils.now()
+  val TopK = 20
+  val MinSupport = 10
+  val FillValue = 0
+  val BinaryFillValue = false
+  val HashWithIndex = false
+  val PrependFeatureName = true
+  val ForceSharedHashSpace = true
+  val CleanText = true
+  val CleanKeys = false
+  val HashAlgorithm = com.salesforce.op.stages.impl.feature.HashAlgorithm.MurMur3
+  val BinaryFreq = false
+  val FillWithMode = true
+  val FillWithMean = true
+  val TrackNulls = true
+  val MinDocFrequency = 0
+  /**
+   * Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
+   */
+  val DefaultGeolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
+
+  /**
+   * Vectorize features by type applying default vectorizers
+   *
+   * @param features input features
+   * @return vectorized features grouped by type
+   */
+  def transmogrify(features: Seq[FeatureLike[_]]): Iterable[FeatureLike[OPVector]] = {
+
+    def castSeqAs[U <: FeatureType](f: Seq[FeatureLike[_]]) = f.map(_.asInstanceOf[FeatureLike[U]])
+
+    def castAs[U <: FeatureType](f: Seq[FeatureLike[_]]): (FeatureLike[U], Array[FeatureLike[U]]) = {
+      val casted = castSeqAs[U](f)
+      casted.head -> casted.tail.toArray
+    }
+
+    val featuresByType = features.groupBy(_.wtt.tpe).toSeq.sortBy(_._1.toString) // make features creation deterministic
+
+    featuresByType.flatMap { case (featureType, g) =>
+      val res = featureType match {
+
+        // Vector
+        case t if t =:= weakTypeOf[OPVector] =>
+          castSeqAs[OPVector](g)
+
+        // Lists
+        case t if t =:= weakTypeOf[TextList] =>
+          val (f, other) = castAs[TextList](g)
+          f.vectorize(numTerms = DefaultNumOfFeatures, binary = BinaryFreq, minDocFreq = MinDocFrequency,
+            others = other)
+        case t if t =:= weakTypeOf[DateList] =>
+          val (f, other) = castAs[DateList](g)
+          f.vectorize(dateListPivot = DateListDefault, trackNulls = TrackNulls, referenceDate = ReferenceDate,
+            others = other)
+        case t if t =:= weakTypeOf[DateTimeList] =>
+          val (f, other) = castAs[DateTimeList](g)
+          f.vectorize(dateListPivot = DateListDefault, trackNulls = TrackNulls, referenceDate = ReferenceDate,
+            others = other)
+        case t if t =:= weakTypeOf[Geolocation] =>
+          val (f, other) = castAs[Geolocation](g)
+          f.vectorize(fillWithMean = FillWithMean, trackNulls = TrackNulls, fillValue = DefaultGeolocation,
+            others = other)
+
+        // Maps
+        case t if t =:= weakTypeOf[Base64Map] =>
+          val (f, other) = castAs[Base64Map](g) // TODO make better default
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[BinaryMap] =>
+          val (f, other) = castAs[BinaryMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[ComboBoxMap] =>
+          val (f, other) = castAs[ComboBoxMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[CurrencyMap] =>
+          val (f, other) = castAs[CurrencyMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[DateMap] =>
+          val (f, other) = castAs[DateMap](g) // TODO make better default
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[DateTimeMap] =>
+          val (f, other) = castAs[DateTimeMap](g) // TODO make better default
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[EmailMap] =>
+          val (f, other) = castAs[EmailMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[IDMap] =>
+          val (f, other) = castAs[IDMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[IntegralMap] =>
+          val (f, other) = castAs[IntegralMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[MultiPickListMap] =>
+          val (f, other) = castAs[MultiPickListMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[PercentMap] =>
+          val (f, other) = castAs[PercentMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[PhoneMap] =>
+          val (f, other) = castAs[PhoneMap](g) // TODO make better default
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[PickListMap] =>
+          val (f, other) = castAs[PickListMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[RealMap] =>
+          val (f, other) = castAs[RealMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+        case t if t =:= weakTypeOf[TextAreaMap] =>
+          val (f, other) = castAs[TextAreaMap](g) // TODO make this be a hash transformation
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[TextMap] =>
+          val (f, other) = castAs[TextMap](g)  // TODO make this be a hash transformation
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[URLMap] =>
+          val (f, other) = castAs[URLMap](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[CountryMap] =>
+          val (f, other) = castAs[CountryMap](g) // TODO make Country specific transformer
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[StateMap] =>
+          val (f, other) = castAs[StateMap](g) // TODO make State specific transformer
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[CityMap] =>
+          val (f, other) = castAs[CityMap](g) // TODO make City specific transformer
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[PostalCodeMap] =>
+          val (f, other) = castAs[PostalCodeMap](g) // TODO make PostalCode specific transformer
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[StreetMap] =>
+          val (f, other) = castAs[StreetMap](g) // TODO make Street specific transformer
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other)
+        case t if t =:= weakTypeOf[GeolocationMap] =>
+          val (f, other) = castAs[GeolocationMap](g)
+          f.vectorize(cleanKeys = CleanKeys, others = other)
+
+        // Numerics
+        case t if t =:= weakTypeOf[Binary] =>
+          val (f, other) = castAs[Binary](g)
+          f.vectorize(fillValue = BinaryFillValue, trackNulls = TrackNulls, others = other)
+        case t if t =:= weakTypeOf[Currency] =>
+          val (f, other) = castAs[Currency](g)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+        case t if t =:= weakTypeOf[Date] =>
+          val (f, other) = castAs[Date](g)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+        case t if t =:= weakTypeOf[DateTime] =>
+          val (f, other) = castAs[DateTime](g)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+        case t if t =:= weakTypeOf[Integral] =>
+          val (f, other) = castAs[Integral](g)
+          f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls, others = other)
+        case t if t =:= weakTypeOf[Percent] =>
+          val (f, other) = castAs[Percent](g)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+        case t if t =:= weakTypeOf[Real] =>
+          val (f, other) = castAs[Real](g)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+        case t if t =:= weakTypeOf[RealNN] =>
+          val (f, other) = castAs[RealNN](g)
+          f.vectorize(other)
+
+        // Sets
+        case t if t =:= weakTypeOf[MultiPickList] =>
+          val (f, other) = castAs[MultiPickList](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
+
+        // Text
+        case t if t =:= weakTypeOf[Base64] =>
+          val (f, other) = castAs[Base64](g) // TODO do something with this??
+          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+        case t if t =:= weakTypeOf[ComboBox] =>
+          val (f, other) = castAs[ComboBox](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
+        case t if t =:= weakTypeOf[Email] =>
+          val (f, other) = castAs[Email](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+        case t if t =:= weakTypeOf[ID] =>
+          val (f, other) = castAs[ID](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
+        case t if t =:= weakTypeOf[Phone] =>
+          val (f, other) = castAs[Phone](g)
+          f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other)
+        case t if t =:= weakTypeOf[PickList] =>
+          val (f, other) = castAs[PickList](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
+        case t if t =:= weakTypeOf[Text] =>
+          val (f, other) = castAs[Text](g)
+          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+        case t if t =:= weakTypeOf[TextArea] =>
+          val (f, other) = castAs[TextArea](g)
+          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+        case t if t =:= weakTypeOf[URL] =>
+          val (f, other) = castAs[URL](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
+        case t if t =:= weakTypeOf[Country] =>
+          val (f, other) = castAs[Country](g) // TODO make do something smart for Country
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+        case t if t =:= weakTypeOf[State] =>
+          val (f, other) = castAs[State](g) // TODO make do something smart for State
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+        case t if t =:= weakTypeOf[City] =>
+          val (f, other) = castAs[City](g) // TODO make do something smart for City
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+        case t if t =:= weakTypeOf[PostalCode] =>
+          val (f, other) = castAs[PostalCode](g) // TODO make do something smart for PostalCode
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+        case t if t =:= weakTypeOf[Street] =>
+          val (f, other) = castAs[Street](g) // TODO make do something smart for Street
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+
+        // Unknown
+        case t => throw new IllegalArgumentException(s"No vectorizer available for type $t")
+      }
+
+      res match {
+        case r: Seq[_] => r.asInstanceOf[Seq[FeatureLike[OPVector]]]
+        case r => Seq(r.asInstanceOf[FeatureLike[OPVector]])
+      }
+    }
+  }
+
+
+  /**
+   * Extract feature history map from array of input features
+   * @param tf array of transient features
+   * @return map from feature name to feature history
+   */
+  def inputFeaturesToHistory(tf: Array[TransientFeature]): Map[String, FeatureHistory] = {
+    tf.map { f => f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages) }.toMap
+  }
+
+}
+
+trait VectorizerDefaults extends OpPipelineStageBase {
+  self: PipelineStage =>
+
+  abstract override def onSetInput(): Unit = {
+    super.onSetInput()
+    setMetadata(vectorMetadataFromInputFeatures.toMetadata)
+  }
+
+  /**
+   * Compute the output vector metadata only from the input features. Vectorizers use this to derive
+   * the full vector, including pivot columns or indicator features.
+   *
+   * @return Vector metadata from input features
+   */
+  protected def vectorMetadataFromInputFeatures: OpVectorMetadata = {
+    val tf = getTransientFeatures()
+    val cols = tf.map { f =>
+      OpVectorColumnMetadata(
+        parentFeatureName = Seq(f.name),
+        parentFeatureType = Seq(f.typeName),
+        indicatorGroup = None,
+        indicatorValue = None
+      )
+    }
+    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf))
+  }
+
+  protected def vectorMetadataWithNullIndicators: OpVectorMetadata = {
+    val vectorMeta = vectorMetadataFromInputFeatures
+    val updatedCols = vectorMeta.columns.flatMap { col =>
+      Seq(
+        col,
+        OpVectorColumnMetadata(
+          parentFeatureName = col.parentFeatureName,
+          parentFeatureType = col.parentFeatureType,
+          indicatorGroup = col.parentFeatureName,
+          indicatorValue = Some(Transmogrifier.NullString)
+        )
+      )
+    }
+    vectorMeta.withColumns(updatedCols)
+  }
+
+  /**
+   * Get the name of the output vector
+   *
+   * @return Output vector name as a string
+   */
+  protected def vectorOutputName: String = (getOutput(): Array[OPFeature]).head.name
+
+  /**
+   * Get the metadata describing the output vector
+   *
+   * This does ''not'' trigger [[onGetMetadata()]]
+   *
+   * @return Metadata of output vector
+   */
+  protected def outputVectorMeta: OpVectorMetadata = OpVectorMetadata(
+    StructField(
+      vectorOutputName,
+      SQLDataTypes.VectorType,
+      metadata = $(outputMetadata)
+    )
+  )
+
+  /**
+   * Function to reindex a sequence of vectorized categoricals or maps when flattening
+   *
+   * @param seq sequence of all previous vectorized values
+   * @return next index for concatenating the sequence
+   */
+  protected def nextIndex(seq: Seq[(Int, Double)]): Int = seq.lastOption.map(_._1 + 1).getOrElse(0)
+
+  /**
+   * Function to flatten sequences of (Index, Value) tuples and reindex them sequentially
+   * Example:
+   * > reindex(Seq(Seq((0,2.0), (1,1.0)), Seq((0,2.0), (5,1.0))))
+   * res: Seq((0,2.0), (1,1.0), (2,2.0), (7,1.0))
+   *
+   * @param seq sequence to flatten
+   * @return flattened and reindex values
+   */
+  protected def reindex(seq: Seq[Seq[(Int, Double)]]): Seq[(Int, Double)] = {
+    val acc = new ArrayBuffer[(Int, Double)](seq.length)
+    var next = 0
+    seq.foreach(curr => {
+      var ind = next
+      curr.foreach(c => {
+        ind = c._1 + next
+        acc += ind -> c._2
+      })
+      next = ind + 1
+    })
+    acc
+  }
+
+  /**
+   * Function to convert sequences of (Index, Value) tuples into a compressed sparse vector
+   *
+   * @param seq Input sequence containing tuples of indicies and values
+   * @return the vector representation of those values
+   */
+  protected def makeSparseVector(seq: Seq[(Int, Double)]): Vector = {
+    val size = nextIndex(seq)
+    if (size == 0) Vectors.dense(Array.empty[Double])
+    else Vectors.sparse(size, seq).compressed
+  }
+
+  /**
+   * Create a one-hot vector
+   *
+   * @param pos  position to put 1.0 in the vector (1-indexed)
+   * @param size size of the one-hot vector
+   * @return one-hot vector with 1.0 in position value (1-indexed)
+   */
+  protected def oneHot(pos: Int, size: Int): Array[Double] = {
+    assert(pos - 1 < size && pos > 0, "one-hot index lies outside the bounds of the vector")
+    val ar = Array.fill[Double](size)(0.0)
+    ar(pos - 1) = 1.0
+    ar
+  }
+
+  protected implicit def booleanToDouble(v: Boolean): Double = if (v) 1.0 else 0.0
+
+}
+
+
+/**
+ * Param that decides whether or not the values that were missing are tracked
+ */
+trait TrackNullsParam extends Params {
+  final val trackNulls = new BooleanParam(
+    parent = this, name = "trackNulls", doc = "option to keep track of values that were missing"
+  )
+
+  setDefault(trackNulls, Transmogrifier.TrackNulls)
+
+  def setTrackNulls(v: Boolean): this.type = set(trackNulls, v)
+
+}
+
+trait CleanTextFun {
+  def cleanTextFn(s: String, shouldClean: Boolean): String = if (shouldClean) TextUtils.cleanString(s) else s
+}
+
+trait CleanTextMapFun extends CleanTextFun {
+
+  def cleanMap[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
+    if (!shouldCleanKey && !shouldCleanValue) m
+    else {
+      m.map {
+        case (k: String, v: String) => cleanTextFn(k, shouldCleanKey) -> cleanTextFn(v, shouldCleanValue)
+        case (k: String, v: Traversable[_]) =>
+          if (v.headOption.exists(_.isInstanceOf[String])) {
+            cleanTextFn(k, shouldCleanKey) -> v.asInstanceOf[Traversable[String]].map(cleanTextFn(_, shouldCleanValue))
+          } else {
+            cleanTextFn(k, shouldCleanKey) -> v
+          }
+        case (k: String, v) => cleanTextFn(k, shouldCleanKey) -> v
+      }.asInstanceOf[Map[String, V]]
+    }
+  }
+
+}
+
+trait TextParams extends Params {
+  self: CleanTextFun =>
+
+  final val cleanText = new BooleanParam(
+    parent = this, name = "cleanText", doc = "ignore capitalization and punctuation in grouping categories"
+  )
+
+  setDefault(cleanText, Transmogrifier.CleanText)
+
+  def setCleanText(clean: Boolean): this.type = set(cleanText, clean)
+}
+
+
+trait PivotParams extends TextParams {
+  self: CleanTextFun =>
+
+  final val topK = new IntParam(
+    parent = this, name = "topK", doc = "number of elements to keep for each vector",
+    isValid = ParamValidators.gt(0L)
+  )
+
+  setDefault(topK, Transmogrifier.TopK)
+
+  def setTopK(numberToKeep: Int): this.type = {
+    set(topK, numberToKeep)
+  }
+}
+
+trait MinSupportParam extends Params {
+
+  final val minSupport = new IntParam(
+    parent = this, name = "minSupport", doc = "minimum number of occurences an element must have to appear in pivot",
+    isValid = ParamValidators.gtEq(0L)
+  )
+
+  setDefault(minSupport, Transmogrifier.MinSupport)
+
+  def setMinSupport(min: Int): this.type = {
+    set(minSupport, min)
+  }
+
+}
+
+
+trait SaveOthersParams extends Params {
+
+  final val unseenName: Param[String] = new Param(this, "unseenName",
+    "Name to give indexes which do not have a label name associated with them.")
+
+  final def getUnseenName: String = $(unseenName)
+
+  final def setUnseenName(unseenNameIn: String): this.type = set(unseenName, unseenNameIn)
+
+  setDefault(unseenName, Transmogrifier.OtherString)
+
+}
+
+
+trait MapPivotParams extends Params {
+  self: CleanTextMapFun =>
+
+  final val cleanKeys = new BooleanParam(
+    parent = this, name = "cleanKeys", doc = "ignore capitalization and punctuation in grouping map keys"
+  )
+  setDefault(cleanKeys, Transmogrifier.CleanKeys)
+  def setCleanKeys(clean: Boolean): this.type = set(cleanKeys, clean)
+
+  final val whiteListKeys = new StringArrayParam(
+    parent = this, name = "whiteListKeys", doc = "list of map keys to include in pivot"
+  )
+  setDefault(whiteListKeys, Array[String]())
+  final def setWhiteListKeys(keys: Array[String]): this.type = set(whiteListKeys, keys)
+
+  final val blackListKeys = new StringArrayParam(
+    parent = this, name = "blackListKeys", doc = "list of map keys to exclude from pivot"
+  )
+  setDefault(blackListKeys, Array[String]())
+  final def setBlackListKeys(keys: Array[String]): this.type = set(blackListKeys, keys)
+
+  protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
+    val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)
+    val (whiteList, blackList) = (
+      $(whiteListKeys).map(cleanTextFn(_, shouldCleanKey)),
+      $(blackListKeys).map(cleanTextFn(_, shouldCleanKey))
+    )
+    if (whiteList.nonEmpty) {
+      map.filter { case (k, v) => whiteList.contains(k) && !blackList.contains(k) }
+    } else if (blackList.nonEmpty) {
+      map.filter { case (k, v) => !blackList.contains(k) }
+    } else {
+      map
+    }
+  }
+
+
+}
+
+
+trait MapStringPivotHelper extends SaveOthersParams {
+  self: MapPivotParams =>
+
+  type MapMap = SequenceAggregators.MapMap
+  type SeqSeqTupArr = Seq[Seq[(String, Array[String])]]
+  type SeqMapMap = SequenceAggregators.SeqMapMap
+
+  protected implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, String]]]
+  protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
+  protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
+
+  protected def getCategoryMaps[V]
+  (
+    in: Dataset[Seq[Map[String, V]]],
+    convertToMapOfMaps: Map[String, V] => MapMap,
+    shouldCleanKeys: Boolean,
+    shouldCleanValues: Boolean
+  ): Dataset[SeqMapMap] = in.map(seq =>
+    seq.map { kc =>
+      val filteredMap = filterKeys[V](kc, shouldCleanKeys, shouldCleanValues)
+      convertToMapOfMaps(filteredMap)
+    }
+  )
+
+  protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
+    val countOccurrences: SeqMapMap = categoryMaps.select(SequenceAggregators.SumSeqMapMap(size = inputSize)).first()
+    // Top K values for each categorical input
+    countOccurrences.map {
+      _.map { case (k, v) => k ->
+        v.toArray
+          .filter(_._2 >= minSup)
+          .sortBy(-_._2)
+          .take(topK)
+          .map(_._1)
+      }.toSeq
+    }
+  }
+
+  protected def createOutputVectorMetadata
+  (
+    topValues: SeqSeqTupArr,
+    inputFeatures: Array[TransientFeature],
+    operationName: String,
+    outputName: String
+  ): OpVectorMetadata = {
+    // names of input features to store in metadata
+    val otherValueString = $(unseenName)
+    val cols = for {
+      (f, kvPairs) <- inputFeatures.zip(topValues)
+      (key, values) <- kvPairs
+      value <- values.view :+ otherValueString // view here to avoid copying the array when appending the string
+    } yield OpVectorColumnMetadata(
+      parentFeatureName = Seq(f.name),
+      parentFeatureType = Seq(f.typeName),
+      indicatorGroup = Option(key),
+      indicatorValue = Option(value)
+    )
+    OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures))
+  }
+
+}

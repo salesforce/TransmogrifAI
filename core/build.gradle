@@ -1,0 +1,23 @@
+dependencies {
+    compile project(':readers')
+    testCompile project(':testkit')
+
+    // Google libphonenumber
+    compile "com.googlecode.libphonenumber:libphonenumber:$googleLibPhoneNumberVersion"
+    compile "com.googlecode.libphonenumber:geocoder:$googleGeoCoderVersion"
+    compile "com.googlecode.libphonenumber:carrier:$googleCarrierVersion"
+
+    // Optimaize language detection
+    compile "com.github.relateiq:language-detector:$optimaizeLangDetectorVersion"
+
+    // Tika library for detecting & parsing various binary data formats
+    compile "org.apache.tika:tika-core:$tikaVersion"
+
+    // Lucene text analysis
+    compile "org.apache.lucene:lucene-analyzers-common:$luceneVersion"
+    compile "org.apache.lucene:lucene-analyzers-kuromoji:$luceneVersion"
+    compile "org.apache.lucene:lucene-suggest:$luceneVersion"
+
+    // Scopt
+    compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
+}

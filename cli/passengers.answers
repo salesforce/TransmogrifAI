@@ -1,0 +1,7 @@
+'age' - what kind of feature is this? [0] integral [1] categorical: => 0
+'gender' - what kind of feature is this? [0] text [1] categorical: => 1
+'height' - what kind of feature is this? [0] integral [1] categorical: => 0
+'weight' - what kind of feature is this? [0] integral [1] categorical: => 0
+'description' - what kind of feature is this? [0] text [1] categorical: => 0
+'boarded' - what kind of feature is this? [0] integral [1] categorical: => 1
+'recordDate' - what kind of feature is this? [0] integral [1] categorical: => 0

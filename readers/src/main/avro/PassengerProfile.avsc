@@ -1,0 +1,21 @@
+{
+  "type": "record",
+  "name": "PassengerProfile",
+  "namespace": "com.salesforce.op.test",
+  "fields": [
+    {
+      "name": "passengerId",
+      "type": [
+        "int",
+        "null"
+      ]
+    },
+    {
+      "name": "state",
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  ]
+}

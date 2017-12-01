@@ -1,0 +1,155 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ */
+
+package com.salesforce.op.stages
+
+import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
+import org.apache.spark.ml.param._
+import org.apache.spark.sql.types.{Metadata, StructType}
+
+
+/**
+ * Parameters and functionalities shared across the input features
+ */
+trait InputParams extends Params {
+
+  /**
+   * FeatureLike should not get serialized with the class since it contains a
+   * portion or the entire DAG
+   *
+   */
+  final private[op] val inputFeatures = new TransientFeatureArrayParam(
+    parent = this, name = "inputFeatures", doc = "Input features"
+  )
+  setDefault(inputFeatures, Array[TransientFeature]())
+
+  /**
+   * Checks the input length
+   *
+   * @param features input features
+   * @return true is input size as expected, false otherwise
+   */
+  protected def checkInputLength(features: Array[_]): Boolean
+
+  /**
+   * Sets input features
+   *
+   * @param features array of input features
+   * @tparam S feature like type
+   * @return this stage
+   */
+  final protected def setInputFeatures[S <: OPFeature](features: Array[S]): this.type = {
+    assert(
+      checkInputLength(features),
+      "Number of input features must match the number expected by this type of pipeline stage"
+    )
+    set(inputFeatures, features.map(TransientFeature(_)))
+    this
+  }
+
+  /**
+   * Gets the input features
+   * Note: this method IS NOT safe to use outside the driver, please use [[getTransientFeatures]] method instead
+   *
+   * @throws NoSuchElementException if the features are not set
+   * @throws RuntimeException       in case one of the features is null
+   * @return array of features
+   */
+  final def getInputFeatures(): Array[OPFeature] = {
+    if ($(inputFeatures).isEmpty) throw new NoSuchElementException("Input features are not set")
+    else $(inputFeatures).map(_.getFeature())
+  }
+
+  /**
+   * Gets an input feature
+   * Note: this method IS NOT safe to use outside the driver, please use [[getTransientFeature]] method instead
+   *
+   * @throws NoSuchElementException if the features are not set
+   * @throws RuntimeException       in case one of the features is null
+   * @return array of features
+   */
+  final def getInputFeature[T <: FeatureType](i: Int): Option[FeatureLike[T]] = {
+    val inputs = getInputFeatures()
+    if (inputs.length <= i) None else Option(inputs(i).asInstanceOf[FeatureLike[T]])
+  }
+
+  /**
+   * Gets the input Features
+   *
+   * @return input features
+   */
+  final def getTransientFeatures(): Array[TransientFeature] = $(inputFeatures)
+
+  /**
+   * Gets an input feature at index i
+   *
+   * @param i input index
+   * @return maybe an input feature
+   */
+  final def getTransientFeature(i: Int): Option[TransientFeature] = {
+    val inputs = getTransientFeatures()
+    if (inputs.length <= i) None else Option(inputs(i))
+  }
+
+  /**
+   * Input Features type
+   */
+  type InputFeatures
+
+  /**
+   * Function to convert InputFeatures to an Array of FeatureLike
+   *
+   * @return an Array of FeatureLike
+   */
+  protected implicit def inputAsArray(in: InputFeatures): Array[OPFeature]
+}
+
+/**
+ * Parameters shared across all Optimus Prime base stages
+ */
+trait OpPipelineStageParams extends InputParams {
+
+  /**
+   * Note this should be removed as a param and changed to a var if move stage reader and writer into op
+   * and out of ml. Is currently a param to prevent having the setter method be public.
+   */
+  final private[op] val outputMetadata = new MetadataParam(
+    parent = this, name = "outputMetadata", doc = "any metadata that user wants to save in the transformed DataFrame"
+  )
+
+  setDefault(outputMetadata, Metadata.empty)
+
+  final def setMetadata(m: Metadata): this.type = set(outputMetadata, m)
+
+  final def getMetadata(): Metadata = {
+    onGetMetadata()
+    $(outputMetadata)
+  }
+
+  /**
+   * Function to be called on getMetadata
+   */
+  protected def onGetMetadata(): Unit = {}
+
+  /**
+   * Note this should be removed as a param and changed to a var if move stage reader and writer into op
+   * and out of ml. Is currently a param to prevent having the setter method be public.
+   */
+  final private[op] val inputSchema = new SchemaParam(
+    parent = this, name = "inputSchema", doc = "the schema of the input data from the dataframe"
+  )
+
+  setDefault(inputSchema, new StructType())
+
+  final private[op] def setInputSchema(s: StructType): this.type = {
+    val featureNames = getInputFeatures().map(_.name)
+    val specificSchema = StructType(s.filter(f => featureNames.contains(f.name)))
+    set(inputSchema, specificSchema)
+  }
+
+  final def getInputSchema(): StructType = $(inputSchema)
+
+}

@@ -1,0 +1,167 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+        maven { url 'http://repo.spring.io/plugins-release' }
+        maven { url 'https://jitpack.io' }
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.0'
+        classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0'
+        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:4.4.18'
+      //classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.8.2'
+    }
+}
+
+if (!project.hasProperty('artifactory_contextUrl')) {
+    project.ext { artifactory_contextUrl = 'https://repo.sfiqautomation.com/artifactory' }
+}
+if (!project.hasProperty('artifactory_user')) {
+    project.ext {
+        artifactory_user = ''
+        artifactory_password = ''
+    }
+}
+
+def artifactoryCredentials = {
+    username "${artifactory_user}"
+    password "${artifactory_password}"
+}
+
+repositories {
+    maven {
+        url "${artifactory_contextUrl}/libs-release"
+        credentials artifactoryCredentials
+    }
+    maven {
+        url "${artifactory_contextUrl}/libs-snapshot"
+        credentials artifactoryCredentials
+    }
+    maven {
+        url "${artifactory_contextUrl}/plugins-release"
+        credentials artifactoryCredentials
+    }
+    maven {
+        url "${artifactory_contextUrl}/plugins-snapshot"
+        credentials artifactoryCredentials
+    }
+    mavenCentral()
+    maven { url "https://oss.sonatype.org/content/repositories/releases/" }
+    maven { url "http://maven.twttr.com/" }
+    maven { url "https://jitpack.io" }
+}
+
+apply plugin: 'application'
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: 'com.github.johnrengelman.shadow'
+//apply plugin: 'scalaStyle'
+apply plugin: 'com.commercehub.gradle.plugin.avro'
+apply from: 'spark.gradle'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+// The main class for the application plugin and is currently unused. Setting a dummy one.
+mainClassName = "com.salesforce.app.Simple" /* << MAIN_CLASS */
+
+ext {
+    scalaVersion = '$scalaVersion'
+    scalaVersionRevision = '$scalaVersionRevision'
+    junitVersion = '$junitVersion'
+    sparkVersion = '$sparkVersion'
+    scalatestVersion = '$scalatestVersion'
+    opVersion = '$opVersion'
+
+    mainClassName = 'com.salesforce.app.Simple' /* << MAIN_CLASS */
+}
+
+configurations {
+    scalaLibrary
+    scalaCompiler
+}
+
+dependencies {
+    // Scala
+    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
+    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+
+    // Spark
+    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+
+    // Optimus Prime
+    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+
+    // Test
+    testCompile ("org.scalatest:scalatest_$scalaVersion:${scalatestVersion}")
+    testCompile "junit:junit:$junitVersion"
+
+    // Avro
+    compileOnly("org.apache.avro:avro:$avroVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
+    testCompile("org.apache.avro:avro:$avroVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
+    compileOnly("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
+    testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
+
+    // Spark Avro
+    compile ("com.databricks:spark-avro_$scalaVersion:$sparkAvroVersion") { exclude group: "org.apache.avro", module: "avro" }
+
+}
+
+tasks.withType(ScalaCompile) {
+    configure(scalaCompileOptions.forkOptions) {
+        memoryMaximumSize = '1g'
+        jvmArgs = ['-XX:MaxMetaspaceSize=256m']
+    }
+}
+compileScala { scalaCompileOptions.additionalParameters = ["-optimize"] }
+compileTestScala { scalaCompileOptions.additionalParameters = ["-Yrangepos"] }
+[compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
+
+jar {
+    manifest.attributes "Main-Class": "\$mainClassName"
+    baseName="\${rootProject.name}"
+}
+
+shadowJar {
+    zip64 = true
+    exclude 'META-INF/**'
+    manifest.attributes "Main-Class": "\$mainClassName"
+    baseName = project.name + '-with-dependencies'
+}
+
+avro {
+    createSetters = true
+    fieldVisibility = "PUBLIC_DEPRECATED"
+    outputCharacterEncoding = "UTF-8"
+    stringType = "String"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'build/generated-main-avro-java'
+        }
+    }
+}
+
+configurations.all { resolutionStrategy.cacheChangingModulesFor 0, 'seconds' }
+
+task repl(type: JavaExec) {
+    description 'Start Scala repl.'
+    main = "scala.tools.nsc.MainGenericRunner"
+    classpath = sourceSets.main.runtimeClasspath
+    standardInput System.in
+    args '-usejavacp'
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '3.5'
+    description "Sets the Gradle wrapper version to $gradleVersion."
+}

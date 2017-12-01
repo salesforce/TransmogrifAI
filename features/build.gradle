@@ -1,0 +1,18 @@
+dependencies {
+    compile project(':utils')
+
+    // Scala graph
+    compile "org.scala-graph:graph-core_$scalaVersion:$scalaGraphVersion"
+
+    // Java -> Scala converters
+    compile "com.daodecode:scalaj-collection_$scalaVersion:$scalajCollVersion"
+
+    // Sourcecode macros
+    compile "com.lihaoyi:sourcecode_$scalaVersion:$sourceCodeVersion"
+
+    // Needed for Url validation
+    compile "commons-validator:commons-validator:$commonsValidatorVersion"
+
+    // Needed for Base64 contents streaming
+    compile "commons-io:commons-io:$commonsIOVersion"
+}

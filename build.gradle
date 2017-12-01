@@ -1,0 +1,314 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+        maven { url 'http://repo.spring.io/plugins-release' }
+        maven { url 'https://jitpack.io' }
+    }
+    dependencies {
+        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
+    id 'org.scoverage' version '2.1.0'
+    id 'com.jfrog.artifactory' version '3.1.1'
+    id 'com.github.jk1.dependency-license-report' version '0.3.11'
+    id 'net.minecrell.licenser' version '0.3'
+    id 'com.github.unafraid.gradle.git-repo-plugin' version '2.0.4'
+}
+
+apply from: 'gradle/artifactory.gradle'
+apply from: 'gradle/git-properties.gradle'
+
+
+def allProjs = allprojects - project(':templates').subprojects - project(':docs')
+def subProjs = subprojects - project(':templates').subprojects - project(':docs')
+
+// distribute to all projects
+ext.subProjs = subProjs
+
+configure(allProjs) {
+
+    apply plugin: 'application'
+    apply plugin: 'java'
+    apply plugin: 'scala'
+    // apply plugin: 'findbugs'
+    apply plugin: 'org.scoverage'
+    apply plugin: 'com.github.johnrengelman.shadow'
+    apply plugin: 'scalaStyle'
+    apply plugin: 'maven'
+    apply plugin: 'maven-publish'
+    apply plugin: 'com.jfrog.artifactory'
+    apply plugin: 'com.commercehub.gradle.plugin.avro'
+    apply plugin: 'net.minecrell.licenser'
+    apply plugin: 'com.github.jk1.dependency-license-report'
+    apply plugin: 'com.github.unafraid.gradle.git-repo-plugin'
+
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
+
+    // Max: Set this to the main class for cli.
+    // Could not figure out how to configure it just for the cli subproject
+    mainClassName = "com.salesforce.op.cli.CLI"
+
+    ext {
+        scalaVersion = '2.11'
+        scalaVersionRevision = '8'
+        scalaTestVersion = '3.0.0'
+        scalaCheckVersion = '1.13.5'
+        junitVersion = '4.11'
+        avroVersion = '1.7.7'
+        sparkVersion = '2.1.1'
+        sparkAvroVersion = '3.2.0'
+        scalaGraphVersion = '1.11.2'
+        scalafmtVersion = '1.0.0-RC1'
+        hadoopVersion = 'hadoop2'
+        scalajCollVersion = '0.1.2'
+        jodaTimeVersion = '2.9.4'
+        jodaConvertVersion = '1.8.1'
+        algebirdVersion = '0.12.3'
+        jacksonVersion = '2.7.3'
+        luceneVersion = '7.1.0'
+        enumeratumVersion = '1.4.12'
+        scoptVersion = '3.5.0'
+        googleLibPhoneNumberVersion = '8.8.5'
+        googleGeoCoderVersion = '2.82'
+        googleCarrierVersion = '1.72'
+        chillAvroVersion = '0.8.0'
+        reflectionsVersion = '0.9.11'
+        collectionsVersion = '3.2.2'
+        optimaizeLangDetectorVersion = '0.7.1'
+        tikaVersion = '1.16'
+        sparkTestingBaseVersion = '2.1.0_0.6.0'
+        sourceCodeVersion = '0.1.3'
+        pegdownVersion = '1.4.2'
+        commonsValidatorVersion = '1.6'
+        commonsIOVersion = '2.6'
+
+        mainClassName = 'com.salesforce.Main'
+    }
+
+    configurations {
+        scalaLibrary
+        scalaCompiler
+    }
+
+    dependencies {
+        scoverage "org.scoverage:scalac-scoverage-plugin_$scalaVersion:1.1.0"
+        scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:1.1.0"
+        scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+        scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
+        compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+
+        // Spark
+        compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+        testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+        compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+        testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+        compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+        testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+
+        // Test
+        compileOnly "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
+        testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
+        compileOnly "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
+        testCompile "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
+        testCompile ("com.holdenkarau:spark-testing-base_$scalaVersion:$sparkTestingBaseVersion") { transitive = false }
+        testCompile "junit:junit:$junitVersion"
+        testRuntime "org.pegdown:pegdown:$pegdownVersion"
+    }
+
+    configurations.all {
+        resolutionStrategy.force "commons-collections:commons-collections:$collectionsVersion"
+    }
+
+    tasks.withType(ScalaCompile) {
+        configure(scalaCompileOptions.forkOptions) {
+            memoryMaximumSize = '1g'
+            jvmArgs = ['-XX:MaxMetaspaceSize=256m']
+        }
+    }
+    compileScala {
+        scalaCompileOptions.additionalParameters = [
+            "-optimize", "-feature", "-language:implicitConversions", "-language:existentials"
+        ]
+    }
+    compileTestScala {
+        scalaCompileOptions.additionalParameters = ["-Yrangepos"]
+    }
+    [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
+
+    jar {
+        manifest.attributes "Main-Class": "$mainClassName"
+        baseName = "${rootProject.name}"
+    }
+
+    shadowJar {
+        zip64 = true
+        exclude 'META-INF/**'
+        baseName = jar.baseName
+    }
+    shadowJar.dependsOn(createGitProperties)
+
+    scalaStyle {
+        configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
+        includeTestSourceDirectory = true
+        source = "src/main/scala"
+        testSource = "src/test/scala"
+    }
+    compileScala.dependsOn(scalaStyle)
+
+    avro {
+        createSetters = true
+        fieldVisibility = "PUBLIC_DEPRECATED"
+        outputCharacterEncoding = "UTF-8"
+        stringType = "String"
+    }
+
+    sourceSets {
+        main {
+            java {
+                srcDir 'build/generated-main-avro-java'
+            }
+        }
+        scoverage {
+            runtimeClasspath += sourceSets.main.output
+            compileClasspath += sourceSets.main.output
+        }
+        testScoverage {
+            runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+            compileClasspath += sourceSets.main.output + sourceSets.test.output
+        }
+    }
+
+    license {
+        header = rootProject.file('LICENSE.txt')
+        ignoreFailures = true
+        include '**/*.java', '**/*.scala'
+        exclude '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.java',
+                '**/com/salesforce/op/utils/io/DirectOutputCommitter.java',
+                '**/org/apache/spark/ml/tuning/OpCrossValidator.scala',
+                '**/org/apache/spark/ml/tuning/OpTrainValidationSplit.scala',
+                '**/com/fasterxml/jackson/module/scala/**',
+                '**/templates/**', '**/resources/**'
+    }
+
+    /* findbugs {
+        toolVersion = '3.0.1'
+        sourceSets = [sourceSets.main]
+        ignoreFailures = true
+        reportsDir = file("$project.buildDir/reports/findbugs")
+        effort = 'max'
+        reportLevel = 'low'
+        includeFilter = file("$rootProject.projectDir/gradle/findbugs-include.xml")
+        excludeFilter = file("$rootProject.projectDir/gradle/findbugs-exclude.xml")
+    } */
+
+    task runMain(type: JavaExec) {
+        description 'Run a main class, i.e.: runMain -Dmain=MyMainClass -Dargs="arg1 arg2 arg3"'
+        main = System.getProperty("main")
+        classpath = sourceSets.main.runtimeClasspath
+        systemProperties = System.getProperties()
+        args = System.getProperty("args", "") == "" ? new LinkedList<String>() : Arrays.asList(System.getProperty("args").split(" "))
+    }
+
+    task repl(type: JavaExec) {
+        description 'Start Scala repl.'
+        main = "scala.tools.nsc.MainGenericRunner"
+        classpath = sourceSets.main.runtimeClasspath + configurations.scalaCompiler
+        standardInput System.in
+        args '-usejavacp'
+    }
+
+    task classpath {
+        doLast {
+            description 'Print project classpath.'
+            println sourceSets.main.runtimeClasspath.asPath
+        }
+    }
+
+    //****************************************************************************************************
+    // Publish to Github repository as a maven repo:
+    //    ./gradlew publishToGithub -Dorg.ajoberstar.grgit.auth.ssh.private=~/.ssh/id_rsa
+    //
+    // Then repo can be used as a maven repository:
+    //    repositories {
+    //        maven {
+    //            url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
+    //            credentials {
+    //                username "<YOUR_PERSONAL_ACCESS_TOKEN" // Generate one here - https://goo.gl/ANZ9oz
+    //                password "" // leave the password empty
+    //            }
+    //            authentication { digest(BasicAuthentication) }
+    //        }
+    //    }
+    gitPublishConfig {
+        org = 'salesforce'
+        repo = 'op'
+        upstream = 'origin'
+        branch = 'mvn-repo'
+    }
+    //****************************************************************************************************
+}
+
+task wrapper(type: Wrapper) {
+    description "Sets the Gradle wrapper version to $gradleVersion."
+    gradleVersion = '4.1'
+}
+
+task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
+    description 'Aggregates scoverage reports of all subprojects.'
+}
+
+artifactoryPublish {
+    doFirst {
+        println "Overriding repository based on project version (snapshot/release) version=$project.version"
+        clientConfig.publisher.repoKey = "libs-${project.version.endsWith('-SNAPSHOT') ? 'snapshot' : 'release'}-local"
+        println("Publishing to ${clientConfig.publisher.repoKey}")
+    }
+}
+
+configure(subProjs) {
+    apply from: "$rootProject.projectDir/gradle/tests.gradle"
+    apply from: "$rootProject.projectDir/gradle/spark.gradle"
+
+    jar.baseName = "$rootProject.name-$project.name"
+
+    publishing {
+        publications {
+            mavenJava(MavenPublication) {
+                artifactId "${jar.baseName}_$scalaVersion"
+                from components.java
+                artifact sourcesJar { classifier 'sources' }
+            }
+        }
+        repositories {
+            maven {
+                url "file://${gitPublishConfig.home}/${gitPublishConfig.org}/${gitPublishConfig.repo}/releases"
+            }
+        }
+    }
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+    sourcesJar.baseName = jar.baseName
+
+    artifacts { archives sourcesJar }
+
+    artifactoryPublish.dependsOn(jar, sourcesJar)
+}
+
+// Skip publishing the root project
+artifactoryPublish.skip = true
+
+
+// Send the version number to TeamCity
+if (System.env.TEAMCITY_VERSION) {
+    println("##teamcity[setParameter name='env.OP_VERSION' value='$project.version']")
+}

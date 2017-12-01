@@ -1,0 +1,26 @@
+{
+  "stageParams": {
+    "TestClass1": {
+      "param1": 11,
+      "param2": "blarg",
+      "param3": false
+    },
+    "TestClass2": {
+      "param1": [
+        "a",
+        "b",
+        "c"
+      ],
+      "param2": 0.25
+    }
+  },
+  "customParams": {
+    "a": 1,
+    "b": 2
+  },
+  "readerParams": {
+    "Passenger": {}
+  },
+  "customTagName": "myTag"
+}
+
