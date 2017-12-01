@@ -1,0 +1,11 @@
+{
+  "namespace": "com.salesforce.op.test",
+  "name": "SparkExample",
+  "type": "record",
+  "fields": [
+    { "name": "id", "type": "string" },
+    { "name": "label", "type": "int" },
+    { "name": "stuff", "type": "string" },
+    { "name": "gender", "type": "string" }
+  ]
+}

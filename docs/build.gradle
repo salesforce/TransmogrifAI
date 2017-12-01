@@ -1,0 +1,58 @@
+plugins {
+    id 'org.jbake.site' version '1.0.0'
+    id 'java'
+    id 'scala'
+}
+
+jbake {
+    srcDirName = 'sources'
+    destDirName = 'site'
+}
+
+configurations {
+    webServer
+}
+
+dependencies {
+    compile 'org.nanohttpd:nanohttpd-webserver:2.3.1'
+
+    // This lets us run a simple static http server basically for free
+    webServer 'org.nanohttpd:nanohttpd-webserver:2.3.1'
+
+    // make the scala plugin happy
+    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+}
+
+task allScaladoc(type: ScalaDoc) {
+    group 'Documentation'
+    description 'Generates Scaladoc for the main source code of all subprojects.'
+    title 'Optimus Prime'
+    source rootProject.subProjs.collect { it.sourceSets.main.allJava + it.sourceSets.main.allScala }
+    classpath = files(rootProject.subProjs.collect { it.sourceSets.main.compileClasspath })
+    destinationDir = file("build/site/scaladoc")
+}
+
+task buildDocs(dependsOn: [bake, allScaladoc]) {
+    group 'Documentation'
+    description = "Build Optimus Prime documentation"
+}
+
+task serve(type: JavaExec) {
+    def port = 3000
+    def host = 'localhost'
+    description = "Serve the Optimus Prime documentation on http://$host:$port"
+    classpath = configurations.webServer
+    main = 'fi.iki.elonen.SimpleWebServer'
+
+    args = ['--dir', project.file('build/site'), '--host', host, '--port', port, '--quiet']
+    // make stdin an InputStream that never reads so that the server doesn't close
+    standardInput = new InputStream() {
+        @Override
+        int read() throws IOException {
+            while(true) {}
+        }
+    }
+    doFirst {
+        println("Starting server at http://$host:$port, Ctrl-C to stop")
+    }
+}

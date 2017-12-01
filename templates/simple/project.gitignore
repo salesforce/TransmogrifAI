@@ -1,0 +1,17 @@
+classes/
+build/
+target/
+/out/
+
+logs/
+
+.idea_modules/
+.idea/*
+*.ipr
+*.iws
+*.iml
+*.swp
+
+*.DS_Store
+.gradle
+!gradle/wrapper/gradle-wrapper.jar

@@ -1,0 +1,18 @@
+#!/bin/sh
+
+CUSTOM_PROJECT=$1
+
+if [ -z "$CUSTOM_PROJECT" ]; then
+    PROJECT="core"
+else
+    PROJECT=$CUSTOM_PROJECT
+fi
+
+echo "Compiling '$PROJECT' project..."
+./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=true $PROJECT:compileScala -q
+
+if [ $? == 0 ]; then
+  CLASSPATH=$(./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false $PROJECT:classpath -q)
+  CP=$(echo $CLASSPATH | grep '/' | tr '\n ' ':' | tr ':' '\n' | sort | uniq | tr '\n' ':')
+  scala -Dscala.color -J-Xmx8g -J-XX:+UseG1GC -J-XX:MaxGCPauseMillis=200 -J-XX:InitiatingHeapOccupancyPercent=70 -classpath $CP
+fi

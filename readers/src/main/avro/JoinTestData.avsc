@@ -1,0 +1,18 @@
+{
+  "type" : "record",
+  "name" : "JoinTestData",
+  "namespace" : "com.salesforce.op.test",
+  "fields" : [ {
+    "name" : "sparkId",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "timestamp",
+    "type" : [ "long", "null" ]
+  }, {
+    "name" : "description",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "id",
+    "type" : [ "double", "null" ]
+  }]
+}

@@ -1,0 +1,93 @@
+dependencies {
+    // scopt
+    compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
+
+    // scalafmt
+    compile "com.geirsson:scalafmt-core_$scalaVersion:$scalafmtVersion"
+
+    // Reflections
+    compile "org.reflections:reflections:$reflectionsVersion"
+
+    testCompile project(':utils')
+
+    compile project(':features')
+
+    // avro
+    compile("org.apache.avro:avro:$avroVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
+}
+
+ext {
+    templateResourcesDir = "$project.buildDir/template-resources"
+}
+
+shadowJar { baseName = jar.baseName }
+
+task copySpark(type: Copy) {
+    from '../templates/simple/gradle'
+    into "$templateResourcesDir/templates/simple/gradle"
+    // shadowJar STILL expands jars into the shadow jar.. this prevents that
+    rename { String fileName ->
+        fileName.replace(".jar", ".notajar")
+    }
+}
+
+task copyTools(type: Copy) {
+
+    from '../templates/simple'
+    into "$templateResourcesDir/templates/simple"
+    include "**/gradlew"
+    include "**/spark.gradle"
+    exclude "**/*.gradle.template"
+
+}
+
+task copyLocalTemplates(type: Copy) {
+    from 'src/main/scala/com/salesforce/op/cli/gen/templates'
+    into "$templateResourcesDir/templates"
+    include "*Template.scala"
+}
+
+task copyTemplates(type: Copy) {
+
+    from '../templates'
+    into "$templateResourcesDir/templates"
+    exclude '**/*.jar'
+    exclude '**/gradle-wrapper.properties'
+    exclude 'build/'
+    exclude '*/build/'
+    exclude "*/gradle/*"
+    exclude '**/gradlew'
+    exclude "**/spark.gradle"
+    rename { String fileName ->
+        fileName.replace(".gradle.template", ".gradle")
+    }
+    expand([
+            artifactory_user: '$artifactory_user',
+            artifactory_password: '$artifactory_password',
+            artifactory_contextUrl: '$artifactory_contextUrl',
+            databaseHostname: 'db.company.com',
+            version: scalaVersion,
+            scalaVersion: scalaVersion,
+            scalaVersionRevision: scalaVersionRevision,
+            scalatestVersion: '3.0',
+            junitVersion: junitVersion,
+            sparkVersion: sparkVersion,
+            avroVersion: avroVersion,
+            sparkAvroVersion: sparkAvroVersion,
+            hadoopVersion: hadoopVersion,
+            gradleVersion: '4.1',
+            opVersion: version,
+            buildNumber: (int)(Math.random() * 1000),
+            date: new Date()
+    ])
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir "$templateResourcesDir"
+        }
+    }
+}
+
+processResources.dependsOn copyTemplates, copyTools, copySpark, copyLocalTemplates

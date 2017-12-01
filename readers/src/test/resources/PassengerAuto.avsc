@@ -1,0 +1,33 @@
+{
+  "type" : "record",
+  "name" : "AutoInferredRecord",
+  "namespace" : "salesforce",
+  "fields" : [ {
+    "name" : "passengerId",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "age",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "gender",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "height",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "weight",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "description",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "boarded",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "recordDate",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "survived",
+    "type" : [ "int", "null" ]
+  } ]
+}

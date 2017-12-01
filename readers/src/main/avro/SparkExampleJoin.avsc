@@ -1,0 +1,18 @@
+{
+  "type" : "record",
+  "name" : "SparkExampleJoin",
+  "namespace" : "com.salesforce.op.test",
+  "fields" : [ {
+    "name" : "id",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "timestamp",
+    "type" : [ "long", "null" ]
+  }, {
+    "name" : "description",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "gender",
+    "type" : [ "string", "null" ]
+  }]
+}
