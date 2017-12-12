@@ -1,0 +1,5 @@
+Index of iris
+
+02 Dec 1996      105 Index
+08 Mar 1993     4551 iris.data
+30 May 1989     2604 iris.names

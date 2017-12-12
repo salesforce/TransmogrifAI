@@ -1,0 +1,43 @@
+{
+  "type" : "record",
+  "name" : "Passenger",
+  "namespace" : "com.salesforce.hw.titanic",
+  "fields" : [ {
+    "name" : "PassengerId",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Survived",
+    "type" : [ "int", "null" ],
+    "default": 0
+  }, {
+    "name" : "Pclass",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Name",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Sex",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Age",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "SibSp",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Parch",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Ticket",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Fare",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "Cabin",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Embarked",
+    "type" : [ "string", "null" ]
+  } ]
+}
