@@ -155,12 +155,14 @@ You can simply add OP as a regular dependency to your existing project. Example 
 ```gradle
 repositories {
     maven {
-        url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
-        credentials {
-            username "<YOUR_PERSONAL_ACCESS_TOKEN" // Generate one here - https://goo.gl/ANZ9oz
-            password "" // leave the password empty
-        }
-        authentication { digest(BasicAuthentication) }
+       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
+       credentials {
+           // Generate github api token here - https://goo.gl/ANZ9oz
+           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
+           username = System.getenv("GITHUB_API_TOKEN")
+           password "" // leave the password empty
+       }
+       authentication { digest(BasicAuthentication) }
     }
 }
 ext {
