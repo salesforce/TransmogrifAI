@@ -10,12 +10,12 @@ In addition, there are two examples of more complex kinds of data preparation th
 1) An example that computes time series aggregations and joins `com.salesforce.hw.dataprep.JoinsAndAggregates`
 2) An example that computes conditional aggregations `com.salesforce.hw.dataprep.ConditionalAggregation`
 
-Each project can be either be run with the gradle task, `sparkSubmit` (**recommended**) or with the standard `spark-submit` command. We show examples of running the Titanic case with both gradle and spark-submit for completeness, but the rest of the instructions are for gradle only since that is the recommended submission method (it defines many other useful spark parameters). You should not mix submission methods (eg. don't train with the gradle task and score with spark-submit), as you may get class serialization errors. It's recommended to define an environment variable corresponding to the location of the source code to make loading data files slightly easier - for example, `export ophw=/your/path/to/helloworld`.
+Each project can be either be run with the gradle task, `sparkSubmit` (**recommended**) or with the standard `spark-submit` command. We show examples of running the Titanic case with both gradle and spark-submit for completeness, but the rest of the instructions are for gradle only since that is the recommended submission method (it defines many other useful spark parameters). You should not mix submission methods (eg. don't train with the gradle task and score with spark-submit), as you may get class serialization errors.
 
 ### Titanic Simple
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
-$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
+`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 
 ### Titanic model - run with gradle (**recommended**)
@@ -24,14 +24,14 @@ $ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=train \
 --model-location=/tmp/titanic-model \
---read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
+--read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 #### Score
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=score \
 --model-location=/tmp/titanic-model \
---read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
+--read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
 --write-location /tmp/titanic-scores"
 ```
 #### Evaluate
@@ -39,7 +39,7 @@ $ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=evaluate \
 --model-location=/tmp/titanic-model \
---read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
+--read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
 --write-location /tmp/titanic-eval \
 --metrics-location /tmp/titanic-metrics"
 ```
@@ -55,7 +55,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
   build/libs/op-helloworld-0.0.1-all.jar \
   --run-type train \
   --model-location /tmp/titanic-model \
-  --read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv
+  --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv
 ```
 #### Score
 ```shell
@@ -63,7 +63,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
   build/libs/op-helloworld-0.0.1-all.jar \
   --run-type score \
   --model-location /tmp/titanic-model \
-  --read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
+  --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
   --write-location /tmp/titanic-scores
 ```
 #### Evaluate
@@ -72,7 +72,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
   build/libs/op-helloworld-0.0.1-all.jar \
   --run-type evaluate \
   --model-location /tmp/titanic-model \
-  --read-location Passenger=$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
+  --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
   --write-location /tmp/titanic-eval \
   --metrics-location /tmp/titanic-metrics
 ```
@@ -83,21 +83,21 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
 --run-type=train "\
 --model-location=/tmp/boston-model "\
---read-location BostonHouse=$ophw/src/main/resources/BostonDataset/housing.data"
+--read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data"
 ```
 #### Score
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
 --run-type=score "\
 --model-location=/tmp/boston-model "\
---read-location BostonHouse=$ophw/src/main/resources/BostonDataset/housing.data "\
+--read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data "\
 --write-location=/tmp/boston-scores"
 ```
 #### Evaluate
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
 --run-type=evaluate "\
---read-location BostonHouse=$ophw/src/main/resources/BostonDataset/housing.data "\
+--read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data "\
 --write-location=/tmp/boston-eval "\
 --model-location=/tmp/boston-model "\
 --metrics-location=/tmp/boston-metrics"
@@ -109,14 +109,14 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
 --run-type=train \
 --model-location=/tmp/iris-model \
---read-location Iris=$ophw/src/main/resources/IrisDataset/iris.data"
+--read-location Iris=`pwd`/src/main/resources/IrisDataset/iris.data"
 ```
 #### Score
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
 --run-type=score \
 --model-location=/tmp/iris-model \
---read-location Iris=$ophw/src/main/resources/IrisDataset/bezdekIris.data \
+--read-location Iris=`pwd`/src/main/resources/IrisDataset/bezdekIris.data \
 --write-location=/tmp/iris-scores"
 ```
 #### Evaluate
@@ -125,7 +125,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 --run-type=evaluate \
 --model-location=/tmp/iris-model \
 --metrics-location=/tmp/iris-metrics \
---read-location Iris=$ophw/src/main/resources/IrisDataset/bezdekIris.data \
+--read-location Iris=`pwd`/src/main/resources/IrisDataset/bezdekIris.data \
 --write-location=/tmp/iris-eval"
 ```
 
