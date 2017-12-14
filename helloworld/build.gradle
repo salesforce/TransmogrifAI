@@ -148,9 +148,8 @@ task runMain(type: JavaExec) {
 task repl(type: JavaExec) {
     description 'Start Scala repl.'
     main = "scala.tools.nsc.MainGenericRunner"
-    classpath = sourceSets.main.runtimeClasspath
+    classpath = sourceSets.main.runtimeClasspath + configurations.scalaCompiler
     standardInput System.in
-    //noinspection GroovyAssignabilityCheck
     args '-usejavacp'
 }
 
