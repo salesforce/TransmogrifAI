@@ -24,7 +24,7 @@ repositories {
        url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
        credentials {
            // Generate github api token here - https://goo.gl/ANZ9oz
-           // and then set it as as env variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
+           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
            username = System.getenv("GITHUB_API_TOKEN")
            password "" // leave the password empty
        }
