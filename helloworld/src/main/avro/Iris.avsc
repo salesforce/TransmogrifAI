@@ -1,6 +1,7 @@
-{ "namespace" : "com.salesforce.hw.iris",
+{
   "type" : "record",
   "name" : "Iris",
+  "namespace" : "com.salesforce.hw.iris",
   "fields" : [ {
     "name" : "ID",
     "type" : [ "int", "null" ]

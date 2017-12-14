@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ */
+
 package com.salesforce.hw.iris
 
 import com.salesforce.op._

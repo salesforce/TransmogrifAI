@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ */
+
 package com.salesforce.hw.dataprep
 
 import com.salesforce.op.OpWorkflow
