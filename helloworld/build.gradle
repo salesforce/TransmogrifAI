@@ -1,0 +1,166 @@
+buildscript {
+    repositories {
+        jcenter()
+        maven { url "https://plugins.gradle.org/m2/" }
+        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+        maven { url 'http://repo.spring.io/plugins-release' }
+        maven { url 'https://jitpack.io' }
+    }
+    dependencies {
+        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
+    }
+}
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
+}
+repositories {
+    jcenter()
+    mavenCentral()
+    maven { url "https://oss.sonatype.org/content/repositories/releases/" }
+    maven { url "http://maven.twttr.com/" }
+    maven { url "https://jitpack.io" }
+    maven {
+       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
+       credentials {
+           // Generate github api token here - https://goo.gl/ANZ9oz
+           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
+           username = System.getenv("GITHUB_API_TOKEN")
+           password "" // leave the password empty
+       }
+       authentication { digest(BasicAuthentication) }
+    }
+}
+
+apply plugin: 'application'
+apply plugin: 'java'
+apply plugin: 'scala'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'scalaStyle'
+apply plugin: 'maven'
+apply plugin: 'maven-publish'
+apply plugin: 'com.commercehub.gradle.plugin.avro'
+
+apply from: 'gradle/tests.gradle'
+apply from: 'gradle/spark.gradle'
+
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+// The main class for the application plugin and is currently unused. Setting a dummy one.
+mainClassName = "com.salesforce.dummy.DummyMain"
+
+ext {
+    scalaVersion = '2.11'
+    scalaVersionRevision = '8'
+    junitVersion = '4.11'
+    sparkVersion = '2.1.1'
+    scalatestVersion = '3.0.0'
+    opVersion='3.1.2'
+    mainClassName = "com.salesforce.dummy.DummyMain"
+}
+
+//noinspection GroovyAssignabilityCheck
+configurations {
+    scalaLibrary
+    scalaCompiler
+}
+
+//noinspection GroovyAssignabilityCheck
+dependencies {
+    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
+    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+
+    // Spark
+    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+
+    // Optimus Prime
+    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+
+    // Test
+    testCompile "org.scalatest:scalatest_$scalaVersion:$scalatestVersion"
+    testCompile "junit:junit:${junitVersion}"
+}
+
+tasks.withType(ScalaCompile) {
+    configure(scalaCompileOptions.forkOptions) {
+        memoryMaximumSize = '1g'
+        jvmArgs = ['-XX:MaxMetaspaceSize=256m']
+    }
+}
+compileScala { scalaCompileOptions.additionalParameters = ["-optimize"] }
+compileTestScala { scalaCompileOptions.additionalParameters = ["-Yrangepos"] }
+[compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
+
+jar {
+    manifest.attributes "Main-Class": "$mainClassName"
+    baseName = "${rootProject.name}"
+}
+
+shadowJar {
+    zip64 = true
+    exclude 'META-INF/**'
+    baseName = jar.baseName
+}
+
+scalaStyle {
+    configLocation = "${rootProject.projectDir}/gradle/scalastyle-config.xml"
+    includeTestSourceDirectory = true
+    source = "src/main/scala"
+    testSource = "src/test/scala"
+}
+compileScala.dependsOn(scalaStyle)
+
+avro {
+    createSetters = true
+    fieldVisibility = "PUBLIC_DEPRECATED"
+    outputCharacterEncoding = "UTF-8"
+    stringType = "String"
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'build/generated-main-avro-java'
+        }
+    }
+}
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+}
+
+task runMain(type: JavaExec) {
+    description 'run a main class, i.e.: runMain -Dmain=MyMainClass -Dargs="arg1 arg2 arg3"'
+    main = System.getProperty("main")
+    classpath = sourceSets.main.runtimeClasspath
+    //noinspection GroovyAssignabilityCheck
+    systemProperties = System.getProperties()
+    args = System.getProperty("args", "") == "" ? new LinkedList<String>() : Arrays.asList(System.getProperty("args").split(" "))
+}
+
+task repl(type: JavaExec) {
+    description 'Start Scala repl.'
+    main = "scala.tools.nsc.MainGenericRunner"
+    classpath = sourceSets.main.runtimeClasspath + configurations.scalaCompiler
+    standardInput System.in
+    args '-usejavacp'
+}
+
+task classpath {
+    doLast {
+        description 'Print project classpath.'
+        println sourceSets.main.runtimeClasspath.asPath
+    }
+}
+
+task wrapper(type: Wrapper) {
+    gradleVersion = '4.1'
+    description "Sets the Gradle wrapper version to $gradleVersion."
+}

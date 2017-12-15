@@ -1,0 +1,12 @@
+xyz@salesforce.com,http://www.amazon.com/BBQGrill,,,2017-09-01::10:00:00
+xyz@salesforce.com,http://www.amazon.com/BBQGrill,,,2017-09-03::10:30:00
+xyz@salesforce.com,http://www.amazon.com/WeberGrill,,,2017-09-03::10:45:00
+xyz@salesforce.com,http://www.amazon.com/SaveBig,,,2017-09-04::08:00:00
+xyz@salesforce.com,http://www.amazon.com/BBQGrill,1234,100,2017-09-04::08:30:00
+abc@salesforce.com,http://www.amazon.com/GirlOnTrain,,,2017-09-01::08:00:00
+abc@salesforce.com,http://www.amazon.com/SaveBig,,,2017-09-01::10:00:00
+abc@salesforce.com,http://www.amazon.com/GirOnTrain,2468,15,2017-09-04::00:00:00
+lmn@salesforce.com,http://www.amazon.com/SaveBig,,,2017-09-02::08:00:00
+lmn@salesforce.com,http://www.amazon.com/LCDTv,5678,500,2017-09-03::08:00:00
+opq@salesforce.com,http://www.amazon.com/IPhone,3579,300,2017-09-04::00:00:00
+
