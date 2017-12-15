@@ -1,0 +1,66 @@
+// Based on from https://github.com/mendhak/Gradle-Travis-Colored-Output
+test {
+
+    String ANSI_BOLD_WHITE = "\u001B[0;1m"
+    String ANSI_RESET = "\u001B[0m"
+    String ANSI_RED = "\u001B[31m"
+    String ANSI_GREEN = "\u001B[32m"
+    String ANSI_YELLOW = "\u001B[33m"
+    String ANSI_WHITE = "\u001B[37m"
+    String SUCC_MARK = "[+]"
+    String SKIP_MARK = "[ ]"
+    String FAIL_MARK = "[-]"
+
+    def elapsed = { r ->
+        if (r.endTime - r.startTime >= 1000) "${(r.endTime - r.startTime) / 1000} secs"
+        else "${r.endTime - r.startTime} ms"
+    }
+
+    testLogging {
+        exceptionFormat "full"
+        showExceptions true
+        showCauses true
+        showStackTraces true
+        showStandardStreams true
+    }
+    maxParallelForks = 1
+
+
+    beforeSuite { suite ->
+        if (suite.name.startsWith("Gradle Test Executor")) return
+        if (suite.parent != null && suite.className != null) println(ANSI_BOLD_WHITE + suite.name + ANSI_RESET)
+    }
+    afterTest { descriptor, result ->
+        def indicator = ANSI_WHITE
+        if (result.failedTestCount > 0) indicator = ANSI_RED + FAIL_MARK
+        else if (result.skippedTestCount > 0) indicator = ANSI_YELLOW + SKIP_MARK
+        else indicator = ANSI_GREEN + SUCC_MARK
+
+        println("  " + indicator + " " + descriptor.name + " (${elapsed(result)})" + ANSI_RESET)
+    }
+
+    afterSuite { suite, result ->
+        if (suite.name.startsWith("Gradle Test Executor")) return
+
+        def summaryStyle = ANSI_WHITE
+        if (result.failedTestCount > 0) summaryStyle = ANSI_RED
+        else if (result.skippedTestCount > 0) summaryStyle = ANSI_YELLOW
+        else summaryStyle = ANSI_GREEN
+
+        def resultsText
+        if (suite.parent) resultsText = "Results"
+        else resultsText = "Final Results for ${suite.name.substring(16)}"
+
+        if (!suite.parent) println("-" * 120)
+        println(ANSI_BOLD_WHITE + "$resultsText: " + ANSI_RESET + summaryStyle + "${result.resultType} - "
+                + "${result.testCount} tests total, "
+                + "${result.successfulTestCount} passed, "
+                + "${result.failedTestCount} failed, "
+                + "${result.skippedTestCount} skipped "
+                + "(${elapsed(result)})" + ANSI_RESET
+        )
+        if (!suite.parent) println("-" * 120)
+        println("")
+    }
+
+}
