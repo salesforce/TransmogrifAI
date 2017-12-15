@@ -1,6 +1,6 @@
 # Hello World project for Optimus Prime apps
 
-There are five example workflows in this project:
+There are four example workflows in this project:
 1) **(start here)** A very simple classifier based on the Titanic dataset `com.salesforce.hw.OpTitanicSimple`
 2) A simple classifier based on the Titanic dataset with examples of overriding default reader behavior  - `com.salesforce.hw.titanic.OpTitanic`
 3) A simple classifier for multiclass labels on the Iris dataset - `com.salesforce.hw.iris.OpIris`
