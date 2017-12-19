@@ -1,0 +1,11 @@
+#!/bin/sh
+
+echo "Compiling project files..."
+./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=true compileScala -q
+
+echo "Starting Scala repl..."
+if [ $? == 0 ]; then
+  CLASSPATH=$(./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false classpath -q)
+  CP=$(echo $CLASSPATH | grep '/' | tr '\n ' ':' | tr ':' '\n' | sort | uniq | tr '\n' ':')
+  scala -Dscala.color -J-Xmx8g -J-XX:+UseG1GC -J-XX:MaxGCPauseMillis=200 -J-XX:InitiatingHeapOccupancyPercent=70 -classpath $CP
+fi

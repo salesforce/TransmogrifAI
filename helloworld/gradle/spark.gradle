@@ -1,0 +1,92 @@
+
+task copyLog4jToSpark(type: Copy, dependsOn: installDist) {
+    description 'copy <project>/src/main/resources/log4j.properties to SPARK_HOME/conf folder'
+    from "$project.projectDir.path/src/main/resources/log4j.properties"
+    into "$System.env.SPARK_HOME/conf"
+}
+
+task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
+    description 'build project and run a Spark submit, i.e.: <project>:sparkSubmit -Dmain=MyMainClass -Dargs="arg1 arg2 arg3"'
+    def sparkHome = "$System.env.SPARK_HOME"
+    def sparkVersion = "$sparkHome-is node determined since SPARK_HOME is not set".split("/").last().split("-").drop(1).head()
+    def wrkDir = System.getProperty("working-dir", sparkHome)
+    def verbose = System.getProperty("verbose", "true") == "true" ? ["-v"] : []
+    def master = System.getProperty("master", "local[4]")
+    def yarnResMngr = System.getProperty("yarn-res-mngr", "")
+    def deployMode = master.endsWith("cluster") ? "cluster" : (master.endsWith("client") ? "client" : System.getProperty("deploy-mode", "client"))
+    def driverCores = System.getProperty("driver-cores", "1")
+    def driverMemory = System.getProperty("driver-memory", "4G")
+    def executorCores = !master.startsWith("local") ? [ "--executor-cores", System.getProperty("executor-cores", "1") ] : []
+    def executorMemory = System.getProperty("executor-memory", "2G")
+    def extraJavaOpts = "-server -XX:hashCode=0 -XX:+UseG1GC -XX:MaxGCPauseMillis=1000 -XX:InitiatingHeapOccupancyPercent=35 -XX:MaxMetaspaceSize=256m -XX:+UseCompressedOops -XX:+DisableExplicitGC -Djava.awt.headless=true" // -Dlog4j.configuration=file:///home/hadoop/scripts/spark-log4j.properties"
+    def numExecutors = !master.startsWith("local") ? [ "--num-executors", System.getProperty("num-executors", "4") ] : []
+    def files = System.getProperty("files", "") == "" ? [] : [ "--files", System.getProperty("files")]
+    def propertiesFile = System.getProperty("properties-file", "") == "" ? [] : [ "--properties-file", System.getProperty("properties-file") ]
+    def conf = System.getProperty("conf", "") == "" ? [] : System.getProperty("conf").split(" ").collect { ["--conf", it] }.flatten()
+
+    def args = System.getProperty("args", "") == "" ? [] : Arrays.asList(System.getProperty("args").split(" "))
+    def main = System.getProperty("main", "")
+    def appName = System.getProperty("name", "$project.name:$main")
+    def buildFolder = fileTree("$project.projectDir.path/build/install/$project.name/lib")
+    def appJar = buildFolder.filter { it.isFile() && it.name.contains("$project.name") }.files.path.join(',')
+    def classPath = buildFolder.filter { it.isFile() }.files.path.join(',')
+
+    def kryoConf = ["--conf", "spark.serializer=org.apache.spark.serializer.KryoSerializer"]
+    def yarnConf = !master.startsWith("yarn") ? [] : [
+            "spark.logConf=true",
+            "spark.eventLog.enabled=true",
+            "spark.eventLog.dir=hdfs:///var/log/spark/apps",
+            "spark.driver.extraClassPath=/usr/lib/hadoop-lzo/lib/*",
+            "spark.driver.extraLibraryPath=/usr/lib64/atlas",
+            "spark.driver.extraJavaOptions=$extraJavaOpts",
+            "spark.executor.extraLibraryPath=/usr/lib64/atlas",
+            "spark.executor.extraJavaOptions=$extraJavaOpts",
+            "spark.task.maxFailures=21",
+            "spark.yarn.maxAppAttempts=3",
+            "spark.yarn.max.executor.failures=25",
+            "spark.yarn.submit.waitAppCompletion=false",
+            "spark.yarn.archive=hdfs://$yarnResMngr:8020/tmp/spark-$sparkVersion-assembly.zip",
+            "spark.dynamicAllocation.enabled=true",
+            "spark.dynamicAllocation.executorIdleTimeout=900s",
+            "spark.shuffle.service.enabled=true",
+            "spark.shuffle.io.maxRetries=120",
+            "spark.sql.avro.compression.codec=deflate",
+            "spark.sql.avro.deflate.level=6",
+            "spark.io.compression.codec=lzf",
+            "spark.hadoop.yarn.resourcemanager.hostname=$yarnResMngr",
+            "spark.hadoop.fs.defaultFS=hdfs://$yarnResMngr:8020/",
+            "spark.hadoop.fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem",
+            "spark.hadoop.fs.file.impl=org.apache.hadoop.fs.LocalFileSystem",
+            "spark.hadoop.fs.AbstractFileSystem.s3a.impl=org.apache.hadoop.fs.s3a.S3AFs",
+            "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
+            "spark.hadoop.fs.s3a.attempts.maximum=20",
+            "spark.hadoop.fs.s3a.fast.upload=true",
+            "spark.hadoop.fs.s3a.fast.buffer.size=10485760",
+            "spark.hadoop.fs.s3a.multipart.size=10485760",
+            "spark.hadoop.fs.s3a.multipart.threshold=104857600",
+            "spark.hadoop.fs.s3a.server-side-encryption-algorithm=AES256",
+            "spark.hadoop.mapred.output.compress=true",
+            "spark.hadoop.avro.output.codec=deflate",
+            "spark.hadoop.avro.mapred.deflate.level=6",
+            "spark.hadoop.validateOutputSpecs=false",
+            "spark.hadoop.mapred.output.committer.class=com.salesforce.op.utils.io.DirectOutputCommitter",
+            "spark.hadoop.spark.sql.sources.outputCommitterClass=com.salesforce.op.utils.io.DirectMapreduceOutputCommitter"
+    ].collect { ["--conf", it] }.flatten()
+
+    environment SPARK_HOME: sparkHome
+    environment HADOOP_CONF_DIR: "$sparkHome/conf"
+    environment HADOOP_USER_NAME: "hadoop"
+
+    def command = ["$sparkHome/bin/spark-submit"] + verbose +
+            ["--master", master,
+             "--deploy-mode", deployMode] + kryoConf + yarnConf +
+            ["--driver-cores", driverCores,
+             "--driver-memory", driverMemory,
+             "--executor-memory", executorMemory] + executorCores + numExecutors + propertiesFile + conf +
+            ["--class", main, "--name", appName, "--jars", classPath] + files + [ appJar ] + args
+
+    workingDir wrkDir
+    commandLine command
+    standardOutput = System.out
+    errorOutput = System.out
+}

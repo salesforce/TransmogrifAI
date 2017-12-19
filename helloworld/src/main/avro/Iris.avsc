@@ -1,0 +1,24 @@
+{
+  "type" : "record",
+  "name" : "Iris",
+  "namespace" : "com.salesforce.hw.iris",
+  "fields" : [ {
+    "name" : "ID",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "SepalLength",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "SepalWidth",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "PetalLength",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "PetalWidth",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "Class",
+    "type" : [ "string", "null" ]
+  } ]
+}
