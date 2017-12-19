@@ -1,3 +1,5 @@
 exclude:  [ Gemfile, Gemfile.lock, Procfile, Rakefile, vendor, gems]
 source: docs/build/site
 destination: _site
+jekyll_auth:
+	ssl: true
