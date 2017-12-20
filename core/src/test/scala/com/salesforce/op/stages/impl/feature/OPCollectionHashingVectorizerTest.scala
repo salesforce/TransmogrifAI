@@ -200,13 +200,11 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "be able to vectorize several columns of MultiPickList data using a shared hash space" in {
     val vectorizer = new OPCollectionHashingVectorizer[MultiPickList].setInput(top, bot)
-      .setNumFeatures((Transmogrifier.MaxNumOfFeatures / 2) + 1).setPrependFeatureName(false)
+      .setNumFeatures((TransmogrifierDefaults.MaxNumOfFeatures / 2) + 1).setPrependFeatureName(false)
     val hasher = vectorizer.hashingTF()
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
-    println(s"Transformed data: $result")
-    result.foreach(println)
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -234,7 +232,8 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
   it should "be able to vectorize several columns of TextList data using a shared hash space" in {
     val vectorizer =
       new OPCollectionHashingVectorizer[TextList].setInput(textList1, textList2)
-        .setNumFeatures((Transmogrifier.MaxNumOfFeatures / 2) + 1).setPrependFeatureName(false).setHashWithIndex(true)
+        .setNumFeatures((TransmogrifierDefaults.MaxNumOfFeatures / 2) + 1)
+        .setPrependFeatureName(false).setHashWithIndex(true)
     val hasher = vectorizer.hashingTF()
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(textListData)
@@ -263,7 +262,8 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
   it should "be able to vectorize several columns of RealMap data using a shared hash spaces" in {
     val vectorizer =
       new OPCollectionHashingVectorizer[RealMap].setInput(rm1, rm2)
-        .setNumFeatures((Transmogrifier.MaxNumOfFeatures / 2) + 1).setPrependFeatureName(false).setHashWithIndex(true)
+        .setNumFeatures((TransmogrifierDefaults.MaxNumOfFeatures / 2) + 1)
+        .setPrependFeatureName(false).setHashWithIndex(true)
     val hasher = vectorizer.hashingTF()
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(realMapData)

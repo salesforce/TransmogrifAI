@@ -6,7 +6,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.IndVal
+import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
@@ -52,14 +52,13 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Z")), IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    println(s"vectorMetadata: $vectorMetadata")
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
@@ -76,8 +75,8 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Z")), IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -100,8 +99,8 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B"))),
-      m2 -> List(IndVal(Some("Z")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
+      m2 -> List(IndColWithGroup(None, "Z"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -123,8 +122,8 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected

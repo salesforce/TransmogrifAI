@@ -59,7 +59,7 @@ class RandomIntegralTest extends FlatSpec with TestCommon with Assertions {
   Spec[RandomIntegral[Integral]] should "generate empties and distinct numbers in some range" in {
     val sut0 = RandomIntegral.integrals(100, 200)
     val sut = sut0.withProbabilityOfEmpty(0.3)
-    check(sut)
+    check(sut, i => i >= 100 && i < 200)
     sut.probabilityOfEmpty shouldBe 0.3
   }
 

@@ -37,8 +37,8 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val vectCollect = vectorized.collect(feature)
 
     for {vector <- vectCollect} {
-      vector.v.size < Transmogrifier.DefaultNumOfFeatures + (Transmogrifier.TopK + 2) * 3 shouldBe true
-      vector.v.size >= Transmogrifier.DefaultNumOfFeatures + 6 shouldBe true
+      vector.v.size < TransmogrifierDefaults.DefaultNumOfFeatures + (TransmogrifierDefaults.TopK + 2) * 3 shouldBe true
+      vector.v.size >= TransmogrifierDefaults.DefaultNumOfFeatures + 6 shouldBe true
     }
 
     val meta = vectorized.schema.toOpVectorMetadata(feature.name)
@@ -47,8 +47,8 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val history = meta.getColumnHistory()
     val cityColumns = history.filter(h =>
       h.parentFeatureOrigins.contains(city.name) &&
-        !h.indicatorValue.contains(Transmogrifier.NullString) &&
-        !h.indicatorValue.contains(Transmogrifier.OtherString)
+        !h.indicatorValue.contains(TransmogrifierDefaults.NullString) &&
+        !h.indicatorValue.contains(TransmogrifierDefaults.OtherString)
     )
     cityColumns.forall(c => c.parentFeatureName.head == c.indicatorGroup.get) shouldBe true
 

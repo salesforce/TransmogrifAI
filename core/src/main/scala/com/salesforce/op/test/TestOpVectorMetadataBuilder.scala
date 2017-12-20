@@ -5,6 +5,7 @@
 
 package com.salesforce.op.test
 
+import com.salesforce.op.FeatureHistory
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.OpPipelineStage
 import com.salesforce.op.test.TestOpVectorColumnType._
@@ -94,6 +95,29 @@ object TestOpVectorMetadataBuilder {
     stage: OpPipelineStage[_],
     fs: (OPFeature, String, List[TestOpVectorColumnType])*
   ): OpVectorMetadata = {
+    val hist = fs.map{ case (f, _, _) =>
+      f.name -> f.history().merge(FeatureHistory(Seq.empty, Seq(stage.stageName)))
+    }
+    withOpNamesAndHist(stage, hist.toMap, fs: _*)
+  }
+
+  /**
+   * Construct an [[OpVectorMetadata]] from the given stage and features, along with any columns associated with each
+   * feature. This lets the user provide the operation name for the column names, instead of it being assumed to be
+   * the stage's operation name.
+   *
+   * @param stage The stage to construct from
+   * @param hist  The history of the parent features
+   * @param fs A seq of tuples. The first element is the feature, the second element is the operation name that
+   *           produced it, and the third element is all the columns that the vectorizer should produce from that
+   *           feature
+   * @return OpVectorMetadata
+   */
+  def withOpNamesAndHist(
+    stage: OpPipelineStage[_],
+    hist: Map[String, FeatureHistory],
+    fs: (OPFeature, String, List[TestOpVectorColumnType])*
+  ): OpVectorMetadata = {
     val cols = for {
       (f, opName, colNames) <- fs.toArray
       col <- colNames
@@ -115,9 +139,7 @@ object TestOpVectorMetadataBuilder {
         case IndColWithGroup(maybeName, _) => maybeName
       }
     )
-    val hist = fs.toArray.map(f => f._1.name -> f._1.history()).toMap
     OpVectorMetadata(stage.outputName, cols, hist)
   }
-
 
 }

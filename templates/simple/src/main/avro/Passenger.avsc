@@ -1,4 +1,5 @@
 {
+  "comment_for_users" : "THIS IS A FAKE TEMPLATE PROTOTYPE, NEVER USE IT",
   "type" : "record",
   "name" : "Passenger",
   "namespace" : "com.salesforce.app.schema",

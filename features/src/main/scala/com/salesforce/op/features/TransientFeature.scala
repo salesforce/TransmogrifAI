@@ -8,6 +8,7 @@ package com.salesforce.op.features
 
 import com.salesforce.op.FeatureHistory
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.json4s.JsonAST.JValue
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods
@@ -111,6 +112,39 @@ class TransientFeature
    * @return FeatureLike[I] instance
    */
   def asFeatureLike[I <: FeatureType]: FeatureLike[I] = getFeature().asInstanceOf[FeatureLike[I]]
+
+
+  /**
+   * Transform trasient feature into column metadata for use vectors
+   * (for when each feature creates one column of a vector)
+   *
+   * @return OpVectorColumnMetadata for vector feature
+   */
+  def toColumnMetaData(): OpVectorColumnMetadata = {
+    new OpVectorColumnMetadata(
+      parentFeatureName = Seq(name),
+      parentFeatureType = Seq(typeName),
+      indicatorGroup = None, // None because this call assumes only one column is made for feature
+      indicatorValue = None) // None because value is assumed to be unchanged (no pivot or null indicator)
+    }
+
+  /**
+   * Transform transient feature into vector metadata for use vectors
+   * (for when each feature creates multiple columns of a vector) assigns indicator group to feature name since
+   * multiple columns are created from single feature - does not provide indicator values since that needs the transform
+   * information (can copy this output with known values when available)
+   *
+   * @param fieldName name of output
+   * @param size size of vector being created
+   * @return OpVectorMetadata for vector feature
+   */
+  def toVectorMetaData(size: Int, fieldName: Option[String] = None): OpVectorMetadata = {
+    val columns = (0 until size)
+      .map{ i => toColumnMetaData().copy(indicatorGroup = Option(name)) }
+      .toArray
+    val history = Map(name -> FeatureHistory(originFeatures = originFeatures, stages = stages))
+    OpVectorMetadata(fieldName.getOrElse(name), columns, history)
+  }
 
   /**
    * Convert to JObject representation without saving the underlying FeatureLike instance

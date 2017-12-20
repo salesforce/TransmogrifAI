@@ -5,17 +5,20 @@
 
 package com.salesforce.op.stages.sparkwrappers.specific
 
-import com.salesforce.op.test.{PrestigeData, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.features.types._
+import com.salesforce.op.test.{PrestigeData, TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class OpPredictorWrapperTest extends FlatSpec with TestSparkContext with PrestigeData {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val (ds, targetLabel, featureVector) = TestFeatureBuilder[Real, OPVector](
     prestigeSeq.map(p => p.prestige.toReal -> Vectors.dense(p.education, p.income, p.women).toOPVector)
@@ -49,20 +52,22 @@ class OpPredictorWrapperTest extends FlatSpec with TestSparkContext with Prestig
     val lrModel = model.getSparkMlStage().get
 
     // Print the coefficients and intercept for linear regression
-    println(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
+    log.info(s"Coefficients: ${lrModel.coefficients} Intercept: ${lrModel.intercept}")
 
     // Summarize the model over the training set and print out some metrics
     val trainingSummary = lrModel.summary
-    println(s"numIterations: ${trainingSummary.totalIterations}")
-    println(s"objectiveHistory: [${trainingSummary.objectiveHistory.mkString(",")}]")
+    log.info(s"numIterations: ${trainingSummary.totalIterations}")
+    log.info(s"objectiveHistory: [${trainingSummary.objectiveHistory.mkString(",")}]")
     trainingSummary.residuals.show()
-    println(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
-    println(s"r2: ${trainingSummary.r2}")
+    log.info(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
+    log.info(s"r2: ${trainingSummary.r2}")
     // checking r2 as a cheap way to make sure things are running as intended.
     assert(trainingSummary.r2 > 0.9)
 
-    val output = lrModel.transform(ds)
-    output.show(false)
+    if (log.isInfoEnabled) {
+      val output = lrModel.transform(ds)
+      output.show(false)
+    }
 
     lrModel
   }

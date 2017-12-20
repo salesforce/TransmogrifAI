@@ -7,11 +7,12 @@ package com.salesforce.op.cli.gen
 
 import java.io.File
 
-import com.salesforce.op.cli.gen.AvroField.ABoolean
-import com.salesforce.op.cli.gen.ProblemKind.{BinaryClassification, MultiClassification, Regression, values}
+import com.salesforce.op.cli.SchemaSource
 import org.apache.avro.Schema
 
-import collection.JavaConverters._
+import scala.collection.JavaConverters._
+import scala.io.Source
+import AvroField._
 
 /**
  * Represents a machine learning problem. The CLI infers what the problem is by looking at schema and data.
@@ -30,70 +31,45 @@ case class ProblemSchema
   idField: AvroField,
   features: List[OPRawFeature],
   schemaName: String,
-  schemaFullName: String
+  schemaFullName: String,
+  theReader: String
 )
 
 object ProblemSchema {
 
   /**
-   * Get _exactly one_ [[AvroField]] by name from a list of the schema's fields. If exactly one isn't found, exit
-   * with an error. Not sensitive to case.
-   *
-   * @param l A list of [[AvroField]]s from the schema's fields
-   * @param fieldName The name of the field we're searching for
-   * @param fieldType The type of the field we're trying to find exactly one of, typically "response" or "id"
-   * @return The [[AvroField]] representing the field we passed in
-   */
-  private def exactlyOne(l: List[AvroField], fieldName: String, fieldType: String): AvroField = {
-    l.filter { _.name.toLowerCase == fieldName } match {
-      case Nil => Ops.oops(s"$fieldType field '$fieldName' not found (ignoring case)")
-      case schema :: Nil => schema
-      case _ => Ops.oops(s"$fieldType field '$fieldName' is defined more than once in the schema (ignoring case)")
-    }
-  }
-
-  /**
    * Construct a [[ProblemSchema]] from a file containing an avro schema, the name of the response field, and the name
    * of the ID field. May prompt the user for
    *
-   * @param schemaFile The file containing an avro schema file (most likely extension .avsc)
+   * @param schemaSource Contains data schema, can come from a file, or whatever
    * @param responseFieldName The name of the response field (e.g. Passenger survived)
    * @param idFieldName The name o the ID field (e.g. PassengerId)
    * @return The Constructed [[ProblemSchema]]
    */
-  def from(ops: Ops, schemaFile: File, responseFieldName: String, idFieldName: String): ProblemSchema = {
-
-    val parser = new Schema.Parser
-    val schema = parser.parse(schemaFile)
-    if (schema.getType != Schema.Type.RECORD) {
-      Ops.oops(s"Schema '${schema.getFullName}' must be a record schema")
-    }
+  def from(ops: Ops, schemaSource: SchemaSource, responseFieldName: String, idFieldName: String): ProblemSchema = {
 
     // construct avro fields from schema
-    val fields = schema.getFields.asScala.toList.map(AvroField.from)
-    val responseFieldSchema = exactlyOne(fields, responseFieldName.toLowerCase, "Response")
-    val idFieldSchema = exactlyOne(fields, idFieldName.toLowerCase(), "Id")
-
-    val problemKind = ProblemKind.from(ops, responseFieldSchema)
+    val responseField = schemaSource.responseField(responseFieldName)
+    val problemKind = responseField.problemKind(ops)
+    val idField = schemaSource.idField(idFieldName)
 
     // construct raw features from avro fields
-    val orderedFields = responseFieldSchema +: fields.filterNot { field =>
-      field == responseFieldSchema || field == idFieldSchema
-    }
+    val orderedFields = responseField +: schemaSource.fields.diff(responseField::idField::Nil)
 
     val orf = MakeRawFeature(ops)
 
     val (responseFeature :: features) = orderedFields.map { field =>
-      orf.from(field, schema.getName, field == responseFieldSchema)
+      orf.from(field, schemaSource.name, field == responseField)
     }
 
     ProblemSchema(
       kind = problemKind,
       responseFeature = responseFeature,
-      idField = idFieldSchema,
+      idField = idField,
       features = features,
-      schemaName = schema.getName,
-      schemaFullName = schema.getFullName
+      schemaName = schemaSource.name,
+      schemaFullName = schemaSource.fullName,
+      theReader = schemaSource.theReader
     )
   }
 
@@ -139,7 +115,7 @@ sealed trait OPRawFeature {
    *
    * @return Generated code
    */
-  def buildString: String
+  def scalaCode: String
 
   /**
    * Gets the java method that Avro generates for this field. e.g. `getPassengerId` for field with name "passengerId"
@@ -158,37 +134,66 @@ sealed trait OPRawFeature {
 
 }
 
+trait TemplateBase {
+  val templateName: String
+
+  def varname(kind: String): String = s"codeGeneration_${kind}_codeGeneration"
+
+  lazy val sourceCode: String = {
+    val ins = getClass.getResourceAsStream(s"/templates/${templateName}Template.scala")
+    if (ins == null) {
+      throw new UnsupportedOperationException(
+        s"Template file ${templateName}Template.scala is missing. " +
+          "Probably you will need to rebuild the whole project."
+      )
+    }
+    val allLines = Source.fromInputStream(ins).getLines
+    val myLines = allLines
+      .dropWhile(s => !(s contains "BEGIN"))
+      .drop(1)
+      .takeWhile(s => !(s contains "END"))
+    myLines.mkString("", "\n", "\n")
+  }
+  def scalaCode: String = sourceCode
+}
+
+case class FeatureListTemplate(whats: Seq[String]) extends TemplateBase {
+  override val templateName: String = "FeatureVector"
+  val ListName: String = varname("list")
+  val ListOfFeatures: String = whats.mkString("Seq(", ",", ")")
+  override def scalaCode: String = sourceCode.replaceAll(ListName, ListOfFeatures)
+}
+
+case class ProblemTemplate(kind: ProblemKind) extends TemplateBase {
+  override val templateName: String = kind.toString
+}
+
+abstract class FeatureTemplate(what: String)
+  extends OPRawFeature with TemplateBase {
+  override val templateName: String = what.capitalize + "Feature"
+  protected val SchemaName = "SampleObject"
+
+  val GetterName: String = varname(s"${what}Field")
+  override def scalaCode: String =
+    sourceCode.replaceAll(SchemaName, schemaName).replaceAll(GetterName, avroGetter) + s".$featureKindString"
+}
+
 case class MakeRawFeature(ops: Ops) {
 
-  case class Categorical(avroField: AvroField, schemaName: String, isResponse: Boolean) extends OPRawFeature {
-    def buildString: String =
-      s"FeatureBuilder.Categorical[$schemaName]" +
-        s".extract(o => Option(o.$avroGetter).map(_.toString).toSet[String].toCategorical).$featureKindString"
-  }
+  case class Categorical(avroField: AvroField, schemaName: String, isResponse: Boolean)
+    extends FeatureTemplate("categorical")
 
-  case class Text(avroField: AvroField, schemaName: String, isResponse: Boolean) extends OPRawFeature {
-    def buildString: String =
-      s"FeatureBuilder.Text[$schemaName]" +
-        s".extract(o => Option(o.$avroGetter).toText).$featureKindString"
-  }
+  case class Text(avroField: AvroField, schemaName: String, isResponse: Boolean)
+    extends FeatureTemplate("text")
 
-  case class Real(avroField: AvroField, schemaName: String, isResponse: Boolean) extends OPRawFeature {
-    def buildString: String =
-      s"FeatureBuilder.Real[$schemaName]" +
-        s".extract(o => Option(o.$avroGetter).map(_.toDouble).toReal).$featureKindString"
-  }
+  case class Real(avroField: AvroField, schemaName: String, isResponse: Boolean)
+    extends FeatureTemplate("real")
 
-  case class Binary(avroField: AvroField, schemaName: String, isResponse: Boolean) extends OPRawFeature {
-    def buildString: String =
-      s"FeatureBuilder.Binary[$schemaName]" +
-        s".extract(o => Option(o.$avroGetter).map(_.booleanValue).toBinary).$featureKindString"
-  }
+  case class Binary(avroField: AvroField, schemaName: String, isResponse: Boolean)
+    extends FeatureTemplate("binary")
 
-  case class Integral(avroField: AvroField, schemaName: String, isResponse: Boolean) extends OPRawFeature {
-    def buildString: String =
-      s"FeatureBuilder.Integral[$schemaName]" +
-        s".extract(o => Option(o.$avroGetter).map(_.toLong).toIntegral).$featureKindString"
-  }
+  case class Integral(avroField: AvroField, schemaName: String, isResponse: Boolean)
+    extends FeatureTemplate("integral")
 
   private val featureTypes = List("categorical", "text", "real", "binary", "integral")
 
@@ -199,7 +204,10 @@ case class MakeRawFeature(ops: Ops) {
    * @param available What available options there are
    * @return What type the user selected
    */
-  private def askFeatureType(field: AvroField, available: List[String] = featureTypes): String = {
+  private def askFeatureType(
+    field: AvroField,
+    available: List[String] = featureTypes,
+    errMsg: String): String = {
     val options = Map(
       "categorical" -> List("categorical", "cat"),
       "text" -> List("text", "string"),
@@ -209,14 +217,17 @@ case class MakeRawFeature(ops: Ops) {
     ).filter {
       case (featureType, _) => available.contains(featureType)
     }
-    ops.ask(s"'${field.name}' - what kind of feature is this?", options)
+    ops.ask(s"'${field.name}' - what kind of feature is this?", options, errMsg)
   }
 
   /**
    * Ask the user whether an integer feature is integral or categorical.
    */
   private def fromInt(field: AvroField, schemaName: String, isResponse: Boolean): OPRawFeature = {
-    askFeatureType(field, List("categorical", "integral")) match {
+    askFeatureType(
+      field,
+      List("categorical", "integral"),
+      s"Failed to determine the feature kind for $field in $schemaName") match {
       case "categorical" => Categorical(field, schemaName, isResponse)
       case "integral" => Real(field, schemaName, isResponse)
     }
@@ -226,11 +237,13 @@ case class MakeRawFeature(ops: Ops) {
    * Ask the user whether a string feature is text or categorical.
    */
   private def fromString(field: AvroField, schemaName: String, isResponse: Boolean): OPRawFeature = {
-    askFeatureType(field, List("categorical", "text")) match {
+    askFeatureType(
+      field,
+      List("categorical", "text"),
+      s"Failed to determine the feature kind for $field in $schemaName") match {
       case "categorical" => Categorical(field, schemaName, isResponse)
       case "text" => Text(field, schemaName, isResponse)
-    }
-  }
+    }  }
 
   /**
    * Construct an [[OPRawFeature]] from an avro field, the class name of the schema (e.g. Passenger), and whether
@@ -243,13 +256,13 @@ case class MakeRawFeature(ops: Ops) {
    */
   def from(field: AvroField, schemaName: String, isResponse: Boolean): OPRawFeature = {
     field match {
-      case AvroField.AEnum(_, _) => Categorical(field, schemaName, isResponse)
-      case AvroField.AInt(_, _) => fromInt(field, schemaName, isResponse)
-      case AvroField.ABoolean(_, _) => Binary(field, schemaName, isResponse)
-      case AvroField.ALong(_, _) => fromInt(field, schemaName, isResponse)
-      case AvroField.AFloat(_, _) => Real(field, schemaName, isResponse)
-      case AvroField.ADouble(_, _) => Real(field, schemaName, isResponse)
-      case AvroField.AString(_, _) => fromString(field, schemaName, isResponse)
+      case AEnum(_, _) => Categorical(field, schemaName, isResponse)
+      case AInt(_, _) => fromInt(field, schemaName, isResponse)
+      case ABoolean(_, _) => Binary(field, schemaName, isResponse)
+      case ALong(_, _) => fromInt(field, schemaName, isResponse)
+      case AFloat(_, _) => Real(field, schemaName, isResponse)
+      case ADouble(_, _) => Real(field, schemaName, isResponse)
+      case AString(_, _) => fromString(field, schemaName, isResponse)
     }
   }
 

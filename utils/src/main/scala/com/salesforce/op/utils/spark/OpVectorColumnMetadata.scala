@@ -23,11 +23,12 @@ import com.salesforce.op.utils.spark.RichMetadata.{RichMetadata => RichMeta}
  *                          shared hash space)
  * @param parentFeatureType The type of the parent feature(s) for the column
  * @param indicatorGroup    The name of the group an indicator belongs to (usually the parent feature, but in the case
- *                          of TextMapVectorizer, this includes keys in maps too). Every other vector column in the same
- *                          vector that has this same indicator group should be mutually exclusive to this one. If
- *                          this is not an indicator, or it corresponds to a null indicator, then this field is None
+ *                          of Maps, this is the keys). Every other column in the same
+ *                          vector that has this indicator group should be mutually exclusive to this one. If
+ *                          there is no grouping then this field is None
  * @param indicatorValue    An indicator for a value (null indicator or result of a pivot or whatever that value is),
- *                          otherwise [[None]]
+ *                          otherwise [[None]] eg this is none when the column is from a numberic group that is not
+ *                          pivoted
  * @param index             Index of the vector this info is associated with (this is updated when
  *                          OpVectorColumnMetadata is passed into [[OpVectorMetadata]]
  */
@@ -64,20 +65,18 @@ case class OpVectorColumnMetadata
   }
 
   /**
-   *
+   * Is this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
    * @return true if this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
    */
-  def isNullIndicator: Boolean = indicatorValue.contains(OpVectorColumnMetadata.NullString) ||
-    indicatorGroup.isDefined && indicatorValue.isEmpty
+  def isNullIndicator: Boolean =
+    indicatorValue.contains(OpVectorColumnMetadata.NullString) || indicatorGroup.isDefined && indicatorValue.isEmpty
 
   /**
    * Convert this column into Spark metadata.
    *
    * @return column Spark metadata
    */
-  def toMetadata(): Metadata = {
-    toMetadata(Array(index))
-  }
+  def toMetadata(): Metadata = toMetadata(Array(index))
 
   /**
    * Make unique name for this column
@@ -86,16 +85,35 @@ case class OpVectorColumnMetadata
   def makeColName(): String =
     s"${parentFeatureName.mkString("_")}${indicatorGroup.map("_" + _).getOrElse("")}" +
       s"${indicatorValue.map("_" + _).getOrElse("")}_$index"
+
+  /**
+   * Does column have parent features that are maps
+   * @return boolean indicating whether parent feature type sequence contains Map types
+   */
+  def hasMapParent(): Boolean = hasParentOfType("Map")
+
+  /**
+   * Does column have parent features of specified feature type
+   * @return boolean indicating whether parent feature type sequence contains type name
+   */
+  def hasParentOfType(typeName: String): Boolean = parentFeatureType.forall(_.contains(typeName))
+
+  /**
+   * Return parent features names with the key (indicatorGroup) from any map parents included in name
+   * @return Sequence of parent feature names, simple names when features are not maps, names plus keys
+   *         for columns with map parent features
+   */
+  def parentNamesWithMapKeys(): Seq[String] =
+    if (hasMapParent()) parentFeatureName.flatMap(p => indicatorGroup.map(p + "_" + _)) else parentFeatureName
+
 }
 
 object OpVectorColumnMetadata {
-
   val ParentFeatureKey = "parent_feature"
   val ParentFeatureTypeKey = "parent_feature_type"
   val IndicatorGroupKey = "indicator_group"
   val IndicatorValueKey = "indicator_value"
   val IndicesKey = "indices"
-
   val NullString = "NullIndicatorValue"
 
   /**
@@ -127,17 +145,13 @@ object OpVectorColumnMetadata {
    * @return The built [[OpVectorColumnMetadata]]
    */
   def fromMetadata(meta: Metadata): Array[OpVectorColumnMetadata] = {
-    val wrapped = RichMeta(meta).wrapped
-    val ind = wrapped.getArray[Long](IndicesKey)
+    val wrp = RichMeta(meta).wrapped
+    val ind = wrp.getArray[Long](IndicesKey)
     val info = OpVectorColumnMetadata(
-      parentFeatureName = wrapped.getArray[String](ParentFeatureKey),
-      parentFeatureType = wrapped.getArray[String](ParentFeatureTypeKey),
-      indicatorGroup =
-        if (wrapped.contains(IndicatorGroupKey)) Option(wrapped.get[String](IndicatorGroupKey))
-        else None,
-      indicatorValue =
-        if (wrapped.contains(IndicatorValueKey)) Option(wrapped.get[String](IndicatorValueKey))
-        else None
+      parentFeatureName = wrp.getArray[String](ParentFeatureKey),
+      parentFeatureType = wrp.getArray[String](ParentFeatureTypeKey),
+      indicatorGroup = if (wrp.contains(IndicatorGroupKey)) Option(wrp.get[String](IndicatorGroupKey)) else None,
+      indicatorValue = if (wrp.contains(IndicatorValueKey)) Option(wrp.get[String](IndicatorValueKey)) else None
     )
     ind.map(i => info.copy(index = i.toInt))
   }

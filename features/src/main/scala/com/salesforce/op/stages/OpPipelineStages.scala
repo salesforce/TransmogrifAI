@@ -40,6 +40,13 @@ trait OpPipelineStageBase extends OpPipelineStageParams with MLWritable {
   def operationName: String
 
   /**
+   * Stage unique name consisting of the stage operation name and uid
+   *
+   * @return stage name
+   */
+  final def stageName: String = s"${operationName}_$uid"
+
+  /**
    * Input features that will be used by the stage
    *
    * @return feature of type InputFeatures
@@ -131,6 +138,7 @@ trait OpPipelineStageBase extends OpPipelineStageParams with MLWritable {
   }
 
   final override def write: MLWriter = new OpPipelineStageWriter(this)
+
 }
 
 

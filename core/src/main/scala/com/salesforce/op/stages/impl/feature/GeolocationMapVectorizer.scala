@@ -19,42 +19,20 @@ class GeolocationMapVectorizer
   operationName: String = "vecGeoMap",
   uid: String = UID[GeolocationMapVectorizer]
 ) extends SequenceEstimator[GeolocationMap, OPVector](operationName = operationName, uid = uid)
-  with VectorizerDefaults with MapPivotParams with CleanTextMapFun {
-  private implicit val seqSetEncoder = Encoders.kryo[Seq[Set[String]]]
+  with VectorizerDefaults with MapPivotParams with CleanTextMapFun
+  with MapVectorizerFuncs[Seq[Double], GeolocationMap] {
   private implicit val seqArrayEncoder = Encoders.kryo[Seq[Array[Double]]]
 
   final val defaultValue = new DoubleArrayParam(
     parent = this, name = "defaultValue", doc = "value to give missing keys when pivoting"
   )
-  setDefault(defaultValue, Transmogrifier.DefaultGeolocation.toArray)
+  setDefault(defaultValue, TransmogrifierDefaults.DefaultGeolocation.toArray)
   def setDefaultValue(value: Geolocation): this.type = set(defaultValue, value.toArray)
-
-  private def getKeyValues(in: Dataset[Seq[GeolocationMap#Value]], shouldClean: Boolean): Seq[Seq[String]] = {
-    val inputSize = getInputFeatures().length
-    in.map(_.map(kb => filterKeys(kb, shouldClean, shouldCleanValue = false).keySet))
-      .select(SequenceAggregators.SumSeqSet(size = inputSize))
-      .first()
-      .map(_.toSeq)
-  }
-
-  private def makeVectorMeta(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
-    val meta = vectorMetadataFromInputFeatures
-    val cols = for {
-      (keys, col) <- allKeys.zip(meta.columns)
-      key <- keys
-    } yield new OpVectorColumnMetadata(
-      parentFeatureName = col.parentFeatureName,
-      parentFeatureType = col.parentFeatureType,
-      indicatorGroup = None,
-      indicatorValue = Option(key)
-    )
-    meta.withColumns(cols.toArray)
-  }
 
   def fitFn(dataset: Dataset[Seq[GeolocationMap#Value]]): SequenceModel[GeolocationMap, OPVector] = {
     val shouldClean = $(cleanKeys)
     val defValue = $(defaultValue).toSeq
-    val allKeys = getKeyValues(dataset, shouldClean)
+    val allKeys = getKeyValues(dataset, shouldClean, false)
     setMetadata(makeVectorMeta(allKeys).toMetadata)
 
     new GeolocationMapVectorizerModel(

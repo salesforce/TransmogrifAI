@@ -108,7 +108,7 @@ class RandomStreamTest extends FlatSpec with TestCommon {
 
     val stream = sut(rnd)
     (stream limit 5) shouldBe
-      List(20, -57, -48, -38, -57)
+      List(20, -7, 2, 12, -7)
   }
 
   it should "do RandomBetween" in {

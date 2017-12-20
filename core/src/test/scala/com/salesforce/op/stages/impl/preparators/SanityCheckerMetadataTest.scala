@@ -17,13 +17,11 @@ import org.scalatest.junit.JUnitRunner
 class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
   val summary = SanityCheckerSummary(
-    correlationsWLabelIsNaN = Seq(),
-    correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3)),
+    correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(), CorrelationType.Pearson),
     dropped = Seq("f1"),
     featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
       Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
     names = Seq("f1", "f2", "f3"),
-    correlationType = CorrelationType.Pearson,
     CategoricalStats(
       categoricalFeatures = Array("f4", "f5"),
       cramersVs = Array(0.45, 0.11),
@@ -38,7 +36,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     val retrieved = SanityCheckerSummary.fromMetadata(meta)
     retrieved.isInstanceOf[SanityCheckerSummary]
-    retrieved.correlationsWLabelIsNaN should contain theSameElementsAs summary.correlationsWLabelIsNaN
+    retrieved.correlationsWLabel.nanCorrs should contain theSameElementsAs summary.correlationsWLabel.nanCorrs
 
     retrieved.correlationsWLabel.featuresIn should contain theSameElementsAs summary.correlationsWLabel.featuresIn
     retrieved.correlationsWLabel.values should contain theSameElementsAs summary.correlationsWLabel.values
@@ -53,7 +51,7 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     retrieved.featuresStatistics.variance should contain theSameElementsAs summary.featuresStatistics.variance
 
     retrieved.names should contain theSameElementsAs summary.names
-    retrieved.correlationType shouldBe summary.correlationType
+    retrieved.correlationsWLabel.corrType shouldBe summary.correlationsWLabel.corrType
 
     retrieved.categoricalStats.categoricalFeatures should contain theSameElementsAs
       summary.categoricalStats.categoricalFeatures

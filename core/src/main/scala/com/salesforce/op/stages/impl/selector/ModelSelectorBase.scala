@@ -31,6 +31,7 @@ case object ModelSelectorBaseNames {
   val TrainingEval = "trainingSetEvaluationResults"
   val HoldOutEval = "testSetEvaluationResults"
   val ResampleValues = "resamplingValues"
+  val CuttValues = "cuttValues"
   val BestModelUid = "bestModelUID"
   val BestModelName = "bestModelName"
   val Positive = "positiveLabels"
@@ -39,6 +40,8 @@ case object ModelSelectorBaseNames {
   val UpSample = "upSamplingFraction"
   val DownSample = "downSamplingFraction"
   val idColName = "rowId"
+  val LabelsKept = "labelsKept"
+  val LabelsDropped = "labelsDropped"
 }
 
 
@@ -211,6 +214,9 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
   final override def fit(dataset: Dataset[_]): SelectedModel = {
     import dataset.sparkSession.implicits._
 
+    transformSchema(dataset.schema)
+    setInputSchema(dataset.schema)
+
     val datasetWithID = dataset.select(in1.name, in2.name)
       .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
       .as[(Double, Vector, Double)].persist()
@@ -242,14 +248,22 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
     splitter.collect {
       case d: DataBalancer =>
         builder.putMetadata(ModelSelectorBaseNames.ResampleValues, met)
-        if (d.getSplitData) putEvalResultsInMetadata(
+        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
           builder = builder,
           bestModel = bestModel.model,
           trainData = trainData,
           testData = Option(testData)
         )
-      case _: DataSplitter =>
-        putEvalResultsInMetadata(
+      case d: DataCutter =>
+        builder.putMetadata(ModelSelectorBaseNames.CuttValues, met)
+        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
+          builder = builder,
+          bestModel = bestModel.model,
+          trainData = trainData,
+          testData = Option(testData)
+        )
+      case d: Splitter =>
+        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
           builder = builder,
           bestModel = bestModel.model,
           trainData = trainData,
@@ -293,6 +307,9 @@ final class SelectedModel
 
   override def operationName: String = stage1OperationName
 
-  override def transform(dataset: Dataset[_]): DataFrame = getSparkMlStage().get.transform(dataset)
+  override def transform(dataset: Dataset[_]): DataFrame = {
+    setInputSchema(dataset.schema)
+    getSparkMlStage().get.transform(dataset)
+  }
 }
 

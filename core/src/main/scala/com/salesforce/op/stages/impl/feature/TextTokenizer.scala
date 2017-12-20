@@ -13,20 +13,7 @@ import org.apache.spark.ml.param._
 
 import scala.reflect.runtime.universe.TypeTag
 
-/**
- * Transformer that takes anything of type Text or lower and returns a TextList of tokens extracted from that text
- *
- * @param languageDetector a language detector instance (defaults to [[OptimaizeLanguageDetector]]
- * @param analyzer a text analyzer instance (defaults to a [[LuceneTextAnalyzer]])
- * @param uid      uid of the stage
- */
-class TextTokenizer[T <: Text]
-(
-  val languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
-  val analyzer: TextAnalyzer = TextTokenizer.Analyzer,
-  uid: String = UID[TextTokenizer[_]]
-)(implicit tti: TypeTag[T])
-  extends UnaryTransformer[T, TextList](operationName = "textToken", uid = uid) {
+trait TextTokenizerParams extends Params {
 
   /**
    * Indicates whether to attempt language detection.
@@ -79,7 +66,10 @@ class TextTokenizer[T <: Text]
   /**
    * Function used to convert input to output
    */
-  override def transformFn: T => TextList = text => {
+  def tokenizeFn(text: Text,
+    languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
+    analyzer: TextAnalyzer = TextTokenizer.Analyzer): TextList = {
+
     if (text.isEmpty) TextList.empty
     else {
       val language = {
@@ -88,8 +78,8 @@ class TextTokenizer[T <: Text]
           val threshold = $(autoDetectThreshold)
           languageDetector
             .detectLanguages(text.v.get)
-            .collect { case (lang, confidence) if confidence > threshold => lang }
-            .headOption.getOrElse(getDefaultLanguage)
+            .collectFirst { case (lang, confidence) if confidence > threshold => lang }
+            .getOrElse(getDefaultLanguage)
         }
       }
       val txt = if ($(toLowercase)) text.v.get.toLowerCase else text.v.get
@@ -99,6 +89,24 @@ class TextTokenizer[T <: Text]
     }
   }
 
+}
+
+/**
+ * Transformer that takes anything of type Text or lower and returns a TextList of tokens extracted from that text
+ *
+ * @param languageDetector a language detector instance (defaults to [[OptimaizeLanguageDetector]]
+ * @param analyzer         a text analyzer instance (defaults to a [[LuceneTextAnalyzer]])
+ * @param uid              uid of the stage
+ */
+class TextTokenizer[T <: Text]
+(
+  val languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
+  val analyzer: TextAnalyzer = TextTokenizer.Analyzer,
+  uid: String = UID[TextTokenizer[_]]
+)(implicit tti: TypeTag[T])
+  extends UnaryTransformer[T, TextList](operationName = "textToken", uid = uid) with TextTokenizerParams {
+
+  override def transformFn: T => TextList = text => super.tokenizeFn(text, languageDetector, analyzer)
 }
 
 object TextTokenizer {

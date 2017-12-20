@@ -10,7 +10,7 @@ dependencies {
     // Optimaize language detection
     compile "com.github.relateiq:language-detector:$optimaizeLangDetectorVersion"
 
-    // Tika library for detecting & parsing various binary data formats
+    // Tika library for detecting various binary data formats
     compile "org.apache.tika:tika-core:$tikaVersion"
 
     // Lucene text analysis

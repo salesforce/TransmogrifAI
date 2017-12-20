@@ -217,7 +217,7 @@ trait FeatureLike[O <: FeatureType] {
       case Success(res) => res
     }
     val stageNames = stages.toSeq
-      .map { case (stage, distance) => distance -> s"${stage.operationName}_${stage.uid}" }
+      .map { case (stage, distance) => distance -> stage.stageName }
       .sortBy { case (distance, stageName) => -distance -> stageName }
       .map { case (_, stageName) => stageName }
     FeatureHistory(originFeatures = originFeatures, stages = stageNames)
@@ -355,7 +355,7 @@ trait FeatureLike[O <: FeatureType] {
    *
    * @return feature's parent stages tree with indentation
    */
-  private[op] final def prettyParentStages: String = {
+  final def prettyParentStages: String = {
     val sb = new StringBuilder
     val stack = new scala.collection.mutable.Stack[(Int, OPFeature)]
     stack.push((0, this))

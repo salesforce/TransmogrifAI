@@ -5,7 +5,8 @@
 
 package com.salesforce.op.cli.gen
 
-import java.io.{File, FileInputStream, InputStream}
+import java.io.{File, FileInputStream, FileWriter, InputStream}
+import java.nio.file.Files
 import java.nio.file.attribute.{PosixFilePermission, PosixFilePermissions}
 
 /**
@@ -15,19 +16,19 @@ import java.nio.file.attribute.{PosixFilePermission, PosixFilePermissions}
  * @param source The source of the new file, either as a stored string or streaming
  * @param perms The permissions of the file to be created
  */
-case class ProjectFile(path: String, source: FileSource, perms: FilePermissions = FilePermissions()) {
+case class FileInProject(path: String, source: FileSource, perms: FilePermissions = FilePermissions()) {
 
   /**
    * Create a new ProjectFile by changing this project file's path.
    *
    * @param newExt The new extension
-   * @return The changed [[ProjectFile]]
+   * @return The changed [[FileInProject]]
    */
-  def withExtension(newExt: String): ProjectFile = {
+  def withExtension(newExt: String): FileInProject = {
     val lastDot = path.lastIndexOf(".")
     val oldBasename = path.substring(0, lastDot)
     val newPath = s"$oldBasename.$newExt"
-    ProjectFile(newPath, source, perms)
+    FileInProject(newPath, source, perms)
   }
 
   /**
@@ -36,9 +37,9 @@ case class ProjectFile(path: String, source: FileSource, perms: FilePermissions 
    * template.
    *
    * @param file The file to copy from
-   * @return The changed [[ProjectFile]]
+   * @return The changed [[FileInProject]]
    */
-  def replaceFrom(file: File): ProjectFile = {
+  def replaceFrom(file: File): FileInProject = {
     val oldBase = path.substring(0, path.lastIndexOf('/') + 1)
     val finalPath = oldBase + file.getName
     copy(path = finalPath, source = FileSource.Streaming(new FileInputStream(file)))
@@ -63,20 +64,32 @@ object FilePermissions {
 
 /**
  * Represents the "source" of a file that should be created in the new project.
- * This can be an InputStream (usually to stream straight from the CLI jar), or a String (usually from a rendered
- * template).
+ * This can be an InputStream (usually to stream straight from the CLI jar),
+ * or a String (usually from a rendered template).
  */
-sealed trait FileSource
+sealed trait FileSource {
+  def writeTo(file: File): Unit
+}
 
 object FileSource {
 
   /**
-   * Render the [[ProjectFile]] using an in-memory string.
+   * Render the [[FileInProject]] using an in-memory string.
    */
-  case class Str(source: String) extends FileSource
+  case class Str(source: String) extends FileSource {
+    override def writeTo(file: File): Unit = {
+      val writer = new FileWriter(file)
+      writer.write(source)
+      writer.close()
+    }
+  }
 
   /**
-   * Render the [[ProjectFile]] by copying from an input stream.
+   * Render the [[FileInProject]] by copying from an input stream.
    */
-  case class Streaming(inputStream: InputStream) extends FileSource
+  case class Streaming(inputStream: InputStream) extends FileSource {
+    override def writeTo(file: File): Unit = {
+      Files.copy(inputStream, file.toPath)
+    }
+  }
 }

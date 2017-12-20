@@ -25,11 +25,9 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
-  // scalastyle:off
   import spark.implicits._
-  // scalastyle:on
 
-  "PercentileBucketizer" should "return a minimum calibrated score of 0 and max of 99 when buckets is 100" in {
+  Spec[PercentileCalibrator] should "return a minimum calibrated score of 0 and max of 99 when buckets is 100" in {
     val data = (0 until 1000).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
     val (scoresDF, f1, f2): (DataFrame, Feature[Integral], Feature[RealNN]) = TestFeatureBuilder(data)
     val percentile = f2.toPercentile()
@@ -42,27 +40,20 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal (99.0)
   }
 
-  it should "print the calibration map" in {
+  it should "produce the calibration map metadata" in {
     Random.setSeed(123)
     val data = (0 until 3).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
     val (scoresDF, f1, f2): (DataFrame, Feature[Integral], Feature[RealNN]) = TestFeatureBuilder(data)
     val percentile = f2.toPercentile()
-
     val model = percentile.originStage.asInstanceOf[Estimator[_]].fit(scoresDF)
-
     val trans = model.asInstanceOf[UnaryModel[_, _]]
-
     val splits = trans.getMetadata().getSummaryMetadata().getStringArray(PercentileCalibrator.OrigSplitsKey)
     val scaled = trans.getMetadata().getSummaryMetadata().getStringArray(PercentileCalibrator.ScaledSplitsKey)
 
-    println(splits.toList)
-    println(scaled.toList)
-
     splits should contain theSameElementsAs
-      Array("-Infinity", "0.7231742029971469", "0.9908988967772393", "Infinity")
-    scaled should contain theSameElementsAs Array("0.0", "50.0", "99.0", "99.0")
+      Array(Double.NegativeInfinity, 0.7231742029971469, 0.9908988967772393, Double.PositiveInfinity).map(_.toString)
+    scaled should contain theSameElementsAs Array(0.0, 50.0, 99.0, 99.0).map(_.toString)
   }
-
 
   it should "return a maximum calibrated score of 99" in {
     val data = (0 until 1000).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
@@ -120,7 +111,6 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     // compute the goodness of fit against a uniform distribution (results in line with the R command `chisq.test`)
     val goodnessOfFitTestResult = Statistics.chiSqTest(Vectors.dense(histBuckets.map(_.toDouble)))
     assert(goodnessOfFitTestResult.pValue > 0.5)
-    println(s"$goodnessOfFitTestResult\n")
   }
 
   it should "return results in same order when sorted by probability or percentile" in {

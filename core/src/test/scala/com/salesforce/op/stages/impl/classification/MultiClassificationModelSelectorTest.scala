@@ -27,10 +27,16 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
 import FunctionalityForClassificationTests._
+import com.salesforce.op.stages.impl.CompareParamGrid
+import org.apache.spark.ml.param.ParamMap
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext {
+class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+
+  val log = LoggerFactory.getLogger(this.getClass)
+
   val (seed, label0Count, label1Count, label2Count) = (1234L, 5, 7, 10)
 
   import spark.implicits._
@@ -119,18 +125,16 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
       .setLogisticRegressionTol(0.005, 0.00002)
       .setLogisticRegressionThreshold(0.8)
 
-    modelSelector.stage1.sparkLR.getElasticNetParam shouldBe 0.1
-    modelSelector.stage1.sparkLR.getMaxIter shouldBe 42
-    modelSelector.stage1.sparkLR.getStandardization shouldBe true
-    modelSelector.stage1.sparkLR.getThreshold shouldBe 0.8
-
     val lrGrid = new ParamGridBuilder().addGrid(modelSelector.stage1.sparkLR.fitIntercept, Array(true, false))
       .addGrid(modelSelector.stage1.sparkLR.regParam, Array(0.1, 0.01))
       .addGrid(modelSelector.stage1.sparkLR.tol, Array(0.005, 0.00002))
+      .addGrid(modelSelector.stage1.sparkLR.elasticNetParam, Array(0.1))
+      .addGrid(modelSelector.stage1.sparkLR.maxIter, Array(42))
+      .addGrid(modelSelector.stage1.sparkLR.standardization, Array(true))
+      .addGrid(modelSelector.stage1.sparkLR.threshold, Array(0.8))
       .build
 
-    (modelSelector.stage1.lRGrid.build().toSeq zip lrGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.lRGrid.build(), lrGrid)
   }
 
   it should "set the Random Forest Params properly" in {
@@ -145,21 +149,19 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val sparkRandomForest = modelSelector.stage1.sparkRF.asInstanceOf[RandomForestClassifier]
 
-    sparkRandomForest.getMaxBins shouldBe 34
-    sparkRandomForest.getMinInfoGain shouldBe 0.1
-    sparkRandomForest.getSeed shouldBe 34L
-    sparkRandomForest.getNumTrees shouldBe 10
-
     val rfGrid =
       new ParamGridBuilder().addGrid(sparkRandomForest.impurity,
         Seq(Impurity.Entropy, Impurity.Gini).map(_.sparkName))
         .addGrid(sparkRandomForest.maxDepth, Array(7, 8))
         .addGrid(sparkRandomForest.minInstancesPerNode, Array(2, 3, 4))
         .addGrid(sparkRandomForest.subsamplingRate, Array(0.4, 0.8))
+        .addGrid(sparkRandomForest.maxBins, Array(34))
+        .addGrid(sparkRandomForest.minInfoGain, Array(0.1))
+        .addGrid(sparkRandomForest.seed, Array(34L))
+        .addGrid(sparkRandomForest.numTrees, Array(10))
         .build
 
-    (modelSelector.stage1.rFGrid.build().toSeq zip rfGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.rFGrid.build(), rfGrid)
   }
 
   it should "set the Decision Tree Params properly" in {
@@ -171,36 +173,33 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
       .setDecisionTreeSeed(34L, 56L)
 
     val sparkDecisionTree = modelSelector.stage1.sparkDT.asInstanceOf[DecisionTreeClassifier]
-    sparkDecisionTree.getImpurity shouldBe Impurity.Entropy.sparkName
-    sparkDecisionTree.getMaxDepth shouldBe 10
-    sparkDecisionTree.getMinInstancesPerNode shouldBe 5
 
     val dtGrid =
       new ParamGridBuilder()
         .addGrid(sparkDecisionTree.maxBins, Array(34, 44))
         .addGrid(sparkDecisionTree.minInfoGain, Array(0.2, 0.5))
         .addGrid(sparkDecisionTree.seed, Array(34L, 56L))
+        .addGrid(sparkDecisionTree.impurity, Array(Impurity.Entropy.sparkName))
+        .addGrid(sparkDecisionTree.maxDepth, Array(10))
+        .addGrid(sparkDecisionTree.minInstancesPerNode, Array(5))
         .build
 
-    (modelSelector.stage1.dTGrid.build().toSeq zip dtGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.dTGrid.build(), dtGrid)
   }
 
   it should "set the Naive Bayes Params properly" in {
     modelSelector.setNaiveBayesModelType(ModelType.Multinomial, ModelType.Bernoulli)
     modelSelector.setNaiveBayesSmoothing(1.5)
 
-    modelSelector.stage1.sparkNB.getSmoothing shouldBe 1.5
-
     val nbGrid =
       new ParamGridBuilder().addGrid(
         modelSelector.stage1.sparkNB.modelType,
         Array(ModelType.Multinomial, ModelType.Bernoulli).map(_.sparkName)
       )
+        .addGrid(modelSelector.stage1.sparkNB.smoothing, Array(1.5))
         .build
 
-    (modelSelector.stage1.nBGrid.build().toSeq zip nbGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.nBGrid.build(), nbGrid)
   }
 
   it should "set the thresholds correctly" in {
@@ -266,22 +265,24 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val testEstimator =
       MultiClassificationModelSelector
         .withCrossValidation(
-          Option(DataSplitter()),
+          Option(DataCutter(seed = 42, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
           numFolds = 4,
           validationMetric = Evaluators.MultiClassification.precision(),
           seed = 10L
         )
         .setModelsToTry(LogisticRegression, RandomForest)
         .setLogisticRegressionRegParam(0.1)
-        .setLogisticRegressionMaxIter(10, 100)
+        .setLogisticRegressionMaxIter(10, 20)
         .setRandomForestImpurity(Impurity.Entropy)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
 
-    println(model.getMetadata())
+    log.info(model.getMetadata().prettyJson)
 
     // evaluation metrics from test set should be in metadata
     val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
@@ -295,10 +296,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val transformedData = model.transform(data)
     val pred = model.getOutput()._1
     val justScores = transformedData.collect(pred)
-
-    justScores.zip(transformedData.collect(label))
-      .map { case (a, b) => math.abs(a.value.get - b.value.get) }
-      .sum should be <= justScores.length.toDouble
+    justScores shouldEqual transformedData.collect(label)
   }
 
   it should "fit and predict with a train validation split, even if there is no split + custom evaluator" in {
@@ -315,13 +313,19 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         .setModelsToTry(DecisionTree, RandomForest)
         .setRandomForestImpurity(Impurity.Gini)
         .setDecisionTreeMaxBins(64, 34)
+        .setDecisionTreeMinInfoGain(0)
+        .setDecisionTreeMinInstancesPerNode(1)
+        .setDecisionTreeMaxDepth(5)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val transformedData = testEstimator.fit(data).transform(data)
     val pred = testEstimator.getOutput()._1
     val justScores = transformedData.collect(pred)
-
-    justScores shouldEqual transformedData.collect(label)
+    val missed = justScores.zip(transformedData.collect(label)).map{ case (p, l) => math.abs(p.v.get - l.v.get) }.sum
+    missed < 10 shouldBe true
   }
 
   it should "fit and predict with a cross validation and compute correct metrics from trainTestEvaluators" in {
@@ -335,7 +339,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val testEstimator =
       MultiClassificationModelSelector
         .withCrossValidation(
-          Option(DataSplitter(reserveTestFraction = 0.2)),
+          Option(DataCutter(42, reserveTestFraction = 0.2, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
           numFolds = 4,
           validationMetric = Evaluators.MultiClassification.precision(),
           trainTestEvaluators = Seq(crossEntropy),
@@ -344,6 +348,12 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         .setModelsToTry(DecisionTree, RandomForest)
         .setRandomForestImpurity(Impurity.Gini)
         .setDecisionTreeMaxBins(64, 34)
+        .setDecisionTreeMinInfoGain(0)
+        .setDecisionTreeMinInstancesPerNode(1)
+        .setDecisionTreeMaxDepth(5)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)

@@ -130,7 +130,13 @@ object RandomStream {
    * @return the random stream of longs between from and to
    */
   def ofLongs(from: Long, to: Long): RandomStream[Long] =
-    RandomStream(_.nextLong % (to - from) + from)
+    RandomStream(rng => trim(rng.nextLong, from, to))
+
+  private def trim(value: Long, from: Long, to: Long) = {
+    val d = to - from
+    val candidate = value % d
+    (candidate + d) % d + from
+  }
 
   /**
    * An incrementing stream of random longs

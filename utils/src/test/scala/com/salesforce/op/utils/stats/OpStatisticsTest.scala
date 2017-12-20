@@ -73,7 +73,7 @@ class OpStatisticsTest extends FlatSpec with TestCommon {
   it should "correctly calculate pmi on a 2x2 matrix" in {
     val contingencyMatrix = new DenseMatrix(2, 2, Array[Double](10, 15, 70, 5))
     val resMap = Map(0 -> Array(-1.0, 1.5850), 1 -> Array(0.2224, -1.5850))
-    val (pmiMap, mi) = OpStatistics.mutualInfo(contingencyMatrix)
+    val (pmiMap, mi) = OpStatistics.mutualInfoWithFilter(contingencyMatrix)
 
     resMap.keySet shouldBe pmiMap.keySet
     pmiMap.keys.forall(k => pmiMap(k).zip(resMap(k)).forall(v => math.abs(v._1 - v._2) < tol))
@@ -82,7 +82,7 @@ class OpStatisticsTest extends FlatSpec with TestCommon {
 
   it should "correctly filter out empty columns from the PMI calculation and not throw an exception" in {
     val contingencyMatrix = new DenseMatrix(5, 2, Array[Double](0.0, 0.0, 0.0, 0.0, 0.0, 5.0, 6.0, 1.0, 2.0, 7.0))
-    val (pmiMap, mi) = OpStatistics.mutualInfo(contingencyMatrix)
+    val (pmiMap, mi) = OpStatistics.mutualInfoWithFilter(contingencyMatrix)
 
     // PMI should correspond to just a single label, so all the values should be zero
     pmiMap.values.forall(_.forall(_ == 0)) shouldBe true
@@ -92,7 +92,7 @@ class OpStatisticsTest extends FlatSpec with TestCommon {
   it should "correctly filter out empty rows from the PMI calculation and not throw an exception" in {
     val contingencyMatrix = new DenseMatrix(6, 2, Array[Double](0, 10, 0, 0, 15, 0, 0, 70, 0, 0, 5, 0))
     val resMap = Map(0 -> Array(-1.0, 1.5850), 1 -> Array(0.2224, -1.5850))
-    val (pmiMap, mi) = OpStatistics.mutualInfo(contingencyMatrix)
+    val (pmiMap, mi) = OpStatistics.mutualInfoWithFilter(contingencyMatrix)
 
     resMap.keySet shouldBe pmiMap.keySet
     pmiMap.keys.forall(k => pmiMap(k).zip(resMap(k)).forall(v => math.abs(v._1 - v._2) < tol))
@@ -103,7 +103,7 @@ class OpStatisticsTest extends FlatSpec with TestCommon {
     val contingencyMatrix = new DenseMatrix(4, 4, Array[Double](0, 0, 0, 0, 0, 10, 15, 0,
       0, 0, 0, 0, 0, 70, 5, 0))
     val resMap = Map(0 -> Array(-1.0, 1.5850), 1 -> Array(0.2224, -1.5850))
-    val (pmiMap, mi) = OpStatistics.mutualInfo(contingencyMatrix)
+    val (pmiMap, mi) = OpStatistics.mutualInfoWithFilter(contingencyMatrix)
 
     resMap.keySet shouldBe pmiMap.keySet
     pmiMap.keys.forall(k => pmiMap(k).zip(resMap(k)).forall(v => math.abs(v._1 - v._2) < tol))

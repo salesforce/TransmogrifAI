@@ -50,10 +50,8 @@ class IntegralVectorizer[T <: Integral]
   }
 
   private def mode(dataset: Dataset[Seq[T#Value]]): Seq[Long] = {
-    import dataset.sparkSession.implicits._
     val size = getInputFeatures().length
-    val mode = dataset.select(SequenceAggregators.ModeSeqNullInt(size)).first()
-    mode
+    dataset.select(SequenceAggregators.ModeSeqNullInt(size = size).toColumn).first()
   }
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {

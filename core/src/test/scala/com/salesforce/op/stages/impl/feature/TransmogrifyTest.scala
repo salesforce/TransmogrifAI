@@ -38,14 +38,19 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val feature = inputFeatures.transmogrify()
     val model = new OpWorkflow().setResultFeatures(feature).setReader(dataReader).train()
     val transformed = model.score(keepRawFeatures = true, keepIntermediateFeatures = true)
+    val hist = feature.parents.flatMap{ f =>
+      val h = f.history()
+      h.originFeatures.map(o => o -> FeatureHistory(Seq(o), h.stages))
+    }.toMap
 
     transformed.schema.toOpVectorMetadata(feature.name) shouldEqual
-      TestOpVectorMetadataBuilder.withOpNames(
+      TestOpVectorMetadataBuilder.withOpNamesAndHist(
         feature.originStage,
-        (gender, "vecSet", List(IndCol(Some("OTHER")), IndCol(Some(Transmogrifier.NullString)))),
+        hist,
+        (gender, "vecSet", List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))),
         (heightNoWindow, "vecReal", List(RootCol,
-          IndColWithGroup(Some(Transmogrifier.NullString), heightNoWindow.name))),
-        (weight, "vecReal", List(RootCol, IndColWithGroup(Some(Transmogrifier.NullString), weight.name)))
+          IndColWithGroup(Some(TransmogrifierDefaults.NullString), heightNoWindow.name))),
+        (weight, "vecReal", List(RootCol, IndColWithGroup(Some(TransmogrifierDefaults.NullString), weight.name)))
       )
 
     transformed.schema.findFields("heightNoWindow-weight_1-stagesApplied_OPVector").nonEmpty shouldBe true

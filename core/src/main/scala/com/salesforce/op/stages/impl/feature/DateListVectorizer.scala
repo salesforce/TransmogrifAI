@@ -126,7 +126,7 @@ class DateListVectorizer[T <: OPList[Long]]
     doc = "reference date to compare against (the milliseconds from 1970-01-01T00:00:00Z in UTC)",
     isValid = ParamValidators.gtEq(0L)
   )
-  setDefault(referenceDate, Transmogrifier.ReferenceDate.getMillis)
+  setDefault(referenceDate, TransmogrifierDefaults.ReferenceDate.getMillis)
 
   def getReferenceDate(): DateTime = new DateTime($(referenceDate), DateTimeUtils.DefaultTimeZone)
 
@@ -248,7 +248,7 @@ class DateListVectorizer[T <: OPList[Long]]
           } else {
             (0 until DateTimeConstants.HOURS_PER_DAY).map(hours => s"$hours:00")
           }
-        val allPivotNames = if ($(trackNulls)) pivotNames :+ Transmogrifier.NullString else pivotNames
+        val allPivotNames = if ($(trackNulls)) pivotNames :+ TransmogrifierDefaults.NullString else pivotNames
         val updatedCols = for {
           col <- vectorMeta.columns
           pivotValue <- allPivotNames

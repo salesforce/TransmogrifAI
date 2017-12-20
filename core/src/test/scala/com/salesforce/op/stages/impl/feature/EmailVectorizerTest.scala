@@ -54,7 +54,7 @@ class EmailVectorizerTest
     val (ds1, f1) = TestFeatureBuilder(emails.map(e => Map(emailKey -> e.value.get).toEmailMap))
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
       cleanText = CleanText, cleanKeys = CleanKeys)
-    vectorized.originStage shouldBe a[TextMapVectorizer[_]]
+    vectorized.originStage shouldBe a[TextMapPivotVectorizer[_]]
     vectorized shouldBe a[FeatureLike[_]]
 
     val result = transformAndCollect(ds1, vectorized)
@@ -65,10 +65,10 @@ class EmailVectorizerTest
 
   it should "work on multiple keys in EmailMap" in {
     val expectedMulti = Array(
-      Vectors.dense(0.0, 1.0, 0.0, 0.0, 1.0, 0.0),
-      Vectors.dense(0.0, 1.0, 0.0, 0.0, 1.0, 0.0),
-      Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0, 0.0),
-      Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+      Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0, 0.0),
+      Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0)
     )
 
     val (ds1, f1) = TestFeatureBuilder(emailMap)

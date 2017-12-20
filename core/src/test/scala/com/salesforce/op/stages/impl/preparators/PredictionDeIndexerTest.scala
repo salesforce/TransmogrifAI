@@ -18,10 +18,8 @@ class PredictionDeIndexerTest extends FlatSpec with TestSparkContext {
   val data = Seq(("a", 0.0), ("b", 1.0), ("c", 2.0)).map { case (txt, num) => (txt.toText, num.toRealNN) }
   val (ds, txtF, numF) = TestFeatureBuilder(data)
 
-
   val response = txtF.indexed()
   val indexedData = response.originStage.asInstanceOf[OpStringIndexerNoFilter[_]].fit(ds).transform(ds)
-
 
   val permutation = new UnaryLambdaTransformer[RealNN, RealNN](
     operationName = "modulo",
@@ -30,16 +28,13 @@ class PredictionDeIndexerTest extends FlatSpec with TestSparkContext {
   val pred = permutation.getOutput()
   val permutedData = permutation.transform(indexedData)
 
-
   val expected = Array("b", "c", "a").map(_.toText)
-
 
   Spec[PredictionDeIndexer] should "deindexed the feature correctly" in {
     val predDeIndexer = new PredictionDeIndexer().setInput(response, pred)
     val deIndexed = predDeIndexer.getOutput()
 
     val results = predDeIndexer.fit(permutedData).transform(permutedData).collect(deIndexed)
-
     results shouldBe expected
   }
 

@@ -141,9 +141,9 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
-      inA -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inB -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inC -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      inA -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
   }
@@ -173,9 +173,9 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
-      inA -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inB -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inC -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      inA -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
   }
@@ -206,9 +206,9 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
-      inAPer -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inBPer -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inCPer -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      inAPer -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inBPer -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inCPer -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
   }

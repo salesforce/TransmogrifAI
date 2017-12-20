@@ -12,7 +12,7 @@ import org.scalatest.{BeforeAndAfterAll, Suite}
 
 /**
  * Trait that creates a temporary directory before all tests and deletes it after all.
- * Copied from Spark test suite
+ * Modified version of Spark 2.x test suite trait
  */
 trait TempDirectoryTest extends BeforeAndAfterAll { self: Suite =>
 

@@ -23,16 +23,15 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowModelReaderWriterTest
-  extends FlatSpec with PassengerSparkFixtureTest with BeforeAndAfterEach {
+class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtureTest with BeforeAndAfterEach {
 
   implicit val jsonFormats: Formats = DefaultFormats
   val log = LoggerFactory.getLogger(this.getClass)
 
-  val workflowParams =
-    new OpParams(Map("a" -> Map("aa" -> 1, "aaa" -> 2), "b" -> Map("bb" -> 3, "bbb" -> 4)),
-      Map("test" -> new ReaderParams(Some("a"), Some(3), Map.empty)),
-      None, None, None, None, None, None, None, None, Map.empty)
+  val workflowParams = OpParams(
+    stageParams = Map("a" -> Map("aa" -> 1, "aaa" -> 2), "b" -> Map("bb" -> 3, "bbb" -> 4)),
+    readerParams = Map("test" -> new ReaderParams(Some("a"), Some(3), Map.empty))
+  )
   var saveFlowPath: String = _
   var saveModelPath: String = _
 
@@ -50,7 +49,7 @@ class OpWorkflowModelReaderWriterTest
   )
 
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
-    val model = new OpWorkflowModel(wf.uid)
+    val model = new OpWorkflowModel(wf.uid, wf.parameters)
       .setParent(wf)
       .setStages(wf.stages)
       .setFeatures(wf.resultFeatures)
@@ -72,22 +71,17 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(density)
       .setParameters(workflowParams)
-
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
   trait MultiStageFlow {
     val density = weight / height
     val weight2 = density * height
-
-    // dead branch
-    val dummy = height * height
-
+    val dummy = height * height // dead branch
     val wf = new OpWorkflow()
       .setReader(dummyReader)
       .setResultFeatures(density, weight2)
       .setParameters(workflowParams)
-
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -96,7 +90,6 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(weight)
       .setParameters(workflowParams)
-
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -108,13 +101,11 @@ class OpWorkflowModelReaderWriterTest
       operationName = "foo3",
       sparkMlStageIn = Some(scaler)
     )
-
     val scaled = height.transformWith(swEstimator)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setReader(dummyReader)
       .setResultFeatures(scaled)
-
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -253,8 +244,7 @@ class OpWorkflowModelReaderWriterTest
 
   def compareWorkflows(wf1: OpWorkflow, wf2: OpWorkflow): Unit = {
     wf1.uid shouldBe wf2.uid
-    wf1.parameters.readerParams.toString() shouldBe wf2.parameters.readerParams.toString()
-    wf1.parameters.stageParams shouldBe wf2.parameters.stageParams
+    compareParams(wf1.parameters, wf2.parameters)
     compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
@@ -262,10 +252,16 @@ class OpWorkflowModelReaderWriterTest
 
   def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
     wf1.uid shouldBe wf2.uid
-    wf1.parameters.readerParams.toString() shouldBe wf2.parameters.readerParams.toString()
-    wf1.parameters.stageParams shouldBe wf2.parameters.stageParams
+    compareParams(wf1.trainingParams, wf2.trainingParams)
+    compareParams(wf1.parameters, wf2.parameters)
     compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
+  }
+
+  def compareParams(p1: OpParams, p2: OpParams): Unit = {
+    p1.stageParams shouldBe p2.stageParams
+    p1.readerParams.toString() shouldBe p2.readerParams.toString()
+    p1.customParams shouldBe p2.customParams
   }
 }
