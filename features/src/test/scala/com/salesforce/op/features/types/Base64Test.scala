@@ -50,5 +50,13 @@ class Base64Test extends PropSpec with PropertyChecks with TestCommon {
     }
   }
 
+  property("produce a stream and map over it") {
+    forAll {
+      (s: String) =>
+        val b64 = toBase64(s.getBytes)
+        Base64(b64).mapInputStream(IOUtils.toString(_, Charset.defaultCharset())) shouldBe Some(s)
+    }
+  }
+
   def toBase64(b: Array[Byte]): String = new String(java.util.Base64.getEncoder.encode(b))
 }

@@ -16,28 +16,46 @@ import com.salesforce.op.cli.gen.ProblemKind.{BinaryClassification, MultiClassif
 /**
  * Represents a field in an Avro record. Can be nullable.
  */
-sealed trait AvroField {
+sealed trait AvroField { field =>
+
+  def schemaField: Schema.Field
 
   /**
    * Whether this schema accepts null values.
    *
    * @return Null value support as a boolean
    */
-  def nullable: Boolean
+  def isNullable: Boolean
 
   /**
    * The name of this field
    *
    * @return Field name as string
    */
-  def name: String
+  def name: String = schemaField.name
 
   /**
    * Figures out what kind of problem is it
    * @param ops environment
    * @return its problem kind
    */
-  def problemKind(ops: Ops): ProblemKind
+  def problemKind(ops: Ops): ProblemKind = {
+    if (isNullable) {
+      Ops.oops(s"Response field '$field' cannot be nullable")
+    }
+    defaultProblemKind(ops)
+  }
+
+  protected def defaultProblemKind(ops: Ops): ProblemKind
+
+  override def equals(something: Any): Boolean = something match {
+    case af: AvroField => af.name == name
+    case other => false
+  }
+
+  override def hashCode(): Int = name.hashCode
+
+  override def toString: String = getClass.getSimpleName + s"($name${if (isNullable) ", nullable"})"
 }
 
 /**
@@ -45,30 +63,30 @@ sealed trait AvroField {
  */
 object AvroField {
 
-  case class AInt(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = askKind(ops, this)
+  case class AInt(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = askKind(ops, this)
   }
-  case class ABoolean(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = BinaryClassification
+  case class ABoolean(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = BinaryClassification
   }
-  case class ALong(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = Regression
+  case class ALong(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = Regression
   }
-  case class AFloat(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = Regression
+  case class AFloat(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = Regression
   }
-  case class ADouble(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = Regression
+  case class ADouble(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = Regression
   }
-  case class AString(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind =
+  case class AString(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind =
       askKind(ops, this, List(BinaryClassification, MultiClassification))
   }
-  case class AEnum(nullable: Boolean, name: String) extends AvroField {
-    def problemKind(ops: Ops): ProblemKind = MultiClassification
+  case class AEnum(schemaField: Schema.Field, isNullable: Boolean) extends AvroField {
+    def defaultProblemKind(ops: Ops): ProblemKind = MultiClassification
   }
 
-  private val AvroTypes: Map[Schema.Type, (Boolean, String) => AvroField] =
+  private val AvroTypes: Map[Schema.Type, (Schema.Field, Boolean) => AvroField] =
     Map(
       Type.INT -> AInt,
       Type.BOOLEAN -> ABoolean,
@@ -84,23 +102,33 @@ object AvroField {
    * This is called "fromPrimitive" because it only accepts primitive avro types, not unions or records.
    *
    * @param schemaType The [[Schema.Type]] to build an avro field from
-   * @param nullable Whether the resulting field should be nullable
-   * @param name The name of the resulting field
+   * @param isNullable Whether the resulting field should be nullable
+   * @param schemaField The avro schema field
    * @return A `Some[AvroField]` if an avro field could be built.
    */
-  private def fromPrimitive(schemaType: Schema.Type, nullable: Boolean, name: String): Option[AvroField] =
-    AvroTypes.get(schemaType) map (_(nullable, name))
+  private def fromPrimitive(
+    schemaType: Schema.Type,
+    schemaField: Schema.Field,
+    isNullable: Boolean): Option[AvroField] =
+    AvroTypes.get(schemaType) map (_(schemaField, isNullable))
 
-  private def fromUnion(schema: Schema, name: String): Option[AvroField] = {
+  def typeOfNullable(schema: Schema): Option[Schema.Type] = {
     schema.getType match {
       case Schema.Type.UNION =>
         schema.getTypes.asScala.toList.map(_.getType) match {
-          case actualType::Schema.Type.NULL::_ => fromPrimitive(actualType, nullable = true, name)
-          case Schema.Type.NULL::actualType::_ => fromPrimitive(actualType, nullable = true, name)
+          case actualType :: Schema.Type.NULL :: _ => Option(actualType)
+          case Schema.Type.NULL :: actualType :: _ => Option(actualType)
           case _ => None
         }
       case _ => None
     }
+  }
+
+  private def fromUnion(schemaField: Schema.Field): Option[AvroField] = {
+    for {
+      actualType <- typeOfNullable(schemaField.schema)
+      avroField <- fromPrimitive(actualType, schemaField, isNullable = true)
+    } yield avroField
   }
 
   /**
@@ -115,10 +143,10 @@ object AvroField {
     val maybeSchema = Option(field.schema())
 
     def maybePrimitive = maybeSchema flatMap {
-      s => fromPrimitive(s.getType, nullable = false, name)
+      s => fromPrimitive(s.getType, field, isNullable = false)
     }
 
-    def maybeUnion = maybeSchema flatMap (s => fromUnion(s, name))
+    def maybeUnion = maybeSchema flatMap (s => fromUnion(field))
 
     maybePrimitive orElse maybeUnion match {
       case Some(fieldSchema) => fieldSchema

@@ -8,12 +8,13 @@ package com.salesforce.op.cli.gen
 import java.io._
 import java.nio.file.Files
 
-import com.salesforce.op.cli.GeneratorConfig
+import com.salesforce.op.cli.{AvroSchemaFromFile, GeneratorConfig}
 import com.salesforce.op.cli.gen.FileSource.{Str, Streaming}
 import org.apache.avro.Schema
 
 import scala.annotation.tailrec
-import scala.io.{Source, StdIn}
+import scala.io.Source
+import scala.Console
 
 /**
  * Does various external-related tasks
@@ -21,46 +22,32 @@ import scala.io.{Source, StdIn}
  * @param config The [[GeneratorConfig]] representing a command to generate a project
  */
 case class Ops(config: GeneratorConfig) {
-  /**
-   * The [[ProblemSchema]] for this command to generate a project. This is a lazy val so we don't prompt the user
-   * until it is actually needed.
-   */
-  lazy val schema: ProblemSchema =
-    ProblemSchema.from(this, config.schemaFile, config.response, config.idField)
-
-
 
   /**
    * Generates a project.
    */
   def run(): Unit = {
-
     // TODO only one (hard-coded) template for now. For future, can have multiple templates
     val templateName = "simple"
-    val template = ProjectTemplate.byName(templateName)(this)
+    val template = ProjectGenerator.byName(templateName)(this)
+    println(s"Starting $templateName project generation")
 
     val generalArgs = Map("APP_NAME" -> config.projName)
     val templateProps = template.props
     val allSubstitutions = generalArgs ++ templateProps
 
     val dir = config.projectDirectory
-    println(s"Generating '${config.projName}' in '${dir.getAbsolutePath}/' with template '$templateName'")
+    println(
+      s"Generating '${config.projName}' in '${dir.getAbsolutePath}/' with template '$templateName'")
 
-    template.renderAll(allSubstitutions).foreach {
-      case ProjectFile(path, source, FilePermissions(perms)) =>
+    template.renderAll(allSubstitutions) foreach {
+      case FileInProject(path, source, FilePermissions(perms)) =>
         val file = new File(dir, path)
         file.getParentFile.mkdirs()
-
-        source match {
-          case Str(s) =>
-            val writer = new FileWriter(file)
-            writer.write(s)
-            writer.close()
-          case Streaming(inputStream) => Files.copy(inputStream, file.toPath)
-        }
+        source.writeTo(file)
 
         Files.setPosixFilePermissions(file.toPath, perms)
-        println(s"Created '${file.getAbsolutePath}'")
+        println(s"  Created '${file.getAbsolutePath}'")
     }
     println("Done.")
     if (template.welcomeMessage != "") {
@@ -76,7 +63,7 @@ case class Ops(config: GeneratorConfig) {
         line <- Source.fromFile(file).getLines
         if line contains " => "
         kv = line split " => "
-      } yield kv(0).trim -> kv(1)
+      } yield kv(0).trim.toLowerCase -> kv(1)
 
       kvs.toMap
     }
@@ -84,13 +71,15 @@ case class Ops(config: GeneratorConfig) {
     map getOrElse Map[String, String]()
   }
 
-  def ask[T](message: String, options: Map[T, List[String]]): T = {
-    Ops.ask[T](message, options, answers)
+  def ask[T](question: String, options: Map[T, List[String]], errMsg: String): T = {
+    Ops.ask[T](question, options, answers) getOrElse {
+      throw new IllegalStateException(s"$errMsg\nThe question was: $question")
+    }
   }
 }
 
-trait Console {
-  protected def readLine(msg: String): String = StdIn.readLine(msg)
+trait UserIO {
+  protected def readLine(msg: String): Option[String] = Option(scala.io.StdIn.readLine(msg))
 
   /**
    * Prompt the user to pick between in an option list between choices of type `T`. The `T` returned is the value the
@@ -116,7 +105,7 @@ trait Console {
   def ask[T](
     message: String,
     options: Map[T, List[String]],
-    answers: Map[String, String] = Map.empty[String, String]): T = {
+    answers: Map[String, String] = Map.empty[String, String]): Option[T] = {
     options.collect {
       case (_, Nil) => throw new IllegalArgumentException("ask needs at least one string description per option")
     }
@@ -134,27 +123,34 @@ trait Console {
     } yield (choice.toLowerCase, value)
     val keys = normalizedOptions.keySet
     val q = message + descriptions.mkString(" ", " ", ": ")
-    // keep prompting the user until we get something
+
     val input = qna(q, keys, answers)
-    normalizedOptions(input)
+    val res = input flatMap normalizedOptions.get
+    res
   }
 
   def qna(
     question: String,
     accept: String => Boolean,
     answers: Map[String, String]
-  ): String = {
-    var answer = answers.get(question.trim) filter accept getOrElse readLine(question).toLowerCase
+  ): Option[String] = {
+    val questionSimplified = question.trim.toLowerCase
+    val fromFile = answers.keySet find questionSimplified.startsWith flatMap answers.get filter accept
 
-    if (accept(answer)) answer else qna(question, accept, answers)
+    var maybeAnswer = fromFile orElse readLine(question) map (_.toLowerCase.trim)
+
+    maybeAnswer match {
+      case Some(answer) =>
+        // keep prompting the user until we get something
+        if (accept(answer)) maybeAnswer else qna(question, accept, answers)
+      case None => None
+    }
   }
 }
 
-object Ops extends Console {
+object Ops extends UserIO {
 
   def oops(errorMsg: String): Nothing = {
     throw new IllegalArgumentException(errorMsg)
   }
-
-
 }

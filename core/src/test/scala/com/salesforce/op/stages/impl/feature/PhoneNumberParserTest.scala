@@ -6,11 +6,14 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.OpWorkflow
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryTransformer
 import com.salesforce.op.test._
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.sql
+import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -23,10 +26,10 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
   val namesAndCode = Map("US" -> "United States", "CA" -> "Canada", "ZW" -> "Zimbabwe")
   userDefParser.setCodesAndCountries(namesAndCode)
 
-  val regionCodes = namesAndCode.keys.map(_.toUpperCase()).toArray
-  val regionNames = namesAndCode.values.map(_.toUpperCase()).toArray
-  val defaultCodes = PhoneNumberParser.DefaultCountryCodes.keys.map(_.toUpperCase).toArray
-  val defaultNames = PhoneNumberParser.DefaultCountryCodes.values.map(_.toUpperCase).toArray
+  private val regionCodes = namesAndCode.keys.map(_.toUpperCase()).toArray
+  private val regionNames = namesAndCode.values.map(_.toUpperCase()).toArray
+  private val defaultCodes = PhoneNumberParser.DefaultCountryCodes.keys.map(_.toUpperCase).toArray
+  private val defaultNames = PhoneNumberParser.DefaultCountryCodes.values.map(_.toUpperCase).toArray
 
   val defaultParser = new ParsePhoneNumber
   val defaultValid = new IsValidPhoneNumber
@@ -210,11 +213,20 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     result.name shouldBe result.originStage.outputName
     ans should contain theSameElementsInOrderAs Array(Phone("+15105556666"), Phone(None), Phone.empty)
   }
-  // TODO make sure that all US numbers are correctly identified
-  ignore should "correctly parse valid phone numbers with shortcut on a random sample" in {
-    val result = pGood.parsePhoneDefaultCountry()
-    val data = new OpWorkflow().setResultFeatures(result).transform(goodPhones)
-    data.collect(result).forall(_.nonEmpty) shouldBe true
+
+  it should "correctly parse valid phone numbers with shortcut on a random sample" in {
+    val result: FeatureLike[Phone] = pGood.parsePhoneDefaultCountry()
+    val data: sql.DataFrame = new OpWorkflow().setResultFeatures(result).transform(goodPhones)
+    val pps: Array[Row] = data.select(result).collect()
+
+    import com.salesforce.op.utils.spark.RichRow._
+
+    def check(r: Row): Unit = {
+      val phone: Phone = r.getFeatureType(result)
+      withClue(s"From $r") { phone.isEmpty shouldBe false }
+    }
+
+    pps foreach check
   }
   it should "skip parse invalid phone numbers with shortcut on a random sample" in {
     val result = pBad.parsePhoneDefaultCountry()
@@ -269,8 +281,7 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     result.name shouldBe result.originStage.outputName
     ans should contain theSameElementsInOrderAs Array(Binary(true), Binary(false), Binary.empty)
   }
-  // TODO make sure that all US numbers are correctly identified
-  ignore should "correctly identify valid phone numbers on a random sample" in {
+  it should "correctly identify valid phone numbers on a random sample" in {
     val result = pGood.isValidPhoneDefaultCountry()
     val data = new OpWorkflow().setResultFeatures(result).transform(goodPhones)
     data.collect(result).forall(_.toDouble() == 1.0) shouldBe true

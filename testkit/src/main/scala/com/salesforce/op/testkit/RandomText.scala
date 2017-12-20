@@ -211,14 +211,13 @@ object RandomText {
   }
 
   private val goodUsPhones = (rng: Random) =>
-    (2005550000L + rng.nextInt(599) * 10000000L + rng.nextInt(10000)) toString
+    RandomAreaCode(rng) + (5550000 + rng.nextInt(10000))
 
   private val badUsPhones = (rng: Random) => {
     val raw = 10000000000L + (rng.nextInt(199) * 10000000L + rng.nextInt(10000000)) toString
 
     raw.substring(rng.nextInt(2), 6 + rng.nextInt(raw.length - 6))
   }
-
 
   /**
    * A generator of random US phone numbers

@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory
 @RunWith(classOf[JUnitRunner])
 class OpPipelineStageReaderWriterTest extends FlatSpec with PassengerSparkFixtureTest {
 
-  val log = LoggerFactory.getLogger(this.getClass.getSimpleName.stripSuffix("$"))
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val meta = new MetadataBuilder().putString("foo", "bar").build()
 

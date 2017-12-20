@@ -5,15 +5,15 @@
 
 package com.salesforce.op.stages.sparkwrappers.specific
 
-import com.salesforce.op.features.types._
 import com.salesforce.op.features.FeatureSparkTypes
+import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.classification.{DecisionTreeClassificationModel, DecisionTreeClassifier, LogisticRegression, LogisticRegressionModel}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
 class OpProbabilisticClassifierWrapperTest extends FlatSpec with TestSparkContext {

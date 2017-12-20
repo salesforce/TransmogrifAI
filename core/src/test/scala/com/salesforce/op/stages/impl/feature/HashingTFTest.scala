@@ -32,7 +32,11 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
 
   lazy val (ds, f1): (DataFrame, Feature[TextList]) = TestFeatureBuilder(testData)
 
-  def hash(s: String, numOfFeatures: Int = Transmogrifier.DefaultNumOfFeatures, binary: Boolean = false): Int = {
+  def hash(
+    s: String,
+    numOfFeatures: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
+    binary: Boolean = false
+  ): Int = {
     new HashingTF(numOfFeatures).setBinary(binary).indexOf(s)
   }
 
@@ -44,7 +48,7 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
     hashed.name shouldBe hashed.originStage.outputName
 
     // scalastyle:off
-    results.forall(_.value.size == Transmogrifier.DefaultNumOfFeatures) shouldBe true
+    results.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures) shouldBe true
     results(0).value(hash("be")) shouldBe 2.0
     results(0).value(hash("that")) shouldBe 1.0
     results(1).value(hash("быть")) shouldBe 2.0

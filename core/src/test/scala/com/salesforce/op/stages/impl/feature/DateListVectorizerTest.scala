@@ -25,7 +25,7 @@ class DateListVectorizerTest extends FlatSpec with TestSparkContext {
 
   // Sunday July 12th 1998 at 22:45
   val defaultDate = new DateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
-  val now = Transmogrifier.ReferenceDate.minusMillis(1).getMillis // make date time be in the past
+  val now = TransmogrifierDefaults.ReferenceDate.minusMillis(1).getMillis // make date time be in the past
 
   private def daysToMilliseconds(n: Int): Long = n * DateTimeConstants.MILLIS_PER_DAY
   private def monthsToMilliseconds(n: Int): Long = n * 2628000000L
@@ -140,7 +140,7 @@ class DateListVectorizerTest extends FlatSpec with TestSparkContext {
   it should "vectorize with SinceFirst and reference date in the past" in {
     val testModelTimeSinceFirst =
       testVectorizer.setInput(clicks, opens, purchases).setPivot(SinceFirst).setTrackNulls(false)
-        .setReferenceDate(Transmogrifier.ReferenceDate.minusDays(30).minusMillis(2))
+        .setReferenceDate(TransmogrifierDefaults.ReferenceDate.minusDays(30).minusMillis(2))
 
     testModelTimeSinceFirst.transformFn(Seq(
       Seq(now - daysToMilliseconds(1), now).toDateList,
@@ -214,7 +214,7 @@ class DateListVectorizerTest extends FlatSpec with TestSparkContext {
     testModelModeDay.getMetadata() shouldEqual fieldMetadata
 
     val daysOfWeek = List("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
-      Transmogrifier.NullString).map(s => IndCol(Some(s)))
+      TransmogrifierDefaults.NullString).map(s => IndCol(Some(s)))
 
     OpVectorMetadata(output.name, fieldMetadata) shouldEqual
       TestOpVectorMetadataBuilder(testVectorizer, clicks -> daysOfWeek, opens -> daysOfWeek, purchases -> daysOfWeek)

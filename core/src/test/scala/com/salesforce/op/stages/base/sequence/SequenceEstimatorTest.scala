@@ -20,8 +20,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class SequenceEstimatorTest
-  extends FlatSpec with TestSparkContext {
+class SequenceEstimatorTest extends FlatSpec with TestSparkContext {
 
   val data = Seq[(DateList, DateList, DateList)](
     (new DateList(1476726419000L, 1476726019000L),
@@ -93,8 +92,8 @@ class FractionOfResponsesEstimator(uid: String = UID[FractionOfResponsesEstimato
   def fitFn(dataset: Dataset[Seq[Seq[Long]]]): SequenceModel[DateList, OPVector] = {
     import dataset.sparkSession.implicits._
     val sizes = dataset.map(_.map(_.size))
-    val size = sizes.first().size
-    val counts = sizes.select(SequenceAggregators.SumNumSeq[Int](size = size)).first()
+    val size = getInputFeatures().length
+    val counts = sizes.select(SequenceAggregators.SumNumSeq[Int](size = size).toColumn).first()
     new FractionOfResponsesModel(counts = counts, operationName = operationName, uid = uid)
   }
 }

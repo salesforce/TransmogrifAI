@@ -6,9 +6,11 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.types._
 import com.salesforce.op.features.Feature
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning._
@@ -24,12 +26,15 @@ import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
-import FunctionalityForClassificationTests._
+import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
-class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext {
+class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+
+  val log = LoggerFactory.getLogger(this.getClass)
+
   val (seed, smallCount, bigCount) = (1234L, 20, 80)
 
   import spark.implicits._
@@ -54,6 +59,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
   val label = rawLabel.copy(isResponse = true)
 
   val modelSelector = BinaryClassificationModelSelector().setInput(label, features)
+
   Spec[BinaryClassificationModelSelector] should "have properly formed stage1" in {
     modelSelector.stage1 shouldBe a[Stage1BinaryClassificationModelSelector]
 
@@ -119,22 +125,22 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
       .setLogisticRegressionTol(0.005, 0.00002)
       .setLogisticRegressionThreshold(0.8)
 
-    modelSelector.stage1.sparkLR.getElasticNetParam shouldBe 0.1
-    modelSelector.stage1.sparkLR.getMaxIter shouldBe 42
-    modelSelector.stage1.sparkLR.getStandardization shouldBe true
-    modelSelector.stage1.sparkLR.getThreshold shouldBe 0.8
-
-    val lrGrid = new ParamGridBuilder().addGrid(modelSelector.stage1.sparkLR.fitIntercept, Array(true, false))
+    val lrGrid = new ParamGridBuilder()
+      .addGrid(modelSelector.stage1.sparkLR.fitIntercept, Array(true, false))
       .addGrid(modelSelector.stage1.sparkLR.regParam, Array(0.1, 0.01))
       .addGrid(modelSelector.stage1.sparkLR.tol, Array(0.005, 0.00002))
+      .addGrid(modelSelector.stage1.sparkLR.elasticNetParam, Array(0.1))
+      .addGrid(modelSelector.stage1.sparkLR.maxIter, Array(42))
+      .addGrid(modelSelector.stage1.sparkLR.standardization, Array(true))
+      .addGrid(modelSelector.stage1.sparkLR.threshold, Array(0.8))
       .build
 
-    (modelSelector.stage1.lRGrid.build().toSeq zip lrGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.lRGrid.build(), lrGrid)
   }
 
   it should "set the Random Forest Params properly" in {
-    modelSelector.setRandomForestImpurity(Impurity.Entropy, Impurity.Gini)
+    modelSelector
+      .setRandomForestImpurity(Impurity.Entropy, Impurity.Gini)
       .setRandomForestMaxBins(34)
       .setRandomForestMaxDepth(7, 8)
       .setRandomForestMinInfoGain(0.1)
@@ -145,25 +151,25 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val sparkRandomForest = modelSelector.stage1.sparkRF.asInstanceOf[RandomForestClassifier]
 
-    sparkRandomForest.getMaxBins shouldBe 34
-    sparkRandomForest.getMinInfoGain shouldBe 0.1
-    sparkRandomForest.getSeed shouldBe 34L
-    sparkRandomForest.getNumTrees shouldBe 10
-
     val rfGrid =
-      new ParamGridBuilder().addGrid(sparkRandomForest.impurity,
-        Seq(Impurity.Entropy, Impurity.Gini).map(_.sparkName))
+      new ParamGridBuilder()
+        .addGrid(sparkRandomForest.impurity, Seq(Impurity.Entropy, Impurity.Gini).map(_.sparkName))
         .addGrid(sparkRandomForest.maxDepth, Array(7, 8))
         .addGrid(sparkRandomForest.minInstancesPerNode, Array(2, 3, 4))
         .addGrid(sparkRandomForest.subsamplingRate, Array(0.4, 0.8))
+        .addGrid(sparkRandomForest.maxBins, Array(34))
+        .addGrid(sparkRandomForest.minInfoGain, Array(0.1))
+        .addGrid(sparkRandomForest.seed, Array(34L))
+        .addGrid(sparkRandomForest.numTrees, Array(10))
         .build
 
     (modelSelector.stage1.rFGrid.build().toSeq zip rfGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+      .map { case (grid1, grid2) => grid1.toSeq.toSet shouldBe grid2.toSeq.toSet }
   }
 
   it should "set the Decision Tree Params properly" in {
-    modelSelector.setDecisionTreeImpurity(Impurity.Entropy)
+    modelSelector
+      .setDecisionTreeImpurity(Impurity.Entropy)
       .setDecisionTreeMaxBins(34, 44)
       .setDecisionTreeMaxDepth(10)
       .setDecisionTreeMinInfoGain(0.2, 0.5)
@@ -171,35 +177,34 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
       .setDecisionTreeSeed(34L, 56L)
 
     val sparkDecisionTree = modelSelector.stage1.sparkDT.asInstanceOf[DecisionTreeClassifier]
-    sparkDecisionTree.getImpurity shouldBe Impurity.Entropy.sparkName
-    sparkDecisionTree.getMaxDepth shouldBe 10
-    sparkDecisionTree.getMinInstancesPerNode shouldBe 5
 
     val dtGrid =
       new ParamGridBuilder()
         .addGrid(sparkDecisionTree.maxBins, Array(34, 44))
         .addGrid(sparkDecisionTree.minInfoGain, Array(0.2, 0.5))
         .addGrid(sparkDecisionTree.seed, Array(34L, 56L))
+        .addGrid(sparkDecisionTree.impurity, Array(Impurity.Entropy.sparkName))
+        .addGrid(sparkDecisionTree.maxDepth, Array(10))
+        .addGrid(sparkDecisionTree.minInstancesPerNode, Array(5))
         .build
 
-    (modelSelector.stage1.dTGrid.build().toSeq zip dtGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.dTGrid.build(), dtGrid)
   }
 
   it should "set the Naive Bayes Params properly" in {
     modelSelector.setNaiveBayesModelType(ModelType.Multinomial, ModelType.Bernoulli)
     modelSelector.setNaiveBayesSmoothing(1.5)
 
-    modelSelector.stage1.sparkNB.getSmoothing shouldBe 1.5
-
     val nbGrid =
-      new ParamGridBuilder().addGrid(
-        modelSelector.stage1.sparkNB.modelType,
-        Array(ModelType.Multinomial, ModelType.Bernoulli).map(_.sparkName))
+      new ParamGridBuilder()
+        .addGrid(
+          modelSelector.stage1.sparkNB.modelType,
+          Array(ModelType.Multinomial, ModelType.Bernoulli).map(_.sparkName)
+        )
+        .addGrid(modelSelector.stage1.sparkNB.smoothing, Array(1.5))
         .build
 
-    (modelSelector.stage1.nBGrid.build().toSeq zip nbGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.stage1.nBGrid.build(), nbGrid)
   }
 
   it should "set the thresholds correctly" in {
@@ -277,11 +282,13 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .setRandomForestImpurity(Impurity.Entropy)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
 
-    println(model.getMetadata())
+    log.info(model.getMetadata().toString)
 
     // evaluation metrics from test set should be in metadata
     val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
@@ -315,11 +322,13 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .setRandomForestImpurity(Impurity.Entropy)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
 
-    println(model.getMetadata())
+    log.info(model.getMetadata().toString)
 
     // evaluation metrics from test set should be in metadata
     val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
@@ -348,21 +357,27 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val testEstimator =
       BinaryClassificationModelSelector
-        .withTrainValidationSplit(Option(DataBalancer(sampleFraction = 0.2, seed = 11L, splitData = false)),
+        .withTrainValidationSplit(Option(DataBalancer(sampleFraction = 0.2, seed = 11L, reserveTestFraction = 0.0)),
           trainRatio = 0.8, validationMetric = crossEntropy, seed = 10L)
         .setModelsToTry(DecisionTree, RandomForest)
         .setRandomForestImpurity(Impurity.Gini)
         .setDecisionTreeMaxBins(64, 34)
+        .setDecisionTreeMinInfoGain(0)
+        .setDecisionTreeMinInstancesPerNode(1)
+        .setDecisionTreeMaxDepth(5)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
 
-    println(model.getMetadata())
+    log.info(model.getMetadata().toString)
 
     val transformedData = model.transform(data)
     val pred = testEstimator.getOutput()._1
     val justScores = transformedData.collect(pred)
-    justScores shouldEqual transformedData.collect(label)
+    justScores shouldEqual data.collect(label)
   }
 
   it should "fit and predict with a train validation split, even if there is no split and balancing" in {
@@ -374,11 +389,17 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .setModelsToTry(DecisionTree, RandomForest)
         .setRandomForestImpurity(Impurity.Gini)
         .setDecisionTreeMaxBins(64, 34)
+        .setDecisionTreeMinInfoGain(0)
+        .setDecisionTreeMinInstancesPerNode(1)
+        .setDecisionTreeMaxDepth(5)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
 
-    println(model.getMetadata())
+    log.info(model.getMetadata().toString)
 
     val transformedData = model.transform(data)
     val pred = testEstimator.getOutput()._1
@@ -407,6 +428,12 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .setModelsToTry(DecisionTree, RandomForest)
         .setRandomForestImpurity(Impurity.Gini)
         .setDecisionTreeMaxBins(64, 34)
+        .setDecisionTreeMinInfoGain(0)
+        .setDecisionTreeMinInstancesPerNode(1)
+        .setDecisionTreeMaxDepth(5)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)

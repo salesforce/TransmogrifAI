@@ -20,10 +20,13 @@ import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val data = Seq(
     (Seq("a", "b"), Seq("x", "x")),
@@ -70,9 +73,9 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       top -> List(IndCol(Some("A")), IndCol(Some("C")), IndCol(Some("B")), IndCol(Some("OTHER")),
-        IndCol(Some(Transmogrifier.NullString))),
+        IndCol(Some(TransmogrifierDefaults.NullString))),
       bot -> List(IndCol(Some("X")), IndCol(Some("Y")), IndCol(Some("Z")), IndCol(Some("OTHER")),
-        IndCol(Some(Transmogrifier.NullString)))
+        IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
     fitted.getInputFeatures() shouldBe Array(top, bot)
@@ -108,9 +111,9 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       top -> List(IndCol(Some("a")), IndCol(Some("A.")), IndCol(Some("C ")), IndCol(Some("b")), IndCol(Some("c")),
-        IndCol(Some("OTHER")), IndCol(Some(Transmogrifier.NullString))),
+        IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString))),
       bot -> List(IndCol(Some("x")), IndCol(Some("y")), IndCol(Some("Z")), IndCol(Some("z")), IndCol(Some("OTHER")),
-        IndCol(Some(Transmogrifier.NullString)))
+        IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
@@ -132,7 +135,6 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setMinSupport(3).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vector = vectorizer.getOutput()
-    transformed.show()
     transformed.collect(vector) shouldBe Array(
       Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 2.0, 0.0),
@@ -155,8 +157,10 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      top -> List(IndCol(Some("A")), IndCol(Some("B")), IndCol(Some("OTHER")), IndCol(Some(Transmogrifier.NullString))),
-      bot -> List(IndCol(Some("OTHER")), IndCol(Some(Transmogrifier.NullString)))
+      top -> List(
+        IndCol(Some("A")), IndCol(Some("B")), IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString))
+      ),
+      bot -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
     val expected2 = Array(
@@ -208,7 +212,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      top -> List(IndCol(Some("OTHER")), IndCol(Some(Transmogrifier.NullString)))
+      top -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
@@ -228,8 +232,8 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       "a", "b", "b", "a", "a", "b", "b", "c", "a"
     ).map(v => Set(v).toMultiPickList))
 
-    val vectorized = feature.vectorize(topK = Transmogrifier.TopK, trackNulls = true, minSupport = 0,
-      cleanText = Transmogrifier.CleanText)
+    val vectorized = feature.vectorize(topK = TransmogrifierDefaults.TopK, trackNulls = true, minSupport = 0,
+      cleanText = TransmogrifierDefaults.CleanText)
 
     val untypedVectorizedStage = vectorized.originStage
     untypedVectorizedStage shouldBe a[OpSetVectorizer[_]]
@@ -280,7 +284,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
 
     val metaMap = transformed.metadata(vectorized)
-    println(metaMap.toString)
+    log.info(metaMap.toString)
   }
 
   it should "process multiple columns of PickList and MultiPickLists using the vectorize shortcut" in {
@@ -302,7 +306,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
 
     val metaMap = transformed.metadata(vectorized)
-    println(metaMap.toString)
+    log.info(metaMap.toString)
   }
 
   it should "process multiple columns of PickList and MultiPickLists using transformWith" in {
@@ -345,6 +349,6 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
 
     val metaMap = transformed.metadata(vectorized)
-    println(metaMap.toString)
+    log.info(metaMap.toString)
   }
 }

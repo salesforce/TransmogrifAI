@@ -34,42 +34,50 @@ object HashAlgorithm extends Enum[HashAlgorithm] {
   case object Native extends HashAlgorithm
 }
 
-private[op] case object Transmogrifier {
+/**
+ * Transmogrifier Defaults trait allows innection of params into Transmogrifier
+ */
+private[op] trait TransmogrifierDefaults {
+  val NullString: String = OpVectorColumnMetadata.NullString
+  val OtherString: String = "OTHER"
+  val DefaultNumOfFeatures: Int = 256
+  val MaxNumOfFeatures: Int = 8192
+  val DateListDefault: DateListPivot = DateListPivot.SinceLast
+  val ReferenceDate: org.joda.time.DateTime = DateTimeUtils.now()
+  val TopK: Int = 20
+  val MinSupport: Int = 10
+  val FillValue: Int = 0
+  val BinaryFillValue: Boolean = false
+  val HashWithIndex: Boolean = false
+  val PrependFeatureName: Boolean = true
+  val ForceSharedHashSpace: Boolean = true
+  val CleanText: Boolean = true
+  val CleanKeys: Boolean = false
+  val HashAlgorithm: HashAlgorithm = com.salesforce.op.stages.impl.feature.HashAlgorithm.MurMur3
+  val BinaryFreq: Boolean = false
+  val FillWithMode: Boolean = true
+  val FillWithMean: Boolean = true
+  val TrackNulls: Boolean = true
+  val MinDocFrequency: Int = 0
+  // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
+  val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
+}
 
-  val NullString = OpVectorColumnMetadata.NullString
-  val OtherString = "OTHER"
-  val DefaultNumOfFeatures = 256
-  val MaxNumOfFeatures = 8192
-  val DateListDefault = DateListPivot.SinceLast
-  val ReferenceDate = DateTimeUtils.now()
-  val TopK = 20
-  val MinSupport = 10
-  val FillValue = 0
-  val BinaryFillValue = false
-  val HashWithIndex = false
-  val PrependFeatureName = true
-  val ForceSharedHashSpace = true
-  val CleanText = true
-  val CleanKeys = false
-  val HashAlgorithm = com.salesforce.op.stages.impl.feature.HashAlgorithm.MurMur3
-  val BinaryFreq = false
-  val FillWithMode = true
-  val FillWithMean = true
-  val TrackNulls = true
-  val MinDocFrequency = 0
-  /**
-   * Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
-   */
-  val DefaultGeolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
+private[op] case object TransmogrifierDefaults extends TransmogrifierDefaults
+
+private[op] case object Transmogrifier {
 
   /**
    * Vectorize features by type applying default vectorizers
    *
    * @param features input features
+   * @param defaults transmogrifier defaults (allows params injection)
    * @return vectorized features grouped by type
    */
-  def transmogrify(features: Seq[FeatureLike[_]]): Iterable[FeatureLike[OPVector]] = {
-
+  def transmogrify(
+    features: Seq[FeatureLike[_]]
+  )(implicit defaults: TransmogrifierDefaults): Iterable[FeatureLike[OPVector]] = {
+    import defaults._
     def castSeqAs[U <: FeatureType](f: Seq[FeatureLike[_]]) = f.map(_.asInstanceOf[FeatureLike[U]])
 
     def castAs[U <: FeatureType](f: Seq[FeatureLike[_]]): (FeatureLike[U], Array[FeatureLike[U]]) = {
@@ -118,7 +126,7 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[CurrencyMap] =>
           val (f, other) = castAs[CurrencyMap](g)
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
         case t if t =:= weakTypeOf[DateMap] =>
           val (f, other) = castAs[DateMap](g) // TODO make better default
           f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
@@ -135,14 +143,14 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[IntegralMap] =>
           val (f, other) = castAs[IntegralMap](g)
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other)
         case t if t =:= weakTypeOf[MultiPickListMap] =>
           val (f, other) = castAs[MultiPickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other)
         case t if t =:= weakTypeOf[PercentMap] =>
           val (f, other) = castAs[PercentMap](g)
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
         case t if t =:= weakTypeOf[PhoneMap] =>
           val (f, other) = castAs[PhoneMap](g) // TODO make better default
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -153,7 +161,7 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[RealMap] =>
           val (f, other) = castAs[RealMap](g)
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g) // TODO make this be a hash transformation
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -224,9 +232,9 @@ private[op] case object Transmogrifier {
 
         // Text
         case t if t =:= weakTypeOf[Base64] =>
-          val (f, other) = castAs[Base64](g) // TODO do something with this??
-          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+          val (f, other) = castAs[Base64](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
+            others = other)
         case t if t =:= weakTypeOf[ComboBox] =>
           val (f, other) = castAs[ComboBox](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
@@ -284,14 +292,17 @@ private[op] case object Transmogrifier {
     }
   }
 
-
   /**
    * Extract feature history map from array of input features
-   * @param tf array of transient features
+   *
+   * @param tf            array of transient features
+   * @param thisStageName this stage name
    * @return map from feature name to feature history
    */
-  def inputFeaturesToHistory(tf: Array[TransientFeature]): Map[String, FeatureHistory] = {
-    tf.map { f => f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages) }.toMap
+  def inputFeaturesToHistory(tf: Array[TransientFeature], thisStageName: String): Map[String, FeatureHistory] = {
+    tf.map { f =>
+      f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages :+ thisStageName)
+    }.toMap
   }
 
 }
@@ -312,15 +323,8 @@ trait VectorizerDefaults extends OpPipelineStageBase {
    */
   protected def vectorMetadataFromInputFeatures: OpVectorMetadata = {
     val tf = getTransientFeatures()
-    val cols = tf.map { f =>
-      OpVectorColumnMetadata(
-        parentFeatureName = Seq(f.name),
-        parentFeatureType = Seq(f.typeName),
-        indicatorGroup = None,
-        indicatorValue = None
-      )
-    }
-    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf))
+    val cols = tf.map { f => f.toColumnMetaData() }
+    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
   }
 
   protected def vectorMetadataWithNullIndicators: OpVectorMetadata = {
@@ -332,7 +336,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
           parentFeatureName = col.parentFeatureName,
           parentFeatureType = col.parentFeatureType,
           indicatorGroup = col.parentFeatureName,
-          indicatorValue = Some(Transmogrifier.NullString)
+          indicatorValue = Some(TransmogrifierDefaults.NullString)
         )
       )
     }
@@ -431,7 +435,7 @@ trait TrackNullsParam extends Params {
     parent = this, name = "trackNulls", doc = "option to keep track of values that were missing"
   )
 
-  setDefault(trackNulls, Transmogrifier.TrackNulls)
+  setDefault(trackNulls, TransmogrifierDefaults.TrackNulls)
 
   def setTrackNulls(v: Boolean): this.type = set(trackNulls, v)
 
@@ -468,7 +472,7 @@ trait TextParams extends Params {
     parent = this, name = "cleanText", doc = "ignore capitalization and punctuation in grouping categories"
   )
 
-  setDefault(cleanText, Transmogrifier.CleanText)
+  setDefault(cleanText, TransmogrifierDefaults.CleanText)
 
   def setCleanText(clean: Boolean): this.type = set(cleanText, clean)
 }
@@ -482,7 +486,7 @@ trait PivotParams extends TextParams {
     isValid = ParamValidators.gt(0L)
   )
 
-  setDefault(topK, Transmogrifier.TopK)
+  setDefault(topK, TransmogrifierDefaults.TopK)
 
   def setTopK(numberToKeep: Int): this.type = {
     set(topK, numberToKeep)
@@ -496,7 +500,7 @@ trait MinSupportParam extends Params {
     isValid = ParamValidators.gtEq(0L)
   )
 
-  setDefault(minSupport, Transmogrifier.MinSupport)
+  setDefault(minSupport, TransmogrifierDefaults.MinSupport)
 
   def setMinSupport(min: Int): this.type = {
     set(minSupport, min)
@@ -514,7 +518,7 @@ trait SaveOthersParams extends Params {
 
   final def setUnseenName(unseenNameIn: String): this.type = set(unseenName, unseenNameIn)
 
-  setDefault(unseenName, Transmogrifier.OtherString)
+  setDefault(unseenName, TransmogrifierDefaults.OtherString)
 
 }
 
@@ -525,7 +529,7 @@ trait MapPivotParams extends Params {
   final val cleanKeys = new BooleanParam(
     parent = this, name = "cleanKeys", doc = "ignore capitalization and punctuation in grouping map keys"
   )
-  setDefault(cleanKeys, Transmogrifier.CleanKeys)
+  setDefault(cleanKeys, TransmogrifierDefaults.CleanKeys)
   def setCleanKeys(clean: Boolean): this.type = set(cleanKeys, clean)
 
   final val whiteListKeys = new StringArrayParam(
@@ -584,13 +588,14 @@ trait MapStringPivotHelper extends SaveOthersParams {
   )
 
   protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
-    val countOccurrences: SeqMapMap = categoryMaps.select(SequenceAggregators.SumSeqMapMap(size = inputSize)).first()
+    val sumAggr = SequenceAggregators.SumSeqMapMap(size = inputSize)
+    val countOccurrences: SeqMapMap = categoryMaps.select(sumAggr.toColumn).first()
     // Top K values for each categorical input
     countOccurrences.map {
       _.map { case (k, v) => k ->
         v.toArray
           .filter(_._2 >= minSup)
-          .sortBy(-_._2)
+          .sortBy(v => -v._2 -> v._1)
           .take(topK)
           .map(_._1)
       }.toSeq
@@ -602,7 +607,8 @@ trait MapStringPivotHelper extends SaveOthersParams {
     topValues: SeqSeqTupArr,
     inputFeatures: Array[TransientFeature],
     operationName: String,
-    outputName: String
+    outputName: String,
+    stageName: String
   ): OpVectorMetadata = {
     // names of input features to store in metadata
     val otherValueString = $(unseenName)
@@ -616,7 +622,7 @@ trait MapStringPivotHelper extends SaveOthersParams {
       indicatorGroup = Option(key),
       indicatorValue = Option(value)
     )
-    OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures))
+    OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
   }
 
 }

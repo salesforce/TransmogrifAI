@@ -3,15 +3,14 @@
  * All rights reserved.
  */
 
-package com.salesforce.op.stages.impl.classification
+package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.stages.impl.tuning.DataBalancer
 import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -24,18 +23,17 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
 
   // scalastyle:off
   import spark.implicits._
-
   // scalastyle:on
 
   // Generate positive observations following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val positiveData =
-  normalVectorRDD(spark.sparkContext, bigCount, 3, seed = seed)
-    .map(v => 1.0 -> Vectors.dense(v.toArray)).toDS()
+    normalVectorRDD(spark.sparkContext, bigCount, 3, seed = seed)
+      .map(v => 1.0 -> Vectors.dense(v.toArray)).toDS()
 
   // Generate negative observations following a distribution ~ N((10.0, 10.0, 10.0), I_3)
   val negativeData =
-  normalVectorRDD(spark.sparkContext, smallCount, 3, seed = seed)
-    .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ + 10.0))).toDS()
+    normalVectorRDD(spark.sparkContext, smallCount, 3, seed = seed)
+      .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ + 10.0))).toDS()
 
   val dataBalancer = new DataBalancer()
 
@@ -62,7 +60,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
 
   it should "not split the dataset when splitData = false" in {
     val (_, bigDataTest, _, smallDataTest, _, _) =
-      dataBalancer.setSplitData(false)
+      dataBalancer.setReserveTestFraction(0.0)
         .getTrainingSplit(negativeData, smallCount, positiveData, bigCount, sampleFraction, maxTrainingSample)
 
     smallDataTest.count() shouldBe 0
@@ -74,13 +72,12 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
       .setSampleFraction(0.4)
       .setMaxTrainingSample(80)
       .setSeed(11L)
-      .setSplitData(true)
+      .setReserveTestFraction(0.0)
 
 
     dataBalancer.getSampleFraction shouldBe 0.4
     dataBalancer.getMaxTrainingSample shouldBe 80
     dataBalancer.getSeed shouldBe 11L
-    dataBalancer.getSplitData shouldBe true
   }
 
 }

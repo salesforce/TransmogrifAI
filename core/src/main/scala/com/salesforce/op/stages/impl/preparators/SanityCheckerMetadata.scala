@@ -6,6 +6,7 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.mllib.linalg.DenseMatrix
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
@@ -23,6 +24,7 @@ case object SanityCheckerNames {
   val CramersV: String = "cramersV"
   val MutualInfo: String = "mutualInfo"
   val PointwiseMutualInfoAgainstLabel: String = "pointwiseMutualInfoAgainstLabel"
+  val CountMatrix: String = "countMatrix"
   val Names: String = "names"
   val FeaturesIn: String = "features"
   val Values: String = "values"
@@ -41,22 +43,18 @@ case object SanityCheckerNames {
 /**
  * Case class to convert to and from [[SanityChecker]] summary metadata
  *
- * @param correlationsWLabelIsNaN nan correlation features
  * @param correlationsWLabel      feature correlations with label
  * @param dropped                 features dropped for label leakage
  * @param featuresStatistics      stats on features
  * @param names                   names of features passed in
- * @param correlationType         type of correlation done on
  * @param categoricalStats
  */
 case class SanityCheckerSummary
 (
-  correlationsWLabelIsNaN: Seq[String],
   correlationsWLabel: Correlations,
   dropped: Seq[String],
   featuresStatistics: SummaryStatistics,
   names: Seq[String],
-  correlationType: CorrelationType,
   categoricalStats: CategoricalStats
 ) {
 
@@ -70,14 +68,14 @@ case class SanityCheckerSummary
     sample: Double
   ) {
     this(
-      correlationsWLabelIsNaN = stats.filter(s => s.corrLabel.isDefined && s.corrLabel.get.isNaN).map(_.name),
       correlationsWLabel = new Correlations(
-        stats.filter(s => s.corrLabel.isDefined && !s.corrLabel.get.isNaN).map(s => s.name -> s.corrLabel.get)
+        stats.filter(s => s.corrLabel.isDefined && !s.corrLabel.get.isNaN).map(s => s.name -> s.corrLabel.get),
+        stats.filter(s => s.corrLabel.isDefined && s.corrLabel.get.isNaN).map(_.name),
+        correlationType
       ),
       dropped = dropped,
       featuresStatistics = new SummaryStatistics(colStats, stats.map(_.numNulls), sample),
       names = names,
-      correlationType = correlationType,
       categoricalStats = catStats
     )
   }
@@ -89,12 +87,10 @@ case class SanityCheckerSummary
    */
   def toMetadata(): Metadata = {
     val summaryMeta = new MetadataBuilder()
-    summaryMeta.putStringArray(SanityCheckerNames.CorrelationsWLabelIsNaN, correlationsWLabelIsNaN.toArray)
     summaryMeta.putMetadata(SanityCheckerNames.CorrelationsWLabel, correlationsWLabel.toMetadata())
     summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
     summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata())
     summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
-    summaryMeta.putString(SanityCheckerNames.CorrelationType, correlationType.name)
     summaryMeta.putMetadata(SanityCheckerNames.CategoricalStats, categoricalStats.toMetadata())
     summaryMeta.build()
   }
@@ -160,13 +156,16 @@ case class SummaryStatistics
  * @param pointwiseMutualInfos Map from label value (as a string) to an Array (over features) of PMI values
  * @param mutualInfos          Values of MI for each feature (should be the same for everything coming from the same
  *                             contingency matrix)
+ * @param counts               Counts of occurance for categoricals (n x m array of arrays where n = number of labels
+ *                             and m = number of features + 1 with last element being occurance count of labels
  */
 case class CategoricalStats
 (
   categoricalFeatures: Array[String] = Array.empty,
   cramersVs: Array[Double] = Array.empty,
-  pointwiseMutualInfos: CategoricalStats.PointwiseMutualInfos.Type = CategoricalStats.PointwiseMutualInfos.Empty,
-  mutualInfos: Array[Double] = Array.empty
+  pointwiseMutualInfos: CategoricalStats.PointwiseMutualInfos.Type = CategoricalStats.PointwiseMutualInfos.empty,
+  mutualInfos: Array[Double] = Array.empty,
+  counts: CategoricalStats.PointwiseMutualInfos.Type = CategoricalStats.PointwiseMutualInfos.empty
 ) {
   // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
   def toMetadata(): Metadata = {
@@ -176,6 +175,9 @@ case class CategoricalStats
     meta.putDoubleArray(SanityCheckerNames.CramersV, cramersVs.map(f => if (f.isNaN) 0 else f))
     meta.putDoubleArray(SanityCheckerNames.MutualInfo, mutualInfos)
     meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel, pointwiseMutualInfos.toMetadata)
+    val countMeta = new MetadataBuilder()
+    counts.map{ case (k, v) => countMeta.putDoubleArray(k, v)}
+    meta.putMetadata(SanityCheckerNames.CountMatrix, countMeta.build())
     meta.build()
   }
 }
@@ -187,7 +189,7 @@ object CategoricalStats {
    */
   object PointwiseMutualInfos {
     type Type = Map[String, Array[Double]]
-    val Empty: Type = Map.empty
+    def empty: Type = Map.empty
   }
 }
 
@@ -196,17 +198,23 @@ object CategoricalStats {
  *
  * @param featuresIn names of features
  * @param values     correlation of feature with label
+ * @param nanCorrs   nan correlation features
+ * @param corrType   type of correlation done on
  */
 case class Correlations
 (
   featuresIn: Seq[String],
-  values: Seq[Double]
+  values: Seq[Double],
+  nanCorrs: Seq[String],
+  corrType: CorrelationType
 ) {
   assert(featuresIn.length == values.length, "Feature names and correlation values arrays must have the same length")
 
-  def this(corrs: Seq[(String, Double)]) = this(
+  def this(corrs: Seq[(String, Double)], nans: Seq[String], corrType: CorrelationType) = this(
     featuresIn = corrs.map(_._1),
-    values = corrs.map(_._2)
+    values = corrs.map(_._2),
+    nanCorrs = nans,
+    corrType = corrType
   )
 
   /**
@@ -218,6 +226,8 @@ case class Correlations
     val corrMeta = new MetadataBuilder()
     corrMeta.putStringArray(SanityCheckerNames.FeaturesIn, featuresIn.toArray)
     corrMeta.putDoubleArray(SanityCheckerNames.Values, values.toArray)
+    corrMeta.putStringArray(SanityCheckerNames.CorrelationsWLabelIsNaN, nanCorrs.toArray)
+    corrMeta.putString(SanityCheckerNames.CorrelationType, corrType.name)
     corrMeta.build()
   }
 }
@@ -228,7 +238,9 @@ case object SanityCheckerSummary {
     val wrapped = meta.wrapped
     Correlations(
       featuresIn = wrapped.getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
-      values = wrapped.getArray[Double](SanityCheckerNames.Values).toSeq
+      values = wrapped.getArray[Double](SanityCheckerNames.Values).toSeq,
+      nanCorrs = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
+      corrType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType))
     )
   }
 
@@ -251,9 +263,10 @@ case object SanityCheckerSummary {
       categoricalFeatures = wrapped.getArray[String](SanityCheckerNames.CategoricalFeatures),
       cramersVs = wrapped.getArray[Double](SanityCheckerNames.CramersV),
       mutualInfos = wrapped.getArray[Double](SanityCheckerNames.MutualInfo),
-      pointwiseMutualInfos =
-        meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
-          .underlyingMap.asInstanceOf[CategoricalStats.PointwiseMutualInfos.Type]
+      pointwiseMutualInfos = meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
+        .underlyingMap.asInstanceOf[CategoricalStats.PointwiseMutualInfos.Type],
+      counts = meta.getMetadata(SanityCheckerNames.CountMatrix)
+        .underlyingMap.asInstanceOf[CategoricalStats.PointwiseMutualInfos.Type]
     )
   }
 
@@ -266,12 +279,10 @@ case object SanityCheckerSummary {
   def fromMetadata(meta: Metadata): SanityCheckerSummary = {
     val wrapped = meta.wrapped
     SanityCheckerSummary(
-      correlationsWLabelIsNaN = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
       correlationsWLabel = correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel)),
       dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
       featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
       names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
-      correlationType = CorrelationType.withNameInsensitive(wrapped.get[String](SanityCheckerNames.CorrelationType)),
       categoricalStats = categoricalStatsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CategoricalStats))
     )
   }

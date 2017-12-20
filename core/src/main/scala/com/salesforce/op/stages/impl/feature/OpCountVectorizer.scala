@@ -93,7 +93,8 @@ class OpCountVectorizer(uid: String = UID[OpCountVectorizer])
       indicatorValue = Option(word)
     )
 
-    model.setMetadata(OpVectorMetadata(outputName, metadataCols, Transmogrifier.inputFeaturesToHistory(tf)).toMetadata)
+    model.setMetadata(
+      OpVectorMetadata(outputName, metadataCols, Transmogrifier.inputFeaturesToHistory(tf, stageName)).toMetadata)
     model
   }
 }

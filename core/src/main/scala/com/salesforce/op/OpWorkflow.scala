@@ -77,7 +77,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       (k, v) <- stageParams
     } {
       val setStage = Try {
-        val paramId = stage.getParam(k)
+        val paramId = stage.getParam(k) // match on selectors??
         if (!stage.isSet(paramId)) {
           stage.set(paramId, v)
           log.info(s"Set parameter $k to value $v for stage $stage")
@@ -210,11 +210,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     val newResultFeatures = resultFeatures.map(_.copyWithNewStages(fittedStages))
 
     val model =
-      new OpWorkflowModel(uid)
+      new OpWorkflowModel(uid, getParameters())
         .setParent(this)
         .setStages(fittedStages)
         .setFeatures(newResultFeatures)
-        .setParameters(parameters)
+        .setParameters(getParameters())
 
     reader.map(model.setReader).getOrElse(model)
   }

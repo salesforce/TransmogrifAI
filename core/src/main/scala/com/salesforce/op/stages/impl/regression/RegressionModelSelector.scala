@@ -8,7 +8,9 @@ package com.salesforce.op.stages.impl.regression
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.TransientFeature
+import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType.Regressor
+import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
 import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBase}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.makeOutputName
@@ -33,7 +35,7 @@ case object RegressionModelSelector {
    * @param numFolds          number of folds for cross validation (>= 2)
    * @param validationMetric  metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and Ddefault evaluator is added to this list (here Evaluators.Regression)
+   *                          and default evaluator is added to this list (here Evaluators.Regression)
    * @param seed              random seed
    * @return Regression Model Selector with a Cross Validation
    */
@@ -44,7 +46,7 @@ case object RegressionModelSelector {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed
   ): RegressionModelSelector = {
-    new RegressionModelSelector(
+    selector(
       validator = new OpCrossValidation[Regressor](numFolds, seed, validationMetric),
       dataSplitter = dataSplitter,
       trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
@@ -58,7 +60,7 @@ case object RegressionModelSelector {
    * @param trainRatio        ratio between training set and validation set (>= 0 && <= 1)
    * @param validationMetric  metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and Ddefault evaluator is added to this list (here Evaluators.Regression)
+   *                          and default evaluator is added to this list (here Evaluators.Regression)
    * @param seed              random seed
    * @return Regression Model Selector with a Train Validation Split
    */
@@ -69,7 +71,7 @@ case object RegressionModelSelector {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed
   ): RegressionModelSelector = {
-    new RegressionModelSelector(
+    selector(
       validator = new OpTrainValidationSplit[Regressor](
         trainRatio,
         seed,
@@ -78,6 +80,50 @@ case object RegressionModelSelector {
       dataSplitter = dataSplitter,
       trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
+  }
+
+  private def selector(
+    validator: OpValidator[Regressor],
+    dataSplitter: Option[DataSplitter],
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]): RegressionModelSelector = {
+    new RegressionModelSelector(
+      validator = validator,
+      dataSplitter = dataSplitter,
+      trainTestEvaluators = trainTestEvaluators
+    ) // models on by default
+      .setModelsToTry(RandomForestRegression, LinearRegression, GBTRegression)
+      // Random forest defaults
+      .setRandomForestMaxDepth(MaxDepth: _*)
+      .setRandomForestImpurity(ImpurityReg)
+      .setRandomForestMaxBins(MaxBin)
+      .setRandomForestMinInfoGain(MinInfoGain: _*)
+      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
+      .setRandomForestNumTrees(MaxTrees)
+      .setRandomForestSubsamplingRate(SubsampleRate)
+      // Linear regression defaults
+      .setLinearRegressionElasticNetParam(ElasticNet)
+      .setLinearRegressionFitIntercept(FitIntercept)
+      .setLinearRegressionMaxIter(MaxIterLin)
+      .setLinearRegressionRegParam(Regularization: _*)
+      .setLinearRegressionSolver(RegSolver)
+      .setLinearRegressionStandardization(Standardized)
+      .setLinearRegressionTol(Tol)
+      // GBT defaults
+      .setGradientBoostedTreeLossType(TreeLossType)
+      .setGradientBoostedTreeMaxBins(MaxBin)
+      .setGradientBoostedTreeMaxDepth(MaxDepth: _*)
+      .setGradientBoostedTreeMinInfoGain(MinInfoGain: _*)
+      .setGradientBoostedTreeMaxIter(MaxIterTree)
+      .setGradientBoostedTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+      .setGradientBoostedTreeStepSize(StepSize)
+      .setGradientBoostedTreeImpurity(ImpurityReg)
+      .setGradientBoostedTreeSubsamplingRate(SubsampleRate)
+      // DT defaults
+      .setDecisionTreeImpurity(ImpurityReg)
+      .setDecisionTreeMaxBins(MaxBin)
+      .setDecisionTreeMaxDepth(MaxDepth: _*)
+      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
+      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
   }
 
 }

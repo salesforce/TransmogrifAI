@@ -5,12 +5,11 @@
 
 package com.salesforce.op
 
-import java.io.File
-
 import com.salesforce.op.test._
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
+import org.slf4j.LoggerFactory
 
 import scala.util.Failure
 
@@ -18,21 +17,16 @@ import scala.util.Failure
 @RunWith(classOf[JUnitRunner])
 class OpParamsTest extends FlatSpec with TestCommon {
 
-  val expectedParamsSimple = new OpParams(
+  val log = LoggerFactory.getLogger(this.getClass)
+
+  val expectedParamsSimple = OpParams(
     stageParams = Map(
       "TestClass1" -> Map("param1" -> 11, "param2" -> "blarg", "param3" -> false),
       "TestClass2" -> Map("param1" -> List("a", "b", "c"), "param2" -> 0.25)
     ),
     readerParams = Map("Passenger" -> new ReaderParams()),
-    modelLocation = None,
-    writeLocation = None,
-    metricsLocation = None,
-    metricsCompress = None,
-    metricsCodec = None,
     customParams = Map("custom1" -> 1, "custom2" -> "2"),
-    customTagName = Some("myTag"),
-    customTagValue = None,
-    logStageMetrics = None
+    customTagName = Some("myTag")
   )
 
   Spec[OpParams] should "correctly load parameters from a json file" in {
@@ -43,7 +37,6 @@ class OpParamsTest extends FlatSpec with TestCommon {
   it should "correctly load parameters with a complex reader format" in {
     val params = OpParams.fromFile(resourceFile(name = "OpParamsComplex.json"))
     val readerParams = params.get.readerParams
-    println(readerParams)
     readerParams("Passenger").partitions shouldEqual Some(5)
     readerParams("Passenger").customParams.head shouldEqual("test" -> 1)
   }
@@ -76,23 +69,25 @@ class OpParamsTest extends FlatSpec with TestCommon {
   }
 
   private def assertParams(loaded: OpParams, expected: OpParams = expectedParamsSimple): Unit = {
-    println("loaded:\n" + loaded)
-    println("expected:\n" + expected)
-    val readerParam = expected.readerParams.values.head
-    val readerLoaded = loaded.readerParams.values.head
+    log.info("loaded:\n" + loaded)
+    log.info("expected:\n" + expected)
     expected.stageParams shouldBe loaded.stageParams
     expected.readerParams.keySet shouldBe loaded.readerParams.keySet
-    readerParam.partitions shouldBe readerLoaded.partitions
-    readerParam.path shouldBe readerLoaded.path
-    readerParam.customParams shouldBe readerLoaded.customParams
-    expected.writeLocation shouldBe loaded.writeLocation
+    expected.readerParams.values zip loaded.readerParams.values foreach { case (r1, r2) =>
+      r1.partitions shouldBe r2.partitions
+      r1.path shouldBe r2.path
+      r1.customParams shouldBe r2.customParams
+    }
     expected.modelLocation shouldBe loaded.modelLocation
-    expected.metricsCodec shouldBe loaded.metricsCodec
+    expected.writeLocation shouldBe loaded.writeLocation
+    expected.metricsLocation shouldBe loaded.metricsLocation
     expected.metricsCompress shouldBe loaded.metricsCompress
-    expected.customParams shouldBe loaded.customParams
+    expected.metricsCodec shouldBe loaded.metricsCodec
     expected.customTagName shouldBe loaded.customTagName
     expected.customTagValue shouldBe loaded.customTagValue
     expected.logStageMetrics shouldBe loaded.logStageMetrics
+    expected.collectStageMetrics shouldBe loaded.collectStageMetrics
+    expected.customParams shouldBe loaded.customParams
   }
 
 }

@@ -5,17 +5,20 @@
 
 package com.salesforce.op.stages.sparkwrappers.specific
 
-import com.salesforce.op.test.{PrestigeData, TestFeatureBuilder, _}
 import com.salesforce.op.features.types._
+import com.salesforce.op.test.{PrestigeData, TestFeatureBuilder, _}
 import org.apache.spark.ml.feature.{MinMaxScaler, MinMaxScalerModel}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class OpEstimatorWrapperTest extends FlatSpec with TestSparkContext with PrestigeData {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val (ds, education, income, women, prestige) =
     TestFeatureBuilder[OPVector, OPVector, OPVector, OPVector]("education", "income", "women", "prestige",
@@ -52,8 +55,11 @@ class OpEstimatorWrapperTest extends FlatSpec with TestSparkContext with Prestig
 
     val model = scaler.fit(ds)
     val scalerModel = model.getSparkMlStage().get
-    val output = scalerModel.transform(ds)
-    output.show(false)
+
+    if (log.isInfoEnabled) {
+      val output = scalerModel.transform(ds)
+      output.show(false)
+    }
     scalerModel
   }
 }

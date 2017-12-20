@@ -18,6 +18,7 @@ object Impurity extends Enum[Impurity] {
 
   case object Entropy extends Impurity("entropy")
   case object Gini extends Impurity("gini")
+  case object Variance extends Impurity("variance")
 }
 
 

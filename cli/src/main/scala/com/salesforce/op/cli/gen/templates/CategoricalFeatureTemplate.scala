@@ -38,9 +38,10 @@ import com.salesforce.op.features.types._
  * This is a template for generating categorical feature handling in a generated project
  */
 class CategoricalFeatureTemplate {
+  private[templates] def feature =
   // BEGIN
-  FeatureBuilder.MultiPickList[_GenericObject_]
-    .extract(o => Option(o._categoricalGetter_)
+  FeatureBuilder.MultiPickList[SampleObject]
+    .extract(o => Option(o.codeGeneration_categoricalField_codeGeneration)
     .map(_.toString).toSet[String].toMultiPickList)
   // END
 }

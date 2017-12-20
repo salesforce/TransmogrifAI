@@ -43,7 +43,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
 
     val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName)
+    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName)
     setMetadata(vectorMeta.toMetadata)
 
     new MultiPickListMapVectorizerModel(

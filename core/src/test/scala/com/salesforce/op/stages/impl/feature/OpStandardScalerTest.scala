@@ -21,9 +21,7 @@ import org.scalatest.FlatSpec
 
 @RunWith(classOf[JUnitRunner])
 class OpStandardScalerTest extends FlatSpec with TestSparkContext {
-  // scalastyle:off
   import spark.implicits._
-  // scalastyle:on
 
   // TODO: use TestFeatureBuilder instead
   lazy val testData: Dataset[StdScTestData] = DataStdScTest.input.toDS()
@@ -52,8 +50,6 @@ class OpStandardScalerTest extends FlatSpec with TestSparkContext {
     // apply the normalizer to the desired feature column
     val scalerModel = featureNormalizer.setInput(someNumericFeature).fit(testData)
     val normalizedFeatureDF = scalerModel.setInput(someNumericFeature).transform(testData)
-
-    normalizedFeatureDF.show(false)
 
     val sumSqDist =
       validateDataframeDoubleColumn(normalizedFeatureDF, scalerModel.getOutput().name, "normalizedWithStdDevOnly")

@@ -61,12 +61,12 @@ trait RichMapFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
-      new TextMapVectorizer[T]()
+      new TextMapPivotVectorizer[T]()
         .setInput(f +: others)
         .setTopK(topK)
         .setCleanKeys(cleanKeys)
@@ -76,7 +76,6 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
   /**
@@ -104,7 +103,7 @@ trait RichMapFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty
@@ -119,7 +118,6 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
 
@@ -144,20 +142,21 @@ trait RichMapFeature {
      */
     def vectorize(
       defaultValue: Double,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      fillWithMean: Boolean = TransmogrifierDefaults.FillWithMean,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       new RealMapVectorizer[T]()
         .setInput(f +: others)
+        .setFillWithMean(fillWithMean)
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
 
@@ -182,12 +181,49 @@ trait RichMapFeature {
      */
     def vectorize(
       defaultValue: Double,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      fillWithMode: Boolean = TransmogrifierDefaults.FillWithMode,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       new IntegralMapVectorizer[T]()
+        .setInput(f +: others)
+        .setFillWithMode(fillWithMode)
+        .setDefaultValue(defaultValue)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys)
+        .getOutput()
+    }
+  }
+
+  /**
+   * Enrichment functions for OPMap Features with Date values
+   *
+   * @param f FeatureLike
+   */
+  implicit class RichDateMapFeature(val f: FeatureLike[DateMap]) {
+
+    /**
+     * Apply DateMapVectorizer on any OPMap that has long values
+     *
+     * @param others        other features of the same type
+     * @param defaultValue  value to give missing keys on pivot
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     *
+     * @return an OPVector feature
+     */
+    def vectorize(
+      defaultValue: Double,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty,
+      others: Array[FeatureLike[DateMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateMapVectorizer()
         .setInput(f +: others)
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
@@ -195,12 +231,43 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
+  /**
+   * Enrichment functions for OPMap Features with DateTime values
+   *
+   * @param f FeatureLike
+   */
+  implicit class RichDateTimeMapFeature(val f: FeatureLike[DateTimeMap]) {
+    /**
+     * Apply DateMapVectorizer on any OPMap that has long values
+     *
+     * @param others        other features of the same type
+     * @param defaultValue  value to give missing keys on pivot
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     * @return an OPVector feature
+     */
+    def vectorize(
+      defaultValue: Double,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty,
+      others: Array[FeatureLike[DateTimeMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateMapVectorizer()
+        .setInput(f +: others)
+        .setDefaultValue(defaultValue)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys)
+        .getOutput()
+    }
+  }
 
   /**
-   * Enrichment functions for OPMap Features with Long values
+   * Enrichment functions for OPMap Features with Boolean values
    *
    * @param f FeatureLike
    */
@@ -219,7 +286,7 @@ trait RichMapFeature {
      */
     def vectorize(
       defaultValue: Double,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[BinaryMap]] = Array.empty
@@ -232,7 +299,6 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
 
@@ -255,8 +321,8 @@ trait RichMapFeature {
      * @return an OPVector feature
      */
     def vectorize(
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
-      defaultValue: Geolocation = Transmogrifier.DefaultGeolocation,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      defaultValue: Geolocation = TransmogrifierDefaults.DefaultGeolocation,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[GeolocationMap]] = Array.empty
@@ -269,7 +335,6 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .getOutput()
     }
-
   }
 
   /**
@@ -295,12 +360,11 @@ trait RichMapFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[EmailMap]] = Array.empty
     ): FeatureLike[OPVector] = {
-
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
         val transformer = new OPMapTransformer[Email, PickList, EmailMap, PickListMap](
           operationName = "emailToPickListMap",
@@ -318,7 +382,6 @@ trait RichMapFeature {
         others = domains.tail
       )
     }
-
   }
 
   /**
@@ -344,7 +407,7 @@ trait RichMapFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      cleanKeys: Boolean = Transmogrifier.CleanKeys,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[URLMap]] = Array.empty

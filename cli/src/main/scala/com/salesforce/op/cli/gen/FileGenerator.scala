@@ -8,17 +8,17 @@ package com.salesforce.op.cli.gen
 import com.salesforce.op.cli.gen.FileSource.Str
 
 import scala.util.matching.Regex
-import FileTemplate._
+import FileGenerator._
 
 /**
  * Encapsulates the rendering of the directives in a file (see `cli/README.md` for more on how this works).
  *
- * The [[render]] method produces a [[ProjectFile]] with the final source of the file to be created in the template.
+ * The [[render]] method produces a [[FileInProject]] with the final source of the file to be created in the template.
  *
  * @param path The path to render the template to.
  * @param sourceFn A delayed value so we can load the actual source for the template as late as possible
  */
-class FileTemplate(val path: String, sourceFn: => String) {
+class FileGenerator(val path: String, sourceFn: => String) {
 
   private lazy val source = sourceFn
 
@@ -26,9 +26,9 @@ class FileTemplate(val path: String, sourceFn: => String) {
    * Render this template with some arguments.
    *
    * @param substitutions The arguments to the template, as [[Substitutions]] (a Map[String, String])
-   * @return A [[ProjectFile]] that represents the rendered file to be created
+   * @return A [[FileInProject]] that represents the rendered file to be created
    */
-  def render(substitutions: Substitutions): ProjectFile = {
+  def render(substitutions: Substitutions): FileInProject = {
     var directives = directiveRegex.findAllMatchIn(source).toList
     var renderedTemplate = source
     var filePath = path
@@ -53,12 +53,12 @@ class FileTemplate(val path: String, sourceFn: => String) {
       directives = directiveRegex.findAllMatchIn(renderedTemplate).toList
     }
 
-    ProjectFile(filePath, Str(renderedTemplate))
+    FileInProject(filePath, Str(renderedTemplate))
   }
 
 }
 
-private[gen] object FileTemplate {
+private[gen] object FileGenerator {
 
   type Substitutions = Map[String, String]
 
