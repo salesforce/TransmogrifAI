@@ -7,11 +7,13 @@ package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import org.apache.spark.ml.Model
 import org.apache.spark.sql.Dataset
+import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
 
 
 /**
@@ -42,7 +44,7 @@ case object BinaryClassificationModelSelector {
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed
   ): BinaryClassificationModelSelector = {
-    new BinaryClassificationModelSelector(
+    selector(
       new OpCrossValidation[ProbClassifier](numFolds, seed, validationMetric),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
@@ -67,11 +69,49 @@ case object BinaryClassificationModelSelector {
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed
   ): BinaryClassificationModelSelector = {
-    new BinaryClassificationModelSelector(
+    selector(
       new OpTrainValidationSplit[ProbClassifier](trainRatio, seed, validationMetric),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
+  }
+
+
+  private def selector(
+    validator: OpValidator[ProbClassifier],
+    splitter: Option[Splitter],
+    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]]
+  ): BinaryClassificationModelSelector = {
+    new BinaryClassificationModelSelector(
+      validator = validator,
+      splitter = splitter,
+      trainTestEvaluators = trainTestEvaluators
+    ) // models on by default
+      .setModelsToTry(RandomForest, LogisticRegression)
+      // Random forest defaults
+      .setRandomForestMaxDepth(MaxDepth: _*)
+      .setRandomForestImpurity(ImpurityClass)
+      .setRandomForestMaxBins(MaxBin)
+      .setRandomForestMinInfoGain(MinInfoGain: _*)
+      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
+      .setRandomForestNumTrees(MaxTrees)
+      .setRandomForestSubsamplingRate(SubsampleRate)
+      // Logistic regression defaults
+      .setLogisticRegressionElasticNetParam(ElasticNet)
+      .setLogisticRegressionFitIntercept(FitIntercept)
+      .setLogisticRegressionMaxIter(MaxIterLin)
+      .setLogisticRegressionRegParam(Regularization: _*)
+      .setLogisticRegressionStandardization(Standardized)
+      .setLogisticRegressionTol(Tol)
+      // NB defaults
+      .setNaiveBayesModelType(NbModel)
+      .setNaiveBayesSmoothing(NbSmoothing)
+      // DT defaults
+      .setDecisionTreeImpurity(ImpurityClass)
+      .setDecisionTreeMaxBins(MaxBin)
+      .setDecisionTreeMaxDepth(MaxDepth: _*)
+      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
+      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
   }
 }
 

@@ -15,7 +15,7 @@ import org.scalatest.Suite
 
 /**
  * Trait to enable Spark context for tests
- * Copied from Spark test suite
+ * Modified version of Spark 2.x test suite trait
  */
 trait TestSparkContext extends TempDirectoryTest with TestCommon {
   self: Suite =>

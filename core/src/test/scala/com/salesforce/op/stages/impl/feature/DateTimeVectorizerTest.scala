@@ -52,7 +52,7 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     val vector = f1.vectorize(
-      dateListPivot = Transmogrifier.DateListDefault,
+      dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = false,
       others = Array(f2, f3)
@@ -67,7 +67,7 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext {
     meta.history.keys.size shouldBe 3
 
     val vector2 = f1.vectorize(
-      dateListPivot = Transmogrifier.DateListDefault,
+      dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = true,
       others = Array(f2, f3)

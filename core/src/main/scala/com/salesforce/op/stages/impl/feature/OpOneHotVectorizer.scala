@@ -12,7 +12,6 @@ import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Operators._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
-import com.salesforce.op.stages.impl.feature.Transmogrifier._
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -57,14 +56,14 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
       countOccurrences.map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
 
     // build metadata describing output
-    val otherValueString = Option($(unseenName))
-    val nullValueString = Some(Transmogrifier.NullString)
+    val unseen = Option($(unseenName))
     val columns = for {
       (parentFeature, values) <- inN.zip(topValues)
       parentFeatureType = parentFeature.typeName
       // Append other/null indicators for each input (view here to avoid copying the array when appending the string)
-      value <- if (shouldTrackNulls) values.map(Option(_)).view ++ Array(otherValueString, Some(NullString))
-      else values.map(Option(_)).view :+ otherValueString
+      value <-
+        if (shouldTrackNulls) values.map(Option(_)).view ++ Array(unseen, Option(TransmogrifierDefaults.NullString))
+        else values.map(Option(_)).view :+ unseen
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(parentFeature.name),
       parentFeatureType = Seq(parentFeatureType),
@@ -72,7 +71,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
       indicatorValue = value
     )
 
-    val vecMetadata = OpVectorMetadata(outputName, columns, Transmogrifier.inputFeaturesToHistory(inN))
+    val vecMetadata = OpVectorMetadata(outputName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
     setMetadata(vecMetadata.toMetadata)
 
     makeModel(
@@ -189,7 +188,7 @@ class OpTextPivotVectorizer[T <: Text]
     val shouldCleanText = $(cleanText)
 
     dataset.rdd.map(_.map(cat =>
-      cat.map(v => cleanTextFn(v.toString, shouldCleanText) -> 1).toMap
+      cat.map(v => cleanTextFn(v, shouldCleanText) -> 1).toMap
     ))
   }
 

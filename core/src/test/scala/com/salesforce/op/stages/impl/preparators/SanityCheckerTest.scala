@@ -107,12 +107,14 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     the[IllegalArgumentException] thrownBy checker.setMinCorrelation(2.0)
     the[IllegalArgumentException] thrownBy checker.setMaxCorrelation(-1.0)
     the[IllegalArgumentException] thrownBy checker.setMaxCorrelation(2.0)
-    the[IllegalArgumentException] thrownBy checker.setSampleLimit(-1)
+    the[IllegalArgumentException] thrownBy checker.setSampleUpperLimit(-1)
+    the[IllegalArgumentException] thrownBy checker.setSampleLowerLimit(-1)
   }
 
   it should "have proper default values for all params" in {
     val checker = new SanityChecker()
-    checker.getOrDefault(checker.sampleLimit) shouldBe SanityChecker.SampleLimit
+    checker.getOrDefault(checker.sampleLowerLimit) shouldBe SanityChecker.SampleLowerLimit
+    checker.getOrDefault(checker.sampleUpperLimit) shouldBe SanityChecker.SampleUpperLimit
     checker.getOrDefault(checker.checkSample) shouldBe SanityChecker.CheckSample
     checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
     checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
@@ -176,11 +178,8 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       .setRemoveBadFeatures(true)
       .setInput(targetLabel, featureVector).getOutput().name
 
-    the[RuntimeException] thrownBy {
-      sanityChecker.fit(testData)
-    } should have message
-      "requirement failed: Nothing has been added to this summarizer."
-
+    val result = sanityChecker.fit(testData)
+    succeed
   }
 
   it should "fail when features are defined incorrectly" in {
@@ -222,14 +221,16 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     )
 
     val f1r = f1.copy(isResponse = true)
-    // Check that setSampleLimit is working by limiting the sample size to 0 (deterministic) and checking for an error
-    // We cannot use a non-zero sample limit since the Spark sampling algorithm is not deterministic and does not
-    // guarantee exactly the supplied sampling fraction
+    // Check that setSampleUpperLimit works by limiting the sample size to 0 (deterministic)
+    // and checking for an error.
+    // We cannot use a non-zero sample limit since the Spark sampling algorithm
+    // is not deterministic and does not guarantee exactly the supplied sampling fraction
     val sanityChecker = new SanityChecker()
       .setInput(f1r, f2)
       .setRemoveBadFeatures(true)
       .setCheckSample(0.99999)
-      .setSampleLimit(0)
+      .setSampleLowerLimit(0)
+      .setSampleUpperLimit(0)
 
     the[IllegalArgumentException] thrownBy {
       sanityChecker.fit(data)
@@ -313,14 +314,12 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
         (expectedCorrFeatNames.length + expectedCorrFeatNamesIsNan.length - expectedFeaturesToDrop.length)
     }
 
-    transformedData.show(false)
-
     val metadata: Metadata = getMetadata(outputColName, transformedData)
     val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
 
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    summary.correlationsWLabelIsNaN should contain theSameElementsAs expectedCorrFeatNamesIsNan
+    summary.correlationsWLabel.nanCorrs should contain theSameElementsAs expectedCorrFeatNamesIsNan
     summary.correlationsWLabel.featuresIn should contain theSameElementsAs expectedCorrFeatNames
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
   }

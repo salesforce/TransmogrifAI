@@ -156,10 +156,10 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
-      inA -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inB -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inC -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inD -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      inA -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inD -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
   }
@@ -193,10 +193,10 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
-      inA -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inB -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inC -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      inD -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      inA -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      inD -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
   }

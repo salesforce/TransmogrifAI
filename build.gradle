@@ -42,6 +42,7 @@ configure(allProjs) {
     apply plugin: 'scalaStyle'
     apply plugin: 'maven'
     apply plugin: 'maven-publish'
+    apply plugin: 'project-report'
     apply plugin: 'com.jfrog.artifactory'
     apply plugin: 'com.commercehub.gradle.plugin.avro'
     apply plugin: 'net.minecrell.licenser'
@@ -189,8 +190,10 @@ configure(allProjs) {
         header = rootProject.file('LICENSE.txt')
         ignoreFailures = true
         include '**/*.java', '**/*.scala'
-        exclude '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.java',
-                '**/com/salesforce/op/utils/io/DirectOutputCommitter.java',
+        exclude '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.scala',
+                '**/com/salesforce/op/test/TestSparkContext.scala',
+                '**/com/salesforce/op/test/TempDirectoryTest.scala',
+                '**/com/salesforce/op/utils/io/DirectOutputCommitter.scala',
                 '**/org/apache/spark/ml/tuning/OpCrossValidator.scala',
                 '**/org/apache/spark/ml/tuning/OpTrainValidationSplit.scala',
                 '**/com/fasterxml/jackson/module/scala/**',

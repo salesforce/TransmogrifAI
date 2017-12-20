@@ -5,3 +5,13 @@
 'description' - what kind of feature is this? [0] text [1] categorical: => 0
 'boarded' - what kind of feature is this? [0] integral [1] categorical: => 1
 'recordDate' - what kind of feature is this? [0] integral [1] categorical: => 0
+'Survived' - what kind of feature is this? [0] integral [1] categorical: => 1
+'Pclass' - what kind of feature is this? [0] integral [1] categorical: => 0
+'Name' - what kind of feature is this? [0] text [1] categorical: => 0
+'Sex' - what kind of feature is this? [0] text [1] categorical: => 1
+'SibSp' - what kind of feature is this? [0] integral [1] categorical: => 0
+'Parch' - what kind of feature is this? [0] integral [1] categorical: => 0
+'Ticket' - what kind of feature is this? [0] text [1] categorical: => 1
+'Cabin' - what kind of feature is this? [0] text [1] categorical: => 0
+'Embarked' - what kind of feature is this? [0] text [1] categorical: => 1
+Cannot infer the kind of problem based on response field 'Survived'. What kind of problem is this? => binclass

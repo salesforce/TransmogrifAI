@@ -20,10 +20,10 @@ For instance, in order to generate a binary classification model with Titanic da
 op gen --input Passengers.csv --id passengerId --response survived --schema Passenger.avsc TitanicProj
 ```
 
-If you have answers to questions in a file (see e.g. passengers.answers), and want to override the old project,
+If you have answers to questions in a file (see e.g. passengers.answers), and want to overwrite the old project,
 the command line looks like this:
 ```
-op gen --input templates/simple/src/main/resources/PassengerData.csv --id passengerId --response survived --schema utils/src/main/avro/PassengerCSV.avsc --answers cli/passengers.answers TitanicProj10112017 --override
+op gen --input templates/simple/src/main/resources/PassengerData.csv --id passengerId --response survived --schema utils/src/main/avro/PassengerCSV.avsc --answers cli/passengers.answers TitanicProj10112017 --overwrite
 ```
 ## Templates
 

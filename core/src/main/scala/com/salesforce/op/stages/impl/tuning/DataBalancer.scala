@@ -10,7 +10,6 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.functions.monotonically_increasing_id
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.slf4j.LoggerFactory
 
@@ -65,7 +64,7 @@ case object DataSplitter {
    */
   def apply(
     seed: Long = SplitterParamsDefault.seedDefault,
-    reserveTestFraction: Double = SplitterParamsDefault.reserveTestFractionDefault
+    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault
   ): DataSplitter = {
     new DataSplitter()
       .setSeed(seed)
@@ -81,8 +80,8 @@ case object DataSplitter {
  */
 class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
   final override private[impl] def split(dataset: Dataset[(Double, Vector, Double)]): ModelSplitData = {
-    val data = randomSplit(dataset, 1 - getReserveTestFraction)
-    ModelSplitData(data._1.persist(), data._2.persist(), new MetadataBuilder().build(), false)
+    val (dataTrain, dataTest) = randomSplit(dataset, 1 - getReserveTestFraction)
+    ModelSplitData(dataTrain.persist(), dataTest.persist(), new MetadataBuilder().build(), false)
   }
 
   final override def copy(extra: ParamMap): DataSplitter = {
@@ -100,22 +99,19 @@ case object DataBalancer {
    * @param maxTrainingSample   maximum size of training set
    * @param seed                seed for spliting and balancing
    * @param reserveTestFraction fraction of the data used for test
-   * @param splitData           wether or not split the data into training set and test set
    * @return data balancer
    */
   def apply(
-    sampleFraction: Double = SplitterParamsDefault.sampleFractionDefault,
-    maxTrainingSample: Int = SplitterParamsDefault.maxTrainingSampleDefault,
+    sampleFraction: Double = SplitterParamsDefault.SampleFractionDefault,
+    maxTrainingSample: Int = SplitterParamsDefault.MaxTrainingSampleDefault,
     seed: Long = SplitterParamsDefault.seedDefault,
-    reserveTestFraction: Double = SplitterParamsDefault.reserveTestFractionDefault,
-    splitData: Boolean = SplitterParamsDefault.splitDataDefault
+    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault
   ): DataBalancer = {
     new DataBalancer().setSampleFraction(sampleFraction)
       .setMaxTrainingSample(maxTrainingSample)
       .setSeed(seed)
       .setReserveTestFraction(reserveTestFraction)
-      .setSplitData(splitData)
-  }
+}
 
 }
 
@@ -150,14 +146,14 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     if (smallCount < (maxTrainingSample * sampleF)) {
       // check to make sure that upsampling will not make data too big
       val upSample =
-      if (checkUpSampleSize(100)) 100.0
-      else if (checkUpSampleSize(50)) 50.0
-      else if (checkUpSampleSize(10)) 10.0
-      else if (checkUpSampleSize(5)) 5.0
-      else if (checkUpSampleSize(4)) 4.0
-      else if (checkUpSampleSize(3)) 3.0
-      else if (checkUpSampleSize(2)) 2.0
-      else 1.0
+        if (checkUpSampleSize(100)) 100.0
+        else if (checkUpSampleSize(50)) 50.0
+        else if (checkUpSampleSize(10)) 10.0
+        else if (checkUpSampleSize(5)) 5.0
+        else if (checkUpSampleSize(4)) 4.0
+        else if (checkUpSampleSize(3)) 3.0
+        else if (checkUpSampleSize(2)) 2.0
+        else 1.0
 
       // then calculate appropriate subsample for big
       ((smallCount * upSample / sampleF - smallCount * upSample) / bigCount, upSample)
@@ -185,7 +181,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     Double, Double)
   = {
 
-    val defaultTestFraction = if ($(splitData)) $(reserveTestFraction) else 0.0
+    val defaultTestFraction = $(reserveTestFraction)
     val balancerSeed = $(seed)
 
     log.info(s"Sampling data to get $sampleF split versus $smallCount small and $bigCount big")
@@ -220,7 +216,6 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
   final override private[impl] def split(dataset: Dataset[(Double, Vector, Double)]): ModelSplitData = {
     // scalastyle:off
     import dataset.sparkSession.implicits._
-
     // scalastyle:on
 
     val ds = dataset.persist()
@@ -277,7 +272,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
         val (train, test) = (
           smallDataTrain.as[(Double, Vector, Double)].union(bigDataTrain.as[(Double, Vector, Double)]),
           bigDataTest.as[(Double, Vector, Double)].union(smallDataTest.as[(Double, Vector, Double)])
-          )
+        )
 
 
         val hasLeakage = upSample > 1.0
@@ -291,7 +286,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
         val (newPositiveCount, newNegativeCount) = (
           math.rint(positiveCount * posFraction),
           math.rint(negativeCount * negFraction)
-          )
+        )
 
         log.info(s"After sampling see " +
           s"$newPositiveCount positives and $newNegativeCount negatives, " +
@@ -320,6 +315,95 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
   }
 }
 
+case object DataCutter {
+
+  /**
+   * Creates instance that will split data into training and test set filtering out any labels that don't
+   * meet the minimum fraction cutoff or fall in the top N labels specified
+   *
+   * @param seed                set for the random split
+   * @param reserveTestFraction fraction of the data used for test
+   * @param maxLabelCategories  maximum number of label categories to include
+   * @param minLabelFraction    minimum fraction of total labels that a category must have to be included
+   * @return data splitter
+   */
+  def apply(
+    seed: Long = SplitterParamsDefault.seedDefault,
+    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault,
+    maxLabelCategories: Int = SplitterParamsDefault.MaxLabelCategoriesDefault,
+    minLabelFraction: Double = SplitterParamsDefault.MinLabelFractionDefault
+  ): DataCutter = {
+    new DataCutter()
+      .setSeed(seed)
+      .setReserveTestFraction(reserveTestFraction)
+      .setMaxLabelCategores(maxLabelCategories)
+      .setMinLabelFraction(minLabelFraction)
+  }
+}
+
+
+
+/**
+ * Instance that will balance the dataset before splitting.
+ * Creates instance that will split data into training and test set filtering out any labels that don't
+ * meet the minimum fraction cutoff or fall in the top N labels specified.
+ *
+ * @param uid
+ */
+class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
+
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+
+  /**
+   * function to use to create the training set and test set.
+   *
+   * @param data
+   * @return Training set test set
+   */
+  override private[impl] def split(data: Dataset[(Double, Vector, Double)]) = {
+    val minLabelFract = getMinLabelFraction
+    val maxLabels = getMaxLabelCategories
+
+    // scalastyle:off
+    import data.sparkSession.implicits._
+    // scalastyle:on
+
+    val labels = data.map(r => r._1 -> 1L)
+    val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
+    val totalValues = labelCounts.groupBy().sum(labelCounts.columns(1)).first().getLong(0).toDouble
+    val labelsKeep = labelCounts
+      .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
+      .sort($"sum(_2)".desc)
+      .take(maxLabels)
+      .map(_.getDouble(0))
+
+    val labelSet = labelsKeep.toSet
+    val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0))
+
+    if (labelSet.size > 1) {
+      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: ${labelsDropped.toSet}")
+    } else {
+      throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
+        s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
+        s"Label counts were: ${labelCounts.collect().toSeq}")
+    }
+
+    val dataUse = data.filter(r => labelSet.contains(r._1))
+
+    val metadata = new MetadataBuilder()
+    metadata.putDoubleArray(ModelSelectorBaseNames.LabelsKept, labelsKeep)
+    metadata.putDoubleArray(ModelSelectorBaseNames.LabelsDropped, labelsDropped)
+
+    val (dataTrain, dataTest) = randomSplit(dataUse, 1 - getReserveTestFraction)
+    ModelSplitData(dataTrain.persist(), dataTest.persist(), metadata.build(), false)
+  }
+
+  override def copy(extra: ParamMap): DataCutter = {
+    val copy = new DataCutter(uid)
+    copyValues(copy, extra)
+  }
+}
+
 
 private[impl] trait SplitterParams extends Params {
 
@@ -344,13 +428,10 @@ private[impl] trait SplitterParams extends Params {
    *
    * @group param
    */
-  final val reserveTestFraction = new DoubleParam(
-    this,
-    "reserveTestFraction",
-    "fraction of data to reserve for test",
-    ParamValidators.inRange(lowerBound = 0, upperBound = 1, lowerInclusive = false, upperInclusive = false)
+  final val reserveTestFraction = new DoubleParam(this, "reserveTestFraction", "fraction of data to reserve for test",
+    ParamValidators.inRange(lowerBound = 0, upperBound = 1, lowerInclusive = true, upperInclusive = false)
   )
-  setDefault(reserveTestFraction, SplitterParamsDefault.reserveTestFractionDefault)
+  setDefault(reserveTestFraction, SplitterParamsDefault.ReserveTestFractionDefault)
 
   def setReserveTestFraction(value: Double): this.type = {
     set(reserveTestFraction, value)
@@ -360,21 +441,6 @@ private[impl] trait SplitterParams extends Params {
 }
 
 private[impl] trait DataBalancerParams extends Params {
-  /**
-   * Whether or not splitting the data between a training set and a test set
-   * Default is true
-   *
-   * @group param
-   */
-  final val splitData = new BooleanParam(this, "splitData", "whether or not splitting the data between a training set" +
-    "and a test set")
-  setDefault(splitData, SplitterParamsDefault.splitDataDefault)
-
-  def setSplitData(value: Boolean): this.type = {
-    set(splitData, value)
-  }
-
-  def getSplitData: Boolean = $(splitData)
 
   /**
    * Targeted sample fraction for the class in minority.
@@ -388,7 +454,7 @@ private[impl] trait DataBalancerParams extends Params {
       lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = false
     )
   )
-  setDefault(sampleFraction, SplitterParamsDefault.sampleFractionDefault)
+  setDefault(sampleFraction, SplitterParamsDefault.SampleFractionDefault)
 
   def setSampleFraction(value: Double): this.type = {
     set(sampleFraction, value)
@@ -408,7 +474,7 @@ private[impl] trait DataBalancerParams extends Params {
       lowerBound = 0, upperBound = 1 << 30, lowerInclusive = false, upperInclusive = true
     )
   )
-  setDefault(maxTrainingSample, SplitterParamsDefault.maxTrainingSampleDefault)
+  setDefault(maxTrainingSample, SplitterParamsDefault.MaxTrainingSampleDefault)
 
   def setMaxTrainingSample(value: Int): this.type = {
     set(maxTrainingSample, value)
@@ -417,12 +483,42 @@ private[impl] trait DataBalancerParams extends Params {
   def getMaxTrainingSample: Int = $(maxTrainingSample)
 }
 
+private[impl] trait DataCutterParams extends Params {
+
+  final val maxLabelCategories = new IntParam(this, "maxLabelCategories",
+    "maximum number of label categories for multiclass classification",
+    ParamValidators.inRange(lowerBound = 1, upperBound = 1 << 30, lowerInclusive = false, upperInclusive = true)
+  )
+  setDefault(maxLabelCategories, SplitterParamsDefault.MaxLabelCategoriesDefault)
+
+  def setMaxLabelCategores(value: Int): this.type = {
+    set(maxLabelCategories, value)
+  }
+
+  def getMaxLabelCategories: Int = $(maxLabelCategories)
+
+  final val minLabelFraction = new DoubleParam(this, "minLabelFraction",
+    "minimum fraction of the data a label category must have", ParamValidators.inRange(
+      lowerBound = 0.0, upperBound = 0.5, lowerInclusive = true, upperInclusive = false
+    )
+  )
+  setDefault(minLabelFraction, SplitterParamsDefault.MinLabelFractionDefault)
+
+  def setMinLabelFraction(value: Double): this.type = {
+    set(minLabelFraction, value)
+  }
+
+  def getMinLabelFraction: Double = $(minLabelFraction)
+
+}
+
 object SplitterParamsDefault {
 
   def seedDefault: Long = util.Random.nextLong
 
-  val reserveTestFractionDefault = 0.1
-  val splitDataDefault = true
-  val sampleFractionDefault = 0.1
-  val maxTrainingSampleDefault = 100000
+  val ReserveTestFractionDefault = 0.1
+  val SampleFractionDefault = 0.1
+  val MaxTrainingSampleDefault = 100000
+  val MaxLabelCategoriesDefault = 100
+  val MinLabelFractionDefault = 0.0
 }

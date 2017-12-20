@@ -233,6 +233,31 @@ trait RichNumericFeature {
     }
 
     /**
+     * Apply NumericBucketizer transformer shortcut function
+     *
+     * @param trackNulls   option to keep track of values that were missing
+     * @param splits       sorted list of split points for bucketizing
+     * @param bucketLabels sorted list of labels for the buckets
+     */
+    def bucketize(
+      trackNulls: Boolean,
+      splits: Array[Double] = NumericBucketizer.Splits,
+      bucketLabels: Option[Array[String]] = None
+    ): FeatureLike[OPVector] = {
+      f.transformWith(new NumericBucketizer[Double, T]().setBuckets(splits, bucketLabels).setTrackNulls(trackNulls))
+    }
+
+    /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label      label feature
+     * @param trackNulls option to keep track of values that were missing
+     */
+    def autoBucketize(label: FeatureLike[RealNN], trackNulls: Boolean): FeatureLike[OPVector] = {
+      new DecisionTreeNumericBucketizer[Double, T]().setTrackNulls(trackNulls).setInput(label, f).getOutput()
+    }
+
+    /**
      * Apply real vectorizer: Converts a sequence of Real features into a vector feature.
      *
      * @param others       other features of same type
@@ -282,8 +307,9 @@ trait RichNumericFeature {
     }
 
     /**
-     *  Apply standard isotonic regression transformer shortcut function.
-     * @param label feature to calibrate against
+     * Apply standard isotonic regression transformer shortcut function.
+     *
+     * @param label      feature to calibrate against
      * @param isIsotonic increasing default true or decreasing
      * @return recalibrated feature
      */
@@ -301,10 +327,10 @@ trait RichNumericFeature {
      *
      * @see [[OpStringIndexerNoFilter]] for converting text into indices
      *
-     * @param labels Optional array of labels specifying index-string mapping.
-     *               If not provided or if empty, then metadata from input feature is used instead.
-     * @param unseenName     name to give strings that appear in transform but not in fit
-     * @param handleInvalid   how to transform values not seen in fitting
+     * @param labels        Optional array of labels specifying index-string mapping.
+     *                      If not provided or if empty, then metadata from input feature is used instead.
+     * @param unseenName    name to give strings that appear in transform but not in fit
+     * @param handleInvalid how to transform values not seen in fitting
      * @return deindexed text feature
      */
     def deindexed(
@@ -328,40 +354,52 @@ trait RichNumericFeature {
      * @param checkSample       Rate to downsample the data for statistical calculations (note: actual sampling
      *                          will not be exact due to Spark's dataset sampling behavior)
      * @param sampleSeed        Seed to use when sampling
-     * @param sampleLimit       Upper limit on number of samples in downsampled data set (note: sample limit
+     * @param sampleLowerLimit  Lower limit on number of samples in downsampled data set (note: sample limit
+     *                          will not be exact, due to Spark's dataset sampling behavior)
+     * @param sampleUpperLimit  Upper limit on number of samples in downsampled data set (note: sample limit
      *                          will not be exact, due to Spark's dataset sampling behavior)
      * @param maxCorrelation    Maximum correlation (absolute value) allowed between a feature in the
      *                          feature vector and the label
      * @param minCorrelation    Minimum correlation (absolute value) allowed between a feature in the
      *                          feature vector and the label
-     * @param correlationType  Which coefficient to use for computing correlation
+     * @param correlationType   Which coefficient to use for computing correlation
      * @param minVariance       Minimum amount of variance allowed for each feature and label
      * @param removeBadFeatures If set to true, this will automatically remove all the bad features
      *                          from the feature vector
      * @return sanity checked feature vector
      */
+    // scalastyle:off
     def sanityCheck(
       featureVector: FeatureLike[OPVector],
       checkSample: Double = SanityChecker.CheckSample,
       sampleSeed: Long = SanityChecker.SampleSeed,
-      sampleLimit: Int = SanityChecker.SampleLimit,
+      sampleLowerLimit: Int = SanityChecker.SampleLowerLimit,
+      sampleUpperLimit: Int = SanityChecker.SampleUpperLimit,
       maxCorrelation: Double = SanityChecker.MaxCorrelation,
       minCorrelation: Double = SanityChecker.MinCorrelation,
+      maxCramersV: Double = SanityChecker.MaxCramersV,
       correlationType: CorrelationType = SanityChecker.CorrelationType,
       minVariance: Double = SanityChecker.MinVariance,
-      removeBadFeatures: Boolean = SanityChecker.RemoveBadFeatures
+      removeBadFeatures: Boolean = SanityChecker.RemoveBadFeatures,
+      categoricalLabel: Option[Boolean] = None
     ): FeatureLike[OPVector] = {
-      new SanityChecker()
+      // scalastyle:on
+      val checker = new SanityChecker()
         .setCheckSample(checkSample)
         .setSampleSeed(sampleSeed)
-        .setSampleLimit(sampleLimit)
+        .setSampleLowerLimit(sampleLowerLimit)
+        .setSampleUpperLimit(sampleUpperLimit)
         .setMaxCorrelation(maxCorrelation)
         .setMinCorrelation(minCorrelation)
+        .setMaxCramersV(maxCramersV)
         .setCorrelationType(correlationType)
         .setMinVariance(minVariance)
         .setRemoveBadFeatures(removeBadFeatures)
         .setInput(f, featureVector)
-        .getOutput()
+
+      categoricalLabel.foreach(checker.setCategoricalLabel)
+
+      checker.getOutput()
     }
 
     /**
@@ -430,6 +468,31 @@ trait RichNumericFeature {
     }
 
     /**
+     * Apply NumericBucketizer transformer shortcut function
+     *
+     * @param trackNulls   option to keep track of values that were missing
+     * @param splits       sorted list of split points for bucketizing
+     * @param bucketLabels sorted list of labels for the buckets
+     */
+    def bucketize(
+      trackNulls: Boolean,
+      splits: Array[Double] = NumericBucketizer.Splits,
+      bucketLabels: Option[Array[String]] = None
+    ): FeatureLike[OPVector] = {
+      f.transformWith(new NumericBucketizer[Long, T]().setBuckets(splits, bucketLabels).setTrackNulls(trackNulls))
+    }
+
+    /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label      label feature
+     * @param trackNulls option to keep track of values that were missing
+     */
+    def autoBucketize(label: FeatureLike[RealNN], trackNulls: Boolean): FeatureLike[OPVector] = {
+      new DecisionTreeNumericBucketizer[Long, T]().setTrackNulls(trackNulls).setInput(label, f).getOutput()
+    }
+
+    /**
      * Apply integral vectorizer: Converts a sequence of Integral features into a vector feature.
      *
      * @param others       other features of same type
@@ -445,9 +508,7 @@ trait RichNumericFeature {
       trackNulls: Boolean,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
-      val stage = new IntegralVectorizer()
-        .setInput(f +: others)
-        .setTrackNulls(trackNulls)
+      val stage = new IntegralVectorizer().setInput(f +: others).setTrackNulls(trackNulls)
       if (fillWithMode) stage.setFillWithMode else stage.setFillWithConstant(fillValue)
       stage.getOutput()
     }

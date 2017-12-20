@@ -28,7 +28,7 @@ class AvroFieldTest extends FlatSpec with TestCommon with Assertions {
       Schema.Type.DOUBLE,
       Schema.Type.BOOLEAN
     )
-    val simpleSchemas = types map (t => t -> Schema.create(t)) toMap
+    val simpleSchemas = types map Schema.create
 
     val unions = List(
       Schema.createUnion((Schema.Type.NULL::Schema.Type.INT::Nil) map Schema.create asJava),
@@ -38,21 +38,22 @@ class AvroFieldTest extends FlatSpec with TestCommon with Assertions {
     val enum = Schema.createEnum("Aliens", "undocumented", "outer",
       List("Edgar_the_Bug", "Boris_the_Animal", "Laura_Vasquez") asJava)
 
-    val allSchemas = (enum::unions)++simpleSchemas.values.tail // NULL does not work
+    val allSchemas = (enum::unions)++simpleSchemas // NULL does not work
 
     val fields = allSchemas.zipWithIndex map {
       case (s, i) => new Schema.Field("x" + i, s, "Who", null)
     }
 
     val expected = List(
-      AEnum(nullable = false, "x0"),
-      AInt(nullable = true, "x1"),
-      AInt(nullable = true, "x2"),
-      AFloat(nullable = false, "x3"),
-      ADouble(nullable = false, "x4"),
-      ALong(nullable = false, "x5"),
-      AString(nullable = false, "x6"),
-      AInt(nullable = false, "x7")
+      AEnum(fields(0), isNullable = false),
+      AInt(fields(1), isNullable = true),
+      AInt(fields(2), isNullable = true),
+      AString(fields(3), isNullable = false),
+      AInt(fields(4), isNullable = false),
+      ALong(fields(5), isNullable = false),
+      AFloat(fields(6), isNullable = false),
+      ADouble(fields(7), isNullable = false),
+      ABoolean(fields(8), isNullable = false)
     )
 
     an[IllegalArgumentException] should be thrownBy {
@@ -66,7 +67,7 @@ class AvroFieldTest extends FlatSpec with TestCommon with Assertions {
     for {
       (field, expected) <- fields zip expected
     } {
-      val actual = AvroField.from(field)
+      val actual = AvroField from field
       actual shouldBe expected
     }
   }

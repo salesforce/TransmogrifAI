@@ -12,12 +12,6 @@ import com.salesforce.op.cli.gen.{Ops, ProblemSchema}
 
 import scala.util.{Failure, Success, Try}
 
-case class CliParameters
-(
-  command: String = "",
-  settings: GeneratorConfigurator = GeneratorConfigurator()
-)
-
 /**
  * Represents a builder for the command to generate a project.
  *
@@ -25,40 +19,35 @@ case class CliParameters
  * @param inputFile  The file to use for input (should be csv)
  * @param response   The name of the response field
  * @param idField    The name of the ID field
- * @param schemaFile The file to read a schema from
+ * @param schemaSource The way data schema is discovered
  * @param answersFile The file with answers to questions; using stdin if missing
- * @param overrideit tells whether we can override the existing project folder
+ * @param overwrite tells whether we can override the existing project folder
  */
-case class GeneratorConfigurator
+case class CliParameters
 (
+  command: String = "???",
   location: File = new File("."),
   projName: String = "Sample",
   inputFile: Option[File] = None,
   response: Option[String] = None,
   idField: Option[String] = None,
-  schemaFile: Option[File] = None,
+  schemaSource: Option[SchemaSource] = None,
   answersFile: Option[File] = None,
-  overrideit: Boolean = false
+  overwrite: Boolean = false
 ) {
 
-  private def delete(dir: File): Unit = {
-    val contents = Option(dir.listFiles).map(_.toList).toList.flatten
+  private def delete(f: File): Unit = {
+    Option(f.listFiles).foreach(_ foreach delete)
+    f.delete()
 
-    for {
-      f <- contents
-    } {
-      delete(f)
-    }
-    dir.delete()
-
-    if (dir.exists()) {
-      throw new IllegalStateException(s"Directory '${dir.getAbsolutePath}' still exists")
+    if (f.exists()) {
+      throw new IllegalStateException(s"Directory '${f.getAbsolutePath}' still exists")
     }
   }
 
   private def ensureProjectDir(projectName: String): Option[File] = Try {
     val dir = new File(location, projName.toLowerCase)
-    if (overrideit) delete(dir)
+    if (overwrite) delete(dir)
 
     dir.mkdirs()
     if (!dir.exists()) {
@@ -76,7 +65,7 @@ case class GeneratorConfigurator
     inf <- inputFile
     resp <- response
     idf <- idField
-    sf <- schemaFile
+    sd <- schemaSource
     pd <- ensureProjectDir(projName)
   } yield GeneratorConfig(
     projName = projName,
@@ -84,7 +73,7 @@ case class GeneratorConfigurator
     inputFile = inf,
     response = resp,
     idField = idf,
-    schemaFile = sf,
+    schemaSource = sd,
     answersFile = answersFile)
 }
 
@@ -96,16 +85,17 @@ case class GeneratorConfigurator
  * @param inputFile  The file to use for input (should be csv)
  * @param response   The name of the response field
  * @param idField    The name of the ID field
- * @param schemaFile The file to read a schema from
+ * @param schemaSource The way data schema is discovered
  * @param answersFile The file with answers to questions; using stdin if missing
  */
 case class GeneratorConfig
 (
+  command: String = "",
   projName: String,
   projectDirectory: File,
   inputFile: File,
   response: String,
   idField: String,
-  schemaFile: File,
+  schemaSource: SchemaSource,
   answersFile: Option[File]
 )

@@ -37,7 +37,6 @@ class OpVectorMetadata private
    */
   def size: Int = columns.length
 
-
   /**
    * Return a new instance of [[OpVectorMetadata]] with the given columns used to update columns with value information
    *
@@ -86,6 +85,7 @@ class OpVectorMetadata private
         throw new RuntimeException(s"Parent feature name '${pn}' has no associated history")))
       val histComb = hist.head.merge(hist.tail: _*)
       OpVectorColumnHistory(
+        columnName = c.makeColName(),
         parentFeatureName = c.parentFeatureName,
         parentFeatureOrigins = histComb.originFeatures,
         parentFeatureStages = histComb.stages,
@@ -141,15 +141,6 @@ object OpVectorMetadata {
   val HistoryKey = "vector_history"
 
   /**
-   * Update the indices associated witht the columns to match
-   * @param columns Array containing column information
-   * @return Same array with index val in [[OpVectorColumnMetadata]] updated to match location in array
-   */
-  def updateColIndices(columns: Array[OpVectorColumnMetadata]): Array[OpVectorColumnMetadata] = {
-    columns.zipWithIndex.map{ case(c, i) => c.copy(index = i) }
-  }
-
-  /**
    * Construct an [[OpVectorMetadata]] from a [[StructField]], assuming that [[ColumnsKey]] is present and conforms
    * to an array of [[OpVectorColumnMetadata]]
    *
@@ -168,6 +159,7 @@ object OpVectorMetadata {
 
     new OpVectorMetadata(field.name, columns, history)
   }
+
 
   /**
    * Construct an [[OpVectorMetadata]] from a string representing its name, and an array of [[OpVectorColumnMetadata]]

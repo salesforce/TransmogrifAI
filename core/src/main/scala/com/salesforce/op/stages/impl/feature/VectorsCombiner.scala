@@ -6,13 +6,16 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import org.apache.spark.ml.attribute.AttributeGroup
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.Dataset
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
 
 
 /**
@@ -35,7 +38,16 @@ class VectorsCombiner(uid: String = UID[VectorsCombiner])
    */
   private def updateMetadata(data: Dataset[Seq[OPVector#Value]]): Unit = {
     val schema = getInputSchema()
-    val attributes = inN.map(f => OpVectorMetadata(schema(f.name)))
+    lazy val firstRow = data.first()
+
+    def vectorSize(f: TransientFeature, index: Int): Int = Try {
+      AttributeGroup.fromStructField(schema(f.name)).numAttributes.get // see it there is an attribute group size
+    } getOrElse firstRow(index).size // get the size from the data
+
+    val attributes = inN.zipWithIndex.map {
+      case (f, i) => Try(OpVectorMetadata(schema(f.name))).getOrElse(f.toVectorMetaData(vectorSize(f, i)))
+    }
+
     val outMeta = OpVectorMetadata.flatten(outputName, attributes)
     setMetadata(outMeta.toMetadata)
   }

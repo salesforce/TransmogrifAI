@@ -54,7 +54,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
       (FN.ResultFeaturesUids.entryName -> resultFeaturesJArray) ~
       (FN.Stages.entryName -> stagesJArray(path)) ~
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
-      (FN.Parameters.entryName -> model.parameters.toJson(pretty = false))
+      (FN.Parameters.entryName -> model.parameters.toJson(pretty = false)) ~
+      (FN.TrainParameters.entryName -> model.trainingParams.toJson(pretty = false))
   }
 
   private def resultFeaturesJArray(): JArray =
@@ -111,6 +112,7 @@ private[op] object OpWorkflowModelReadWriteShared {
     case object Stages extends FieldNames("stages")
     case object AllFeatures extends FieldNames("allFeatures")
     case object Parameters extends FieldNames("parameters")
+    case object TrainParameters extends FieldNames("trainParameters")
   }
 
 }

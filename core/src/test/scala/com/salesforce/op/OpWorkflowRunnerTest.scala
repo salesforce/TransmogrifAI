@@ -11,23 +11,27 @@ import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.utils.spark.AppMetrics
 import org.apache.commons.io.FileUtils
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{AsyncFlatSpec, FlatSpec}
 import org.scalatest.junit.JUnitRunner
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.concurrent.Promise
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest {
+class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val thisDir = new File("resources/tmp/OpWorkflowRunnerTest/")
 
-  override def afterAll: Unit = {
-    super.afterAll()
-    try deleteRecursively(thisDir) finally super.afterAll()
-  }
+  override def beforeAll: Unit = try deleteRecursively(thisDir) finally super.beforeAll
+
+  override def afterAll: Unit = try deleteRecursively(thisDir) finally super.afterAll
 
   private val features = Seq(height, weight, gender, description, age).transmogrify()
   private val survivedNum = survived.occurs()
@@ -38,6 +42,8 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest {
     Evaluators.BinaryClassification()
       .setLabelCol(survivedNum).setPredictionCol(pred).setRawPredictionCol(raw)
 
+  val metricsPromise = Promise[AppMetrics]()
+
   val testRunner = new OpWorkflowRunner(
     workflow = workflow,
     trainingReader = dataReader,
@@ -46,11 +52,10 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest {
     featureToComputeUpTo = gender,
     evaluator = evaluator,
     scoringEvaluator = Some(evaluator)
-  )
+  ).addApplicationEndHandler(collectMetrics(metricsPromise))
 
   val invalidParamsLocation = Some(resourceFile(name = "RunnerParamsInvalid.json").getPath)
   val paramsLocation = Some(resourceFile(name = "RunnerParams.json").getPath)
-
   val testConfig = OpWorkflowRunnerConfig(paramLocation = paramsLocation)
 
   Spec[OpWorkflowRunner] should "correctly determine if the command line options are valid for each run type" in {
@@ -155,6 +160,19 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest {
     res shouldBe a[FeaturesResult]
   }
 
+  it should "collect and report metrics on application end" in {
+    spark.stop()
+    metricsPromise.future.map { metrics =>
+      metrics.appId.isEmpty shouldBe false
+      OpWorkflowRunType.withNameInsensitiveOption(metrics.runType).isDefined shouldBe true
+      metrics.appName shouldBe "op-test"
+      metrics.appStartTime should be >= 0L
+      metrics.appEndTime should be >= 0L
+      metrics.appDuration should be >= 0L
+      metrics.stageMetrics.length should be > 0
+    }
+  }
+
   private def doRun(rc: OpWorkflowRunnerConfig, outFiles: File*): OpWorkflowRunnerResult = {
     val res = testRunner.run(rc.runType, rc.toOpParams.get)
 
@@ -167,6 +185,11 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest {
       files.size > 1
     }
     res
+  }
+
+  private def collectMetrics(p: Promise[AppMetrics])(appMetrics: AppMetrics): Unit = {
+    log.info("App metrics:\n{}", appMetrics)
+    if (!p.isCompleted) p.success(appMetrics)
   }
 
 }

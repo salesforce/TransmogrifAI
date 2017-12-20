@@ -15,10 +15,13 @@ import org.joda.time.Duration
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val simpleReader = DataReaders.Simple.csv[PassengerCSV](
     path = Some(passengerCsvPath),
@@ -47,8 +50,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     val joinedData = joinedReader.generateDataFrame(Array(survived, age, gender, origin)).collect()
 
-    println("Actual data:")
-    joinedData.foreach(println)
+    log.info("Actual data:\n{}", joinedData.mkString("\n"))
 
     val dataExpected = Array(
       Row(List("NY"), null, 32, List("Female"), "1"),
@@ -60,8 +62,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Row(List("UT"), true, null, List(), "6"),
       Row(List("AZ"), null, null, null, "7"))
 
-    println("Expected data:")
-    dataExpected.foreach(println)
+    log.info("Expected data:\n{}", dataExpected.mkString("\n"))
 
     joinedData.map(_.get(0)).toSet shouldEqual dataExpected.map(_.get(0)).toSet
     joinedData.map(_.get(1)).toSet shouldEqual dataExpected.map(_.get(1)).toSet
@@ -74,8 +75,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     val joinedData = joinedReader.generateDataFrame(Array(survived, age, gender, origin)).collect()
 
-    println("Actual data:")
-    joinedData.foreach(println)
+    log.info("Actual data:\n{}", joinedData.mkString("\n"))
 
     val dataExpected = Array(
       Row(List("NY"), null, 32, List("Female"), "1"),
@@ -85,8 +85,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Row(List("TX"), true, null, List(), "6"),
       Row(List("UT"), true, null, List(), "6"))
 
-    println("Expected data:")
-    dataExpected.foreach(println)
+    log.info("Expected data:\n{}", dataExpected.mkString("\n"))
 
     joinedData.map(_.get(0)).toSet shouldEqual dataExpected.map(_.get(0)).toSet
     joinedData.map(_.get(1)).toSet shouldEqual dataExpected.map(_.get(1)).toSet
@@ -99,8 +98,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     val joinedData = joinedReader.generateDataFrame(Array(survived, age, gender, origin)).collect()
 
-    println("Actual data:")
-    joinedData.foreach(println)
+    log.info("Actual data:\n{}", joinedData.mkString("\n"))
 
     val dataExpected = Array(
       Row(List("NY"), null, 32, List("Female"), "1"),
@@ -111,8 +109,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Row(List("UT"), true, null, List(), "6"),
       Row(List("AZ"), null, null, null, "7"))
 
-    println("Expected data:")
-    dataExpected.foreach(println)
+    log.info("Expected data:\n{}", dataExpected.mkString("\n"))
 
     joinedData.map(_.get(0)).toSet shouldEqual dataExpected.map(_.get(0)).toSet
     joinedData.map(_.get(1)).toSet shouldEqual dataExpected.map(_.get(1)).toSet
@@ -139,8 +136,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     val joinedData = joinedDataFrame.collect()
 
-    println("Actual data:")
-    joinedData.foreach(println)
+    log.info("Actual data:\n{}", joinedData.mkString("\n"))
 
     val dataExpected = Array(
       Row(List("NY"), null, 32, List("Female"), "Logistic regression models are neat", "1"),
@@ -150,8 +146,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Row(List("TX"), true, null, List(), null, "6"),
       Row(List("UT"), true, null, List(), null, "6"))
 
-    println("Expected data:")
-    dataExpected.foreach(println)
+    log.info("Expected data:\n{}", dataExpected.mkString("\n"))
 
     joinedData.map(_.get(0)).toSet shouldEqual dataExpected.map(_.get(0)).toSet
     joinedData.map(_.get(1)).toSet shouldEqual dataExpected.map(_.get(1)).toSet
@@ -173,7 +168,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
     val inputFeatures: Array[OPFeature] = Array(survived, age, boardedTime, newDescription, newBoarded)
     val aggregatedData = joinedReader.generateDataFrame(inputFeatures)
 
-    aggregatedData.show(false)
+    if (log.isInfoEnabled) aggregatedData.show(false)
 
     aggregatedData.count() shouldBe 8
     aggregatedData.schema.fields.map(_.name).toSet shouldEqual Set(DataFrameFieldNames.KeyFieldName, survived.name,
@@ -184,7 +179,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
     val sparkReader = DataReaders.Simple.csv[SparkExampleJoin](
       path = Some("../test-data/SparkExampleJoin.csv"),
       schema = SparkExampleJoin.getClassSchema.toString(),
-      key = _.getId.toString
+      key = _.getId
     )
     val description = FeatureBuilder.Text[SparkExampleJoin]
       .extract(_.getDescription.toText).asPredictor
@@ -212,14 +207,14 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       primary = new TimeColumn(time),
       timeWindow = Duration.standardDays(1000)
     )
-
-
     val joinedData = sparkReader.outerJoin(secondReader, joinKeys).generateDataFrame(inputFeatures).persist()
-    joinedData.show(false)
+
+    if (log.isInfoEnabled) joinedData.show(false)
 
     val joinedReader = sparkReader.outerJoin(secondReader, joinKeys).withSecondaryAggregation(timeFilter)
     val aggregatedData = joinedReader.generateDataFrame(inputFeatures).persist()
-    aggregatedData.show(false)
+
+    if (log.isInfoEnabled) aggregatedData.show(false)
 
     // right fields unchanged by agg
     joinedData.select(description, time).collect.toSet shouldEqual
@@ -252,13 +247,15 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       newHeight, newWeight, recordTime
     )
 
-    println("Joined & aggregated data:")
-    val nonAgg = joinedReader.generateDataFrame(inputFeatures)
-    nonAgg.show(false)
+    log.info("Joined & aggregated data:")
+    if (log.isInfoEnabled) {
+      val nonAgg = joinedReader.generateDataFrame(inputFeatures)
+      nonAgg.show(false)
+    }
 
-    println("After secondary aggregation:")
+    log.info("After secondary aggregation:")
     val aggregatedData = joinedReader.withSecondaryAggregation(timeFilter).generateDataFrame(inputFeatures).persist()
-    aggregatedData.show(false)
+    if (log.isInfoEnabled) aggregatedData.show(false)
 
     aggregatedData.select(DataFrameFieldNames.KeyFieldName).collect().map(_.getAs[String](0)).sorted should
       contain theSameElementsAs Array("1", "2", "3", "4", "5", "6")

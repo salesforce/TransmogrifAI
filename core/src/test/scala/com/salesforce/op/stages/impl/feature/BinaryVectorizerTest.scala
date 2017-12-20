@@ -60,8 +60,8 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
-      f1 -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      f2 -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
   }
 
@@ -84,8 +84,8 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
-      f1 -> List(RootCol, IndCol(Some(Transmogrifier.NullString))),
-      f2 -> List(RootCol, IndCol(Some(Transmogrifier.NullString)))
+      f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
+      f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
   }
 

@@ -8,9 +8,12 @@ dependencies {
     // Reflections
     compile "org.reflections:reflections:$reflectionsVersion"
 
+    compile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+
     testCompile project(':utils')
 
     compile project(':features')
+    compile project(":core")
 
     // avro
     compile("org.apache.avro:avro:$avroVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
@@ -52,9 +55,12 @@ task copyTemplates(type: Copy) {
     from '../templates'
     into "$templateResourcesDir/templates"
     exclude '**/*.jar'
+    exclude '**/*.bat'
+    exclude '**/*.iml'
     exclude '**/gradle-wrapper.properties'
     exclude 'build/'
     exclude '*/build/'
+    exclude "*/.gradle/*"
     exclude "*/gradle/*"
     exclude '**/gradlew'
     exclude "**/spark.gradle"

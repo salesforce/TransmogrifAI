@@ -32,8 +32,8 @@ trait RichListFeature {
      * @param binary      if true, all non zero counts are set to 1.0
      */
     def tf(
-      numTerms: Int = Transmogrifier.DefaultNumOfFeatures,
-      binary: Boolean = Transmogrifier.BinaryFreq
+      numTerms: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
+      binary: Boolean = TransmogrifierDefaults.BinaryFreq
     ): FeatureLike[OPVector] = {
       val htf = new HashingTF().setNumFeatures(numTerms).setBinary(binary)
       val tr = new OpTransformerWrapper[TextList, OPVector, HashingTF](htf, UID[HashingTF])
@@ -49,8 +49,8 @@ trait RichListFeature {
      * @param minDocFreq  minimum number of documents in which a term should appear for filtering
      */
     def tfidf(
-      numTerms: Int = Transmogrifier.DefaultNumOfFeatures,
-      binary: Boolean = Transmogrifier.BinaryFreq,
+      numTerms: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
+      binary: Boolean = TransmogrifierDefaults.BinaryFreq,
       minDocFreq: Int = 0
     ): FeatureLike[OPVector] =
       f.tf(numTerms = numTerms, binary = binary).idf(minDocFreq = minDocFreq)
@@ -197,8 +197,8 @@ trait RichListFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: DateTime = Transmogrifier.ReferenceDate,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      referenceDate: DateTime = TransmogrifierDefaults.ReferenceDate,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[DateList]] = Array.empty
     ): FeatureLike[OPVector] = {
       new DateListVectorizer()
@@ -238,8 +238,8 @@ trait RichListFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: DateTime = Transmogrifier.ReferenceDate,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      referenceDate: DateTime = TransmogrifierDefaults.ReferenceDate,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[DateTimeList]] = Array.empty
     ): FeatureLike[OPVector] = {
       new DateListVectorizer()
@@ -272,7 +272,7 @@ trait RichListFeature {
     (
       fillWithMean: Boolean,
       trackNulls: Boolean,
-      fillValue: Geolocation = Transmogrifier.DefaultGeolocation,
+      fillValue: Geolocation = TransmogrifierDefaults.DefaultGeolocation,
       others: Array[FeatureLike[Geolocation]] = Array.empty
     ): FeatureLike[OPVector] = {
       val stage = new GeolocationVectorizer()

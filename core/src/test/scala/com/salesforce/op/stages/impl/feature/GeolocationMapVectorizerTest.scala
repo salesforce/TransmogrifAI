@@ -6,7 +6,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.IndVal
+import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
@@ -53,8 +53,8 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Z")), IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -79,8 +79,8 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Z")), IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -101,8 +101,8 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B"))),
-      m2 -> List(IndVal(Some("Z")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
+      m2 -> List(IndColWithGroup(None, "Z"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -123,8 +123,8 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -140,7 +140,7 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     val expectedOutput = transformed.collect()
 
     // Now using the shortcut
-    val res = m1.vectorize(cleanKeys = Transmogrifier.CleanKeys, others = Array(m2))
+    val res = m1.vectorize(cleanKeys = TransmogrifierDefaults.CleanKeys, others = Array(m2))
     val actualOutput = res.originStage.asInstanceOf[GeolocationMapVectorizer]
       .fit(data).transform(data).collect()
 

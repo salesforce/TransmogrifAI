@@ -6,7 +6,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.IndVal
+import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup, IndVal}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
@@ -25,15 +25,13 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
       (Map.empty[String, Boolean], Map.empty[String, Boolean])
     ).map(v => v._1.toBinaryMap -> v._2.toBinaryMap)
   )
-
-  val vectorizer = new BinaryMapVectorizer().setInput(m1, m2).asInstanceOf[OPMapVectorizer[Boolean, BinaryMap]]
-    .setCleanKeys(true)
+  val vectorizer = new BinaryMapVectorizer().setInput(m1, m2).setCleanKeys(true)
 
   /**
    * Note that defaults and filters are tested in [[RealMapVectorizerTest]]
    * as that code is shared between the two classes
    */
-  Spec[BinaryMapVectorizer] should "take an array of features as input and return a single vector feature" in {
+  Spec[BinaryMapVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = vectorizer.getOutput()
 
     vector.name shouldBe vectorizer.outputName
@@ -54,8 +52,8 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndVal(Some("A")), IndVal(Some("B")), IndVal(Some("C"))),
-      m2 -> List(IndVal(Some("Z")), IndVal(Some("Y")), IndVal(Some("X")))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
     )
 
     transformed.collect(vector) shouldBe expected

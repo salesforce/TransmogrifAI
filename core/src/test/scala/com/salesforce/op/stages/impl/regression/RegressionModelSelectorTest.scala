@@ -6,27 +6,28 @@
 package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.types._
 import com.salesforce.op.features.Feature
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType.Regressor
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames}
 import com.salesforce.op.stages.impl.tuning.OpCrossValidation
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.regression.{DecisionTreeRegressor, RandomForestRegressor}
+import org.apache.spark.ml.regression.{DecisionTreeRegressor, GBTRegressor, RandomForestRegressor}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
+class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
   val seed = 1234L
   val stageNames = "label_prediction"
 
@@ -72,17 +73,16 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
       .setLinearRegressionStandardization(true)
       .setLinearRegressionTol(0.005, 0.0002)
 
-    modelSelector.sparkLR.getMaxIter shouldBe 10
-    modelSelector.sparkLR.getElasticNetParam shouldBe 0.1
-    modelSelector.sparkLR.getStandardization shouldBe true
-
     val lrGrid = new ParamGridBuilder().addGrid(modelSelector.sparkLR.fitIntercept, Array(true, false))
       .addGrid(modelSelector.sparkLR.regParam, Array(0.1, 0.01))
       .addGrid(modelSelector.sparkLR.tol, Array(0.005, 0.0002))
+      .addGrid(modelSelector.sparkLR.maxIter, Array(10))
+      .addGrid(modelSelector.sparkLR.elasticNetParam, Array(0.1))
+      .addGrid(modelSelector.sparkLR.standardization, Array(true))
+      .addGrid(modelSelector.sparkLR.solver, Array(DefaultSelectorParams.RegSolver.sparkName))
       .build
 
-    (modelSelector.lRGrid.build().toSeq zip lrGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.lRGrid.build(), lrGrid)
   }
 
   it should "set the Random Forest Params properly" in {
@@ -96,19 +96,18 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
 
     val sparkRandomForest = modelSelector.sparkRF.asInstanceOf[RandomForestRegressor]
 
-    sparkRandomForest.getMaxBins shouldBe 34
-    sparkRandomForest.getMinInfoGain shouldBe 0.1
-    sparkRandomForest.getSeed shouldBe 34L
-    sparkRandomForest.getNumTrees shouldBe 10
-
     val rfGrid =
       new ParamGridBuilder().addGrid(sparkRandomForest.maxDepth, Array(7, 8))
         .addGrid(sparkRandomForest.minInstancesPerNode, Array(2, 3, 4))
         .addGrid(sparkRandomForest.subsamplingRate, Array(0.4, 0.8))
+        .addGrid(sparkRandomForest.maxBins, Array(34))
+        .addGrid(sparkRandomForest.minInfoGain, Array(0.1))
+        .addGrid(sparkRandomForest.seed, Array(34L))
+        .addGrid(sparkRandomForest.numTrees, Array(10))
+        .addGrid(sparkRandomForest.impurity, Array(DefaultSelectorParams.ImpurityReg.sparkName))
         .build
 
-    (modelSelector.rFGrid.build().toSeq zip rfGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.rFGrid.build(), rfGrid)
   }
 
   it should "set the Decision Tree Params properly" in {
@@ -119,43 +118,46 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
       .setDecisionTreeSeed(34L, 56L)
 
     val sparkDecisionTree = modelSelector.sparkDT.asInstanceOf[DecisionTreeRegressor]
-    sparkDecisionTree.getMaxDepth shouldBe 10
-    sparkDecisionTree.getMinInstancesPerNode shouldBe 5
 
     val dtGrid =
       new ParamGridBuilder()
         .addGrid(sparkDecisionTree.maxBins, Array(34, 44))
         .addGrid(sparkDecisionTree.minInfoGain, Array(0.2, 0.5))
         .addGrid(sparkDecisionTree.seed, Array(34L, 56L))
+        .addGrid(sparkDecisionTree.maxDepth, Array(10))
+        .addGrid(sparkDecisionTree.minInstancesPerNode, Array(5))
+        .addGrid(sparkDecisionTree.impurity, Array(DefaultSelectorParams.ImpurityReg.sparkName))
         .build
 
-    (modelSelector.dTGrid.build().toSeq zip dtGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.dTGrid.build(), dtGrid)
   }
 
   it should "set the Gradient Boosted Tree Params properly" in {
     modelSelector.setGradientBoostedTreeMaxBins(34, 44)
-      .setGradientBoostedTreeMaxDepth(10)
       .setGradientBoostedTreeMinInfoGain(0.2, 0.5)
-      .setGradientBoostedTreeMinInstancesPerNode(5)
       .setGradientBoostedTreeSeed(34L, 56L)
-      .setGradientBoostedTreeStepSize(0.5)
       .setGradientBoostedTreeLossType(LossType.Squared, LossType.Absolute)
+      .setGradientBoostedTreeMaxDepth(10)
+      .setGradientBoostedTreeMinInstancesPerNode(5)
+      .setGradientBoostedTreeStepSize(0.5)
 
-    modelSelector.sparkGBT.getMaxDepth shouldBe 10
-    modelSelector.sparkGBT.getMinInstancesPerNode shouldBe 5
-    modelSelector.sparkGBT.getStepSize shouldBe 0.5
+    val sparkGBTTree = modelSelector.sparkGBT.asInstanceOf[GBTRegressor]
 
     val dtGrid =
       new ParamGridBuilder()
-        .addGrid(modelSelector.sparkGBT.maxBins, Array(34, 44))
-        .addGrid(modelSelector.sparkGBT.minInfoGain, Array(0.2, 0.5))
-        .addGrid(modelSelector.sparkGBT.seed, Array(34L, 56L))
-        .addGrid(modelSelector.sparkGBT.lossType, Array(LossType.Squared, LossType.Absolute).map(_.sparkName))
+        .addGrid(sparkGBTTree.maxBins, Array(34, 44))
+        .addGrid(sparkGBTTree.minInfoGain, Array(0.2, 0.5))
+        .addGrid(sparkGBTTree.seed, Array(34L, 56L))
+        .addGrid(sparkGBTTree.lossType, Array(LossType.Squared, LossType.Absolute).map(_.sparkName))
+        .addGrid(sparkGBTTree.maxDepth, Array(10))
+        .addGrid(sparkGBTTree.minInstancesPerNode, Array(5))
+        .addGrid(sparkGBTTree.impurity, Array(DefaultSelectorParams.ImpurityReg.sparkName))
+        .addGrid(sparkGBTTree.stepSize, Array(0.5))
+        .addGrid(sparkGBTTree.maxIter, Array(DefaultSelectorParams.MaxIterTree))
+        .addGrid(sparkGBTTree.subsamplingRate, Array(DefaultSelectorParams.SubsampleRate))
         .build
 
-    (modelSelector.gBTGrid.build().toSeq zip dtGrid.toSeq)
-      .map { case (grid1, grid2) => grid1.toSeq shouldBe grid2.toSeq }
+    gridCompare(modelSelector.gBTGrid.build(), dtGrid)
   }
 
   it should "set the cross validation params correctly" in {
@@ -200,9 +202,13 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         .setModelsToTry(LinearRegression, RandomForestRegression)
         .setLinearRegressionElasticNetParam(0, 0.5, 1)
         .setLinearRegressionMaxIter(10, 100)
+        .setLinearRegressionRegParam(0)
         .setLinearRegressionSolver(Solver.LBFGS)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
@@ -237,7 +243,12 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         .setLinearRegressionElasticNetParam(0.5)
         .setLinearRegressionMaxIter(10, 100)
         .setLinearRegressionSolver(Solver.Auto)
+        .setLinearRegressionRegParam(0)
         .setRandomForestMaxDepth(2, 10)
+        .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
     val pred = testEstimator.getOutput()
     val transformedData = testEstimator.fit(data).transform(data)
@@ -253,8 +264,12 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         .setModelsToTry(LinearRegression, RandomForestRegression)
         .setLinearRegressionElasticNetParam(0, 0.5, 1)
         .setLinearRegressionSolver(Solver.LBFGS)
+        .setLinearRegressionRegParam(0)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
     val pred = testEstimator.getOutput()
     val transformedData = testEstimator.fit(data).transform(data)
@@ -280,8 +295,12 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         .setModelsToTry(LinearRegression, RandomForestRegression)
         .setLinearRegressionElasticNetParam(0, 0.5, 1)
         .setLinearRegressionSolver(Solver.Normal)
+        .setLinearRegressionRegParam(0)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
     val pred = testEstimator.getOutput()
     val transformedData = testEstimator.fit(data).transform(data)
@@ -308,8 +327,12 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         .setModelsToTry(LinearRegression, RandomForestRegression)
         .setLinearRegressionElasticNetParam(0, 0.5, 1)
         .setLinearRegressionSolver(Solver.Normal)
+        .setLinearRegressionRegParam(0)
         .setRandomForestMaxDepth(2, 10)
         .setRandomForestNumTrees(10)
+        .setRandomForestMinInfoGain(0)
+        .setRandomForestMinInstancesPerNode(1)
+        .setRandomForestMaxDepth(5)
         .setInput(label, features)
     val model = testEstimator.fit(data)
 
@@ -328,7 +351,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext {
         )
       }
       case evaluator: OpRegressionEvaluatorBase[_] => {
-        println(metaData.json)
         Seq(trainMetaData, holdOutMetaData).foreach(
           metadata =>
             assert(metadata.contains(s"(${evaluator.name})_${evaluator.name}"),

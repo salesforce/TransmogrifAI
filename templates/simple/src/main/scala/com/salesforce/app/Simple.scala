@@ -1,8 +1,8 @@
 /* setFileName APP_NAME */
-/* replace Passenger SCHEMA_NAME */
+/* replace DataClass SCHEMA_NAME */
 package com.salesforce.app
 
-import com.salesforce.app.schema.Passenger /* << SCHEMA_IMPORT */
+import com.salesforce.app.schema.DataClass /* << SCHEMA_IMPORT */
 import com.salesforce.op._
 import com.salesforce.op.readers._
 import com.salesforce.op.evaluators._
@@ -19,34 +19,65 @@ object /* APP_NAME >> */ Simple extends OpApp with Features {
   ////////////////////////////////////////////////////////////////////////////////
   // READER DEFINITIONS
   /////////////////////////////////////////////////////////////////////////////////
+  val schema = DataClass.getClassSchema
 
-  val trainingReader = new CSVReader[Passenger](
-    readPath = None,
-    schema = Passenger.getClassSchema.toString,
-    key = _.getPassengerId.toString /* << KEY_FN */
-  ) {
-    override def read(params: OpParams)(implicit spark: SparkSession): Either[RDD[Passenger], Dataset[Passenger]] = {
-      split(data = super.read(params), isTest = false)
+  trait CanRead {
+    val isTest: Boolean
+
+    protected def split(
+      data: Either[RDD[DataClass], Dataset[DataClass]],
+      weights: Array[Double] = Array(0.9, 0.1)
+    ): Either[RDD[DataClass], Dataset[DataClass]] = data match {
+      case Left(rdd) =>
+        val Array(train, test) = rdd.randomSplit(weights, randomSeed)
+        Left(if (isTest) test else train)
+      case Right(ds) =>
+        val Array(train, test) = ds.randomSplit(weights, randomSeed)
+        Right(if (isTest) test else train)
     }
   }
 
-  val scoringReader = new CSVReader[Passenger](
-    readPath = None,
-    schema = Passenger.getClassSchema.toString,
-    key = _.getPassengerId.toString /* << KEY_FN */
-  ) {
-    override def read(params: OpParams)(implicit spark: SparkSession): Either[RDD[Passenger], Dataset[Passenger]] = {
-      split(data = super.read(params), isTest = true)
+  trait Training extends CanRead {
+    val isTest = false
+  }
+
+  trait Scoring extends CanRead {
+    val isTest = true
+  }
+
+  abstract class ReaderWithHeaders
+    extends CSVAutoReader[DataClass](
+      readPath = None,
+      headers = Seq.empty,
+      recordNamespace = schema.getNamespace,
+      recordName = schema.getName,
+      key = _.getSomeId.toString /* << KEY_FN */
+    ) with CanRead {
+    override def read(params: OpParams)(implicit spark: SparkSession): Either[RDD[DataClass], Dataset[DataClass]] = {
+      split(super.read(params))
     }
   }
+
+  abstract class ReaderWithNoHeaders
+    extends CSVReader[DataClass](
+      readPath = None,
+      schema = schema.toString,
+      key = _.getSomeId.toString  /* << KEY_FN */
+    ) with CanRead {
+    override def read(params: OpParams)(implicit spark: SparkSession): Either[RDD[DataClass], Dataset[DataClass]] = {
+      split(super.read(params))
+    }
+  }
+
+  abstract class SampleReader extends ReaderWithHeaders  /* << READER_CHOICE */
 
   val randomSeed = 42 /* << RANDOM_SEED */
 
   private def split(
-    data: Either[RDD[Passenger], Dataset[Passenger]],
+    data: Either[RDD[DataClass], Dataset[DataClass]],
     isTest: Boolean,
     weights: Array[Double] = Array(0.9, 0.1)
-  ): Either[RDD[Passenger], Dataset[Passenger]] = data match {
+  ): Either[RDD[DataClass], Dataset[DataClass]] = data match {
     case Left(rdd) =>
       val Array(train, test) = rdd.randomSplit(weights, randomSeed)
       Left(if (isTest) test else train)
@@ -61,11 +92,11 @@ object /* APP_NAME >> */ Simple extends OpApp with Features {
   /////////////////////////////////////////////////////////////////////////////////
 
   val featureVector =
-    Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify() /* << FEATURE_VECTORIZE */
+    Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify() /* << FEATURE_LIST */
 
   val labelFixed =
-    survived.vectorize() /* << RESPONSE_FEATURE */
-    .map[RealNN](_.value(0).toRealNN)
+    Seq(survived).transmogrify() /* << RESPONSE_FEATURE */
+      .map[RealNN](_.value(0).toRealNN)
 
   val checkedFeatures = new SanityChecker()
     .setCheckSample(0.10)
@@ -85,8 +116,8 @@ object /* APP_NAME >> */ Simple extends OpApp with Features {
   def run(runType: OpWorkflowRunType, opParams: OpParams)(implicit spark: SparkSession): Unit = {
     new OpWorkflowRunner(
       workflow = workflow,
-      trainingReader = trainingReader,
-      scoringReader = scoringReader,
+      trainingReader = new SampleReader with Training,
+      scoringReader = new SampleReader with Scoring,
       evaluator = evaluator,
       scoringEvaluator = Some(evaluator),
       featureToComputeUpTo = featureVector

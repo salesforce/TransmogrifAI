@@ -53,16 +53,16 @@ class OpLdaTest extends FlatSpec with TestSparkContext {
     .toSeq
     .map(_.getAs[Vector](0))
 
-
-
   Spec[OpLdaTest] should "convert document term vectors into topic vectors" in {
     val f2Vec = new OpLDA().setInput(f2).setK(k).setSeed(seed).setMaxIter(maxIter)
     val testTransformedData = f2Vec.fit(inputDS).transform(inputDS)
     val output = f2Vec.getOutput()
     val estimate = testTransformedData.collect(output)
     val mse = computeMeanSqError(estimate, expected)
-    println(mse)
-    mse should (be < 0.5)
+    val expectedMse = 0.5
+    withClue(s"Computed mse $mse (expected $expectedMse)") {
+      mse should be < expectedMse
+    }
   }
 
   it should "convert document term vectors into topic vectors (shortcut version)" in {
@@ -71,8 +71,10 @@ class OpLdaTest extends FlatSpec with TestSparkContext {
     val testTransformedData = f2Vec.fit(inputDS).transform(inputDS)
     val estimate = testTransformedData.collect(output)
     val mse = computeMeanSqError(estimate, expected)
-    println(mse)
-    mse should (be < 0.5)
+    val expectedMse = 0.5
+    withClue(s"Computed mse $mse (expected $expectedMse)") {
+      mse should be < expectedMse
+    }
   }
 
   private def computeMeanSqError(estimate: Seq[OPVector], expected: Seq[Vector]): Double = {

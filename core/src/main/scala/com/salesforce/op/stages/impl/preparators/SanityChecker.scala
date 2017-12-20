@@ -5,7 +5,6 @@
 
 package com.salesforce.op.stages.impl.preparators
 
-import scala.math.min
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
@@ -22,21 +21,29 @@ import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
 
+import scala.math.min
 import scala.reflect.runtime.universe._
 import scala.util.Try
 
 
 trait SanityCheckerParams extends Params {
-  final lazy val sampleLimit = new IntParam(
-    parent = this, name = "sampleLimit",
+  final lazy val sampleLowerLimit = new IntParam(
+    parent = this, name = "sampleLowerLimit",
+    doc = "ULowerer limit on number of samples in downsampled data set (note: sample limit will not be exact, due " +
+      "to Spark's dataset sampling behavior)",
+    isValid = ParamValidators.gtEq(lowerBound = 0)
+  )
+  def setSampleLowerLimit(value: Int): this.type = set(sampleLowerLimit, value)
+  def getSampleLowerLimit: Int = $(sampleLowerLimit)
+
+  final lazy val sampleUpperLimit = new IntParam(
+    parent = this, name = "sampleUpperLimit",
     doc = "Upper limit on number of samples in downsampled data set (note: sample limit will not be exact, due " +
       "to Spark's dataset sampling behavior)",
     isValid = ParamValidators.gtEq(lowerBound = 0)
   )
-
-  def setSampleLimit(value: Int): this.type = set(sampleLimit, value)
-
-  def getSampleLimit: Int = $(sampleLimit)
+  def setSampleUpperLimit(value: Int): this.type = set(sampleUpperLimit, value)
+  def getSampleUpperLimit: Int = $(sampleUpperLimit)
 
   final lazy val checkSample = new DoubleParam(
     parent = this, name = "checkSample",
@@ -44,27 +51,21 @@ trait SanityCheckerParams extends Params {
       "due to Spark's dataset sampling behavior)",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true)
   )
-
   def setCheckSample(value: Double): this.type = set(checkSample, value)
-
   def getCheckSample: Double = $(checkSample)
 
   final lazy val sampleSeed = new LongParam(
     parent = this, name = "sampleSeed",
     doc = "Seed to use when sampling"
   )
-
   def setSampleSeed(value: Long): this.type = set(sampleSeed, value)
-
   def getSampleSeed: Long = $(sampleSeed)
 
   final lazy val removeBadFeatures = new BooleanParam(
     parent = this, name = "removeBadFeatures",
     doc = "If set to true, this will automatically remove all the bad features from the feature vector"
   )
-
   def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
-
   def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
 
   final lazy val maxCorrelation = new DoubleParam(
@@ -72,9 +73,7 @@ trait SanityCheckerParams extends Params {
     doc = "Maximum correlation (absolute value) allowed between a feature in the feature vector and the label",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
   )
-
   def setMaxCorrelation(value: Double): this.type = set(maxCorrelation, value)
-
   def getMaxCorrelation: Double = $(maxCorrelation)
 
   final lazy val minCorrelation = new DoubleParam(
@@ -82,27 +81,21 @@ trait SanityCheckerParams extends Params {
     doc = "Minimum correlation (absolute value) allowed between a feature in the feature vector and the label",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
   )
-
   def setMinCorrelation(value: Double): this.type = set(minCorrelation, value)
-
   def getMinCorrelation: Double = $(minCorrelation)
 
   final lazy val correlationType = new Param[CorrelationType](
     parent = this, name = "correlationType",
     doc = "Which coefficient to use for computing correlation"
   )
-
   def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value)
-
   def getCorrelationType: CorrelationType = $(correlationType)
 
   final lazy val minVariance = new DoubleParam(
     parent = this, name = "minVariance",
     doc = "Minimum amount of variance allowed for each feature and label"
   )
-
   def setMinVariance(value: Double): this.type = set(minVariance, value)
-
   def getMinVariance: Double = $(minVariance)
 
   final lazy val maxCramersV = new DoubleParam(
@@ -111,9 +104,7 @@ trait SanityCheckerParams extends Params {
       "feature vector and a categorical label",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
   )
-
   def setMaxCramersV(value: Double): this.type = set(maxCramersV, value)
-
   def getMaxCramersV: Double = $(maxCramersV)
 
   final lazy val categoricalLabel = new BooleanParam(
@@ -122,20 +113,28 @@ trait SanityCheckerParams extends Params {
       "categorical features). If this is not set, then use a max class fraction of 0.1 to estimate whether label is" +
       "categorical or not."
   )
-
   def setCategoricalLabel(value: Boolean): this.type = set(categoricalLabel, value)
-
   def getCategoricalLabel: Boolean = $(categoricalLabel)
+
+  final lazy val removeFeatureGroup = new BooleanParam(
+    parent = this, name = "removeFeatureGroup",
+    doc = "If true, remove all features descended from a parent feature (parent is direct parent before" +
+      " vectorization) which has derived features that meet the exclusion criteria."
+  )
+  def setRemoveFeatureGroup(value: Boolean): this.type = set(removeFeatureGroup, value)
+  def getRemoveFeatureGroup: Boolean = $(removeFeatureGroup)
 
   setDefault(
     checkSample -> SanityChecker.CheckSample,
     sampleSeed -> SanityChecker.SampleSeed,
-    sampleLimit -> SanityChecker.SampleLimit,
+    sampleLowerLimit -> SanityChecker.SampleLowerLimit,
+    sampleUpperLimit -> SanityChecker.SampleUpperLimit,
     maxCorrelation -> SanityChecker.MaxCorrelation,
     minCorrelation -> SanityChecker.MinCorrelation,
     minVariance -> SanityChecker.MinVariance,
     maxCramersV -> SanityChecker.MaxCramersV,
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
+    removeFeatureGroup -> SanityChecker.RemoveFeatureGroup,
     correlationType -> SanityChecker.CorrelationType
   )
 }
@@ -160,7 +159,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
   }
-
   override protected def outputIsResponse: Boolean = false
 
   private def makeColumnStatistics(
@@ -193,17 +191,16 @@ class SanityChecker(uid: String = UID[SanityChecker])
       nullGroups.toMap
     }
 
-    def numNulls(col: OpVectorColumnMetadata) = nullIndicators.get(col.makeColName()).fold(0.0) {
-      case (_, i) => means(i) * count
-    }
+    def numNulls(col: OpVectorColumnMetadata) =
+      nullIndicators.get(col.makeColName()).fold(0.0) { case (_, i) => means(i) * count }
 
-    val parentMap = metaCols.flatMap(c => c.parentFeatureName.map(p => c.makeColName() -> p)).toMap
+    val parentMap = metaCols.flatMap{ c => c.parentNamesWithMapKeys().map(c.makeColName() -> _) }.toMap
 
-    val corrParent = metaCols.flatMap(c => c.parentFeatureName.map(_ -> corrMatrix(c.index, labelColumnIndex)))
+    val corrParent = metaCols
+      .flatMap(c => c.parentNamesWithMapKeys().map(_ -> corrMatrix(c.index, labelColumnIndex)))
       .groupBy(_._1).map(_._2.maxBy(_._2))
 
-    val cramersVParent = cramersVMap.toSeq
-      .map { case (k, v) => parentMap(k) -> v }.groupBy(_._1).map(_._2.maxBy(_._2))
+    val cramersVParent = cramersVMap.toSeq.map { case (k, v) => parentMap(k) -> v }.groupBy(_._1).map(_._2.maxBy(_._2))
 
     val featuresStats = metaCols.map {
       col =>
@@ -219,10 +216,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
           variance = variances(i),
           numNulls = numNulls(col),
           corrLabel = Option(corrMatrix(i, labelColumnIndex)),
-          // TODO: Remove categorical stuff from ColumnStatistics or refactor
           cramersV = cramersVMap.get(col.makeColName()),
-          parentCorr = col.parentFeatureName.map(corrParent.get).max,
-          parentCramersV = col.parentFeatureName.map(cramersVParent.get).max
+          parentCorr = col.parentNamesWithMapKeys().map(corrParent.get).max,
+          parentCramersV = col.parentNamesWithMapKeys().map(cramersVParent.get).max
         )
     }
     val labelStats = ColumnStatistics(
@@ -248,13 +244,15 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val minCorr = $(minCorrelation)
     val maxCorr = $(maxCorrelation)
     val maxCramV = $(maxCramersV)
+    val removeFromParent = $(removeFeatureGroup)
     for {
       col <- stats
       reasons = col.reasonsToRemove(
         minVariance = minVar,
         minCorrelation = minCorr,
         maxCorrelation = maxCorr,
-        maxCramersV = maxCramV
+        maxCramersV = maxCramV,
+        removeFeatureGroup = removeFromParent
       )
       if reasons.nonEmpty
     } yield {
@@ -290,16 +288,15 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
       // Only perform Cramer's V calculation on columns that have an indicatorGroup and indicatorValue defined (right
       // now, the only things that will have indicatorValue defined and indicatorGroup be None is numeric maps)
-      val colIndicesByIndicatorGroup = columnMeta.filter { f =>
-        val ftt = FeatureType.featureTypeTag(f.parentFeatureType.head).tpe
+      val columnsWithIndicator = columnMeta.filter { f =>
         f.indicatorGroup.isDefined && f.indicatorValue.isDefined &&
-          !(ftt =:= weakTypeOf[MultiPickList] || ftt <:< weakTypeOf[OPMap[_]])
+          !(f.hasParentOfType(FeatureType.shortTypeName[MultiPickList]) || f.hasMapParent())
       }
-        .map { meta => (meta.indicatorGroup.get, meta) }
-        .groupBy(_._1)
-        .map {
-          case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index))
-        }
+      val colIndicesByIndicatorGroup =
+        columnsWithIndicator
+          .map { meta => meta.indicatorGroup.get -> meta }
+          .groupBy(_._1)
+          .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index)) }
 
       val statsTuple = colIndicesByIndicatorGroup.flatMap {
         case (group, colNames, valueIndices) =>
@@ -328,15 +325,22 @@ class SanityChecker(uid: String = UID[SanityChecker])
           colNames.map(c => (c, group, cStats.cramersV, cStats.pointwiseMutualInfo, cStats.mutualInfo))
       }
 
+      // PMI map contains an array entry for each feature in the group so get the first for the group and combine
+      // across features
       val statsTuplePerGroup = statsTuple.groupBy(_._2).map { case (k, v) => v.head }
       val reducedPMI = statsTuplePerGroup.map(_._4).foldLeft(Map.empty[String, Array[Double]]) {
         case (l, r) => r.map { case (k, v) => k.toString -> (l.getOrElse(k.toString, Array.empty[Double]) ++ v) }
       }
+
+      val catIndicies = colIndicesByIndicatorGroup.toSeq.flatMap(_._3)
+
       CategoricalStats(
         categoricalFeatures = statsTuple.map(_._1).toArray,
         cramersVs = statsTuple.map(_._3).toArray,
         pointwiseMutualInfos = reducedPMI,
-        mutualInfos = statsTuple.map(_._5).toArray
+        mutualInfos = statsTuple.map(_._5).toArray,
+        counts = contingencyWithKeys.toMap
+          .map{ case (k, v) => k.toString -> (catIndicies.map(v.apply) :+ v.last).toArray }
       )
     } else {
       logInfo(s"Label is assumed to be continuous since number of distinct labels = $distictLabel" +
@@ -346,28 +350,41 @@ class SanityChecker(uid: String = UID[SanityChecker])
   }
 
   /**
+   * Estimate of a fraction of data that is being checked.
+   *
+   * @param totalSize
+   * @return
+   */
+  def fraction(totalSize: Long): Double = {
+    val ckSample = $(checkSample)
+    val minFraction = math.min(1.0, $(sampleLowerLimit).toDouble / totalSize)
+    val maxFraction = math.max(0.0, $(sampleUpperLimit).toDouble / totalSize)
+    math.max(math.min(ckSample, maxFraction), minFraction)
+  }
+
+  /**
    * The SanityChecker's core 'estimator' function, computes statistics on the features and the
    * list of features to be removed.
    */
   override def fitFn(data: Dataset[(RealNN#Value, OPVector#Value)]): BinaryModel[RealNN, OPVector, OPVector] = {
-    data.persist()
     val ckSample = $(checkSample)
     val sampSeed = $(sampleSeed)
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)
-    val sampleData = if (ckSample >= 1.0) {
-      logInfo(s"NOT sampling the data for Sanity Checker, since the specified check sample is $ckSample")
-      data
-    }
-    else {
-      logInfo(s"Sampling the data for Sanity Checker with sample $ckSample and seed $sampSeed")
-      val dataCount = data.count()
-      data.sample(
-        withReplacement = false,
-        fraction = math.min(ckSample, $(sampleLimit).toDouble / dataCount),
-        seed = sampSeed
-      )
-    }
+
+    val sampleData =
+      if (ckSample >= 1.0) {
+        logInfo(s"NOT sampling the data for Sanity Checker, since the specified check sample is $ckSample")
+        data
+      } else {
+        logInfo(s"Sampling the data for Sanity Checker with sample $ckSample and seed $sampSeed")
+        val dataCount = data.count()
+        data.sample(
+          withReplacement = false,
+          fraction = fraction(dataCount),
+          seed = sampSeed
+        )
+      }
 
     implicit val enc: Encoder[OldVector] = ExpressionEncoder()
     logInfo("Getting vector rows")
@@ -425,7 +442,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
 
-    val outputMeta = OpVectorMetadata(in2.name, outputFeatures, vectorMeta.history)
+    val outputMeta = OpVectorMetadata(outputName, outputFeatures, vectorMeta.history)
 
     // TODO: Refactor so that everything is constructed directly from our Array[ColumnStatistics], stats
     val summary = new SanityCheckerSummary(
@@ -453,7 +470,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
   }
 }
 
-private final class SanityCheckerModel
+private[op] final class SanityCheckerModel
 (
   indicesToKeep: Array[Int],
   removeBadFeatures: Boolean,
@@ -480,16 +497,17 @@ private final class SanityCheckerModel
 
 object SanityChecker {
   val CheckSample = 1.0
-  val SampleLimit = 100000
+  val SampleLowerLimit = 10
+  val SampleUpperLimit = 100000
   val MaxCorrelation = 0.95
   val MinCorrelation = 0.0
   val MinVariance = 0.00001
   val MaxCramersV = 0.95
   val RemoveBadFeatures = false
+  val RemoveFeatureGroup = true
   val CorrelationType = Pearson
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
-
 }
 
 /**
@@ -528,26 +546,37 @@ private[op] case class ColumnStatistics
     minVariance: Double,
     maxCorrelation: Double,
     minCorrelation: Double,
-    maxCramersV: Double
+    maxCramersV: Double,
+    removeFeatureGroup: Boolean
   ): List[String] = {
     if (isLabel) List() // never remove the label!
-    else List(
-      Option(variance).filter(_ <= minVariance).map(variance =>
-        s"variance $variance lower than min variance $minVariance"
-      ),
-      corrLabel.filter(Math.abs(_) < minCorrelation).map(corr =>
-        s"correlation $corr lower than min correlation $minCorrelation"
-      ),
-      corrLabel.filter(Math.abs(_) > maxCorrelation).map(corr =>
-        s"correlation $corr higher than max correlation $maxCorrelation"
-      ),
-      cramersV.filter(_ > maxCramersV).map(cv =>
-        s"Cramer's V $cv higher than max Cramer's V $maxCramersV"
-      ),
-      parentCramersV.filter(_ > maxCramersV).map(cv =>
-        s"Cramer's V $cv for something in parent feature set higher than max Cramer's V $maxCramersV"
-      )
-    ).flatten
+    else {
+
+      val exclusionReasons = List(
+        Option(variance).filter(_ <= minVariance).map(variance =>
+          s"variance $variance lower than min variance $minVariance"
+        ),
+        corrLabel.filter(Math.abs(_) < minCorrelation).map(corr =>
+          s"correlation $corr lower than min correlation $minCorrelation"
+        ),
+        corrLabel.filter(Math.abs(_) > maxCorrelation).map(corr =>
+          s"correlation $corr higher than max correlation $maxCorrelation"
+        ),
+        cramersV.filter(_ > maxCramersV).map(cv =>
+          s"Cramer's V $cv higher than max Cramer's V $maxCramersV"
+        )).flatten
+
+      val parentExclusionReasons =
+        if (removeFeatureGroup) List(
+          parentCramersV.filter(_ > maxCramersV).map(cv =>
+            s"Cramer's V $cv for something in parent feature set higher than max Cramer's V $maxCramersV"),
+          parentCorr.filter(_ > maxCorrelation).map(corr =>
+            s"correlation $corr for something in parent feature set higher than max correlation $maxCorrelation")
+        ).flatten
+        else List.empty[String]
+
+      exclusionReasons ++ parentExclusionReasons
+    }
   }
 
   override def toString: String = {

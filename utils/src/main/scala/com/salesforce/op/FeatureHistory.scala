@@ -13,14 +13,9 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
  * History of all stages and origin features used to create a given feature
  *
  * @param originFeatures alphabetically ordered names of the raw features this feature was created from
- * @param stages         sequence of the operation names applied
+ * @param stages         sequence of the stageNames applied
  */
-
-case class FeatureHistory
-(
-  originFeatures: Seq[String],
-  stages: Seq[String]
-) extends JsonLike {
+case class FeatureHistory(originFeatures: Seq[String], stages: Seq[String]) extends JsonLike {
 
   /**
    * Convert to Spark metadata

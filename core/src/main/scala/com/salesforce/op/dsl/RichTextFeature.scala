@@ -48,10 +48,10 @@ trait RichTextFeature {
     def pivot
     (
       others: Array[FeatureLike[T]] = Array.empty,
-      topK: Int = Transmogrifier.TopK,
-      minSupport: Int = Transmogrifier.MinSupport,
-      cleanText: Boolean = Transmogrifier.CleanText,
-      trackNulls: Boolean = Transmogrifier.TrackNulls
+      topK: Int = TransmogrifierDefaults.TopK,
+      minSupport: Int = TransmogrifierDefaults.MinSupport,
+      cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
       val vectorizer = new OpTextPivotVectorizer[T]()
 
@@ -102,13 +102,13 @@ trait RichTextFeature {
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
-      hashWithIndex: Boolean = Transmogrifier.HashWithIndex,
-      binaryFreq: Boolean = Transmogrifier.BinaryFreq,
-      prependFeatureName: Boolean = Transmogrifier.PrependFeatureName,
+      hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
+      binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
+      prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      forceSharedHashSpace: Boolean = Transmogrifier.ForceSharedHashSpace,
+      forceSharedHashSpace: Boolean = TransmogrifierDefaults.ForceSharedHashSpace,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
-      hashAlgorithm: HashAlgorithm = Transmogrifier.HashAlgorithm,
+      hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
       analyzer: TextAnalyzer = TextTokenizer.Analyzer,
       others: Array[FeatureLike[T]] = Array.empty
@@ -379,8 +379,8 @@ trait RichTextFeature {
     def vectorize(
       defaultRegion: String,
       isStrict: Boolean = PhoneNumberParser.StrictValidation,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
-      fillValue: Boolean = Transmogrifier.BinaryFillValue,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      fillValue: Boolean = TransmogrifierDefaults.BinaryFillValue,
       others: Array[FeatureLike[Phone]] = Array.empty
     ): FeatureLike[OPVector] = {
       val valid = (f +: others).map(_.isValidPhoneDefaultCountry(defaultRegion = defaultRegion, isStrict = isStrict))
@@ -388,7 +388,6 @@ trait RichTextFeature {
     }
 
   }
-
 
   implicit class RichEmailFeature(val f: FeatureLike[Email]) {
 
@@ -421,7 +420,7 @@ trait RichTextFeature {
       topK: Int,
       cleanText: Boolean,
       minSupport: Int,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[Email]] = Array.empty
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](_.domain.toPickList))
@@ -431,7 +430,6 @@ trait RichTextFeature {
     }
 
   }
-
 
   implicit class RichURLFeature(val f: FeatureLike[URL]) {
 
@@ -476,7 +474,7 @@ trait RichTextFeature {
       topK: Int,
       cleanText: Boolean,
       minSupport: Int,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[URL]] = Array.empty
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](v => if (v.isValid) v.domain.toPickList else PickList.empty))
@@ -501,6 +499,35 @@ trait RichTextFeature {
       f.transformWith(detector)
     }
 
+    /**
+     * Extracts Base64 features (MIME type etc.),
+     * then converts those into PickList features and vectorizes them.
+     *
+     * @param topK            number of values to keep for each key
+     * @param minSupport      min times a value must occur to be retained in pivot
+     * @param cleanText       clean text before pivoting
+     * @param trackNulls keep an extra column that indicated if feature was null
+     * @param typeHint        MIME type hint, i.e. 'application/json', 'text/plain' etc.
+     * @param others          other features of the same type
+     * @return result feature of type vector
+     */
+    def vectorize(
+      topK: Int,
+      minSupport: Int,
+      cleanText: Boolean,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      typeHint: Option[String] = None,
+      others: Array[FeatureLike[Base64]] = Array.empty
+    ): FeatureLike[OPVector] = {
+
+      val feats: Array[FeatureLike[PickList]] =
+        (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](_.value.toPickList))
+
+      feats.head.vectorize(
+        topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls, others = feats.tail
+      )
+    }
+
   }
 
   implicit class RichPickListFeature(val f: FeatureLike[PickList]) {
@@ -521,14 +548,13 @@ trait RichTextFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[PickList]] = Array.empty
     ): FeatureLike[OPVector] = {
       f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)
     }
 
   }
-
 
   implicit class RichComboBoxFeature(val f: FeatureLike[ComboBox]) {
 
@@ -548,7 +574,7 @@ trait RichTextFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[ComboBox]] = Array.empty
     ): FeatureLike[OPVector] = {
       f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)
@@ -574,7 +600,7 @@ trait RichTextFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[ID]] = Array.empty
     ): FeatureLike[OPVector] = {
       f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)

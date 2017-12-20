@@ -7,20 +7,24 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup}
+import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
+
+  val log = LoggerFactory.getLogger(this.getClass)
+
   lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
     Seq(
       (Map("a" -> Set("d"), "b" -> Set("d")), Map("x" -> Set("W"))),
@@ -103,20 +107,20 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = fitted.getMetadata()
     printRes(transformed, vectorMetadata, vectorizer.outputName)
     val expected = Array(
-      Vectors.sparse(17, Array(3, 6, 9), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(17, Array(3, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(4, 12, 15), Array(1.0, 1.0, 1.0)),
-      Vectors.sparse(17, Array(1, 8, 11), Array(1.0, 1.0, 1.0)),
-      Vectors.sparse(17, Array(0, 3, 14), Array(1.0, 1.0, 1.0))
+      Vectors.sparse(17, Array(0, 9, 11), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(17, Array(1, 3, 14), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     transformed.collect(vector) shouldBe expected
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(vectorizer,
       top -> List(
-        IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("OTHER"), "c"),
+        IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
         IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
         IndColWithGroup(Some("OTHER"), "a"), IndColWithGroup(Some("d"), "b"), IndColWithGroup(Some("OTHER"), "b")
       ),
       bot -> List(
-        IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("OTHER"), "x"),
+        IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("OTHER"), "x"),
         IndColWithGroup(Some("V"), "y"), IndColWithGroup(Some("v"), "y"),
         IndColWithGroup(Some("OTHER"), "y"), IndColWithGroup(Some("v"), "z"), IndColWithGroup(Some("w"), "z"),
         IndColWithGroup(Some("OTHER"), "z")
@@ -144,7 +148,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTopK(10).setMinSupport(2).fit(dataSet)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSet)
-    transformed.show(truncate = false)
     val expected = Array(
       Vectors.sparse(10, Array(2, 4, 5), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(3, 7, 9), Array(1.0, 1.0, 1.0)),
@@ -161,8 +164,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = fitted.getMetadata()
     printRes(transformed, vectorMetadata, vectorizer.outputName)
     val expected = Array(
-      Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0),
-      Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
+      Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
 
@@ -170,10 +173,10 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
-      Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0),
-      Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
+      Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0),
-      Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0)
+      Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
     transformed2.collect(vector) shouldBe expected2
   }
@@ -234,17 +237,16 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
     printRes(transformed, vectorMetadata, kcVectorizer.outputName)
 
     val expected = Array(
-      Vectors.sparse(8, Array(2, 4), Array(1.0, 1.0)),
-      Vectors.sparse(8, Array(0, 1, 2, 5, 6), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(8, Array(1, 6), Array(1.0, 1.0)),
+      Vectors.sparse(8, Array(0, 1, 2, 4, 5), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(8, Array(3, 7), Array(1.0, 1.0)),
-      Vectors.sparse(8, Array(0, 1, 4, 5, 6), Array(1.0, 1.0, 1.0, 1.0, 1.0))
+      Vectors.sparse(8, Array(0, 2, 4, 5, 6), Array(1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     transformed.collect(vector) shouldBe expected
   }
 
   private def printRes(df: DataFrame, meta: Metadata, outName: String): Unit = {
-    df.show(false)
-    println("Metadata:")
-    println(OpVectorMetadata(outName, meta))
+    if (log.isInfoEnabled) df.show(false)
+    log.info("Metadata: {}", OpVectorMetadata(outName, meta).toString)
   }
 }

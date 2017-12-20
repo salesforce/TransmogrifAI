@@ -30,7 +30,7 @@ class GeolocationVectorizer
   private implicit val seqArrayEncoder = Encoders.kryo[Seq[Array[Double]]]
 
   final val fillValue = new DoubleArrayParam(this, "fillValue", "default value for FillWithConstant")
-  setDefault(fillValue, Transmogrifier.DefaultGeolocation.toArray)
+  setDefault(fillValue, TransmogrifierDefaults.DefaultGeolocation.toArray)
 
   final val withConstant = new BooleanParam(this, "fillWithConstant",
     "boolean to check if filling the nulls with a constant value")

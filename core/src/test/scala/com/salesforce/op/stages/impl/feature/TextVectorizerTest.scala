@@ -7,12 +7,11 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.Transmogrifier._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -28,7 +27,7 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
   // scalastyle:on
 
   "TextVectorizer" should "work correctly out of the box" in {
-    val vectorized = f1.vectorize(numHashes = DefaultNumOfFeatures,
+    val vectorized = f1.vectorize(numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
       autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
       minTokenLength = TextTokenizer.MinTokenLength,
       toLowercase = TextTokenizer.ToLowercase
@@ -50,7 +49,7 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
     // scalastyle:on
   }
   it should "allow forcing hashing into a shared hash space" in {
-    val vectorized = f1.vectorize(numHashes = DefaultNumOfFeatures,
+    val vectorized = f1.vectorize(numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
       autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
       minTokenLength = TextTokenizer.MinTokenLength,
       toLowercase = TextTokenizer.ToLowercase,

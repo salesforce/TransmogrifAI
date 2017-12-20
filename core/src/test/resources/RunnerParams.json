@@ -23,6 +23,7 @@
   "writeLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-write",
   "metricsLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-metrics",
   "customParams" : {},
-  "customTagName": "myTag"
+  "customTagName": "myTag",
+  "collectStageMetrics": true
 }
 

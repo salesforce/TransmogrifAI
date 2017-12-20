@@ -12,7 +12,9 @@ import com.salesforce.op.stages.impl.feature.NumericBucketizer
 import com.salesforce.op.stages.impl.preparators.{SanityChecker, SanityCheckerSummary}
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -369,8 +371,10 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
 
     // Construct a binned value of expected revenue into three bins: null, 0, or neither to perform a Cramer's V test
     val erBucketizer = new NumericBucketizer[Double, Currency]()
-      .setBuckets(splitPoints = Array(-1.0, 0.0, 1.0, Double.PositiveInfinity))
+      .setTrackNulls(false)
+      .setBuckets(Array(Double.NegativeInfinity, 0.00000001, Double.PositiveInfinity))
     val erBinned = erBucketizer.setInput(rawER).getOutput()
+
 
     // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
     val labelTransformer = new UnaryLambdaTransformer[Binary, RealNN](operationName = "labelFunc",
@@ -396,7 +400,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
 
     // Should throw out the original two expectedRevenue features, along with the three that come from binning
-    retrieved.dropped.count(_.startsWith("expectedRevenue")) shouldBe 5
+    retrieved.dropped.count(_.startsWith("expectedRevenue")) shouldBe 4
   }
 
   it should "not try to compute Cramer's V between categorical features and numeric labels (eg. for regression)" in {
@@ -476,4 +480,47 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     retrieved.categoricalStats.cramersVs.length shouldBe 1
   }
 
+  it should "throw out all features from the same parent when the correlation is too high" in {
+    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+      .withProbabilityOfEmpty(0.2).limit(1000)
+    val domain = List("Strawberry Milk", "Chocolate Milk", "Soy Milk", "Almond Milk")
+    val picklistMapData: Seq[PickListMap] = RandomMap.of[PickList, PickListMap](RandomText.pickLists(domain), 1, 3)
+      .limit(1000)
+
+    // Generate the raw features and corresponding dataframe
+    val generatedData: Seq[(Currency, PickListMap)] = currencyData.zip(picklistMapData)
+    val (rawDF, rawCurrency, rawPicklistMap) =
+      TestFeatureBuilder("currency", "picklistMap", generatedData)
+
+    val labelTransformer2 = new UnaryLambdaTransformer[Currency, RealNN](operationName = "labelFunc",
+      transformFn = p => p.value match {
+        case None => RealNN(5.0)
+        case Some(v) => RealNN(v + 2.0)
+      }
+    )
+    val labelData = labelTransformer2.setInput(rawCurrency).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+
+    val genFeatureVector = Seq(rawCurrency, rawPicklistMap).transmogrify()
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setInput(labelData, genFeatureVector)
+      .setMaxCorrelation(0.8)
+      .setRemoveBadFeatures(true)
+      .getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(checkedFeatures).transform(rawDF)
+
+    val retrieved = SanityCheckerSummary.fromMetadata(
+      transformed.schema(checkedFeatures.name).metadata.getSummaryMetadata()
+    )
+
+    val outputColumns = OpVectorMetadata(transformed.schema(checkedFeatures.name))
+    val inputColumns = OpVectorMetadata(transformed.schema(genFeatureVector.name))
+    outputColumns.columns.length + 4 shouldEqual inputColumns.columns.length
+
+    retrieved.dropped shouldBe inputColumns.columns
+      .filter(c => c.parentFeatureName.contains("currency") || c.indicatorValue.contains("OTHER")).map(_.makeColName())
+    retrieved.categoricalStats.cramersVs.size shouldBe 0
+  }
 }
