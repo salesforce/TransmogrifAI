@@ -9,8 +9,8 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
-import org.apache.commons.io.input.CharSequenceInputStream
 import com.twitter.chill.Base64.{InputStream => Base64InputStream}
+import org.apache.commons.io.input.CharSequenceInputStream
 import org.apache.commons.validator.routines.UrlValidator
 
 /**
@@ -56,12 +56,19 @@ object Email {
 class Base64(value: Option[String]) extends Text(value) {
   def this(value: String) = this(Option(value))
   /**
-   * Input stream over the contents over this base64
+   * Input stream over the contents in this base64
    * @return Some(inputStream) if data present, or None if not
    */
   def asInputStream: Option[InputStream] = {
     value map { v => new Base64InputStream(new CharSequenceInputStream(v, StandardCharsets.ISO_8859_1)) }
   }
+  /**
+   * Maps f over the input stream of the contents this base64
+   * @param f function to apply over stream
+   * @return Some(inputStream) if data present, or None if not
+   * @throws IOException if an I/O error occurs.
+   */
+  def mapInputStream[T](f: InputStream => T): Option[T] = asInputStream.map(in => try f(in) finally in.close())
   /**
    * Bytes hidden in this base64
    * @return Some(bytes) if data present, or None if not

@@ -38,10 +38,10 @@ trait RichSetFeature {
     def pivot
     (
       others: Array[FeatureLike[T]] = Array.empty,
-      topK: Int = Transmogrifier.TopK,
-      minSupport: Int = Transmogrifier.MinSupport,
-      cleanText: Boolean = Transmogrifier.CleanText,
-      trackNulls: Boolean = Transmogrifier.TrackNulls
+      topK: Int = TransmogrifierDefaults.TopK,
+      minSupport: Int = TransmogrifierDefaults.MinSupport,
+      cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
       val opSetVectorizer = new OpSetVectorizer[T]()
 
@@ -69,7 +69,7 @@ trait RichSetFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] =
       f.pivot(others = others, topK = topK, cleanText = cleanText, minSupport = minSupport, trackNulls = trackNulls)

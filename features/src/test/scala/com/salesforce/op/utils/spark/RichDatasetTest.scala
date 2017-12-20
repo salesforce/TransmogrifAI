@@ -12,7 +12,6 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.test.SparkMatchers._
-import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -20,8 +19,8 @@ import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
-
 import org.apache.spark.ml.linalg.Vectors
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
@@ -31,6 +30,8 @@ class RichDatasetTest extends FlatSpec with TestSparkContext {
   import com.salesforce.op.utils.spark.RichDataType._
   import com.salesforce.op.utils.spark.RichMetadata._
   import com.salesforce.op.utils.spark.RichDataset._
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   lazy val savedPath = new File(tempDir + "/richDS-" + DateTime.now().getMillis)
 
@@ -147,7 +148,7 @@ class RichDatasetTest extends FlatSpec with TestSparkContext {
     transformed.saveAvro(savedPath.toString)
     val loaded = loadAvro(savedPath.toString)
 
-    assertDataFrames(actual = loaded, expected = transformed, verbose = true)
+    assertDataFrames(actual = loaded, expected = transformed)
   }
 
   it should "check 'forall' with names" in {
@@ -207,11 +208,11 @@ class RichDatasetTest extends FlatSpec with TestSparkContext {
     in(ds) noneOf "f2" should ((x: Double) => x > 3.5)
   }
 
-  private def assertDataFrames(actual: DataFrame, expected: DataFrame, verbose: Boolean): Unit = {
-    if (verbose) {
-      println("Actual schema:\n" + actual.schema.prettyJson)
+  private def assertDataFrames(actual: DataFrame, expected: DataFrame): Unit = {
+    if (log.isInfoEnabled) {
+      log.info("Actual schema:\n" + actual.schema.prettyJson)
       actual.show(false)
-      println("Expected schema:\n" + expected.schema.prettyJson)
+      log.info("Expected schema:\n" + expected.schema.prettyJson)
       expected.show(false)
     }
     // assert the columns

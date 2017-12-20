@@ -16,17 +16,16 @@ import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
 import scala.reflect.runtime.universe._
-import MonoidAggregatorDefaults._
 
 @RunWith(classOf[JUnitRunner])
 class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
 
+  import MonoidAggregatorDefaults._
+
   val doubleBase = Seq(Option(-1.0), None, Option(0.25), Option(0.1), Option(0.7), Option(2.5))
   val longBase = Seq(Option(1L), None, Option(11110L), Option(250L), Option(10L), Option(1234324234L))
   val booleanBase = Seq(Option(true), None, Option(false), Option(true), None)
-  val stringSetBase = Seq(
-    Set("a", "b", "c"), Set("d", "e"), Set("d", "a"), Set.empty[String]
-  )
+  val stringSetBase = Seq(Set("a", "b", "c"), Set("d", "e"), Set("d", "a"), Set.empty[String])
   val pickListBase = Seq(Some("A"), Some("B"), Some("B"), Some("A"), None, Some("A"), None, Some("C"))
   val pickListBaseBalanced = Seq(Some("C"), Some("B"), None, Some("D"))
   val textBase = Seq(
@@ -75,16 +74,8 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     Seq.empty[Double],
     Seq(45.0, -105.5, 4.0)
   )
-  val geoBaseSingle = Seq(
-    Seq(32.4, -100.2, 3.0),
-    Seq.empty[Double],
-    Seq.empty[Double]
-  )
-  val geoBaseEmpty = Seq(
-    Seq.empty[Double],
-    Seq.empty[Double],
-    Seq.empty[Double]
-  )
+  val geoBaseSingle = Seq(Seq(32.4, -100.2, 3.0), Seq.empty[Double], Seq.empty[Double])
+  val geoBaseEmpty = Seq(Seq.empty[Double], Seq.empty[Double], Seq.empty[Double])
 
   private val realTestSeq = doubleBase.map(Real(_))
   private val realNNTestSeq = doubleBase.map(RealNN(_))
@@ -144,6 +135,13 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   private val multiPickListMapTestSeq = stringSetMapBase.map(new MultiPickListMap(_))
 
   private val vectorTestSeq = Seq(Array(0.1, 0.2), Array(1.0), Array(0.2)).map(Vectors.dense(_).toOPVector)
+
+  Spec(MonoidAggregatorDefaults.getClass) should "throw an error on unknown feature type" in {
+    assertThrows[IllegalArgumentException](
+      aggregatorOf[FeatureType](
+        weakTypeTag[Double].asInstanceOf[WeakTypeTag[FeatureType]])
+    )
+  }
 
   Spec[SumNumeric[_, _]] should "work" in {
     val expectedDoubleResult = Option(doubleBase.flatten.sum)

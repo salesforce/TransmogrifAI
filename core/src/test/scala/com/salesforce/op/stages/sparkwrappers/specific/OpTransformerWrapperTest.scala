@@ -13,8 +13,8 @@ import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
 class OpTransformerWrapperTest extends FlatSpec with TestSparkContext {
@@ -46,7 +46,6 @@ class OpTransformerWrapperTest extends FlatSpec with TestSparkContext {
     val swFilter =
       new OpTransformerWrapper[MultiPickList, MultiPickList, StopWordsRemover](remover).setInput(featureVector)
     val output = swFilter.transform(testData)
-    output.show(false)
 
     output.collect(swFilter.getOutput()) shouldBe Array(
       Seq("I", "saw", "red", "balloon").toMultiPickList,
@@ -59,7 +58,6 @@ class OpTransformerWrapperTest extends FlatSpec with TestSparkContext {
     val normalizer =
       new OpTransformerWrapper[OPVector, OPVector, Normalizer](baseNormalizer).setInput(featureVectorNorm)
     val output = normalizer.transform(testDataNorm)
-    output.show(false)
 
     val sumSqDist = validateDataframeDoubleColumn(output, normalizer.getOutput().name, targetDataNorm, "features")
     assert(sumSqDist <= 1E-6, "==> the sum of squared distances between actual and expected should be below tolerance.")
@@ -73,8 +71,6 @@ class OpTransformerWrapperTest extends FlatSpec with TestSparkContext {
     val targetColRename = "targetFeatures"
     val renamedTargedDF = targetFeatureDF.withColumnRenamed(targetColumnName, targetColRename)
     val joinedDF = normalizedFeatureDF.join(renamedTargedDF, Seq("label"))
-
-    joinedDF.show(false)
 
     // compute sum of squared distances between expected and actual
     val finalDF = joinedDF.withColumn("sqDist", sqDistUdf(joinedDF(normalizedFeatureName), joinedDF(targetColRename)))

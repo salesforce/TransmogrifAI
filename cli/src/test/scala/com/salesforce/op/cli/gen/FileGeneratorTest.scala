@@ -13,7 +13,7 @@ import org.scalatest.{Matchers, PropSpec}
 
 
 @RunWith(classOf[JUnitRunner])
-class FileTemplateTest extends PropSpec with TestCommon with PropertyChecks {
+class FileGeneratorTest extends PropSpec with TestCommon with PropertyChecks {
 
   private val sourceLeft = "/* COMM */   \t \n  word"
   private val sourceRight = "word   \t \n    /* COMM */"
@@ -40,24 +40,24 @@ class FileTemplateTest extends PropSpec with TestCommon with PropertyChecks {
     """.stripMargin
 
   property("skips whitespace") {
-    FileTemplate.skipWhitespace(sourceLeft, sourceLeft.lastIndexOf('/') + 1, +1) should equal(sourceLeft.indexOf('w'))
-    FileTemplate.skipWhitespace(sourceRight, sourceRight.indexOf('/') - 1, -1) should equal(sourceRight.indexOf('d'))
+    FileGenerator.skipWhitespace(sourceLeft, sourceLeft.lastIndexOf('/') + 1, +1) should equal(sourceLeft.indexOf('w'))
+    FileGenerator.skipWhitespace(sourceRight, sourceRight.indexOf('/') - 1, -1) should equal(sourceRight.indexOf('d'))
   }
 
   property("skips expressions") {
-    FileTemplate.skipExpr(bigSourceLeft, bigSourceLeft.indexOf('{'), +1) should equal(
+    FileGenerator.skipExpr(bigSourceLeft, bigSourceLeft.indexOf('{'), +1) should equal(
       bigSourceLeft.lastIndexOf('}') + 1
     )
-    FileTemplate.skipExpr(bigSourceRight, bigSourceRight.lastIndexOf('}'), -1) should equal(
+    FileGenerator.skipExpr(bigSourceRight, bigSourceRight.lastIndexOf('}'), -1) should equal(
       bigSourceRight.indexOf('{') - 1
     )
   }
 
   property("finds the right amount of substitution text in template") {
-    FileTemplate.getSubstitutionEnd(bigSourceLeft, bigSourceLeft.lastIndexOf('/') + 1, +1) should equal(
+    FileGenerator.getSubstitutionEnd(bigSourceLeft, bigSourceLeft.lastIndexOf('/') + 1, +1) should equal(
       bigSourceLeft.lastIndexOf('}') + 1
     )
-    FileTemplate.getSubstitutionEnd(bigSourceRight, bigSourceRight.indexOf('/') - 1, -1) should equal(
+    FileGenerator.getSubstitutionEnd(bigSourceRight, bigSourceRight.indexOf('/') - 1, -1) should equal(
       bigSourceRight.indexOf('{') - 1
     )
   }

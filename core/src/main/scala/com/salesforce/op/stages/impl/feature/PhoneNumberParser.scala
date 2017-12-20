@@ -271,9 +271,10 @@ case object PhoneNumberParser {
   private[op] def parse(phoneNumber: Phone, regionCode: String, strictValidation: Boolean): Phone = new Phone(
     phoneNumber.v.flatMap {
       case pn if pn.length() < 2 => None
-      case pn => parsePhoneNumber(pn, regionCode, strictValidation).toOption.flatMap(p =>
-        if (phoneUtil.isValidNumber(p)) Some(s"+${p.getCountryCode}${p.getNationalNumber}${p.getExtension}") else None
-      )
+      case pn =>
+        val parsed = parsePhoneNumber(pn, regionCode, strictValidation)
+        val validOpt = parsed.toOption.filter(phoneUtil.isValidNumber)
+        validOpt.map(p => s"+${p.getCountryCode}${p.getNationalNumber}${p.getExtension}")
     }
   )
 

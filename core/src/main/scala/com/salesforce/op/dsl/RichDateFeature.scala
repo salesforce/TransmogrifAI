@@ -8,7 +8,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.{DateListPivot, Transmogrifier}
+import com.salesforce.op.stages.impl.feature.{DateListPivot, TransmogrifierDefaults}
 import org.joda.time.{DateTime => JDateTime}
 
 
@@ -52,8 +52,8 @@ trait RichDateFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: JDateTime = Transmogrifier.ReferenceDate,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
       // vectorize DateList
@@ -104,8 +104,8 @@ trait RichDateFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: JDateTime = Transmogrifier.ReferenceDate,
-      trackNulls: Boolean = Transmogrifier.TrackNulls,
+      referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[DateTime]] = Array.empty
     ): FeatureLike[OPVector] = {
       f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,

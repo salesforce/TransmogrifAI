@@ -40,8 +40,8 @@ trait RichFeaturesCollection {
      *
      * @return vector feature
      */
-    def transmogrify(): FeatureLike[OPVector] = Transmogrifier.transmogrify(features.toSeq).combine()
-
+    def transmogrify(): FeatureLike[OPVector] =
+      Transmogrifier.transmogrify(features.toSeq)(TransmogrifierDefaults).combine()
 
     /**
      * Convert features into a single vector feature using the feature engineering steps most likely to provide

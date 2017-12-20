@@ -35,7 +35,7 @@ private[classification] trait HasLogisticRegression extends Params
   val sparkLR = new LogisticRegression()
 
   final val useLR = new BooleanParam(this, "useLR", "boolean to decide to use LogisticRegression in the model selector")
-  setDefault(useLR, true)
+  setDefault(useLR, false)
 
   private[classification] val lRGrid = new ParamGridBuilder()
 
@@ -45,8 +45,7 @@ private[classification] trait HasLogisticRegression extends Params
    */
   private[classification] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkLR.getParam(pName).asInstanceOf[Param[T]]
-    if (values.distinct.length == 1) sparkLR.set(p, values.head) else lRGrid.addGrid(p, values)
-
+    lRGrid.addGrid(p, values)
     subStage.foreach(_.setLRParams[T](pName, values))
     this
   }
@@ -133,6 +132,7 @@ private[classification] trait HasDecisionTreeClassifier
 }
 
 
+
 sealed abstract class ModelType(val sparkName: String) extends EnumEntry with Serializable
 
 object ModelType extends Enum[ModelType] {
@@ -159,8 +159,7 @@ private[classification] trait HasNaiveBayes extends Params with SubStage[Stage1C
 
   private[impl] def setNBParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkNB.getParam(pName).asInstanceOf[Param[T]]
-    if (values.distinct.length == 1) sparkNB.set(p, values.head) else nBGrid.addGrid(p, values)
-
+    nBGrid.addGrid(p, values)
     subStage.map(_.setNBParams[T](pName, values))
     this
   }
@@ -187,7 +186,7 @@ private[classification] trait HasNaiveBayes extends Params with SubStage[Stage1C
 /**
  * Classifiers to try in the Model Selector
  */
-private[impl] trait SelectorClassifiers
+private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade to spark 2.2
   extends HasLogisticRegression
     with HasRandomForestClassifier
     with HasDecisionTreeClassifier

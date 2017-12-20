@@ -54,8 +54,9 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
    */
   def loadJson(json: JValue): Try[OpWorkflowModel] = {
     for {
-      model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String]))
+      trainParams <- OpParams.fromString((json \ TrainParameters.entryName).extract[String])
       params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
+      model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json))
     } yield model
       .setFeatures(resultFeatures)

@@ -5,6 +5,8 @@
 
 package com.salesforce.op.cli.gen
 
+import com.salesforce.op.cli.SchemaSource
+
 /**
  * Represents one of the three kinds of machine learning problems.
  */
@@ -32,29 +34,17 @@ object ProblemKind {
     ops: Ops,
     responseFieldSchema: AvroField,
     available: List[ProblemKind] = values): ProblemKind = {
+
     val options = Map(
       Regression -> List("regress", "regression"),
       BinaryClassification -> List("binclass", "binary classification"),
       MultiClassification -> List("multiclass", "multi classification")
-    ).filter {
-      case (kind, _) => available.contains(kind)
-    }
-    ops.ask(
-      s"Cannot infer the kind of problem based on response field ${responseFieldSchema.name}.\n" +
-        "What kind of problem is this?", options
-    )
-  }
+    ).filterKeys(available.contains)
 
-  /**
-   * Build a [[ProblemKind]] from the schema for an [[AvroField]]. May prompt the user if more information is required.
-   *
-   * @param responseFieldSchema The schema to build from
-   * @return The built [[ProblemKind]]
-   */
-  def from(ops: Ops, responseFieldSchema: AvroField): ProblemKind = {
-    if (responseFieldSchema.nullable) {
-      Ops.oops(s"Response field '$responseFieldSchema' cannot be nullable")
-    }
-    responseFieldSchema.problemKind(ops)
+    ops.ask(
+      "Cannot infer the kind of problem based on response field" +
+        s" '${responseFieldSchema.name}'. What kind of problem is this?",
+      options,
+      s"Failed to figure out problem kind from $responseFieldSchema")
   }
 }

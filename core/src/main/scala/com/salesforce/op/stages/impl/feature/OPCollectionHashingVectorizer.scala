@@ -21,7 +21,7 @@ import scala.reflect.runtime.universe.TypeTag
  *
  * In more details:
  * It tries to hash entries in the collection using the specified hashing algorithm to build a single vector.
- * If the desired number of features (= hash space size) for all features combines is larger than Integer.Max
+ * If the desired number of features (= hash space size) for all features combined is larger than Integer.Max
  * (the maximal index for a vector), then all the features use the same hash space. There are also options for
  * the user to hash indices with collections where that makes sense (OPLists and OPVectors), and to force a
  * shared hash space, even if the number of feature is not high enough to require it.
@@ -35,9 +35,10 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
 
   final val numFeatures = new IntParam(
     parent = this, name = "numFeatures",
-    doc = s"number of features (hashes) to generate (default: ${Transmogrifier.DefaultNumOfFeatures})",
+    doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",
     isValid = ParamValidators.inRange(
-      lowerBound = 0, upperBound = Transmogrifier.MaxNumOfFeatures, lowerInclusive = false, upperInclusive = true
+      lowerBound = 0, upperBound = TransmogrifierDefaults.MaxNumOfFeatures,
+      lowerInclusive = false, upperInclusive = true
     )
   )
   def setNumFeatures(v: Int): this.type = set(numFeatures, v)
@@ -74,12 +75,12 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
   def setBinaryFreq(v: Boolean): this.type = set(binaryFreq, v)
 
   setDefault(
-    numFeatures -> Transmogrifier.DefaultNumOfFeatures,
-    hashWithIndex -> Transmogrifier.HashWithIndex,
+    numFeatures -> TransmogrifierDefaults.DefaultNumOfFeatures,
+    hashWithIndex -> TransmogrifierDefaults.HashWithIndex,
     forceSharedHashSpace -> false,
-    prependFeatureName -> Transmogrifier.PrependFeatureName,
-    hashAlgorithm -> Transmogrifier.HashAlgorithm.toString.toLowerCase,
-    binaryFreq -> Transmogrifier.BinaryFreq
+    prependFeatureName -> TransmogrifierDefaults.PrependFeatureName,
+    hashAlgorithm -> TransmogrifierDefaults.HashAlgorithm.toString.toLowerCase,
+    binaryFreq -> TransmogrifierDefaults.BinaryFreq
   )
 
   /**
@@ -88,7 +89,7 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
    * @return true if the shared hashing space to be used, false otherwise
    */
   def isSharedHashSpace: Boolean =
-    (getNumFeatures() * inN.length) > Transmogrifier.MaxNumOfFeatures || $(forceSharedHashSpace)
+    (getNumFeatures() * inN.length) > TransmogrifierDefaults.MaxNumOfFeatures || $(forceSharedHashSpace)
 
   /**
    * Get the underlying hashing transformer
@@ -140,10 +141,15 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
   override def transformFn: Seq[T] => OPVector = in => {
     if (in.isEmpty) OPVector.empty
     else {
+      // TODO: make hasher a lazy val to prevent repeated instatiation
       val hasher = hashingTF()
       val shouldHashWithIndex = $(hashWithIndex)
       val shouldPrependFeatureName = $(prependFeatureName)
+      // TODO: perhaps change the hashing so that we can test Text vs. TextMap vectorization equivalence easier?
       val fNameHashesWithInputs = getTransientFeatures().map(f => hasher.indexOf(f.name)).zip(in)
+      // println(s"getTransientFeatures(): ${getTransientFeatures().toList}")
+      // getTransientFeatures().foreach(f => println(f.name, f.originFeatures))
+      // println(s"fNameHashesWithInputs: ${fNameHashesWithInputs.toList}")
 
       if (isSharedHashSpace) {
         val allElements = ArrayBuffer.empty[Any]
@@ -152,6 +158,10 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
           prepared = prepare(el, shouldHashWithIndex, shouldPrependFeatureName, featureNameHash)
           p <- prepared
         } allElements.append(p)
+
+        // println(s"allElements: ${allElements.toList}")
+        // println(s"hasher.transform(allElements): ${hasher.transform(allElements)}")
+        // println(s"hasher.transform(allElements).asML.toOPVector: ${hasher.transform(allElements).asML.toOPVector}")
 
         hasher.transform(allElements).asML.toOPVector
       }
@@ -192,6 +202,6 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
           indicatorValue = None
         )
       }
-    setMetadata(OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inN)).toMetadata)
+    setMetadata(OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inN, stageName)).toMetadata)
   }
 }

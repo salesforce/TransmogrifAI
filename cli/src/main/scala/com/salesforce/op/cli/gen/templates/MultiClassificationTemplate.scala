@@ -31,7 +31,14 @@
 
 package com.salesforce.op.cli.gen.templates
 
-// scalastyle:off
-class _GenericObject_ {
-  def _categoricalGetter_[E <: Enum[E]] : E = ???
+import com.salesforce.op.stages.impl.classification.MultiClassificationModelSelector
+import com.salesforce.op.stages.impl.regression._
+
+/**
+ * This is a template for generating some code
+ */
+class MultiClassificationTemplate {
+  // BEGIN
+  MultiClassificationModelSelector()
+  // END
 }

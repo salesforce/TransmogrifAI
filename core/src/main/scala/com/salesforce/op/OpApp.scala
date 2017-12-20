@@ -18,7 +18,7 @@ import scopt.Read
  */
 abstract class OpApp {
 
-  @transient private val log = LoggerFactory.getLogger(this.getClass)
+  @transient private val logr = LoggerFactory.getLogger(this.getClass)
 
   /**
    * The main function to run your [[OpWorkflow]].
@@ -66,10 +66,10 @@ abstract class OpApp {
    */
   def sparkSession: SparkSession = {
     val conf = sparkConf
-    if (log.isDebugEnabled) {
-      log.debug("*" * 80)
-      log.debug("SparkConf:\n{}", conf.toDebugString)
-      log.debug("*" * 80)
+    if (logr.isDebugEnabled) {
+      logr.debug("*" * 80)
+      logr.debug("SparkConf:\n{}", conf.toDebugString)
+      logr.debug("*" * 80)
     }
     SparkSession.builder.config(conf).getOrCreate()
   }
@@ -117,7 +117,7 @@ abstract class OpApp {
     val config = parser.parse(args, OpWorkflowRunnerConfig())
     if (config.isEmpty) sys.exit(1)
 
-    log.info("Parsed config:\n{}", config)
+    logr.info("Parsed config:\n{}", config)
     config.get.runType -> config.get.toOpParams.get
   }
 

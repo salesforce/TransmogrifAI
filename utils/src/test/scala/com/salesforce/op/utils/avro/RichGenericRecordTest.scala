@@ -24,7 +24,6 @@ class RichGenericRecordTest extends FlatSpec
   val dataPath = resourceFile(parent = "../test-data", name = s"PassengerData.avro").getPath
   val passengerData = AvroInOut.read[GenericRecord](dataPath).getOrElse(throw new Exception("Couldn't read data"))
   val firstRow = passengerData.first
-  print(firstRow)
 
   Spec[RichGenericRecord] should "get value of Int" in {
 

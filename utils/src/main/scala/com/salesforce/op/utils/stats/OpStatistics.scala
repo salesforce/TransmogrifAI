@@ -110,26 +110,26 @@ object OpStatistics {
    * @return 2-element result tuple containing (Map of label values to pointwise mutual information values,
    *         total mutual information between the feature and the label)
    */
-  private[stats] def mutualInfo(contingency: Matrix): (PointwiseMutualInfo, Double) = {
+  private[stats] def mutualInfoWithFilter(contingency: Matrix): (PointwiseMutualInfo, Double) = {
     val filteredMatrix = filterEmpties(contingency)
-    mutualInfoOnFiltered(filteredMatrix)
+    mutualInfo(filteredMatrix)
   }
 
   /**
    * Mutual information calculation, assuming the matrix passed in has had all its empty rows and columns filtered out
    *
-   * @param filteredMatrix Contingency matrix with no rows/cols of zeros
+   * @param contingency Contingency matrix with no rows/cols of zeros
    * @return 2-element result tuple containing (Map of label values to pointwise mutual information values,
    *         total mutual information between the feature and the label)
    */
-  private[stats] def mutualInfoOnFiltered(filteredMatrix: Matrix): (PointwiseMutualInfo, Double) = {
+  private[stats] def mutualInfo(contingency: Matrix): (PointwiseMutualInfo, Double) = {
     // First check contingency matrix to see make sure we can compute a chi-squared test on it
-    val (rows, cols) = (filteredMatrix.numRows, filteredMatrix.numCols)
+    val (rows, cols) = (contingency.numRows, contingency.numCols)
     // Add all the columns together
-    val summedCols = filteredMatrix.multiply(new DenseMatrix(cols, 1, Array.fill(cols)(1.0)))
+    val summedCols = contingency.multiply(new DenseMatrix(cols, 1, Array.fill(cols)(1.0)))
     val sampleSize = summedCols.values.sum
     val summedRows = {
-      val fm = filteredMatrix match {
+      val fm = contingency match {
         case s: SparseMatrix => s.toDense
         case d: DenseMatrix => d
       }
@@ -139,7 +139,7 @@ object OpStatistics {
     // This is the column-major array that corresponds to the matrix of PMI values from the contingency matrix
     val pmiArray = {
       for {
-        (vec, j) <- filteredMatrix.colIter.zipWithIndex
+        (vec, j) <- contingency.colIter.zipWithIndex
         (v, i) <- vec.toArray.zipWithIndex
       } yield {
         // TODO: Use our SpecialDoubleSerializer to serialize these arrays with Infinity/NaN values
@@ -154,7 +154,7 @@ object OpStatistics {
     val pmiMap = pmiArray.groupBy(_._1).mapValues(_.map(_._2))
 
     // The mutual information is also easily calculated from all the pmi values and the contingency matrix
-    val mi = pmiArray.map(_._2).zip(filteredMatrix.toArray).map { case (pmi, count) => pmi * count / sampleSize }.sum
+    val mi = pmiArray.map(_._2).zip(contingency.toArray).map { case (pmi, count) => pmi * count / sampleSize }.sum
 
     pmiMap -> mi
   }
@@ -174,7 +174,7 @@ object OpStatistics {
       return ContingencyStats(cramersV = Double.NaN, pointwiseMutualInfo = Map.empty, mutualInfo = 0.0)
     }
     // If we filter out empty columns, then we don't end up with the right number of elements in pmiMap
-    val (pmiMap, mi) = mutualInfoOnFiltered(contingency) // mutualInfoOnFiltered(filteredMatrix)
+    val (pmiMap, mi) = mutualInfo(contingency) // mutualInfoOnFiltered(filteredMatrix)
     val cvMap = cramersVOnFiltered(filteredMatrix)
 
     ContingencyStats(cramersV = cvMap, pointwiseMutualInfo = pmiMap, mutualInfo = mi)

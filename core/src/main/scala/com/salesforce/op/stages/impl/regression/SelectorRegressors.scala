@@ -49,7 +49,7 @@ private[regression] trait HasLinearRegression extends Params
   final val useLR = new BooleanParam(this, "useLR",
     "boolean to decide to use LinearRegression in the model selector"
   )
-  setDefault(useLR, true)
+  setDefault(useLR, false)
 
   private[regression] val lRGrid = new ParamGridBuilder()
 
@@ -59,8 +59,7 @@ private[regression] trait HasLinearRegression extends Params
    */
   private[regression] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkLR.getParam(pName).asInstanceOf[Param[T]]
-    if (values.distinct.length == 1) sparkLR.set(p, values.head)
-    else lRGrid.addGrid(p, values)
+    lRGrid.addGrid(p, values)
     subStage.foreach(_.setLRParams[T](pName, values))
     this
   }
@@ -135,7 +134,7 @@ private[regression] trait HasLinearRegression extends Params
 }
 
 /**
- * Decision Tree Regressor for Model Selector
+ * RandomForest Regressor for Model Selector
  */
 private[regression] trait HasRandomForestRegressor
   extends HasRandomForestBase[Regressor, SelectorRegressors] {
@@ -151,6 +150,14 @@ private[regression] trait HasDecisionTreeRegressor
 }
 
 
+/**
+ * GradientBoostedTree Regressor for Model Selector
+ */
+private[regression] trait HasGradientBoostedTreeRegression
+  extends HasGradientBoostedTreeBase[Regressor, SelectorRegressors] {
+  override val sparkGBT: Regressor = new GBTRegressor().asInstanceOf[Regressor]
+}
+
 sealed abstract class LossType(val sparkName: String) extends EnumEntry with Serializable
 
 object LossType extends Enum[LossType] {
@@ -160,103 +167,6 @@ object LossType extends Enum[LossType] {
   case object Absolute extends LossType("absolute")
 }
 
-/**
- * Gradient Boosted Tree Regressor for Model Selector
- */
-private[regression] trait HasGradientBoostedTreeRegression extends Params
-  with SubStage[RegressionModelSelector] {
-
-  val sparkGBT = new GBTRegressor()
-
-  final val useGBT = new BooleanParam(this, "useGBT",
-    "boolean to decide to use GradientBoostedTree in the model selector"
-  )
-  setDefault(useGBT, true)
-
-  private[impl] val gBTGrid = new ParamGridBuilder()
-
-  /**
-   * Gradient Boosted Tree Params
-   */
-
-  private[regression] def setGBTParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
-    val p: Param[T] = sparkGBT.getParam(pName).asInstanceOf[Param[T]]
-    if (values.distinct.length == 1) sparkGBT.set(p, values.head)
-    else gBTGrid.addGrid(p, values)
-    subStage.foreach(_.setGBTParams[T](pName, values))
-    this
-  }
-
-  /**
-   * Set the maximum number of iterations.
-   * Default is 100.
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeMaxIter(value: Int*): this.type = setGBTParams("maxIter", value)
-
-  /**
-   * Set maximum depth of the tree (>= 0).
-   * E.g., depth 0 means 1 leaf node; depth 1 means 1 internal node + 2 leaf nodes.
-   * (default = 5)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeMaxDepth(value: Int*): this.type = setGBTParams("maxDepth", value)
-
-  /**
-   * Set maximum number of bins used for discretizing continuous features and for choosing how to split
-   * on features at each node.  More bins give higher granularity.
-   * Must be >= 2 and >= number of categories in any categorical feature.
-   * (default = 32)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeMaxBins(value: Int*): this.type = setGBTParams("maxBins", value)
-
-  /**
-   * Set minimum number of instances each child must have after split.
-   * If a split causes the left or right child to have fewer than minInstancesPerNode,
-   * the split will be discarded as invalid.
-   * Should be >= 1.
-   * (default = 1)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeMinInstancesPerNode(value: Int*): this.type = setGBTParams("minInstancesPerNode", value)
-
-  /**
-   * Set minimum information gain for a split to be considered at a tree node.
-   * (default = 0.0)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeMinInfoGain(value: Double*): this.type = setGBTParams("minInfoGain", value)
-
-  /**
-   * Set loss function which GBT tries to minimize.
-   * Supported: "squared" (L2) and "absolute" (L1)
-   * (default = squared)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeLossType(value: LossType*): this.type = setGBTParams("lossType", value.map(_.sparkName))
-
-  /**
-   * Set param for random seed.
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeSeed(value: Long*): this.type = setGBTParams("seed", value)
-
-  /**
-   * Set param for Step size (a.k.a learning rate) in interval [0, 1] for shrinking the contribution of each estimator
-   * (default = 0.1)
-   *
-   * @group setParam
-   */
-  def setGradientBoostedTreeStepSize(value: Double*): this.type = setGBTParams("stepSize", value)
-}
 
 /**
  * Regressors to try in the Model Selector

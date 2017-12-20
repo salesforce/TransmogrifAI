@@ -117,7 +117,8 @@ trait OpPipelineStageParams extends InputParams {
    * and out of ml. Is currently a param to prevent having the setter method be public.
    */
   final private[op] val outputMetadata = new MetadataParam(
-    parent = this, name = "outputMetadata", doc = "any metadata that user wants to save in the transformed DataFrame"
+    parent = this, name = OpPipelineStageParamsNames.OutputMetadata,
+    doc = "any metadata that user wants to save in the transformed DataFrame"
   )
 
   setDefault(outputMetadata, Metadata.empty)
@@ -139,17 +140,23 @@ trait OpPipelineStageParams extends InputParams {
    * and out of ml. Is currently a param to prevent having the setter method be public.
    */
   final private[op] val inputSchema = new SchemaParam(
-    parent = this, name = "inputSchema", doc = "the schema of the input data from the dataframe"
+    parent = this, name = OpPipelineStageParamsNames.InputSchema,
+    doc = "the schema of the input data from the dataframe"
   )
 
   setDefault(inputSchema, new StructType())
 
   final private[op] def setInputSchema(s: StructType): this.type = {
     val featureNames = getInputFeatures().map(_.name)
-    val specificSchema = StructType(s.filter(f => featureNames.contains(f.name)))
+    val specificSchema = StructType(featureNames.map(s(_)))
     set(inputSchema, specificSchema)
   }
 
   final def getInputSchema(): StructType = $(inputSchema)
 
+}
+
+object OpPipelineStageParamsNames {
+  val OutputMetadata: String = "outputMetadata"
+  val InputSchema: String = "inputSchema"
 }

@@ -18,7 +18,7 @@ import org.scalafmt.config.ScalafmtConfig
 import collection.JavaConverters._
 import scala.io.Source
 
-trait ProjectTemplate {
+trait ProjectGenerator {
 
   /**
    * The command that generates this project template.
@@ -38,14 +38,14 @@ trait ProjectTemplate {
   /**
    * Perform any last replacements on the file.
    */
-  def replace(file: ProjectFile): ProjectFile
+  def replace(file: FileInProject): FileInProject
 
   /**
    * Generates arguments to feed into the templates.
    *
-   * @return Arguments as [[FileTemplate.Substitutions]]
+   * @return Arguments as [[FileGenerator.Substitutions]]
    */
-  def props: FileTemplate.Substitutions
+  def props: FileGenerator.Substitutions
 
   /**
    * Returns if the file should be copied instead of rendered
@@ -67,27 +67,27 @@ trait ProjectTemplate {
   private def loadTemplateFileSource(templatePath: String): String =
     Source.fromInputStream(loadResource(templatePath)).getLines.map(_ + "\n").mkString
 
-  private lazy val templates: Map[String, FileTemplate] = templateResources.filterNot(shouldCopy).map { path =>
-    path -> new FileTemplate(path, loadTemplateFileSource(path))
+  private lazy val templates: Map[String, FileGenerator] = templateResources.filterNot(shouldCopy).map { path =>
+    path -> new FileGenerator(path, loadTemplateFileSource(path))
   }.toMap
 
-  private lazy val copies: List[ProjectFile] = templateResources.filter(shouldCopy).map { path =>
-    ProjectFile(path = path, source = Streaming(loadResource(path)))
+  private lazy val copies: List[FileInProject] = templateResources.filter(shouldCopy).map { path =>
+    FileInProject(path = path, source = Streaming(loadResource(path)))
   }
 
-  def templateFile(name: String): FileTemplate = templates(name)
+  def templateFile(name: String): FileGenerator = templates(name)
 
   def renderAll(
-    substitutions: FileTemplate.Substitutions, formatScala: Boolean = true
-  ): Traversable[ProjectFile] = {
+    substitutions: FileGenerator.Substitutions, formatScala: Boolean = true
+  ): Traversable[FileInProject] = {
 
     val rendered = templates map {
       case (_, tpl) => tpl.render(substitutions)
     }
 
     val formatted =
-      if (formatScala) rendered.map {
-        case f @ ProjectFile(path, Str(source), _) if path.endsWith(".scala") =>
+      if (formatScala) rendered map {
+        case f @ FileInProject(path, Str(source), _) if path.endsWith(".scala") =>
           f.copy(source = Str(Scalafmt.format(source, new ScalafmtConfig(maxColumn = 120)).get))
         case f => f
       }
@@ -100,8 +100,8 @@ trait ProjectTemplate {
 
 }
 
-object ProjectTemplate {
-  val byName: Map[String, Ops => ProjectTemplate] =
+object ProjectGenerator {
+  val byName: Map[String, Ops => ProjectGenerator] =
     Map(
     "simple" -> SimpleProject
   )

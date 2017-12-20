@@ -11,21 +11,18 @@ import com.github.fommil.netlib.{BLAS, LAPACK}
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.readers.Reader
-import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.OpSparkListener
 import com.salesforce.op.utils.spark.RichRDD._
+import com.salesforce.op.utils.spark.{AppMetrics, OpSparkListener}
 import enumeratum._
 import org.apache.hadoop.io.compress.CompressionCodec
 import org.apache.hadoop.mapred.JobConf
+import org.apache.spark.scheduler.{SparkListener, SparkListenerApplicationEnd}
 import org.apache.spark.sql.SparkSession
-import org.joda.time.Duration
-import org.joda.time.format.PeriodFormatterBuilder
-import org.scalacheck.Prop.Exception
 import org.slf4j.LoggerFactory
 
+import scala.collection.mutable.ArrayBuffer
 import scala.util.{Failure, Success, Try}
-
 
 /**
  * A class for running an Optimus Prime Workflow.
@@ -49,7 +46,24 @@ class OpWorkflowRunner
   val featureToComputeUpTo: OPFeature
 ) extends Serializable {
 
-  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
+  @transient protected lazy val log = LoggerFactory.getLogger(classOf[OpWorkflowRunner])
+
+  private val onAppEndHandlers = ArrayBuffer.empty[AppMetrics => Unit]
+
+  /**
+   * Add handle to collect the app metrics when the application ends
+   * @param h a handle to collect the app metrics when the application ends
+   */
+  final def addApplicationEndHandler(h: AppMetrics => Unit): this.type = {
+    onAppEndHandlers += h
+    this
+  }
+
+  private def onApplicationEnd(metrics: AppMetrics): Unit = {
+    onAppEndHandlers.foreach(h =>
+      Try(h(metrics)).recover { case e => log.error("Failed to handle application end event", e) }
+    )
+  }
 
   /**
    * This method is called to train your workflow
@@ -104,11 +118,14 @@ class OpWorkflowRunner
         .setParameters(params)
 
     val metrics = scoringEvaluator match {
-      case None => workflowModel.score(path = params.writeLocation)
+      case None =>
+        workflowModel.score(path = params.writeLocation)
         None
-      case Some(e) => val (_, met) = workflowModel.scoreAndEvaluate(e,
-        path = params.writeLocation, metricsPath = params.metricsLocation)
-      Option(met)
+      case Some(e) =>
+        val (_, metrcs) = workflowModel.scoreAndEvaluate(
+          evaluator = e, path = params.writeLocation, metricsPath = params.metricsLocation
+        )
+        Option(metrcs)
     }
 
     new ScoreResult(metrics)
@@ -144,44 +161,47 @@ class OpWorkflowRunner
    * @return runner result
    */
   def run(runType: OpWorkflowRunType, opParams: OpParams)(implicit spark: SparkSession): OpWorkflowRunnerResult = {
-    if (log.isDebugEnabled) {
-      log.debug("BLAS implementation provided by: {}", BLAS.getInstance().getClass.getName)
-      log.debug("LAPACK implementation provided by: {}", LAPACK.getInstance().getClass.getName)
-    }
-
     log.info("Assuming OP params:\n{}", opParams)
     workflow.setParameters(opParams)
 
-    // TODO: remove listener on app completion (should be available in spark 2.2.x - SPARK-18975)
-    spark.sparkContext.addSparkListener(
-      new OpSparkListener(
-        appName = spark.sparkContext.appName,
-        appId = spark.sparkContext.applicationId,
-        runType = runType.toString,
-        customTagName = opParams.customTagName,
-        customTagValue = opParams.customTagValue,
-        logStageMetrics = opParams.logStageMetrics.getOrElse(false)
-      )
-    )
+    log.info("BLAS implementation provided by: {}", BLAS.getInstance().getClass.getName)
+    log.info("LAPACK implementation provided by: {}", LAPACK.getInstance().getClass.getName)
 
-    val start = DateTimeUtils.now()
+    // TODO: remove listener on app completion (should be available in spark 2.2.x - SPARK-18975)
+    val listener = sparkListener(runType, opParams)
+    spark.sparkContext.addSparkListener(listener)
+
     val result = runType match {
       case OpWorkflowRunType.Train => train(opParams)
       case OpWorkflowRunType.Score => score(opParams)
       case OpWorkflowRunType.Features => computeFeatures(opParams)
       case OpWorkflowRunType.Evaluate => evaluate(opParams)
     }
-    val duration = new Duration(DateTimeUtils.now().minus(start.getMillis).getMillis)
-    val total = new PeriodFormatterBuilder()
-      .appendHours().appendSuffix("h")
-      .appendMinutes().appendSuffix("m")
-      .appendSecondsWithOptionalMillis().appendSuffix("s")
-      .toFormatter.print(duration.toPeriod())
-
-    log.info("Total run time: {}", total)
     log.info(result.toString)
     result
   }
+
+  private def sparkListener(
+    runType: OpWorkflowRunType,
+    opParams: OpParams
+  )(implicit spark: SparkSession): SparkListener =
+    new OpSparkListener(
+      appName = spark.sparkContext.appName,
+      appId = spark.sparkContext.applicationId,
+      runType = runType.toString,
+      customTagName = opParams.customTagName,
+      customTagValue = opParams.customTagValue,
+      logStageMetrics = opParams.logStageMetrics.getOrElse(false),
+      collectStageMetrics = opParams.collectStageMetrics.getOrElse(false)
+    ) {
+      override def onApplicationEnd(applicationEnd: SparkListenerApplicationEnd): Unit = {
+        super.onApplicationEnd(applicationEnd)
+        val m = super.metrics
+        log.info("Total run time: {}", m.appDurationPretty)
+        OpWorkflowRunner.this.onApplicationEnd(m)
+      }
+    }
+
 }
 
 

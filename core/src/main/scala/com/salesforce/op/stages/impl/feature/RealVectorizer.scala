@@ -56,7 +56,7 @@ class RealVectorizer[T <: Real]
 
   private def means(dataset: Dataset[Seq[T#Value]]): Seq[Double] = {
     val size = getInputFeatures().length
-    val means = dataset.select(SequenceAggregators.MeanSeqNullNum(size)).first()
+    val means = dataset.select(SequenceAggregators.MeanSeqNullNum(size = size).toColumn).first()
     means
   }
 
