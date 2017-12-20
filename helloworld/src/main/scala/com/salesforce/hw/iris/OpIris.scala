@@ -9,7 +9,7 @@ import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.readers.CustomReader
 import com.salesforce.op.stages.impl.classification.{ClassificationModelsToTry, Impurity, MultiClassificationModelSelector}
-import com.salesforce.op.stages.impl.tuning.DataSplitter
+import com.salesforce.op.stages.impl.tuning.DataCutter
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, SparkSession}
@@ -48,12 +48,7 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
   private val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrify()
 
   val (pred, raw, prob) = MultiClassificationModelSelector
-    .withCrossValidation(splitter = Some(DataSplitter(reserveTestFraction = 0.2, seed = randomSeed)), seed = randomSeed)
-    .setModelsToTry(ClassificationModelsToTry.LogisticRegression, ClassificationModelsToTry.DecisionTree)
-    .setLogisticRegressionMaxIter(10, 100)
-    .setLogisticRegressionRegParam(0.01, 0.1)
-    .setDecisionTreeMaxDepth(10, 20, 30)
-    .setDecisionTreeImpurity(Impurity.Gini)
+    .withCrossValidation(splitter = Some(DataCutter(reserveTestFraction = 0.2, seed = randomSeed)), seed = randomSeed)
     .setDecisionTreeSeed(randomSeed)
     .setInput(labels, features).getOutput()
 

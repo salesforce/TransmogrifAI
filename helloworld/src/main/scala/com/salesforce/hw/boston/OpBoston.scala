@@ -65,16 +65,8 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
 
   val prediction = RegressionModelSelector
     .withCrossValidation(dataSplitter = Option(DataSplitter(seed = randomSeed)), seed = randomSeed)
-    .setLinearRegressionRegParam(0.05, 0.3, 0.1)
-    .setLinearRegressionElasticNetParam(0.1, 0.8)
-    .setLinearRegressionMaxIter(10)
-    .setRandomForestMaxDepth(5, 10)
-    .setRandomForestMinInstancesPerNode(10, 20, 30)
     .setRandomForestSeed(randomSeed)
-    .setGradientBoostedTreeMaxDepth(5, 10)
-    .setGradientBoostedTreeMinInstancesPerNode(10, 20, 30)
     .setGradientBoostedTreeSeed(randomSeed)
-    .setModelsToTry(LinearRegression, RandomForestRegression, GBTRegression)
     .setInput(medv, houseFeatures)
     .getOutput()
 
