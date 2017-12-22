@@ -47,7 +47,7 @@ domain knowledge but lacking a machine learning background in creating high qual
 
 ### Feature engineering
 The first component of Optimus Prime AutoML is smart feature engineering based on our rich
-[type hierarchy](https://docs.google.com/a/salesforce.com/presentation/d/1I_eq9LGehJRrQGmzogo2c32zOUiHRfxKToTdSK3fXAc/edit?usp=sharing).
+[type hierarchy](https://github.com/salesforce/op/wiki/Documentation#type-hierarchy-and-automatic-feature-engineering).
 Optimus Prime defines many specific input feature types: Email, Phone, PostalCode, Categorical, Percentage, Currency, etc.
 
 Default (type specific) feature transformations can be used to create a feature vector:
