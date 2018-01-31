@@ -2,6 +2,8 @@
 
 An AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning.
 
+[![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
+
 ## Overview
 Optimus Prime is a Machine Learning (ML) library to simplfy development of modeling
 workflows for multiple customers without hand tuning the models.
