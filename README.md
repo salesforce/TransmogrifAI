@@ -141,9 +141,9 @@ alias op="java -cp `pwd`/cli/build/libs/\* com.salesforce.op.cli.CLI"
 
 Finally generate your Titanic model project (follow the instructions on screen):
 ```
-op gen --input `pwd`/templates/simple/src/main/resources/PassengerData.csv \
+op gen --input `pwd`/test-data/PassengerData.csv \
   --id passengerId --response survived \
-  --schema `pwd`/templates/simple/src/main/avro/Passenger.avsc Titanic
+  --schema `pwd`/test-data/PassengerDataAll.avsc Titanic
 ```
 
 Your Titanic model project is ready to go. Happy modeling!
