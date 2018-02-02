@@ -80,26 +80,26 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ### Boston model
 #### Train
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
---run-type=train "\
---model-location=/tmp/boston-model "\
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+--run-type=train \
+--model-location=/tmp/boston-model \
 --read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data"
 ```
 #### Score
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
---run-type=score "\
---model-location=/tmp/boston-model "\
---read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data "\
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+--run-type=score \
+--model-location=/tmp/boston-model \
+--read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
 --write-location=/tmp/boston-scores"
 ```
 #### Evaluate
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs=\
---run-type=evaluate "\
---read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data "\
---write-location=/tmp/boston-eval "\
---model-location=/tmp/boston-model "\
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+--run-type=evaluate \
+--read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
+--write-location=/tmp/boston-eval \
+--model-location=/tmp/boston-model \
 --metrics-location=/tmp/boston-metrics"
 ```
 
