@@ -5,18 +5,70 @@
 
 package com.salesforce.op.readers
 
-import com.salesforce.op.OpParams
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.FeatureGeneratorStage
+import com.salesforce.op.{OpParams, ReaderParams}
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 import scala.reflect.runtime.universe.WeakTypeTag
 
 
-trait Reader[T] extends Serializable {
+private[readers] trait ReaderType[T] extends Serializable {
 
+  /**
+   * Reader type tag
+   */
   implicit val wtt: WeakTypeTag[T]
+
+  /**
+   * Full reader input type name
+   *
+   * @return full input type name
+   */
+  final def fullTypeName: String = wtt.tpe.toString
+
+  /**
+   * Short reader input type name
+   *
+   * @return short reader input type name
+   */
+  final def typeName: String = fullTypeName.split("\\.").last
+
+  /**
+   * Default method for extracting this reader's parameters from readerParams in [[OpParams]]
+   *
+   * @param opParams contains map of reader type to ReaderParams instances
+   * @return ReaderParams instance if it exists
+   */
+  final def getReaderParams(opParams: OpParams): Option[ReaderParams] = opParams.readerParams.get(this.typeName)
+
+}
+
+
+private[readers] trait ReaderKey[T] extends Serializable {
+
+  /**
+   * Function for extracting key from a record
+   * @return key string
+   */
+  def key: T => String
+
+}
+
+object ReaderKey {
+
+  /**
+   * Random key function
+   *
+   * @return a random key value
+   */
+  def randomKey[T](t: T): String = util.Random.nextLong().toString
+
+}
+
+
+trait Reader[T] extends ReaderType[T] {
 
   /**
    * All the reader's sub readers (used in joins)

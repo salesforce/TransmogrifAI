@@ -16,8 +16,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
  *
  * @param key function for extracting key from a record
  */
-abstract class CustomReader[T](val key: T => String)(implicit val wtt: WeakTypeTag[T])
-  extends DataReader[T] with Reader[T] {
+abstract class CustomReader[T](val key: T => String)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] {
 
   val readPath: Option[String] = None // dummy, not used in custom readers
 

@@ -58,7 +58,7 @@ class OpScalarStandardScaler
 }
 
 
-private final class OpScalarStandardScalerModel
+final class OpScalarStandardScalerModel private[op]
 (
   val std: Array[Double],
   val mean: Array[Double],

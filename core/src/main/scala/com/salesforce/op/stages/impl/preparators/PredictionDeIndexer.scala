@@ -40,26 +40,22 @@ class PredictionDeIndexer(uid: String = UID[PredictionDeIndexer])
         s" any label/index mapping in its metadata")
     }
 
-
     new PredictionDeIndexerModel(labels, $(unseenName), operationName, uid)
   }
 }
 
-private final class PredictionDeIndexerModel
+final class PredictionDeIndexerModel private[op]
 (
-  labels: Array[String],
-  unseen: String,
+  val labels: Array[String],
+  val unseen: String,
   operationName: String,
   uid: String
 ) extends BinaryModel[RealNN, RealNN, Text](operationName = operationName, uid = uid) {
-  override def transformFn: (RealNN, RealNN) => Text = {
-    (response: RealNN, pred: RealNN) => {
-      val idx = pred.value.get.toInt
-      if (0 <= idx && idx < labels.length) {
-        labels(idx).toText
-      } else {
-        unseen.toText
-      }
-    }
+
+  def transformFn: (RealNN, RealNN) => Text = (response: RealNN, pred: RealNN) => {
+    val idx = pred.value.get.toInt
+    if (0 <= idx && idx < labels.length) labels(idx).toText
+    else unseen.toText
   }
+
 }

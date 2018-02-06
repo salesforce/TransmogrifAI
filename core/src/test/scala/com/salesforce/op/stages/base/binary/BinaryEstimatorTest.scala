@@ -99,7 +99,7 @@ class TestPivotEstimator(uid: String = UID[TestPivotEstimator])
     new TestPivotModel(topValue = topValue, operationName = operationName, uid = uid)
   }
 }
-private final class TestPivotModel(topValue: String, operationName: String, uid: String)
+final class TestPivotModel private[op](val topValue: String, operationName: String, uid: String)
   extends BinaryModel[Text, Text, OPVector](operationName = operationName, uid = uid) {
 
   def transformFn: (Text, Text) => OPVector = (city: Text, country: Text) => {

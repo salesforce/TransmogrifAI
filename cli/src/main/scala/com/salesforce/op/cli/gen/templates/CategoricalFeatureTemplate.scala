@@ -3,11 +3,10 @@
  * All rights reserved.
  */
 
-
 package com.salesforce.op.cli.gen.templates
 
-import com.salesforce.op.features.FeatureBuilder
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.{FeatureBuilder => FB}
+import com.salesforce.op.cli.gen.templates.FeatureOps._
 
 /**
  * This is a template for generating categorical feature handling in a generated project
@@ -15,8 +14,7 @@ import com.salesforce.op.features.types._
 class CategoricalFeatureTemplate {
   private[templates] def feature =
   // BEGIN
-  FeatureBuilder.MultiPickList[SampleObject]
-    .extract(o => Option(o.codeGeneration_categoricalField_codeGeneration)
-    .map(_.toString).toSet[String].toMultiPickList)
+  FB.PickList[SampleObject]
+    .extract(asPickList(_.codeGeneration_categoricalField_codeGeneration))
   // END
 }

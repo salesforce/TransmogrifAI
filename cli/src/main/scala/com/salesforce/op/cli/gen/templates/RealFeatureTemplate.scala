@@ -3,10 +3,9 @@
  * All rights reserved.
  */
 
-
 package com.salesforce.op.cli.gen.templates
 
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.{FeatureBuilder => FB}
 import com.salesforce.op.features.types._
 
 /**
@@ -15,6 +14,7 @@ import com.salesforce.op.features.types._
 class RealFeatureTemplate {
   private[templates] def feature =
   // BEGIN
-  FeatureBuilder.Real[SampleObject].extract(o => o.codeGeneration_realField_codeGeneration.toReal)
+  FB.Real[SampleObject]
+    .extract(_.codeGeneration_realField_codeGeneration.toReal)
   // END
 }

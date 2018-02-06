@@ -13,6 +13,7 @@ import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.stages.impl.preparators.{CorrelationType, SanityChecker}
 import com.salesforce.op.stages.impl.regression.IsotonicRegressionCalibrator
 import com.salesforce.op.utils.tuples.RichTuple._
+import com.salesforce.op.utils.numeric.Number
 
 import scala.language.postfixOps
 import scala.reflect.ClassTag
@@ -235,26 +236,48 @@ trait RichNumericFeature {
     /**
      * Apply NumericBucketizer transformer shortcut function
      *
-     * @param trackNulls   option to keep track of values that were missing
-     * @param splits       sorted list of split points for bucketizing
-     * @param bucketLabels sorted list of labels for the buckets
+     * @param trackNulls     option to keep track of values that were missing
+     * @param trackInvalid   option to keep track of invalid values,
+     *                       eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param splits         sorted list of split points for bucketizing
+     * @param splitInclusion should the splits be left or right inclusive.
+     *                       Meaning if x1 and x2 are split points, then for Left the bucket interval is [x1, x2)
+     *                       and for Right the bucket interval is (x1, x2].
+     * @param bucketLabels   sorted list of labels for the buckets
      */
     def bucketize(
       trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
       splits: Array[Double] = NumericBucketizer.Splits,
+      splitInclusion: Inclusion = NumericBucketizer.SplitInclusion,
       bucketLabels: Option[Array[String]] = None
     ): FeatureLike[OPVector] = {
-      f.transformWith(new NumericBucketizer[Double, T]().setBuckets(splits, bucketLabels).setTrackNulls(trackNulls))
+      f.transformWith(
+        new NumericBucketizer[Double, T]()
+          .setBuckets(splits, bucketLabels)
+          .setTrackNulls(trackNulls)
+          .setSplitInclusion(splitInclusion)
+          .setTrackInvalid(trackInvalid)
+      )
     }
 
     /**
      * Apply a smart bucketizer transformer
      *
-     * @param label      label feature
-     * @param trackNulls option to keep track of values that were missing
+     * @param label        label feature
+     * @param trackNulls   option to keep track of values that were missing
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
      */
-    def autoBucketize(label: FeatureLike[RealNN], trackNulls: Boolean): FeatureLike[OPVector] = {
-      new DecisionTreeNumericBucketizer[Double, T]().setTrackNulls(trackNulls).setInput(label, f).getOutput()
+    def autoBucketize(
+      label: FeatureLike[RealNN],
+      trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid
+    ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericBucketizer[Double, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls).getOutput()
     }
 
     /**
@@ -381,6 +404,7 @@ trait RichNumericFeature {
       correlationType: CorrelationType = SanityChecker.CorrelationType,
       minVariance: Double = SanityChecker.MinVariance,
       removeBadFeatures: Boolean = SanityChecker.RemoveBadFeatures,
+      removeFeatureGroup: Boolean = SanityChecker.RemoveFeatureGroup,
       categoricalLabel: Option[Boolean] = None
     ): FeatureLike[OPVector] = {
       // scalastyle:on
@@ -395,6 +419,7 @@ trait RichNumericFeature {
         .setCorrelationType(correlationType)
         .setMinVariance(minVariance)
         .setRemoveBadFeatures(removeBadFeatures)
+        .setRemoveFeatureGroup(removeFeatureGroup)
         .setInput(f, featureVector)
 
       categoricalLabel.foreach(checker.setCategoricalLabel)
@@ -470,26 +495,48 @@ trait RichNumericFeature {
     /**
      * Apply NumericBucketizer transformer shortcut function
      *
-     * @param trackNulls   option to keep track of values that were missing
-     * @param splits       sorted list of split points for bucketizing
-     * @param bucketLabels sorted list of labels for the buckets
+     * @param trackNulls     option to keep track of values that were missing
+     * @param trackInvalid   option to keep track of invalid values,
+     *                       eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param splits         sorted list of split points for bucketizing
+     * @param splitInclusion should the splits be left or right inclusive.
+     *                       Meaning if x1 and x2 are split points, then for Left the bucket interval is [x1, x2)
+     *                       and for Right the bucket interval is (x1, x2].
+     * @param bucketLabels   sorted list of labels for the buckets
      */
     def bucketize(
       trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
       splits: Array[Double] = NumericBucketizer.Splits,
+      splitInclusion: Inclusion = NumericBucketizer.SplitInclusion,
       bucketLabels: Option[Array[String]] = None
     ): FeatureLike[OPVector] = {
-      f.transformWith(new NumericBucketizer[Long, T]().setBuckets(splits, bucketLabels).setTrackNulls(trackNulls))
+      f.transformWith(
+        new NumericBucketizer[Long, T]()
+          .setBuckets(splits, bucketLabels)
+          .setTrackNulls(trackNulls)
+          .setSplitInclusion(splitInclusion)
+          .setTrackInvalid(trackInvalid)
+      )
     }
 
     /**
      * Apply a smart bucketizer transformer
      *
-     * @param label      label feature
-     * @param trackNulls option to keep track of values that were missing
+     * @param label        label feature
+     * @param trackNulls   option to keep track of values that were missing
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
      */
-    def autoBucketize(label: FeatureLike[RealNN], trackNulls: Boolean): FeatureLike[OPVector] = {
-      new DecisionTreeNumericBucketizer[Long, T]().setTrackNulls(trackNulls).setInput(label, f).getOutput()
+    def autoBucketize(
+      label: FeatureLike[RealNN],
+      trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid
+    ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericBucketizer[Long, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls).getOutput()
     }
 
     /**
@@ -514,8 +561,4 @@ trait RichNumericFeature {
     }
   }
 
-}
-
-object Number extends Serializable {
-  def isValid(x: Double): Boolean = !x.isNaN && !x.isInfinity
 }

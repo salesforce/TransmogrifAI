@@ -41,11 +41,27 @@ trait FeatureType extends Serializable {
    * Returns value shortcut
    */
   final def v: Value = value
-
   /**
    * Returns true is the value is non empty, false otherwise
    */
   final def nonEmpty: Boolean = !isEmpty
+
+  /**
+   * Returns true if this feature value is non empty and the predicate
+   * $p returns true when applied to this feature type value.
+   * Otherwise, returns false.
+   *
+   * @param p the predicate to test
+   */
+  final def exists(p: Value => Boolean): Boolean = nonEmpty && p(value)
+
+  /**
+   * Returns true if this feature value is non empty and contains the specified value $v.
+   * Otherwise, returns false.
+   *
+   * @param v value to test
+   */
+  final def contains(v: Value): Boolean = exists(_ == v)
 
   /**
    * Indicates whether some other object is "equal to" this one
@@ -100,6 +116,22 @@ trait MultiResponse extends FeatureType with Categorical
  * Represents a feature type that can only take on values from some discrete, finite number of values.
  */
 trait Categorical extends FeatureType
+
+
+/**
+ * Extractor for non empty feature type value
+ */
+object SomeValue {
+
+  /**
+   * Extractor for non empty feature type value
+   *
+   * @tparam T feature type
+   * @param v feature type
+   * @return feature type value
+   */
+  def unapply[T <: FeatureType](v: T): Option[T#Value] = if (v.isEmpty) None else Some(v.value)
+}
 
 
 /**

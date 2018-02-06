@@ -70,9 +70,9 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a close match if country code is not found or country is misspelled" in {
-    val countries = Array("uS", "United St America", "States of America", "Grece", "Switzland").map(Text(_))
+    val countries = Array("uS", "United St America", "States of America", "Grece", "Switzland", "USA").map(Text(_))
     countries.map(PhoneNumberParser.validCountryCode(Phone(""), _, PhoneNumberParser.DefaultRegion,
-      defaultCodes, defaultNames)) shouldBe Array("US", "US", "US", "GR", "CH")
+      defaultCodes, defaultNames)) shouldBe Array("US", "US", "US", "GR", "CH", "US")
   }
 
   it should "country code should always be generic international locale if number starts with +" in {
@@ -81,10 +81,10 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
   }
 
   it should "find valid country code by string match" in {
-    val countries = Array("uS", "CD", "United", "Zimbwe").map(Text(_))
+    val countries = Array("uS", "CD", "United", "Zimbwe", "USA").map(Text(_))
     countries.map(PhoneNumberParser.validCountryCode(Phone(""), _,
       PhoneNumberParser.DefaultRegion, regionCodes, regionNames)) should contain theSameElementsInOrderAs
-      Array("US", "CD", "US", "ZW")
+      Array("US", "CD", "US", "ZW", "US")
   }
 
   it should "find closest valid match in input or supported if input region is not part of the set" in {

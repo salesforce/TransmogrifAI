@@ -25,8 +25,8 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
   uid: String = UID[MultiPickListMapVectorizer[T]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "vecCatMap", uid = uid)
-  with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
-  with MapStringPivotHelper with CleanTextMapFun with MinSupportParam {
+    with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
+    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam {
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
@@ -43,22 +43,25 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
 
     val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName)
+    val theTrackNulls = $(trackNulls)
+
+    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName, theTrackNulls)
     setMetadata(vectorMeta.toMetadata)
 
     new MultiPickListMapVectorizerModel(
       topValues = topValues, shouldCleanKeys = shouldCleanKeys, shouldCleanValues = shouldCleanValues,
-      operationName = operationName, uid = uid
+      trackNulls = theTrackNulls, operationName = operationName, uid = uid
     )
   }
 
 }
 
-private final class MultiPickListMapVectorizerModel[T <: OPMap[Set[String]]]
+final class MultiPickListMapVectorizerModel[T <: OPMap[Set[String]]] private[op]
 (
   val topValues: Seq[Seq[(String, Array[String])]],
   val shouldCleanKeys: Boolean,
   val shouldCleanValues: Boolean,
+  val trackNulls: Boolean,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
@@ -73,15 +76,13 @@ private final class MultiPickListMapVectorizerModel[T <: OPMap[Set[String]]]
         topMap.map { case (mapKey, top) =>
           val sizeOfVector = top.length
           cleanedMap.get(mapKey) match {
-            case None => Seq(sizeOfVector -> 0.0)
+            case None => if (trackNulls) Seq(sizeOfVector + 1 -> 1.0) else Seq(sizeOfVector -> 0.0)
             case Some(mapVal) =>
-              val topPivotVals =
-                mapVal
-                  .map(top.indexOf)
-                  .collect { case i if i >= 0 => i -> 1.0 }
-                  .toSeq
-              if (topPivotVals.isEmpty) Seq(sizeOfVector -> 1.0)
-              else topPivotVals ++ Seq(sizeOfVector -> 0.0)
+              val topIndicies = mapVal.toSeq.map(top.indexOf)
+              val topPivotVals = topIndicies.collect { case i if i >= 0 => i -> 1.0 }
+              val others = topIndicies.count(_ < 0).toDouble
+
+              topPivotVals ++ Seq(sizeOfVector -> others) ++ (if (trackNulls) Seq(sizeOfVector + 1 -> 0.0) else Seq())
           }
         }
       }

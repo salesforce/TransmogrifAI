@@ -3,15 +3,14 @@
  * All rights reserved.
  */
 
-package org.apache.spark.ml
+package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.OpPipelineStageReadWriteShared._
-import org.apache.spark.ml.util.DefaultParamsReader.Metadata
-import org.apache.spark.ml.util.{DefaultParamsReader, MLReader}
+import OpPipelineStageReadWriteShared._
+import org.apache.spark.ml.SparkDefaultParamsReadWrite
+import org.apache.spark.ml.util.MLReader
 import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, render}
@@ -54,16 +53,17 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
    */
   def loadFromJsonString(jsonStr: String): OpPipelineStageBase = {
     // Load stage json with it's params
-    val metadata = DefaultParamsReader.parseMetadata(jsonStr)
+    val metadata = SparkDefaultParamsReadWrite.parseMetadata(jsonStr)
+    val (className, metadataJson) = metadata.className -> metadata.metadata
     // Check if it's a model
-    val isModel = (metadata.metadata \ FieldNames.IsModel.entryName).extract[Boolean]
+    val isModel = (metadataJson \ FieldNames.IsModel.entryName).extract[Boolean]
     // In case we stumbled upon model we instantiate it using the class name + ctor args
     // otherwise we simply use the provided stage instance.
-    val stage = if (isModel) loadModel(metadata) else originalStage
+    val stage = if (isModel) loadModel(className, metadataJson) else originalStage
 
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
-    DefaultParamsReader.getAndSetParams(stage, metadata)
+    SparkDefaultParamsReadWrite.getAndSetParams(stage, metadata)
     stage.getTransientFeatures().foreach(f => {
       val feature = inputFeatures.find(_.uid == f.uid).getOrElse(
         throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'")
@@ -75,16 +75,12 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
 
   /**
    * Load the model instance from the metadata by instantiating it using a class name + ctor args
-   * @param metadata
-   * @return
    */
-  private def loadModel(metadata: Metadata): OpPipelineStageBase = {
-    val metadataJson = metadata.metadata
+  private def loadModel(modelClassName: String, metadataJson: JValue): OpPipelineStageBase = {
     // Extract all the ctor args
     val ctorArgsJson = (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj
     val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
     // Get the model class
-    val modelClassName = metadata.className
 
     // Make the ctor function used for creating a model instance
     def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = Try {

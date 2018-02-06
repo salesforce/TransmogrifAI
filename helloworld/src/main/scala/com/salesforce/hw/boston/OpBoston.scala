@@ -9,7 +9,6 @@ import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.readers.CustomReader
 import com.salesforce.op.stages.impl.regression.RegressionModelSelector
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 import org.apache.spark.rdd.RDD
@@ -21,6 +20,7 @@ import org.apache.spark.sql.{Dataset, SparkSession}
 object OpBoston extends OpAppWithRunner with BostonFeatures {
 
   override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[BostonKryoRegistrator]
+
 
   ////////////////////////////////////////////////////////////////////////////////
   // READERS DEFINITION
@@ -56,6 +56,7 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
     }
   }
 
+
   ////////////////////////////////////////////////////////////////////////////////
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
@@ -80,9 +81,9 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
       trainingReader = trainingReader,
       scoringReader = scoringReader,
       evaluationReader = Option(trainingReader),
-      evaluator = evaluator,
+      evaluator = Option(evaluator),
       scoringEvaluator = None,
-      featureToComputeUpTo = houseFeatures
+      featureToComputeUpTo = Option(houseFeatures)
     )
 
 }

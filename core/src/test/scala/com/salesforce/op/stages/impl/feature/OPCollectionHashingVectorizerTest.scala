@@ -31,7 +31,8 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
       (Seq("a", "b").toTextList, Seq("x", "x").toTextList),
       (Seq("a").toTextList, Seq("z", "y", "z", "z", "y").toTextList),
       (Seq("c", "x").toTextList, Seq("x", "y").toTextList),
-      (Seq("C ", "A.").toTextList, Seq("Z", "Z", "Z").toTextList)
+      (Seq("C ", "A.").toTextList, Seq("Z", "Z", "Z").toTextList),
+      (TextList.empty, TextList.empty)
     )
   )
   val (realMapData, rm1, rm2) = TestFeatureBuilder("rm1", "rm2",

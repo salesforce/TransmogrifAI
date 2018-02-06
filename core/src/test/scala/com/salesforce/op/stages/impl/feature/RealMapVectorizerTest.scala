@@ -8,14 +8,13 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichStructType._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-
 
 
 @RunWith(classOf[JUnitRunner])
@@ -38,6 +37,26 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(v => v._1.toRealMap -> v._2.toRealMap)
   )
 
+  val baseVectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setCleanKeys(true)
+
+  val expectedMeta = TestOpVectorMetadataBuilder(
+    baseVectorizer,
+    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+    m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
+  )
+
+  val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
+
+  val expectedMetaTrackNulls = TestOpVectorMetadataBuilder(
+    baseVectorizer,
+    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
+      IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
+      IndColWithGroup(None, "C"), IndColWithGroup(nullIndicatorValue, "C")),
+    m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"),
+      IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
+      IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"))
+  )
+
   Spec[RealMapVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setCleanKeys(true).setInput(m1, m2)
     val vector = vectorizer.getOutput()
@@ -50,7 +69,7 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a model that correctly transforms the data" in {
-    val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0).setCleanKeys(true).fit(data)
+    val vectorizer = baseVectorizer.setDefaultValue(0.0).setTrackNulls(false).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -58,11 +77,6 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(6, Array(2, 4), Array(11.0, 3.0)),
       Vectors.sparse(6, Array(), Array())
     ).map(_.toOPVector)
-    val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
-    )
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
@@ -70,9 +84,24 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
+  it should "track nulls" in {
+    val vectorizer = baseVectorizer.setDefaultValue(0.0).setTrackNulls(true).fit(data)
+    val transformed = vectorizer.transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.sparse(12, Array(0, 2, 5, 6, 9, 11), Array(1.0, 5.0, 1.0, 10.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(1, 3, 4, 7, 8), Array(1.0, 1.0, 11.0, 1.0, 3.0)),
+      Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+  }
+
   it should "use the correct fill value for missing keys" in {
-    val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setCleanKeys(true)
-      .setDefaultValue(100).fit(data)
+    val vectorizer = baseVectorizer.setDefaultValue(100).setTrackNulls(false).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -80,20 +109,34 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(Array(100.0, 100.0, 11.0, 100.0, 3.0, 0.0)),
       Vectors.dense(Array(100.0, 100.0, 100.0, 100.0, 100.0, 100.0))
     ).map(_.toOPVector)
-    val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
-    )
+
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
+  it should "track nulls with fill value for missing keys" in {
+    val vectorizer = baseVectorizer.setDefaultValue(100).setTrackNulls(true).fit(data)
+    val vector = vectorizer.getOutput()
+    val transformed = vectorizer.transform(data)
+
+    val expected = Array(
+      Vectors.sparse(12, Array(0, 2, 4, 5, 6, 8, 9, 10, 11), Array(1.0, 5.0, 100.0, 1.0, 10.0, 100.0, 1.0, 100.0, 1.0)),
+      Vectors.sparse(12, Array(0, 1, 2, 3, 4, 6, 7, 8), Array(100.0, 1.0, 100.0, 1.0, 11.0, 100.0, 1.0, 3.0)),
+      Vectors.dense(Array(100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0))
+    ).map(_.toOPVector)
+
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+  }
+
   it should "correctly whitelist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setWhiteListKeys(Array("a", "b", "z")).fit(data)
+      .setCleanKeys(true).setWhiteListKeys(Array("a", "b", "z")).setTrackNulls(false).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -104,7 +147,30 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
-      m2 -> List(IndColWithGroup(None, "Z"))
+      m2 -> List(IndColWithGroup(None, "Z")))
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+  }
+
+  it should "track nulls with whitelist keys" in {
+    val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
+      .setCleanKeys(true).setWhiteListKeys(Array("a", "b", "z")).setTrackNulls(true).fit(data)
+    val vector = vectorizer.getOutput()
+    val transformed = vectorizer.transform(data)
+
+    val expected = Array(
+      Vectors.sparse(6, Array(0, 2, 4), Array(1.0, 5.0, 10.0)),
+      Vectors.sparse(6, Array(1, 3, 5), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(6, Array(1, 3, 5), Array(1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+    val expectedMeta = TestOpVectorMetadataBuilder(
+      vectorizer,
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
+        IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -115,7 +181,7 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "correctly backlist keys" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
-      .setCleanKeys(true).setBlackListKeys(Array("a", "z")).fit(data)
+      .setCleanKeys(true).setBlackListKeys(Array("a", "z")).setTrackNulls(false).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -135,9 +201,35 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
+
+  it should "track nulls with backlist keys" in {
+    val vectorizer = new RealMapVectorizer[RealMap]().setInput(m1, m2).setDefaultValue(0.0)
+      .setCleanKeys(true).setBlackListKeys(Array("a", "z")).setTrackNulls(true).fit(data)
+    val vector = vectorizer.getOutput()
+    val transformed = vectorizer.transform(data)
+
+    val expected = Array(
+      Vectors.sparse(8, Array(0, 3, 5, 7), Array(5.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(8, Array(1, 2, 4, 6), Array(1.0, 11.0, 3.0, 0.0)),
+      Vectors.sparse(8, Array(1, 3, 5, 7), Array(1.0, 1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+    val expectedMeta = TestOpVectorMetadataBuilder(
+      vectorizer,
+      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
+        IndColWithGroup(None, "C"), IndColWithGroup(nullIndicatorValue, "C")),
+      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
+        IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"))
+    )
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+  }
+
   it should "correctly calculate means by key and fill missing values with them" in {
     val vectorizer = new RealMapVectorizer[RealMap]().setInput(f1, f2).setCleanKeys(true)
-      .setFillWithMean(true).fit(meanData)
+      .setFillWithMean(true).setTrackNulls(false).fit(meanData)
     val transformed = vectorizer.transform(meanData)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -158,6 +250,35 @@ class RealMapVectorizerTest extends FlatSpec with TestSparkContext {
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+  }
+
+  it should "track nulls with means by key" in {
+    val vectorizer = new RealMapVectorizer[RealMap]().setInput(f1, f2).setCleanKeys(true)
+      .setFillWithMean(true).setTrackNulls(true).fit(meanData)
+    val transformed = vectorizer.transform(meanData)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.sparse(12, Array(0, 2, 4, 5, 6, 10), Array(1.0, 5.0, 11.0, 1.0, 4.0, 10.0)),
+      Vectors.sparse(12, Array(0, 2, 4, 6, 10, 11), Array(-3.0, 3.0, 11.0, 3.0, 15.0 / 2, 1.0)),
+      Vectors.dense(-1.0, 1.0, 4.0, 1.0, 11.0, 1.0, 1.0, 0.0, 0.0, 0.0, 5.0, 0.0),
+      Vectors.dense(-1.0, 1.0, 4.0, 1.0, 11.0, 1.0, 8.0 / 3, 1.0, 0.0, 1.0, 15.0 / 2, 1.0)
+    ).map(_.toOPVector)
+
+    transformed.collect(vector) shouldBe expected
+
+    // TODO: Order of columns needed to be changed here compared to earlier tests - why does this happen?
+    val expectedMetaTrackNulls = TestOpVectorMetadataBuilder(
+      vectorizer,
+      f1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
+        IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
+        IndColWithGroup(None, "C"), IndColWithGroup(nullIndicatorValue, "C")),
+      f2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
+        IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"),
+        IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
+    )
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
 }

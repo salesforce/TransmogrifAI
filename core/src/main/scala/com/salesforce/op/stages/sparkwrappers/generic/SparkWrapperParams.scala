@@ -5,8 +5,9 @@
 
 package com.salesforce.op.stages.sparkwrappers.generic
 
+import com.salesforce.op.stages.SparkStageParam
 import org.apache.spark.ml.param.{Param, Params, StringArrayParam}
-import org.apache.spark.ml.{PipelineStage, SparkStageParam}
+import org.apache.spark.ml.PipelineStage
 
 
 /**

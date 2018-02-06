@@ -8,7 +8,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup, IndVal}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
@@ -42,7 +42,7 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a model that correctly transforms the data" in {
-    val transformed = vectorizer.fit(data).transform(data)
+    val transformed = vectorizer.setTrackNulls(false).fit(data).transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
       Vectors.sparse(6, Array(1), Array(1.0)),
@@ -52,8 +52,37 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"),
+        IndColWithGroup(None, "C")),
       m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
+    )
+
+    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vectorizer.outputName)
+    OpVectorMetadata(field) shouldEqual expectedMeta
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
+  }
+
+  it should " track nulls" in {
+    val transformed = vectorizer.setTrackNulls(true).fit(data).transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.sparse(12, Array(2, 5, 9, 11), Array(1.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(1, 3, 7, 8, 10), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+
+
+    val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
+    val expectedMeta = TestOpVectorMetadataBuilder(
+      vectorizer,
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
+        IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
+        IndColWithGroup(None, "C"), IndColWithGroup(nullIndicatorValue, "C")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"),
+        IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
+        IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"))
     )
 
     transformed.collect(vector) shouldBe expected

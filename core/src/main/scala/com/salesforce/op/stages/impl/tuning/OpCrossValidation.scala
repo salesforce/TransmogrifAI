@@ -13,7 +13,6 @@ import org.apache.spark.sql.types.MetadataBuilder
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 
 
-
 private[impl] class OpCrossValidation[E <: Estimator[_]]
 (
   val numFolds: Int = ValidatorParamDefaults.NumFolds,
@@ -31,8 +30,7 @@ private[impl] class OpCrossValidation[E <: Estimator[_]]
   private[op] def validate(
     estimator: E,
     paramGrids: Array[ParamMap],
-    label: String,
-    hasLeakage: Boolean
+    label: String
   ): Estimator[_] = {
 
     // get param that stores the label column
@@ -43,7 +41,6 @@ private[impl] class OpCrossValidation[E <: Estimator[_]]
       .setEstimatorParamMaps(paramGrids)
       .setNumFolds(numFolds)
       .setEvaluator(evaluator.set(labelCol, label))
-      .setHasLeakage(hasLeakage)
   }
 
   final override private[op] def bestModel[M <: Model[M]](

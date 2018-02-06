@@ -34,11 +34,6 @@ private[op] class OpMultiClassificationEvaluator
   def getDefaultMetric: MultiClassificationMetrics => Double = _.F1
 
   override def evaluateAll(data: Dataset[_]): MultiClassificationMetrics = {
-
-    // scalastyle:off
-    import data.sparkSession.implicits._
-    // scalastyle:on
-
     val (labelColName, predictionColName, rawPredictionColName) = (getLabelCol, getPredictionCol, getRawPredictionCol)
 
     log.debug(
@@ -46,22 +41,18 @@ private[op] class OpMultiClassificationEvaluator
       labelColName, rawPredictionColName, predictionColName
     )
 
-    val multiclassMetrics = new MulticlassMetrics(
-      data.select(predictionColName, labelColName).as[(Double, Double)].rdd
-    )
+    import data.sparkSession.implicits._
+    val rdd = data.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
+    val multiclassMetrics = new MulticlassMetrics(rdd)
     val error = 1.0 - multiclassMetrics.accuracy
     val precision = multiclassMetrics.weightedPrecision
     val recall = multiclassMetrics.weightedRecall
-    val f1 = 2 * precision * recall / (precision + recall)
+    val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
 
-    val metrics = MultiClassificationMetrics(
-      Precision = precision,
-      Recall = recall,
-      F1 = f1,
-      Error = error
-    )
-    log.info("Evaluated metrics : {}", metrics.toString)
+    val metrics = MultiClassificationMetrics(Precision = precision, Recall = recall, F1 = f1, Error = error)
+
+    log.info("Evaluated metrics: {}", metrics.toString)
     metrics
   }
 

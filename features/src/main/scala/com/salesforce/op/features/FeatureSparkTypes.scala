@@ -210,7 +210,7 @@ case object FeatureSparkTypes {
       case wt if wt <:< weakTypeOf[t.MultiPickList] => ArrStrEncoder
 
       // Everything else
-      case _ => ExpressionEncoder()(ReflectionUtils.dealiasedTypeTag[O#Value](ttv))
+      case _ => ExpressionEncoder()(ReflectionUtils.dealiasedTypeTagForType[O#Value]()(ttv))
     }
     encoder.asInstanceOf[Encoder[O#Value]]
   }

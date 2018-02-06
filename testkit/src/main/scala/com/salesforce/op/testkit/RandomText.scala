@@ -128,6 +128,34 @@ object RandomText {
   ): RandomText[T] = RandomText[T](RandomStream of domain distributedAs distribution)
 
   /**
+   * Produces random Text from a given list of possible values
+   *
+   * @param domain       list of possible values returned by this generator
+   * @param distribution distribution of probability for this list - if provided;
+   *                     if not, distribution is assumed to be uniform.
+   *                     distribution must be an array of double values, same size
+   *                     as domain; distribution(k) is the probability that
+   *                     an element in domain
+   * @return a random picklist generator that only returns elements of domain
+   */
+  def textFromDomain(domain: List[String], distribution: Seq[Double] = Nil): RandomText[Text] =
+    selectRandom[Text](domain, distribution)
+
+  /**
+   * Produces random TextArea from a given list of possible values
+   *
+   * @param domain       list of possible values returned by this generator
+   * @param distribution distribution of probability for this list - if provided;
+   *                     if not, distribution is assumed to be uniform.
+   *                     distribution must be an array of double values, same size
+   *                     as domain; distribution(k) is the probability that
+   *                     an element in domain
+   * @return a random picklist generator that only returns elements of domain
+   */
+  def textAreaFromDomain(domain: List[String], distribution: Seq[Double] = Nil): RandomText[TextArea] =
+    selectRandom[TextArea](domain, distribution)
+
+  /**
    * Produces random picklists from a given list of possible values
    *
    * @param domain       list of possible values returned by this generator

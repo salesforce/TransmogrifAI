@@ -39,7 +39,7 @@ class CSVAutoReader[T <: GenericRecord : ClassTag]
   val timeZone: String = CSVDefaults.TimeZone,
   val recordNamespace: String = CSVDefaults.RecordNamespace,
   val recordName: String = CSVDefaults.RecordName
-)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] with Reader[T] {
+)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] {
 
   override def read(params: OpParams = new OpParams())
     (implicit spark: SparkSession): Either[RDD[T], Dataset[T]] = Left {

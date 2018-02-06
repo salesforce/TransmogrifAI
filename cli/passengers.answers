@@ -13,5 +13,5 @@
 'Parch' - what kind of feature is this? [0] integral [1] categorical: => 0
 'Ticket' - what kind of feature is this? [0] text [1] categorical: => 1
 'Cabin' - what kind of feature is this? [0] text [1] categorical: => 0
-'Embarked' - what kind of feature is this? [0] text [1] categorical: => 1
+'Embarked' - what kind of feature is this? [0] text [1] categorical: => 0
 Cannot infer the kind of problem based on response field 'Survived'. What kind of problem is this? => binclass

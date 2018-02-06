@@ -13,6 +13,7 @@ import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, 
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Params}
+import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
 import org.joda.time.{DateTime, DateTimeZone, Days}
 
@@ -21,7 +22,7 @@ import scala.reflect.runtime.universe.TypeTag
 /**
  * Base class for vectorizing OPMap[A] features. Individual vectorizers for different feature types need to implement
  * the getFillByKey function (which calculates any fill values that differ by key - means, modes, etc.) and the
- * makeModel funtion (which specifies which type of model will be returned).
+ * makeModel function (which specifies which type of model will be returned).
  *
  * @param uid           uid for instance
  * @param operationName unique name of the operation this stage performs
@@ -38,7 +39,7 @@ abstract class OPMapVectorizer[A, T <: OPMap[A]]
   val convertFn: T#Value => RealMap#Value
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid) with
-    MapVectorizerFuncs[Double, RealMap] with NumericMapDefaultParam {
+    MapVectorizerFuns[Double, RealMap] with NumericMapDefaultParam with TrackNullsParam {
 
   private implicit val seqRealMapEncoder = Encoders.kryo[Seq[RealMap#Value]]
   protected val shouldCleanValues = true
@@ -54,14 +55,18 @@ abstract class OPMapVectorizer[A, T <: OPMap[A]]
       shouldCleanKeys = shouldCleanKeys,
       shouldCleanValues = shouldCleanValues
     )
-    setMetadata(makeVectorMeta(allKeys).toMetadata)
+
+    val meta = if ($(trackNulls)) makeVectorMetaWithNullIndicators(allKeys) else makeVectorMetadata(allKeys)
+    setMetadata(meta.toMetadata)
+
 
     val args = OPMapVectorizerModelArgs(
       allKeys = allKeys,
       fillByKey = fillByKey(dataset),
       shouldCleanKeys = shouldCleanKeys,
       shouldCleanValues = shouldCleanValues,
-      defaultValue = $(defaultValue)
+      defaultValue = $(defaultValue),
+      trackNulls = $(trackNulls)
     )
     makeModel(args, operationName, uid)
   }
@@ -126,47 +131,34 @@ class DateMapVectorizer[T <: OPMap[Long]](uid: String = UID[DateMapVectorizer[T]
 
 }
 
-/**
- * Converts a sequence of KeyString features into a vector keeping the top K most common occurrences of each
- * key in the maps for that feature (ie the final vector has length k * number of keys * number of features).
- * Each key found will also generate an other column which will capture values that do not make the cut or where not
- * seen in training. Note that any keys not seen in training will be ignored.
- *
- * @param uid uid for instance
- */
-class TextMapPivotVectorizer[T <: OPMap[String]]
+class TextMapHashingVectorizer[T <: OPMap[String]]
 (
-  uid: String = UID[TextMapPivotVectorizer[T]]
+  uid: String = UID[TextMapHashingVectorizer[T]]
 )(implicit tti: TypeTag[T])
-  extends SequenceEstimator[T, OPVector](operationName = "vecTextMap", uid = uid)
-    with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
-    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam {
+  extends OPMapVectorizer[String, T](
+    uid = uid, operationName = "vecHashTextMap",
+    convertFn = _.map { case (k, v) => k -> 1.0 }
+  ) with TextParams {
 
-  def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-    val shouldCleanKeys = $(cleanKeys)
-    val shouldCleanValues = $(cleanText)
+  final val prependFeatureName = new BooleanParam(
+    parent = this, name = "prependFeatureName",
+    doc = s"if true, prepends a input feature name to each token of that feature"
+  )
+  setDefault(prependFeatureName, true)
 
-    def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = {
-      mapIn.map { case (k, v) => k -> Map(v -> 1L) }
-    }
+  def setPrependFeatureName(v: Boolean): this.type = set(prependFeatureName, v)
 
-    val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(dataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+  def getFillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = Seq.empty
 
-    val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
-
-    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName)
-    setMetadata(vectorMeta.toMetadata)
-
-    new TextMapPivotVectorizerModel[T](
-      topValues = topValues,
-      shouldCleanKeys = shouldCleanKeys,
-      shouldCleanValues = shouldCleanValues,
+  def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[String, T] =
+    new TextMapHashingVectorizerModel[T](
+      args = args.copy(shouldCleanValues = $(cleanText)),
+      shouldPrependFeatureName = $(prependFeatureName),
       operationName = operationName,
       uid = uid
     )
-  }
 }
+
 
 /**
  * Class for vectorizing RealMap features. Fills missing keys with the mean for that key.
@@ -196,6 +188,7 @@ class RealMapVectorizer[T <: OPMap[Double]](uid: String = UID[RealMapVectorizer[
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[Double, T] =
     new RealMapVectorizerModel(args, operationName = operationName, uid = uid)
 }
+
 sealed trait NumericMapDefaultParam extends Params {
 
   final val defaultValue = new DoubleParam(
@@ -217,7 +210,7 @@ sealed trait NumericMapDefaultParam extends Params {
 }
 
 
-trait MapVectorizerFuncs[A, T <: OPMap[A]] extends VectorizerDefaults with MapPivotParams with CleanTextMapFun {
+trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPivotParams with CleanTextMapFun {
   self: PipelineStage =>
 
   protected def getKeyValues
@@ -235,7 +228,7 @@ trait MapVectorizerFuncs[A, T <: OPMap[A]] extends VectorizerDefaults with MapPi
       .map(_.toSeq)
   }
 
-  protected def makeVectorMeta(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
+  protected def makeVectorMetadata(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
     val meta = vectorMetadataFromInputFeatures
     val cols = for {
       (keys, col) <- allKeys.zip(meta.columns)
@@ -247,6 +240,23 @@ trait MapVectorizerFuncs[A, T <: OPMap[A]] extends VectorizerDefaults with MapPi
       indicatorValue = None
     )
     meta.withColumns(cols.toArray)
+  }
+
+
+  protected def makeVectorMetaWithNullIndicators(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
+    val vectorMeta = makeVectorMetadata(allKeys)
+    val updatedCols = vectorMeta.columns.flatMap { col =>
+      Seq(
+        col,
+        OpVectorColumnMetadata(
+          parentFeatureName = col.parentFeatureName,
+          parentFeatureType = col.parentFeatureType,
+          indicatorGroup = col.indicatorGroup,
+          indicatorValue = Some(TransmogrifierDefaults.NullString)
+        )
+      )
+    }
+    vectorMeta.withColumns(updatedCols)
   }
 }
 
@@ -265,7 +275,8 @@ sealed case class OPMapVectorizerModelArgs
   fillByKey: Seq[Map[String, Double]],
   shouldCleanKeys: Boolean,
   shouldCleanValues: Boolean,
-  defaultValue: Double
+  defaultValue: Double,
+  trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
 )
 
 sealed abstract class OPMapVectorizerModel[A, I <: OPMap[A]]
@@ -286,14 +297,21 @@ sealed abstract class OPMapVectorizerModel[A, I <: OPMap[A]]
           val keys = args.allKeys(i)
           val fills: Map[String, Double] = if (args.fillByKey.isEmpty) Map.empty else args.fillByKey(i)
           val cleaned = cleanMap(map, shouldCleanKey = args.shouldCleanKeys, shouldCleanValue = args.shouldCleanValues)
-          keys.map(k => cleaned.getOrElse(k, fills.getOrElse(k, args.defaultValue)))
+          if (args.trackNulls) {
+            keys.flatMap(k => cleaned.get(k) match {
+              case Some(v) => Seq(v, 0.0)
+              case None => Seq(fills.getOrElse(k, args.defaultValue), 1.0)
+            })
+          } else {
+            keys.map(k => cleaned.getOrElse(k, fills.getOrElse(k, args.defaultValue)))
+          }
       }.toArray
     Vectors.dense(eachPivoted).compressed.toOPVector
   }
 
 }
 
-private final class BinaryMapVectorizerModel[T <: OPMap[Boolean]]
+final class BinaryMapVectorizerModel[T <: OPMap[Boolean]] private[op]
 (
   args: OPMapVectorizerModelArgs,
   operationName: String,
@@ -303,7 +321,7 @@ private final class BinaryMapVectorizerModel[T <: OPMap[Boolean]]
   def convertFn: Map[String, Boolean] => Map[String, Double] = booleanToRealMap
 }
 
-private final class IntegralMapVectorizerModel[T <: OPMap[Long]]
+final class IntegralMapVectorizerModel[T <: OPMap[Long]] private[op]
 (
   args: OPMapVectorizerModelArgs,
   operationName: String,
@@ -313,7 +331,7 @@ private final class IntegralMapVectorizerModel[T <: OPMap[Long]]
   def convertFn: Map[String, Long] => Map[String, Double] = intMapToRealMap
 }
 
-private final class DateMapVectorizerModel[T <: OPMap[Long]]
+final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
 (
   args: OPMapVectorizerModelArgs,
   operationName: String,
@@ -321,13 +339,13 @@ private final class DateMapVectorizerModel[T <: OPMap[Long]]
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Long, T](args = args, operationName = operationName, uid = uid) {
   val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
-  val referenceDate: DateTime = new DateTime(TransmogrifierDefaults.ReferenceDate.getMillis, timeZone)
+  val referenceDate = TransmogrifierDefaults.ReferenceDate
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
     dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
 }
 
-private final class RealMapVectorizerModel[T <: OPMap[Double]]
+final class RealMapVectorizerModel[T <: OPMap[Double]] private[op]
 (
   args: OPMapVectorizerModelArgs,
   operationName: String,
@@ -337,36 +355,57 @@ private final class RealMapVectorizerModel[T <: OPMap[Double]]
   def convertFn: Map[String, Double] => Map[String, Double] = identity
 }
 
-private final class TextMapPivotVectorizerModel[T <: OPMap[String]]
+object TextMapHashingVectorizerNames {
+  val MapKeys = "mapKeys"
+}
+
+final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
 (
-  val topValues: Seq[Seq[(String, Array[String])]],
-  val shouldCleanKeys: Boolean,
-  val shouldCleanValues: Boolean,
+  args: OPMapVectorizerModelArgs,
+  val shouldPrependFeatureName: Boolean,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
-  extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun {
+  extends OPMapVectorizerModel[String, T](args, operationName = operationName, uid = uid)
+    with TextTokenizerParams with HashingFun {
 
-  def transformFn: Seq[T] => OPVector = row => {
-    // Combine top values for each feature with map feature
-    val eachPivoted =
-      row.zip(topValues).map { case (map, topMap) =>
-        val cleanedMap = cleanMap(map.value, shouldCleanKeys, shouldCleanValues)
-        topMap.map { case (mapKey, top) =>
-          val sizeOfVector = top.length
-          cleanedMap.get(mapKey) match {
-            case None => Seq(sizeOfVector -> 0.0)
-            case Some(cv) =>
-              top.indexOf(cv) match {
-                case i if i < 0 => Seq(sizeOfVector -> 1.0)
-                case i => Seq(i -> 1.0, sizeOfVector -> 0.0)
-              }
-          }
-        }
-      }
-    // Fix indices for sparse vector
-    val reindexed = reindex(eachPivoted.map(reindex))
-    makeSparseVector(reindexed).toOPVector
+  private val hashingParams = HashingFunctionParams(
+    hashWithIndex = TransmogrifierDefaults.HashWithIndex,
+    // Need to not prepend the feature name in the tests, so allow this to be settable
+    prependFeatureName = shouldPrependFeatureName,
+    numFeatures = TransmogrifierDefaults.DefaultNumOfFeatures,
+    numInputs = 1, // All tokens are combined into a single TextList before hashing
+    maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
+    forceSharedHashSpace = TransmogrifierDefaults.ForceSharedHashSpace,
+    binaryFreq = TransmogrifierDefaults.BinaryFreq,
+    hashAlgorithm = TransmogrifierDefaults.HashAlgorithm
+  )
+
+  def convertFn: Map[String, String] => Map[String, Double] = _.map { case (k, v) => k -> 1.0 }
+
+  // Try to use old vectorizer on each of the items, mapped to Text features
+  override def transformFn: Seq[T] => OPVector = row => {
+    val tokenSeq = row.zipWithIndex.flatMap {
+      case (map, i) =>
+        val keys = args.allKeys(i)
+        val cleaned = cleanMap(map.v, shouldCleanKey = args.shouldCleanKeys, shouldCleanValue = args.shouldCleanValues)
+        val mapValues = cleaned.map { case (k, v) => v.toText }
+        mapValues.map(tokenizeFn(_)).toSeq
+    }
+    val allTokens = tokenSeq.flatMap(_.value).toTextList
+
+    // TODO make sure this also works when we are not using the shared hash space
+    hash(hashingParams, Seq(allTokens))
   }
+
+  // TODO: Set this metadata in the estimator
+  override def onGetMetadata(): Unit = {
+    val metaBuilder = new MetadataBuilder()
+    // Add all the maps' keys to the metadata
+    metaBuilder.withMetadata(makeVectorMetadata(hashingParams, outputName).toMetadata)
+    metaBuilder.putStringArray(TextMapHashingVectorizerNames.MapKeys, args.allKeys.flatten.toArray)
+
+    setMetadata(metaBuilder.build())
+  }
+
 }

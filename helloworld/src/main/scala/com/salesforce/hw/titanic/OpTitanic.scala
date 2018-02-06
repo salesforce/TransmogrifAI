@@ -19,9 +19,11 @@ import org.apache.spark.sql.{Dataset, SparkSession}
 /**
  * Optimus Prime example classification app using the Titanic dataset
  */
-object OpTitanic extends OpAppWithRunner with TitanicFeatures  {
+object OpTitanic extends OpAppWithRunner with TitanicFeatures {
+
 
   override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[TitanicKryoRegistrator]
+
 
   ////////////////////////////////////////////////////////////////////////////////
   // READER DEFINITIONS
@@ -104,9 +106,8 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures  {
       trainingReader = trainingReader,
       scoringReader = scoringReader,
       evaluationReader = Option(trainingReader),
-      evaluator = evaluator,
-      scoringEvaluator = None,
-      featureToComputeUpTo = featureVector
+      evaluator = Option(evaluator),
+      featureToComputeUpTo = Option(featureVector)
     )
 
 }

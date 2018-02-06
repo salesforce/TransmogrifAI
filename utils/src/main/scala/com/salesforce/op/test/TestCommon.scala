@@ -63,9 +63,21 @@ trait TestCommon extends Matchers with Assertions {
    * @param name     resource name
    * @return resource file
    */
+  @deprecated("Use loadResource", "3.2.3")
   def resourceString(parent: String = "src/test/resources", noSpaces: Boolean = true, name: String): String = {
     val file = resourceFile(parent = parent, name = name)
     val contents = Source.fromFile(file, "UTF-8").mkString
     if (noSpaces) contents.replaceAll("\\s", "") else contents
   }
+
+  /**
+   * Loads resource by path
+   * @param path absolute or relative path of a resource
+   * @return the whole content of resource file as a string
+   */
+  def loadResource(path: String, noSpaces: Boolean = false): String = {
+    val raw = Source.fromInputStream(getClass.getResourceAsStream(path)).getLines
+    if (noSpaces) raw.mkString("").replaceAll("\\s", "") else raw.mkString("\n")
+  }
+
 }

@@ -20,6 +20,7 @@
 
 package org.apache.spark.ml.tuning
 
+import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.linalg.Vector
@@ -35,21 +36,13 @@ import scala.language.existentials
 /**
  * Modified version of Spark 2.x [[org.apache.spark.ml.tuning.TrainValidationSplit]]
  * (commit d60f6f62d00ffccc40ed72e15349358fe3543311)
- *
- * - Added a boolean param `hasLeakage` to assess label leakage.
- * - In the fit function, data with leakage are grouped by id then split.
+ * In the fit function, data is grouped by key then split to avoid leakage
  */
 class OpTrainValidationSplit (override val uid: String)
   extends Estimator[TrainValidationSplitModel]
     with TrainValidationSplitParams with MLWritable with Logging {
 
   def this() = this(Identifiable.randomUID("tvs"))
-
-  val hasLeakage: BooleanParam = new BooleanParam(this, "hasLeakage", "if there is leakage")
-  setDefault(hasLeakage, false)
-
-  /** @group setParam */
-  def setHasLeakage(value: Boolean): this.type = set(hasLeakage, value)
 
   /** @group setParam */
   def setEstimator(value: Estimator[_]): this.type = set(estimator, value)
@@ -68,7 +61,6 @@ class OpTrainValidationSplit (override val uid: String)
 
   override def fit(dataset: Dataset[_]): TrainValidationSplitModel = {
 
-    val hasLeak = $(hasLeakage)
     val schema = dataset.schema
     transformSchema(schema, logging = true)
     val est = $(estimator)
@@ -77,16 +69,11 @@ class OpTrainValidationSplit (override val uid: String)
     val numModels = epm.length
     val metrics = new Array[Double](epm.length)
 
-    // scalastyle:off
     import dataset.sparkSession.implicits._
-    // scalastyle:on
-    val rdd = dataset.as[(Double, Vector, Double)].rdd
-    val Array(trainingRDD, validationRDD) = if (hasLeak) {
-      // group by ID then split
-      rdd.map(p => p._3 -> Row(p._1, p._2))
-        .groupByKey().randomSplit(Array($(trainRatio), 1 - $(trainRatio)), $(seed)).map(_.values.flatMap(identity))
-
-    } else rdd.map(p => Row(p._1, p._2)).randomSplit(Array($(trainRatio), 1 - $(trainRatio)), $(seed))
+    val rdd = dataset.as[LabelFeaturesKey].rdd
+    // group by ID then split
+    val Array(trainingRDD, validationRDD) = rdd.map(p => p._3 -> Row(p._1, p._2))
+      .groupByKey().randomSplit(Array($(trainRatio), 1 - $(trainRatio)), $(seed)).map(_.values.flatMap(identity))
 
     val sparkSession = dataset.sparkSession
     val newSchema = StructType(schema.dropRight(1))
@@ -154,14 +141,12 @@ object OpTrainValidationSplit extends MLReadable[OpTrainValidationSplit] {
         ValidatorParams.loadImpl(path, sc, className)
       val trainRatio = (metadata.params \ "trainRatio").extract[Double]
       val seed = (metadata.params \ "seed").extract[Long]
-      val hasLeakage = (metadata.params \ "hasLeakage").extract[Boolean]
       new OpTrainValidationSplit(metadata.uid)
         .setEstimator(estimator)
         .setEvaluator(evaluator)
         .setEstimatorParamMaps(estimatorParamMaps)
         .setTrainRatio(trainRatio)
         .setSeed(seed)
-        .setHasLeakage(hasLeakage)
     }
   }
 

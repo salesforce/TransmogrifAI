@@ -6,7 +6,7 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
-import com.salesforce.op.evaluators.{OpClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
+import com.salesforce.op.evaluators.{EvaluationMetrics, OpClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
 import com.salesforce.op.features.{FeatureLike, TransientFeature}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
@@ -23,14 +23,14 @@ import org.apache.spark.sql.{DataFrame, Dataset}
  *
  * @param validator Cross Validation or Train Validation Split
  * @param splitter  instance that will balance and split the data
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
 private[op] abstract class ClassificationModelSelector
 (
   val validator: OpValidator[ProbClassifier],
   val splitter: Option[Splitter],
-  val trainTestEvaluators: Seq[OpEvaluatorBase[_]],
+  val evaluators: Seq[OpEvaluatorBase[_]],
   val uid: String = UID[ClassificationModelSelector]
 ) extends Estimator[BestModel]
   with OpPipelineStage2to3[RealNN, OPVector, RealNN, OPVector, OPVector]
@@ -43,10 +43,10 @@ private[op] abstract class ClassificationModelSelector
   private[op] val stage1: Stage1ClassificationModelSelector
 
   private[op] lazy val stage2 = new SwTernaryTransformer[RealNN, OPVector, RealNN, OPVector, SelectedModel](
-    inputParam1Name = inputParam1Name,
-    inputParam2Name = inputParam2Name,
+    inputParam1Name = StageParamNames.inputParam1Name,
+    inputParam2Name = StageParamNames.inputParam2Name,
     inputParam3Name = stage1OperationName,
-    outputParamName = outputParam2Name,
+    outputParamName = StageParamNames.outputParam2Name,
     operationName = stage2OperationName,
     sparkMlStageIn = None,
     uid = stage2uid
@@ -54,11 +54,11 @@ private[op] abstract class ClassificationModelSelector
 
   private[op] lazy val stage3 = new SwQuaternaryTransformer[RealNN, OPVector, RealNN, OPVector, OPVector,
     SelectedModel](
-    inputParam1Name = inputParam1Name,
-    inputParam2Name = inputParam2Name,
+    inputParam1Name = StageParamNames.inputParam1Name,
+    inputParam2Name = StageParamNames.inputParam2Name,
     inputParam3Name = stage1OperationName,
     inputParam4Name = stage2OperationName,
-    outputParamName = outputParam3Name,
+    outputParamName = StageParamNames.outputParam3Name,
     operationName = stage3OperationName,
     sparkMlStageIn = None,
     uid = stage3uid
@@ -99,15 +99,24 @@ private[op] abstract class ClassificationModelSelector
  * @param stage2 second stage - dummy for generating second output
  * @param stage3 third stage - dummy for generating third output
  */
-private[op] class BestModel
+final class BestModel private[op]
 (
   val stage1: SelectedModel,
   val stage2: SwTernaryTransformer[RealNN, OPVector, RealNN, OPVector, SelectedModel],
   val stage3: SwQuaternaryTransformer[RealNN, OPVector, RealNN, OPVector, OPVector, SelectedModel],
   val uid: String = UID[BestModel]
-) extends Model[BestModel]
-  with OpPipelineStage2to3[RealNN, OPVector, RealNN, OPVector, OPVector]
-  with Stage3ParamNamesBase {
+) extends Model[BestModel] with OpPipelineStage2to3[RealNN, OPVector, RealNN, OPVector, OPVector]
+  with StageOperationName with HasTestEval {
+
+  override def evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = stage1.evaluators
+  override protected[op] def outputsColNamesMap: Map[String, String] = stage1.outputsColNamesMap
+  override protected[op] def labelColName: String = stage1.labelColName
+
+  override private[op] def evaluateModel(data: Dataset[_]) = {
+    val transformed = stage1.evaluateModel(data)
+    setMetadata(stage1.getMetadata())
+    transformed
+  }
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     stage1.transform(dataset)
@@ -130,29 +139,26 @@ private[op] class BestModel
  *
  * @param validator validator used for the selection. It can be either CrossValidation or TrainValidationSplit
  * @param splitter  to split and/or balance the dataset
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
 private[classification] abstract class Stage1ClassificationModelSelector
 (
   validator: OpValidator[ProbClassifier],
   splitter: Option[Splitter],
-  trainTestEvaluators: Seq[OpClassificationEvaluatorBase[_]],
+  evaluators: Seq[OpClassificationEvaluatorBase[_ <: com.salesforce.op.evaluators.EvaluationMetrics]],
   uid: String = UID[Stage1ClassificationModelSelector],
   val stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
   val stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
 ) extends ModelSelectorBase[ProbClassifier](validator = validator, splitter = splitter,
-  trainTestEvaluators = trainTestEvaluators, uid = uid) with SelectorClassifiers {
-
-  lazy val rawPredictionColName: String = outputsColNamesMap(outputParam2Name)
-  lazy val probabilityColName: String = outputsColNamesMap(outputParam3Name)
+  evaluators = evaluators, uid = uid) with SelectorClassifiers {
 
   final override protected def getOutputsColNamesMap(
     f1: TransientFeature, f2: TransientFeature
   ): Map[String, String] = {
-    Map(outputParam1Name -> makeOutputNameFromStageId[RealNN](uid, Seq(f1, f2)),
-      outputParam2Name -> makeOutputNameFromStageId[OPVector](stage2uid, Seq(f1, f2), 2),
-      outputParam3Name -> makeOutputNameFromStageId[OPVector](stage3uid, Seq(f1, f2), 3)
+    Map(StageParamNames.outputParam1Name -> makeOutputNameFromStageId[RealNN](uid, Seq(f1, f2)),
+      StageParamNames.outputParam2Name -> makeOutputNameFromStageId[OPVector](stage2uid, Seq(f1, f2), 2),
+      StageParamNames.outputParam3Name -> makeOutputNameFromStageId[OPVector](stage3uid, Seq(f1, f2), 3)
     )
   }
 

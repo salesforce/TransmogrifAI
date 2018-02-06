@@ -10,6 +10,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, RandomForest}
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
+import com.salesforce.op.stages.impl.selector.StageOperationName
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import org.apache.spark.ml.Model
@@ -88,7 +89,7 @@ case object MultiClassificationModelSelector {
     new MultiClassificationModelSelector(
       validator = validator,
       splitter = splitter,
-      trainTestEvaluators = trainTestEvaluators
+      evaluators = trainTestEvaluators
     ) // models on by default
       .setModelsToTry(RandomForest, LogisticRegression)
       // Random forest defaults
@@ -124,21 +125,21 @@ case object MultiClassificationModelSelector {
  *
  * @param validator Cross Validation or Train Validation Split
  * @param splitter  instance that will split the data
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
 private[op] class MultiClassificationModelSelector
 (
   override val validator: OpValidator[ProbClassifier],
   override val splitter: Option[DataCutter],
-  override val trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+  override val evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   override val uid: String = UID[MultiClassificationModelSelector]
-) extends ClassificationModelSelector(validator, splitter, trainTestEvaluators, uid) {
+) extends ClassificationModelSelector(validator, splitter, evaluators, uid) with StageOperationName {
 
   override private[classification] val stage1uid: String = UID[Stage1BinaryClassificationModelSelector]
 
-  override lazy val stage1 = new Stage1MultiClassificationModelSelector(validator = validator,
-    splitter = splitter.asInstanceOf[Option[DataCutter]], trainTestEvaluators = trainTestEvaluators,
+  lazy val stage1 = new Stage1MultiClassificationModelSelector(validator = validator,
+    splitter = splitter.asInstanceOf[Option[DataCutter]], evaluators = evaluators,
     uid = stage1uid, stage2uid = stage2uid, stage3uid = stage3uid)
 }
 
@@ -149,35 +150,15 @@ private[op] class MultiClassificationModelSelector
  *
  * @param validator Cross Validation or Train Validation Split
  * @param splitter  instance that will split the data
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
 private[op] class Stage1MultiClassificationModelSelector
 (
   validator: OpValidator[ProbClassifier],
   splitter: Option[DataCutter],
-  trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+  evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[Stage1MultiClassificationModelSelector],
   stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
   stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
-) extends Stage1ClassificationModelSelector(validator, splitter,
-  trainTestEvaluators , uid, stage2uid, stage3uid) {
-
-  final override protected def evaluate(
-    data: Dataset[_],
-    labelColName: String,
-    predictionColName: String,
-    best: => Model[_ <: Model[_]]
-  ): EvaluationMetrics = {
-    val metricsMap = trainTestEvaluators.map { case evaluator =>
-      evaluator.name -> evaluator
-        .setLabelCol(labelColName)
-        .setRawPredictionCol(rawPredictionColName)
-        .setPredictionCol(predictionColName)
-        .setProbabilityCol(probabilityColName)
-        .evaluateAll(data)
-    }.toMap
-
-    MultiMetrics(metricsMap)
-  }
-}
+) extends Stage1ClassificationModelSelector(validator, splitter, evaluators, uid, stage2uid, stage3uid)

@@ -84,7 +84,8 @@ object CommandParser extends scopt.OptionParser[CliParameters]("op") with OpCli 
     ))
 
   private val autoOption = opt[String]("auto")
-    .text("Automatic detection of data schema (you need to provide a name);\n" +
+    .text(
+      "Automatic detection of data schema (you need to provide a name);\n" +
       "need this one or a schema file. Experimental feature.")
     .validate(isIdentifier)
     .action((name, cfg) => cfg.copy(schemaSource = cfg.inputFile map AutomaticSchema(name)))

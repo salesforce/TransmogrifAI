@@ -54,7 +54,7 @@ class VectorsCombiner(uid: String = UID[VectorsCombiner])
 
 }
 
-private final class VectorsCombinerModel(operationName: String, uid: String)
+final class VectorsCombinerModel private[op] (operationName: String, uid: String)
   extends SequenceModel[OPVector, OPVector](operationName = operationName, uid = uid) {
   def transformFn: Seq[OPVector] => OPVector = VectorsCombiner.combineOP
 }

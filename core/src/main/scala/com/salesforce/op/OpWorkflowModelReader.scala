@@ -7,9 +7,8 @@ package com.salesforce.op
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
-import com.salesforce.op.stages._
-import org.apache.spark.ml.OpPipelineStageReadWriteShared._
-import org.apache.spark.ml.OpPipelineStageReader
+import com.salesforce.op.stages.{OpPipelineStageReader, _}
+import OpPipelineStageReadWriteShared._
 import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JValue}
 import org.json4s.jackson.JsonMethods.parse
@@ -59,8 +58,8 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json))
     } yield model
-      .setFeatures(resultFeatures)
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
+      .setFeatures(resultFeatures)
       .setParameters(params)
   }
 
