@@ -52,8 +52,8 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     // Top K values for each categorical input
     val numToKeep = $(topK)
     val minSup = $(minSupport)
-    val topValues: Seq[Seq[String]] =
-      countOccurrences.map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
+    val topValues: Seq[Seq[String]] = countOccurrences
+      .map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
 
     // build metadata describing output
     val unseen = Option($(unseenName))
@@ -154,7 +154,7 @@ class OpSetVectorizer[T <: OPSet[_]]
 
 }
 
-private[op] final class OpSetVectorizerModel[T <: OPSet[_]]
+final class OpSetVectorizerModel[T <: OPSet[_]] private[op]
 (
   topValues: Seq[Seq[String]],
   shouldCleanText: Boolean,
@@ -202,7 +202,7 @@ class OpTextPivotVectorizer[T <: Text]
       uid = uid)
 }
 
-private[op] final class OpTextPivotVectorizerModel[T <: Text]
+final class OpTextPivotVectorizerModel[T <: Text] private[op]
 (
   topValues: Seq[Seq[String]],
   shouldCleanText: Boolean,

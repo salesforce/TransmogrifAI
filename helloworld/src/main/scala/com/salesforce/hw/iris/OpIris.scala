@@ -8,7 +8,7 @@ package com.salesforce.hw.iris
 import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.readers.CustomReader
-import com.salesforce.op.stages.impl.classification.{ClassificationModelsToTry, Impurity, MultiClassificationModelSelector}
+import com.salesforce.op.stages.impl.classification.MultiClassificationModelSelector
 import com.salesforce.op.stages.impl.tuning.DataCutter
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 import org.apache.spark.rdd.RDD
@@ -21,11 +21,12 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
 
   override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[IrisKryoRegistrator]
 
+
   ////////////////////////////////////////////////////////////////////////////////
   // READER DEFINITIONS
   /////////////////////////////////////////////////////////////////////////////////
 
-  val randomSeed = 112233
+  val randomSeed = 42
 
   val irisReader = new CustomReader[Iris](key = _.getID.toString){
     def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Iris], Dataset[Iris]] = {
@@ -38,6 +39,7 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
       })
     }
   }
+
 
   ////////////////////////////////////////////////////////////////////////////////
   // WORKFLOW DEFINITION
@@ -66,7 +68,7 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
       trainingReader = irisReader,
       scoringReader = irisReader,
       evaluationReader = Option(irisReader),
-      evaluator = evaluator,
-      featureToComputeUpTo = features
+      evaluator = Option(evaluator),
+      featureToComputeUpTo = Option(features)
     )
 }

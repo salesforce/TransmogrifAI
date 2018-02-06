@@ -246,13 +246,13 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val testFraction = 0.2
 
-    val splitData = DataSplitter(reserveTestFraction = testFraction)
+    val (train, test) = DataSplitter(reserveTestFraction = testFraction)
       .split(data.withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
         .as[(Double, Vector, Double)])
 
 
-    val trainCount = splitData.train.count()
-    val testCount = splitData.test.count()
+    val trainCount = train.count()
+    val testCount = test.count()
     val totalCount = label0Count + label1Count + label2Count
 
     assert(math.abs(testCount - testFraction * totalCount) <= 20)
@@ -285,14 +285,20 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     log.info(model.getMetadata().prettyJson)
 
     // evaluation metrics from test set should be in metadata
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
-    // No evaluator passed so only the default one is there
-    val evaluatorMetricName = testEstimator.trainTestEvaluators.head.name
-
+    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
     MultiClassEvalMetrics.values.foreach(metric =>
       assert(metaData.contains(s"(${OpEvaluatorNames.multi})_${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
     )
+
+    // evaluation metrics from test set should be in metadata after eval run
+    model.evaluateModel(data)
+    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    MultiClassEvalMetrics.values.foreach(metric =>
+      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.multi})_${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+    )
+
     val transformedData = model.transform(data)
     val pred = model.getOutput()._1
     val justScores = transformedData.collect(pred)
@@ -328,7 +334,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     missed < 10 shouldBe true
   }
 
-  it should "fit and predict with a cross validation and compute correct metrics from trainTestEvaluators" in {
+  it should "fit and predict with a cross validation and compute correct metrics from evaluators" in {
 
     val crossEntropy = Evaluators.MultiClassification.custom(
       metricName = "cross entropy",
@@ -357,16 +363,17 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
+    model.evaluateModel(data)
 
     // checking the holdOut Evaluators
-    assert(testEstimator.trainTestEvaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
+    assert(testEstimator.evaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
 
     // checking trainingEval & holdOutEval metrics
     val metaData = model.getMetadata().getSummaryMetadata()
     val trainMetaData = metaData.getMetadata(ModelSelectorBaseNames.TrainingEval)
     val holdOutMetaData = metaData.getMetadata(ModelSelectorBaseNames.HoldOutEval)
 
-    testEstimator.trainTestEvaluators.foreach {
+    testEstimator.evaluators.foreach {
       case evaluator: OpMultiClassificationEvaluator => {
         MultiClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(

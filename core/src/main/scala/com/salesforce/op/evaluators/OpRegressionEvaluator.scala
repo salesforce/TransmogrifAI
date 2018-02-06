@@ -44,7 +44,8 @@ private[op] class OpRegressionEvaluator
     val metrics = RegressionMetrics(
       RootMeanSquaredError = rmse, MeanSquaredError = mse, R2 = r2, MeanAbsoluteError = mae
     )
-    if (log.isInfoEnabled) log.info(metrics.toString)
+
+    log.info("Evaluated metrics: {}", metrics.toString)
     metrics
 
   }

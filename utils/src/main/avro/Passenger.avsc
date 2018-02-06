@@ -5,76 +5,46 @@
   "fields": [
     {
       "name": "passengerId",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "age",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "gender",
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": [ "string", "null" ]
     },
     {
       "name": "height",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "weight",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "description",
-      "type": [
-        "string",
-        "null"
-      ]
+      "type": [ "string", "null" ]
     },
     {
       "name": "survived",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "boarded",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "recordDate",
-      "type": [
-        "int",
-        "null"
-      ]
+      "type": [ "int", "null" ]
     },
     {
       "name": "stringMap",
       "type": [
         {
           "type": "map",
-          "values": [
-            "string",
-            "null"
-          ]
+          "values": [ "string", "null" ]
         },
         "null"
       ]

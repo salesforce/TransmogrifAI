@@ -58,7 +58,7 @@ class OpPredictorWrapperTest extends FlatSpec with TestSparkContext with Prestig
     val trainingSummary = lrModel.summary
     log.info(s"numIterations: ${trainingSummary.totalIterations}")
     log.info(s"objectiveHistory: [${trainingSummary.objectiveHistory.mkString(",")}]")
-    trainingSummary.residuals.show()
+    if (log.isInfoEnabled) trainingSummary.residuals.show()
     log.info(s"RMSE: ${trainingSummary.rootMeanSquaredError}")
     log.info(s"r2: ${trainingSummary.r2}")
     // checking r2 as a cheap way to make sure things are running as intended.

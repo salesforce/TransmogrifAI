@@ -73,6 +73,18 @@ class RandomTextTest extends FlatSpec with TestCommon with Assertions {
     check(g, (s: String) => s.length >= 40 && s.length <= 50)
   }
 
+  "textFromDomain generator" should "generate Texts from provided domain" in {
+    val dom = List("Alpha", "Beta", "Gamma", "Delta", "Epsilon")
+    val g = RandomText.textFromDomain(dom) withProbabilityOfEmpty 0.001
+    check(g, dom.toSet)
+  }
+
+  "textAreaFromDomain generator" should "generate TextAreas from provided domain" in {
+    val dom = List("Alpha", "Beta", "Gamma", "Delta", "Epsilon")
+    val g = RandomText.textAreaFromDomain(dom) withProbabilityOfEmpty 0.001
+    check(g, dom.toSet)
+  }
+
   "PickList generator" should "generate picklists" in {
     val dom = List("Red", "Green", "Blue")
     val g = RandomText.pickLists(dom) withProbabilityOfEmpty 0.001

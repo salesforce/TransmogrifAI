@@ -29,7 +29,8 @@ case object CSVSchemaUtils {
     options: com.salesforce.op.utils.io.csv.CSVOptions
   ): StructType = {
     val opts = new org.apache.spark.sql.execution.datasources.csv.CSVOptions(
-      options.copy(header = false).toSparkCSVOptionsMap
+      parameters = options.copy(header = false).toSparkCSVOptionsMap + ("inferSchema" -> true.toString),
+      defaultTimeZoneId = "GMT"
     )
     CSVInferSchema.infer(rdd, header.toArray, opts)
   }

@@ -98,7 +98,7 @@ class FractionOfResponsesEstimator(uid: String = UID[FractionOfResponsesEstimato
   }
 }
 
-private final class FractionOfResponsesModel
+final class FractionOfResponsesModel private[op]
 (
   val counts: Seq[Int],
   operationName: String,

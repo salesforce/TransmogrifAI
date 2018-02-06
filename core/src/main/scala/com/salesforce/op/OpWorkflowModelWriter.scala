@@ -6,11 +6,10 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.FeatureJsonHelper
-import com.salesforce.op.stages.OpPipelineStageBase
+import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageWriter}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import enumeratum._
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.OpPipelineStageWriter
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._

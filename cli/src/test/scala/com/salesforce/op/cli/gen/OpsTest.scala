@@ -6,12 +6,9 @@
 package com.salesforce.op.cli.gen
 
 import java.io.File
-import java.io.File.TempDirectory
 
 import com.salesforce.op.cli.{AvroSchemaFromFile, CliParameters, GeneratorConfig}
 import com.salesforce.op.test.TestCommon
-import org.junit.{Rule, Test}
-import org.junit.rules.TemporaryFolder
 import org.scalatest.{Assertions, FlatSpec}
 
 import scala.io.Source
@@ -48,7 +45,7 @@ class OpsTest extends FlatSpec with TestCommon with Assertions {
 
         val buildFileContent = Source.fromFile(buildFile).mkString
 
-        buildFileContent should include ("credentials artifactoryCredentials")
+        buildFileContent should include("credentials artifactoryCredentials")
 
         val scalaSourcesFolder = new File(projectFolder, "src/main/scala/com/salesforce/app")
         val featuresFile = Source.fromFile(new File(scalaSourcesFolder, "Features.scala")).getLines

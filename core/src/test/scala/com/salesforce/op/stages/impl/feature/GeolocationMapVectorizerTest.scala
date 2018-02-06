@@ -8,7 +8,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, IndColWithGroup}
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichStructType._
 import org.apache.spark.ml.linalg.Vectors
@@ -28,6 +28,34 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(v => (GeolocationMap(v._1), GeolocationMap(v._2)))
   )
 
+  val baseVectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true)
+  val expectedMeta = TestOpVectorMetadataBuilder(
+    baseVectorizer,
+    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
+      IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
+      IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C")),
+    m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"),
+      IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
+      IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"))
+  )
+  val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
+
+  val expectedMetaTrackNulls = TestOpVectorMetadataBuilder(
+    baseVectorizer,
+    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
+      IndColWithGroup(nullIndicatorValue, "A"),
+      IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
+      IndColWithGroup(nullIndicatorValue, "B"),
+      IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C"),
+      IndColWithGroup(nullIndicatorValue, "C")),
+    m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"),
+      IndColWithGroup(nullIndicatorValue, "Z"),
+      IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
+      IndColWithGroup(nullIndicatorValue, "Y"),
+      IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
+      IndColWithGroup(nullIndicatorValue, "X"))
+  )
+
   Spec[GeolocationMapVectorizer] should "take an array of features as input and return a single vector feature" in {
     val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true)
     val vector = vectorizer.getOutput()
@@ -40,7 +68,7 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a model that correctly transforms the data" in {
-    val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).fit(data)
+    val vectorizer = baseVectorizer.setTrackNulls(false).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -51,11 +79,6 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(18, Array(), Array())
     ).map(_.toOPVector)
 
-    val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
-    )
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
@@ -63,10 +86,28 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
+  it should "track nulls" in {
+    val vectorizer = baseVectorizer.setTrackNulls(true).fit(data)
+    val transformed = vectorizer.transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.sparse(24, Array(0, 1, 2, 4, 5, 6, 11, 12, 13, 14, 19, 23),
+        Array(32.4, -100.2, 3.0, 33.8, -108.7, 2.0, 1.0, 45.0, -105.5, 4.0, 1.0, 1.0)),
+      Vectors.sparse(24, Array(3, 7, 8, 9, 10, 15, 16, 17, 18, 20, 21, 22),
+        Array(1.0, 1.0, 33.8, -108.7, 2.0, 1.0, 42.5, -95.4, 4.0, 40.4, -116.3, 2.0)),
+      Vectors.sparse(24, Array(3, 7, 11, 15, 19, 23), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+  }
+
   it should "use the correct fill value for missing keys" in {
-    val vectorizer =
-      new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true)
-        .setDefaultValue(Geolocation(6.0, 6.0, GeolocationAccuracy.Zip)).fit(data)
+    val vectorizer = baseVectorizer.setTrackNulls(false)
+      .setDefaultValue(Geolocation(6.0, 6.0, GeolocationAccuracy.Zip)).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
     val expected = Array(
@@ -77,20 +118,33 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(Array.fill(18)(6.0))
     ).map(_.toOPVector)
 
-    val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
-    )
-
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
   }
 
+  it should "track nulls with missing keys" in {
+    val vectorizer = baseVectorizer.setTrackNulls(true)
+      .setDefaultValue(Geolocation(6.0, 6.0, GeolocationAccuracy.Zip)).fit(data)
+    val transformed = vectorizer.transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.dense(Array(32.4, -100.2, 3.0, 0.0, 33.8, -108.7, 2.0, 0.0, 6.0, 6.0, 6.0, 1.0, 45.0, -105.5, 4.0, 0.0,
+        6.0, 6.0, 6.0, 1.0, 6.0, 6.0, 6.0, 1.0)),
+      Vectors.dense(Array(6.0, 6.0, 6.0, 1.0, 6.0, 6.0, 6.0, 1.0, 33.8, -108.7, 2.0, 0.0, 6.0, 6.0, 6.0, 1.0,
+        42.5, -95.4, 4.0, 0.0, 40.4, -116.3, 2.0, 0.0)),
+      Vectors.dense((0 until 6).flatMap(k => Seq.fill(3)(6.0) :+ 1.0).toArray)
+    ).map(_.toOPVector)
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+  }
+
   it should "correctly whitelist keys" in {
-    val vectorizer = new GeolocationMapVectorizer().setCleanKeys(true)
+    val vectorizer = new GeolocationMapVectorizer().setCleanKeys(true).setTrackNulls(false)
       .setInput(m1, m2).setWhiteListKeys(Array("a", "b", "z")).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
@@ -101,8 +155,35 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
-      m2 -> List(IndColWithGroup(None, "Z"))
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
+        IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"))
+    )
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+  }
+
+  it should "track nulls with whitelist keys" in {
+    val vectorizer = new GeolocationMapVectorizer().setCleanKeys(true).setTrackNulls(true)
+      .setInput(m1, m2).setWhiteListKeys(Array("a", "b", "z")).fit(data)
+    val transformed = vectorizer.transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.dense(Array(32.4, -100.2, 3.0, 0.0, 33.8, -108.7, 2.0, 0.0, 45.0, -105.5, 4.0, 0.0)),
+      Vectors.sparse(12, Array(3, 7, 11), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(3, 7, 11), Array(1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+    val expectedMeta = TestOpVectorMetadataBuilder(
+      vectorizer,
+      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
+        IndColWithGroup(nullIndicatorValue, "A"),
+        IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
+        IndColWithGroup(nullIndicatorValue, "B")),
+      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"),
+        IndColWithGroup(nullIndicatorValue, "Z"))
     )
 
     transformed.collect(vector) shouldBe expected
@@ -112,7 +193,7 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "correctly backlist keys" in {
-    val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true)
+    val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(false)
       .setBlackListKeys(Array("a", "z")).fit(data)
     val transformed = vectorizer.transform(data)
     val vector = vectorizer.getOutput()
@@ -123,8 +204,38 @@ class GeolocationMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
+      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
+        IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C")),
+      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
+        IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"))
+    )
+
+    transformed.collect(vector) shouldBe expected
+    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    val vectorMetadata = vectorizer.getMetadata()
+    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+  }
+
+  it should "track nulls with backlist keys" in {
+    val vectorizer = new GeolocationMapVectorizer().setInput(m1, m2).setCleanKeys(true).setTrackNulls(true)
+      .setBlackListKeys(Array("a", "z")).fit(data)
+    val transformed = vectorizer.transform(data)
+    val vector = vectorizer.getOutput()
+    val expected = Array(
+      Vectors.sparse(16, Array(0, 1, 2, 7, 11, 15), Array(33.8, -108.7, 2.0, 1.0, 1.0, 1.0)),
+      Vectors.dense(Array(0.0, 0.0, 0.0, 1.0, 33.8, -108.7, 2.0, 0.0, 42.5, -95.4, 4.0, 0.0, 40.4, -116.3, 2.0, 0.0)),
+      Vectors.sparse(16, Array(3, 7, 11, 15), Array(1.0, 1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
+    val expectedMeta = TestOpVectorMetadataBuilder(
+      vectorizer,
+      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
+        IndColWithGroup(nullIndicatorValue, "B"),
+        IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C"),
+        IndColWithGroup(nullIndicatorValue, "C")),
+      m2 -> List(IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
+        IndColWithGroup(nullIndicatorValue, "Y"),
+        IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
+        IndColWithGroup(nullIndicatorValue, "X"))
     )
 
     transformed.collect(vector) shouldBe expected

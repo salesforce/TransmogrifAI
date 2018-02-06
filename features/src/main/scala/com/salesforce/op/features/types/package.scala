@@ -65,23 +65,29 @@ package object types extends FeatureTypeSparkConverters {
     def toDate: Date = new Date(Option(v).map(_.toLong))
     def toDateTime: DateTime = new DateTime(Option(v).map(_.toLong))
   }
+  implicit class JBooleanConversions(val v: java.lang.Boolean) extends AnyVal {
+    def toBinary: Binary = new Binary(v)
+  }
   implicit class OptDoubleConversions(val v: Option[Double]) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN: RealNN = new RealNN(v)
     def toCurrency: Currency = new Currency(v)
     def toPercent: Percent = new Percent(v)
+    def toBinary: Binary = new Binary(v.map(_ != 0.0))
   }
   implicit class OptIntConversions(val v: Option[Int]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
     def toIntegral: Integral = new Integral(v.map(_.toLong))
     def toDate: Date = new Date(v.map(_.toLong))
     def toDateTime: DateTime = new DateTime(v.map(_.toLong))
+    def toBinary: Binary = new Binary(v.map(_ != 0))
   }
   implicit class OptLongConversions(val v: Option[Long]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
     def toIntegral: Integral = new Integral(v)
     def toDate: Date = new Date(v)
     def toDateTime: DateTime = new DateTime(v)
+    def toBinary: Binary = new Binary(v.map(_ != 0L))
   }
   implicit class OptBooleanConversions(val v: Option[Boolean]) extends AnyVal {
     def toBinary: Binary = new Binary(v)
@@ -91,6 +97,7 @@ package object types extends FeatureTypeSparkConverters {
     def toRealNN: RealNN = new RealNN(v)
     def toCurrency: Currency = new Currency(v)
     def toPercent: Percent = new Percent(v)
+    def toBinary: Binary = new Binary(v != 0.0)
   }
   implicit class IntConversions(val v: Int) extends AnyVal {
     def toReal: Real = new Real(v)
@@ -98,12 +105,14 @@ package object types extends FeatureTypeSparkConverters {
     def toIntegral: Integral = new Integral(v.toLong)
     def toDate: Date = new Date(v.toLong)
     def toDateTime: DateTime = new DateTime(v.toLong)
+    def toBinary: Binary = new Binary(v != 0)
   }
   implicit class LongConversions(val v: Long) extends AnyVal {
     def toReal: Real = new Real(v)
     def toIntegral: Integral = new Integral(v)
     def toDate: Date = new Date(v)
     def toDateTime: DateTime = new DateTime(v)
+    def toBinary: Binary = new Binary(v != 0L)
   }
   implicit class BooleanConversions(val v: Boolean) extends AnyVal {
     def toBinary: Binary = new Binary(v)

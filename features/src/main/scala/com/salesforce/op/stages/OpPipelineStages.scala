@@ -11,7 +11,7 @@ import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataType._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.util.{MLWritable, MLWriter}
-import org.apache.spark.ml.{OpPipelineStageWriter, PipelineStage, Transformer}
+import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.StructType
 

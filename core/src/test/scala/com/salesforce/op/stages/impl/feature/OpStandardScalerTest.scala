@@ -7,7 +7,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.{CustomReader, DataReaders}
+import com.salesforce.op.readers._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.{OpWorkflow, _}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
@@ -15,8 +15,8 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.{sum, udf}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
@@ -94,7 +94,7 @@ class OpStandardScalerTest extends FlatSpec with TestSparkContext {
     // create a pipeline and set the input features to be ingested by the pipeline.
     val workflow = new OpWorkflow().setResultFeatures(normedOutput, expectedNormalizedScalarFeature)
 
-    val reader = new CustomReader[StdScTestData](DataReaders.randomKey) {
+    val reader = new CustomReader[StdScTestData](ReaderKey.randomKey) {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[StdScTestData], Dataset[StdScTestData]] =
         Left(spark.sparkContext.parallelize(DataStdScTest.input))
     }

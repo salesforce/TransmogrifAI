@@ -6,8 +6,8 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.OpEvaluatorBase
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
-import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.sql.types.MetadataBuilder
 import org.slf4j.LoggerFactory
 
@@ -46,8 +46,7 @@ private[impl] trait OpValidator[E <: Estimator[_]] extends Serializable {
   private[op] def validate(
     estimator: E,
     paramGrids: Array[ParamMap],
-    label: String,
-    hasIdColumn: Boolean
+    label: String
   ): Estimator[_]
 
   /**

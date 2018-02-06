@@ -1,3 +1,9 @@
+plugins {
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+}
+
+apply plugin: 'com.github.johnrengelman.shadow'
+
 dependencies {
     // scopt
     compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
@@ -23,7 +29,12 @@ ext {
     templateResourcesDir = "$project.buildDir/template-resources"
 }
 
-shadowJar { baseName = jar.baseName }
+shadowJar {
+    zip64 = true
+    exclude 'META-INF/maven/**'
+    baseName = jar.baseName
+}
+shadowJar.dependsOn(createVersionProperties)
 
 task copySpark(type: Copy) {
     from '../templates/simple/gradle'

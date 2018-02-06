@@ -26,7 +26,7 @@ class CSVProductReader[T <: Product : Encoder]
   val readPath: Option[String],
   val key: T => String,
   val options: CSVOptions = CSVDefaults.CSVOptions
-)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] with Reader[T] {
+)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] {
 
   override def read(params: OpParams = new OpParams())(implicit sc: SparkSession): Either[RDD[T], Dataset[T]] = Right {
     val finalPath = getFinalReadPath(params)

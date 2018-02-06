@@ -97,8 +97,7 @@ private[op] abstract class JoinedReader[T, U]
   val rightReader: DataReader[U],
   val joinKeys: JoinKeys,
   val joinType: JoinType
-)(implicit val wtt: WeakTypeTag[T], val wttu: WeakTypeTag[U]) {
-  self: Reader[T] =>
+)(implicit val wtt: WeakTypeTag[T], val wttu: WeakTypeTag[U]) extends Reader[T] {
 
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
@@ -199,7 +198,7 @@ private[op] class JoinedDataReader[T, U]
   joinType: JoinType
 ) extends JoinedReader[T, U](
   leftReader = leftReader, rightReader = rightReader, joinKeys = joinKeys, joinType = joinType
-) with Reader[T] {
+) {
 
   /**
    * Produces a new reader that will aggregate after joining the data
@@ -233,7 +232,7 @@ private[op] class JoinedAggregateDataReader[T, U]
   val timeFilter: TimeBasedFilter
 ) extends JoinedReader[T, U](
   leftReader = leftReader, rightReader = rightReader, joinKeys = joinKeys, joinType = joinType
-) with Reader[T] {
+) {
 
   override def getJoinedData(
     rawFeatures: Array[OPFeature],

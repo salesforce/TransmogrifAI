@@ -102,7 +102,7 @@ class TripleInteractionsEstimator(uid: String = UID[TripleInteractionsEstimator]
 
 }
 
-private final class TripleInteractionsModel(val mean: Double, operationName: String, uid: String)
+final class TripleInteractionsModel private[op](val mean: Double, operationName: String, uid: String)
   extends TernaryModel[MultiPickList, Binary, RealMap, Real](operationName = operationName, uid = uid)
     with TripleInteractions {
 

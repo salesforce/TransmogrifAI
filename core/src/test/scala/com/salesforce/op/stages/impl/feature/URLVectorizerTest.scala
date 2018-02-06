@@ -47,13 +47,20 @@ class URLVectorizerTest
     Vectors.dense(0.0, 1.0, 0.0, 0.0)
   ).map(_.toOPVector)
 
+  val expectedTrackNulls = Array(
+    Vectors.dense(0.0, 1.0, 0.0, 0.0),
+    Vectors.dense(0.0, 1.0, 0.0, 0.0),
+    Vectors.dense(1.0, 0.0, 0.0, 0.0),
+    Vectors.dense(1.0, 0.0, 0.0, 0.0)
+  ).map(_.toOPVector)
+
   def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] =
     new OpWorkflow().setResultFeatures(feature).transform(ds).collect(feature)
 
   Spec[RichURLMapFeature] should "vectorize UrlMaps correctly" in {
     val (ds1, f1) = TestFeatureBuilder(urls.map(e => Map(urlKey -> e.value.get).toURLMap))
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys)
+      cleanText = CleanText, cleanKeys = CleanKeys, trackNulls = false)
     vectorized.originStage shouldBe a[TextMapPivotVectorizer[_]]
     vectorized shouldBe a[FeatureLike[_]]
 
@@ -61,6 +68,19 @@ class URLVectorizerTest
     result(0) shouldBe result(1)
     result(2) shouldBe result(3)
     result should contain theSameElementsAs expectedUrlMap
+  }
+
+  it should "track nulls" in {
+    val (ds1, f1) = TestFeatureBuilder(urls.map(e => Map(urlKey -> e.value.get).toURLMap))
+    val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, trackNulls = true)
+    vectorized.originStage shouldBe a[TextMapPivotVectorizer[_]]
+    vectorized shouldBe a[FeatureLike[_]]
+
+    val result = transformAndCollect(ds1, vectorized)
+    result(0) shouldBe result(1)
+    result(2) shouldBe result(3)
+    result should contain theSameElementsAs expectedTrackNulls
   }
 
   it should "work on multiple keys in UrlMap" in {
@@ -73,7 +93,23 @@ class URLVectorizerTest
 
     val (ds1, f1) = TestFeatureBuilder(urlMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys)
+      cleanText = CleanText, cleanKeys = CleanKeys, trackNulls = false)
+
+    val result = transformAndCollect(ds1, vectorized).map(_.value.toDense)
+    result shouldBe expectedMulti
+  }
+
+  it should "track nulls with multiple keys in UrlMap" in {
+    val expectedMulti = Array(
+      Vectors.dense(0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+      Vectors.dense(0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
+      Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+    )
+
+    val (ds1, f1) = TestFeatureBuilder(urlMap)
+    val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, trackNulls = true)
 
     val result = transformAndCollect(ds1, vectorized).map(_.value.toDense)
     result shouldBe expectedMulti
@@ -82,7 +118,7 @@ class URLVectorizerTest
   it should "use whitelisted/ignore blacklisted keys in UrlMap" in {
     val (ds1, f1) = TestFeatureBuilder(urlMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(urlKey2))
+      cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(urlKey2), trackNulls = false)
 
     val result = transformAndCollect(ds1, vectorized)
     result(0) shouldBe result(1)
@@ -90,11 +126,29 @@ class URLVectorizerTest
     result should contain theSameElementsAs expectedUrlMap
 
     val vectorizedWhitelist = f1.vectorize(topK = TopK, minSupport = MinSupport,
-      cleanText = CleanText, cleanKeys = CleanKeys, whiteListKeys = Array(urlKey))
+      cleanText = CleanText, cleanKeys = CleanKeys, whiteListKeys = Array(urlKey), trackNulls = false)
     val resultWhitelist = transformAndCollect(ds1, vectorizedWhitelist)
     resultWhitelist(0) shouldBe resultWhitelist(1)
     resultWhitelist(2) shouldBe resultWhitelist(3)
     resultWhitelist should contain theSameElementsAs expectedUrlMap
+  }
+
+  it should "track nulls whitelisted/ignore blacklisted keys in UrlMap" in {
+    val (ds1, f1) = TestFeatureBuilder(urlMap)
+    val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(urlKey2), trackNulls = true)
+
+    val result = transformAndCollect(ds1, vectorized)
+    result(0) shouldBe result(1)
+    result(2) shouldBe result(3)
+    result should contain theSameElementsAs expectedTrackNulls
+
+    val vectorizedWhitelist = f1.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, cleanKeys = CleanKeys, whiteListKeys = Array(urlKey), trackNulls = true)
+    val resultWhitelist = transformAndCollect(ds1, vectorizedWhitelist)
+    resultWhitelist(0) shouldBe resultWhitelist(1)
+    resultWhitelist(2) shouldBe resultWhitelist(3)
+    resultWhitelist should contain theSameElementsAs expectedTrackNulls
   }
 
   Spec[RichURLFeature] should "vectorize Urls correctly" in {

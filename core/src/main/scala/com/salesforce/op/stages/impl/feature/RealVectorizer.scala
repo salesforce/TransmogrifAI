@@ -70,7 +70,7 @@ class RealVectorizer[T <: Real]
 
 }
 
-private final class RealVectorizerModel[T <: Real]
+final class RealVectorizerModel[T <: Real] private[op]
 (
   val fillValues: Seq[Double],
   val trackNulls: Boolean,
