@@ -8,7 +8,7 @@ package com.salesforce.op.utils.reflection
 import scala.reflect._
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => runtimeUniverse}
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 
 /**
@@ -32,41 +32,24 @@ object ReflectionUtils {
   }
 
   /**
-   * Given a Class this will return the runtime mirror and class mirror
+   * Create a new instance of type T given a ctor argse getter function
    *
-   * @param klazz
+   * @param klazz       instance class
+   * @param ctorArgs    ctor args getter function
    * @param classLoader class loader to use
-   * @return tuple of runtimemirrir and class mirror
-   */
-  def mirrors(klazz: Class[_], classLoader: ClassLoader = defaultClassLoader): (Mirror, ClassMirror) = {
-    val rtm = runtimeMirror()
-    val klazzSymbol = rtm.classSymbol(klazz)
-    rtm -> rtm.reflectClass(klazzSymbol)
-  }
-
-  /**
-   * Find the best constructor method to use.
-   *
-   * @param klazz
-   * @return ctor method with params list
-   */
-  def bestCtor(klazz: Class[_]): (MethodMirror, List[List[Symbol]]) = {
-    val (runtimeMirror, classMirror) = mirrors(klazz)
-    val tMembers = runtimeMirror.classSymbol(klazz).toType.members
-    bestCtor(classMirror, tMembers)
-  }
-
-  /**
-   * Create a new instance of T
-   *
-   * @param klazz
-   * @param ctorArgs ctor args getter function
    * @tparam T
    * @return new instance of T
    */
-  def newInstance[T](klazz: Class[_], ctorArgs: (String, Symbol) => util.Try[Any]): T = {
-    val (ctor, ctorParams) = ReflectionUtils.bestCtor(klazz)
-    val args = extractParams(klazz, ctorParams, ctorArgs)
+  def newInstance[T](
+    klazz: Class[_],
+    ctorArgs: (String, Symbol) => util.Try[Any],
+    classLoader: ClassLoader = defaultClassLoader
+  ): T = {
+    val (runtimeMirror, classMirror) = mirrors(klazz, classLoader)
+    val classType = runtimeMirror.classSymbol(klazz).toType
+    // reflect best constructor
+    val (ctor, args) = bestCtor(klazz, classType, classMirror, ctorArgs)
+    // apply the constructor on the extracted args
     ctor.apply(args.map(_._2): _*).asInstanceOf[T]
   }
 
@@ -81,13 +64,14 @@ object ReflectionUtils {
    * Explicitly pass TypeTag as a val:
    * case class MyClass[T](t: T)(implicit val tt: TypeTag[T])
    *
-   * @param t instance of type T
+   * @param instance instance of type T
    * @tparam T type T
+   * @param classLoader class loader to use
    * @return a copy of t
    * @throws RuntimeException in case a ctor param value cannot be extracted
    */
-  def copy[T: ClassTag](t: T): T = {
-    val (ctor, args) = bestCtorWithArgs(t)
+  def copy[T: ClassTag](instance: T, classLoader: ClassLoader = defaultClassLoader): T = {
+    val (ctor, args) = bestCtorWithArgs(instance, classLoader)
     ctor.apply(args.map(_._2): _*).asInstanceOf[T]
   }
 
@@ -97,52 +81,47 @@ object ReflectionUtils {
    * the appropriate members and their values used as arguments to the
    * constructor.
    *
-   * @param t instance to make copy from
+   * @param instance    instance to make copy from
+   * @param classLoader class loader to use
    * @tparam T type of instance to copy
    * @return a tuple where the first element is the Constructor Mirror,
    *         and the second element is a List of tuples containing the
    *         member names and their values
    */
-  def bestCtorWithArgs[T: ClassTag](t: T): (MethodMirror, List[(String, Any)]) = {
-    val klazz = t.getClass
-    val (runtimeMirror, classMirror) = mirrors(klazz)
-    val tMembers = runtimeMirror.classSymbol(klazz).toType.members
-    val (ctorMethod, ctorParamLists) = bestCtor(classMirror, tMembers)
-
-    val getters = tMembers.collect {
-      case m: MethodSymbol if m.isGetter && m.isPublic => termNameStr(m.name) -> m
-    }.toMap
-    val vals = tMembers.collect {
-      case v: TermSymbol if v.isVal => termNameStr(v.name) -> v
-    }.toMap
-
-    val instanceMirror = runtimeMirror.reflect(t)
+  def bestCtorWithArgs[T: ClassTag](
+    instance: T,
+    classLoader: ClassLoader = defaultClassLoader
+  ): (MethodMirror, List[(String, Any)]) = {
+    val klazz = instance.getClass
+    val (runtimeMirror, classMirror) = mirrors(klazz, classLoader)
+    val classType = runtimeMirror.classSymbol(klazz).toType
+    val tMembers = classType.members
+    val gettrs = tMembers.collect { case m: MethodSymbol if m.isGetter && m.isPublic => termNameStr(m.name) -> m }.toMap
+    val vals = tMembers.collect { case v: TermSymbol if v.isVal => termNameStr(v.name) -> v }.toMap
+    val instanceMirror = runtimeMirror.reflect(instance)
 
     def ctorArgs(paramName: String, param: Symbol): util.Try[Any] = util.Try {
-      val getterOpt = getters.get(paramName).map(instanceMirror.reflectMethod)
+      val getterOpt = gettrs.get(paramName).map(instanceMirror.reflectMethod)
       if (getterOpt.isDefined) getterOpt.get.apply()
       else instanceMirror.reflectField(vals(paramName)).get
     }
-
-    ctorMethod -> extractParams(klazz, ctorParamLists, ctorArgs)
+    bestCtor(klazz, classType, classMirror, ctorArgs)
   }
 
   /**
    * Find the class by name
    *
-   * @param name class
-   * @param classLoader
+   * @param name        class name
+   * @param classLoader class loader to use
    * @throws ClassNotFoundException
    * @return class object
    */
-  def classForName(name: String, classLoader: ClassLoader = defaultClassLoader): Class[_] = {
-    classLoader.loadClass(name)
-  }
+  def classForName(name: String, classLoader: ClassLoader = defaultClassLoader): Class[_] = classLoader.loadClass(name)
 
   /**
    * Create a TypeTag for Type
    *
-   * @param rtm runtime mirror (default: [[ReflectionUtils.runtimeMirror]]
+   * @param rtm runtime mirror
    * @param tpe type
    * @tparam T type T
    * @return TypeTag[T]
@@ -156,13 +135,26 @@ object ReflectionUtils {
   }
 
   /**
+   * Create a ClassTag for a WeakTypeTag
+   *
+   * @tparam T type T
+   * @return ClassTag[T]
+   */
+  def classTagForWeakTypeTag[T: WeakTypeTag]: ClassTag[T] = {
+    val t = weakTypeTag[T]
+    ClassTag[T](t.mirror.runtimeClass(t.tpe))
+  }
+
+  /**
    * Return a TypeTag of typeTag[T].tpe.dealias (see [[TypeApi.dealias]])
    *
+   * @param rtm  runtime mirror
    * @param ttag TypeTag[T]
    * @tparam T type T
    * @return TypeTag of typeTag[T].tpe.dealias
    */
-  def dealiasedTypeTag[T](implicit ttag: TypeTag[T]): TypeTag[T] = typeTagForType[T](tpe = ttag.tpe.dealias)
+  def dealiasedTypeTagForType[T](rtm: Mirror = runtimeMirror())
+    (implicit ttag: TypeTag[T]): TypeTag[T] = typeTagForType[T](tpe = ttag.tpe.dealias, rtm = rtm)
 
   /**
    * Creates a Manifest[T] of a TypeTag[T]
@@ -191,11 +183,48 @@ object ReflectionUtils {
   }
 
   /**
+   * Given a Class this will return the runtime mirror and class mirror
+   *
+   * @param klazz       instance class
+   * @param classLoader class loader to use
+   * @return tuple of runtime mirror and class mirror
+   */
+  private def mirrors(klazz: Class[_], classLoader: ClassLoader): (Mirror, ClassMirror) = {
+    val rtm = runtimeMirror()
+    val klazzSymbol = rtm.classSymbol(klazz)
+    rtm -> rtm.reflectClass(klazzSymbol)
+  }
+
+  /**
+   * Reflects the best matching ctor that matches given ctor args extract function
+   *
+   * @return ctor method mirror with extracted args
+   */
+  private def bestCtor(
+    klazz: Class[_],
+    classType: Type,
+    classMirror: ClassMirror,
+    ctorArgs: (String, Symbol) => util.Try[Any]
+  ): (MethodMirror, List[(String, Any)]) = {
+    val ctorsWithParams = allCtorsWithParams(classType, classMirror)
+    val ctorCandidates = ctorsWithParams.map { case (ctorMethod, ctorParamLists) =>
+      util.Try(ctorMethod -> extractParams(klazz, ctorParamLists, ctorArgs))
+    }
+    ctorCandidates.partition(_.isSuccess) match {
+      case (Success(ctor) :: _, _) => ctor
+      case (_, Failure(error) :: _) => throw error
+      case _ => throw new RuntimeException(
+        s"No constructors were found for type ${klazz.getCanonicalName}"
+      )
+    }
+  }
+
+  /**
    * Cycles through the parameter list and uses the paramGetter lambda function to extract
    * the param value by name. If a param extraction has failed a RuntimeException will be
    * thrown
    *
-   * @param klazz
+   * @param klazz instance class
    * @param paramLists  param list to try and get values for
    * @param paramGetter lambda function to extract the param value by name.
    * @return List of tuples with the param name and it's value
@@ -212,29 +241,31 @@ object ReflectionUtils {
       paramName = termNameStr(param.name.toTermName)
     } yield paramName -> paramGetter(paramName, param)
 
-    val maybeFailure = paramValues.collectFirst {
-      case (paramName, maybeValue) if maybeValue.isFailure => (paramName, maybeValue.failed.get)
-    }
-
-    if (maybeFailure.isDefined) {
-      val ex = maybeFailure.get._2
+    paramValues.collectFirst { case (paramName, Failure(error)) =>
       throw new RuntimeException(
-        s"Failed to extract value for param '${maybeFailure.get._1}' " +
-          s"for an instance of type '${klazz.getCanonicalName}' due to: ${ex.getMessage}",
-        ex
+        s"Failed to extract value for param '$paramName' " +
+          s"for an instance of type '${klazz.getCanonicalName}' due to: ${error.getMessage}",
+        error
       )
     }
     paramValues.collect { case (n, Success(v)) => n -> v }
   }
 
-  private def bestCtor(classMirror: ClassMirror, tMembers: MemberScope): (MethodMirror, List[List[Symbol]]) = {
-    // TODO: implement a more robust logic of picking up the best ctor
-    val ctor = tMembers.collect {
-      case m: MethodSymbol if m.isConstructor && m.isPrimaryConstructor && m.isPublic => m
-    }.head
+  /**
+   * Reflects and returns all type ctors + ctor params sorted by params length (desc)
+   */
+  private def allCtorsWithParams(
+    classType: Type, classMirror: ClassMirror
+  ): List[(MethodMirror, List[List[Symbol]])] = {
+    // reflect all type constructors
+    val ctors =
+      classType.decl(runtimeUniverse.termNames.CONSTRUCTOR)
+        .asTerm.alternatives.filter(_.isConstructor).map(_.asMethod)
 
-    val cMethod = classMirror.reflectConstructor(ctor)
-    cMethod -> ctor.paramLists
+    // reflect params for all constructors and sort by the number of params (desc)
+    ctors
+      .map(ctor => classMirror.reflectConstructor(ctor) -> ctor.paramLists)
+      .sortBy(-_._2.map(_.length).sum)
   }
 
   private def termNameStr(termName: TermName): String = termName.decodedName.toString.trim

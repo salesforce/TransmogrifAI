@@ -41,59 +41,41 @@ private[op] class OpBinaryClassificationEvaluator
       labelColName, rawPredictionColName, predictionColName
     )
 
-    val Array(aUROC, aUPR) = Array(
-      BinaryClassEvalMetrics.AuROC,
-      BinaryClassEvalMetrics.AuPR
-    ).map(getBinaryEvaluatorMetric(_, data))
+    val Array(aUROC, aUPR) =
+      Array(BinaryClassEvalMetrics.AuROC, BinaryClassEvalMetrics.AuPR).map(getBinaryEvaluatorMetric(_, data))
 
-
-    // scalastyle:off
     import data.sparkSession.implicits._
-    // scalastyle:on
-
     val rdd = data.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
-  if (rdd.isEmpty()) {
-    log.error("The dataset is empty")
-    BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-  } else {
-    val multiclassMetrics = new MulticlassMetrics(rdd)
-
-    val labels = multiclassMetrics.labels
-
-    val (tn, fn, fp, tp) = if (labels.length == 2) {
-
-      val confusionMatrix = multiclassMetrics.confusionMatrix
-      (confusionMatrix(0, 0), confusionMatrix(1, 0), confusionMatrix(0, 1), confusionMatrix(1, 1))
+    if (rdd.isEmpty()) {
+      log.error("The dataset is empty")
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
     } else {
-      // if labels and predictions of data are only one class, cannot compute confusion matrix
-      val size = data.count().toDouble
-      if (labels.head == 0.0) {
-        (size, 0.0, 0.0, 0.0)
-      } else (0.0, 0.0, 0.0, size)
+      val multiclassMetrics = new MulticlassMetrics(rdd)
+      val labels = multiclassMetrics.labels
+
+      val (tn, fn, fp, tp) = if (labels.length == 2) {
+        val confusionMatrix = multiclassMetrics.confusionMatrix
+        (confusionMatrix(0, 0), confusionMatrix(1, 0), confusionMatrix(0, 1), confusionMatrix(1, 1))
+      } else {
+        // if labels and predictions of data are only one class, cannot compute confusion matrix
+        val size = data.count().toDouble
+        if (labels.head == 0.0) (size, 0.0, 0.0, 0.0) else (0.0, 0.0, 0.0, size)
+      }
+
+      val precision = if (tp + fp == 0.0) 0.0 else tp / (tp + fp)
+      val recall = if (tp + fn == 0.0) 0.0 else tp / (tp + fn)
+      val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
+      val error = if (tp + fp + tn + fn == 0.0) 0.0 else (fp + fn) / (tp + fp + tn + fn)
+
+      val metrics = BinaryClassificationMetrics(
+        Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
+        AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn
+      )
+
+      log.info("Evaluated metrics: {}", metrics.toString)
+      metrics
     }
-
-    val precision = if (tp + fp == 0.0) 0.0 else tp / (tp + fp)
-    val recall = if (tp + fn == 0.0) 0.0 else tp / (tp + fn)
-    val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
-    val error = if (tp + fp + tn + fn == 0.0) 0.0 else (fp + fn) / (tp + fp + tn + fn)
-
-    val metrics = BinaryClassificationMetrics(
-      Precision = precision,
-      Recall = recall,
-      F1 = f1,
-      AuROC = aUROC,
-      AuPR = aUPR,
-      Error = error,
-      TP = tp,
-      TN = tn,
-      FP = fp,
-      FN = fn
-    )
-
-    log.info("Evaluated metrics : {}", metrics.toString)
-    metrics
-  }
   }
 
   final protected def getBinaryEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {

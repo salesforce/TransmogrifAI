@@ -33,6 +33,7 @@ import org.joda.time.format.DateTimeFormat
  * ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates
  */
 
+
 case class Click(clickId: Int, userId: Int, emailId: Int, timeStamp: String)
 case class Send(sendId: Int, userId: Int, emailId: Int, timeStamp: String)
 

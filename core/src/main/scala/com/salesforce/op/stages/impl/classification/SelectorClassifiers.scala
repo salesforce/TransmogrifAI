@@ -191,8 +191,7 @@ private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade t
     with HasRandomForestClassifier
     with HasDecisionTreeClassifier
     with HasNaiveBayes
-    with SelectorModels[ProbClassifier, Stage1ClassificationModelSelector]
-    with Stage3ParamNamesBase {
+    with SelectorModels[ProbClassifier, Stage1ClassificationModelSelector] {
 
   /**
    * Set param for Thresholds of all classifiers to adjust the probability of predicting each class.

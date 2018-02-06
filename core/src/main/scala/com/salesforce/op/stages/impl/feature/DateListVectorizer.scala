@@ -193,7 +193,7 @@ class DateListVectorizer[T <: OPList[Long]]
           dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getDayOfWeek)
             .groupBy(identity).mapValues(_.size).toArray
         val modeDay = countDays.minBy { case (w, c) => (-c, w) }._1
-        oneHot(modeDay, DateTimeConstants.DAYS_PER_WEEK)
+        oneHot(modeDay - 1, DateTimeConstants.DAYS_PER_WEEK) // oneHot is zero based so subtracting one
       }
     if ($(trackNulls)) day :+ (dt.isEmpty : Double) else day
   }
@@ -209,7 +209,7 @@ class DateListVectorizer[T <: OPList[Long]]
           dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getMonthOfYear)
             .groupBy(identity).mapValues(_.size).toArray
         val modeMonth = countMonths.minBy { case (m, c) => (-c, m) }._1
-        oneHot(modeMonth, 12)
+        oneHot(modeMonth - 1, 12) // oneHot is zero based so subtracting one
       }
     if ($(trackNulls)) month :+ (dt.isEmpty : Double) else month
   }
@@ -226,7 +226,7 @@ class DateListVectorizer[T <: OPList[Long]]
           dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getHourOfDay)
             .groupBy(identity).mapValues(_.size).toArray
         val modeHour = countHours.minBy { case (h, c) => (-c, h) }._1
-        oneHot(modeHour + 1, DateTimeConstants.HOURS_PER_DAY)
+        oneHot(modeHour, DateTimeConstants.HOURS_PER_DAY)
       }
     if ($(trackNulls)) hour :+ (dt.isEmpty : Double) else hour
   }

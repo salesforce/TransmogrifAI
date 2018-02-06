@@ -1,55 +1,28 @@
 buildscript {
     repositories {
-        jcenter()
         maven { url "https://plugins.gradle.org/m2/" }
-        maven { url "https://oss.sonatype.org/content/repositories/releases" }
-        maven { url 'http://repo.spring.io/plugins-release' }
-        maven { url 'https://jitpack.io' }
+        mavenCentral()
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.0'
         classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0'
-        classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:4.4.18'
       //classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.8.2'
     }
 }
 
-if (!project.hasProperty('artifactory_contextUrl')) {
-    project.ext { artifactory_contextUrl = 'https://repo.sfiqautomation.com/artifactory' }
-}
-if (!project.hasProperty('artifactory_user')) {
-    project.ext {
-        artifactory_user = ''
-        artifactory_password = ''
-    }
-}
-
-def artifactoryCredentials = {
-    username "${artifactory_user}"
-    password "${artifactory_password}"
-}
-
 repositories {
-    maven {
-        url "${artifactory_contextUrl}/libs-release"
-        credentials artifactoryCredentials
-    }
-    maven {
-        url "${artifactory_contextUrl}/libs-snapshot"
-        credentials artifactoryCredentials
-    }
-    maven {
-        url "${artifactory_contextUrl}/plugins-release"
-        credentials artifactoryCredentials
-    }
-    maven {
-        url "${artifactory_contextUrl}/plugins-snapshot"
-        credentials artifactoryCredentials
-    }
     mavenCentral()
-    maven { url "https://oss.sonatype.org/content/repositories/releases/" }
-    maven { url "http://maven.twttr.com/" }
     maven { url "https://jitpack.io" }
+    maven {
+       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
+       credentials {
+           // Generate github api token here - https://goo.gl/ANZ9oz
+           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
+           username = System.getenv("GITHUB_API_TOKEN")
+           password "" // leave the password empty
+       }
+       authentication { digest(BasicAuthentication) }
+    }
 }
 
 apply plugin: 'application'
@@ -162,6 +135,6 @@ task repl(type: JavaExec) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '3.5'
-    description "Sets the Gradle wrapper version to $gradleVersion."
+    gradleVersion = '4.1'
+    description "Sets the Gradle wrapper version."
 }

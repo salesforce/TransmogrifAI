@@ -53,17 +53,17 @@ class OpParamsTest extends FlatSpec with TestCommon {
   }
 
   it should "correctly load parameters from a json string" in {
-    val workflowParams = OpParams.fromString(resourceString(name = "OpParams.json"))
+    val workflowParams = OpParams.fromString(loadResource("/OpParams.json", noSpaces = true))
     assertParams(workflowParams.get)
   }
 
   it should "correctly load parameters from a yaml string" in {
-    val workflowParams = OpParams.fromString(resourceString(name = "OpParams.yaml", noSpaces = false))
+    val workflowParams = OpParams.fromString(loadResource("/OpParams.yaml"))
     assertParams(workflowParams.get)
   }
 
   it should "fail to load parameters from an invalid string" in {
-    val workflowParams = OpParams.fromString(resourceString(name = "log4j.properties"))
+    val workflowParams = OpParams.fromString(loadResource("/log4j.properties", noSpaces = true))
     workflowParams shouldBe a[Failure[_]]
     workflowParams.failed.get shouldBe a[IllegalArgumentException]
   }
@@ -81,6 +81,8 @@ class OpParamsTest extends FlatSpec with TestCommon {
     expected.modelLocation shouldBe loaded.modelLocation
     expected.writeLocation shouldBe loaded.writeLocation
     expected.metricsLocation shouldBe loaded.metricsLocation
+    expected.batchDurationSecs shouldBe loaded.batchDurationSecs
+    expected.awaitTerminationTimeoutSecs shouldBe loaded.awaitTerminationTimeoutSecs
     expected.metricsCompress shouldBe loaded.metricsCompress
     expected.metricsCodec shouldBe loaded.metricsCodec
     expected.customTagName shouldBe loaded.customTagName

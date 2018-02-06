@@ -3,7 +3,7 @@
  * All rights reserved.
  */
 
-package org.apache.spark.ml
+package com.salesforce.op.stages
 
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import enumeratum._

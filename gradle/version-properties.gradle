@@ -11,10 +11,10 @@ def cmdCaller = { commandln ->
 }
 
 
-configure(allprojects - project(':templates').subprojects)  {
+configure(allprojects - project(':templates').subprojects - project(':docs'))  {
     // Note: to make this function to work on TeamCity set 'VCS checkout mode' to 'Automatically on Agent'
     //noinspection GroovyAssignabilityCheck
-    task createGitProperties() {
+    task createVersionProperties() {
         doLast {
             String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
             String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
@@ -24,12 +24,12 @@ configure(allprojects - project(':templates').subprojects)  {
 
             String propsStr = 'version=' + version + '\n' +
                     'build.time=' + formattedDate + '\n' +
-                    'git.commit.id=' + gitCommitHash + '\n' +
                     'git.repo=' + gitRepo + '\n' +
                     'git.branch=' + gitBranch + '\n' +
+                    'git.commit.id=' + gitCommitHash + '\n' +
                     'git.commit.time=' + gitDate + '\n'
 
-            File versionFile = file('build/resources/main/git.properties')
+            File versionFile = file('build/resources/main/op-version.properties')
             versionFile.parentFile.mkdirs()
             versionFile.write(propsStr)
         }

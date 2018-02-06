@@ -16,24 +16,26 @@ import scala.reflect.ClassTag
 case class ModelInfo[E <: Estimator[_]](sparkEstimator: E, grid: ParamGridBuilder, use: BooleanParam)
 
 /**
- * Input and Output Param names for Selectors having one stage
+ * Input and Output Param names for Selectors containing models extending the Predictor and ClassifierPredictor spark
+ * classes
  */
-private[impl] trait Stage1ParamNamesBase {
+private[op] object StageParamNames {
   val inputParam1Name = "labelCol"
   val inputParam2Name = "featuresCol"
-  val outputParam1Name = "predictionCol"
-  val stage1OperationName = "label_prediction"
-}
 
-/**
- * Input and Output Param names for Selectors having three stages
- */
-private[impl] trait Stage3ParamNamesBase extends Stage1ParamNamesBase {
+  val outputParam1Name = "predictionCol"
   val outputParam2Name = "rawPredictionCol"
   val outputParam3Name = "probabilityCol"
 
+  val stage1OperationName = "label_prediction"
   val stage2OperationName = "label_rawPrediction"
   val stage3OperationName = "label_probability"
+}
+
+private[op] trait StageOperationName {
+  val stage1OperationName = StageParamNames.stage1OperationName
+  val stage2OperationName = StageParamNames.stage2OperationName
+  val stage3OperationName = StageParamNames.stage3OperationName
 }
 
 /**

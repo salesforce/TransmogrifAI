@@ -21,8 +21,10 @@ class CSVInOut(val options: CSVOptions) {
    * @param path path to file
    * @return DataFrame
    */
-  def readDataFrame(path: String)(implicit spark: SparkSession): DataFrame =
-    spark.read.options(options.toSparkCSVOptionsMap).csv(path)
+  def readDataFrame(path: String)(implicit spark: SparkSession): DataFrame = {
+    val reader = spark.read.options(options.toSparkCSVOptionsMap).format(options.format)
+    reader.load(path)
+  }
 
   /**
    * Method for reading CSV file into an RDD of columns (a collections of strings)
@@ -48,6 +50,7 @@ class CSVInOut(val options: CSVOptions) {
  * @param escapeChar  the escape character to use
  * @param allowEscape allow the specification of a particular escape character
  * @param header      first line is a header
+ * @param format      specifies the input data source format. For more info see [[org.apache.spark.sql.DataFrameReader]]
  */
 case class CSVOptions
 (
@@ -55,7 +58,8 @@ case class CSVOptions
   quoteChar: String = "\"",
   escapeChar: String = "\\",
   allowEscape: Boolean = false,
-  header: Boolean = false
+  header: Boolean = false,
+  format: String = "csv"
 ) {
 
   /**

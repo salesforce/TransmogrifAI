@@ -29,7 +29,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   private val descrVec = description.vectorize(10, false, 1, true)
   private val features = Seq(density, age, generVec, weight, descrVec).transmogrify()
   private val label = survived.occurs()
-  private val checked = label.sanityCheck(features, removeBadFeatures = true, checkSample = 1.0)
+  private val checked = label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false,
+    checkSample = 1.0)
 
   val (pred, rawPred, prob) = BinaryClassificationModelSelector
     .withCrossValidation(seed = 42, splitter = None)
@@ -80,7 +81,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     genderInsights.derivedFeatures.size shouldBe 4
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 6
+    insights.stageInfo.keys.size shouldEqual 8
   }
 
   it should "return feature insights with selector info and label info even when models are found" in {
@@ -111,7 +112,27 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 8
+    insights.stageInfo.keys.size shouldEqual 10
+  }
+
+  it should "find the sanity checker metadata even if the model has been serialized" in {
+    val json = OpWorkflowModelWriter.toJson(workflowModel, "tmp")
+    val loadedModel = new OpWorkflowModelReader(workflow).loadJson(json)
+    val insights = loadedModel.get.modelInsights(checked)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
   }
 
   it should "return feature insights with selector info and label info and model info" in {
@@ -142,7 +163,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.contains("crossValidationResults") shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 13
   }
 
   it should "return feature insights with label info and model info even when no sanity checker is found" in {
@@ -173,7 +194,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.contains("trainValidationSplitResults") shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 8
+    insights.stageInfo.keys.size shouldEqual 10
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
@@ -184,7 +205,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
     )
     reg.size shouldBe 1
-    reg.head.size shouldBe 20
+    reg.head.size shouldBe 21
 
     lin.size shouldBe 1
     lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length

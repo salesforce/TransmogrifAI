@@ -6,12 +6,13 @@
 package com.salesforce.op.features
 
 import com.salesforce.op._
-import com.salesforce.op.test.PassengerFeaturesTest
 import com.salesforce.op.features.types._
-import com.salesforce.op.test._
+import com.salesforce.op.test.{PassengerFeaturesTest, _}
 import org.junit.runner.RunWith
+import org.scalatest.WordSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Matchers, WordSpec}
+
+import scala.util.{Failure, Success}
 
 
 // scalastyle:off
@@ -91,16 +92,45 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         bar.name shouldBe "bar"
       }
     }
-
     "isSubtypeOf" should {
       "correctly figure out feature subtypes" in {
         survived.isSubtypeOf[SingleResponse] shouldBe true
         boardedTime.isSubtypeOf[SingleResponse] shouldBe false
       }
     }
+    "traverse" should {
+      "operate correctly" in {
+        (height + weight * age).traverse(List.empty[String])((acc, f) =>
+          if (acc.contains(f.uid)) acc else f.uid :: acc
+        ).length shouldBe 5
+      }
+      "collect raw features" in {
+        height.rawFeatures shouldBe Seq(height)
+        (height + weight).rawFeatures should contain theSameElementsAs Seq(height, weight)
+      }
+      "collect all features" in {
+        height.allFeatures shouldBe Seq(height)
+        val plus = height + weight
+        plus.allFeatures should contain theSameElementsAs Seq(plus, height, weight)
+      }
+      "collect parent stages with correct distances" in {
+        val plus = height + weight
+        val mul = plus * age
+        val div = mul / height
+        div.parentStages() match {
+          case Failure(e) => fail(e)
+          case Success(stages) =>
+            stages.size shouldBe 3
+            stages.get(plus.originStage) shouldBe Some(2)
+            stages.get(mul.originStage) shouldBe Some(1)
+            stages.get(div.originStage) shouldBe Some(0)
+        }
+      }
+
+    }
+    // TODO: test other feature methods
 
   }
-  // TODO: test feature parent stages
 
 }
 

@@ -7,9 +7,12 @@ package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.OPStage
+import com.salesforce.op.stages.impl.selector.{HasEval, HasTestEval}
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.apache.spark.ml._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
+import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Try}
 
 
@@ -98,9 +101,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param features final features passed into setInput
    */
   private def setStages(features: Array[OPFeature]): OpWorkflow.this.type = {
-
     // Unique stages layered by distance
-    val uniqueStagesLayered: Array[Array[(OPStage, Int)]] = computeStagesDAG(features)
+    val uniqueStagesLayered = computeStagesDAG(features)
 
     if (log.isDebugEnabled) {
       val total = uniqueStagesLayered.map(_.length).sum
@@ -126,8 +128,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param in DataFrame
    * @return transformed DataFrame
    */
-  private[op] def transform(in: DataFrame): DataFrame = {
-    sparkPipelineFit(data = in).transform(in)
+  private[op] def transform(in: DataFrame)(implicit sc: SparkSession): DataFrame = {
+    val transformers = fitStages(in, stages).map(_.asInstanceOf[Transformer])
+    applySparkTransformations(in, transformers, OpWorkflowModel.persistEveryKStages)
   }
 
   /**
@@ -203,15 +206,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    */
   def train()(implicit spark: SparkSession): OpWorkflowModel = {
     val rawData = generateRawData()
-    val fitPipeline = sparkPipelineFit(data = rawData)
 
     // Update features with fitted stages
-    val fittedStages = fitPipeline.stages.map(_.asInstanceOf[OPStage])
+    val fittedStages = fitStages(data = rawData, stagesToFit = stages)
     val newResultFeatures = resultFeatures.map(_.copyWithNewStages(fittedStages))
 
     val model =
       new OpWorkflowModel(uid, getParameters())
-        .setParent(this)
         .setStages(fittedStages)
         .setFeatures(newResultFeatures)
         .setParameters(getParameters())

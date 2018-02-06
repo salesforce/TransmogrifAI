@@ -131,6 +131,7 @@ class URL(value: Option[String]) extends Text(value){
 object URL {
   def apply(value: Option[String]): URL = new URL(value)
   def apply(value: String): URL = new URL(value)
+  def empty: URL = FeatureTypeDefaults.URL
 }
 
 class TextArea(value: Option[String]) extends Text(value){

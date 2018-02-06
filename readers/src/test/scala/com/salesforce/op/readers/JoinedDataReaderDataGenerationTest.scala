@@ -23,12 +23,6 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  val simpleReader = DataReaders.Simple.csv[PassengerCSV](
-    path = Some(passengerCsvPath),
-    schema = PassengerCSV.getClassSchema.toString,
-    key = _.getPassengerId.toString // entity to score
-  )
-
   val newWeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getWeight.toDouble.toRealNN)
@@ -240,7 +234,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       primary = new TimeColumn(recordTime),
       timeWindow = Duration.standardDays(1000)
     )
-    val joinedReader = simpleReader.leftOuterJoin(dataReader)
+    val joinedReader = simpleCsvReader.leftOuterJoin(dataReader)
 
     val inputFeatures: Array[OPFeature] = Array(
       survived, age, gender, description, stringMap, boarded, height, boardedTime,

@@ -94,7 +94,7 @@ class FantasticFourEstimator(uid: String = UID[FantasticFourEstimator])
 
 }
 
-private final class FantasticFourModel(val mean: Double, operationName: String, uid: String)
+final class FantasticFourModel private[op](val mean: Double, operationName: String, uid: String)
   extends QuaternaryModel[Real, TextMap, BinaryMap, MultiPickList, Real](operationName = operationName, uid = uid)
     with FantasticFour {
 

@@ -11,7 +11,7 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType.Regressor
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBase}
+import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBase, StageParamNames}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.makeOutputName
 import org.apache.spark.ml.Model
@@ -89,7 +89,7 @@ case object RegressionModelSelector {
     new RegressionModelSelector(
       validator = validator,
       dataSplitter = dataSplitter,
-      trainTestEvaluators = trainTestEvaluators
+      evaluators = trainTestEvaluators
     ) // models on by default
       .setModelsToTry(RandomForestRegression, LinearRegression, GBTRegression)
       // Random forest defaults
@@ -134,37 +134,21 @@ case object RegressionModelSelector {
  * @param validator         validator used for the model selector
  * @param uid
  * @param dataSplitter      instance that will split the data into training set and test set
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  *
  */
 private[op] class RegressionModelSelector
 (
   validator: OpValidator[Regressor],
   val dataSplitter: Option[DataSplitter],
-  trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
+  evaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[RegressionModelSelector]
 ) extends ModelSelectorBase[Regressor](validator = validator, splitter = dataSplitter,
-  trainTestEvaluators = trainTestEvaluators, uid = uid)
+  evaluators = evaluators, uid = uid)
   with SelectorRegressors {
 
-  final override protected def evaluate(
-    data: Dataset[_],
-    labelColName: String,
-    predictionColName: String,
-    best: => Model[_ <: Model[_]]
-  ): EvaluationMetrics = {
-    val metricsMap = trainTestEvaluators.map { evaluator =>
-      evaluator.name -> evaluator
-        .setLabelCol(labelColName)
-        .setPredictionCol(predictionColName)
-        .evaluateAll(data)
-    }.toMap
-
-    MultiMetrics(metricsMap)
-  }
-
   final override protected def getOutputsColNamesMap(f1: TransientFeature, f2: TransientFeature): Map[String, String] =
-    Map(outputParam1Name -> makeOutputName(outputFeatureUid, Seq(f1, f2)))
+    Map(StageParamNames.outputParam1Name -> makeOutputName(outputFeatureUid, Seq(f1, f2)))
 
   final override protected def getModelInfo: Seq[ModelInfo[Regressor]] = modelInfo
 }

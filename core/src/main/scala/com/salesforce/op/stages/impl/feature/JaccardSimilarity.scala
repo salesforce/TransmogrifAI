@@ -18,5 +18,4 @@ class JaccardSimilarity(uid: String = UID[JaccardSimilarity])
   extends BinaryTransformer[MultiPickList, MultiPickList, RealNN](operationName = "jacSim", uid = uid) {
 
   def transformFn: (MultiPickList, MultiPickList) => RealNN = (x, y) => JaccardDistance(x.value, y.value).toRealNN
-
 }

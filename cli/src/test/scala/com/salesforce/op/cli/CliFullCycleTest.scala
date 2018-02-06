@@ -5,14 +5,19 @@
 
 package com.salesforce.op.cli
 
-import java.io.{ByteArrayOutputStream, File, FileWriter}
+import java.io.{File, FileWriter}
+
+import com.salesforce.op.OpWorkflowRunType
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 import scala.language.postfixOps
 import scala.sys.process._
 
 /**
- * Test for generator operations
+ * End to end test: gen, build and spark submit
  */
+@RunWith(classOf[JUnitRunner])
 class CliFullCycleTest extends CliTestBase {
 
   Spec[CliExec] should "do full cycle with avcs present" in {
@@ -23,54 +28,65 @@ class CliFullCycleTest extends CliTestBase {
       "--id", "passengerId",
       "--response", "survived",
       "--schema", TestAvsc,
-      "--answers", "cli/passengers.answers",
+      "--answers", AnswersFile,
       ProjectName,
-      "--overwrite")
-    withClue(result.err) { result.outcome shouldBe Succeeded }
+      "--overwrite"
+    )
+    assertResult(result, Succeeded)
     checkScalaFiles(shouldNotContain = "_code")
     checkAvroFile(new File(TestAvsc))
+    // runTraining() // TODO: requires proper SPARK_HOME setup on TC
 
-    runSampleWithGradle
+    // TODO: score & evaluate
   }
 
-  Spec[CliExec] should "do full cycle with autoreader" in {
+  it should "do full cycle with autoreader" in {
     val sut = new Sut
     val result = sut.run(
       "gen",
-      "--input", TestCsvWithHeaders,
+      "--input", TestBigCsvWithHeaders,
       "--id", "passengerId",
       "--response", "survived",
       "--auto", "Pasajeros",
-      "--answers", "cli/passengers.answers",
+      "--answers", AnswersFile,
       ProjectName,
-      "--overwrite")
-    withClue(result.err) { result.outcome shouldBe Succeeded }
+      "--overwrite"
+    )
+    assertResult(result, Succeeded)
     checkScalaFiles(shouldNotContain = "_code")
+    // TODO: unfortunately, it fails, due to bad data.
+    // runTraining() // TODO: requires proper SPARK_HOME setup on TC
 
-// unfortunately, it fails, due to bad data.    runSampleWithGradle
+    // TODO: score & evaluate
   }
 
-  private def runSampleWithGradle = {
-    val trainMe = appRuntimeArgs("train")
+  // TODO: add tests for multiclass & regression models
+
+
+  private def runBuild() = runCommand(List("./gradlew", "--no-daemon", "installDist"))
+
+  private def runTraining() = {
+    val trainMe = appRuntimeArgs(OpWorkflowRunType.Train)
     val cmd = List(
       "./gradlew",
+      "--no-daemon",
       s"sparkSubmit",
       s"-Dmain=com.salesforce.app.$ProjectName",
-      s"""-Dargs=\"$trainMe\"""")
-    val cmdToRunManuallyInYourConsole = cmd mkString " "
-    val shell = new File(projectDir, "train")
-    val shellW = new FileWriter(shell)
-    shellW.write(cmdToRunManuallyInYourConsole)
-    shellW.close()
+      s"""-Dargs=\"$trainMe\""""
+    )
+    runCommand(cmd)
+  }
 
-    val proc = Process("sh" :: "train" :: Nil, projectDir.getAbsoluteFile)
-    val stdOut = new ByteArrayOutputStream
-    val stdErr = new ByteArrayOutputStream
-    val logger = ProcessLogger(stdout.print, stderr.print)
+  private def runCommand(cmd: List[String]) = {
+    val cmdStr = cmd.mkString(" ")
+    val cmdSh = new FileWriter(new File(projectDir, "cmd"))
+    cmdSh.write(cmdStr)
+    cmdSh.close()
+
+    val proc = Process("sh" :: "cmd" :: Nil, projectDir.getAbsoluteFile)
+    val logger = ProcessLogger(s => log.info(s), s => log.error(s))
     val code = proc !< logger
 
-    withClue(s"code=$code\nerr=${stdErr.toString}\nout=${stdOut.toString}") {
-      code shouldBe 0
-    }
+    if (code == 0) succeed else fail(s"Command returned a non zero code: $code")
   }
 }

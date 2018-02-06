@@ -18,6 +18,7 @@ import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVect
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
 
@@ -152,9 +153,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
     operationName = classOf[SanityChecker].getSimpleName, uid = uid
   ) with SanityCheckerParams {
 
-  /**
-   * Function to be called on setInput
-   */
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
@@ -194,13 +192,30 @@ class SanityChecker(uid: String = UID[SanityChecker])
     def numNulls(col: OpVectorColumnMetadata) =
       nullIndicators.get(col.makeColName()).fold(0.0) { case (_, i) => means(i) * count }
 
-    val parentMap = metaCols.flatMap{ c => c.parentNamesWithMapKeys().map(c.makeColName() -> _) }.toMap
+    def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map{ case(k, v) =>
+      // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
+      k -> v.filterNot(_._2.isNaN).foldLeft(0.0)((a, b) => math.max(a, b._2))
+    }
 
-    val corrParent = metaCols
-      .flatMap(c => c.parentNamesWithMapKeys().map(_ -> corrMatrix(c.index, labelColumnIndex)))
-      .groupBy(_._1).map(_._2.maxBy(_._2))
+    def corrParentMap(fn: OpVectorColumnMetadata => Seq[String]) =
+      maxByParent(metaCols.flatMap(c => fn(c).map(_ -> corrMatrix(c.index, labelColumnIndex))))
 
-    val cramersVParent = cramersVMap.toSeq.map { case (k, v) => parentMap(k) -> v }.groupBy(_._1).map(_._2.maxBy(_._2))
+    def cramersVParentMap(fn: OpVectorColumnMetadata => Seq[String]) = {
+      val parentMap = metaCols.flatMap{ c => fn(c).map(c.makeColName() -> _) }.toMap
+      maxByParent(cramersVMap.toSeq.map { case (k, v) => parentMap(k) -> v })
+    }
+
+    val corrParent = corrParentMap(_.parentNamesWithMapKeys())
+    val corrParentNoKeys = corrParentMap(_.parentFeatureName)
+
+    val cramersVParent = cramersVParentMap(_.parentNamesWithMapKeys())
+    val cramersVParentNoKeys = cramersVParentMap(_.parentFeatureName)
+
+    // TODO: For Hashing vectorizers, there is no indicator group, so check for parentNamesWithMapKeys()
+    // inside cramersVParent first and then check without keys for removal. This will over-remove features (eg.
+    // an entire map), but should only affect custom map vectorizers that don't set indicator groups on columns.
+    def getParentValue(col: OpVectorColumnMetadata, check1: Map[String, Double], check2: Map[String, Double]) =
+    col.parentNamesWithMapKeys().flatMap( k => check1.get(k).orElse(check2.get(k)) ).reduceOption(_ max _)
 
     val featuresStats = metaCols.map {
       col =>
@@ -217,8 +232,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
           numNulls = numNulls(col),
           corrLabel = Option(corrMatrix(i, labelColumnIndex)),
           cramersV = cramersVMap.get(col.makeColName()),
-          parentCorr = col.parentNamesWithMapKeys().map(corrParent.get).max,
-          parentCramersV = col.parentNamesWithMapKeys().map(cramersVParent.get).max
+          parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
+          parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys)
         )
     }
     val labelStats = ColumnStatistics(
@@ -290,7 +305,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
       // now, the only things that will have indicatorValue defined and indicatorGroup be None is numeric maps)
       val columnsWithIndicator = columnMeta.filter { f =>
         f.indicatorGroup.isDefined && f.indicatorValue.isDefined &&
-          !(f.hasParentOfType(FeatureType.shortTypeName[MultiPickList]) || f.hasMapParent())
+          !f.hasParentOfType(FeatureType.shortTypeName[MultiPickList])
       }
       val colIndicesByIndicatorGroup =
         columnsWithIndicator
@@ -388,7 +403,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
     implicit val enc: Encoder[OldVector] = ExpressionEncoder()
     logInfo("Getting vector rows")
-    val vectorRows: Dataset[OldVector] = sampleData.map {
+    val vectorRows: RDD[OldVector] = sampleData.map {
       case (Some(label), sparse: SparseVector) =>
         val newSize = sparse.size + 1
         if (label != 0.0) OldVectors.sparse(newSize, sparse.indices :+ sparse.size, sparse.values :+ label)
@@ -396,13 +411,16 @@ class SanityChecker(uid: String = UID[SanityChecker])
       case (Some(label), dense: DenseVector) =>
         OldVectors.dense(dense.toArray :+ label)
       case (label, _) => throw new IllegalArgumentException("Sanity checker input missing label for row")
-    }.persist()
+    }.rdd.persist()
 
     logInfo("Calculating columns stats")
-    val colStats = Statistics.colStats(vectorRows.rdd)
+    val colStats = Statistics.colStats(vectorRows)
+    val count = colStats.count
+    require(count > 0, "Sample size cannot be zero")
 
-    // do this instead of vectorRows.first().size - 1 to avoid having to submit a job for the spark action
-    val featureSize = colStats.mean.size - 1
+    val featureSize = vectorRows.first().size - 1
+    require(featureSize > 0, "Feature vector passed in is empty, check your vectorizers")
+
     val labelColumn = featureSize // label column goes at end of vector
 
     // handle any possible serialization errors if users give us wrong metadata
@@ -417,10 +435,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
       "Number of columns in vector metadata did not match number of columns in data, check your vectorizers")
     val vectorMetaColumns = vectorMeta.columns
     val featureNames = vectorMetaColumns.map(_.makeColName())
-    require(featureSize > 0, "Feature vector passed in is empty, check your vectorizers")
 
     logInfo(s"Calculating ${corrType.name} correlations")
-    val covariance = Statistics.corr(vectorRows.rdd, corrType.name)
+    val covariance = Statistics.corr(vectorRows, corrType.name)
 
     // Only calculate this if the label is categorical, so ignore if user has flagged label as not categorical
     val categoricalStats =
@@ -428,12 +445,11 @@ class SanityChecker(uid: String = UID[SanityChecker])
         CategoricalStats()
       } else {
         logInfo("Attempting to calculate Cramer's V between each categorical feature and the label")
-        categoricalTests(colStats.count, featureSize, vectorMetaColumns, sampleData)
+        categoricalTests(count, featureSize, vectorMetaColumns, sampleData)
       }
 
     logInfo("Logging all statistics")
     val stats = makeColumnStatistics(vectorMetaColumns, labelColumn, covariance, colStats, categoricalStats)
-    require(colStats.count > 0, "Nothing has been added to this colStats")
     stats.foreach { stat => logInfo(stat.toString) }
 
     logInfo("Calculating features to remove")
@@ -470,10 +486,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
   }
 }
 
-private[op] final class SanityCheckerModel
+final class SanityCheckerModel private[op]
 (
-  indicesToKeep: Array[Int],
-  removeBadFeatures: Boolean,
+  val indicesToKeep: Array[Int],
+  val removeBadFeatures: Boolean,
   operationName: String,
   uid: String
 ) extends BinaryModel[RealNN, OPVector, OPVector](operationName = operationName, uid = uid) {

@@ -20,10 +20,11 @@
     }
   },
   "modelLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-model",
-  "writeLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-write",
-  "metricsLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-metrics",
+  "writeLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-write",
+  "metricsLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-metrics",
   "customParams" : {},
   "customTagName": "myTag",
-  "collectStageMetrics": true
+  "collectStageMetrics": true,
+  "awaitTerminationTimeoutSecs": 5
 }
 

@@ -29,8 +29,7 @@ private[impl] class OpTrainValidationSplit[E <: Estimator[_]]
   private[op] def validate(
     estimator: E,
     paramGrids: Array[ParamMap],
-    label: String,
-    hasLeakage: Boolean
+    label: String
   ): Estimator[_] = {
     // get param that stores the label column
     val labelCol = evaluator.getParam(ValidatorParamDefaults.labelCol)
@@ -40,7 +39,6 @@ private[impl] class OpTrainValidationSplit[E <: Estimator[_]]
       .setEstimatorParamMaps(paramGrids)
       .setTrainRatio(trainRatio)
       .setEvaluator(evaluator.set(labelCol, label))
-      .setHasLeakage(hasLeakage)
   }
 
   final override private[op] def bestModel[M <: Model[M]](

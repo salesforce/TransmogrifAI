@@ -143,7 +143,7 @@ trait TemplateBase {
     val ins = getClass.getResourceAsStream(s"/templates/${templateName}Template.scala")
     if (ins == null) {
       throw new UnsupportedOperationException(
-        s"Template file ${templateName}Template.scala is missing. " +
+        s"Template file ${templateName}Template.scala is missing in resources. " +
           "Probably you will need to rebuild the whole project."
       )
     }
@@ -229,7 +229,7 @@ case class MakeRawFeature(ops: Ops) {
       List("categorical", "integral"),
       s"Failed to determine the feature kind for $field in $schemaName") match {
       case "categorical" => Categorical(field, schemaName, isResponse)
-      case "integral" => Real(field, schemaName, isResponse)
+      case "integral" => Integral(field, schemaName, isResponse)
     }
   }
 

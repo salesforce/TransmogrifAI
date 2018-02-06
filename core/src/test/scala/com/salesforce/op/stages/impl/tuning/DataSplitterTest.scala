@@ -1,0 +1,47 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ */
+
+package com.salesforce.op.stages.impl.tuning
+
+import com.salesforce.op.test.TestSparkContext
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.mllib.random.RandomRDDs
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
+
+@RunWith(classOf[JUnitRunner])
+class DataSplitterTest extends FlatSpec with TestSparkContext {
+  import spark.implicits._
+
+  val seed = 1234L
+  val dataCount = 1000
+
+  val data =
+    RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
+      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDS()
+
+  val dataSplitter = new DataSplitter().setSeed(seed)
+
+  Spec[DataSplitter] should "split the data in the appropriate proportion" in {
+    val (train0, test0) = dataSplitter.setReserveTestFraction(0.0).split(data)
+    test0.count() shouldBe 0
+    train0.count() shouldBe dataCount
+
+    val (train2, test2) = dataSplitter.setReserveTestFraction(0.2).split(data)
+    math.abs(test2.count() - 200) < 30 shouldBe true
+    math.abs(train2.count() - 800) < 30 shouldBe true
+
+    val (train6, test6) = dataSplitter.setReserveTestFraction(0.6).split(data)
+    math.abs(test6.count() - 600) < 30 shouldBe true
+    math.abs(train6.count() - 400) < 30 shouldBe true
+  }
+
+  it should "wrap the data in the the ModelData class without changing it when prepare is called" in {
+    val train = dataSplitter.prepare(data)
+    train.train.collect().zip(data.collect()).foreach{ case (a, b) => a shouldBe b }
+  }
+
+}

@@ -66,7 +66,7 @@ class IntegralVectorizer[T <: Integral]
 
 }
 
-private final class IntegralVectorizerModel[T <: Integral]
+final class IntegralVectorizerModel[T <: Integral] private[op]
 (
   val fillValues: Seq[Long],
   val trackNulls: Boolean,

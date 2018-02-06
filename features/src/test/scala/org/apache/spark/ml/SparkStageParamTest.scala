@@ -5,6 +5,7 @@
 
 package org.apache.spark.ml
 
+import com.salesforce.op.stages.SparkStageParam
 import com.salesforce.op.test.TestSparkContext
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.feature.StandardScaler
