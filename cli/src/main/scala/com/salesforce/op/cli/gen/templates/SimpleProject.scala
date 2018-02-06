@@ -3,7 +3,6 @@
  * All rights reserved.
  */
 
-
 package com.salesforce.op.cli.gen.templates
 
 import java.io.File

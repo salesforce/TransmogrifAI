@@ -34,28 +34,6 @@ import scala.reflect.ClassTag
 class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams: OpParams) extends OpWorkflowCore {
 
   /**
-   * The parent workflow that produced this model.
-   */
-  @transient var parent: OpWorkflow = _
-
-  /**
-   * Sets the parent of this model.
-   */
-  def setParent(parent: OpWorkflow): OpWorkflowModel = {
-    this.parent = parent
-    this.asInstanceOf[OpWorkflowModel]
-  }
-
-  /**
-   * Get the un-fit workflow that created this workflow model
-   *
-   * @return OpWorkflow
-   */
-  def getParent(): OpWorkflow = {
-    this.parent
-  }
-
-  /**
    * Set reader parameters from OpWorkflowParams object for run (stage parameters passed in will have no effect)
    *
    * @param newParams new parameter values

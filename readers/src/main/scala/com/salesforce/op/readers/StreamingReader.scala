@@ -29,3 +29,4 @@ trait StreamingReader[T] extends ReaderType[T] with ReaderKey[T] {
   def stream(params: OpParams)(implicit streaming: StreamingContext): DStream[T]
 
 }
+
