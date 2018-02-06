@@ -3,7 +3,6 @@
  * All rights reserved.
  */
 
-
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.functions._
@@ -29,8 +28,8 @@ object DataGeneration {
   val df2 = df.toDF(names: _*)
 
   case class PassengerDG(passengerId: Int, age: Option[Int], gender: String,
-                       height: Int, weight: Int, description: Option[String],
-                       boarded: Long, recordDate: Long, survived: Boolean)
+    height: Int, weight: Int, description: Option[String],
+    boarded: Long, recordDate: Long, survived: Boolean)
 
   val ds = df2.as[PassengerDG]
 

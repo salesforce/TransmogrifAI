@@ -32,3 +32,4 @@ class ExtendedMultisetTest extends FlatSpec with TestCommon {
     SUT.minus(SUT.zero, sut2) shouldBe Map[String, Long]("d" -> -7, "c" -> -2)
   }
 }
+

@@ -5,13 +5,13 @@
 
 package com.salesforce.op.cli.gen
 
-import language.postfixOps
-import collection.JavaConverters._
-
+import com.salesforce.op.cli.gen.AvroField._
 import com.salesforce.op.test.TestCommon
 import org.apache.avro.Schema
 import org.scalatest.{Assertions, FlatSpec}
-import AvroField._
+
+import scala.collection.JavaConverters._
+import scala.language.postfixOps
 
 /**
  * Test for AvroField methods.

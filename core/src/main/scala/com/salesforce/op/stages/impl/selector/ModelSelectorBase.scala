@@ -6,11 +6,13 @@
 package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.UID
-import com.salesforce.op.evaluators._
+import com.salesforce.op.evaluators.{EvaluationMetrics, _}
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
+import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.CheckIsResponseValues
+import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -19,7 +21,7 @@ import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PipelineStage, Transformer}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 import scala.reflect.runtime.universe._
@@ -44,6 +46,68 @@ case object ModelSelectorBaseNames {
   val LabelsDropped = "labelsDropped"
 }
 
+/**
+ * Trait to mix into Estimators that you wish to work with cross validation and training data holdout
+ */
+private[op] trait HasEval {
+
+  def evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]]
+
+  protected[op] def outputsColNamesMap: Map[String, String]
+  protected[op] def labelColName: String
+
+  protected[op] def predictionColName: String = outputsColNamesMap(StageParamNames.outputParam1Name)
+  protected[op] def rawPredictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam2Name)
+  protected[op] def probabilityColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam3Name)
+
+  /**
+   * Function that evaluates the selected model on the test set
+   *
+   * @param data              data transformed by best model
+   * @return EvaluationMetrics
+   */
+  protected def evaluate(
+    data: Dataset[_]
+  ): EvaluationMetrics = {
+    val metricsMap = evaluators.map {
+      case evaluator: OpClassificationEvaluatorBase[_] =>
+        evaluator.setLabelCol(labelColName).setPredictionCol(predictionColName)
+        rawPredictionColName.map(evaluator.setRawPredictionCol)
+        probabilityColName.map(evaluator.setProbabilityCol)
+        evaluator.name -> evaluator.evaluateAll(data)
+      case evaluator: OpRegressionEvaluatorBase[_] =>
+        evaluator.setLabelCol(labelColName).setPredictionCol(predictionColName)
+        evaluator.name -> evaluator.evaluateAll(data)
+      case evaluator => throw new RuntimeException(s"Evaluator $evaluator is not supported")
+    }.toMap
+
+    MultiMetrics(metricsMap)
+  }
+
+}
+
+/**
+ * Trait to mix into Model that you wish to work with cross validation and training data holdout
+ */
+private[op] trait HasTestEval extends HasEval {
+
+  self: Model[_] with OpPipelineStageBase =>
+
+  // TODO may want to allow others to use this eventually but then need to get evaluators on deser
+  /**
+   * Evaluation function for workflow to call on test dataset
+   * @param data transformed data
+   * @return transforms data and sets evaluation metadata
+   */
+  private[op] def evaluateModel(data: Dataset[_]): DataFrame = {
+    val scored = transform(data)
+    val metrics = evaluate(scored)
+    val builder = new MetadataBuilder().withMetadata(getMetadata().getSummaryMetadata())
+    builder.putMetadata(ModelSelectorBaseNames.HoldOutEval, metrics.toMetadata)
+    setMetadata(builder.build().toSummaryMetadata())
+    scored
+  }
+}
 
 /**
  * Factory to implement a Model Selector. Model Selector has only one output, it can be used for the stage 1 of a
@@ -51,7 +115,7 @@ case object ModelSelectorBaseNames {
  *
  * @param validator         validator used for the selection. It can be either CrossValidation or TrainValidationSplit
  * @param splitter          to split and/or balance the dataset
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  * @param tti1
  * @param tto
@@ -61,7 +125,7 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
 (
   val validator: OpValidator[E],
   val splitter: Option[Splitter],
-  val trainTestEvaluators: Seq[OpEvaluatorBase[_]],
+  override val evaluators: Seq[OpEvaluatorBase[_ <: com.salesforce.op.evaluators.EvaluationMetrics]],
   val uid: String = UID[ModelSelectorBase[E]]
 )(
   implicit val tti1: TypeTag[OPVector],
@@ -69,14 +133,16 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
   val ttov: TypeTag[RealNN#Value]
 ) extends Estimator[SelectedModel]
   with OpPipelineStage2[RealNN, OPVector, RealNN]
-  with Stage1ParamNamesBase {
+  with HasEval {
 
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
   }
 
-  final override def operationName: String = stage1OperationName
+
+  final val operationName: String = StageParamNames.stage1OperationName
+
 
   /**
    * Abstract function that gets the map of the output column names
@@ -86,22 +152,6 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
    * @return Map (name of param, value of param) of output column names
    */
   protected def getOutputsColNamesMap(f1: TransientFeature, f2: TransientFeature): Map[String, String]
-
-  /**
-   * Abstract function that evaluates the selected model on the test set
-   *
-   * @param data              data transformed by best model
-   * @param labelColName      name of the labels column
-   * @param predictionColName name of the prediction columns
-   * @param best              best model
-   * @return EvaluationMetrics
-   */
-  protected def evaluate(
-    data: Dataset[_],
-    labelColName: String,
-    predictionColName: String,
-    best: => Model[_ <: Model[_]]
-  ): EvaluationMetrics
 
 
   /**
@@ -118,7 +168,7 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
    * @param data dataset
    * @return best model
    */
-  private def findBestModel[M <: Model[M]](data: Dataset[_], hasIdColumn: Boolean): BestModel[M] = {
+  private def findBestModel[M <: Model[M]](data: Dataset[_]): BestModel[M] = {
     // Remove Logging of OWLQN used in LogisticRegression
     Logger.getLogger("breeze.optimize.OWLQN").setLevel(Level.WARN)
 
@@ -131,15 +181,14 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
 
     val fittedModels = models.collect {
       case (model, paramGrids) =>
-        val pi1 = model.getParam(inputParam1Name)
-        val pi2 = model.getParam(inputParam2Name)
+        val pi1 = model.getParam(StageParamNames.inputParam1Name)
+        val pi2 = model.getParam(StageParamNames.inputParam2Name)
         model.set(pi1, in1.name).set(pi2, in2.name)
 
         validator.validate(
           estimator = model.asInstanceOf[E],
           paramGrids = paramGrids,
-          label = in1.name,
-          hasIdColumn = hasIdColumn
+          label = in1.name
         ).fit(data) -> paramGrids
     }
 
@@ -154,55 +203,9 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
     bestModel
   }
 
-
-  /**
-   * Get metrics on test set and put in metadata
-   *
-   * @param builder   metadata
-   * @param bestModel model
-   * @param trainData training data to evaluate
-   * @param testData  optional test data to evaluate
-   */
-  private def putEvalResultsInMetadata(
-    builder: MetadataBuilder,
-    bestModel: Model[_ <: Model[_]],
-    trainData: Dataset[_],
-    testData: Option[Dataset[_]] = None
-  ): Unit = {
-
-    log.info("Evaluating the selected model on training set: \n")
-    val trainMetrics = evaluateBestModel(bestModel, trainData)
-    builder.putMetadata(ModelSelectorBaseNames.TrainingEval, trainMetrics.toMetadata)
-
-    testData.map { case holdOutData =>
-      log.info("Evaluating the selected model on hold out set: \n")
-      val holdOutMetrics = evaluateBestModel(bestModel, holdOutData)
-      builder.putMetadata(ModelSelectorBaseNames.HoldOutEval, holdOutMetrics.toMetadata)
-    }
-  }
-
-  /**
-   * Evaluate metrics of the best model on given data
-   *
-   * @param best model to use for evaluation
-   * @param data data
-   *
-   * @return evaluationMetrics
-   */
-  private def evaluateBestModel(
-    best: Model[_ <: Model[_]], data: Dataset[_]): EvaluationMetrics = {
-
-    lazy val labelColName = in1.name
-    val predictionColName = outputsColNamesMap(outputParam1Name)
-    val transformedTest = best.transform(data)
-
-
-    evaluate(transformedTest, labelColName, predictionColName, best)
-  }
-
   // Map (name of param, value of param) of output column names
   lazy val outputsColNamesMap: Map[String, String] = getOutputsColNamesMap(in1, in2)
-
+  lazy val labelColName: String = in1.name
 
   /**
    * Splits the data into training test and test set, balances the training set and selects the best model
@@ -217,67 +220,46 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
     transformSchema(dataset.schema)
     setInputSchema(dataset.schema)
 
-    val datasetWithID = dataset.select(in1.name, in2.name)
-      .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
-      .as[(Double, Vector, Double)].persist()
+    val datasetWithID =
+      if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
+        dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
+          .as[LabelFeaturesKey].persist()
+      } else {
+        dataset.select(in1.name, in2.name)
+          .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+          .as[LabelFeaturesKey].persist()
+      }
 
-    val ModelSplitData(trainData, testData, met, hasLeak) = splitter match {
-      case Some(spltr) => spltr.split(datasetWithID)
-      case None => ModelSplitData(
-        train = datasetWithID,
-        test = datasetWithID,
-        metadata = new MetadataBuilder().build(),
-        hasLeakage = false
-      )
+    val ModelData(trainData, met) = splitter match {
+      case Some(spltr) => spltr.prepare(datasetWithID)
+      case None => new ModelData(datasetWithID, new MetadataBuilder())
     }
 
-    val bestModel = findBestModel(trainData, hasLeak)
+    val bestModel = findBestModel(trainData)
 
     // set input and output params
     outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.model.set(bestModel.model.getParam(pname), pvalue) }
 
-    val selectedModel =
-      new SelectedModel(bestModel.model, uid = uid)
-        .setParent(this)
-        .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
-
     val builder = new MetadataBuilder().withMetadata(getMetadata()) // get cross val metrics
     builder.putString(ModelSelectorBaseNames.BestModelUid, bestModel.model.uid) // log bestModel uid (ie model type)
     builder.putString(ModelSelectorBaseNames.BestModelName, bestModel.name) // log bestModel name
-
     splitter.collect {
-      case d: DataBalancer =>
-        builder.putMetadata(ModelSelectorBaseNames.ResampleValues, met)
-        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
-          builder = builder,
-          bestModel = bestModel.model,
-          trainData = trainData,
-          testData = Option(testData)
-        )
-      case d: DataCutter =>
-        builder.putMetadata(ModelSelectorBaseNames.CuttValues, met)
-        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
-          builder = builder,
-          bestModel = bestModel.model,
-          trainData = trainData,
-          testData = Option(testData)
-        )
-      case d: Splitter =>
-        if (d.getReserveTestFraction > 0.0) putEvalResultsInMetadata(
-          builder = builder,
-          bestModel = bestModel.model,
-          trainData = trainData,
-          testData = Option(testData)
-        )
-      case _ => putEvalResultsInMetadata(
-        builder = builder,
-        bestModel = bestModel.model,
-        trainData = trainData
-      )
+      case _: DataBalancer => builder.putMetadata(ModelSelectorBaseNames.ResampleValues, met)
+      case _: DataCutter => builder.putMetadata(ModelSelectorBaseNames.CuttValues, met)
     }
+
+
+    // add eval results to metadata
+    val transformed = bestModel.model.transform(trainData)
+    builder.putMetadata(ModelSelectorBaseNames.TrainingEval, evaluate(transformed).toMetadata)
     val allMetadata = builder.build().toSummaryMetadata()
     setMetadata(allMetadata)
-    selectedModel.setMetadata(allMetadata)
+
+    new SelectedModel(bestModel.model, outputsColNamesMap, uid)
+      .setParent(this)
+      .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
+      .setMetadata(allMetadata)
+      .setEvaluators(evaluators)
   }
 
 }
@@ -286,11 +268,13 @@ private[op] abstract class ModelSelectorBase[E <: Estimator[_]]
  * Wrapper for the model returned by ModelSelector
  *
  * @param sparkMlStageIn best model
+ * @param outputsColNamesMap column names
  * @param uid
  */
-final class SelectedModel
+final class SelectedModel private[op]
 (
   private val sparkMlStageIn: Model[_ <: Model[_]],
+  val outputsColNamesMap: Map[String, String],
   val uid: String = UID[SelectedModel]
 )(
   implicit val tti1: TypeTag[RealNN],
@@ -298,14 +282,23 @@ final class SelectedModel
   val ttov: TypeTag[RealNN#Value]
 ) extends Model[SelectedModel]
   with OpPipelineStage2[RealNN, OPVector, RealNN]
-  with Stage1ParamNamesBase
-  with SparkWrapperParams[Transformer with Params] {
+  with SparkWrapperParams[Transformer with Params] with HasTestEval {
 
   setSparkMlStage(Option(sparkMlStageIn))
 
   val tto: TypeTag[RealNN] = tti1
 
-  override def operationName: String = stage1OperationName
+  val operationName: String = StageParamNames.stage1OperationName
+  lazy val labelColName: String = in1.name
+
+  // TODO this is lost on serialization if we want to use the eval method here in eval runs as well as training
+  // need to pass evaluators from origin stage to deserialized in OpPipelineStageReader.loadModel
+  @transient private var evaluatorList: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty
+  def setEvaluators(ev: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]]): this.type = {
+    evaluatorList = ev
+    this
+  }
+  override def evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = evaluatorList
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     setInputSchema(dataset.schema)

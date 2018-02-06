@@ -20,16 +20,18 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
 
-  val cityData: Seq[City] = RandomText.cities.take(1000).toList
-  val countryData: Seq[Country] = RandomText.countries.take(1000).toList
-  val postalData: Seq[PostalCode] = RandomText.postalCodes.take(1000).toList
-  val textData: Seq[Text] = RandomText.textAreas(0, 1000).take(1000).toList
+  val cityData: Seq[City] = RandomText.cities.take(10).toList
+  val countryData: Seq[Country] = RandomText.countries.take(10).toList
+  val postalData: Seq[PostalCode] = RandomText.postalCodes.take(10).toList
+  val textAreaData: Seq[TextArea] = RandomText.textAreas(0, 10).take(10).toList
+  val textData: Seq[Text] = RandomText.strings(0, 10).take(10).toList
 
-  val data: Seq[(City, Country, PostalCode, Text)] =
-    cityData.zip(countryData).zip(postalData).zip(textData)
-      .map{ case (((ci, co), p), t) => (ci, co, p, t) }
+  val data: Seq[(City, Country, PostalCode, Text, TextArea)] =
+    cityData.zip(countryData).zip(postalData).zip(textData).zip(textAreaData)
+      .map{ case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
 
-  val (ds, city, country, postal, text) = TestFeatureBuilder("city", "country", "postal", "text", data)
+  val (ds, city, country, postal, text, textarea) = TestFeatureBuilder("city", "country", "postal", "text",
+    "textarea", data)
 
   "TextVectorizers" should "vectorize various text feature types" in {
     val feature = Seq(city, country, postal, text).transmogrify()
@@ -70,6 +72,14 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     val meta = vectorized.schema.toOpVectorMetadata(feature.name)
     meta.columns.length shouldBe vectCollect.head._2.value.size
+  }
+
+  "Text and TextArea features" should "be vectorized with or without null tracking, as specified" in {
+    val feature = Seq(text).transmogrify()
+    val vectorized = new OpWorkflow().setResultFeatures(feature).transform(ds)
+    val vectCollect = vectorized.collect(feature)
+
+    vectCollect.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures + 1)
   }
 
 }

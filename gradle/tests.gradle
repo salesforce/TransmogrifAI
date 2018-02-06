@@ -25,7 +25,6 @@ test {
     }
     maxParallelForks = 1
 
-
     beforeSuite { suite ->
         if (suite.name.startsWith("Gradle Test Executor")) return
         if (suite.parent != null && suite.className != null) println(ANSI_BOLD_WHITE + suite.name + ANSI_RESET)

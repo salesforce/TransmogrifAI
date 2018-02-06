@@ -3,15 +3,16 @@
  * All rights reserved.
  */
 
-package org.apache.spark.ml
+package com.salesforce.op.stages
 
 import org.apache.hadoop.fs.Path
+import org.apache.spark.ml.{PipelineStage, SparkDefaultParamsReadWrite}
 import org.apache.spark.ml.param.{Param, ParamPair, Params}
 import org.apache.spark.ml.util.{Identifiable, MLReader, MLWritable}
-import org.apache.spark.util.Utils
-import org.json4s.{DefaultFormats, Formats}
+import org.apache.spark.util.SparkUtils
 import org.json4s.JsonDSL._
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import org.json4s.{DefaultFormats, Formats}
 
 object SparkStageParam {
   final val NoPath: String = ""
@@ -81,7 +82,7 @@ class SparkStageParam[S <: PipelineStage with Params]
     }
     else {
       savePath = Option(path)
-      val cls = Utils.classForName((json \ "className").extract[String])
+      val cls = SparkUtils.classForName((json \ "className").extract[String])
       val stage = cls.getMethod("read").invoke(null).asInstanceOf[MLReader[PipelineStage]].load(path)
       Option(stage).map(_.asInstanceOf[S])
     }

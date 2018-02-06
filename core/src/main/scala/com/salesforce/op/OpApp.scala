@@ -5,11 +5,16 @@
 
 package com.salesforce.op
 
+import java.util.concurrent.TimeUnit
+
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.streaming.StreamingContext
 import org.slf4j.LoggerFactory
 import scopt.Read
+
+import scala.concurrent.duration.Duration
 
 
 /**
@@ -25,10 +30,12 @@ abstract class OpApp {
    * The easiest way is to create an [[OpWorkflowRunner]] and run it.
    *
    * @param runType  run type
-   * @param opParams op params
-   * @param spark    spark session
+   * @param opParams  parameters injected at runtime
+   * @param spark     spark session which runs the workflow
+   * @param streaming spark streaming context which runs the workflow
    */
-  def run(runType: OpWorkflowRunType, opParams: OpParams)(implicit spark: SparkSession): Unit
+  def run(runType: OpWorkflowRunType, opParams: OpParams)
+    (implicit spark: SparkSession, streaming: StreamingContext): Unit
 
   /**
    * Kryo registrar to use when creating a SparkConf.
@@ -41,9 +48,16 @@ abstract class OpApp {
   def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[OpKryoRegistrator]
 
   /**
-   * Application name (default: Class simple name).
+   * Default application name - to be used if 'spark.app.name' parameter is not set.
    */
-  def appName: String = this.getClass.getSimpleName.stripSuffix("$")
+  def defaultAppName: String = thisClassName
+
+  private def thisClassName: String = this.getClass.getSimpleName.stripSuffix("$")
+
+  /**
+   * Application name (gets the value of 'spark.app.name' parameter).
+   */
+  def appName: String = sparkConf.get("spark.app.name")
 
   /**
    * Configuration for a Spark application.
@@ -52,13 +66,11 @@ abstract class OpApp {
    * @return SparkConf
    */
   def sparkConf: SparkConf = {
-    new SparkConf()
-      .setAppName(appName)
+    val conf = new SparkConf()
+    conf
+      .setAppName(conf.get("spark.app.name", defaultAppName))
       .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getCanonicalName)
       .set("spark.kryo.registrator", kryoRegistrator.getCanonicalName)
-    // .set("spark.ui.enabled", "false") // Disables Spark Application UI
-    // .set("spark.kryo.registrationRequired", "true") // Enable to debug Kryo
-    // .set("spark.kryo.unsafe", "true") // This might improve performance
   }
 
   /**
@@ -75,6 +87,16 @@ abstract class OpApp {
   }
 
   /**
+   * Gets/creates a Spark Streaming Context.
+   *
+   * @param batchDuration the time interval at which streaming data will be divided into batches
+   */
+  def sparkStreamingContext(batchDuration: Duration): StreamingContext = {
+    val bd = org.apache.spark.streaming.Milliseconds(batchDuration.toMillis)
+    StreamingContext.getActiveOrCreate(() => new StreamingContext(sparkSession.sparkContext, bd))
+  }
+
+  /**
    * Parse command line arguments as [[OpParams]].
    *
    * @param args command line arguments
@@ -83,7 +105,7 @@ abstract class OpApp {
   def parseArgs(args: Array[String]): (OpWorkflowRunType, OpParams) = {
     def optStr(s: String): Option[String] = if (s == null || s.isEmpty) None else Some(s)
 
-    val parser = new scopt.OptionParser[OpWorkflowRunnerConfig](appName) {
+    val parser = new scopt.OptionParser[OpWorkflowRunnerConfig](thisClassName) {
       implicit val runTypeRead: Read[OpWorkflowRunType] = scopt.Read.reads(OpWorkflowRunType.withNameInsensitive)
 
       opt[OpWorkflowRunType]('t', "run-type").required().action { (x, c) =>
@@ -128,8 +150,9 @@ abstract class OpApp {
    */
   def main(args: Array[String]): Unit = {
     val (runType, opParams) = parseArgs(args)
-    implicit val spark = sparkSession
-    run(runType, opParams)
+    val batchDuration = Duration(opParams.batchDurationSecs.getOrElse(1), TimeUnit.SECONDS)
+    val (spark, streaming) = sparkSession -> sparkStreamingContext(batchDuration)
+    run(runType, opParams)(spark, streaming)
   }
 
 }
@@ -142,7 +165,7 @@ abstract class OpAppWithRunner extends OpApp {
   /**
    * Override this function to create an instance of [[OpWorkflowRunner]] to run your workflow
    *
-   * @param opParams op params
+   * @param opParams parameters injected at runtime
    * @return an instance of [[OpWorkflowRunner]]
    */
   def runner(opParams: OpParams): OpWorkflowRunner
@@ -151,11 +174,13 @@ abstract class OpAppWithRunner extends OpApp {
    * The main function to run your [[OpWorkflow]].
    * The easiest way is to create an [[OpWorkflowRunner]] and run it.
    *
-   * @param runType  run type
-   * @param opParams op params
-   * @param spark    spark session
+   * @param runType   run type
+   * @param opParams  parameters injected at runtime
+   * @param spark     spark session which runs the workflow
+   * @param streaming spark streaming context which runs the workflow
    */
-  override def run(runType: OpWorkflowRunType, opParams: OpParams)(implicit spark: SparkSession): Unit = {
+  override def run(runType: OpWorkflowRunType, opParams: OpParams)
+    (implicit spark: SparkSession, streaming: StreamingContext): Unit = {
     runner(opParams).run(runType, opParams)
   }
 }

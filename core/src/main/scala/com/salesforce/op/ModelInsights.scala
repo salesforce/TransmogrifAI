@@ -6,20 +6,20 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.features.types.{FeatureType, OPVector, RealNN}
-import com.salesforce.op.stages.{OPStage, OpPipelineStageParamsNames}
+import com.salesforce.op.features.types.{OPVector, RealNN}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, SelectedModel}
+import com.salesforce.op.stages.{OPStage, OpPipelineStageParams, OpPipelineStageParamsNames}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
 import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
-import org.slf4j.LoggerFactory
-import org.json4s.jackson.Serialization.{write, writePretty}
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
+import org.json4s.jackson.Serialization.{write, writePretty}
+import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
@@ -176,11 +176,11 @@ case object ModelInsights {
     trainingParams: OpParams
   ): ModelInsights = {
     val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
-    val checkerData = sanityCheckers.lastOption
-    val checkerSummary = checkerData.map(s => SanityCheckerSummary.fromMetadata(s.getMetadata().getSummaryMetadata()))
+    val sanityChecker = sanityCheckers.lastOption
+    val checkerSummary = sanityChecker.map(s => SanityCheckerSummary.fromMetadata(s.getMetadata().getSummaryMetadata()))
     log.info(
       s"Found ${sanityCheckers.length} sanity checkers will " +
-        s"${checkerData.map("use results from the last checker:" + _.uid + "to").getOrElse("not")}" +
+        s"${sanityChecker.map("use results from the last checker:" + _.uid + "to").getOrElse("not")}" +
         s" to fill in model insights"
     )
 
@@ -192,31 +192,35 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val label = model.map(_.getInputFeature[RealNN](0)).orElse(checkerData.map(_.getInputFeature[RealNN](0))).flatten
+    val label = model.map(_.getInputFeature[RealNN](0)).orElse(sanityChecker.map(_.getInputFeature[RealNN](0))).flatten
     log.info(s"Found ${label.map(_.name + " as label").getOrElse("no label")} to fill in model insights")
 
-    val vectorInput = checkerData
-      .map(s => OpVectorMetadata(s.parent.asInstanceOf[SanityChecker].getInputSchema().last))
-      .orElse(model.map(m => OpVectorMetadata(m.parent.asInstanceOf[ModelSelectorBase[_]].getInputSchema().last)))
-      .orElse {
-        stages.filter(_.getOutput().typeName == FeatureType.typeName[OPVector]).lastOption
-          .map(v => OpVectorMetadata(v.outputName, v.getMetadata()))
-      }
 
-    log.info(s"Found ${vectorInput.map(_.name + " as feature vector").getOrElse("no feature vector")}" +
-      s" to fill in model insights")
+    // Recover the vector metadata
+    val vectorInput: Option[OpVectorMetadata] = {
+      def makeMeta(s: => OpPipelineStageParams) = Try(OpVectorMetadata(s.getInputSchema().last)).toOption
 
-    val labelSummary = getLabelSummary(label, checkerSummary)
-    val featureInsights = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures)
-    val modelInfo = getModelInfo(model)
-    val stageInfo = getStageInfo(stages)
-
+      sanityChecker
+        // first try out to get vector metadata from sanity checker
+        .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
+        // fall back to model selector stage metadata
+        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelectorBase[_]])))
+        // finally try to get it from the last vector stage
+        .orElse(
+          stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
+            .map(v => OpVectorMetadata(v.outputName, v.getMetadata()))
+        )
+    }
+    log.info(
+      s"Found ${vectorInput.map(_.name + " as feature vector").getOrElse("no feature vector")}" +
+      s" to fill in model insights"
+    )
     ModelInsights(
-      label = labelSummary,
-      features = featureInsights,
-      selectedModelInfo = modelInfo,
+      label = getLabelSummary(label, checkerSummary),
+      features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures),
+      selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
-      stageInfo = stageInfo
+      stageInfo = getStageInfo(stages)
     )
   }
 
@@ -349,8 +353,8 @@ case object ModelInsights {
     def getParams(stage: PipelineStage): Map[String, Any] =
       stage.extractParamMap().toSeq
         .collect{
-          case p if p.param.name ==  OpPipelineStageParamsNames.OutputMetadata ||
-            p.param.name ==  OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value
+          case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
+            p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value
         }.toMap
 
     stages.map { s =>

@@ -39,7 +39,7 @@ class OpLogisticRegressionTest extends FlatSpec with TestSparkContext {
     inputNames should have length 2
     inputNames shouldBe Array(feature1.name, feature2.name)
     logReg.stage1.getOutput().name shouldBe logReg.stage1.outputName
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       logReg.setInput(feature1.copy(isResponse = true), feature2.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }

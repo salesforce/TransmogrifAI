@@ -198,16 +198,33 @@ class IsValidPhoneNumber(uid: String = UID[IsValidPhoneNumber])
  * Returns binary feature true if phone is valid false if invalid and none if phone number is none
  */
 class IsValidPhoneDefaultCountry(uid: String = UID[IsValidPhoneDefaultCountry])
-  extends UnaryTransformer[Phone, Binary](
-    operationName = "validatePhoneNoCC",
-    uid = uid
-  ) with PhoneParams {
+  extends UnaryTransformer[Phone, Binary](operationName = "validatePhoneNoCC", uid = uid) with PhoneParams {
 
   override def transformFn: (Phone) => Binary = (phoneNumber: Phone) => {
     PhoneNumberParser.validate(phoneNumber, $(defaultRegion), $(strictValidation))
   }
 }
 
+/**
+ * Transformer to determine if a map of phone numbers is valid when no country code is available.
+ * The default locale will be used for validation.
+ * All phone numbers with less than 2 characters will be categorized as invalid
+ * All phone numbers that starts with "+" will be evaluated with international formatting
+ *
+ * Returns binary map feature true if phone is valid false if invalid and none if phone number is none
+ */
+class IsValidPhoneMapDefaultCountry(uid: String = UID[IsValidPhoneMapDefaultCountry])
+  extends UnaryTransformer[PhoneMap, BinaryMap](operationName = "validatePhoneMapNoCC", uid = uid) with PhoneParams {
+
+  override def transformFn: (PhoneMap) => BinaryMap = (phoneNumberMap: PhoneMap) => {
+    val region = $(defaultRegion)
+    val isStrict = $(strictValidation)
+
+    phoneNumberMap.value
+      .mapValues(p => PhoneNumberParser.validate(p.toPhone, region, isStrict))
+      .collect{ case(k, v) if !v.isEmpty => k -> v.value.get }.toBinaryMap
+  }
+}
 
 case object PhoneNumberParser {
   val DefaultRegion = "US"
@@ -217,7 +234,7 @@ case object PhoneNumberParser {
   private[op] def phoneUtil = PhoneNumberUtil.getInstance()
 
   /**
-   * trims phone numbers string and removes all non-numeric and "+" symbols
+   * trims phone numbers string and removes all non-numeric except "+" symbols
    *
    * @param pn phone number as string
    * @return
@@ -253,10 +270,11 @@ case object PhoneNumberParser {
       case (_, Some(rc)) if regionCodes.contains(rc) => rc
       case (_, Some(rc)) if phoneUtil.getSupportedRegions.contains(rc) => rc
       case (_, Some(rc)) if regionCodes.nonEmpty =>
-        val rcBi = rc.sliding(2).toSet
-        regionCodes.zip(countryNames).map {
-          case (regCode, country) => regCode -> JaccardDistance(rcBi, country.sliding(2).toSet)
-        }.maxBy(_._2)._1
+        val rcBi = rc.trim.sliding(2).toSet
+        regionCodes.zip(countryNames).flatMap {
+          case (regCode, country) => country.split(",").map{ // Can have multiple versions of country name
+            c => regCode -> JaccardDistance(rcBi, c.trim.sliding(2).toSet)
+          }}.maxBy(_._2)._1
       case _ => defaultRegionCode
     }
   }

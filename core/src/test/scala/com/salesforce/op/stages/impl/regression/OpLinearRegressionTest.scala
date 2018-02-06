@@ -34,7 +34,7 @@ class OpLinearRegressionTest extends FlatSpec with TestSparkContext {
   Spec[OpLinearRegression] should "have output with correct origin stage" in {
     val output = linReg.getOutput()
     assert(output.originStage.isInstanceOf[SwBinaryEstimator[_, _, _, _, _]])
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       linReg.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }

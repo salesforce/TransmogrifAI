@@ -5,6 +5,10 @@
 
 package com.salesforce.op.utils.spark
 
+import com.salesforce.op.utils.json.JsonLike
+import org.json4s._
+import org.json4s.jackson.JsonMethods._
+
 /**
  * Full history for each column element in a vector
  *
@@ -31,4 +35,19 @@ case class OpVectorColumnHistory
   indicatorGroup: Option[String],
   indicatorValue: Option[String],
   index: Int
-)
+) extends JsonLike
+
+case object OpVectorColumnHistory {
+
+  /**
+   * Read vector column history from a json
+   *
+   * @param json vector column history in json
+   * @return Try[OpVectorColumnHistory]
+   */
+  def fromJson(json: String): OpVectorColumnHistory = {
+    implicit val formats: DefaultFormats = DefaultFormats
+    parse(json).extract[OpVectorColumnHistory]
+  }
+
+}

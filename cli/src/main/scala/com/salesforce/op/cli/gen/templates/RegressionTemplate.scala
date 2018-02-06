@@ -3,16 +3,25 @@
  * All rights reserved.
  */
 
-
 package com.salesforce.op.cli.gen.templates
-
-import com.salesforce.op.stages.impl.regression._
+import com.salesforce.op.evaluators.Evaluators
+import com.salesforce.op.features.Feature
+import com.salesforce.op.features.types.{OPVector, RealNN}
+import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 
 /**
  * This is a template for generating some code
  */
-class RegressionTemplate {
+trait RegressionTemplate {
+  val label: Feature[RealNN]
+  val checkedFeatures: Feature[OPVector]
   // BEGIN
-  RegressionModelSelector()
+  val pred = RegressionModelSelector()
+    .setInput(label, checkedFeatures)
+    .getOutput()
+
+  val evaluator =
+    Evaluators.Regression()
+      .setLabelCol(label).setPredictionCol(pred)
   // END
 }

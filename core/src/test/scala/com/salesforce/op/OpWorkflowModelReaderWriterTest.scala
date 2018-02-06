@@ -50,7 +50,6 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
 
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
     val model = new OpWorkflowModel(wf.uid, wf.parameters)
-      .setParent(wf)
       .setStages(wf.stages)
       .setFeatures(wf.resultFeatures)
       .setParameters(wf.parameters)
@@ -174,28 +173,24 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     wfM.save(saveModelPath)
     val wfMR = wf.loadModel(saveModelPath)
     compareWorkflowModels(wfMR, wfM)
-    wfMR.parent shouldBe null
   }
 
   it should "load proper multiple stage workflow" in new MultiStageFlow {
     wfM.save(saveModelPath)
     val wfMR = wf.loadModel(saveModelPath)
     compareWorkflowModels(wfMR, wfM)
-    wfMR.parent shouldBe null
   }
 
   it should "load proper raw feature workflow" in new RawFeatureFlow {
     wfM.save(saveModelPath)
     val wfMR = wf.loadModel(saveModelPath)
     compareWorkflowModels(wfMR, wfM)
-    wfMR.parent shouldBe null
   }
 
   it should "load proper workflow with spark wrapped stages" in new SwSingleStageFlow {
     wfM.save(saveModelPath)
     val wfMR = wf.loadModel(saveModelPath)
     compareWorkflowModels(wfMR, wfM)
-    wfMR.parent shouldBe null
   }
 
   it should "work for models" in new SingleStageFlow {
@@ -219,7 +214,6 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     wfM.save(saveFlowPath)
     val wfMR = wf.loadModel(saveFlowPath)
     compareWorkflowModels(wfMR, wfM)
-    wfMR.parent shouldBe null
   }
 
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {

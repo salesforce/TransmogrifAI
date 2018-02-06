@@ -11,6 +11,8 @@ buildscript {
 }
 
 repositories {
+    mavenCentral()
+    maven { url "https://jitpack.io" }
     maven {
        url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
        credentials {
@@ -21,8 +23,6 @@ repositories {
        }
        authentication { digest(BasicAuthentication) }
     }
-    mavenCentral()
-    maven { url "https://jitpack.io" }
 }
 
 apply plugin: 'application'
@@ -135,6 +135,6 @@ task repl(type: JavaExec) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '3.5'
-    description "Sets the Gradle wrapper version to $gradleVersion."
+    gradleVersion = '4.1'
+    description "Sets the Gradle wrapper version."
 }

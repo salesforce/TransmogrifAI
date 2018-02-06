@@ -117,15 +117,15 @@ class TransientFeature
   /**
    * Transform trasient feature into column metadata for use vectors
    * (for when each feature creates one column of a vector)
-   *
+   * @param isNull is the metadata created for a null indicator column
    * @return OpVectorColumnMetadata for vector feature
    */
-  def toColumnMetaData(): OpVectorColumnMetadata = {
+  def toColumnMetaData(isNull: Boolean = false): OpVectorColumnMetadata = {
     new OpVectorColumnMetadata(
       parentFeatureName = Seq(name),
       parentFeatureType = Seq(typeName),
-      indicatorGroup = None, // None because this call assumes only one column is made for feature
-      indicatorValue = None) // None because value is assumed to be unchanged (no pivot or null indicator)
+      indicatorGroup = if (isNull) Some(name) else None,
+      indicatorValue = if (isNull) Some(OpVectorColumnMetadata.NullString) else None)
     }
 
   /**

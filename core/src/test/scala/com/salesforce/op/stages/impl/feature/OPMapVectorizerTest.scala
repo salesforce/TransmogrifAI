@@ -22,28 +22,29 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
+import scala.collection.Traversable
 import scala.reflect.runtime.universe._
 
 
 @RunWith(classOf[JUnitRunner])
-class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
+class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
 
   val log = LoggerFactory.getLogger(this.getClass)
-  loggingLevel(Level.ERROR)
-
-  lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
-    Seq(
-      (Map("a" -> "d", "b" -> "d"), Map("x" -> "W")),
-      (Map("a" -> "e"), Map("z" -> "w", "y" -> "v")),
-      (Map("c" -> "D"), Map("x" -> "w", "y" -> "V")),
-      (Map("c" -> "d", "a" -> "d"), Map("z" -> "v"))
-    ).map(v => v._1.toTextMap -> v._2.toTextMap)
-  )
-  val vectorizer = new TextMapPivotVectorizer[TextMap]().setCleanKeys(true).setMinSupport(0).setTopK(10)
-    .setInput(top, bot)
-  val vector = vectorizer.getOutput()
+  // loggingLevel(Level.INFO)
 
   Spec[TextMapPivotVectorizer[_]] should "return the expected vector with the default param settings" in {
+    val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
+      Seq(
+        (Map("a" -> "d", "b" -> "d"), Map("x" -> "W")),
+        (Map("a" -> "e"), Map("z" -> "w", "y" -> "v")),
+        (Map("c" -> "D"), Map("x" -> "w", "y" -> "V")),
+        (Map("c" -> "d", "a" -> "d"), Map("z" -> "v"))
+      ).map(v => v._1.toTextMap -> v._2.toTextMap)
+    )
+    val vectorizer =
+      new TextMapPivotVectorizer[TextMap]()
+        .setCleanKeys(true).setMinSupport(0).setTopK(10).setTrackNulls(false).setInput(top, bot)
+
     val fitted = vectorizer.fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
@@ -55,104 +56,8 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
 
-    transformed.collect(vector) shouldBe expected
+    transformed.collect(vectorizer.getOutput()) shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
-  }
-
-  "Base64 features" should "be vectorized the same way whether their in maps, or their own base features" in {
-    val base64Data: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.3).limit(1000)
-    val base64Data2: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.3).limit(1000)
-    val base64Data3: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.3).limit(1000)
-
-    val generatedData: Seq[(Base64, Base64, Base64)] =
-      base64Data.zip(base64Data2).zip(base64Data3).map {
-        case ((f1, f2), f3) => (f1, f2, f3)
-      }
-
-    val (rawDF, rawBase64F1, rawBase64F2, rawBase64F3) = TestFeatureBuilder("base64_feature1", "base64_feature2",
-      "base64_feature3", generatedData)
-
-    val featureVector = Seq(rawBase64F1, rawBase64F2, rawBase64F3).transmogrify()
-    val transformed = new OpWorkflow().setResultFeatures(featureVector).transform(rawDF)
-    val summary = transformed.schema(featureVector.name).metadata
-
-    // Transformer to construct a single map feature from the individual features
-    val mapTransformer = new TernaryLambdaTransformer[Base64, Base64, Base64, Base64Map](operationName = "labelFunc",
-      transformFn = (f1, f2, f3) => {
-        val mapData: Map[String, String] = {
-          val m1 = f1.v match {
-            case Some(s) => Map[String, String]("f1" -> s)
-            case None => Map.empty[String, String]
-          }
-          val m2 = f2.v match {
-            case Some(s) => Map[String, String]("f2" -> s)
-            case None => Map.empty[String, String]
-          }
-          val m3 = f3.v match {
-            case Some(s) => Map[String, String]("f3" -> s)
-            case None => Map.empty[String, String]
-          }
-          m1 ++ m2 ++ m3
-        }
-        Base64Map(mapData)
-      }
-    )
-    val base64MapFeature = mapTransformer.setInput(rawBase64F1, rawBase64F2, rawBase64F3).getOutput()
-      .asInstanceOf[Feature[Base64Map]]
-    val mapFeatureVector = Seq(base64MapFeature).transmogrify()
-    val transformedMap = new OpWorkflow().setResultFeatures(mapFeatureVector).transform(rawDF)
-    val mapSummary = transformedMap.schema(mapFeatureVector.name).metadata
-  }
-
-  "ID features" should "be vectorized the same way whether their in maps, or their own base features" in {
-    val IDData: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.3).limit(1000)
-    val IDData2: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.3).limit(1000)
-    val IDData3: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.3).limit(1000)
-
-    val generatedData: Seq[(ID, ID, ID)] =
-      IDData.zip(IDData2).zip(IDData3).map {
-        case ((f1, f2), f3) => (f1, f2, f3)
-      }
-
-    val (rawDF, rawIDF1, rawIDF2, rawIDF3) = TestFeatureBuilder("ID_feature1", "ID_feature2",
-      "ID_feature3", generatedData)
-
-    val featureVector = Seq(rawIDF1, rawIDF2, rawIDF3).transmogrify()
-    val transformed = new OpWorkflow().setResultFeatures(featureVector).transform(rawDF)
-    val summary = transformed.schema(featureVector.name).metadata
-    log.info(s"summary: $summary")
-    log.info(s"summary.getMetadataArray('vector_columns'): ${summary.getMetadataArray("vector_columns").toList}")
-
-    // Transformer to construct a single map feature from the individual features
-    val mapTransformer = new TernaryLambdaTransformer[ID, ID, ID, IDMap](operationName = "labelFunc",
-      transformFn = (f1, f2, f3) => {
-        val mapData: Map[String, String] = {
-          val m1 = f1.v.map(v => "f1" -> v).toMap
-          val m2 = f2.v.map(v => "f2" -> v).toMap
-          val m3 = f3.v.map(v => "f3" -> v).toMap
-          m1 ++ m2 ++ m3
-        }
-        IDMap(mapData)
-      }
-    )
-    val IDMapFeature = mapTransformer.setInput(rawIDF1, rawIDF2, rawIDF3).getOutput()
-      .asInstanceOf[Feature[IDMap]]
-    val mapFeatureVector = Seq(IDMapFeature).transmogrify()
-    val transformedMap = new OpWorkflow().setResultFeatures(mapFeatureVector).transform(rawDF)
-    val mapSummary = transformedMap.schema(mapFeatureVector.name).metadata
-
-    // Main difference for correctly vectorized features is that nulls are not explicitly tracked in maps, while
-    // they are in the underlying feature types. So, need to extract out the feature vector except the nullIndicator
-    // columns
-
-  }
-
-  "private function" should "do the same thing" in {
-    val iDData: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.5).limit(1000)
-    val iDData2: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.5).limit(1000)
-    val iDData3: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.5).limit(1000)
-
-    testFeatureToMap[ID, IDMap, String](iDData, iDData2, iDData3)
   }
 
   "Binary features" should "be vectorized the same whether they're in maps or not" in {
@@ -163,8 +68,7 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
     testFeatureToMap[Binary, BinaryMap, Boolean](binaryData, binaryData2, binaryData3)
   }
 
-  // TODO: Fix failing test
-  "Base64 features" should "be vectorized the same whether they're in maps or not" ignore {
+  "Base64 features" should "be vectorized the same whether they're in maps or not" in {
     val base64Data: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.5).limit(1000)
     val base64Data2: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.5).limit(1000)
     val base64Data3: Seq[Base64] = RandomText.base64(10, 50).withProbabilityOfEmpty(0.5).limit(1000)
@@ -250,8 +154,7 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
     testFeatureToMap[Integral, IntegralMap, Long](integralData, integralData2, integralData3)
   }
 
-  // TODO: Fix failing test
-  "MultiPickList features" should "be vectorized the same whether they're in maps or not" ignore {
+  "MultiPickList features" should "be vectorized the same whether they're in maps or not" in {
     val mplData: Seq[MultiPickList] = RandomMultiPickList.of(texts =
       RandomText.pickLists(domain = List("A", "B", "C", "D", "E")), maxLen = 3).limit(1000)
     val mplData2: Seq[MultiPickList] = RandomMultiPickList.of(texts =
@@ -271,10 +174,13 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   // TODO: Fix failing test
-  "Phone features" should "be vectorized the same whether they're in maps or not" ignore {
-    val phoneData: Seq[Phone] = RandomText.phones.withProbabilityOfEmpty(0.5).limit(1000)
-    val phoneData2: Seq[Phone] = RandomText.phones.withProbabilityOfEmpty(0.5).limit(1000)
-    val phoneData3: Seq[Phone] = RandomText.phones.withProbabilityOfEmpty(0.5).limit(1000)
+  "Phone features" should "be vectorized the same whether they're in maps or not" in {
+    val phoneData: Seq[Phone] = RandomText.phonesWithErrors(probabilityOfError = 0.3)
+      .withProbabilityOfEmpty(0.5).limit(1000)
+    val phoneData2: Seq[Phone] = RandomText.phonesWithErrors(probabilityOfError = 0.3)
+      .withProbabilityOfEmpty(0.5).limit(1000)
+    val phoneData3: Seq[Phone] = RandomText.phonesWithErrors(probabilityOfError = 0.3)
+      .withProbabilityOfEmpty(0.5).limit(1000)
 
     testFeatureToMap[Phone, PhoneMap, String](phoneData, phoneData2, phoneData3)
   }
@@ -298,35 +204,43 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
     testFeatureToMap[Real, RealMap, Double](realData, realData2, realData3)
   }
 
-  // TODO: Fix failing test
-  "TextArea features" should "be vectorized the same whether they're in maps or not" ignore {
+  "TextArea features" should "be vectorized the same whether they're in maps or not" in {
     val textAreaData: Seq[TextArea] = RandomText.textAreas(minLen = 5, maxLen = 10)
-      .withProbabilityOfEmpty(0.5).limit(100)
+      .withProbabilityOfEmpty(0.5).limit(1000)
     val textAreaData2: Seq[TextArea] = RandomText.textAreas(minLen = 5, maxLen = 10)
-      .withProbabilityOfEmpty(0.5).limit(100)
+      .withProbabilityOfEmpty(0.5).limit(1000)
     val textAreaData3: Seq[TextArea] = RandomText.textAreas(minLen = 5, maxLen = 10)
-      .withProbabilityOfEmpty(0.5).limit(100)
+      .withProbabilityOfEmpty(0.5).limit(1000)
 
     testFeatureToMap[TextArea, TextAreaMap, String](textAreaData, textAreaData2, textAreaData3)
   }
 
-  // TODO: Fix failing test
-  "Text features" should "be vectorized the same whether they're in maps or not" ignore {
-    val textData: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(100)
-    val textData2: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(100)
-    val textData3: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(100)
+  "Text features" should "be vectorized the same whether they're in maps or not" in {
+    val textData: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
+    val textData2: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
+    val textData3: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
 
     testFeatureToMap[Text, TextMap, String](textData, textData2, textData3)
   }
 
-  // TODO: Fix failing test
   "URL features" should "be vectorized the same whether they're in maps or not" in {
-    val urlData: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp"))
+    // Generate URLs from a list of domains where some are valid and some are not
+    val urlData: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp", "ish?"))
       .withProbabilityOfEmpty(0.5).limit(1000)
-    val urlData2: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp"))
+    val urlData2: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp", "ish?"))
       .withProbabilityOfEmpty(0.5).limit(1000)
-    val urlData3: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp"))
+    val urlData3: Seq[URL] = RandomText.urlsOn(RandomStream of List("www.google.com", "www.yahoo.co.jp", "ish?"))
       .withProbabilityOfEmpty(0.5).limit(1000)
+
+    // The problem with doing completely random URLs is that most randomly generated URLs will be invalid and
+    // therefore removed from the resulting PickListMap. If any of them map keys are entirely full of invalid URLs
+    // then those map keys will not be present at all in the PickListMap, and therefore the vectorized map data
+    // will have less columns than the vectorized non-map data.
+    /*
+    val urlData: Seq[URL] = RandomText.urls.withProbabilityOfEmpty(0.5).limit(1000)
+    val urlData2: Seq[URL] = RandomText.urls.withProbabilityOfEmpty(0.5).limit(1000)
+    val urlData3: Seq[URL] = RandomText.urls.withProbabilityOfEmpty(0.5).limit(1000)
+     */
 
     testFeatureToMap[URL, URLMap, String](urlData, urlData2, urlData3)
   }
@@ -371,8 +285,7 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
     testFeatureToMap[Street, StreetMap, String](streetData, streetData2, streetData3)
   }
 
-  // TODO: Fix failing test
-  "Geolocation features" should "be vectorized the same whether they're in maps or not" ignore {
+  "Geolocation features" should "be vectorized the same whether they're in maps or not" in {
     val GeolocationData: Seq[Geolocation] = RandomList.ofGeolocations.limit(1000)
     val GeolocationData2: Seq[Geolocation] = RandomList.ofGeolocations.limit(1000)
     val GeolocationData3: Seq[Geolocation] = RandomList.ofGeolocations.limit(1000)
@@ -396,19 +309,29 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
   (f1Data: Seq[F], f2Data: Seq[F], f3Data: Seq[F]): Unit = {
 
     val generatedData: Seq[(F, F, F)] = f1Data.zip(f2Data).zip(f3Data).map { case ((f1, f2), f3) => (f1, f2, f3) }
-
     val (rawDF, rawF1, rawF2, rawF3) = TestFeatureBuilder("f1", "f2", "f3", generatedData)
 
-    val featureVector = Seq(rawF1, rawF2, rawF3).transmogrify()
+    // Turn off prepending the feature name in the tests here so that we can compare the hashes of the same data
+    // in maps and base features. Otherwise because the feature type is different, they would have different feature
+    // name hashes appended to all the tokens and never be equal.
+    implicit val TransmogrifierTestDefaults = new TransmogrifierDefaults {
+      // Also need to set ReferenceDate to prevent it from being locally different that the one used everywhere else
+      override val ReferenceDate = TransmogrifierDefaults.ReferenceDate
+      override val PrependFeatureName: Boolean = false
+    }
+
+    val featureVector = Transmogrifier.transmogrify(Seq(rawF1, rawF2, rawF3))(TransmogrifierTestDefaults).combine()
     val transformed = new OpWorkflow().setResultFeatures(featureVector).transform(rawDF)
     if (log.isInfoEnabled) {
-      log.info(s"transformed:")
+      log.info("transformed data:")
       transformed.show(10)
     }
 
     val summary = transformed.schema(featureVector.name).metadata
-    log.info(s"summary: $summary")
-    log.info(s"summary.getMetadataArray('vector_columns'): ${summary.getMetadataArray("vector_columns").toList}")
+    log.info("summary:\n{}", summary)
+    log.info(s"summary.getMetadataArray('${OpVectorMetadata.ColumnsKey}'):\n{}",
+      summary.getMetadataArray(OpVectorMetadata.ColumnsKey).toList
+    )
     val ftFactory = FeatureTypeFactory[FM]()
 
     // Transformer to construct a single map feature from the individual features
@@ -416,85 +339,81 @@ class MapBaseVectorizerTest extends FlatSpec with TestSparkContext {
       transformFn = (f1, f2, f3) => {
         // For all the maps, the value in the original feature type is an Option[MT], but can't figure out how
         // to specify that here since that's not true in general for FeatureTypes (eg. RealNN)
-        val mapData = {
-          val m1 = f1.v match {
-            case Some(s) => Map("f1" -> s)
-            case seq: Seq[_] if seq.nonEmpty => Map("f1" -> seq)
+        def asMap(v: F, featureName: String): Map[String, Any] = {
+          v.value match {
+            case Some(s) => Map(featureName -> s)
+            case t: Traversable[_] if t.nonEmpty => Map(featureName -> t)
             case _ => Map.empty
           }
-          val m2 = f2.v match {
-            case Some(s) => Map("f2" -> s)
-            case seq: Seq[_] if seq.nonEmpty => Map("f2" -> seq)
-            case _ => Map.empty
-          }
-          val m3 = f3.v match {
-            case Some(s) => Map("f3" -> s)
-            case seq: Seq[_] if seq.nonEmpty => Map("f3" -> seq)
-            case _ => Map.empty
-          }
-          m1 ++ m2 ++ m3
         }
+        val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
         ftFactory.newInstance(mapData)
       }
     )
 
-    val mapFeature = mapTransformer.setInput(rawF1, rawF2, rawF3).getOutput()
-      .asInstanceOf[Feature[FM]]
-    val mapFeatureVector = Seq(mapFeature).transmogrify()
+    val mapFeature = mapTransformer.setInput(rawF1, rawF2, rawF3).getOutput().asInstanceOf[Feature[FM]]
+    val mapFeatureVector = Transmogrifier.transmogrify(Seq(mapFeature))(TransmogrifierTestDefaults).combine()
     val transformedMap = new OpWorkflow().setResultFeatures(mapFeatureVector).transform(rawDF)
     val mapSummary = transformedMap.schema(mapFeatureVector.name).metadata
     if (log.isInfoEnabled) {
-      log.info(s"transformedMap:")
+      log.info("transformedMap:")
       transformedMap.show(10)
     }
 
     // Check that the actual features are the same
     val vectorizedBaseFeatures = transformed.collect(featureVector)
     val vectorizedMapFeatures = transformedMap.collect(mapFeatureVector)
-    log.info(s"vectorizedBaseFeatures: ${vectorizedBaseFeatures.toList}")
-    log.info(s"vectorizedMapFeatures: ${vectorizedMapFeatures.toList}")
+    log.info("vectorizedBaseFeatures: {}", vectorizedBaseFeatures.toList)
+    log.info("vectorizedMapFeatures: {}", vectorizedMapFeatures.toList)
 
-    val baseColMetaArray: Array[OpVectorColumnMetadata] = summary.getMetadataArray("vector_columns").flatMap(
-      OpVectorColumnMetadata.fromMetadata
-    )
-    val mapColMetaArray: Array[OpVectorColumnMetadata] = mapSummary.getMetadataArray("vector_columns").flatMap(
-      OpVectorColumnMetadata.fromMetadata
-    )
+    val baseColMetaArray =
+      summary.getMetadataArray(OpVectorMetadata.ColumnsKey).flatMap(OpVectorColumnMetadata.fromMetadata)
+    val mapColMetaArray =
+      mapSummary.getMetadataArray(OpVectorMetadata.ColumnsKey).flatMap(OpVectorColumnMetadata.fromMetadata)
+    log.info("baseColMetaArray: {}", baseColMetaArray.map(_.toString).mkString("\n"))
+    log.info("mapColMetaArray: {}", mapColMetaArray.map(_.toString).mkString("\n"))
 
-    log.info(s"baseColMetaArray.foreach(println):")
-    baseColMetaArray.foreach(m => log.info(m.toString))
-    log.info(s"mapColMetaArray.foreach(println):")
-    mapColMetaArray.foreach(m => log.info(m.toString))
-
-    // TODO: Until null-tracking is standardized between maps and base features, only compare non-null indicator cols
     // val baseIndicesToCompare: Array[Int] = baseColMetaArray.filterNot(_.isNullIndicator).map(_.index).sorted
-    val baseIndicesToCompare: Array[Int] = baseColMetaArray.filterNot(_.isNullIndicator)
+    val baseIndicesToCompare: Array[Int] = baseColMetaArray
       .map(f => (f.parentFeatureName.head, f.indicatorValue, f.indicatorGroup) match {
-        case (pfName, Some(iv), Some(ig)) => (ig + iv, f.index)
+        case (pfName, Some(iv), Some(ig)) => (pfName + ig + iv, f.index)
         case (pfName, Some(iv), None) => (pfName + iv, f.index)
-        case (pfName, None, Some(ig)) => (ig, f.index)
+        case (pfName, None, Some(ig)) => (pfName + ig, f.index)
         case (pfName, None, None) => (pfName, f.index)
       }).sortBy(_._1).map(_._2)
     // Also need to sort map vectorized indices by feature name since they can come out in arbitrary orders
     val mapIndicesToCompare: Array[Int] = mapColMetaArray
       .map(f => (f.parentFeatureName.head, f.indicatorValue, f.indicatorGroup) match {
-        case (pfName, Some(iv), Some(ig)) => (ig + iv, f.index)
+        case (pfName, Some(iv), Some(ig)) => (pfName + ig + iv, f.index)
         case (pfName, Some(iv), None) => (pfName + iv, f.index)
-        case (pfName, None, Some(ig)) => (ig, f.index)
+        case (pfName, None, Some(ig)) => (pfName + ig, f.index)
         case (pfName, None, None) => (pfName, f.index)
       }).sortBy(_._1).map(_._2)
-    log.info(s"base indices to compare: ${baseIndicesToCompare.toList}")
-    log.info(s"map indices to compare: ${mapIndicesToCompare.toList}")
+    log.info("base indices to compare: {}", baseIndicesToCompare.toList)
+    log.info("map indices to compare: {}", mapIndicesToCompare.toList)
 
-    vectorizedBaseFeatures.zip(vectorizedMapFeatures).forall {
-      case (baseFeat, mapFeat) =>
-        log.info(s"baseFeat: $baseFeat")
-        log.info(s"baseIndicesToCompare.map(baseFeat.value.apply): " +
-          s"${baseIndicesToCompare.map(baseFeat.value.apply).toList}")
-        log.info(s"mapFeat: $mapFeat")
-        log.info(s"mapIndicesToCompare.map(mapFeat.value.apply): " +
-          s"${mapIndicesToCompare.map(mapFeat.value.apply).toList}")
-        baseIndicesToCompare.map(baseFeat.value.apply) sameElements mapIndicesToCompare.map(mapFeat.value.apply)
-    } shouldBe true
+    vectorizedBaseFeatures.zip(vectorizedMapFeatures).zipWithIndex.foreach {
+      case ((baseFeat, mapFeat), i) =>
+        log.info("baseFeat: {}", baseFeat)
+        log.info("baseIndicesToCompare.map(baseFeat.value.apply): {}", baseIndicesToCompare.map(baseFeat.value.apply))
+        log.info("mapFeat: {}", mapFeat)
+        log.info("mapIndicesToCompare.map(mapFeat.value.apply): {}", mapIndicesToCompare.map(mapFeat.value.apply))
+
+        val isTheSame =
+          baseIndicesToCompare.map(baseFeat.value.apply) sameElements mapIndicesToCompare.map(mapFeat.value.apply)
+
+        if (!isTheSame) {
+          log.error(
+            s"Mismatch when comparing ${i}th row!\n" +
+              s"transformed.take(${i + 1}).drop($i):\n" +
+              transformed.take(i + 1).drop(i).head.toSeq.mkString("   ", "\n   ", "") +
+              s"\ntransformedMap.take(${i + 1}).drop($i):\n" +
+              transformedMap.take(i + 1).drop(i).head.toSeq.mkString("   ", "\n   ", "")
+          )
+        }
+        isTheSame shouldBe true
+    }
+
+    // TODO assert metadata
   }
 }

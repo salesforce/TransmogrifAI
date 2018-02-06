@@ -30,8 +30,11 @@ sealed trait HashAlgorithm extends EnumEntry with Serializable
 
 object HashAlgorithm extends Enum[HashAlgorithm] {
   val values = findValues
+
   case object MurMur3 extends HashAlgorithm
+
   case object Native extends HashAlgorithm
+
 }
 
 /**
@@ -58,12 +61,13 @@ private[op] trait TransmogrifierDefaults {
   val FillWithMode: Boolean = true
   val FillWithMean: Boolean = true
   val TrackNulls: Boolean = true
+  val TrackInvalid: Boolean = false
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
 }
 
-private[op] case object TransmogrifierDefaults extends TransmogrifierDefaults
+private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
 
 private[op] case object Transmogrifier {
 
@@ -116,87 +120,92 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[Base64Map] =>
           val (f, other) = castAs[Base64Map](g) // TODO make better default
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[BinaryMap] =>
           val (f, other) = castAs[BinaryMap](g)
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[ComboBoxMap] =>
           val (f, other) = castAs[ComboBoxMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[CurrencyMap] =>
           val (f, other) = castAs[CurrencyMap](g)
-          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
+            trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[DateMap] =>
           val (f, other) = castAs[DateMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[DateTimeMap] =>
           val (f, other) = castAs[DateTimeMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[IDMap] =>
           val (f, other) = castAs[IDMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[IntegralMap] =>
           val (f, other) = castAs[IntegralMap](g)
-          f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other,
+            trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[MultiPickListMap] =>
           val (f, other) = castAs[MultiPickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[PercentMap] =>
           val (f, other) = castAs[PercentMap](g)
-          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
+            trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[PhoneMap] =>
           val (f, other) = castAs[PhoneMap](g) // TODO make better default
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+          f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[PickListMap] =>
           val (f, other) = castAs[PickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[RealMap] =>
           val (f, other) = castAs[RealMap](g)
-          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other)
+          f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
+            trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[TextAreaMap] =>
-          val (f, other) = castAs[TextAreaMap](g) // TODO make this be a hash transformation
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+          val (f, other) = castAs[TextAreaMap](g)
+          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
+          f.vectorize(shouldPrependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[TextMap] =>
-          val (f, other) = castAs[TextMap](g)  // TODO make this be a hash transformation
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+          val (f, other) = castAs[TextMap](g)
+          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
+          f.vectorize(shouldPrependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[URLMap] =>
           val (f, other) = castAs[URLMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[CountryMap] =>
           val (f, other) = castAs[CountryMap](g) // TODO make Country specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[StateMap] =>
           val (f, other) = castAs[StateMap](g) // TODO make State specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[CityMap] =>
           val (f, other) = castAs[CityMap](g) // TODO make City specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[PostalCodeMap] =>
           val (f, other) = castAs[PostalCodeMap](g) // TODO make PostalCode specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[StreetMap] =>
           val (f, other) = castAs[StreetMap](g) // TODO make Street specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other)
+            others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[GeolocationMap] =>
           val (f, other) = castAs[GeolocationMap](g)
-          f.vectorize(cleanKeys = CleanKeys, others = other)
+          f.vectorize(cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
 
         // Numerics
         case t if t =:= weakTypeOf[Binary] =>
@@ -255,12 +264,14 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
-          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+          f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
+            toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
-          f.vectorize(numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase, others = other)
+          f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
+            toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
@@ -307,12 +318,22 @@ private[op] case object Transmogrifier {
 
 }
 
+
 trait VectorizerDefaults extends OpPipelineStageBase {
   self: PipelineStage =>
 
+  // TODO once track nulls is everywhere put track nulls param here and avoid making the metadata twice
   abstract override def onSetInput(): Unit = {
     super.onSetInput()
     setMetadata(vectorMetadataFromInputFeatures.toMetadata)
+  }
+
+  private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {
+    val tf = getTransientFeatures()
+    val cols =
+      if (withNullTracking) tf.flatMap { f => Seq(f.toColumnMetaData(), f.toColumnMetaData(isNull = true)) }
+      else tf.map { f => f.toColumnMetaData() }
+    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
   }
 
   /**
@@ -321,27 +342,9 @@ trait VectorizerDefaults extends OpPipelineStageBase {
    *
    * @return Vector metadata from input features
    */
-  protected def vectorMetadataFromInputFeatures: OpVectorMetadata = {
-    val tf = getTransientFeatures()
-    val cols = tf.map { f => f.toColumnMetaData() }
-    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
-  }
+  protected def vectorMetadataFromInputFeatures: OpVectorMetadata = vectorMetadata(withNullTracking = false)
 
-  protected def vectorMetadataWithNullIndicators: OpVectorMetadata = {
-    val vectorMeta = vectorMetadataFromInputFeatures
-    val updatedCols = vectorMeta.columns.flatMap { col =>
-      Seq(
-        col,
-        OpVectorColumnMetadata(
-          parentFeatureName = col.parentFeatureName,
-          parentFeatureType = col.parentFeatureType,
-          indicatorGroup = col.parentFeatureName,
-          indicatorValue = Some(TransmogrifierDefaults.NullString)
-        )
-      )
-    }
-    vectorMeta.withColumns(updatedCols)
-  }
+  protected def vectorMetadataWithNullIndicators: OpVectorMetadata = vectorMetadata(withNullTracking = true)
 
   /**
    * Get the name of the output vector
@@ -397,6 +400,20 @@ trait VectorizerDefaults extends OpPipelineStageBase {
   }
 
   /**
+   * Create a one-hot vector
+   *
+   * @param pos  position to put 1.0 in the vector
+   * @param size size of the one-hot vector
+   * @return one-hot vector with 1.0 in position value
+   */
+  protected def oneHot(pos: Int, size: Int): Array[Double] = {
+    assert(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
+    val arr = new Array[Double](size)
+    arr(pos) = 1.0
+    arr
+  }
+
+  /**
    * Function to convert sequences of (Index, Value) tuples into a compressed sparse vector
    *
    * @param seq Input sequence containing tuples of indicies and values
@@ -406,20 +423,6 @@ trait VectorizerDefaults extends OpPipelineStageBase {
     val size = nextIndex(seq)
     if (size == 0) Vectors.dense(Array.empty[Double])
     else Vectors.sparse(size, seq).compressed
-  }
-
-  /**
-   * Create a one-hot vector
-   *
-   * @param pos  position to put 1.0 in the vector (1-indexed)
-   * @param size size of the one-hot vector
-   * @return one-hot vector with 1.0 in position value (1-indexed)
-   */
-  protected def oneHot(pos: Int, size: Int): Array[Double] = {
-    assert(pos - 1 < size && pos > 0, "one-hot index lies outside the bounds of the vector")
-    val ar = Array.fill[Double](size)(0.0)
-    ar(pos - 1) = 1.0
-    ar
   }
 
   protected implicit def booleanToDouble(v: Boolean): Double = if (v) 1.0 else 0.0
@@ -434,11 +437,27 @@ trait TrackNullsParam extends Params {
   final val trackNulls = new BooleanParam(
     parent = this, name = "trackNulls", doc = "option to keep track of values that were missing"
   )
-
   setDefault(trackNulls, TransmogrifierDefaults.TrackNulls)
 
+  /**
+   * Option to keep track of values that were missing
+   */
   def setTrackNulls(v: Boolean): this.type = set(trackNulls, v)
+}
 
+/**
+ * Param that decides whether or not the values that are considered invalid are tracked
+ */
+trait TrackInvalidParam extends Params {
+  final val trackInvalid = new BooleanParam(
+    parent = this, name = "trackInvalid", doc = "option to keep track of invalid values"
+  )
+  setDefault(trackInvalid, TransmogrifierDefaults.TrackInvalid)
+
+  /**
+   * Option to keep track of invalid values
+   */
+  def setTrackInvalid(v: Boolean): this.type = set(trackInvalid, v)
 }
 
 trait CleanTextFun {
@@ -530,18 +549,21 @@ trait MapPivotParams extends Params {
     parent = this, name = "cleanKeys", doc = "ignore capitalization and punctuation in grouping map keys"
   )
   setDefault(cleanKeys, TransmogrifierDefaults.CleanKeys)
+
   def setCleanKeys(clean: Boolean): this.type = set(cleanKeys, clean)
 
   final val whiteListKeys = new StringArrayParam(
     parent = this, name = "whiteListKeys", doc = "list of map keys to include in pivot"
   )
   setDefault(whiteListKeys, Array[String]())
+
   final def setWhiteListKeys(keys: Array[String]): this.type = set(whiteListKeys, keys)
 
   final val blackListKeys = new StringArrayParam(
     parent = this, name = "blackListKeys", doc = "list of map keys to exclude from pivot"
   )
   setDefault(blackListKeys, Array[String]())
+
   final def setBlackListKeys(keys: Array[String]): this.type = set(blackListKeys, keys)
 
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
@@ -608,14 +630,16 @@ trait MapStringPivotHelper extends SaveOthersParams {
     inputFeatures: Array[TransientFeature],
     operationName: String,
     outputName: String,
-    stageName: String
+    stageName: String,
+    trackNulls: Boolean = false // todo remove default and use this for other maps
   ): OpVectorMetadata = {
     // names of input features to store in metadata
     val otherValueString = $(unseenName)
     val cols = for {
       (f, kvPairs) <- inputFeatures.zip(topValues)
       (key, values) <- kvPairs
-      value <- values.view :+ otherValueString // view here to avoid copying the array when appending the string
+      value <- values.view ++ Seq(otherValueString) ++ // view here to avoid copying the array when appending the string
+        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil)
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),

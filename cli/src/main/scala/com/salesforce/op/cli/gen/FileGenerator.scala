@@ -29,8 +29,8 @@ class FileGenerator(val path: String, sourceFn: => String) {
    * @return A [[FileInProject]] that represents the rendered file to be created
    */
   def render(substitutions: Substitutions): FileInProject = {
+    var renderedTemplate = replaceMultiline(source, substitutions)
     var directives = directiveRegex.findAllMatchIn(source).toList
-    var renderedTemplate = source
     var filePath = path
 
     while (directives.nonEmpty) {
@@ -49,6 +49,14 @@ class FileGenerator(val path: String, sourceFn: => String) {
           )
         case List("replace", pattern, variable) =>
           renderedTemplate = removeDirective(renderedTemplate, m).replace(pattern, substitutions(variable))
+
+        case List("replaceLine", arg) =>
+          renderedTemplate = splice(
+            renderedTemplate,
+            whereLineStarts(renderedTemplate, m.start),
+            whereLineEnds(renderedTemplate, m.end) + 1,
+            substitutions(arg)
+          )
       }
       directives = directiveRegex.findAllMatchIn(renderedTemplate).toList
     }
@@ -76,9 +84,25 @@ private[gen] object FileGenerator {
   def updateFileName(path: String, newFileName: String): String =
     splice(path, path.lastIndexOf('/') + 1, path.lastIndexOf('.'), newFileName)
 
+  def whereLineStarts(source: String, pos: Int): Int = {
+    for {
+      i <- math.min(math.max(0, pos - 1), source.length) until (0, -1)
+      if source(i) == '\n'
+    } return i + 1
+    0
+  }
+
+  def whereLineEnds(source: String, pos: Int): Int = {
+    for {
+      i <- math.min(pos, source.length) until source.length
+      if source(i) == '\n'
+    } return i - 1
+    source.length - 1
+  }
+
   def skipWhitespace(source: String, start: Int, inc: Int = 1): Int = {
     var i = start
-    while (i > 0 && i < source.length - 1 && Set(' ', '\n', '\t').contains(source.charAt(i))) {
+    while (i > 0 && i < source.length - 1 && " \n\t".contains(source(i))) {
       i += inc
     }
     i
@@ -113,6 +137,50 @@ private[gen] object FileGenerator {
     val endWhitespace = skipWhitespace(source, start, inc)
     val endExpr = skipExpr(source, endWhitespace, inc)
     endExpr
+  }
+
+  private trait Chunk {
+    def append(line: String): Chunk
+    def render(substitutions: Substitutions): String
+  }
+
+  private case class Lines(lines: List[String] = Nil) extends Chunk {
+    def append(line: String): Lines = Lines(line::lines)
+    def render(substitutions: Substitutions): String = {
+      lines.reverse mkString "\n"
+    }
+  }
+
+  private case class Fragment(name: String) extends Chunk {
+    def append(line: String): Fragment = this
+    def render(substitutions: Substitutions): String = {
+      substitutions(name)
+    }
+  }
+
+  def replaceMultiline(in: String, substitutions: Substitutions): String = {
+    if (in contains "BEGIN") {
+      val MacroStart = "\\s*//\\s+BEGIN\\s+(\\w+).*".r
+      val MacroEnd = "\\s*//\\s+END\\s+(\\w+).*".r
+      val lines = in split "\n"
+      val chunks = (List[Chunk](Lines()) /: lines) {
+        case ((ls: Lines)::t, MacroStart(name)) => Fragment(name)::ls::t
+        case ((ls: Lines)::t, MacroEnd(name)) =>
+          throw new IllegalArgumentException(s"Bad template $in: // END $name before //BEGIN")
+        case ((ls: Lines)::t, line) => ls.append(line)::t
+        case ((Fragment(name1)::t), MacroStart(name2)) =>
+          throw new IllegalArgumentException(s"Unexpected template $name2 inside template $name1")
+        case (cs@(Fragment(name1)::t), MacroEnd(name2)) =>
+          if (name1 != name2) {
+            throw new IllegalArgumentException(s"Unexpected template end $name2 inside template $name1")
+          } else Lines()::cs
+        case (cs@((_: Fragment)::t), line) => cs
+      }
+      val out = chunks.reverse map (_ render substitutions) mkString "\n"
+      out
+    } else {
+      in
+    }
   }
 
 }

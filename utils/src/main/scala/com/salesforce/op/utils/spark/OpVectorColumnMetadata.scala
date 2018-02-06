@@ -5,6 +5,7 @@
 
 package com.salesforce.op.utils.spark
 
+import com.salesforce.op.utils.json.JsonLike
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import com.salesforce.op.utils.spark.RichMetadata.{RichMetadata => RichMeta}
 
@@ -27,7 +28,7 @@ import com.salesforce.op.utils.spark.RichMetadata.{RichMetadata => RichMeta}
  *                          vector that has this indicator group should be mutually exclusive to this one. If
  *                          there is no grouping then this field is None
  * @param indicatorValue    An indicator for a value (null indicator or result of a pivot or whatever that value is),
- *                          otherwise [[None]] eg this is none when the column is from a numberic group that is not
+ *                          otherwise [[None]] eg this is none when the column is from a numeric group that is not
  *                          pivoted
  * @param index             Index of the vector this info is associated with (this is updated when
  *                          OpVectorColumnMetadata is passed into [[OpVectorMetadata]]
@@ -39,7 +40,7 @@ case class OpVectorColumnMetadata
   indicatorGroup: Option[String],
   indicatorValue: Option[String],
   index: Int = 0
-) {
+) extends JsonLike {
 
   assert(parentFeatureName.nonEmpty, "must provide parent feature name")
   assert(parentFeatureType.nonEmpty, "must provide parent type name")
@@ -69,7 +70,7 @@ case class OpVectorColumnMetadata
    * @return true if this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
    */
   def isNullIndicator: Boolean =
-    indicatorValue.contains(OpVectorColumnMetadata.NullString) || indicatorGroup.isDefined && indicatorValue.isEmpty
+    indicatorValue.contains(OpVectorColumnMetadata.NullString)
 
   /**
    * Convert this column into Spark metadata.
@@ -104,7 +105,8 @@ case class OpVectorColumnMetadata
    *         for columns with map parent features
    */
   def parentNamesWithMapKeys(): Seq[String] =
-    if (hasMapParent()) parentFeatureName.flatMap(p => indicatorGroup.map(p + "_" + _)) else parentFeatureName
+    if (hasMapParent()) parentFeatureName.map(p => indicatorGroup.map(p + "_" + _).getOrElse(p))
+    else parentFeatureName
 
 }
 

@@ -11,7 +11,6 @@ import com.salesforce.op.utils.kryo.OpKryoRegistrator
 class IrisKryoRegistrator extends OpKryoRegistrator {
 
   override def registerCustomClasses(kryo: Kryo): Unit = {
-    doClassRegistration(kryo)(classOf[IrisFeatures])
     doAvroRegistration[com.salesforce.hw.iris.Iris](kryo)
   }
 

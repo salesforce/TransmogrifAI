@@ -9,10 +9,11 @@ import com.salesforce.op.UID
 import com.salesforce.op.aggregators.{GeolocationFunctions, Geolocations}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{BooleanParam, DoubleArrayParam}
 import org.apache.spark.sql.{Dataset, Encoders}
-import com.salesforce.op.utils.spark.RichDataset._
 
 /**
  * Converts a sequence of Geolocation features into a vector feature.
@@ -67,6 +68,23 @@ class GeolocationVectorizer
     means
   }
 
+  /**
+   * Compute the output vector metadata only from the input features. Vectorizers use this to derive
+   * the full vector, including pivot columns or indicator features.
+   *
+   * @return Vector metadata from input features
+   */
+  private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {
+    val tf = getTransientFeatures()
+    val cols =
+      if (withNullTracking) tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()) ++ Seq(f.toColumnMetaData(isNull = true)))
+      else tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()))
+    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
+  }
+
+  override def vectorMetadataFromInputFeatures: OpVectorMetadata = vectorMetadata(withNullTracking = false)
+  override def vectorMetadataWithNullIndicators: OpVectorMetadata = vectorMetadata(withNullTracking = true)
+
   def fitFn(dataset: Dataset[Seq[Geolocation#Value]]): SequenceModel[Geolocation, OPVector] = {
     if ($(trackNulls)) setMetadata(vectorMetadataWithNullIndicators.toMetadata)
 
@@ -78,7 +96,7 @@ class GeolocationVectorizer
 
 }
 
-private final class GeolocationVectorizerModel
+final class GeolocationVectorizerModel private[op]
 (
   val fillValues: Seq[Seq[Double]],
   val trackNulls: Boolean,
@@ -92,18 +110,15 @@ private final class GeolocationVectorizerModel
   def transformFn: Seq[Geolocation] => OPVector = row => {
     val replaced =
       if (!trackNulls) {
-        row.zip(fillValues).
-          flatMap { case (r, m) => if (r.isEmpty) m else r.value }
+        row.zip(fillValues).flatMap { case (r, m) => if (r.isEmpty) m else r.value }
       }
       else {
-        row.zip(fillValues).
-          flatMap { case (r, m) =>
-            val meanToUse: Seq[Double] = if (m.isEmpty) RepresentationOfEmpty else m
-            // Unlike the RealVectorizer case, we need parents here since r.value is a list and :+ takes precedence
-            (if (r.isEmpty) meanToUse else r.value) :+ booleanToDouble(r.isEmpty)
-          }
+        row.zip(fillValues).flatMap { case (r, m) =>
+          val meanToUse: Seq[Double] = if (m.isEmpty) RepresentationOfEmpty else m
+          // Unlike the RealVectorizer case, we need parents here since r.value is a list and :+ takes precedence
+          (if (r.isEmpty) meanToUse else r.value) :+ (r.isEmpty: Double)
+        }
       }
-
     Vectors.dense(replaced.toArray).toOPVector
   }
 }

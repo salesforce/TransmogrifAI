@@ -6,6 +6,7 @@
 package com.salesforce.op.utils.reflection
 
 
+import com.salesforce.op.utils.types.TestPrivateType
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
@@ -65,7 +66,7 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   it should "return a dealiased TypeTag for an type alias" in {
     val tTag = typeTag[scala.collection.immutable.List[String]]
     val aliasTag = typeTag[ListStringAlias]
-    val dealiasedTag = ReflectionUtils.dealiasedTypeTag[ListStringAlias]
+    val dealiasedTag = ReflectionUtils.dealiasedTypeTagForType[ListStringAlias]()
 
     tTag should not be equal(aliasTag)
     tTag.tpe shouldBe aliasTag.tpe.dealias
@@ -113,13 +114,20 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     orig.ttag shouldBe copy.ttag
   }
 
+  it should "allow copying a class with a private package ctor" in {
+    val orig = TestPrivateType(1, 2)
+    val copy = ReflectionUtils.copy(orig)
+    orig.x shouldBe copy.x
+    orig.y shouldBe copy.y
+  }
+
+  it should "find a private package ctor correctly with args" in {
+    val (_, argsList) = ReflectionUtils.bestCtorWithArgs(TestPrivateType(1, 2))
+    argsList shouldBe List("x" -> 1, "y" -> 2)
+  }
+
   it should "create a new instance of a class" in {
-    val ctorArgs = (argName: String, argSymbol: Symbol) => Try {
-      argName match {
-        case "x" => 1
-        case "y" => 2
-      }
-    }
+    val ctorArgs = (argName: String, argSymbol: Symbol) => Try { argName match { case "x" => 1; case "y" => 2 } }
     val instance = ReflectionUtils.newInstance[TestValCaseClass](classOf[TestValCaseClass], ctorArgs)
     instance.x shouldBe 1
     instance.y shouldBe 2
@@ -139,6 +147,11 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   it should "create a manifest for a type tag" in {
     val m = ReflectionUtils.manifestForTypeTag[Map[String, Option[Long]]]
     m.toString() shouldBe "scala.collection.immutable.Map[java.lang.String, scala.Option[long]]"
+  }
+
+  it should "create a class tag from a weak type tag" in {
+    val c = ReflectionUtils.classTagForWeakTypeTag[Map[String, Option[Long]]]
+    c.toString() shouldBe "scala.collection.immutable.Map"
   }
 
 }

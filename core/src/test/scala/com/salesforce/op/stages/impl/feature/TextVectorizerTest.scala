@@ -32,11 +32,12 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
       minTokenLength = TextTokenizer.MinTokenLength,
       toLowercase = TextTokenizer.ToLowercase
     )
-    vectorized.originStage shouldBe a[OPCollectionHashingVectorizer[_]]
-    val hasher = vectorized.originStage.asInstanceOf[OPCollectionHashingVectorizer[_]].hashingTF()
+    vectorized.originStage shouldBe a[VectorsCombiner]
+    vectorized.parents.head.originStage shouldBe a[OPCollectionHashingVectorizer[_]]
+    val hasher = vectorized.parents.head.originStage.asInstanceOf[OPCollectionHashingVectorizer[_]].hashingTF()
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(data)
     val result = transformed.collect(vectorized)
-    val f1NameHash = hasher.indexOf(vectorized.originStage.getInputFeatures().head.name)
+    val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
 
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) should be >= 1.0
@@ -48,6 +49,7 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
     result(2).value(hasher.indexOf(s"${f1NameHash}_" + "להיות")) should be >= 2.0
     // scalastyle:on
   }
+
   it should "allow forcing hashing into a shared hash space" in {
     val vectorized = f1.vectorize(numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
       autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
@@ -55,10 +57,10 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
       toLowercase = TextTokenizer.ToLowercase,
       binaryFreq = true,
       others = Array(f2))
-    val hasher = vectorized.originStage.asInstanceOf[OPCollectionHashingVectorizer[_]].hashingTF()
+    val hasher = vectorized.parents.head.originStage.asInstanceOf[OPCollectionHashingVectorizer[_]].hashingTF()
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(data)
     val result = transformed.collect(vectorized)
-    val f1NameHash = hasher.indexOf(vectorized.originStage.getInputFeatures().head.name)
+    val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
 
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) shouldBe 1.0

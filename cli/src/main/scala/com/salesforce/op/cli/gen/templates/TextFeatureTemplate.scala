@@ -3,10 +3,9 @@
  * All rights reserved.
  */
 
-
 package com.salesforce.op.cli.gen.templates
 
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.{FeatureBuilder => FB}
 import com.salesforce.op.features.types._
 
 /**
@@ -15,6 +14,6 @@ import com.salesforce.op.features.types._
 class TextFeatureTemplate {
   private[templates] def feature =
   // BEGIN
-  FeatureBuilder.Text[SampleObject].extract(o => o.codeGeneration_textField_codeGeneration.toText)
+  FB.Text[SampleObject].extract(_.codeGeneration_textField_codeGeneration.toText)
   // END
 }

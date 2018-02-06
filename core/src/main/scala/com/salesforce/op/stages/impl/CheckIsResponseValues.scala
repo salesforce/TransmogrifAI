@@ -12,7 +12,11 @@ import com.salesforce.op.features.TransientFeature
  */
 private[op] case object CheckIsResponseValues {
   def apply(in1: TransientFeature, in2: TransientFeature): Unit = {
-    if (!in1.isResponse) throw new RuntimeException("The numeric 'label' feature should be a response feature.")
-    if (in2.isResponse) throw new RuntimeException("The feature vector should not contain any response features.")
+    if (!in1.isResponse) {
+      throw new IllegalArgumentException("The numeric 'label' feature should be a response feature.")
+    }
+    if (in2.isResponse) {
+      throw new IllegalArgumentException("The feature vector should not contain any response features.")
+    }
   }
 }
