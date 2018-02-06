@@ -14,7 +14,6 @@ import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
-
 /**
  * Define a case class corresponding to our data file (nullable columns must be Option types)
  *
@@ -48,7 +47,7 @@ case class Passenger
 )
 
 /**
- * A sinmplified Optimus Prime example classification app using the Titanic dataset
+ * A simplified Optimus Prime example classification app using the Titanic dataset
  */
 object OpTitanicSimple {
 
@@ -73,38 +72,27 @@ object OpTitanicSimple {
     /////////////////////////////////////////////////////////////////////////////////
 
     // Define features using the OP types based on the data
-    val survived = FeatureBuilder.RealNN[Passenger]
-      .extract(_.survived.toRealNN).asResponse
+    val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
 
-    val pClass = FeatureBuilder.MultiPickList[Passenger]
-      .extract(d => d.pClass.map(_.toString).toSet[String].toMultiPickList).asPredictor
+    val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
 
-    val name = FeatureBuilder.Text[Passenger]
-      .extract(d => d.name.toText).asPredictor
+    val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
 
-    val sex = FeatureBuilder.MultiPickList[Passenger]
-      .extract(d => d.sex.map(_.toString).toSet[String].toMultiPickList).asPredictor
+    val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
 
-    val age = FeatureBuilder.RealNN[Passenger]
-      .extract(d => d.age.toRealNN).asPredictor
+    val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN).asPredictor
 
-    val sibSp = FeatureBuilder.Integral[Passenger]
-      .extract(d => d.sibSp.toIntegral).asPredictor
+    val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
 
-    val parCh = FeatureBuilder.Integral[Passenger]
-      .extract(d => d.parCh.toIntegral).asPredictor
+    val parCh = FeatureBuilder.Integral[Passenger].extract(_.parCh.toIntegral).asPredictor
 
-    val ticket = FeatureBuilder.MultiPickList[Passenger]
-      .extract(d => d.ticket.map(_.toString).toSet[String].toMultiPickList).asPredictor
+    val ticket = FeatureBuilder.PickList[Passenger].extract(_.ticket.map(_.toString).toPickList).asPredictor
 
-    val fare = FeatureBuilder.Real[Passenger]
-      .extract(d => d.fare.toReal).asPredictor
+    val fare = FeatureBuilder.Real[Passenger].extract(_.fare.toReal).asPredictor
 
-    val cabin = FeatureBuilder.MultiPickList[Passenger]
-      .extract(d => d.cabin.map(_.toString).toSet[String].toMultiPickList).asPredictor
+    val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).toPickList).asPredictor
 
-    val embarked = FeatureBuilder.MultiPickList[Passenger]
-      .extract(d => d.embarked.map(_.toString).toSet[String].toMultiPickList).asPredictor
+    val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
 
     ////////////////////////////////////////////////////////////////////////////////
     // TRANSFORMED FEATURES
@@ -113,19 +101,20 @@ object OpTitanicSimple {
     // Do some basic feature engineering using knowledge of the underlying dataset
     val familySize = sibSp + parCh + 1
     val estimatedCostOfTickets = familySize * fare
+    // val pivotedSex = sex.map[PickList](v => v).pivot()
     val pivotedSex = sex.pivot()
     val normedAge = age.zNormalize()
-    val ageGroup = age.map[MultiPickList](_.value.map(v => if (v > 18) "adult" else "child")
-      .toSet[String].toMultiPickList)
+    val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
 
     // Define a feature of type vector containing all the predictors you'd like to use
     val passengerFeatures = Seq(
-      pClass, name, sex, age, sibSp, parCh, ticket,
+      pClass, name, age, sibSp, parCh, ticket,
       cabin, embarked, familySize, estimatedCostOfTickets,
-      pivotedSex, ageGroup).transmogrify()
+      pivotedSex, ageGroup
+    ).transmogrify()
 
     // Optionally check the features with a sanity checker
-    val sanityCheck = false
+    val sanityCheck = true
     val finalFeatures = if (sanityCheck) survived.sanityCheck(passengerFeatures) else passengerFeatures
 
     // Define the model we want to use (here a simple logistic regression) and get the resulting output
