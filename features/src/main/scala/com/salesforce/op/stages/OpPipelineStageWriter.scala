@@ -3,14 +3,14 @@
  * All rights reserved.
  */
 
-package org.apache.spark.ml
+package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import org.apache.spark.ml.OpPipelineStageReadWriteShared._
-import org.apache.spark.ml.util.{DefaultParamsWriter, MLWriter}
+import OpPipelineStageReadWriteShared._
+import org.apache.spark.ml.util.MLWriter
+import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
@@ -51,7 +51,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    */
   def writeToMap: Map[String, Any] = {
     // We produce stage metadata for all the Spark params
-    val metadataJson = DefaultParamsWriter.getMetadataToSave(stage, sc)
+    val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage, sc)
     // Add isModel indicator
     val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
     // In case we stumbled upon a model instance, we also include it's ctor argg

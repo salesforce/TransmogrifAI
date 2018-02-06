@@ -6,7 +6,7 @@
 
 package com.salesforce.op.cli.gen.templates
 
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.{FeatureBuilder => FB}
 import com.salesforce.op.features.types._
 
 /**
@@ -15,6 +15,7 @@ import com.salesforce.op.features.types._
 class IntegralFeatureTemplate {
   private[templates] def feature =
   // BEGIN
-  FeatureBuilder.Integral[SampleObject].extract(o => o.codeGeneration_integralField_codeGeneration.toIntegral)
+  FB.Integral[SampleObject]
+    .extract(_.codeGeneration_integralField_codeGeneration.toIntegral)
   // END
 }

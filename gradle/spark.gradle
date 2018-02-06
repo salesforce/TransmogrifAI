@@ -34,8 +34,9 @@ task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
     def kryoConf = ["--conf", "spark.serializer=org.apache.spark.serializer.KryoSerializer"]
     def yarnConf = !master.startsWith("yarn") ? [] : [
             "spark.logConf=true",
-            "spark.eventLog.enabled=true",
-            "spark.eventLog.dir=hdfs:///var/log/spark/apps",
+            "spark.eventLog.enabled=false",
+            // "spark.eventLog.enabled=true",
+            // "spark.eventLog.dir=hdfs:///var/log/spark/apps",
             "spark.driver.extraClassPath=/usr/lib/hadoop-lzo/lib/*",
             "spark.driver.extraLibraryPath=/usr/lib64/atlas",
             "spark.driver.extraJavaOptions=$extraJavaOpts",

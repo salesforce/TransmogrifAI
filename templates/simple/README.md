@@ -6,8 +6,10 @@ This is an Optimus Prime project created with the 'simple' template.
 
 - Java 1.8
 - Scala ${scalaVersion}.${scalaVersionRevision}
+- Spark ${sparkVersion}
 - IntelliJ Idea 2017+ recommended
 - Optimus Prime ${opVersion}
+
 
 ## Structure
 
@@ -30,6 +32,9 @@ You can run build commands by running `./gradlew` in this directory. Make sure t
 To build the project, run `./gradlew build`. This will compile your sources and tell you of any compile errors.
 
 ### Training
+
+Note: this platform runs on Spark, so you must download Spark ${sparkVersion} (prebuilt against hadoop 2.7), unpack and export `SPARK_HOME` before trying to run.
+
 To train your project, run
 
 ```

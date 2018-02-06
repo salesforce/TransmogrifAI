@@ -176,8 +176,7 @@ private[impl] trait SelectorRegressors
     with HasRandomForestRegressor
     with HasDecisionTreeRegressor
     with HasGradientBoostedTreeRegression
-    with SelectorModels[Regressor, RegressionModelSelector]
-    with Stage1ParamNamesBase {
+    with SelectorModels[Regressor, RegressionModelSelector] {
 
   // scalastyle:off
   import RegressionModelsToTry._

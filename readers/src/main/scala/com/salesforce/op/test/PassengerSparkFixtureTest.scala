@@ -5,13 +5,14 @@
 
 package com.salesforce.op.test
 
-import language.postfixOps
 import java.io.File
 
 import com.salesforce.op.aggregators.CutOffTime
 import com.salesforce.op.readers._
 import org.apache.spark.sql.{DataFrame, Row}
 import org.scalatest.Suite
+
+import scala.language.postfixOps
 
 trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesTest {
   self: Suite =>
@@ -23,6 +24,22 @@ trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesT
   def passengerCsvPath: String = s"$testDataPath/PassengerData.csv"
   def passengerCsvWithHeaderPath: String = s"$testDataPath/PassengerDataWithHeader.csv"
   def passengerProfileCsvPath: String = s"$testDataPath/PassengerProfileData.csv"
+
+  lazy val simpleReader: AvroReader[Passenger] =
+    DataReaders.Simple.avro[Passenger](
+      path = Some(passengerAvroPath), // Path should be optional so can also pass in as a parameter
+      key = _.getPassengerId.toString // Entity to score
+    )
+
+  val simpleCsvReader = DataReaders.Simple.csv[PassengerCSV](
+    path = Some(passengerCsvPath), // Path should be optional so can also pass in as a parameter
+    schema = PassengerCSV.getClassSchema.toString, // Input schema
+    key = _.getPassengerId.toString // Entity to score
+  )
+
+  val simpleStreamingReader = StreamingReaders.Simple.avro[Passenger](
+    key = _.getPassengerId.toString  // Entity to score
+  )
 
   lazy val dataReader: AggregateAvroReader[Passenger] =
     DataReaders.Aggregate.avro[Passenger](

@@ -10,6 +10,7 @@ import org.apache.spark.sql.Encoder
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.WeakTypeTag
+import com.salesforce.op.readers.ReaderKey.randomKey
 
 
 /**
@@ -190,12 +191,5 @@ object DataReaders {
     ): ConditionalCSVProductReader[T] = csvProduct(path, key, conditionalParams)
 
   }
-
-  /**
-   * Random key function
-   *
-   * @return a random key value
-   */
-  def randomKey[T](t: T): String = util.Random.nextLong().toString
 
 }

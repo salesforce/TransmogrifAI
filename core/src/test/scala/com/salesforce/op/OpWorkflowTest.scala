@@ -5,7 +5,7 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.Evaluators
+import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
@@ -14,6 +14,7 @@ import com.salesforce.op.stages.base.unary._
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning.DataBalancer
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -41,7 +42,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   private val densityByHeightNormed = density * heightNormed
   private val whyNotNormed = new NormEstimatorTest[Real]().setInput(densityByHeightNormed).getOutput()
   private val densityNormed = new NormEstimatorTest[Real]().setInput(density).getOutput()
-  // *****************************************************************
 
   private lazy val workflow = new OpWorkflow().setResultFeatures(whyNotNormed, weightNormed)
 
@@ -114,7 +114,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   it should s"return an ${classOf[OpWorkflowModel].getSimpleName} when it is fit" in {
     val model = workflow.setReader(dataReader).train()
 
-    model.parent shouldBe workflow
     model.getStages().length shouldBe 5
     model.getResultFeatures() shouldBe workflow.getResultFeatures()
     model.getOriginStageOf(heightNormed).isInstanceOf[UnaryModel[_, _]]
@@ -235,8 +234,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .getOutput()
     val (pred, rawPred, prob) =
       BinaryClassificationModelSelector.withCrossValidation(
-        seed = 42,
-        splitter = Option(DataBalancer(reserveTestFraction = 0.2)))
+        seed = 4242,
+        splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)))
         .setModelsToTry(LogisticRegression)
         .setLogisticRegressionRegParam(0.01, 0.1)
         .setInput(survivedNum, checked)
@@ -252,6 +251,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     summary.contains("logreg") shouldBe true
     summary.contains(""""regParam" : "0.1"""") shouldBe true
     summary.contains(""""regParam" : "0.01"""") shouldBe true
+    summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
+    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
   }
 
   it should "be able to refit a workflow with calibrated probability" in {
@@ -302,13 +303,10 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setPredictionCol(pred)
 
     val scores1 = fittedWorkflow.score(keepIntermediateFeatures = true)
-    val (scores2, metrics2) = fittedWorkflow.scorePipeline(keepIntermediateFeatures = true,
-      evaluator = Option(evaluator))
-    val (scores3, metrics3) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator, keepIntermediateFeatures = true)
+    val (scores2, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator, keepIntermediateFeatures = true)
 
     val fields1 = scores1.schema.fields
     val fields2 = scores2.schema.fields
-    val fields3 = scores2.schema.fields
 
     scores1.collect().sortBy(_.getAs[String](DataFrameFieldNames.KeyFieldName)) should contain theSameElementsAs
       scores2.collect().sortBy(_.getAs[String](DataFrameFieldNames.KeyFieldName))
@@ -316,18 +314,12 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     scores1.schema.fields.map(_.metadata.toString()) should contain theSameElementsAs
       scores2.schema.fields.map(_.metadata.toString())
 
-    scores1.collect().sortBy(_.getAs[String](DataFrameFieldNames.KeyFieldName)) should contain theSameElementsAs
-      scores3.collect().sortBy(_.getAs[String](DataFrameFieldNames.KeyFieldName))
-    scores1.schema.fields.map(_.name) should contain theSameElementsAs scores3.schema.fields.map(_.name)
-    scores1.schema.fields.map(_.metadata.toString()) should contain theSameElementsAs
-      scores3.schema.fields.map(_.metadata.toString())
-
-    metrics2.get.toMap should contain theSameElementsAs metrics3.toMap
+    metrics shouldBe BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0)
   }
 
   it should "return an empty data set if passed empty data for scoring" in {
     val model = new OpWorkflow().setResultFeatures(whyNotNormed, weightNormed).setReader(dataReader).train()
-    val emptyReader = new CustomReader[Passenger](DataReaders.randomKey) {
+    val emptyReader = new CustomReader[Passenger](ReaderKey.randomKey) {
       def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Passenger], Dataset[Passenger]] =
         Left(spark.sparkContext.emptyRDD[Passenger])
     }
@@ -346,19 +338,32 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     )
   }
 
-  it should "work with data passed in as setInput rather than a DataReader" in {
-    val data = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
+  it should "work with data passed in RDD rather than DataReader" in {
+    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
     val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
     val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
     val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
-    val f4 = f1 + f2
-    val f5 = f4 + f3
-    val wf = new OpWorkflow().setResultFeatures(f5)
-      .setInputRDD[(Double, Double, Double)](data)
-    val wfm = wf.train().save(checkpointDir + "/setInput")
-    val loaded = wf.loadModel(checkpointDir + "/setInput")
-    val scores = loaded.setInputRDD[(Double, Double, Double)](data).score()
-    scores.collect().map(_.getDouble(0)).toSeq shouldEqual Seq(6.0, 6.0, 6.0)
+    val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
+    val wf = new OpWorkflow().setResultFeatures(f).setInputRDD(rdd)
+    val modelLocation = checkpointDir + "/setInputRDD"
+    wf.train().save(modelLocation)
+    val scores = wf.loadModel(modelLocation).setInputRDD(rdd).score()
+    scores.collect(f) shouldEqual Seq.fill(3)(0.0.toRealNN)
+  }
+
+  it should "work with data passed in Dataset rather than DataReader" in {
+    import spark.implicits._
+    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
+    val ds = spark.createDataset(rdd)
+    val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
+    val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
+    val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
+    val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
+    val wf = new OpWorkflow().setResultFeatures(f).setInputDataset(ds)
+    val modelLocation = checkpointDir + "/setInputDataset"
+    wf.train().save(modelLocation)
+    val scores = wf.loadModel(modelLocation).setInputDataset(ds).score()
+    scores.collect(f) shouldEqual Seq.fill(3)(0.0.toRealNN)
   }
 
 }
@@ -390,7 +395,7 @@ class NormEstimatorTest[I <: Real](uid: String = UID[NormEstimatorTest[_]])
   }
 }
 
-private final class NormEstimatorTestModel[I <: Real]
+final class NormEstimatorTestModel[I <: Real] private[op]
 (
   val min: Double,
   val max: Double,

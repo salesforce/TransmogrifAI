@@ -48,7 +48,8 @@ class Geolocation(val value: Seq[Double]) extends OPList[Double] with Location {
   }
 
   override def toString: String = {
-    if (isEmpty) "Geolocation()" else f"Geolocation($lat%.5f, $lon%.5f, $accuracy)"
+    val vals = if (nonEmpty) f"$lat%.5f, $lon%.5f, $accuracy" else ""
+    s"${getClass.getSimpleName}($vals)"
   }
 
 }

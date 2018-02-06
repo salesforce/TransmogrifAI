@@ -1,10 +1,7 @@
 buildscript {
     repositories {
-        jcenter()
+        mavenCentral()
         maven { url "https://plugins.gradle.org/m2/" }
-        maven { url "https://oss.sonatype.org/content/repositories/releases" }
-        maven { url 'http://repo.spring.io/plugins-release' }
-        maven { url 'https://jitpack.io' }
     }
     dependencies {
         classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
@@ -15,10 +12,7 @@ plugins {
     id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
 }
 repositories {
-    jcenter()
     mavenCentral()
-    maven { url "https://oss.sonatype.org/content/repositories/releases/" }
-    maven { url "http://maven.twttr.com/" }
     maven { url "https://jitpack.io" }
     maven {
        url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
@@ -54,9 +48,9 @@ ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '8'
     junitVersion = '4.11'
-    sparkVersion = '2.1.1'
+    sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='3.2.0'
+    opVersion='3.2.3'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
 

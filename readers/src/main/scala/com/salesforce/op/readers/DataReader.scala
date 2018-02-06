@@ -5,19 +5,17 @@
 
 package com.salesforce.op.readers
 
+import com.salesforce.op.OpParams
 import com.salesforce.op.aggregators.CutOffTime
 import com.salesforce.op.features.types.FeatureTypeSparkConverter
 import com.salesforce.op.features.{FeatureSparkTypes, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.{OpParams, ReaderParams}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
 import org.joda.time.{DateTimeConstants, Duration}
-
-import scala.reflect.runtime.universe.WeakTypeTag
 
 
 /**
@@ -28,26 +26,13 @@ import scala.reflect.runtime.universe.WeakTypeTag
  *
  * @tparam T
  */
-trait DataReader[T] {
-  self: Reader[T] =>
-
-  implicit val wtt: WeakTypeTag[T]
-
-  final def fullTypeName: String = wtt.tpe.toString
-
-  final def typeName: String = fullTypeName.split("\\.").last
+trait DataReader[T] extends Reader[T] with ReaderKey[T] {
 
   /**
    * Default optional read path
    * @return optional read path
    */
   def readPath: Option[String]
-
-  /**
-   * Function for extracting key from a record
-   * @return key string
-   */
-  def key: T => String
 
   /**
    * All the reader's sub readers (used in joins)
@@ -109,16 +94,6 @@ trait DataReader[T] {
     val featureFields = rawFeatures.map(FeatureSparkTypes.toStructField(_))
     StructType(keyField +: featureFields)
   }
-
-
-  /**
-   * Default method for extracting this reader's parameters from readerParams in [[OpParams]]
-   *
-   * @param opParams contains map of reader type to ReaderParams instances
-   * @return ReaderParams instance if it exists
-   */
-  final def getReaderParams(opParams: OpParams): Option[ReaderParams] =
-    opParams.readerParams.get(this.typeName)
 
   /**
    * Default method for extracting the path used in read method. The path is taken in the following order
@@ -201,7 +176,6 @@ trait DataReader[T] {
  * @tparam T
  */
 trait AggregatedReader[T] extends DataReader[T] {
-  self: Reader[T] =>
   implicit val strEnc = Encoders.STRING
   implicit val seqEnc = Encoders.kryo[Seq[T]]
   implicit val tupEnc = Encoders.tuple[String, Seq[T]](strEnc, seqEnc)
@@ -248,7 +222,6 @@ trait AggregatedReader[T] extends DataReader[T] {
  * @tparam T
  */
 trait AggregateDataReader[T] extends AggregatedReader[T] {
-  self: Reader[T] =>
 
   /**
    * Aggregate data reader params
@@ -285,7 +258,6 @@ case class AggregateParams[T](timeStampFn: Option[T => Long], cutOffTime: CutOff
  * @tparam T
  */
 trait ConditionalDataReader[T] extends AggregatedReader[T] {
-  self: Reader[T] =>
 
   /**
    * Conditional data reader params

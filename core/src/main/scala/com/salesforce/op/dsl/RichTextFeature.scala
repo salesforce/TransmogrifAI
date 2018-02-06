@@ -85,6 +85,8 @@ trait RichTextFeature {
      * @param autoDetectThreshold  Language detection threshold. If none of the detected languages have
      *                             confidence greater than the threshold then defaultLanguage is used.
      * @param minTokenLength       minimum token length, >= 1.
+     * @param trackNulls           indicates whether or not to track null values in a separate column. Since features
+     *                             my be combined into a shared hash space here, the
      * @param toLowercase          indicates whether to convert all characters to lowercase before analyzing
      * @param numHashes            number of features (hashes) to generate
      * @param hashWithIndex        include indices when hashing a feature that has them (OPLists or OPVectors)
@@ -102,6 +104,7 @@ trait RichTextFeature {
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
@@ -123,7 +126,7 @@ trait RichTextFeature {
         minTokenLength = minTokenLength,
         toLowercase = toLowercase
       ))
-      new OPCollectionHashingVectorizer[TextList]()
+      val hashedFeatures = new OPCollectionHashingVectorizer[TextList]()
         .setInput(tokenized)
         .setNumFeatures(numHashes)
         .setHashWithIndex(hashWithIndex)
@@ -132,6 +135,12 @@ trait RichTextFeature {
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
         .getOutput()
+
+      if (trackNulls) {
+        val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
+        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+      }
+      else hashedFeatures
     }
 
     /**

@@ -88,7 +88,7 @@ class OpRandomForestTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a properly formed Random Forest when fitted" in {
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       randomForest.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
 
@@ -127,7 +127,7 @@ class OpRandomForestTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return a model for multiClassification problem" in {
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       randomForestMulti.setInput(labelMulti.copy(isResponse = true), featuresMulti.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
 

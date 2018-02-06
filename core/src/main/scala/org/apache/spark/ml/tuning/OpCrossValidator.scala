@@ -21,10 +21,10 @@
 package org.apache.spark.ml.tuning
 
 import com.github.fommil.netlib.F2jBLAS
+import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.annotation.Since
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.evaluation.Evaluator
-import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.util._
 import org.apache.spark.ml.{Estimator, Model}
@@ -37,8 +37,7 @@ import org.json4s.DefaultFormats
  * Modified version of Spark 2.x [[org.apache.spark.ml.tuning.CrossValidator]]
  * (commit d60f6f62d00ffccc40ed72e15349358fe3543311)
  *
- * - Added a boolean param `hasLeakage` to assess label leakage.
- * - In the fit function, data with leakage are grouped by id then split.
+ * In the fit function, data is grouped are grouped by key then split to avoid leakage
  */
 class OpCrossValidator (override val uid: String)
   extends Estimator[CrossValidatorModel]
@@ -47,12 +46,6 @@ class OpCrossValidator (override val uid: String)
   def this() = this(Identifiable.randomUID("cv"))
 
   private val f2jBLAS = new F2jBLAS
-
-  val hasLeakage: BooleanParam = new BooleanParam(this, "hasLeakage", "if there is leakage")
-  setDefault(hasLeakage, false)
-
-  /** @group setParam */
-  def setHasLeakage(value: Boolean): this.type = set(hasLeakage, value)
 
   /** @group setParam */
   def setEstimator(value: Estimator[_]): this.type = set(estimator, value)
@@ -73,7 +66,6 @@ class OpCrossValidator (override val uid: String)
 
   override def fit(dataset: Dataset[_]): CrossValidatorModel = {
 
-    val hasLeak = $(hasLeakage)
     val schema = dataset.schema
     transformSchema(schema, logging = true)
 
@@ -83,28 +75,19 @@ class OpCrossValidator (override val uid: String)
     val epm = $(estimatorParamMaps)
     val numModels = epm.length
     val metrics = new Array[Double](epm.length)
-    // scalastyle:off
     import sparkSession.implicits._
-    // scalastyle:on
-    val rdd = dataset.as[(Double, Vector, Double)].rdd
+    val rdd = dataset.as[LabelFeaturesKey].rdd
 
-    val splits = if (hasLeak) {
-      // group by ID then split
+    // group by key and then split
+    val rddRow = rdd.map(p => p._3 -> Row(p._1, p._2)).groupByKey()
 
-      val rddRow = rdd.map(p => p._3 -> Row(p._1, p._2))
-        .groupByKey()
-
-      MLUtils.kFold(rddRow, $(numFolds), $(seed))
-        .map { case (rdd1, rdd2) => (rdd1.values.flatMap(identity), rdd2.values.flatMap(identity))
-        }
-    } else {
-      MLUtils.kFold(rdd.map(p => Row(p._1, p._2)), $(numFolds), $(seed))
-    }
+    val splits = MLUtils.kFold(rddRow, $(numFolds), $(seed))
+      .map { case (rdd1, rdd2) => (rdd1.values.flatMap(identity), rdd2.values.flatMap(identity)) }
 
     val newSchema = StructType(schema.dropRight(1))
 
 
-    (splits.zipWithIndex).par.map { case ((training, validation), splitIndex) =>
+    splits.zipWithIndex.par.map { case ((training, validation), splitIndex) =>
 
       val trainingDataset = sparkSession.createDataFrame(training, newSchema).cache()
       val validationDataset = sparkSession.createDataFrame(validation, newSchema).cache()
@@ -173,13 +156,11 @@ private class OpCrossValidatorReader extends MLReader[OpCrossValidator] {
       ValidatorParams.loadImpl(path, sc, className)
     val numFolds = (metadata.params \ "numFolds").extract[Int]
     val seed = (metadata.params \ "seed").extract[Long]
-    val hasLeakage = (metadata.params \ "hasLeakage").extract[Boolean]
     new OpCrossValidator(metadata.uid)
       .setEstimator(estimator)
       .setEvaluator(evaluator)
       .setEstimatorParamMaps(estimatorParamMaps)
       .setNumFolds(numFolds)
       .setSeed(seed)
-      .setHasLeakage(hasLeakage)
   }
 }

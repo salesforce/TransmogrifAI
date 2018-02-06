@@ -42,7 +42,7 @@ class OpStringIndexerNoFilter[I <: Text]
   }
 }
 
-private final class OpStringIndexerNoFilterModel[I <: Text]
+final class OpStringIndexerNoFilterModel[I <: Text] private[op]
 (
   val labels: Seq[Option[String]],
   val otherPos: Int,

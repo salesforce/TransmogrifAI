@@ -14,6 +14,7 @@ import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, 
 import org.apache.spark.ml.Model
 import org.apache.spark.sql.Dataset
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
+import com.salesforce.op.stages.impl.selector.StageOperationName
 
 
 /**
@@ -85,7 +86,7 @@ case object BinaryClassificationModelSelector {
     new BinaryClassificationModelSelector(
       validator = validator,
       splitter = splitter,
-      trainTestEvaluators = trainTestEvaluators
+      evaluators = trainTestEvaluators
     ) // models on by default
       .setModelsToTry(RandomForest, LogisticRegression)
       // Random forest defaults
@@ -120,21 +121,21 @@ case object BinaryClassificationModelSelector {
  *
  * @param validator Cross Validation or Train Validation Split
  * @param splitter  instance that will balance and/or split the data
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
 private[op] class BinaryClassificationModelSelector
 (
   override val validator: OpValidator[ProbClassifier],
   override val splitter: Option[Splitter],
-  override val trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+  override val evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   override val uid: String = UID[BinaryClassificationModelSelector]
-) extends ClassificationModelSelector(validator, splitter, trainTestEvaluators, uid) {
+) extends ClassificationModelSelector(validator, splitter, evaluators, uid) with StageOperationName {
 
   override private[classification] val stage1uid: String = UID[Stage1BinaryClassificationModelSelector]
 
-  override lazy val stage1 = new Stage1BinaryClassificationModelSelector(validator = validator, splitter = splitter,
-    trainTestEvaluators = trainTestEvaluators, uid = stage1uid, stage2uid = stage2uid, stage3uid = stage3uid)
+  lazy val stage1 = new Stage1BinaryClassificationModelSelector(validator = validator, splitter = splitter,
+    evaluators = evaluators, uid = stage1uid, stage2uid = stage2uid, stage3uid = stage3uid)
 }
 
 /**
@@ -142,35 +143,15 @@ private[op] class BinaryClassificationModelSelector
  *
  * @param validator Cross Validation or Train Validation Split
  * @param splitter  instance that will balance and split the data
- * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation.
+ * @param evaluators List of evaluators applied on training + holdout data for evaluation.
  * @param uid
  */
-
-private[classification] class Stage1BinaryClassificationModelSelector
+private[op] class Stage1BinaryClassificationModelSelector
 (
   validator: OpValidator[ProbClassifier],
   splitter: Option[Splitter],
-  trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+  evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[Stage1BinaryClassificationModelSelector],
   stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
   stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
-) extends Stage1ClassificationModelSelector(validator, splitter, trainTestEvaluators, uid, stage2uid, stage3uid) {
-
-  final override protected def evaluate(
-    data: Dataset[_],
-    labelColName: String,
-    predictionColName: String,
-    best: => Model[_ <: Model[_]]
-  ): EvaluationMetrics = {
-    val metricsMap = trainTestEvaluators.map { case evaluator =>
-      evaluator.name -> evaluator
-        .setLabelCol(labelColName)
-        .setRawPredictionCol(rawPredictionColName)
-        .setPredictionCol(predictionColName)
-        .setProbabilityCol(probabilityColName)
-        .evaluateAll(data)
-    }.toMap
-
-    MultiMetrics(metricsMap)
-  }
-}
+) extends Stage1ClassificationModelSelector(validator, splitter, evaluators, uid, stage2uid, stage3uid)

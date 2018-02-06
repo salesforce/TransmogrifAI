@@ -38,7 +38,7 @@ To exclude a file from templating (the best reason for this is if the file is bi
 This templating engine has directives in comments that look like:
 ```scala
 val (pred, raw, prob) = BinaryClassificationModelSelector() /* << PROBLEM_KIND */
-    .setInput(labelFixed, checkedFeatures)
+    .setInput(label, checkedFeatures)
     .getOutput()
 ```
 
@@ -60,7 +60,7 @@ object /* APP_NAME >> */ Simple extends OpApp with Features {
 ##### 1.
 ```scala
 val (pred, raw, prob) = BinaryClassificationModelSelector()   /* << PROBLEM_KIND */
-    .setInput(labelFixed, checkedFeatures)
+    .setInput(label, checkedFeatures)
     .getOutput()
 ```
 
@@ -68,7 +68,7 @@ with `Map("PROBLEM_KIND" -> "MY_VALUE")` becomes:
 
 ```scala
 val (pred, raw, prob) = MY_VALUE
-    .setInput(labelFixed, checkedFeatures)
+    .setInput(label, checkedFeatures)
     .getOutput()
 ```
 
@@ -112,7 +112,7 @@ hello world
 ```scala
  val checkedFeatures = new SanityChecker()
     .setCheckSample(0.10)
-    .setInput(labelFixed, featureVector) /* << NEW_INPUT */
+    .setInput(label, featureVector) /* << NEW_INPUT */
     .getOutput()
 ```
 

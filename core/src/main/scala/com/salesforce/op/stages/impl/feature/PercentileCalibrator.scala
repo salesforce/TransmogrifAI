@@ -60,7 +60,7 @@ class PercentileCalibrator(uid: String = UID[PercentileCalibrator])
 }
 
 
-private final class PercentileCalibratorModel
+final class PercentileCalibratorModel private[op]
 (
   val splits: Array[Double],
   val actualNumBuckets: Int,

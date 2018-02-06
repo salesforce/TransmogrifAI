@@ -7,6 +7,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
@@ -31,7 +32,7 @@ import scala.reflect.runtime.universe.TypeTag
 class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPCollectionHashingVectorizer[_]])
   (implicit tti: TypeTag[T], val ttvi: TypeTag[T#Value])
   extends SequenceTransformer[T, OPVector](operationName = "vecColHash", uid = uid)
-  with VectorizerDefaults with PivotParams with CleanTextFun {
+    with VectorizerDefaults with PivotParams with CleanTextFun with HashingFun {
 
   final val numFeatures = new IntParam(
     parent = this, name = "numFeatures",
@@ -88,18 +89,140 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
    *
    * @return true if the shared hashing space to be used, false otherwise
    */
-  def isSharedHashSpace: Boolean =
-    (getNumFeatures() * inN.length) > TransmogrifierDefaults.MaxNumOfFeatures || $(forceSharedHashSpace)
+  def isSharedHashSpace: Boolean = this.isSharedHashSpace(makeHashingParams())
 
   /**
    * Get the underlying hashing transformer
    *
    * @return
    */
-  def hashingTF(): HashingTF = {
-    new HashingTF(numFeatures = $(numFeatures))
-      .setBinary($(binaryFreq))
-      .setHashAlgorithm($(hashAlgorithm))
+  def hashingTF(): HashingTF = this.hashingTF(makeHashingParams())
+
+  private def makeHashingParams() = HashingFunctionParams(
+    hashWithIndex = $(hashWithIndex),
+    prependFeatureName = $(prependFeatureName),
+    numFeatures = $(numFeatures),
+    numInputs = inN.length,
+    maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
+    forceSharedHashSpace = $(forceSharedHashSpace),
+    binaryFreq = $(binaryFreq),
+    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
+  )
+
+  override def transformFn: Seq[T] => OPVector = in => hash[T](makeHashingParams(), in)
+
+  /**
+   * Function to be called on getMetadata
+   */
+  override def onGetMetadata(): Unit = {
+    val meta = makeVectorMetadata(makeHashingParams(), outputName)
+    setMetadata(meta.toMetadata)
+  }
+}
+
+/**
+ * Hashing functionality
+ */
+private[op] trait HashingFun {
+  self: OpPipelineStageBase =>
+
+  /**
+   * Hashing Parameters
+   *
+   * @param hashWithIndex        if true, include indices when hashing a feature that has them (OPLists or OPVectors)
+   * @param prependFeatureName   if true, prepends a input feature name to each token of that feature
+   * @param numFeatures          number of features (hashes) to generate
+   * @param numInputs            number of inputs
+   * @param maxNumOfFeatures     max number of features (hashes)
+   * @param forceSharedHashSpace if true, then force the hash space to be shared among all included features
+   * @param binaryFreq           if true, term frequency vector will be binary such that non-zero term counts
+   *                             will be set to 1.0
+   * @param hashAlgorithm        hash algorithm to use
+   */
+  case class HashingFunctionParams
+  (
+    hashWithIndex: Boolean,
+    prependFeatureName: Boolean,
+    numFeatures: Int,
+    numInputs: Int,
+    maxNumOfFeatures: Int,
+    forceSharedHashSpace: Boolean,
+    binaryFreq: Boolean,
+    hashAlgorithm: HashAlgorithm
+  )
+
+  /**
+   * Determine if the transformer should use a shared hash space for all features or not
+   *
+   * @return true if the shared hashing space to be used, false otherwise
+   */
+  protected def isSharedHashSpace(p: HashingFunctionParams) =
+    (p.numFeatures * p.numInputs) > p.maxNumOfFeatures || p.forceSharedHashSpace
+
+  /**
+   * HashingTF instance
+   */
+  protected def hashingTF(p: HashingFunctionParams): HashingTF = {
+    new HashingTF(numFeatures = p.numFeatures)
+      .setBinary(p.binaryFreq)
+      .setHashAlgorithm(p.hashAlgorithm.toString.toLowerCase)
+  }
+
+  protected def makeVectorMetadata(p: HashingFunctionParams, outputName: String): OpVectorMetadata = {
+    def inN = getTransientFeatures()
+    val numFeatures = p.numFeatures
+    val cols =
+      if (isSharedHashSpace(p)) {
+        val allNames = inN.map(_.name)
+        (0 until numFeatures).map { i =>
+          OpVectorColumnMetadata(
+            parentFeatureName = inN.map(_.name),
+            parentFeatureType = inN.map(_.typeName),
+            indicatorGroup = None,
+            indicatorValue = None
+          )
+        }.toArray
+      } else {
+        for {
+          f <- inN
+          i <- 0 until numFeatures
+        } yield OpVectorColumnMetadata(
+          parentFeatureName = Seq(f.name),
+          parentFeatureType = Seq(f.typeName),
+          indicatorGroup = None,
+          indicatorValue = None
+        )
+      }
+    OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+  }
+
+  /**
+   * Hashes input sequence of values into OPVector using the supplied hashing params
+   */
+  protected def hash[T <: OPCollection](p: HashingFunctionParams, in: Seq[T]): OPVector = {
+    if (in.isEmpty) OPVector.empty
+    else {
+      val hasher = hashingTF(p)
+      val fNameHashesWithInputs = getTransientFeatures().map(f => hasher.indexOf(f.name)).zip(in)
+
+      if (isSharedHashSpace(p)) {
+        val allElements = ArrayBuffer.empty[Any]
+        for {
+          (featureNameHash, el) <- fNameHashesWithInputs
+          prepared = prepare[T](el, p.hashWithIndex, p.prependFeatureName, featureNameHash)
+          p <- prepared
+        } allElements.append(p)
+
+        hasher.transform(allElements).asML.toOPVector
+      }
+      else {
+        val hashedVecs =
+          fNameHashesWithInputs.map { case (featureNameHash, el) =>
+            hasher.transform(prepare[T](el, p.hashWithIndex, p.prependFeatureName, featureNameHash)).asML
+          }
+        VectorsCombiner.combine(hashedVecs).toOPVector
+      }
+    }
   }
 
   /**
@@ -112,7 +235,7 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
    * @param el element we are hashing (eg. an OPList, OPMap, etc.)
    * @return an Iterable object corresponding to the hashed element
    */
-  private def prepare(
+  private def prepare[T <: OPCollection](
     el: T,
     shouldHashWithIndex: Boolean,
     shouldPrependFeatureName: Boolean,
@@ -135,73 +258,4 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
     if (shouldPrependFeatureName) res.map(v => s"${featureNameHash}_$v") else res
   }
 
-  /**
-   * Function used to convert input to output
-   */
-  override def transformFn: Seq[T] => OPVector = in => {
-    if (in.isEmpty) OPVector.empty
-    else {
-      // TODO: make hasher a lazy val to prevent repeated instatiation
-      val hasher = hashingTF()
-      val shouldHashWithIndex = $(hashWithIndex)
-      val shouldPrependFeatureName = $(prependFeatureName)
-      // TODO: perhaps change the hashing so that we can test Text vs. TextMap vectorization equivalence easier?
-      val fNameHashesWithInputs = getTransientFeatures().map(f => hasher.indexOf(f.name)).zip(in)
-      // println(s"getTransientFeatures(): ${getTransientFeatures().toList}")
-      // getTransientFeatures().foreach(f => println(f.name, f.originFeatures))
-      // println(s"fNameHashesWithInputs: ${fNameHashesWithInputs.toList}")
-
-      if (isSharedHashSpace) {
-        val allElements = ArrayBuffer.empty[Any]
-        for {
-          (featureNameHash, el) <- fNameHashesWithInputs
-          prepared = prepare(el, shouldHashWithIndex, shouldPrependFeatureName, featureNameHash)
-          p <- prepared
-        } allElements.append(p)
-
-        // println(s"allElements: ${allElements.toList}")
-        // println(s"hasher.transform(allElements): ${hasher.transform(allElements)}")
-        // println(s"hasher.transform(allElements).asML.toOPVector: ${hasher.transform(allElements).asML.toOPVector}")
-
-        hasher.transform(allElements).asML.toOPVector
-      }
-      else {
-        val hashedVecs =
-          fNameHashesWithInputs.map { case (featureNameHash, el) =>
-            hasher.transform(prepare(el, shouldHashWithIndex, shouldPrependFeatureName, featureNameHash)).asML
-          }
-        VectorsCombiner.combine(hashedVecs).toOPVector
-      }
-    }
-  }
-
-  /**
-   * Function to be called on getMetadata
-   */
-  override protected def onGetMetadata(): Unit = {
-    val numFeatures = getNumFeatures()
-    val cols =
-      if (isSharedHashSpace) {
-        val allNames = inN.map(_.name)
-        (0 until numFeatures).map { i =>
-          OpVectorColumnMetadata(
-            parentFeatureName = inN.map(_.name),
-            parentFeatureType = inN.map(_.typeName),
-            indicatorGroup = None,
-            indicatorValue = None
-          )
-        }.toArray
-      } else {
-        for {
-          f <- inN
-          i <- 0 until numFeatures
-        } yield OpVectorColumnMetadata(
-          parentFeatureName = Seq(f.name),
-          parentFeatureType = Seq(f.typeName),
-          indicatorGroup = None,
-          indicatorValue = None
-        )
-      }
-    setMetadata(OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inN, stageName)).toMetadata)
-  }
 }

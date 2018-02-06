@@ -5,14 +5,16 @@
 
 package com.salesforce.op.cli
 
-import java.io.{ByteArrayOutputStream, File, FileWriter, StringReader}
+import java.io.{ByteArrayOutputStream, File, StringReader}
 
+import com.salesforce.op.OpWorkflowRunType
 import com.salesforce.op.test.TestCommon
-import org.scalatest.{Assertions, BeforeAndAfter, FlatSpec}
+import org.scalactic.source
+import org.scalatest.{Assertion, Assertions, BeforeAndAfter, FlatSpec}
+import org.slf4j.LoggerFactory
 
 import scala.io.Source
 import scala.language.postfixOps
-import scala.sys.process._
 
 /**
  * Test for generator operations
@@ -21,17 +23,30 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
   CommandParser.AUTO_ENABLED = true
 
   protected val ProjectName = "CliGeneratedTestProject"
+  val log = LoggerFactory.getLogger("cli-test")
 
   trait Outcome
-
   case class Crashed(msg: String, code: Int) extends Throwable with Outcome {
     override def toString: String = s"Crashed($msg, $code)"
   }
-
   case object Succeeded extends Outcome
-
   case class Result(outcome: Outcome, out: String, err: String)
 
+  def assertResult(r: Result, expected: Outcome)(implicit pos: source.Position): Assertion = {
+    def logMsg = s"out=\n${r.out}\nerr=\n${r.err}"
+    r.outcome match {
+      case v if v == expected =>
+        log.info(logMsg)
+        succeed
+      case bad@Crashed(msg, code) =>
+        log.error(logMsg)
+        log.error("Crash stack trace: ", bad: Throwable)
+        fail(s"Crashed: code=$code, msg='$msg'")
+      case v =>
+        log.error(logMsg)
+        fail(s"Unexpected result: $v")
+    }
+  }
 
   class Sut(input: String = "") extends CliExec {
     override protected val DEBUG = true
@@ -62,13 +77,9 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
     }
   }
 
-  before {
-    new Sut().delete(new File(ProjectName))
-  }
+  before { new Sut().delete(new File(ProjectName)) }
 
-  after {
-    new Sut().delete(new File(ProjectName))
-  }
+  after { new Sut().delete(new File(ProjectName)) }
 
   val expectedSourceFiles = "Features.scala" :: s"$ProjectName.scala"::Nil
 
@@ -98,12 +109,22 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
     }
   }
 
-  protected val TestAvsc = "test-data/PassengerDataAll.avsc"
-  protected val TestCsvHeadless = "test-data/PassengerDataAll.csv"
-  protected val TestCsvWithHeaders = "test-data/PassengerDataAllWithHeader.csv"
-  protected lazy val dataPath = new File(".").getAbsolutePath + "/" + TestCsvHeadless
+  def findFile(relPath: String): String = {
+    Option(new File(relPath)) filter (_.exists) orElse
+    Option(new File(new File(".."), relPath)) filter (_.exists) getOrElse {
+      throw new UnsupportedOperationException(
+        s"Could not find file $relPath, current is ${new File(".").getAbsolutePath}")
+    } getAbsolutePath
+  }
 
-  protected def appRuntimeArgs(whatToDo: String) =
-    s"--run-type=$whatToDo --model-location=/tmp/titanic-model " +
-    s"--read-location Passenger=$dataPath"
+  protected lazy val TestAvsc: String = findFile("test-data/PassengerDataAll.avsc")
+  protected lazy val TestCsvHeadless: String = findFile("test-data/PassengerDataAll.csv")
+  protected lazy val TestSmallCsvWithHeaders: String = findFile("test-data/PassengerDataWithHeader.csv")
+  protected lazy val TestBigCsvWithHeaders: String = findFile("test-data/PassengerDataAllWithHeader.csv")
+  protected lazy val AvcsSchema: String = findFile("templates/simple/src/main/avro/Passenger.avsc")
+  protected lazy val AnswersFile: String = findFile("cli/passengers.answers")
+
+  protected def appRuntimeArgs(runType: OpWorkflowRunType) =
+    s"--run-type=${runType.toString.toLowerCase} --model-location=/tmp/titanic-model " +
+    s"--read-location Passenger=$TestCsvHeadless"
 }

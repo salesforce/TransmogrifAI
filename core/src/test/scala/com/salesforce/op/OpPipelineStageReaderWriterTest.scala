@@ -7,14 +7,14 @@ package com.salesforce.op
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.OpPipelineStageBase
+import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageReader, OpPipelineStageWriter}
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryLambdaTransformer, UnaryModel}
 import com.salesforce.op.stages.impl.feature.PercentileCalibrator
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.ml.OpPipelineStageReadWriteShared._
-import org.apache.spark.ml.{Model, OpPipelineStageReader, OpPipelineStageWriter, Transformer}
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import org.apache.spark.ml.{Model, Transformer}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types.{DataType, Metadata, MetadataBuilder}
 import org.json4s.JsonAST.JValue
@@ -148,7 +148,7 @@ class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
   }
 }
 
-private final class MinMaxNormEstimatorModel
+final class MinMaxNormEstimatorModel private[op]
 (
   val min: Double,
   val max: Double,

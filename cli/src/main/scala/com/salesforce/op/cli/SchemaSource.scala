@@ -7,14 +7,16 @@ package com.salesforce.op.cli
 
 import java.io.{File, FileWriter}
 
-import collection.JavaConverters._
 import com.salesforce.op.cli.gen.{AvroField, Ops}
-import com.salesforce.op.readers.DataReaders
+import com.salesforce.op.readers.{CSVAutoReader, DataReaders, ReaderKey}
+import com.salesforce.op.utils.io.csv.CSVOptions
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.{SparkConf, SparkContext}
+
+import scala.collection.JavaConverters._
 
 /**
  * A variety of functionalities for pulling data schema.
@@ -75,9 +77,20 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
     println(
       s"""Launching spark to read data from the file $dataFile to deduce data schema.
       |This may take a while, depending on the input file size.""".stripMargin)
-    val dataReader = DataReaders.Simple.csvAuto[GenericRecord](
-      path = Option(dataFile.getAbsolutePath)
-    )
+    val dataReader1 = DataReaders.Simple.csvAuto[GenericRecord](path = Option(dataFile.getAbsolutePath))
+
+    val dataReader: CSVAutoReader[GenericRecord] =
+      new CSVAutoReader[GenericRecord](
+        readPath = Option(dataFile.getAbsolutePath),
+        key = ReaderKey.randomKey _,
+        headers = Seq.empty,
+        options = new CSVOptions(format = "org.apache.spark.sql.execution.datasources.csv.CSVFileFormat")
+      )
+
+    val hadoopConfig = sc.hadoopConfiguration
+    hadoopConfig.set("fs.hdfs.impl", classOf[org.apache.hadoop.hdfs.DistributedFileSystem].getName)
+    hadoopConfig.set("fs.file.impl", classOf[org.apache.hadoop.fs.LocalFileSystem].getName)
+
     val schema = dataReader.readRDD().first.getSchema
     schema
   }
@@ -117,8 +130,8 @@ case class AvroSchemaFromFile(schemaFile: File) extends SchemaSource {
     Ops.oops(s"Schema '${dataSchema.getFullName}' must be a record schema, check out $schemaFile")
   }
 
-  val name = dataSchema.getName
-  lazy val fullName = dataSchema.getFullName
+  val name: String = dataSchema.getName
+  lazy val fullName: String = dataSchema.getFullName
   val theReader = "ReaderWithNoHeaders"
 
   def responseField(name: String): AvroField = {

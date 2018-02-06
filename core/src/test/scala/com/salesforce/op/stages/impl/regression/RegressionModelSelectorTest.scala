@@ -50,7 +50,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     inputNames should have length 2
     inputNames shouldBe Array(label.name, features.name)
     modelSelector.getOutput().name shouldBe modelSelector.outputName
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       modelSelector.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }
@@ -183,7 +183,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
 
     val (train, test) = modelSelector.setInput(label, features)
-      .splitter.get.randomSplit(data.as[(Double, Vector)], 0.8)
+      .splitter.get.setReserveTestFraction(0.2).split(data.as[(Double, Vector)])
 
     val trainCount = train.count()
     val testCount = test.count()
@@ -212,15 +212,20 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
+    model.evaluateModel(data)
     val pred = model.getOutput()
 
-    // evaluation metrics from test set should be in metadata
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
-    // No evaluator passed so only the default one is there
-    val evaluatorMetricName = testEstimator.trainTestEvaluators.head.name
-
+    // evaluation metrics from train set should be in metadata
+    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
     RegressionEvalMetrics.values.foreach(metric =>
       assert(metaData.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+    )
+
+    // evaluation metrics from train set should be in metadata
+    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
     )
 
@@ -337,11 +342,12 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val model = testEstimator.fit(data)
 
     // checking trainingEval & holdOutEval metrics
+    model.evaluateModel(data)
     val metaData = model.getMetadata().getSummaryMetadata()
     val trainMetaData = metaData.getMetadata(ModelSelectorBaseNames.TrainingEval)
     val holdOutMetaData = metaData.getMetadata(ModelSelectorBaseNames.HoldOutEval)
 
-    testEstimator.trainTestEvaluators.foreach {
+    testEstimator.evaluators.foreach {
       case evaluator: OpRegressionEvaluator => {
         RegressionEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(

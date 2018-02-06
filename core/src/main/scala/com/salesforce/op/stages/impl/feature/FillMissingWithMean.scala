@@ -40,7 +40,7 @@ class FillMissingWithMean[N, I <: OPNumeric[N]]
 
 }
 
-private final class FillMissingWithMeanModel[I <: OPNumeric[_]]
+final class FillMissingWithMeanModel[I <: OPNumeric[_]] private[op]
 (
   val mean: Double,
   operationName: String,

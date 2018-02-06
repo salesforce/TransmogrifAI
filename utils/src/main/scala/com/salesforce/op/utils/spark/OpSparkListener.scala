@@ -7,6 +7,7 @@ package com.salesforce.op.utils.spark
 
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.version.VersionInfo
 import org.apache.spark.scheduler._
 import org.joda.time.Duration
 import org.joda.time.format.PeriodFormatterBuilder
@@ -65,7 +66,8 @@ class OpSparkListener
     appStartTime = appStartTime,
     appEndTime = appEndTime,
     appDuration = appEndTime - appStartTime,
-    stageMetrics = stageMetrics.toList
+    stageMetrics = stageMetrics.toList,
+    versionInfo = VersionInfo()
   )
 
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
@@ -103,7 +105,8 @@ class OpSparkListener
 }
 
 /**
- * App metrics container: contains the app info and all the stage metrics computed by the spark listener
+ * App metrics container.
+ * Contains the app info, all the stage metrics computed by the spark listener and project version info.
  */
 case class AppMetrics
 (
@@ -115,7 +118,8 @@ case class AppMetrics
   appStartTime: Long,
   appEndTime: Long,
   appDuration: Long,
-  stageMetrics: Seq[StageMetrics]
+  stageMetrics: Seq[StageMetrics],
+  versionInfo: VersionInfo
 ) extends JsonLike {
 
   def appDurationPretty: String = {

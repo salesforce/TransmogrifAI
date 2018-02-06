@@ -73,14 +73,12 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
   val expectedCorrFeatNames = featureNames.tail
   val expectedCorrFeatNamesIsNan = Seq(featureNames(0))
 
-
   val testData = testDataNoMeta.select(
     testDataNoMeta(targetLabelNoResponse.name),
     testDataNoMeta(featureVector.name).as(featureVector.name, testMetadata.toMetadata)
   )
 
   val targetLabel = targetLabelNoResponse.copy(isResponse = true)
-
 
   Spec[SanityChecker] should "remove trouble features" in {
     val checked = targetLabel.sanityCheck(featureVector,
@@ -148,7 +146,6 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
-
   it should "not remove trouble features" in {
 
     val sanityChecker = new SanityChecker()
@@ -183,7 +180,7 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "fail when features are defined incorrectly" in {
-    the[RuntimeException] thrownBy {
+    the[IllegalArgumentException] thrownBy {
       new SanityChecker().setInput(targetLabel.copy(isResponse = true), featureVector.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }
@@ -234,7 +231,7 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
 
     the[IllegalArgumentException] thrownBy {
       sanityChecker.fit(data)
-    } should have message "requirement failed: Nothing has been added to this summarizer."
+    } should have message "requirement failed: Sample size cannot be zero"
   }
 
   it should "compute higher spearman correlation for monotonic, nonlinear functions than pearson" in {

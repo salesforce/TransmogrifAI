@@ -7,9 +7,9 @@ package com.salesforce.op.cli.gen
 
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
+import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{Matchers, PropSpec}
 
 
 @RunWith(classOf[JUnitRunner])

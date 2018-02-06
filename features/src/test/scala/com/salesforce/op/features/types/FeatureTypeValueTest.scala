@@ -50,7 +50,6 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   private def mapGen[T](valGen: Gen[T]): Gen[Map[String, T]] = {
     Gen.nonEmptyMap(for {k <- textGen; v <- valGen} yield (k, v))
   }
-
   private final val binaryMapGen = mapGen(binaryGen)
   private final val doubleMapGen = mapGen(doubleGen)
   private final val longMapGen = mapGen(longGen)
@@ -63,6 +62,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   property("OPNumeric types should correctly wrap their corresponding Option types") {
     forAll { (x: Option[Double]) =>
       checkOptionVals(Real(x), x)
+      checkOptionVals(RealNN(x), if (x.isEmpty) Some(0.0) else x)
       checkOptionVals(Percent(x), x)
       checkOptionVals(Currency(x), x)
     }
@@ -107,9 +107,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   }
 
   property("OPSet types should correctly wrap their corresponding types") {
-    forAll(setGen) { x =>
-      checkVals(MultiPickList(x), x)
-    }
+    forAll(setGen) { x => checkVals(MultiPickList(x), x) }
   }
 
   property("OPMap types should correctly wrap their corresponding types") {
@@ -140,9 +138,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
       checkVals(PostalCodeMap(x), x)
       checkVals(StreetMap(x), x)
     }
-    forAll(setMapGen) { x =>
-      checkVals(MultiPickListMap(x), x)
-    }
+    forAll(setMapGen) { x => checkVals(MultiPickListMap(x), x) }
     forAll(geoMapGen) { x => checkVals(GeolocationMap(x), x) }
   }
 
@@ -162,12 +158,13 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
     (feature, value) match {
       case (f: Binary, v: Option[_]) =>
         f.toDouble shouldBe v.map(x => if (x == true) 1.0 else 0.0)
-      case (f: OPNumeric[_], _) =>
-        f.toDouble shouldBe value
-        f.toDouble(default = 947.21) shouldBe value.getOrElse(947.21)
+      case (f: OPNumeric[_], v) =>
+        f.toDouble shouldBe v
+        f.toDouble(default = 947.21) shouldBe v.getOrElse(947.21)
       case (f: Text, v) =>
         f.value shouldBe v // Nothing extra to check here yet
-      case _ => fail("Option types should only be passed to to OPNumeric and Text types")
+      case _ =>
+        fail("Option types should only be passed to to OPNumeric and Text types")
     }
     feature.value shouldBe value
     feature.nonEmpty shouldBe value.nonEmpty

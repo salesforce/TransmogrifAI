@@ -51,9 +51,7 @@ object Evaluators {
     def precision(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(name = OpMetricsNames.precision, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
         }
       }
@@ -64,9 +62,7 @@ object Evaluators {
     def recall(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(name = OpMetricsNames.recall, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
         }
       }
@@ -77,9 +73,7 @@ object Evaluators {
     def f1(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(name = OpMetricsNames.f1, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           new MulticlassMetrics(
             dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).fMeasure(1.0)
         }
@@ -114,13 +108,9 @@ object Evaluators {
       ) {
         override val name: String = metricName
         override val isLargerBetter: Boolean = islbt
-
         override def getDefaultMetric: SingleMetric => Double = _.value
-
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           val metric = evaluateFn(ds)
@@ -202,9 +192,7 @@ object Evaluators {
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           try {
@@ -214,11 +202,7 @@ object Evaluators {
             case iae: IllegalArgumentException =>
               val size = dataset.count
               val desc = s"dataset with ($getLabelCol, $getRawPredictionCol, $getProbabilityCol, $getPredictionCol)"
-              val msg = if (size == 0) {
-                s"empty $desc"
-              } else {
-                s"$desc of $size rows"
-              }
+              val msg = if (size == 0) s"empty $desc" else s"$desc of $size rows"
               throw new IllegalArgumentException(s"Metric $name failed on $msg", iae)
           }
         }
@@ -298,9 +282,7 @@ object Evaluators {
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
-          // scalastyle:off
           import dataset.sparkSession.implicits._
-          // scalastyle:on
           val ds = dataset.select(getLabelCol, getPredictionCol).as[(Double, Double)]
           val metric = evaluateFn(ds)
           SingleMetric(name, metric)
