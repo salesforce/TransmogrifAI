@@ -2,9 +2,7 @@ language: java
 
 jdk: openjdk8
 
-before_script: export JAVA_OPTS="-Xmx3g -Xms512m -Dfile.encoding=UTF-8"
-
-script: ./gradlew --parallel --no-daemon build
+script: ./gradlew --parallel build
 
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
