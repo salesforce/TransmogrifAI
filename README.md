@@ -13,7 +13,7 @@ Going one step further, lets assume that you wanted to create survival models fo
 (and that the data for ships always came in the same format). You can define your workflow in Optimus Prime:
 
 ```scala
-val features = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).vectorize()
+val features = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, features).getOutput()
 val workflow = new OpWorkflow().setResultFeatures(pred)
 ```
@@ -53,7 +53,7 @@ Optimus Prime defines many specific input feature types: Email, Phone, PostalCod
 Default (type specific) feature transformations can be used to create a feature vector:
 
 ```scala
-val features = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).vectorize()
+val features = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()
 ```
 
 Or each of these feature types can be manipulated directly by users (using type safe operations with editor tab completion) to achieve the desired feature engineering steps:
@@ -132,8 +132,7 @@ git clone https://github.com/salesforce/op.git
 
 Build the OP CLI by running:
 ```bash
-cd ./optimus-prime
-./gradlew cli:shadowJar
+cd ./op && ./gradlew cli:shadowJar
 alias op="java -cp `pwd`/cli/build/libs/\* com.salesforce.op.cli.CLI"
 ```
 
