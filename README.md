@@ -1,8 +1,8 @@
-# Octopus Prime (aka Optimus Prime)
+# Octopus Prime (aka Optimus Prime) [![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
 
 An AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning.
 
-[![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
+Latest release [3.2.3](https://github.com/salesforce/op/releases/latest).
 
 ## Overview
 Optimus Prime is a Machine Learning (ML) library to simplfy development of modeling
