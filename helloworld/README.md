@@ -131,8 +131,11 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 
 ### Data Preparation
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
+`pwd`/src/main/resources/EmailDataset/Clicks.csv `pwd`/src/main/resources/EmailDataset/Sends.csv"
+
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
+`pwd`src/main/resources/WebVisitsDataset/WebVisits.csv"
 ```
 
 ## Verify the Results
