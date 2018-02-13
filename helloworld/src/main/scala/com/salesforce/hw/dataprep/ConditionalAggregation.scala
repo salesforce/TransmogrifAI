@@ -27,7 +27,8 @@ import org.joda.time.format.DateTimeFormat
  * is never met, we simply drop the corresponding user from the prepared dataset.
  *
  * This is how you run this example from your command line:
- * ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation
+ * ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
+ * `pwd`src/main/resources/WebVisitsDataset/WebVisits.csv"
  */
 
 case class WebVisit(userId: String, url: String, productId: Option[Int], price: Option[Double], timestamp: String)
@@ -35,6 +36,8 @@ case class WebVisit(userId: String, url: String, productId: Option[Int], price: 
 object ConditionalAggregation {
 
   def main(args: Array[String]): Unit = {
+
+    if (args.length != 1) throw new IllegalArgumentException("Full path to WebVisit dataset was not provided")
 
     val conf = new SparkConf().setAppName("ConditionalAggregation")
     implicit val spark = SparkSession.builder.config(conf).getOrCreate()
@@ -55,7 +58,7 @@ object ConditionalAggregation {
     @transient lazy val formatter = DateTimeFormat.forPattern("yyyy-MM-dd::HH:mm:ss")
 
     val visitsReader = DataReaders.Conditional.csvCase[WebVisit](
-      path = Some("src/main/resources/WebVisitsDataset/WebVisits.csv"),
+      path = Option(args(0)),
       key = _.userId,
       conditionalParams = ConditionalParams(
         timeStampFn = visit => formatter.parseDateTime(visit.timestamp).getMillis,
