@@ -30,7 +30,8 @@ import org.joda.time.format.DateTimeFormat
  * obtained by joining the two tables.
  *
  * This is how you run this example from your command line:
- * ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates
+ * ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
+ * `pwd`/src/main/resources/EmailDataset/Clicks.csv `pwd`/src/main/resources/EmailDataset/Sends.csv"
  */
 
 
@@ -40,6 +41,8 @@ case class Send(sendId: Int, userId: Int, emailId: Int, timeStamp: String)
 object JoinsAndAggregates {
 
   def main(args: Array[String]): Unit = {
+
+    if (args.length != 2) throw new IllegalArgumentException("Full paths to Click and Send datasets were not provided")
 
     val conf = new SparkConf().setAppName("JoinsAndAggregates")
     implicit val spark = SparkSession.builder.config(conf).getOrCreate()
@@ -70,7 +73,7 @@ object JoinsAndAggregates {
     @transient lazy val formatter = DateTimeFormat.forPattern("yyyy-MM-dd::HH:mm:ss")
 
     val clicksReader = DataReaders.Aggregate.csvCase[Click](
-      path = Some("src/main/resources/EmailDataset/Clicks.csv"),
+      path = Option(args(0)),
       key = _.userId.toString,
       aggregateParams = AggregateParams(
         timeStampFn = Some[Click => Long](c => formatter.parseDateTime(c.timeStamp).getMillis),
@@ -79,7 +82,7 @@ object JoinsAndAggregates {
     )
 
     val sendsReader = DataReaders.Aggregate.csvCase[Send](
-      path = Some("src/main/resources/EmailDataset/Sends.csv"),
+      path = Option(args(1)),
       key = _.userId.toString,
       aggregateParams = AggregateParams(
         timeStampFn = Some[Send => Long](s => formatter.parseDateTime(s.timeStamp).getMillis),
