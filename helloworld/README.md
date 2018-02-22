@@ -46,7 +46,7 @@ Each project can be either be run with the gradle task, `sparkSubmit` (**recomme
 
 ### Titanic model - run with `spark-submit`
 
-First, build project with `./gradlew shadowjar`.
+First, build project with `./gradlew shadowJar`.
 Note: `SPARK_HOME` environment variable must be set.
 
 #### Train
