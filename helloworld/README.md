@@ -156,7 +156,7 @@ First, build project with `./gradlew installDist`. Then run:
 
 ## Verify the Results
 
-Look for the output file(s) in the location you specified. For instance, you can use [`avro-tools`](https://brewinstall.org/install-avro-tools-on-mac-with-brew/) to inspect the scores files.
+Look for the output file(s) in the location you specified. For instance, you can use `avro-tools` to inspect the scores files (on mac simply run `brew install avro-tools` to install it).
 
 Other than that, the best way to verify the results is to look through the logs that should have been generated during the run. It has all kinds of information about the features the processing and the model reliability.
 
