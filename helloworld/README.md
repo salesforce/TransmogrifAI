@@ -12,13 +12,21 @@ In addition, there are two examples of more complex kinds of data preparation th
 
 Each project can be either be run with the gradle task, `sparkSubmit` (**recommended**) or with the standard `spark-submit` command. We show examples of running the Titanic case with both gradle and spark-submit for completeness, but the rest of the instructions are for gradle only since that is the recommended submission method (it defines many other useful spark parameters). You should not mix submission methods (eg. don't train with the gradle task and score with spark-submit), as you may get class serialization errors.
 
+Note: make sure you have all the [Prerequisites](https://github.com/salesforce/op/wiki/Bootstrap-Your-First-Project#prerequisites).
+
 ### Titanic Simple
+
+First, build project with `./gradlew installDist`. Then run:
+
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
 `pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 
 ### Titanic model - run with gradle (**recommended**)
+
+First, build project with `./gradlew installDist`.
+
 #### Train
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
@@ -47,7 +55,6 @@ Each project can be either be run with the gradle task, `sparkSubmit` (**recomme
 ### Titanic model - run with `spark-submit`
 
 First, build project with `./gradlew shadowJar`.
-Note: `SPARK_HOME` environment variable must be set.
 
 #### Train
 ```shell
@@ -78,6 +85,9 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ```
 
 ### Boston model
+
+First, build project with `./gradlew installDist`.
+
 #### Train
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
@@ -104,6 +114,9 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ```
 
 ### Iris model
+
+First, build project with `./gradlew installDist`.
+
 #### Train
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
@@ -130,17 +143,20 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 ```
 
 ### Data Preparation
+
+First, build project with `./gradlew installDist`. Then run:
+
 ```shell
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
 `pwd`/src/main/resources/EmailDataset/Clicks.csv `pwd`/src/main/resources/EmailDataset/Sends.csv"
 
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
-`pwd`src/main/resources/WebVisitsDataset/WebVisits.csv"
+`pwd`/src/main/resources/WebVisitsDataset/WebVisits.csv"
 ```
 
 ## Verify the Results
 
-Look for the output file(s) in the location you specified.
+Look for the output file(s) in the location you specified. For instance, you can use `avro-tools` to inspect the scores files (on mac simply run `brew install avro-tools` to install it).
 
 Other than that, the best way to verify the results is to look through the logs that should have been generated during the run. It has all kinds of information about the features the processing and the model reliability.
 
