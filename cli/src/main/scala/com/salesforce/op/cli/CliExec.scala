@@ -12,13 +12,13 @@ package com.salesforce.op.cli
 import java.io.File
 
 import com.salesforce.op.cli.gen.Ops
+import org.apache.commons.io.FileUtils
 
 class CliExec {
   protected val DEBUG = false
 
   private[cli] def delete(dir: File): Unit = {
-    Option(dir.listFiles) foreach (_ foreach delete)
-    dir.delete()
+    FileUtils.deleteDirectory(dir)
     if (dir.exists()) {
       throw new IllegalStateException(s"Directory '${dir.getAbsolutePath}' still exists")
     }

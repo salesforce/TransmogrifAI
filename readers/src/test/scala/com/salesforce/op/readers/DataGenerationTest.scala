@@ -5,7 +5,10 @@
 
 package com.salesforce.op.readers
 
+import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.features.types._
 import com.salesforce.op.test._
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -22,9 +25,7 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
       path = Some(passengerAvroPath),
       key = _.getPassengerId.toString
     )
-    val dataSet = simpleAvroReader.generateDataFrame(
-      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    ).collect()
+    val dataSet = simpleAvroReader.generateDataFrame(rawFeatures).collect()
 
     val dataExpected = Array(
       Row("1", false, 32, Array("Female"), 168, 67, null, Array[Long](1471046200),
@@ -60,7 +61,7 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
     actualAt(10).toSet shouldEqual expectedAt(10).toSet
   }
 
-  Spec[AggregateDataReader[_]] should "read data and extract and aggregate the features to create a dataframe" in {
+  Spec[AggregateDataReader[_]] should "read data, extract and aggregate the features to create a dataframe" in {
     val dataExpected = Array(
       Row("1", null, 32, List("Female"), 168, 67, "", List(1471046200),
         Map("Female" -> "string"), Map("Female" -> 1.0), Map("Female" -> false)),
@@ -87,7 +88,7 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
 
 
   Spec[ConditionalDataReader[_]] should
-    "read data and extract and do conditional aggregation on the features to create a dataframe" in {
+    "read data, extract and do conditional aggregation on the features to create a dataframe" in {
 
     val dataSource = DataReaders.Conditional.avro[Passenger](
       path = Some(passengerAvroPath),
@@ -101,9 +102,7 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
       )
     )
 
-    val dataSet = dataSource.generateDataFrame(
-      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    ).collect()
+    val dataSet = dataSource.generateDataFrame(rawFeatures).collect()
 
     /* Logic on this should be double checked - conditional extractors
      * take target function if target is true get date from that record and use it
@@ -134,6 +133,30 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
     for { i <- 1 to 10 } {
       actualAt(i).toSet shouldEqual expectedAt(i).toSet
     }
+  }
+
+  it should
+    "read data, extract and do conditional aggregation on the features to create a dataframe with a user cutoff fn" in {
+    val dataSource = DataReaders.Conditional.avro[Passenger](
+      path = Some(passengerAvroPath),
+      key = _.getPassengerId.toString,
+      conditionalParams = ConditionalParams(
+        timeStampFn = _.getRecordDate.toLong,
+        targetCondition = _.getBoarded >= 1471046600,
+        responseWindow = None,
+        predictorWindow = None,
+        cutOffTimeFn = Some((key, rows) => CutOffTime.UnixEpoch(0)), // cut everything off
+        timeStampToKeep = TimeStampToKeep.Min
+      )
+    )
+    val dataSet = dataSource.generateDataFrame(rawFeatures)
+    dataSet.collect(age, gender, weight, description, boarded).foreach(r =>
+      r.productIterator.forall(_.asInstanceOf[FeatureType].isEmpty) shouldBe true
+    )
+    dataSet.collect(stringMap, numericMap, booleanMap).foreach(r =>
+      r.productIterator.forall(_.asInstanceOf[FeatureType].isEmpty) shouldBe true
+    )
+    dataSet.collect(height).foreach(_ shouldBe RealNN.empty)
   }
 
 }

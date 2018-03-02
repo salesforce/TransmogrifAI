@@ -210,6 +210,7 @@ trait RichTextFeature {
      *                            confidence greater than the threshold then defaultLanguage is used.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
+     * @param stripHtml           indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenize(
@@ -217,11 +218,12 @@ trait RichTextFeature {
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase
+      toLowercase: Boolean = TextTokenizer.ToLowercase,
+      stripHtml: Boolean = TextTokenizer.StripHtml
     ): FeatureLike[TextList] =
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
-        analyzer = TextTokenizer.Analyzer,
+        analyzer = if (stripHtml) TextTokenizer.AnalyzerHtmlStrip else TextTokenizer.Analyzer,
         autoDetectLanguage = autoDetectLanguage,
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,

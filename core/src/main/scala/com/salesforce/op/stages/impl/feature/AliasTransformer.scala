@@ -30,8 +30,7 @@ class AliasTransformer[I <: FeatureType](val name: String, uid: String = UID[Ali
   override def transformFn: I => I = identity
   override def outputName: String = name
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val newSchema = transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val meta = newSchema(in1.name).metadata
     dataset.select(col("*"), col(in1.name).as(outputName, meta))
   }

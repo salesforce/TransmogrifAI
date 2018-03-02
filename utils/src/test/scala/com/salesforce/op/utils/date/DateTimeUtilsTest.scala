@@ -8,8 +8,8 @@ package com.salesforce.op.utils.date
 import com.salesforce.op.test.TestCommon
 import org.joda.time.{DateTime, DateTimeZone}
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -34,8 +34,10 @@ class DateTimeUtilsTest extends FlatSpec with TestCommon {
 
   it should "get range between two dates" in {
     val numberOfDays = 500
-    val diff = DateTimeUtils.getRange(date.minusDays(numberOfDays).toString("YYYY/MM/dd"),
-      date.toString("YYYY/MM/dd"))
+    val diff = DateTimeUtils.getRange(
+      date.minusDays(numberOfDays).toString("YYYY/MM/dd"),
+      date.toString("YYYY/MM/dd")
+    )
     diff.length shouldBe numberOfDays + 1
   }
 

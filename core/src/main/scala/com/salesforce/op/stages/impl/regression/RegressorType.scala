@@ -11,5 +11,6 @@ import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.regression.RegressionModel
 
 object RegressorType {
-  type Regressor = Estimator[_ <: RegressionModel[Vector, _]]
+  type RegressorModel = RegressionModel[Vector, _]
+  type Regressor = Estimator[_ <: RegressorModel]
 }

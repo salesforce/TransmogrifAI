@@ -175,8 +175,7 @@ private[impl] trait SelectorRegressors
   extends HasLinearRegression
     with HasRandomForestRegressor
     with HasDecisionTreeRegressor
-    with HasGradientBoostedTreeRegression
-    with SelectorModels[Regressor, RegressionModelSelector] {
+    with HasGradientBoostedTreeRegression {
 
   // scalastyle:off
   import RegressionModelsToTry._
@@ -199,9 +198,10 @@ private[impl] trait SelectorRegressors
     this
   }
 
-  final override protected[impl] def modelInfo: Seq[ModelInfo[Regressor]] =
-    Seq(ModelInfo(sparkLR.asInstanceOf[Regressor], lRGrid, useLR),
-      ModelInfo(sparkRF.asInstanceOf[Regressor], rFGrid, useRF),
-      ModelInfo(sparkDT.asInstanceOf[Regressor], dTGrid, useDT),
-      ModelInfo(sparkGBT.asInstanceOf[Regressor], gBTGrid, useGBT))
+  final protected def getModelInfo: Seq[ModelInfo[Regressor]] = Seq(
+    ModelInfo(sparkLR.asInstanceOf[Regressor], lRGrid, useLR),
+    ModelInfo(sparkRF.asInstanceOf[Regressor], rFGrid, useRF),
+    ModelInfo(sparkDT.asInstanceOf[Regressor], dTGrid, useDT),
+    ModelInfo(sparkGBT.asInstanceOf[Regressor], gBTGrid, useGBT)
+  )
 }

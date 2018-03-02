@@ -382,24 +382,23 @@ class SanityChecker(uid: String = UID[SanityChecker])
    * list of features to be removed.
    */
   override def fitFn(data: Dataset[(RealNN#Value, OPVector#Value)]): BinaryModel[RealNN, OPVector, OPVector] = {
-    val ckSample = $(checkSample)
     val sampSeed = $(sampleSeed)
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)
 
-    val sampleData =
-      if (ckSample >= 1.0) {
-        logInfo(s"NOT sampling the data for Sanity Checker, since the specified check sample is $ckSample")
-        data
-      } else {
-        logInfo(s"Sampling the data for Sanity Checker with sample $ckSample and seed $sampSeed")
-        val dataCount = data.count()
-        data.sample(
-          withReplacement = false,
-          fraction = fraction(dataCount),
-          seed = sampSeed
-        )
-      }
+    val dataCount = data.persist().count()
+    val sampleFraction = fraction(dataCount)
+    val sampleData = if (sampleFraction < 1.0) {
+      logInfo(s"Sampling the data for Sanity Checker with sample $sampleFraction and seed $sampSeed")
+      data.sample(
+        withReplacement = false,
+        fraction = sampleFraction,
+        seed = sampSeed
+      )
+    } else {
+      logInfo(s"NOT sampling the data for Sanity Checker, since the calculated check sample is $sampleFraction")
+      data
+    }
 
     implicit val enc: Encoder[OldVector] = ExpressionEncoder()
     logInfo("Getting vector rows")
@@ -412,6 +411,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         OldVectors.dense(dense.toArray :+ label)
       case (label, _) => throw new IllegalArgumentException("Sanity checker input missing label for row")
     }.rdd.persist()
+    data.unpersist(blocking = false)
 
     logInfo("Calculating columns stats")
     val colStats = Statistics.colStats(vectorRows)
@@ -468,7 +468,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
       colStats = colStats,
       names = featureNames :+ in1.name,
       correlationType = corrType,
-      sample = ckSample
+      sample = sampleFraction
     )
     setMetadata(outputMeta.toMetadata.withSummaryMetadata(summary.toMetadata()))
 
@@ -513,11 +513,11 @@ final class SanityCheckerModel private[op]
 
 object SanityChecker {
   val CheckSample = 1.0
-  val SampleLowerLimit = 10
-  val SampleUpperLimit = 100000
+  val SampleLowerLimit = 1E3.toInt
+  val SampleUpperLimit = 1E6.toInt
   val MaxCorrelation = 0.95
   val MinCorrelation = 0.0
-  val MinVariance = 0.00001
+  val MinVariance = 1E-5
   val MaxCramersV = 0.95
   val RemoveBadFeatures = false
   val RemoveFeatureGroup = true

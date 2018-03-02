@@ -190,8 +190,7 @@ private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade t
   extends HasLogisticRegression
     with HasRandomForestClassifier
     with HasDecisionTreeClassifier
-    with HasNaiveBayes
-    with SelectorModels[ProbClassifier, Stage1ClassificationModelSelector] {
+    with HasNaiveBayes {
 
   /**
    * Set param for Thresholds of all classifiers to adjust the probability of predicting each class.
@@ -241,10 +240,11 @@ private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade t
   }
 
 
-  final override protected[impl] def modelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
+  final protected def getModelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
     ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
     ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
     ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
     ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
   )
+
 }

@@ -12,7 +12,7 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Params}
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
 import org.joda.time.{DateTime, DateTimeZone, Days}
@@ -126,8 +126,17 @@ class IntegralMapVectorizer[T <: OPMap[Long]](uid: String = UID[IntegralMapVecto
 class DateMapVectorizer[T <: OPMap[Long]](uid: String = UID[DateMapVectorizer[T]])(implicit tti: TypeTag[T])
   extends OPMapVectorizer[Long, T](uid = uid, operationName = "vecDateMap", convertFn = intMapToRealMap) {
 
+  val referenceDate = new Param[DateTime](parent = this, name = "referenceDate",
+    doc = "Reference date used to compare time to")
+  def setReferenceDate(date: DateTime): this.type = set(referenceDate, date)
+  def getReferenceDate(): DateTime = $(referenceDate)
+
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[Long, T] =
-    new DateMapVectorizerModel(args, operationName = operationName, uid = uid)
+    new DateMapVectorizerModel(
+      args.copy(referenceDate = Some(getReferenceDate())),
+      operationName = operationName,
+      uid = uid
+    )
 
 }
 
@@ -268,6 +277,8 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
  * @param shouldCleanKeys   should clean map keys
  * @param shouldCleanValues should clean map values
  * @param defaultValue      default value to replace with
+ * @param trackNulls        add column to track null values for each map key
+ * @param referenceDate     reference date to subtract off before converting times into to vector
  */
 sealed case class OPMapVectorizerModelArgs
 (
@@ -276,7 +287,8 @@ sealed case class OPMapVectorizerModelArgs
   shouldCleanKeys: Boolean,
   shouldCleanValues: Boolean,
   defaultValue: Double,
-  trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+  trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+  referenceDate: Option[DateTime] = None
 )
 
 sealed abstract class OPMapVectorizerModel[A, I <: OPMap[A]]
@@ -339,10 +351,10 @@ final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Long, T](args = args, operationName = operationName, uid = uid) {
   val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
-  val referenceDate = TransmogrifierDefaults.ReferenceDate
+  val reference = args.referenceDate.getOrElse(TransmogrifierDefaults.ReferenceDate)
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
-    dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
+    dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), reference).getDays.toDouble)
 }
 
 final class RealMapVectorizerModel[T <: OPMap[Double]] private[op]

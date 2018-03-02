@@ -250,7 +250,7 @@ case object DecisionTreeNumericBucketizer {
   val MaxDepth: Int = 5
   val MaxBins: Int = 32
   val MinInstancesPerNode: Int = 1
-  val MinInfoGain: Double = 0.1
+  val MinInfoGain: Double = 0.01
   val ShouldSplitKey = "shouldSplit"
   val SplitsKey = "splits"
   val Inclusion = com.salesforce.op.stages.impl.feature.Inclusion.Right

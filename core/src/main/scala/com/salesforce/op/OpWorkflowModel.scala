@@ -58,8 +58,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @throws IllegalArgumentException if a feature is not part of this workflow
    * @return Dataframe containing columns corresponding to all of the features generated before the feature given
    */
-  def computeDataUpTo(feature: OPFeature)(implicit spark: SparkSession): DataFrame = {
-    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = true)
+  def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit spark: SparkSession): DataFrame = {
+    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = true, persistEveryKStages = persistEveryKStages)
   }
 
   /**
@@ -169,10 +170,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    */
   def score(
     path: Option[String] = None,
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores
   )(implicit spark: SparkSession): DataFrame = {
     val (scores, _) = scoreFn(
       keepRawFeatures = keepRawFeatures,
@@ -207,10 +208,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   def scoreAndEvaluate(
     evaluator: OpEvaluatorBase[_ <: EvaluationMetrics],
     path: Option[String] = None,
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores,
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores,
     metricsPath: Option[String] = None
   )(implicit spark: SparkSession): (DataFrame, EvaluationMetrics) = {
     val (scores, metrics) = scoreFn(
@@ -240,10 +241,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   private[op] def scoreFn(
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores,
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores,
     evaluator: Option[OpEvaluatorBase[_ <: EvaluationMetrics]] = None,
     metricsPath: Option[String] = None
   )(implicit spark: SparkSession): Option[String] => (DataFrame, Option[EvaluationMetrics]) = {
@@ -338,9 +339,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
 
 case object OpWorkflowModel {
 
-  val keepRawFeatures = false
-  val keepIntermediateFeatures = false
-  val persistEveryKStages = 5
-  val persistScores = true
+  val KeepRawFeatures = false
+  val KeepIntermediateFeatures = false
+  val PersistEveryKStages = 5
+  val PersistScores = true
 
 }
