@@ -8,16 +8,16 @@ package com.salesforce.op
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
-import com.salesforce.op.stages.impl.selector.{HasTestEval, ModelSelectorBase}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.stages.FitStagesUtil
 import org.apache.spark.ml._
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
-import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable.{ArrayBuffer, ListBuffer}
+import scala.collection.mutable.ListBuffer
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Try
 
@@ -27,7 +27,7 @@ import scala.util.Try
  */
 private[op] trait OpWorkflowCore {
 
-  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
+  @transient implicit protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   // the uid of the stage
   def uid: String
@@ -170,61 +170,59 @@ private[op] trait OpWorkflowCore {
    * Fit the estimators to return a sequence of only transformers
    * Modified version of Spark 2.x Pipeline
    *
-   * @param data   dataframe to fit on
-   * @return fitted model
+   * @param data                dataframe to fit on
+   * @param stagesToFit         stages that need to be converted to transformers
+   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
+   * @return fitted transformers
    */
-  protected def fitStages(data: DataFrame, stagesToFit: Array[OPStage])
+  protected def fitStages(data: DataFrame, stagesToFit: Array[OPStage], persistEveryKStages: Int)
     (implicit spark: SparkSession): Array[OPStage] = {
 
     // TODO may want to make workflow take an optional reserve fraction
-    val splitters = stagesToFit.collect{ case s: ModelSelectorBase[_] => s.splitter }.flatten
+    val splitters = stagesToFit.collect{ case s: ModelSelectorBase[_, _] => s.splitter }.flatten
     val splitter = splitters.reduceOption{ (a, b) => if (a.getReserveTestFraction > b.getReserveTestFraction) a else b }
     val (train, test) = splitter.map(_.split(data)).getOrElse{ (data, spark.emptyDataFrame) }
     val hasTest = !test.isEmpty
 
+    val dag = computeStagesDAG(resultFeatures)
+      .map(_.filter(s => stagesToFit.contains(s._1)))
+      .filter(_.nonEmpty)
 
     // Search for the last estimator
-    val indexOfLastEstimator = stagesToFit.view.zipWithIndex
-      .collect { case (stage: Estimator[_], index) => index }
-      .lastOption.getOrElse(-1)
+    val indexOfLastEstimator = dag
+      .collect { case seq if seq.exists( _._1.isInstanceOf[Estimator[_]] ) => seq.head._2 }
+      .lastOption
 
-    val transformers = ListBuffer.empty[Transformer]
-    stagesToFit.view.zipWithIndex.foldLeft((train.toDF(), test.toDF())) {
-      case ((currTrain, currTest), (stage, index)) =>
-      if (index <= indexOfLastEstimator) { // only need to check for estimators before the last one
-        val transformer: Transformer = stage match {
-          case estimator: Estimator[_] =>
-            estimator.fit(currTrain) match {
-              case m: HasTestEval =>
-                if (hasTest) m.evaluateModel(currTest)
-                m
-              case m => m
-            }
-          case t: Transformer => t
-          case _ => throw new IllegalArgumentException(s"Does not support stage $stage of type ${stage.getClass}")
-        }
-        transformers += transformer
-        if (index < indexOfLastEstimator) { // only need to update for fit before last estimator
-          transformer.transform(currTrain) -> ( if (hasTest) transformer.transform(currTest) else currTest )
-        } else {
-          currTrain -> currTest
-        }
-      } else {
-        transformers += stage.asInstanceOf[Transformer]
-        currTrain -> currTest
-      }
+    val transformers = ListBuffer.empty[OPStage]
+
+    dag.foldLeft((train.toDF(), test.toDF())) {
+      case ((currTrain, currTest), stagesLayer) =>
+        val index = stagesLayer.head._2
+
+        val (newTrain, newTest, fitTransform) = FitStagesUtil.fitAndTransform(
+          train = currTrain,
+          test = currTest,
+          stages = stagesLayer.map(_._1),
+          transformData = indexOfLastEstimator.exists(_ < index), // only need to update for fit before last estimator
+          persistEveryKStages = persistEveryKStages,
+          doTest = Some(hasTest)
+        )
+
+        transformers.append(fitTransform: _*)
+        newTrain -> newTest
     }
-
-    transformers.map(_.asInstanceOf[OPStage]).toArray
+    transformers.toArray
   }
 
 
   /**
    * Returns a Dataframe containing all the columns generated up to the stop stage
-   *
+   * @param stopStage last stage to apply
+   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
    * @return Dataframe containing columns corresponding to all of the features generated before the feature given
    */
-  protected def computeDataUpTo(stopStage: Option[Int], fitted: Boolean)(implicit spark: SparkSession): DataFrame = {
+  protected def computeDataUpTo(stopStage: Option[Int], fitted: Boolean, persistEveryKStages: Int)
+    (implicit spark: SparkSession): DataFrame = {
     if (stopStage.isEmpty) {
       log.warn("Could not find origin stage for feature in workflow!! Defaulting to generate raw features.")
       generateRawData()
@@ -236,8 +234,9 @@ private[op] trait OpWorkflowCore {
       val rawData = generateRawData()
 
       if (!fitted) {
-        val stages = fitStages(rawData, featureStages).map(_.asInstanceOf[Transformer])
-        applySparkTransformations(rawData, stages, OpWorkflowModel.persistEveryKStages) // TODO use DAG transform
+        val stages = fitStages(rawData, featureStages, persistEveryKStages)
+          .map(_.asInstanceOf[Transformer])
+        FitStagesUtil.applySparkTransformations(rawData, stages, persistEveryKStages) // TODO use DAG transform
       } else {
         featureStages.foldLeft(rawData)((data, stage) => stage.asInstanceOf[Transformer].transform(data))
       }
@@ -247,23 +246,26 @@ private[op] trait OpWorkflowCore {
   /**
    * Returns a dataframe containing all the columns generated up to the feature input
    *
-   * @param feature input feature to compute up to
+   * @param feature             input feature to compute up to
+   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
    * @return Dataframe containing columns corresponding to all of the features generated before the feature given
    */
-  def computeDataUpTo(feature: OPFeature)(implicit spark: SparkSession): DataFrame
+  def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit spark: SparkSession): DataFrame
 
   /**
    * Computes a dataframe containing all the columns generated up to the feature input and saves it to the
    * specified path in avro format
    */
-  def computeDataUpTo(feature: OPFeature, path: String)(implicit spark: SparkSession): Unit = {
+  def computeDataUpTo(feature: OPFeature, path: String)
+    (implicit spark: SparkSession): Unit = {
     val df = computeDataUpTo(feature)
     df.saveAvro(path)
   }
 
   /**
    * Computes stages DAG
-   *
+   * @param features array if features in workflow
    * @return unique stages layered by distance (desc order)
    */
   protected def computeStagesDAG(features: Array[OPFeature]): StagesDAG = {
@@ -293,106 +295,39 @@ private[op] trait OpWorkflowCore {
       }._2
   }
 
+
   /**
-   * Efficiently applies all fited stages grouping by level in the DAG where possible
-   * @param rawData data to transform
-   * @param dag computation graph
+   * Efficiently applies all fitted stages grouping by level in the DAG where possible
+   *
+   * @param rawData             data to transform
+   * @param dag                 computation graph
    * @param persistEveryKStages breaks in computation to persist
-   * @param spark spark session
+   * @param spark               spark session
    * @return transformed dataframe
    */
   protected def applyTransformationsDAG(
     rawData: DataFrame, dag: StagesDAG, persistEveryKStages: Int
   )(implicit spark: SparkSession): DataFrame = {
     // A holder for the last persisted rdd
-    var lastPersisted: Option[RDD[_]] = None
+    var lastPersisted: Option[DataFrame] = None
 
     // Apply stages layer by layer
     dag.foldLeft(rawData) { case (df, stagesLayer) =>
       // Apply all OP stages
       val opStages = stagesLayer.collect { case (s: OpTransformer, _) => s }
-      val dfTransformed: DataFrame =
-        if (opStages.isEmpty) df
-        else {
-          log.info("Applying {} OP stage(s): {}", opStages.length, opStages.map(_.uid).mkString(","))
+      val dfTransformed: DataFrame = FitStagesUtil.applyOpTransformations(opStages, df)
 
-          val newSchema = opStages.foldLeft(df.schema) {
-            case (schema, s) =>
-              s.setInputSchema(schema)
-              s.transformSchema(schema)
-          }
-          val transforms = opStages.map(_.transformRow)
-          val transformed: RDD[Row] =
-            df.rdd.map { (row: Row) =>
-              val values = new ArrayBuffer[Any](row.length + transforms.length)
-              var i = 0
-              while (i < row.length) {
-                values += row.get(i)
-                i += 1
-              }
-              for {transform <- transforms} values += transform(row)
-              Row.fromSeq(values)
-            }.persist()
-
-          lastPersisted.foreach(_.unpersist())
-          lastPersisted = Some(transformed)
-
-          spark.createDataFrame(transformed, newSchema)
-        }
+      lastPersisted.foreach(_.unpersist())
+      lastPersisted = Some(dfTransformed)
 
       // Apply all non OP stages (ex. Spark wrapping stages etc)
       val sparkStages = stagesLayer.collect {
         case (s: Transformer, _) if !s.isInstanceOf[OpTransformer] => s.asInstanceOf[Transformer]
       }
-      applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
+      FitStagesUtil.applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
     }
   }
 
-  /**
-   * Transform the data using the specified Spark transformers.
-   * Applying all the transformers one by one as [[org.apache.spark.ml.Pipeline]] does.
-   *
-   * ATTENTION: This method applies transformers sequentially (as [[org.apache.spark.ml.Pipeline]] does)
-   * and usually results in slower run times with large amount of transformations due to Catalyst crashes,
-   * therefore always remember to set 'persistEveryKStages' to break up Catalyst.
-   *
-   * @param transformers        spark transformers to apply
-   * @param persistEveryKStages how often to break up Catalyst by persisting the data,
-   *                            to turn off set to Int.MaxValue (not recommended)
-   * @return Dataframe transformed data
-   */
-  protected def applySparkTransformations(
-    data: DataFrame, transformers: Array[Transformer], persistEveryKStages: Int
-  )(implicit spark: SparkSession): DataFrame = {
-
-    // you have more than 5 stages and are not persisting at least once
-    if (transformers.length > 5 && persistEveryKStages > transformers.length) {
-      log.warn(
-        "Number of transformers for scoring pipeline exceeds the persistence frequency. " +
-          "Scoring performance may significantly degrade due to Catalyst optimizer issues. " +
-          s"Consider setting 'persistEveryKStages' to a smaller number (ex. ${OpWorkflowModel.persistEveryKStages}).")
-    }
-
-    // A holder for the last persisted rdd
-    var lastPersisted: Option[RDD[_]] = None
-
-    // Apply all the transformers one by one as [[org.apache.spark.ml.Pipeline]] does
-    val transformedData: DataFrame =
-      transformers.zipWithIndex.foldLeft(data) { case (df, (stage, i)) =>
-        val persist = i > 0 && i % persistEveryKStages == 0
-        log.info(s"Applying stage: ${stage.uid}{}", if (persist) " (persisted)" else "")
-        val newDF = stage.asInstanceOf[Transformer].transform(df)
-        if (!persist) newDF
-        else {
-          // Converting to rdd and back here to break up Catalyst [SPARK-13346]
-          val persisted = newDF.rdd.persist()
-          lastPersisted.foreach(_.unpersist())
-          lastPersisted = Some(persisted)
-          spark.createDataFrame(persisted, newDF.schema)
-        }
-      }
-    transformedData
-  }
 
   /**
    * Looks at model parents to match parent stage for features (since features are created from the estimator not

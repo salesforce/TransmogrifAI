@@ -31,27 +31,24 @@ case object UnionIntegralMap extends UnionSumNumericMap[Long, IntegralMap]
 /**
  * Natural map monoid lifting averaging operator
  */
-abstract class UnionMeanDoubleMap[A <: OPMap[Double]](presentFn: Map[String, Double] => A)
-  extends MonoidAggregator[Event[A], Map[String, (Double, Int)], A] {
-
-  def prepare(input: Event[A]): Map[String, (Double, Int)] = input.value.value.map{ case (k, v) => k -> (v, 1) }
-  def present(reduction: Map[String, (Double, Int)]): A = {
-    val v = reduction.map {
-      case (k, (sum, count)) if count != 0 => k -> (sum / count)
-      case (k, _) => k -> 0.0
-    }
-    presentFn(v)
-  }
+abstract class UnionMeanDoubleMap[T <: OPMap[Double]](implicit val ttag: WeakTypeTag[T])
+  extends MonoidAggregator[Event[T], Map[String, (Double, Int)], T] {
+  val ftFactory: FeatureTypeFactory[T] = FeatureTypeFactory[T]()
+  def prepare(input: Event[T]): Map[String, (Double, Int)] = input.value.value.map { case (k, v) => k -> (v, 1) }
+  def present(reduction: Map[String, (Double, Int)]): T = ftFactory.newInstance(reduction.map {
+    case (k, (sum, count)) if count != 0 => k -> (sum / count)
+    case (k, _) => k -> 0.0
+  })
   val monoid: Monoid[Map[String, (Double, Int)]] = Monoid.mapMonoid[String, (Double, Int)]
 }
-case object UnionMeanCurrencyMap extends UnionMeanDoubleMap[CurrencyMap](new CurrencyMap(_))
-case object UnionMeanRealMap extends UnionMeanDoubleMap[RealMap](new RealMap(_))
-case object UnionMeanPercentMap extends UnionMeanDoubleMap[PercentMap](new PercentMap(_)) with PercentPrepare {
+case object UnionMeanCurrencyMap extends UnionMeanDoubleMap[CurrencyMap]
+case object UnionMeanRealMap extends UnionMeanDoubleMap[RealMap]
+case object UnionMeanPercentMap extends UnionMeanDoubleMap[PercentMap] with PercentPrepare {
   override def prepare(input: Event[PercentMap]): Map[String, (Double, Int)] =
     input.value.value.map { case (k, p) => k -> (prepareFn(p), 1) }
 }
 
-case object UnionGeolocationsMap
+case object UnionGeolocationMidpointMap
   extends MonoidAggregator[Event[GeolocationMap], Map[String, Array[Double]], GeolocationMap]
     with GeolocationFunctions {
   /**
@@ -73,7 +70,7 @@ case object UnionGeolocationsMap
     reduction.map { case (k, v) => k -> present(v).value }
   )
 
-  val monoid: Monoid[Map[String, Array[Double]]] = Monoid.mapMonoid[String, Array[Double]](Geolocations.monoid)
+  val monoid: Monoid[Map[String, Array[Double]]] = Monoid.mapMonoid[String, Array[Double]](GeolocationMidpoint.monoid)
 }
 
 

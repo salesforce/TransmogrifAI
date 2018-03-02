@@ -13,7 +13,9 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 
 import scala.reflect.ClassTag
 
-case class ModelInfo[E <: Estimator[_]](sparkEstimator: E, grid: ParamGridBuilder, use: BooleanParam)
+case class ModelInfo[E <: Estimator[_]](sparkEstimator: E, grid: ParamGridBuilder, useModel: BooleanParam) {
+  def modelName: String = sparkEstimator.getClass.getSimpleName
+}
 
 /**
  * Input and Output Param names for Selectors containing models extending the Predictor and ClassifierPredictor spark
@@ -345,14 +347,3 @@ private[op] trait HasGradientBoostedTreeBase[E <: Estimator[_], +MS <: HasGradie
 }
 
 
-
-
-/**
- * Models used for the model Selectoe
- *
- * @tparam E  type of Models
- * @tparam MS model selector
- */
-private[impl] trait SelectorModels[E <: Estimator[_], +MS <: SelectorModels[E, MS]] extends SubStage[MS] {
-  protected[impl] def modelInfo: Seq[ModelInfo[E]]
-}

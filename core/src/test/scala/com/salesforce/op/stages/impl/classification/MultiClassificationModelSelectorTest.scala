@@ -10,13 +10,13 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassifier}
+import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
@@ -212,34 +212,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     modelSelector.stage1.getThresholds shouldBe Array(1.0, 2.0)
   }
 
-  it should "set the cross validation params correctly" in {
-    val crossValidator = new OpCrossValidation[ProbClassifier](
-      numFolds = 3,
-      evaluator = Evaluators.MultiClassification(),
-      seed = 10L
-    )
-
-    crossValidator.validationParams shouldBe Map(
-      "metric" -> OpMetricsNames.f1,
-      "numFolds" -> 3,
-      "seed" -> 10L
-    )
-  }
-
-  it should "set the train validation split params correctly" in {
-    val trainValidator = new OpTrainValidationSplit[ProbClassifier](
-      trainRatio = 0.6,
-      evaluator = Evaluators.MultiClassification.f1(),
-      seed = 11L
-    )
-
-    trainValidator.validationParams shouldBe Map(
-      "metric" -> OpMetricsNames.f1,
-      "trainRatio" -> 0.6,
-      "seed" -> 11L
-    )
-  }
-
   it should "split into training and test" in {
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
@@ -271,10 +243,10 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           seed = 10L
         )
         .setModelsToTry(LogisticRegression, RandomForest)
-        .setLogisticRegressionRegParam(0.1)
-        .setLogisticRegressionMaxIter(10, 20)
+        .setLogisticRegressionRegParam(1000, 0.1)
+        .setLogisticRegressionMaxIter(0, 10)
         .setRandomForestImpurity(Impurity.Entropy)
-        .setRandomForestMaxDepth(2, 10)
+        .setRandomForestMaxDepth(0, 10)
         .setRandomForestNumTrees(10)
         .setRandomForestMinInfoGain(0)
         .setRandomForestMinInstancesPerNode(1)
@@ -316,18 +288,24 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val testEstimator =
       MultiClassificationModelSelector
         .withTrainValidationSplit(None, trainRatio = 0.8, validationMetric = crossEntropy, seed = 10L)
-        .setModelsToTry(DecisionTree, RandomForest)
-        .setRandomForestImpurity(Impurity.Gini)
-        .setDecisionTreeMaxBins(64, 34)
-        .setDecisionTreeMinInfoGain(0)
-        .setDecisionTreeMinInstancesPerNode(1)
-        .setDecisionTreeMaxDepth(5)
+        .setModelsToTry(LogisticRegression, RandomForest)
+        .setLogisticRegressionRegParam(1000, 0.1)
+        .setLogisticRegressionMaxIter(0, 10)
+        .setRandomForestImpurity(Impurity.Entropy)
+        .setRandomForestMaxDepth(0)
+        .setRandomForestNumTrees(10)
         .setRandomForestMinInfoGain(0)
         .setRandomForestMinInstancesPerNode(1)
-        .setRandomForestMaxDepth(5)
         .setInput(label, features)
 
-    val transformedData = testEstimator.fit(data).transform(data)
+    val model = testEstimator.fit(data)
+
+    val sparkStage = model.stage1.getSparkMlStage().get
+    sparkStage.isInstanceOf[LogisticRegressionModel] shouldBe true
+    sparkStage.extractParamMap()(sparkStage.getParam("maxIter")) shouldBe 10
+    sparkStage.extractParamMap()(sparkStage.getParam("regParam")) shouldBe 0.1
+
+    val transformedData = model.transform(data)
     val pred = testEstimator.getOutput()._1
     val justScores = transformedData.collect(pred)
     val missed = justScores.zip(transformedData.collect(label)).map{ case (p, l) => math.abs(p.v.get - l.v.get) }.sum

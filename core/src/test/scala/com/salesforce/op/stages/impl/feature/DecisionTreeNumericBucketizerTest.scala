@@ -94,7 +94,7 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "correctly bucketize when labels are specified" in new UniformData {
-    val out = currency.autoBucketize(label, trackNulls = false)
+    val out = currency.autoBucketize(label = label, trackNulls = false, minInfoGain = 0.1)
     assertBucketizer(
       bucketizer = out.originStage.asInstanceOf[DecisionTreeNumericBucketizer[_, _ <: OPNumeric[_]]],
       data = ds, shouldSplit = true, trackNulls = false, trackInvalid = false, expectedSplits = expectedSplits,

@@ -69,8 +69,7 @@ case class OpVectorColumnMetadata
    * Is this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
    * @return true if this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
    */
-  def isNullIndicator: Boolean =
-    indicatorValue.contains(OpVectorColumnMetadata.NullString)
+  def isNullIndicator: Boolean = indicatorValue.contains(OpVectorColumnMetadata.NullString)
 
   /**
    * Convert this column into Spark metadata.
@@ -97,7 +96,7 @@ case class OpVectorColumnMetadata
    * Does column have parent features of specified feature type
    * @return boolean indicating whether parent feature type sequence contains type name
    */
-  def hasParentOfType(typeName: String): Boolean = parentFeatureType.forall(_.contains(typeName))
+  def hasParentOfType(typeName: String): Boolean = parentFeatureType.exists(_.contains(typeName))
 
   /**
    * Return parent features names with the key (indicatorGroup) from any map parents included in name

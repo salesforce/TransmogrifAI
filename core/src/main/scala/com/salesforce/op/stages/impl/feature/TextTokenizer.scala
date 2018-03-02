@@ -68,7 +68,8 @@ trait TextTokenizerParams extends Params {
    */
   def tokenizeFn(text: Text,
     languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
-    analyzer: TextAnalyzer = TextTokenizer.Analyzer): TextList = {
+    analyzer: TextAnalyzer = TextTokenizer.Analyzer
+  ): TextList = {
 
     if (text.isEmpty) TextList.empty
     else {
@@ -112,9 +113,11 @@ class TextTokenizer[T <: Text]
 object TextTokenizer {
   val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
   val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
+  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneTextAnalyzer(LuceneTextAnalyzer.withHtmlStripping)
   val AutoDetectLanguage = false
   val AutoDetectThreshold = 0.99
   val DefaultLanguage = Language.Unknown
   val MinTokenLength = 1
   val ToLowercase = true
+  val StripHtml = false
 }

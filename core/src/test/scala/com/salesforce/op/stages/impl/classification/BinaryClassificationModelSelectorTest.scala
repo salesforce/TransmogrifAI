@@ -11,14 +11,14 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.{DecisionTreeClassifier, RandomForestClassifier}
+import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
@@ -218,34 +218,6 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     modelSelector.stage1.getThresholds shouldBe Array(1.0, 2.0)
   }
 
-  it should "set the cross validation params correctly" in {
-    val crossValidator = new OpCrossValidation[ProbClassifier](
-      numFolds = 3,
-      evaluator = Evaluators.BinaryClassification.auPR(),
-      seed = 10L
-    )
-
-    crossValidator.validationParams shouldBe Map(
-      "metric" -> OpMetricsNames.auPR,
-      "numFolds" -> 3,
-      "seed" -> 10L
-    )
-  }
-
-  it should "set the train validation split params correctly" in {
-    val trainValidator = new OpTrainValidationSplit[ProbClassifier](
-      trainRatio = 0.6,
-      evaluator = Evaluators.BinaryClassification.auROC(),
-      seed = 11L
-    )
-
-    trainValidator.validationParams shouldBe Map(
-      "metric" -> OpMetricsNames.auROC,
-      "trainRatio" -> 0.6,
-      "seed" -> 11L
-    )
-  }
-
   it should "split into training and test even if the balancing is not desired" in {
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
@@ -274,23 +246,27 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
           Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
           numFolds = 4,
           validationMetric = Evaluators.BinaryClassification.precision(),
-          seed = 10L
+          seed = 42L
         )
         .setModelsToTry(LogisticRegression, RandomForest)
-        .setLogisticRegressionRegParam(0.1)
-        .setLogisticRegressionMaxIter(10, 100)
+        .setLogisticRegressionRegParam(0.1, 1000)
+        .setLogisticRegressionMaxIter(10, 0)
         .setRandomForestImpurity(Impurity.Entropy)
-        .setRandomForestMaxDepth(2, 10)
+        .setRandomForestMaxDepth(0)
         .setRandomForestNumTrees(10)
         .setRandomForestMinInfoGain(0)
         .setRandomForestMinInstancesPerNode(1)
         .setInput(label, features)
 
     val model = testEstimator.fit(data)
+    val sparkStage = model.stage1.getSparkMlStage().get
+    sparkStage.isInstanceOf[LogisticRegressionModel] shouldBe true
+    sparkStage.extractParamMap()(sparkStage.getParam("maxIter")) shouldBe 10
+    sparkStage.extractParamMap()(sparkStage.getParam("regParam")) shouldBe 0.1
 
     log.info(model.getMetadata().toString)
 
-    // Evaluation from train data shoudl be there
+    // Evaluation from train data should be there
     val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
     BinaryClassEvalMetrics.values.foreach(metric =>
       assert(metaData.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),

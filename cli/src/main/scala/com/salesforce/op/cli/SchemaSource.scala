@@ -17,6 +17,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.JavaConverters._
+import scala.util.Try
 
 /**
  * A variety of functionalities for pulling data schema.
@@ -58,9 +59,9 @@ sealed trait SchemaSource {
 }
 
 case class AutomaticSchema(recordClassName: String)(dataFile: File) extends SchemaSource {
-  val name = recordClassName
+  val name: String = recordClassName
   private val defaultName = "AutoInferredRecord"
-  lazy val fullName = dataSchema.getFullName.replace(defaultName, name)
+  lazy val fullName: String = dataSchema.getFullName.replace(defaultName, name)
   val theReader = "ReaderWithHeaders"
 
   lazy val conf: SparkConf = new SparkConf()
@@ -91,7 +92,16 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
     hadoopConfig.set("fs.hdfs.impl", classOf[org.apache.hadoop.hdfs.DistributedFileSystem].getName)
     hadoopConfig.set("fs.file.impl", classOf[org.apache.hadoop.fs.LocalFileSystem].getName)
 
-    val schema = dataReader.readRDD().first.getSchema
+    val schema = try {
+      dataReader.readRDD().first.getSchema
+    } catch {
+      case spe: org.apache.avro.SchemaParseException
+        if spe.getMessage contains "Illegal initial" =>
+          throw BadSchema(
+            s"Bad data file, it should contain column headers, and $dataFile does not",
+            spe)
+      case x: Exception => throw BadSchema("Failed to build Schema", x)
+    }
     schema
   }
 
@@ -143,3 +153,5 @@ case class AvroSchemaFromFile(schemaFile: File) extends SchemaSource {
   }
 
 }
+
+case class BadSchema(msg: String, source: Exception) extends Exception(msg, source)

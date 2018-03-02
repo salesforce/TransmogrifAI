@@ -123,6 +123,7 @@ package object types extends FeatureTypeSparkConverters {
     def toReal: Seq[Real] = v.map(_.toReal)
     def toRealNN: Seq[RealNN] = v.map(_.toRealNN)
     def toOPVector: OPVector = new OPVector(Vectors.dense(v.toArray))
+    def toGeolocation: Geolocation = new Geolocation(v)
   }
   implicit class SeqLongConversions(val v: Seq[Long]) extends AnyVal {
     def toDateList: DateList = new DateList(v)

@@ -40,11 +40,12 @@ case object DataBalancer {
 }
 
 /**
- * Instance that will balance the dataset before splitting
+ * Instance that will split the data into train and holdout and then balance the dataset
+ * before modeling binary classifications
  *
  * @param uid
  */
-private[op] class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
+class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
@@ -57,7 +58,7 @@ private[op] class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter
    * @param maxTrainingSample maximum training size
    * @return downSample & upSample proportions
    */
-  private[op] def getProportions(
+  def getProportions(
     smallCount: Double,
     bigCount: Double,
     sampleF: Double,
@@ -101,7 +102,7 @@ private[op] class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter
    * @return balanced small and big data split into training and test sets
    *         with downSample and upSample proportions and a boolean of whether or not logging the new counts
    */
-  private[op] def getTrainingSplit(
+  def getTrainingSplit(
     smallData: Dataset[_],
     smallCount: Long,
     bigData: Dataset[_],
@@ -138,10 +139,10 @@ private[op] class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter
   /**
    * Split into a training set and a test set and balance the training set
    *
-   * @param data
+   * @param data to prepare for model training
    * @return balanced training set and a test set
    */
-  final override def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
+  def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
 
     val ds = data.persist()
 
@@ -221,13 +222,13 @@ private[op] class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter
     new ModelData(trainData, metaDataBuilder)
   }
 
-  final override def copy(extra: ParamMap): DataBalancer = {
+  override def copy(extra: ParamMap): DataBalancer = {
     val copy = new DataBalancer(uid)
     copyValues(copy, extra)
   }
 }
 
-private[impl] trait DataBalancerParams extends Params {
+trait DataBalancerParams extends Params {
 
   /**
    * Targeted sample fraction for the class in minority.
