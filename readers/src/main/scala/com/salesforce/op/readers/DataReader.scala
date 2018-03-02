@@ -15,7 +15,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.util.ClosureUtils
 import org.joda.time.{DateTimeConstants, Duration}
+
+import scala.util.Failure
 
 
 /**
@@ -265,31 +268,23 @@ trait ConditionalDataReader[T] extends AggregatedReader[T] {
   def conditionalParams: ConditionalParams[T]
 
   final override def generateRow(key: String, records: Seq[T], rawFeatures: Array[OPFeature]): Option[Row] = {
-    val ConditionalParams(timeStampFn, targetCondition, responseWindow,
-    predictorWindow, timeStampToKeep, dropIfTargetConditionNotMet) = conditionalParams
+    val ConditionalParams(
+    timeStampFn, targetCondition, responseWindow,
+    predictorWindow, timeStampToKeep, cutOffTimeFn,
+    dropIfTargetConditionNotMet) = conditionalParams
 
-    val rawTargetTimes = records.flatMap { record =>
-      if (targetCondition(record)) Option(timeStampFn(record)) else None
-    }
+    val rawTargetTimes = records.collect { case record if targetCondition(record) => timeStampFn(record) }
+
     if (rawTargetTimes.isEmpty && dropIfTargetConditionNotMet) None
     else {
-      val targetTime =
-        if (rawTargetTimes.isEmpty) DateTimeUtils.now().getMillis
-        else if (timeStampToKeep == TimeStampToKeep.Min) rawTargetTimes.min
-        else if (timeStampToKeep == TimeStampToKeep.Max) rawTargetTimes.max
-        else if (timeStampToKeep == TimeStampToKeep.Random) {
-          val index = scala.util.Random.nextInt(rawTargetTimes.size) // TODO should this be seeded?
-          rawTargetTimes(index)
-        } else {
-          throw new IllegalArgumentException(s"TimeStampToKeep type $timeStampToKeep is not supported")
-        }
+      val cutOff: CutOffTime = cutOffTimeFn.map(_(key, records)).getOrElse(cutOffTime(rawTargetTimes, timeStampToKeep))
 
       val featureVals = rawFeatures.map { f =>
         val featureAgg = getGenStage[T](f).featureAggregator
         val extracted = featureAgg.extract(
           records = records,
           timeStampFn = Some(timeStampFn),
-          cutOffTime = CutOffTime.UnixEpoch(targetTime),
+          cutOffTime = cutOff,
           responseWindow = responseWindow,
           predictorWindow = predictorWindow
         )
@@ -297,6 +292,18 @@ trait ConditionalDataReader[T] extends AggregatedReader[T] {
       }
       Some(Row.fromSeq(key +: featureVals))
     }
+  }
+
+  private def cutOffTime(rawTargetTimes: Seq[Long], timeStampToKeep: TimeStampToKeep): CutOffTime = {
+    import TimeStampToKeep._
+    val targetTime: Long =
+      if (rawTargetTimes.isEmpty) DateTimeUtils.now().getMillis
+      else timeStampToKeep match {
+        case Min => rawTargetTimes.min
+        case Max => rawTargetTimes.max
+        case Random => rawTargetTimes(scala.util.Random.nextInt(rawTargetTimes.size)) // TODO should this be seeded?
+      }
+    CutOffTime.UnixEpoch(targetTime)
   }
 }
 
@@ -310,10 +317,11 @@ trait ConditionalDataReader[T] extends AggregatedReader[T] {
  *                                    are to be aggregated
  * @param timeStampToKeep             if a particular key met the condition multiple times, which of the times
  *                                    would you like to use in the training set
+ * @param cutOffTimeFn                optional function to compute the cutoff value based on key and aggregated
+ *                                    sequence of events for that key
  * @param dropIfTargetConditionNotMet do not generate feature vectors for keys in training set
  *                                    where the target condition is not met. If set to false,
  *                                    and condition is not met, features for those
- * @tparam T
  */
 case class ConditionalParams[T]
 (
@@ -322,5 +330,14 @@ case class ConditionalParams[T]
   responseWindow: Option[Duration] = Some(Duration.standardDays(DateTimeConstants.DAYS_PER_WEEK)),
   predictorWindow: Option[Duration] = Some(Duration.standardDays(DateTimeConstants.DAYS_PER_WEEK)),
   timeStampToKeep: TimeStampToKeep = TimeStampToKeep.Random,
+  cutOffTimeFn: Option[(String, Seq[T]) => CutOffTime] = None,
   dropIfTargetConditionNotMet: Boolean = false
-)
+) {
+  // Validate function params
+  Seq(timeStampFn, targetCondition, cutOffTimeFn.getOrElse(identity _)).foreach(function =>
+    ClosureUtils.checkSerializable(function) match {
+      case Failure(e) => throw new IllegalArgumentException("Function is not serializable", e)
+      case _ =>
+    }
+  )
+}

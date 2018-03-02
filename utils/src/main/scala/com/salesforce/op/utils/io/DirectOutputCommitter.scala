@@ -1,3 +1,4 @@
+// scalastyle:off header.matches
 /*
  * Modifications: (c) 2017, Salesforce.com, Inc.
  * Copyright 2015 Databricks, Inc.

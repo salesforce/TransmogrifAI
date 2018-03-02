@@ -5,10 +5,13 @@
 
 package com.salesforce.op.utils.text
 
+import java.io.Reader
+
 import com.salesforce.op.utils.text.Language._
 import org.apache.lucene.analysis.ar.ArabicAnalyzer
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer
 import org.apache.lucene.analysis.ca.CatalanAnalyzer
+import org.apache.lucene.analysis.charfilter.HTMLStripCharFilter
 import org.apache.lucene.analysis.cjk.CJKAnalyzer
 import org.apache.lucene.analysis.cz.CzechAnalyzer
 import org.apache.lucene.analysis.da.DanishAnalyzer
@@ -39,7 +42,7 @@ import org.apache.lucene.analysis.sv.SwedishAnalyzer
 import org.apache.lucene.analysis.th.ThaiAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.tr.TurkishAnalyzer
-import org.apache.lucene.analysis.{Analyzer, TokenStream}
+import org.apache.lucene.analysis.{Analyzer, AnalyzerWrapper, TokenStream}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -131,6 +134,16 @@ object LuceneTextAnalyzer {
     TraditionalChinese -> new CJKAnalyzer()
   )
 
+  private val defaultAnalyzerHtmlStrip = stripHtml(DefaultAnalyzer)
+
+  private val analyzersHtmlStrip = analyzers.map { case (lang, analyzer) => lang -> stripHtml(analyzer) }
+
+  private def stripHtml(analyzer: Analyzer): Analyzer =
+    new AnalyzerWrapper(analyzer.getReuseStrategy) {
+      override def getWrappedAnalyzer(fieldName: String): Analyzer = analyzer
+      override def wrapReader(fieldName: String, reader: Reader) = new HTMLStripCharFilter(reader)
+    }
+
   /**
    * Creates a Lucene Analyzer for a specific language or falls back to [[StandardAnalyzer]]
    *
@@ -138,5 +151,15 @@ object LuceneTextAnalyzer {
    * @return language specific language analyzer or [[StandardAnalyzer]] as default
    */
   def apply(lang: Language): Analyzer = analyzers.getOrElse(lang, DefaultAnalyzer)
+
+  /**
+   * Creates a Lucene Analyzer for a specific language or falls back to [[StandardAnalyzer]]
+   * with HTML stripping applied [[HTMLStripCharFilter]]
+   *
+   * @param lang desired language
+   * @return language specific language analyzer or [[StandardAnalyzer]] as default
+   *         with HTML stripping applied [[HTMLStripCharFilter]]
+   */
+  def withHtmlStripping(lang: Language): Analyzer = analyzersHtmlStrip.getOrElse(lang, defaultAnalyzerHtmlStrip)
 
 }

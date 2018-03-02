@@ -31,16 +31,23 @@ case object DataSplitter {
 }
 
 /**
- * Instance that will only split the data
+ * Instance that will split the data into training and holdout for regressions
  *
  * @param uid
  */
-private[op] class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
+class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
 
-  final override def prepare(data: Dataset[LabelFeaturesKey]): ModelData =
+  /**
+   * Function to use to prepare the dataset for modeling
+   * eg - do data balancing or dropping based on the labels
+   *
+   * @param data
+   * @return Training set test set
+   */
+  def prepare(data: Dataset[LabelFeaturesKey]): ModelData =
     new ModelData(data, new MetadataBuilder())
 
-  final override def copy(extra: ParamMap): DataSplitter = {
+  override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)
     copyValues(copy, extra)
   }

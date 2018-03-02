@@ -8,18 +8,20 @@ package com.salesforce.op.readers
 import com.salesforce.op.OpParams
 import com.salesforce.op.aggregators.CutOffTime
 import com.salesforce.op.test._
+import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, SparkSession}
 import org.joda.time.Duration
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 
-// scalastyle:off
+
 @RunWith(classOf[JUnitRunner])
 class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest {
 
+  // scalastyle:off
   Spec(DataReaders.getClass) should "define readers" in {
     /* Set type of extraction with data reader definition */
     val simpleAvroReader: DataReader[Passenger] = DataReaders.Simple.avro[Passenger](
@@ -63,6 +65,31 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest {
     )
 
   }
+  // scalastyle:on
+
+  Spec[ConditionalParams[_]] should "validate if user functions are serializable" in {
+    class NotSerializable(val v: Double)
+    val ns = new NotSerializable(1.0)
+
+    assertTaskNotSerializable(ConditionalParams[Passenger](
+      timeStampFn = _ => ns.v.toLong, targetCondition = _.getBoarded >= 1471046600
+    ))
+    assertTaskNotSerializable(ConditionalParams[Passenger](
+      timeStampFn = _.getRecordDate.toLong, targetCondition = _ => ns.v > 1
+    ))
+    assertTaskNotSerializable(ConditionalParams[Passenger](
+      timeStampFn = _.getRecordDate.toLong, targetCondition = _.getBoarded >= 1471046600,
+      cutOffTimeFn = Some((_, _) => CutOffTime.UnixEpoch(ns.v.toLong))
+    ))
+
+    def assertTaskNotSerializable(v: => Any): Unit = {
+      val error = intercept[IllegalArgumentException](v)
+      error.getMessage shouldBe "Function is not serializable"
+      error.getCause shouldBe a[SparkException]
+    }
+
+  }
+
   // TODO: test the readers
 }
 

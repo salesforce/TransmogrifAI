@@ -79,8 +79,7 @@ abstract class TernaryEstimator[I1 <: FeatureType, I2 <: FeatureType, I3 <: Feat
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): TernaryModel[I1, I2, I3, O] = {
-    transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val df = dataset.select(in1.name, in2.name, in3.name)
     val ds = df.map(r =>

@@ -393,7 +393,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
-     *
+     * @param referenceDate reference date to subtract off before converting to vector
      * @return an OPVector feature
      */
     def vectorize(
@@ -402,7 +402,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
     ): FeatureLike[OPVector] = {
       new DateMapVectorizer()
         .setInput(f +: others)
@@ -411,6 +412,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setReferenceDate(referenceDate)
         .getOutput()
     }
   }
@@ -430,6 +432,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param referenceDate reference date to subtract off before converting to vector
      * @return an OPVector feature
      */
     def vectorize(
@@ -438,7 +441,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateTimeMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
     ): FeatureLike[OPVector] = {
       new DateMapVectorizer()
         .setInput(f +: others)
@@ -447,6 +451,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setReferenceDate(referenceDate)
         .getOutput()
     }
   }

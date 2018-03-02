@@ -74,7 +74,6 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     Seq.empty[Double],
     Seq(45.0, -105.5, 4.0)
   )
-  val geoBaseSingle = Seq(Seq(32.4, -100.2, 3.0), Seq.empty[Double], Seq.empty[Double])
   val geoBaseEmpty = Seq(Seq.empty[Double], Seq.empty[Double], Seq.empty[Double])
 
   private val realTestSeq = doubleBase.map(Real(_))
@@ -161,12 +160,14 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     val minLong = Option(longBase.flatten.min)
 
     assertAggr(MaxReal, realTestSeq, maxDouble)
+    assertAggr(MaxRealNN, realNNTestSeq, maxDouble)
     assertAggr(MaxCurrency, currencyTestSeq, maxDouble)
     assertAggr(MaxIntegral, integralTestSeq, maxLong)
     // These two are defaults.
     assertDefaultAggr(dateTestSeq, maxLong)
     assertDefaultAggr(dateTimeTestSeq, maxLong)
     assertAggr(MinReal, realTestSeq, minDouble)
+    assertAggr(MinRealNN, realNNTestSeq, minDouble)
     assertAggr(MinCurrency, currencyTestSeq, minDouble)
     assertAggr(MinIntegral, integralTestSeq, minLong)
     assertAggr(MinDate, dateTestSeq, minLong)
@@ -186,8 +187,9 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
 
       (Option(meanDouble), Option("%.2f".format(percentDouble).toDouble))
     }
-
+    val meanRealNN = Option(realNNTestSeq.flatMap(_.value).sum / realNNTestSeq.length)
     assertAggr(MeanReal, realTestSeq, meanDouble)
+    assertAggr(MeanRealNN, realNNTestSeq, meanRealNN)
     assertAggr(MeanCurrency, currencyTestSeq, meanDouble)
     assertAggr(MeanPercent, percentTestSeq, meanPercent)
   }
@@ -242,45 +244,24 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   /**
    * This test looks different for a few reasons
    * 1) Custom aggregator does different things to different indices of the Geolocation list so not easy to
-   *    express the expected result in terms of the initial geolocation set
+   * express the expected result in terms of the initial geolocation set
    * 2) Expected result comes from online calculator (http://www.geomidpoint.com/), so compare with an error tolerance
    */
-  Spec[Geolocations.type] should "find the geographic centroid" in {
-    val geoTestSeq = geoBase.map(Geolocation(_))
-    val geoTestSingleSeq = geoBaseSingle.map(Geolocation(_))
-
+  Spec(GeolocationMidpoint.getClass) should "find the geographic centroid" in {
     val eps = 0.01 // error tolerance
-    val expectedGeo = Seq[Double](40.04, -106.33, 0.0) // from http://www.geomidpoint.com/
-    val expectedGeoSingle = geoTestSingleSeq.head.toArray
 
-    val aggregatedValue = aggregatorOf[Geolocation](weakTypeTag[Geolocation])(
-      geoTestSeq.map(Event(0L, _))).value
-    val errors = expectedGeo.zip(aggregatedValue).map(f => math.abs(f._2 - f._1)) zipWithIndex
+    def assertGeo(inputs: Seq[Geolocation], expected: Seq[Double]): Unit = {
+      val aggregatedValue = aggregatorOf[Geolocation].apply(inputs.map(Event(0L, _))).value
+      val errors = expected.zip(aggregatedValue).map(f => math.abs(f._2 - f._1)) zipWithIndex
 
-    errors foreach { case (e, i) =>
-      withClue(s"Failed at $i: expected about $expectedGeo, actual $aggregatedValue, err=$e") {
-        (e < eps) shouldBe true
+      errors foreach { case (e, i) =>
+        withClue(s"Failed at $i: expected about $expected, actual $aggregatedValue, err=$e") {
+          e should be < eps
+        }
       }
     }
-
-    val aggregatedValueSingle = aggregatorOf(weakTypeTag[Geolocation])(
-      geoTestSingleSeq.map(Event(0L, _))).value
-
-    for {
-      i <- expectedGeoSingle.indices
-      expected = expectedGeoSingle(i)
-      actual = aggregatedValueSingle(i)
-    } {
-      //      withClue(s"Failed at $i: $actual instead of $expected") {
-      //        math.abs(expected - actual) should be < eps
-      //      }
-    }
-
-    val geoTestEmptySeq = geoBaseEmpty.map(Geolocation(_))
-
-    val aggregatedValueEmpty = aggregatorOf[Geolocation](weakTypeTag[Geolocation])(
-      geoTestEmptySeq.map(Event(0L, _))).value
-    assert(aggregatedValueEmpty == Nil)
+    assertGeo(inputs = geoBase.map(Geolocation(_)), expected = Seq(40.04, -106.33, 0.0))
+    assertGeo(inputs = Seq(geoBase.head.toGeolocation), expected = geoBase.head)
   }
 
   Spec(LogicalOr.getClass) should "work" in {
@@ -317,10 +298,10 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     }
   }
 
-  private val logicalValues = Some(true)::Some(false)::None::Nil
+  private val logicalValues = Some(true) :: Some(false) :: None :: Nil
 
   Spec(LogicalOr.getClass) should "be a monoid" in {
-    checkMonoid(new LogicalOrMonoid{}.monoid, logicalValues)
+    checkMonoid(new LogicalOrMonoid {}.monoid, logicalValues)
   }
 
   Spec(LogicalXor.getClass) should "work" in {
@@ -328,7 +309,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   }
 
   Spec(LogicalXor.getClass) should "be a monoid" in {
-    checkMonoid(new LogicalXorMonoid{}.monoid, logicalValues)
+    checkMonoid(new LogicalXorMonoid {}.monoid, logicalValues)
   }
 
   Spec(LogicalAnd.getClass) should "work" in {
@@ -336,7 +317,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   }
 
   Spec(LogicalAnd.getClass) should "be a monoid" in {
-    checkMonoid(new LogicalAndMonoid{}.monoid, logicalValues)
+    checkMonoid(new LogicalAndMonoid {}.monoid, logicalValues)
   }
 
   Spec[UnionSumNumericMap[_, _]] should "work" in {
@@ -354,7 +335,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     assertDefaultAggr(percentMapTestSeq, expectedDoubleRes)
   }
 
-  Spec[UnionGeolocationsMap.type] should "correctly find the geographic centroid" in {
+  Spec(UnionGeolocationMidpointMap.getClass) should "correctly find the geographic centroid" in {
     val geoMapBase = Seq(
       Map("a" -> Seq(38.4, -110.2, 3.0)),
       Map("a" -> Seq(38.6, -110.4, 2.0)),
@@ -380,15 +361,12 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
       "c" -> List(40.4, -116.3, 2.0)
     )
 
-    val aggregatedValue = aggregatorOf[GeolocationMap](weakTypeTag[GeolocationMap])(
-      geoMapTestSeq.map(Event(0L, _))).value
-    val errorMap = expectedGeo.map{
+    val aggregatedValue = aggregatorOf[GeolocationMap].apply(geoMapTestSeq.map(Event(0L, _))).value
+    val errorMap = expectedGeo.map {
       case (k, v) => k -> v.zip(aggregatedValue(k)).map(f => math.abs(f._2 - f._1))
     }
 
-    for {
-      (k, v) <- errorMap
-    } {
+    for {(k, v) <- errorMap} {
       withClue(s"Failed at $k: expected ${expectedGeo(k)}, actual ${aggregatedValue(k)}, err=$v") {
         v.forall(_ < eps) shouldBe true
       }
@@ -397,18 +375,18 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
 
   private def distance(xs: Array[Double], ys: Array[Double]): Double = {
     val xys = xs zip ys
-    math.sqrt((0.0 /: xys){ case (s, (x, y)) => s + (x - y) * (x - y) })
+    math.sqrt((0.0 /: xys) { case (s, (x, y)) => s + (x - y) * (x - y) })
   }
 
   private def prettyClose(xs: Array[Double], ys: Array[Double]) =
     distance(xs take 5, ys take 5) < 0.01
 
   private def checkGeolocationsOn(p1: Geolocation, p2: Geolocation, p3: Geolocation): Unit = {
-    val m = Geolocations.monoid
+    val m = GeolocationMidpoint.monoid
 
-    val a = Geolocations.prepare(p1)
-    val b = Geolocations.prepare(p2)
-    val c = Geolocations.prepare(p3)
+    val a = GeolocationMidpoint.prepare(p1)
+    val b = GeolocationMidpoint.prepare(p2)
+    val c = GeolocationMidpoint.prepare(p3)
     checkGeopoints(m, a, b, c)
   }
 
@@ -433,7 +411,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     checkOn(a :: b :: c :: Nil)
   }
 
-  Spec[Geolocations.monoid.type] should "be a monoid" in {
+  Spec(GeolocationMidpoint.getClass) should "be a monoid" in {
 
     checkGeolocationsOn(
       Geolocation(0, 0, GeolocationAccuracy.Address),
@@ -442,7 +420,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     )
 
     def checkOn(what: Seq[Array[Double]]) =
-      checkMonoid(Geolocations.monoid, what, prettyClose)
+      checkMonoid(GeolocationMidpoint.monoid, what, prettyClose)
 
     // The following code is temporarily commented out because we have a circular dependency
     //    val generator = RandomList.ofGeolocations
@@ -539,7 +517,8 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   private def assertAggr[A <: FeatureType : WeakTypeTag, B](
     aggregator: MonoidAggregator[Event[A], _, A],
     testSeq: Seq[A],
-    expectedResult: B): Unit = {
+    expectedResult: B
+  ): Unit = {
     val events = testSeq.map(Event(0L, _))
     val aggregatedValue = aggregator(events).value.asInstanceOf[B]
     aggregatedValue shouldEqual expectedResult
