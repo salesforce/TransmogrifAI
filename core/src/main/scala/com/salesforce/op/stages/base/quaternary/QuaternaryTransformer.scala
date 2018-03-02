@@ -56,9 +56,7 @@ trait OpTransformer4[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, I4
    * @return a new dataset containing a column for the transformed feature
    */
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val newSchema = transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
-
+    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val functionUDF = FeatureSparkTypes.udf4[I1, I2, I3, I4, O](transformFn)
     val meta = newSchema(outputName).metadata
     dataset.select(col("*"),

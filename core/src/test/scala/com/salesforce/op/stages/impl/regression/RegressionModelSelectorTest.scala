@@ -10,7 +10,7 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
-import com.salesforce.op.stages.impl.regression.RegressorType.Regressor
+import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames}
 import com.salesforce.op.stages.impl.tuning.OpCrossValidation
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
@@ -158,17 +158,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
         .build
 
     gridCompare(modelSelector.gBTGrid.build(), dtGrid)
-  }
-
-  it should "set the cross validation params correctly" in {
-    val crossValidator = new OpCrossValidation[Regressor](numFolds = 3,
-      evaluator = Evaluators.Regression.rmse(), seed = 10L)
-
-    crossValidator.validationParams shouldBe Map(
-      "metric" -> OpMetricsNames.rootMeanSquaredError,
-      "numFolds" -> 3,
-      "seed" -> 10L
-    )
   }
 
   it should "set the data splitting params correctly" in {

@@ -40,13 +40,13 @@ case object DataCutter {
 }
 
 /**
- * Instance that will balance the dataset before splitting.
+ * Instance that will make a holdout set and prepare the data for multicalss modeling
  * Creates instance that will split data into training and test set filtering out any labels that don't
  * meet the minimum fraction cutoff or fall in the top N labels specified.
  *
  * @param uid
  */
-private[op] class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
+class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
@@ -58,7 +58,7 @@ private[op] class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid
    * @param data
    * @return Training set test set
    */
-  final override def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
+  def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
     import data.sparkSession.implicits._
 
     val minLabelFract = getMinLabelFraction

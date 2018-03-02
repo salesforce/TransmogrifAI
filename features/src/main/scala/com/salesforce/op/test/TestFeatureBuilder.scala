@@ -7,8 +7,9 @@ package com.salesforce.op.test
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter, Real}
-import com.salesforce.op.features.{Feature, FeatureSparkTypes}
+import com.salesforce.op.features.{Feature, FeatureBuilderWithExtract, FeatureSparkTypes}
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.StructType
@@ -24,8 +25,8 @@ case object TestFeatureBuilder {
     val (f1, f2, f3, f4, f5) = ("f1", "f2", "f3", "f4", "f5")
   }
 
-  private val DummyFeature = feature[Real]("dummy")
-  lazy val DefaultFeatureArgs = ReflectionUtils.bestCtorWithArgs(DummyFeature)._2.toMap
+  private val dummyFeature = feature[Real]("dummy")
+  private lazy val DefaultFeatureArgs = ReflectionUtils.bestCtorWithArgs(dummyFeature)._2.toMap
 
   /**
    * Build features from a given dataset
@@ -264,15 +265,19 @@ case object TestFeatureBuilder {
 
   private def dataframe[T <: Product](schema: StructType, data: Seq[T])(implicit spark: SparkSession): DataFrame = {
     import spark.implicits._
-    implicit val e = RowEncoder(schema)
+    implicit val rowEncoder = RowEncoder(schema)
 
-    def productToSeq(p: Product) = p.productIterator.toSeq.map {
-      case f: FeatureType => FeatureTypeSparkConverter.toSpark(f)
-    }
-    data.map(p => Row.fromSeq(productToSeq(p))).toDF()
+    data.map(p => Row.fromSeq(
+      p.productIterator.toSeq.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
+    )).toDF()
   }
 
-  private def feature[T <: FeatureType: TypeTag](name: String) =
-    Feature[T](name = name, isResponse = false, originStage = null, parents = Seq.empty, uid = UID[Feature[T]])
-
+  private def feature[T <: FeatureType](name: String)(implicit tt: TypeTag[T]) = {
+    val conv = FeatureTypeSparkConverter[T]()(tt)
+    new FeatureBuilderWithExtract[Row, T](
+      name = name,
+      extractFn = (r: Row) => conv.fromSpark(r.getAny(name)),
+      extractSource = "(r: Row) => conv.fromSpark(r.getAny(name))"
+    ).asPredictor
+  }
 }

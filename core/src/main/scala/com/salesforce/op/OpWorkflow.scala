@@ -7,12 +7,11 @@ package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.OPStage
-import com.salesforce.op.stages.impl.selector.{HasEval, HasTestEval}
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.stages.FitStagesUtil
 import org.apache.spark.ml._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.collection.mutable.ListBuffer
 import scala.util.{Failure, Try}
 
 
@@ -128,9 +127,10 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param in DataFrame
    * @return transformed DataFrame
    */
-  private[op] def transform(in: DataFrame)(implicit sc: SparkSession): DataFrame = {
-    val transformers = fitStages(in, stages).map(_.asInstanceOf[Transformer])
-    applySparkTransformations(in, transformers, OpWorkflowModel.persistEveryKStages)
+  private[op] def transform(in: DataFrame, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit sc: SparkSession): DataFrame = {
+    val transformers = fitStages(in, stages, persistEveryKStages).map(_.asInstanceOf[Transformer])
+    FitStagesUtil.applySparkTransformations(in, transformers, persistEveryKStages)
   }
 
   /**
@@ -202,13 +202,15 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Fit all of the estimators in the pipeline and return a pipeline model of only transformers. Uses data loaded
    * as specified by the data reader to generate the initial data set.
    *
+   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
    * @return a fitted pipeline model
    */
-  def train()(implicit spark: SparkSession): OpWorkflowModel = {
+  def train(persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit spark: SparkSession): OpWorkflowModel = {
     val rawData = generateRawData()
 
     // Update features with fitted stages
-    val fittedStages = fitStages(data = rawData, stagesToFit = stages)
+    val fittedStages = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
     val newResultFeatures = resultFeatures.map(_.copyWithNewStages(fittedStages))
 
     val model =
@@ -248,10 +250,12 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Returns a dataframe containing all the columns generated up to the feature input
    *
    * @param feature input feature to compute up to
+   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
    * @return Dataframe containing columns corresponding to all of the features generated before the feature given
    */
-  def computeDataUpTo(feature: OPFeature)(implicit spark: SparkSession): DataFrame = {
-    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = false)
+  def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit spark: SparkSession): DataFrame = {
+    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = false, persistEveryKStages)
   }
 
 }

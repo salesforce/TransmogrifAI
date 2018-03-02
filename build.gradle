@@ -43,8 +43,8 @@ configure(allProjs) {
     apply plugin: 'com.github.jk1.dependency-license-report'
     apply plugin: 'com.github.unafraid.gradle.git-repo-plugin'
 
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = 1.8
+    targetCompatibility = 1.8
 
     // Max: Set this to the main class for cli.
     // Could not figure out how to configure it just for the cli subproject
@@ -182,8 +182,9 @@ configure(allProjs) {
                 '**/com/salesforce/op/test/TestSparkContext.scala',
                 '**/com/salesforce/op/test/TempDirectoryTest.scala',
                 '**/com/salesforce/op/utils/io/DirectOutputCommitter.scala',
-                '**/org/apache/spark/ml/tuning/OpCrossValidator.scala',
-                '**/org/apache/spark/ml/tuning/OpTrainValidationSplit.scala',
+                '**/com/salesforce/op/stages/impl/tuning/OpCrossValidation.scala',
+                '**/com/salesforce/op/stages/impl/tuning/OpTrainValidationSplit.scala',
+                '**/com/salesforce/op/test/*.java',
                 '**/com/fasterxml/jackson/module/scala/**',
                 '**/templates/**', '**/resources/**'
     }
@@ -255,7 +256,7 @@ configure(allProjs) {
 
 task wrapper(type: Wrapper) {
     description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.1'
+    gradleVersion = '4.5.1'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {

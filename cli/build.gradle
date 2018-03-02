@@ -1,5 +1,5 @@
 plugins {
-    id 'com.github.johnrengelman.shadow' version '1.2.3'
+    id 'com.github.johnrengelman.shadow' version '2.0.2'
 }
 
 apply plugin: 'com.github.johnrengelman.shadow'
@@ -92,7 +92,7 @@ task copyTemplates(type: Copy) {
             avroVersion: avroVersion,
             sparkAvroVersion: sparkAvroVersion,
             hadoopVersion: hadoopVersion,
-            gradleVersion: '4.1',
+            gradleVersion: '4.5.1',
             opVersion: version,
             buildNumber: (int)(Math.random() * 1000),
             date: new Date()

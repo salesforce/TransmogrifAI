@@ -16,7 +16,8 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning.DataBalancer
-import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.BooleanParam
@@ -140,8 +141,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     data.schema.fields.map(_.dataType) should contain only(StringType, DoubleType)
 
-    val partialData = model.computeDataUpTo(density)
-    partialData.schema.fieldNames should contain theSameElementsAs List("weight", "height", KeyFieldName)
+    val partialData = model.computeDataUpTo(density).schema.fieldNames
+    List("weight", "height", KeyFieldName).forall(n => partialData.contains(n)) shouldBe true
   }
 
   it should "leave the intermediate features in the scoring output, if requested to" in {
@@ -339,10 +340,12 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "work with data passed in RDD rather than DataReader" in {
-    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
-    val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
-    val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
-    val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
+    val (ds, f1, f2, f3) = TestFeatureBuilder(Seq(
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal)
+    ))
+    val rdd = ds.rdd
     val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
     val wf = new OpWorkflow().setResultFeatures(f).setInputRDD(rdd)
     val modelLocation = checkpointDir + "/setInputRDD"
@@ -352,12 +355,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "work with data passed in Dataset rather than DataReader" in {
-    import spark.implicits._
-    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
-    val ds = spark.createDataset(rdd)
-    val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
-    val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
-    val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
+    val (ds, f1, f2, f3) = TestFeatureBuilder(Seq(
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal)
+    ))
     val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
     val wf = new OpWorkflow().setResultFeatures(f).setInputDataset(ds)
     val modelLocation = checkpointDir + "/setInputDataset"

@@ -88,8 +88,7 @@ I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): QuaternaryModel[I1, I2, I3, I4, O] = {
-    transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val df = dataset.select(in1.name, in2.name, in3.name, in4.name)
     val ds = df.map(r =>

@@ -268,16 +268,19 @@ trait RichNumericFeature {
      * @param trackNulls   option to keep track of values that were missing
      * @param trackInvalid option to keep track of invalid values,
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree
      */
     def autoBucketize(
       label: FeatureLike[RealNN],
       trackNulls: Boolean,
-      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
     ): FeatureLike[OPVector] = {
       new DecisionTreeNumericBucketizer[Double, T]()
         .setInput(label, f)
         .setTrackInvalid(trackInvalid)
-        .setTrackNulls(trackNulls).getOutput()
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain).getOutput()
     }
 
     /**
@@ -527,16 +530,19 @@ trait RichNumericFeature {
      * @param trackNulls   option to keep track of values that were missing
      * @param trackInvalid option to keep track of invalid values,
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree
      */
     def autoBucketize(
       label: FeatureLike[RealNN],
       trackNulls: Boolean,
-      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
     ): FeatureLike[OPVector] = {
       new DecisionTreeNumericBucketizer[Long, T]()
         .setInput(label, f)
         .setTrackInvalid(trackInvalid)
-        .setTrackNulls(trackNulls).getOutput()
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain).getOutput()
     }
 
     /**

@@ -8,7 +8,7 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import org.apache.spark.ml.Model
@@ -46,7 +46,7 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpCrossValidation[ProbClassifier](numFolds, seed, validationMetric),
+      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -71,7 +71,7 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpTrainValidationSplit[ProbClassifier](trainRatio, seed, validationMetric),
+      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](trainRatio, seed, validationMetric),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -79,7 +79,7 @@ case object BinaryClassificationModelSelector {
 
 
   private def selector(
-    validator: OpValidator[ProbClassifier],
+    validator: OpValidator[ProbClassifierModel, ProbClassifier],
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]]
   ): BinaryClassificationModelSelector = {
@@ -126,7 +126,7 @@ case object BinaryClassificationModelSelector {
  */
 private[op] class BinaryClassificationModelSelector
 (
-  override val validator: OpValidator[ProbClassifier],
+  override val validator: OpValidator[ProbClassifierModel, ProbClassifier],
   override val splitter: Option[Splitter],
   override val evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   override val uid: String = UID[BinaryClassificationModelSelector]
@@ -148,7 +148,7 @@ private[op] class BinaryClassificationModelSelector
  */
 private[op] class Stage1BinaryClassificationModelSelector
 (
-  validator: OpValidator[ProbClassifier],
+  validator: OpValidator[ProbClassifierModel, ProbClassifier],
   splitter: Option[Splitter],
   evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[Stage1BinaryClassificationModelSelector],

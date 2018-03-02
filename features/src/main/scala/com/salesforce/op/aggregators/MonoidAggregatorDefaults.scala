@@ -34,7 +34,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[TextList] => ConcatTextList
       case wt if wt =:= weakTypeOf[DateList] => ConcatDateList
       case wt if wt =:= weakTypeOf[DateTimeList] => ConcatDateTimeList
-      case wt if wt =:= weakTypeOf[Geolocation] => Geolocations
+      case wt if wt =:= weakTypeOf[Geolocation] => GeolocationMidpoint
 
       // Maps
       case wt if wt =:= weakTypeOf[Base64Map] => UnionConcatBase64Map
@@ -59,7 +59,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[CityMap] => UnionConcatCityMap
       case wt if wt =:= weakTypeOf[PostalCodeMap] => UnionConcatPostalCodeMap
       case wt if wt =:= weakTypeOf[StreetMap] => UnionConcatStreetMap
-      case wt if wt =:= weakTypeOf[GeolocationMap] => UnionGeolocationsMap
+      case wt if wt =:= weakTypeOf[GeolocationMap] => UnionGeolocationMidpointMap
 
       // Numerics
       case wt if wt =:= weakTypeOf[Binary] => LogicalOr // TODO: reconsider using Xor since this is natural op on Z/2

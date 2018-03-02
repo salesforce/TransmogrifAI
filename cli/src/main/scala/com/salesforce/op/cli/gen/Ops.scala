@@ -33,25 +33,31 @@ case class Ops(config: GeneratorConfig) {
     println(s"Starting $templateName project generation")
 
     val generalArgs = Map("APP_NAME" -> config.projName)
-    val templateProps = template.props
-    val allSubstitutions = generalArgs ++ templateProps
-
     val dir = config.projectDirectory
-    println(
-      s"Generating '${config.projName}' in '${dir.getAbsolutePath}/' with template '$templateName'")
 
-    template.renderAll(allSubstitutions) foreach {
-      case FileInProject(path, source, FilePermissions(perms)) =>
-        val file = new File(dir, path)
-        file.getParentFile.mkdirs()
-        source.writeTo(file)
+    try {
+      val templateProps = template.props
+      val allSubstitutions = generalArgs ++ templateProps
 
-        Files.setPosixFilePermissions(file.toPath, perms)
-        println(s"  Created '${file.getAbsolutePath}'")
-    }
-    println("Done.")
-    if (template.welcomeMessage != "") {
-      println(template.welcomeMessage)
+      println(
+        s"Generating '${config.projName}' in '${dir.getAbsolutePath}/' with template '$templateName'")
+      template.renderAll(allSubstitutions) foreach {
+        case FileInProject(path, source, FilePermissions(perms)) =>
+          val file = new File(dir, path)
+          file.getParentFile.mkdirs()
+          source.writeTo(file)
+
+          Files.setPosixFilePermissions(file.toPath, perms)
+          println(s"  Created '${file.getAbsolutePath}'")
+      }
+      println("Done.")
+      if (template.welcomeMessage != "") {
+        println(template.welcomeMessage)
+      }
+    } catch {
+      case x: Exception =>
+        dir.delete() // TODO(mt, vlad): make sure that all potential contents is deleted too
+        throw x
     }
   }
 

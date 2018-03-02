@@ -6,101 +6,126 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.stages.impl.selector.ModelInfo
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types.MetadataBuilder
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 /**
  * Best Model container
- * @param name the name of the best model
- * @param model best trained model
+ *
+ * @param name     the name of the best model
+ * @param model    best trained model
  * @param metadata optional metadata
  * @tparam M model type
  */
-case class BestModel[M <: Model[M]](name: String, model: Model[M], metadata: Option[MetadataBuilder] = None)
+case class BestModel[M <: Model[_]](name: String, model: M, metadata: Option[MetadataBuilder] = None)
+
+
+/**
+ * Validated Model container
+ *
+ * @param model     model instance
+ * @param bestIndex best metric / grid index
+ * @param metrics   all computed metrics
+ * @param grids     all param grids
+ */
+private[tuning] case class ValidatedModel[E <: Estimator[_]]
+(
+  model: E,
+  bestIndex: Int,
+  metrics: Array[Double],
+  grids: Array[ParamMap]
+) {
+  /**
+   * Best metric (metric at bestIndex)
+   */
+  def bestMetric: Double = metrics(bestIndex)
+  /**
+   * Best grid (param grid at bestIndex)
+   */
+  def bestGrid: ParamMap = grids(bestIndex)
+}
 
 /**
  * Abstract class for Validator: Cross Validation or Train Validation Split
+ * The model type should be the output of the estimator type but specifying that kills the scala compiler
  */
-private[impl] trait OpValidator[E <: Estimator[_]] extends Serializable {
+private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializable {
 
-  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
+  @transient protected lazy val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  val seed: Long
-  val evaluator: OpEvaluatorBase[_]
-
-  /**
-   * Validation parameters map
-   */
-  def validationParams: Map[String, Any]
+  def seed: Long
+  def evaluator: OpEvaluatorBase[_]
+  def validationName: String
 
   /**
    * Function that performs the model selection
    *
-   * @param estimator  estimator used
-   * @param paramGrids param grids
+   * @param modelInfo estimators and grids to validate
    * @param label
+   * @param features
+   * @param dataset
    * @return estimator
    */
   private[op] def validate(
-    estimator: E,
-    paramGrids: Array[ParamMap],
-    label: String
-  ): Estimator[_]
-
-  /**
-   * get the best model and the metadata with with the validator params
-   * @param allModelsStr name of all the different models
-   * @param fittedModels sequence of all models with their params
-   * @param meta metadata
-   * @return best model
-   */
-  private[op] def bestModel[M <: Model[M]](
-    allModelsStr: String,
-    fittedModels: Seq[(Any, Array[ParamMap])],
-    meta: MetadataBuilder
+    modelInfo: Seq[ModelInfo[E]],
+    dataset: Dataset[_],
+    label: String,
+    features: String
   ): BestModel[M]
 
   /**
+   * Get the best model and the metadata with with the validator params
+   *
+   * @param modelsFit info from validation
+   * @param bestModel best fit model
+   * @param splitInfo split info for logging
+   * @return best model
+   */
+  private[op] def wrapBestModel(
+    modelsFit: Array[ValidatedModel[E]],
+    bestModel: M,
+    splitInfo: String
+  ): BestModel[M] = {
+    log.info(
+      "Model Selection over {} with {} with {} and the {} metric",
+      modelsFit.map(_.model.getClass.getSimpleName).mkString(","), validationName, splitInfo, evaluator.name
+    )
+    val meta = new MetadataBuilder()
+    val cvFittedModels = modelsFit.map(v => updateBestModelMetadata(meta, v) -> v.bestMetric)
+    val newMeta = new MetadataBuilder().putMetadata(validationName, meta.build())
+    val (bestModelName, _) = if (evaluator.isLargerBetter) cvFittedModels.maxBy(_._2) else cvFittedModels.minBy(_._2)
+
+    BestModel(name = bestModelName, model = bestModel, metadata = Option(newMeta))
+  }
+
+  /**
    * Update metadata during model selection and return best model name
-   * @param metadataBuilder
-   * @param paramGrids
-   * @param modelUid
-   * @param modelParams
-   * @param modelMetrics
    * @return best model name
    */
-  private[op] def updateBestModelMetadata(
-    metadataBuilder: MetadataBuilder,
-    paramGrids: Array[ParamMap],
-    modelUid: String,
-    modelParams: ParamMap,
-    modelMetrics: Array[Double]
-  ): String = {
-    def getModelName(index: Int) = s"${modelUid}_$index"
+  private[op] def updateBestModelMetadata(metadataBuilder: MetadataBuilder, v: ValidatedModel[E]): String = {
+    val ValidatedModel(model, bestIndex, metrics, grids) = v
+    val modelParams = model.extractParamMap()
+    def makeModelName(index: Int) = s"${model.uid}_$index"
 
-    for {((paramGrid, met), ind) <- paramGrids.zip(modelMetrics).zipWithIndex} {
+    for {((paramGrid, met), ind) <- grids.zip(metrics).zipWithIndex} {
       val paramMetBuilder = new MetadataBuilder()
       paramMetBuilder.putString(evaluator.name, met.toString)
       // put in all model params from the winner
       modelParams.toSeq.foreach(p => paramMetBuilder.putString(p.param.name, p.value.toString))
       // override with param map values if they exists
       paramGrid.toSeq.foreach(p => paramMetBuilder.putString(p.param.name, p.value.toString))
-      metadataBuilder.putMetadata(getModelName(ind), paramMetBuilder.build())
+      metadataBuilder.putMetadata(makeModelName(ind), paramMetBuilder.build())
     }
-    val bestModelIndex =
-      if (evaluator.isLargerBetter) modelMetrics.zipWithIndex.maxBy(_._1)._2
-      else modelMetrics.zipWithIndex.minBy(_._1)._2
-
-    getModelName(bestModelIndex)
+    makeModelName(bestIndex)
   }
 }
 
 object ValidatorParamDefaults {
-  // scalastyle:off method.name
-  def Seed: Long = util.Random.nextLong
-
+  def Seed: Long = util.Random.nextLong // scalastyle:off method.name
   val labelCol = "labelCol"
   val NumFolds = 3
   val TrainRatio = 0.75

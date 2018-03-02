@@ -22,6 +22,7 @@ class Text(val value: Option[String]) extends FeatureType {
   type Value = Option[String]
   def this(value: String) = this(Option(value))
   final def isEmpty: Boolean = value.isEmpty
+  final def map[B](f: String => B): Option[B] = value.map(f)
 }
 object Text {
   def apply(value: Option[String]): Text = new Text(value)

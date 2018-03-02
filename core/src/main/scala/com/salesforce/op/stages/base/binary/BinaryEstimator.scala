@@ -72,8 +72,7 @@ abstract class BinaryEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: Featur
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): BinaryModel[I1, I2, O] = {
-    transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val df = dataset.select(in1.name, in2.name)
     val ds = df.map(r =>
