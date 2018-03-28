@@ -1,10 +1,12 @@
 language: java
 jdk: openjdk8
+dist: trusty
+sudo: required
 before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS="-Xms512m -Xmx3g -XX:MaxMetaspaceSize=256m"
+    - GRADLE_OPTS="-Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m"
 script: "./gradlew build"
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
