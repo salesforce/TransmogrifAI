@@ -1,5 +1,8 @@
 language: java
 jdk: openjdk8
+env:
+  global:
+    - GRADLE_OPTS="-server -Xms512g -Xmx3g -XX:MaxMetaspaceSize=256m"
 script: "./gradlew build"
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
