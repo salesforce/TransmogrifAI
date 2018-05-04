@@ -257,7 +257,7 @@ configure(allProjs) {
 
 task wrapper(type: Wrapper) {
     description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.6'
+    gradleVersion = '4.7'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
