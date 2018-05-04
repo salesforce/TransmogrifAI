@@ -5,12 +5,10 @@
 
 package com.salesforce.op.features.types
 
-
 class Real(val value: Option[Double]) extends OPNumeric[Double] {
   def this(value: Double) = this(Option(value))
   final def toDouble: Option[Double] = value
-  def toRealNN(default: Option[Double] = FeatureTypeDefaults.RealNN.value): RealNN =
-    new RealNN(value.orElse(default))
+  def toRealNN(default: Double): RealNN = new RealNN(value.getOrElse(default))
 }
 object Real {
   def apply(value: Option[Double]): Real = new Real(value)
@@ -18,18 +16,18 @@ object Real {
   def empty: Real = FeatureTypeDefaults.Real
 }
 
-class RealNN(value: Option[Double]) extends Real(value.orElse(FeatureTypeDefaults.RealNN.value)) with NonNullable {
+class RealNN private[op](v: Option[Double]) extends Real(
+    if (v == null || v.isEmpty) throw new NonNullableEmptyException(classOf[RealNN]) else v
+  ) with NonNullable {
   def this(value: Double) = this(Option(value))
 }
 object RealNN {
-  def apply(value: Option[Double]): RealNN = new RealNN(value.orElse(FeatureTypeDefaults.RealNN.value))
   def apply(value: Double): RealNN = new RealNN(value)
-  def empty: RealNN = FeatureTypeDefaults.RealNN
 }
 
 class Binary(val value: Option[Boolean]) extends OPNumeric[Boolean] with SingleResponse {
   def this(value: Boolean) = this(Option(value))
-  final def toDouble: Option[Double] = value.map { case true => 1.0; case false => 0.0 }
+  final def toDouble: Option[Double] = value.map(if (_) 1.0 else 0.0)
 }
 object Binary {
   def apply(value: Option[Boolean]): Binary = new Binary(value)

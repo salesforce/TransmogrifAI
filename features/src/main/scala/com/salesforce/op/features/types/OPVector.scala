@@ -8,7 +8,7 @@ package com.salesforce.op.features.types
 import org.apache.spark.ml.linalg.Vector
 
 
-class OPVector(val value: Vector) extends OPCollection with NonNullable {
+class OPVector(val value: Vector) extends OPCollection {
   type Value = Vector
   final def isEmpty: Boolean = value.size == 0
 }

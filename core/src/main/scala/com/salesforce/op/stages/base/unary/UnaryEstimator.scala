@@ -72,6 +72,7 @@ abstract class UnaryEstimator[I <: FeatureType, O <: FeatureType]
       .setParent(this)
       .setInput(in1.asFeatureLike[I])
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

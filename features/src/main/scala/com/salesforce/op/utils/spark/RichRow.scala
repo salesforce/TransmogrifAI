@@ -6,7 +6,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
-import com.salesforce.op.features.{FeatureLike, FeatureSparkTypes}
+import com.salesforce.op.features.{FeatureLike, TransientFeature}
 import org.apache.spark.sql.Row
 
 
@@ -43,6 +43,14 @@ object RichRow {
     def getAny(fieldName: String): Any = row.get(row.fieldIndex(fieldName))
 
     /**
+     * Returns map feature by name
+     * @param fieldName name of map feature
+     * @return feature value as instance of Map[String, Any]
+     */
+    def getMapAny(fieldName: String): scala.collection.Map[String, Any] =
+      row.getMap[String, Any](row.fieldIndex(fieldName))
+
+    /**
      * Returns the value of field named {fieldName}. If the value is null, None is returned.
      */
     def getOptionAny(fieldName: String): Option[Any] = Option(getAny(fieldName))
@@ -70,6 +78,17 @@ object RichRow {
      * @throws ClassCastException when data type does not match.
      */
     def getFeatureType[T <: FeatureType](f: FeatureLike[T])(implicit conv: FeatureTypeSparkConverter[T]): T =
+      conv.fromSpark(getAny(f.name))
+
+    /**
+     * Returns the value of a given feature casted into the feature type from the transient feature and the
+     * weak type tag of features
+     *
+     * @throws UnsupportedOperationException when schema is not defined.
+     * @throws IllegalArgumentException when fieldName do not exist.
+     * @throws ClassCastException when data type does not match.
+     */
+    def getFeatureType[T <: FeatureType](f: TransientFeature)(implicit conv: FeatureTypeSparkConverter[T]): T =
       conv.fromSpark(getAny(f.name))
 
   }

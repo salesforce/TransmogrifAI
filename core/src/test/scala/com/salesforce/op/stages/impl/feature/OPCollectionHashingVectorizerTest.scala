@@ -51,7 +51,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
   it should "take an array of features as input and return a single vector feature" in {
     val vectorizer = new OPCollectionHashingVectorizer[MultiPickList].setInput(top, bot).setNumFeatures(128)
     val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
     val vectorMetadata = vectorizer.getMetadata()
@@ -61,7 +61,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
       top -> (0 to 127).map(i => PivotColNoInd(i.toString)).toList,
       bot -> (0 to 127).map(i => PivotColNoInd(i.toString)).toList
     )
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "validate the params correctly" in {

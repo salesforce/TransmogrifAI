@@ -79,6 +79,7 @@ case object FeatureTypeSparkConverter {
     case n: t.OPSet[_] => MWrappedArray.make(n.toArray)
     // Maps
     case n: t.MultiPickListMap => n.value.map { case (k, v) => k -> MWrappedArray.make(v.toArray) }
+    case n: t.GeolocationMap => n.value.map { case (k, v) => k -> MWrappedArray.make(v.toArray) }
     case n: t.OPMap[_] => n.value
   }
 
@@ -96,12 +97,14 @@ case object FeatureTypeSparkConverter {
         if (value == null) FeatureTypeDefaults.Text.value else Some(value.asInstanceOf[String])
 
       // Numerics
-      case wt if wt <:< weakTypeOf[t.Binary] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Binary.value else Some(value.asInstanceOf[Boolean])
+      case wt if wt <:< weakTypeOf[t.RealNN] => (value: Any) =>
+        if (value == null) None else Some(value.asInstanceOf[Double])
       case wt if wt <:< weakTypeOf[t.Real] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Real.value else Some(value.asInstanceOf[Double])
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Integral.value else Some(value.asInstanceOf[Long])
+      case wt if wt <:< weakTypeOf[t.Binary] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.Binary.value else Some(value.asInstanceOf[Boolean])
 
       // Maps
       case wt if wt <:< weakTypeOf[t.MultiPickListMap] => (value: Any) =>
@@ -186,6 +189,7 @@ trait FeatureTypeSparkConverters {
   implicit val PostalCodeMapConverter = FeatureTypeSparkConverter[PostalCodeMap]()
   implicit val StreetMapConverter = FeatureTypeSparkConverter[StreetMap]()
   implicit val GeolocationMapConverter = FeatureTypeSparkConverter[GeolocationMap]()
+  implicit val PredictionConverter = FeatureTypeSparkConverter[Prediction]()
 }
 
 /**

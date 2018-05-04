@@ -50,5 +50,5 @@ final class MinMaxNormEstimatorModel private[op]
   val map: Map[String, Map[String, Double]],
   operationName: String, uid: String
 ) extends UnaryModel[Real, Real](operationName = operationName, uid = uid) {
-  def transformFn: Real => Real = r => r.map(v => (v - min) / (max - min)).toReal
+  def transformFn: Real => Real = r => r.v.map(v => (v - min) / (max - min)).toReal
 }

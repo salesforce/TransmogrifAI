@@ -5,6 +5,7 @@
 
 package com.salesforce.op.stages.impl.preparators
 
+import scala.util.Try
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.sql.types.Metadata
@@ -20,18 +21,35 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(), CorrelationType.Pearson),
     dropped = Seq("f1"),
     featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
-      Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
+      Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
     names = Seq("f1", "f2", "f3"),
-    CategoricalStats(
-      categoricalFeatures = Array("f4", "f5"),
-      cramersVs = Array(0.45, 0.11),
-      pointwiseMutualInfos = Map("0" -> Array(1.23, -2.11), "1" -> Array(1.11, 0.34), "2" -> Array(-0.32, 0.99)),
-      mutualInfos = Array(-1.22, 0.51)
+    Array(
+      CategoricalGroupStats(
+        group = "f4",
+        categoricalFeatures = Array("f4"),
+        contingencyMatrix = Map("0" -> Array(12), "1" -> Array(12), "2" -> Array(12)),
+        cramersV = 0.45,
+        pointwiseMutualInfo = Map("0" -> Array(1.23), "1" -> Array(1.11), "2" -> Array(-0.32)),
+        mutualInfo = -1.22,
+        maxRuleConfidences = Array(1.0),
+        supports = Array(1.0)
+      ),
+      CategoricalGroupStats(
+        group = "f5",
+        categoricalFeatures = Array("f5"),
+        contingencyMatrix = Map("0" -> Array(12), "1" -> Array(12), "2" -> Array(12)),
+        cramersV = 0.11,
+        pointwiseMutualInfo = Map("0" -> Array(-2.11), "1" -> Array(0.34), "2" -> Array(0.99)),
+        mutualInfo = -0.51,
+        maxRuleConfidences = Array(1.0),
+        supports = Array(1.0)
+      )
     )
   )
 
   Spec[SanityCheckerSummary] should "convert to and from metadata correctly" in {
     val meta = summary.toMetadata()
+
     meta.isInstanceOf[Metadata] shouldBe true
 
     val retrieved = SanityCheckerSummary.fromMetadata(meta)
@@ -40,7 +58,8 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     retrieved.correlationsWLabel.featuresIn should contain theSameElementsAs summary.correlationsWLabel.featuresIn
     retrieved.correlationsWLabel.values should contain theSameElementsAs summary.correlationsWLabel.values
-    retrieved.categoricalStats.cramersVs should contain theSameElementsAs summary.categoricalStats.cramersVs
+    retrieved.categoricalStats.map(_.cramersV) should contain theSameElementsAs
+      summary.categoricalStats.map(_.cramersV)
 
     retrieved.dropped should contain theSameElementsAs summary.dropped
 
@@ -53,9 +72,10 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     retrieved.names should contain theSameElementsAs summary.names
     retrieved.correlationsWLabel.corrType shouldBe summary.correlationsWLabel.corrType
 
-    retrieved.categoricalStats.categoricalFeatures should contain theSameElementsAs
-      summary.categoricalStats.categoricalFeatures
-    retrieved.categoricalStats.cramersVs should contain theSameElementsAs summary.categoricalStats.cramersVs
+    retrieved.categoricalStats.flatMap(_.categoricalFeatures) should contain theSameElementsAs
+      summary.categoricalStats.flatMap(_.categoricalFeatures)
+    retrieved.categoricalStats.map(_.cramersV) should contain theSameElementsAs
+      summary.categoricalStats.map(_.cramersV)
   }
 
   it should "convert to and from JSON and give the same values" in {
@@ -65,6 +85,11 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
 
     // recovered shouldBe meta
     recovered.hashCode() shouldEqual summary.toMetadata().hashCode()
+  }
+
+  it should "be able to be constructed (albeit poorly) from the old metadata format" in {
+    val oldMeta = Metadata.fromJson(loadResource("/SanityCheckerSummaryMetadata_pre3.3.0.json"))
+    Try(SanityCheckerSummary.fromMetadata(oldMeta)).isSuccess shouldBe true
   }
 
 }

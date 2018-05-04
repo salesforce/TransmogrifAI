@@ -14,6 +14,4 @@ abstract class OPNumeric[N] extends FeatureType {
   type Value = Option[N]
   def toDouble: Option[Double]
   final def isEmpty: Boolean = value.isEmpty
-  final def toDouble(default: Double = 0.0): Double = toDouble.getOrElse(default)
-  final def map[B](f: N => B): Option[B] = value.map(f)
 }

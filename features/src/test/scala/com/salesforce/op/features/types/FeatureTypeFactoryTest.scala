@@ -7,16 +7,17 @@ package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
+import org.scalatest.{Assertion, Matchers, PropSpec}
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
-import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 
 @RunWith(classOf[JUnitRunner])
 class FeatureTypeFactoryTest
-  extends PropSpec with PropertyChecks with TestCommon with ConcurrentCheck {
+  extends PropSpec with PropertyChecks with TestCommon with ConcurrentCheck with FeatureTypeAsserts {
 
   val featureTypeFactories: TableFor1[FeatureTypeFactory[_ <: FeatureType]] = Table("ft",
     // Vector
@@ -50,6 +51,7 @@ class FeatureTypeFactoryTest
     FeatureTypeFactory[PostalCodeMap](),
     FeatureTypeFactory[StreetMap](),
     FeatureTypeFactory[GeolocationMap](),
+    FeatureTypeFactory[Prediction](),
     // Numerics
     FeatureTypeFactory[Binary](),
     FeatureTypeFactory[Currency](),
@@ -85,22 +87,26 @@ class FeatureTypeFactoryTest
     forAll(featureTypeFactories) { ft => ft shouldBe a[Serializable] }
   }
   property("create a feature type instance of null") {
-    forAll(featureTypeFactories) { ft =>
-      val res = ft.newInstance(null)
-      res should not be null
-      res shouldBe a[FeatureType]
-    }
+    forAll(featureTypeFactories)(ft => assertCreate(ft.newInstance(null)))
   }
   property("create a feature type instance in a timely fashion") {
     forAllConcurrentCheck[FeatureTypeFactory[_ <: FeatureType]](
       numThreads = 10, numInstancesPerThread = 50000, atMost = 10.seconds,
       table = featureTypeFactories,
-      functionCheck = (ft: FeatureTypeFactory[_ <: FeatureType]) => {
-        val res = ft.newInstance(null)
-        res should not be null
-        res shouldBe a[FeatureType]
-      }
+      functionCheck = ft => assertCreate(ft.newInstance(null))
     )
+  }
+}
+
+trait FeatureTypeAsserts {
+  self: Matchers =>
+
+  def assertCreate(ft: => FeatureType): Assertion = Try(ft) match {
+    case Failure(e) =>
+      e shouldBe a[NonNullableEmptyException]
+    case Success(v) =>
+      v should not be null
+      v shouldBe a[FeatureType]
   }
 
 }

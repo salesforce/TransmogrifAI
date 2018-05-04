@@ -7,16 +7,16 @@ package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
+import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
-import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
 
 
 @RunWith(classOf[JUnitRunner])
 class FeatureTypeSparkConverterTest
-  extends PropSpec with PropertyChecks with TestCommon with ConcurrentCheck {
+  extends PropSpec with PropertyChecks with TestCommon with ConcurrentCheck with FeatureTypeAsserts {
 
   val featureTypeConverters: TableFor1[FeatureTypeSparkConverter[_ <: FeatureType]] = Table("ft",
     // Vector
@@ -43,6 +43,13 @@ class FeatureTypeSparkConverterTest
     FeatureTypeSparkConverter[TextAreaMap](),
     FeatureTypeSparkConverter[TextMap](),
     FeatureTypeSparkConverter[URLMap](),
+    FeatureTypeSparkConverter[CountryMap](),
+    FeatureTypeSparkConverter[StateMap](),
+    FeatureTypeSparkConverter[CityMap](),
+    FeatureTypeSparkConverter[PostalCodeMap](),
+    FeatureTypeSparkConverter[StreetMap](),
+    FeatureTypeSparkConverter[GeolocationMap](),
+    FeatureTypeSparkConverter[Prediction](),
     // Numerics
     FeatureTypeSparkConverter[Binary](),
     FeatureTypeSparkConverter[Currency](),
@@ -73,21 +80,13 @@ class FeatureTypeSparkConverterTest
     forAll(featureTypeConverters) { ft => ft shouldBe a[Serializable] }
   }
   property("create a feature type instance of null") {
-    forAll(featureTypeConverters) { ft =>
-      val res = ft.fromSpark(null)
-      res should not be null
-      res shouldBe a[FeatureType]
-    }
+    forAll(featureTypeConverters)(ft => assertCreate(ft.fromSpark(null)))
   }
   property("create a feature type instance in a timely fashion") {
     forAllConcurrentCheck[FeatureTypeSparkConverter[_ <: FeatureType]](
       numThreads = 10, numInstancesPerThread = 50000, atMost = 10.seconds,
       table = featureTypeConverters,
-      functionCheck = (ft: FeatureTypeSparkConverter[_ <: FeatureType]) => {
-        val res = ft.fromSpark(null)
-        res should not be null
-        res shouldBe a[FeatureType]
-      }
+      functionCheck = ft => assertCreate(ft.fromSpark(null))
     )
   }
 }

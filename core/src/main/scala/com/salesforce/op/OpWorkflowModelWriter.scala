@@ -51,6 +51,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     val FN = OpWorkflowModelReadWriteShared.FieldNames
     (FN.Uid.entryName -> model.uid) ~
       (FN.ResultFeaturesUids.entryName -> resultFeaturesJArray) ~
+      (FN.BlacklistedFeaturesUids.entryName -> blacklistFeaturesJArray()) ~
       (FN.Stages.entryName -> stagesJArray(path)) ~
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.parameters.toJson(pretty = false)) ~
@@ -59,6 +60,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
 
   private def resultFeaturesJArray(): JArray =
     JArray(model.resultFeatures.map(_.uid).map(JString).toList)
+
+  private def blacklistFeaturesJArray(): JArray =
+    JArray(model.blacklistedFeatures.map(_.uid).map(JString).toList)
 
   /**
    * Serialize all the workflow model stages
@@ -108,6 +112,7 @@ private[op] object OpWorkflowModelReadWriteShared {
     val values = findValues
     case object Uid extends FieldNames("uid")
     case object ResultFeaturesUids extends FieldNames("resultFeaturesUids")
+    case object BlacklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
     case object Stages extends FieldNames("stages")
     case object AllFeatures extends FieldNames("allFeatures")
     case object Parameters extends FieldNames("parameters")

@@ -54,7 +54,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage, sc)
     // Add isModel indicator
     val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
-    // In case we stumbled upon a model instance, we also include it's ctor argg
+    // In case we stumbled upon a model instance, we also include it's ctor args
     // so we can reconstruct the model instance when loading
     if (isModel) metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap) else metadata
   }
@@ -84,7 +84,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
           )
 
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
-        case v: Option[_] if v.isDefined && v.get.isInstanceOf[PipelineStage] =>
+        case v: Option[_] if v.exists(_.isInstanceOf[PipelineStage]) =>
           AnyValue(AnyValueTypes.SparkWrappedStage, v.get.asInstanceOf[PipelineStage].uid)
         case v: PipelineStage =>
           AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)

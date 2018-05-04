@@ -47,6 +47,12 @@ import scala.util.Try
  *                                    should collect metrics for every stage.
  *                                    Note: can increase memory usage on the driver if app has too many stages.
  * @param customParams                any custom parameters
+ * @param alternateReaderParams       a map of parameters to inject into readers - other than the main reader
+ *                                    being called in the workflow run
+ *                                    Format is Map(ReaderType -> Map(ParameterName -> Value)).
+ *                                    In order to use these parameters the read method
+ *                                    in the reader must be overwritten to
+ *                                    specifically take and use these parameters.
  */
 final class OpParams
 (
@@ -63,11 +69,13 @@ final class OpParams
   val customTagValue: Option[String],
   val logStageMetrics: Option[Boolean],
   val collectStageMetrics: Option[Boolean],
-  val customParams: Map[String, Any]
+  val customParams: Map[String, Any],
+  val alternateReaderParams: Map[String, ReaderParams]
 ) extends JsonLike {
 
   // fix for jackson putting in nulls
-  def this() = this(Map.empty, Map.empty, None, None, None, None, None, None, None, None, None, None, None, Map.empty)
+  def this() = this(Map.empty, Map.empty, None, None, None, None, None, None, None, None,
+    None, None, None, Map.empty, Map.empty)
 
   /**
    * Copy op params with new specified values
@@ -78,6 +86,7 @@ final class OpParams
    * @param metricsLocation             metrics location
    * @param batchDurationSecs           the time interval at which streaming data will be divided into batches
    * @param awaitTerminationTimeoutSecs the time to await until streaming context termination
+   * @param alternateReadLocations      read locations for readers other than the main reader in the workflow
    * @return a copy of params with new values
    */
   def withValues(
@@ -86,13 +95,25 @@ final class OpParams
     modelLocation: Option[String] = None,
     metricsLocation: Option[String] = None,
     batchDurationSecs: Option[Int] = None,
-    awaitTerminationTimeoutSecs: Option[Int] = None
+    awaitTerminationTimeoutSecs: Option[Int] = None,
+    alternateReadLocations: Map[String, String] = Map.empty
   ): OpParams = {
-    val existingReadLocations = readerParams.collect { case (k, r) if r.path.isDefined => k -> r.path.get }
-    val newReaderParams = (existingReadLocations ++ readLocations).map { case (k, v) =>
-      if (readerParams.contains(k)) k -> readerParams(k).withValues(path = v)
-      else k -> new ReaderParams(path = Option(v), partitions = None, customParams = Map.empty)
+
+    def readParamsUpdate(
+      rParam: Map[String, ReaderParams],
+      locations: Map[String, String]
+    ): Map[String, ReaderParams] = {
+      // some version issue on the cluster (cannot produce locally) introduces nulls
+      val oldParams = if (rParam != null) rParam else Map.empty[String, ReaderParams]
+      val existingReadLocations = oldParams.collect { case (k, r) if r.path.isDefined => k -> r.path.get }
+      (existingReadLocations ++ locations).map { case (k, v) =>
+        if (oldParams.contains(k)) k -> oldParams(k).withValues(path = v)
+        else k -> new ReaderParams(path = Option(v), partitions = None, customParams = Map.empty)
+      }
     }
+
+    val newReaderParams = readParamsUpdate(readerParams, readLocations)
+    val newAltReaderParams = readParamsUpdate(alternateReaderParams, alternateReadLocations)
     new OpParams(
       stageParams = stageParams,
       readerParams = newReaderParams,
@@ -108,9 +129,34 @@ final class OpParams
       customTagValue = customTagValue,
       logStageMetrics = logStageMetrics,
       collectStageMetrics = collectStageMetrics,
-      customParams = customParams
+      customParams = customParams,
+      alternateReaderParams = newAltReaderParams
     )
   }
+
+  /**
+   * Switch the reader params with the alternate reader params and return a new params instance
+   * this is necessary because the readers will always try to use readerParams so if you want to
+   * use the alternate reader params they need to be moved to readerParams
+   * @return a new params instance
+   */
+  def switchReaderParams(): OpParams = new OpParams(
+    stageParams = stageParams,
+    readerParams = alternateReaderParams,
+    modelLocation = modelLocation,
+    writeLocation = writeLocation,
+    metricsLocation = metricsLocation,
+    metricsCompress = metricsCompress,
+    metricsCodec = metricsCodec,
+    batchDurationSecs = batchDurationSecs,
+    awaitTerminationTimeoutSecs = awaitTerminationTimeoutSecs,
+    customTagName = customTagName,
+    customTagValue = customTagValue,
+    logStageMetrics = logStageMetrics,
+    collectStageMetrics = collectStageMetrics,
+    customParams = customParams,
+    alternateReaderParams = readerParams
+  )
 }
 
 /**
@@ -165,7 +211,8 @@ object OpParams {
     customTagValue: Option[String] = None,
     logStageMetrics: Option[Boolean] = None,
     collectStageMetrics: Option[Boolean] = None,
-    customParams: Map[String, Any] = Map.empty
+    customParams: Map[String, Any] = Map.empty,
+    scoringReaderParams: Map[String, ReaderParams] = Map.empty
   ): OpParams = new OpParams(
     stageParams = stageParams,
     readerParams = readerParams,
@@ -180,7 +227,8 @@ object OpParams {
     customTagValue = customTagValue,
     logStageMetrics = logStageMetrics,
     collectStageMetrics = collectStageMetrics,
-    customParams = customParams
+    customParams = customParams,
+    alternateReaderParams = scoringReaderParams
   )
 
   /**

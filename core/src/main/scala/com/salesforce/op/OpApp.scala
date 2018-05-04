@@ -107,6 +107,7 @@ abstract class OpApp {
 
     val parser = new scopt.OptionParser[OpWorkflowRunnerConfig](thisClassName) {
       implicit val runTypeRead: Read[OpWorkflowRunType] = scopt.Read.reads(OpWorkflowRunType.withNameInsensitive)
+      override val errorOnUnknownArgument = false
 
       opt[OpWorkflowRunType]('t', "run-type").required().action { (x, c) =>
         c.copy(runType = x)
@@ -135,12 +136,13 @@ abstract class OpApp {
       checkConfig(_.validate match { case Left(error: String) => Left(error) case _ => Right(()) })
       help("help").text("prints this usage text")
     }
-
     val config = parser.parse(args, OpWorkflowRunnerConfig())
-    if (config.isEmpty) sys.exit(1)
-
-    logr.info("Parsed config:\n{}", config)
-    config.get.runType -> config.get.toOpParams.get
+    config match {
+      case None => sys.exit(1)
+      case Some(conf) =>
+        logr.info("Parsed config:\n{}", conf)
+        conf.runType -> conf.toOpParams.get
+    }
   }
 
   /**

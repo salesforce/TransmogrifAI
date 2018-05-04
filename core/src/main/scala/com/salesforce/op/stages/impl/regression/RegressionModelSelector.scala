@@ -11,11 +11,11 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBase, StageParamNames}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.makeOutputName
-import org.apache.spark.ml.Model
-import org.apache.spark.sql.Dataset
+
+import scala.util.Try
 
 
 /**

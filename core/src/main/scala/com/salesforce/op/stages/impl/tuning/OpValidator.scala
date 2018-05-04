@@ -5,11 +5,13 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
 import com.salesforce.op.stages.impl.selector.ModelInfo
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
-import org.apache.spark.sql.Dataset
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.MetadataBuilder
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -23,6 +25,15 @@ import org.slf4j.{Logger, LoggerFactory}
  */
 case class BestModel[M <: Model[_]](name: String, model: M, metadata: Option[MetadataBuilder] = None)
 
+/**
+ * Best Estimator container
+ *
+ * @param name     the name of the best model
+ * @param estimator    best estimator
+ * @param metadata optional metadata
+ * @tparam E model type
+ */
+case class BestEstimator[E <: Estimator[_]](name: String, estimator: E, metadata: MetadataBuilder = new MetadataBuilder)
 
 /**
  * Validated Model container
@@ -60,6 +71,13 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
   def seed: Long
   def evaluator: OpEvaluatorBase[_]
   def validationName: String
+  def stratify: Boolean
+
+  private[op] final def isClassification = evaluator match {
+    case _: OpBinaryClassificationEvaluatorBase[_] => true
+    case _: OpMultiClassificationEvaluatorBase[_] => true
+    case _ => false
+  }
 
   /**
    * Function that performs the model selection
@@ -122,6 +140,13 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
     }
     makeModelName(bestIndex)
   }
+
+  /**
+   * Creates Train Validation Splits
+   * @param rdd
+   * @return Train Validation Splits
+   */
+  private[op] def createTrainValidationSplits(rdd: RDD[(Double, Vector, String)]): Array[(RDD[Row], RDD[Row])]
 }
 
 object ValidatorParamDefaults {
@@ -129,5 +154,6 @@ object ValidatorParamDefaults {
   val labelCol = "labelCol"
   val NumFolds = 3
   val TrainRatio = 0.75
+  val Stratify = false
 }
 

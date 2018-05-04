@@ -10,6 +10,7 @@ import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import org.apache.spark.sql.types.{ArrayType, DataType, MapType}
+import com.salesforce.op.utils.spark.RichDataType._
 
 import scala.reflect.runtime.universe._
 
@@ -38,8 +39,8 @@ import scala.reflect.runtime.universe._
  * @tparam ICol         input feature type for desired collection transformer
  * @tparam OCol         output feature type for desired collection transformer
  */
-sealed abstract class OPCollectionTransformer[I <: FeatureType,
-O <: FeatureType, ICol <: OPCollection, OCol <: OPCollection]
+sealed abstract class OPCollectionTransformer[I <: FeatureType, O <: FeatureType,
+ICol <: OPCollection, OCol <: OPCollection]
 (
   val transformer: UnaryTransformer[I, O],
   operationName: String,
@@ -50,17 +51,17 @@ O <: FeatureType, ICol <: OPCollection, OCol <: OPCollection]
   // Perform input types validation using Spark data type and throw an exception early on
   requireValidateTypes()
 
-  val inFactory = FeatureTypeSparkConverter[I]()(transformer.tti)
-  val outFactory = FeatureTypeFactory[OCol]()
-  val outEmpty = FeatureTypeDefaults.default[OCol]
+  val inFactory: FeatureTypeSparkConverter[I] = FeatureTypeSparkConverter[I]()(transformer.tti)
+  val outFactory: FeatureTypeFactory[OCol] = FeatureTypeFactory[OCol]()
+  val outEmpty: OCol = FeatureTypeDefaults.default[OCol]
 
-  def transformFn: ICol => OCol = in => if (in.isEmpty) outEmpty else outFactory.newInstance(doTransform(in))
+  override def transformFn: ICol => OCol = in => if (in.isEmpty) outEmpty else outFactory.newInstance(doTransform(in))
 
   /**
    * Function that transforms the relevant entry of the collection based on the supplied transformer. OPLists and
    * OPSets have their entries transformed, and OPMaps have just their values transformed.
    */
-  protected def doTransform: ICol => Any
+  protected def doTransform(in: ICol): Any
 
   /**
    * Function that takes the values contained in our FeatureTypes and converts them to/from types that the supplied
@@ -87,20 +88,20 @@ O <: FeatureType, ICol <: OPCollection, OCol <: OPCollection]
   private def requireValidateTypes(): Unit = {
     def validateTypes(l: DataType, r: DataType): Boolean = (l, r) match {
       case (ArrayType(fromElement, _), ArrayType(toElement, _)) => validateTypes(fromElement, toElement)
-      case (MapType(_, fromValue, _), MapType(_, toValue, _)) => validateTypes(fromValue, toValue)
-      case (fromDataType, toDataType)
-        if fromDataType == FeatureSparkTypes.sparkTypeOf[I](transformer.tti) &&
-          toDataType == FeatureSparkTypes.sparkTypeOf[O](transformer.tto) => true
-      case _ => false
+      case (MapType(fromKey, fromValue, _), MapType(toKey, toValue, _)) =>
+        fromKey == toKey && validateTypes(fromValue, toValue)
+      case (fromDataType, toDataType) =>
+        fromDataType.equalsIgnoreNullability(FeatureSparkTypes.sparkTypeOf[I](transformer.tti)) &&
+          toDataType.equalsIgnoreNullability(FeatureSparkTypes.sparkTypeOf[O](transformer.tto))
     }
-
     require(
-      validateTypes(FeatureSparkTypes.sparkTypeOf[ICol], FeatureSparkTypes.sparkTypeOf[OCol]),
+      validateTypes(FeatureSparkTypes.sparkTypeOf[ICol](tti), FeatureSparkTypes.sparkTypeOf[OCol](tto)),
       s"Type ${tti.tpe.typeSymbol.name} is not convertible to ${tto.tpe.typeSymbol.name} with given " +
         s"${transformer.getClass.getSimpleName}[${transformer.tti.tpe.typeSymbol.name}, " +
         s"${transformer.tto.tpe.typeSymbol.name}]"
     )
   }
+
 }
 
 
@@ -126,9 +127,8 @@ private[op] class OPMapTransformer[I <: FeatureType, O <: FeatureType, IMap <: O
   operationName: String,
   uid: String = UID[OPMapTransformer[_, _, _, _]]
 )(implicit tti: TypeTag[IMap], tto: TypeTag[OMap], ttov: TypeTag[OMap#Value])
-  extends OPCollectionTransformer[I, O, IMap, OMap](
-    transformer = transformer, operationName = operationName, uid = uid) {
-  def doTransform: IMap => Any = _.value.map { case (key, value) => key -> transformValue(value) }
+  extends OPCollectionTransformer[I, O, IMap, OMap](transformer, operationName = operationName, uid = uid) {
+  def doTransform(in: IMap): Any = in.value.map { case (key, value) => key -> transformValue(value) }
 }
 
 /**
@@ -153,9 +153,8 @@ private[op] class OPSetTransformer[I <: FeatureType, O <: FeatureType, ISet <: O
   operationName: String,
   uid: String = UID[OPSetTransformer[_, _, _, _]]
 )(implicit tti: TypeTag[ISet], tto: TypeTag[OSet], ttov: TypeTag[OSet#Value])
-  extends OPCollectionTransformer[I, O, ISet, OSet](
-    transformer = transformer, operationName = operationName, uid = uid) {
-  def doTransform: ISet => Any = _.value.map(transformValue)
+  extends OPCollectionTransformer[I, O, ISet, OSet](transformer, operationName = operationName, uid = uid) {
+  def doTransform(in: ISet): Any = in.value.map(transformValue)
 }
 
 /**
@@ -180,7 +179,6 @@ private[op] class OPListTransformer[I <: FeatureType, O <: FeatureType, IList <:
   operationName: String,
   uid: String = UID[OPListTransformer[_, _, _, _]]
 )(implicit tti: TypeTag[IList], tto: TypeTag[OList], ttov: TypeTag[OList#Value])
-  extends OPCollectionTransformer[I, O, IList, OList](
-    transformer = transformer, operationName = operationName, uid = uid) {
-  def doTransform: IList => Any = _.value.map(transformValue)
+  extends OPCollectionTransformer[I, O, IList, OList](transformer, operationName = operationName, uid = uid) {
+  def doTransform(in: IList): Any = in.value.map(transformValue)
 }

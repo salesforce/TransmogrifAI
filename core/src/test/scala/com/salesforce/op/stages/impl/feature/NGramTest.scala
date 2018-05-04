@@ -27,7 +27,7 @@ class NGramTest extends FlatSpec with TestSparkContext {
     val transformedData = bigrams.originStage.asInstanceOf[Transformer].transform(ds)
     val results = transformedData.collect(bigrams)
 
-    bigrams.name shouldBe bigrams.originStage.outputName
+    bigrams.name shouldBe bigrams.originStage.getOutputFeatureName
     results(0) shouldBe Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList
   }
 

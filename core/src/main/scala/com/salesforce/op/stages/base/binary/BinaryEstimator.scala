@@ -85,6 +85,7 @@ abstract class BinaryEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: Featur
       .setParent(this)
       .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2])
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

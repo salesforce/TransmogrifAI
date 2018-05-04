@@ -26,14 +26,13 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
   val newWeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getWeight.toDouble.toRealNN)
-      .aggregate(zero = Some(Double.MaxValue),
-        (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(zero = Some(Double.MaxValue), (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
       .asPredictor
 
   val newHeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getHeight.toDouble.toRealNN)
-      .aggregate((a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(zero = Some(0.0), (a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
       .asPredictor
 
   val recordTime = FeatureBuilder.DateTime[PassengerCSV].extract(_.getRecordDate.toLong.toDateTime).asPredictor
@@ -282,16 +281,16 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
     // height has a special integration window so this features tests that things included in other
     // features are excluded here
     aggregatedData.collect(height) should contain theSameElementsAs
-      Array(RealNN.empty, RealNN.empty, RealNN.empty, RealNN.empty, RealNN.empty, RealNN(186.0))
+      Seq(0.0, 0.0, 0.0, 0.0, 0.0, 186.0).toRealNN
 
     aggregatedData.collect(boardedTime) should contain theSameElementsAs
       Array(Date.empty, Date.empty, Date(1471046100L), Date(1471046400L), Date(1471046400L), Date(1471046600L))
 
     aggregatedData.collect(newHeight) should contain theSameElementsAs
-      Array(RealNN(186.0), RealNN(168.0), RealNN.empty, RealNN.empty, RealNN(Some(186.0)), RealNN(Some(172.0)))
+      Seq(186.0, 168.0, 0.0, 0.0, 186.0, 172.0).toRealNN
 
     aggregatedData.collect(newWeight) should contain theSameElementsAs
-      Array(RealNN(96.0), RealNN(67.0), RealNN(Double.MaxValue), RealNN(Double.MaxValue), RealNN(76.0), RealNN(78.0))
+      Seq(96.0, 67.0, Double.MaxValue, Double.MaxValue, 76.0, 78.0).toRealNN
 
     aggregatedData.collect(recordTime) should contain theSameElementsAs
       Array(DateTime(None), DateTime(None), DateTime(1471045900L), DateTime(1471046000L),

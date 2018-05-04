@@ -37,7 +37,7 @@ class TextListNullTransformerTest extends FlatSpec with TestSparkContext {
     val vectorizer = new TextListNullTransformer().setInput(f1, f2)
     val vector = vectorizer.getOutput()
 
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
@@ -61,7 +61,7 @@ class TextListNullTransformerTest extends FlatSpec with TestSparkContext {
     transformed.collect(vector) shouldBe expected
 
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(IndCol(Some(TransmogrifierDefaults.NullString)))

@@ -44,7 +44,7 @@ class SequenceEstimatorTest extends FlatSpec with TestSparkContext {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testEstimator.setInput(clicks, opens, purchases).getOutput()
     outputFeatures shouldBe new Feature[OPVector](
-      name = testEstimator.outputName,
+      name = testEstimator.getOutputFeatureName,
       originStage = testEstimator,
       isResponse = false,
       parents = Array(clicks, opens, purchases)
@@ -66,7 +66,7 @@ class SequenceEstimatorTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformed.schema.fieldNames.toSet shouldEqual
-      Set(clicks.name, opens.name, purchases.name, testEstimator.outputName)
+      Set(clicks.name, opens.name, purchases.name, testEstimator.getOutputFeatureName)
 
     val fractions = Array(
       Vectors.dense(0.4, 0.25, 0.25).toOPVector,

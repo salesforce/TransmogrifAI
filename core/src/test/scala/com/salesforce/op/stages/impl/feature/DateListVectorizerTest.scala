@@ -79,7 +79,7 @@ class DateListVectorizerTest extends FlatSpec with TestSparkContext {
   it should "return a single output feature of the correct type" in {
     val output = testVectorizer.setInput(clicks, opens, purchases).getOutput()
     output shouldBe new Feature[OPVector](
-      name = testVectorizer.outputName,
+      name = testVectorizer.getOutputFeatureName,
       originStage = testVectorizer,
       isResponse = false,
       parents = Array(clicks, opens, purchases)

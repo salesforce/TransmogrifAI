@@ -1,0 +1,803 @@
+{
+  "uid" : "OpWorkflow_00000000000b",
+  "resultFeaturesUids" : [ "Real_00000000000a" ],
+  "stages" : [ {
+    "timestamp" : 1521649885007,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "TextTokenizer_000000000005",
+    "class" : "com.salesforce.op.stages.impl.feature.TextTokenizer",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "description",
+          "type" : "string",
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "toLowercase" : true,
+      "autoDetectThreshold" : 0.99,
+      "outputMetadata" : { },
+      "minTokenLength" : 1,
+      "inputFeatures" : [ {
+        "stages" : [ ],
+        "name" : "description",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.Text",
+        "isRaw" : true,
+        "uid" : "Text_000000000007",
+        "originFeatures" : [ "description" ]
+      } ],
+      "defaultLanguage" : "unknown",
+      "autoDetectLanguage" : false
+    }
+  }, {
+    "timestamp" : 1521649885015,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "OPCollectionHashingVectorizer_000000000006",
+    "class" : "com.salesforce.op.stages.impl.feature.OPCollectionHashingVectorizer",
+    "paramMap" : {
+      "binaryFreq" : false,
+      "hashWithIndex" : false,
+      "hashAlgorithm" : "murmur3",
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "description_1-stagesApplied_TextList_000000000005",
+          "type" : {
+            "type" : "array",
+            "elementType" : "string",
+            "containsNull" : true
+          },
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "description_1-stagesApplied_TextList_000000000005" : {
+            "stages" : [ "textToken_TextTokenizer_000000000005", "vecColHash_OPCollectionHashingVectorizer_000000000006" ],
+            "origin_features" : [ "description" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ]
+        } ]
+      },
+      "prependFeatureName" : true,
+      "cleanText" : true,
+      "numFeatures" : 256,
+      "inputFeatures" : [ {
+        "stages" : [ "textToken_TextTokenizer_000000000005" ],
+        "name" : "description_1-stagesApplied_TextList_000000000005",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.TextList",
+        "isRaw" : false,
+        "uid" : "TextList_000000000005",
+        "originFeatures" : [ "description" ]
+      } ],
+      "topK" : 20,
+      "forceSharedHashSpace" : true
+    }
+  }, {
+    "timestamp" : 1521649885020,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "TextListNullTransformer_000000000007",
+    "class" : "com.salesforce.op.stages.impl.feature.TextListNullTransformer",
+    "paramMap" : {
+      "inputFeatures" : [ {
+        "stages" : [ "textToken_TextTokenizer_000000000005" ],
+        "name" : "description_1-stagesApplied_TextList_000000000005",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.TextList",
+        "isRaw" : false,
+        "uid" : "TextList_000000000005",
+        "originFeatures" : [ "description" ]
+      } ],
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "description_1-stagesApplied_TextList_000000000005",
+          "type" : {
+            "type" : "array",
+            "elementType" : "string",
+            "containsNull" : true
+          },
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "description_1-stagesApplied_TextList_000000000005" : {
+            "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007" ],
+            "origin_features" : [ "description" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 0 ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "indicator_group" : "description_1-stagesApplied_TextList_000000000005"
+        } ]
+      }
+    }
+  }, {
+    "timestamp" : 1521649885023,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "DateListVectorizer_000000000001",
+    "class" : "com.salesforce.op.stages.impl.feature.DateListVectorizer",
+    "paramMap" : {
+      "fillWithPivotModeHour" : false,
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "boarded",
+          "type" : {
+            "type" : "array",
+            "elementType" : "long",
+            "containsNull" : true
+          },
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "fillWithPivotModeDay" : false,
+      "outputMetadata" : {
+        "vector_history" : {
+          "boarded" : {
+            "stages" : [ "vecDateList_DateListVectorizer_000000000001" ],
+            "origin_features" : [ "boarded" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 0 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "parent_feature" : [ "boarded" ]
+        }, {
+          "indices" : [ 1 ],
+          "parent_feature" : [ "boarded" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "indicator_group" : "boarded"
+        } ]
+      },
+      "withTimeSince" : true,
+      "fillWithPivotModeMonth" : false,
+      "referenceDate" : 1521649882332,
+      "inputFeatures" : [ {
+        "stages" : [ ],
+        "name" : "boarded",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.DateList",
+        "isRaw" : true,
+        "uid" : "DateList_000000000008",
+        "originFeatures" : [ "boarded" ]
+      } ],
+      "first" : false,
+      "trackNulls" : true,
+      "fillValue" : 0.0
+    }
+  }, {
+    "timestamp" : 1521649885025,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "RealNNVectorizer_000000000004",
+    "class" : "com.salesforce.op.stages.impl.feature.RealNNVectorizer",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "height",
+          "type" : "double",
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ ],
+        "name" : "height",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.RealNN",
+        "isRaw" : true,
+        "uid" : "RealNN_000000000004",
+        "originFeatures" : [ "height" ]
+      } ],
+      "outputMetadata" : {
+        "vector_history" : {
+          "height" : {
+            "stages" : [ "vecNum_RealNNVectorizer_000000000004" ],
+            "origin_features" : [ "height" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 0 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.RealNN" ],
+          "parent_feature" : [ "height" ]
+        } ]
+      }
+    }
+  }, {
+    "ctorArgs" : {
+      "tti" : {
+        "type" : "TypeTag",
+        "value" : "com.salesforce.op.features.types.Real"
+      },
+      "uid" : {
+        "type" : "Value",
+        "value" : "RealVectorizer_000000000003"
+      },
+      "trackNulls" : {
+        "type" : "Value",
+        "value" : true
+      },
+      "fillValues" : {
+        "type" : "Value",
+        "value" : [ 29.25 ]
+      },
+      "operationName" : {
+        "type" : "Value",
+        "value" : "vecReal"
+      }
+    },
+    "timestamp" : 1521649885026,
+    "sparkVersion" : "2.2.1",
+    "isModel" : true,
+    "uid" : "RealVectorizer_000000000003",
+    "class" : "com.salesforce.op.stages.impl.feature.RealVectorizerModel",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "age",
+          "type" : "double",
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "age" : {
+            "stages" : [ "vecReal_RealVectorizer_000000000003" ],
+            "origin_features" : [ "age" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 1 ],
+          "parent_feature" : [ "age" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "indicator_group" : "age"
+        }, {
+          "indices" : [ 0 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "parent_feature" : [ "age" ]
+        } ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ ],
+        "name" : "age",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.Real",
+        "isRaw" : true,
+        "uid" : "Real_000000000001",
+        "originFeatures" : [ "age" ]
+      } ]
+    }
+  }, {
+    "ctorArgs" : {
+      "operationName" : {
+        "type" : "Value",
+        "value" : "combVec"
+      },
+      "uid" : {
+        "type" : "Value",
+        "value" : "VectorsCombiner_000000000008"
+      }
+    },
+    "timestamp" : 1521649885230,
+    "sparkVersion" : "2.2.1",
+    "isModel" : true,
+    "uid" : "VectorsCombiner_000000000008",
+    "class" : "com.salesforce.op.stages.impl.feature.VectorsCombinerModel",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "description_2-stagesApplied_OPVector_000000000006",
+          "type" : {
+            "type" : "udt",
+            "class" : "org.apache.spark.ml.linalg.VectorUDT",
+            "pyClass" : "pyspark.ml.linalg.VectorUDT",
+            "sqlType" : {
+              "type" : "struct",
+              "fields" : [ {
+                "name" : "type",
+                "type" : "byte",
+                "nullable" : false,
+                "metadata" : { }
+              }, {
+                "name" : "size",
+                "type" : "integer",
+                "nullable" : true,
+                "metadata" : { }
+              }, {
+                "name" : "indices",
+                "type" : {
+                  "type" : "array",
+                  "elementType" : "integer",
+                  "containsNull" : false
+                },
+                "nullable" : true,
+                "metadata" : { }
+              }, {
+                "name" : "values",
+                "type" : {
+                  "type" : "array",
+                  "elementType" : "double",
+                  "containsNull" : false
+                },
+                "nullable" : true,
+                "metadata" : { }
+              } ]
+            }
+          },
+          "nullable" : true,
+          "metadata" : {
+            "vector_history" : {
+              "description_1-stagesApplied_TextList_000000000005" : {
+                "stages" : [ "textToken_TextTokenizer_000000000005", "vecColHash_OPCollectionHashingVectorizer_000000000006" ],
+                "origin_features" : [ "description" ]
+              }
+            },
+            "vector_columns" : [ {
+              "indices" : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 ],
+              "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+              "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ]
+            } ]
+          }
+        }, {
+          "name" : "description_2-stagesApplied_OPVector_000000000007",
+          "type" : {
+            "type" : "udt",
+            "class" : "org.apache.spark.ml.linalg.VectorUDT",
+            "pyClass" : "pyspark.ml.linalg.VectorUDT",
+            "sqlType" : {
+              "type" : "struct",
+              "fields" : [ {
+                "name" : "type",
+                "type" : "byte",
+                "nullable" : false,
+                "metadata" : { }
+              }, {
+                "name" : "size",
+                "type" : "integer",
+                "nullable" : true,
+                "metadata" : { }
+              }, {
+                "name" : "indices",
+                "type" : {
+                  "type" : "array",
+                  "elementType" : "integer",
+                  "containsNull" : false
+                },
+                "nullable" : true,
+                "metadata" : { }
+              }, {
+                "name" : "values",
+                "type" : {
+                  "type" : "array",
+                  "elementType" : "double",
+                  "containsNull" : false
+                },
+                "nullable" : true,
+                "metadata" : { }
+              } ]
+            }
+          },
+          "nullable" : true,
+          "metadata" : {
+            "vector_history" : {
+              "description_1-stagesApplied_TextList_000000000005" : {
+                "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007" ],
+                "origin_features" : [ "description" ]
+              }
+            },
+            "vector_columns" : [ {
+              "indices" : [ 0 ],
+              "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ],
+              "indicator_value" : "NullIndicatorValue",
+              "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+              "indicator_group" : "description_1-stagesApplied_TextList_000000000005"
+            } ]
+          }
+        } ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "description_1-stagesApplied_TextList_000000000005" : {
+            "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007" ],
+            "origin_features" : [ "description" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 256 ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "indicator_group" : "description_1-stagesApplied_TextList_000000000005"
+        }, {
+          "indices" : [ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ]
+        } ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ "textToken_TextTokenizer_000000000005", "vecColHash_OPCollectionHashingVectorizer_000000000006" ],
+        "name" : "description_2-stagesApplied_OPVector_000000000006",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000006",
+        "originFeatures" : [ "description" ]
+      }, {
+        "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007" ],
+        "name" : "description_2-stagesApplied_OPVector_000000000007",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000007",
+        "originFeatures" : [ "description" ]
+      } ]
+    }
+  }, {
+    "ctorArgs" : {
+      "tti" : {
+        "type" : "TypeTag",
+        "value" : "com.salesforce.op.features.types.MultiPickList"
+      },
+      "shouldTrackNulls" : {
+        "type" : "Value",
+        "value" : true
+      },
+      "shouldCleanText" : {
+        "type" : "Value",
+        "value" : true
+      },
+      "uid" : {
+        "type" : "Value",
+        "value" : "OpSetVectorizer_000000000002"
+      },
+      "operationName" : {
+        "type" : "Value",
+        "value" : "vecSet"
+      },
+      "topValues" : {
+        "type" : "Value",
+        "value" : [ [ ] ]
+      }
+    },
+    "timestamp" : 1521649885243,
+    "sparkVersion" : "2.2.1",
+    "isModel" : true,
+    "uid" : "OpSetVectorizer_000000000002",
+    "class" : "com.salesforce.op.stages.impl.feature.OpSetVectorizerModel",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ {
+          "name" : "gender",
+          "type" : {
+            "type" : "array",
+            "elementType" : "string",
+            "containsNull" : true
+          },
+          "nullable" : true,
+          "metadata" : { }
+        } ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "gender" : {
+            "stages" : [ "vecSet_OpSetVectorizer_000000000002" ],
+            "origin_features" : [ "gender" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 0 ],
+          "parent_feature" : [ "gender" ],
+          "indicator_value" : "OTHER",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        }, {
+          "indices" : [ 1 ],
+          "parent_feature" : [ "gender" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        } ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ ],
+        "name" : "gender",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.MultiPickList",
+        "isRaw" : true,
+        "uid" : "MultiPickList_000000000002",
+        "originFeatures" : [ "gender" ]
+      } ]
+    }
+  }, {
+    "ctorArgs" : {
+      "operationName" : {
+        "type" : "Value",
+        "value" : "combVec"
+      },
+      "uid" : {
+        "type" : "Value",
+        "value" : "VectorsCombiner_000000000009"
+      }
+    },
+    "timestamp" : 1521649885253,
+    "sparkVersion" : "2.2.1",
+    "isModel" : true,
+    "uid" : "VectorsCombiner_000000000009",
+    "class" : "com.salesforce.op.stages.impl.feature.VectorsCombinerModel",
+    "paramMap" : {
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ ]
+      },
+      "outputMetadata" : {
+        "vector_history" : {
+          "height" : {
+            "stages" : [ "vecNum_RealNNVectorizer_000000000004" ],
+            "origin_features" : [ "height" ]
+          },
+          "age" : {
+            "stages" : [ "vecReal_RealVectorizer_000000000003" ],
+            "origin_features" : [ "age" ]
+          },
+          "description_1-stagesApplied_TextList_000000000005" : {
+            "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007" ],
+            "origin_features" : [ "description" ]
+          },
+          "boarded" : {
+            "stages" : [ "vecDateList_DateListVectorizer_000000000001" ],
+            "origin_features" : [ "boarded" ]
+          },
+          "gender" : {
+            "stages" : [ "vecSet_OpSetVectorizer_000000000002" ],
+            "origin_features" : [ "gender" ]
+          }
+        },
+        "vector_columns" : [ {
+          "indices" : [ 4 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "parent_feature" : [ "age" ]
+        }, {
+          "indices" : [ 263 ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "indicator_group" : "description_1-stagesApplied_TextList_000000000005"
+        }, {
+          "indices" : [ 0 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "parent_feature" : [ "boarded" ]
+        }, {
+          "indices" : [ 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123, 124, 125, 126, 127, 128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 140, 141, 142, 143, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 164, 165, 166, 167, 168, 169, 170, 171, 172, 173, 174, 175, 176, 177, 178, 179, 180, 181, 182, 183, 184, 185, 186, 187, 188, 189, 190, 191, 192, 193, 194, 195, 196, 197, 198, 199, 200, 201, 202, 203, 204, 205, 206, 207, 208, 209, 210, 211, 212, 213, 214, 215, 216, 217, 218, 219, 220, 221, 222, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 234, 235, 236, 237, 238, 239, 240, 241, 242, 243, 244, 245, 246, 247, 248, 249, 250, 251, 252, 253, 254, 255, 256, 257, 258, 259, 260, 261, 262 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.TextList" ],
+          "parent_feature" : [ "description_1-stagesApplied_TextList_000000000005" ]
+        }, {
+          "indices" : [ 1 ],
+          "parent_feature" : [ "boarded" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "indicator_group" : "boarded"
+        }, {
+          "indices" : [ 2 ],
+          "parent_feature" : [ "gender" ],
+          "indicator_value" : "OTHER",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        }, {
+          "indices" : [ 3 ],
+          "parent_feature" : [ "gender" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        }, {
+          "indices" : [ 6 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.RealNN" ],
+          "parent_feature" : [ "height" ]
+        }, {
+          "indices" : [ 5 ],
+          "parent_feature" : [ "age" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "indicator_group" : "age"
+        } ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ "vecDateList_DateListVectorizer_000000000001" ],
+        "name" : "boarded_1-stagesApplied_OPVector_000000000001",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000001",
+        "originFeatures" : [ "boarded" ]
+      }, {
+        "stages" : [ "vecSet_OpSetVectorizer_000000000002" ],
+        "name" : "gender_1-stagesApplied_OPVector_000000000002",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000002",
+        "originFeatures" : [ "gender" ]
+      }, {
+        "stages" : [ "vecReal_RealVectorizer_000000000003" ],
+        "name" : "age_1-stagesApplied_OPVector_000000000003",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000003",
+        "originFeatures" : [ "age" ]
+      }, {
+        "stages" : [ "vecNum_RealNNVectorizer_000000000004" ],
+        "name" : "height_1-stagesApplied_OPVector_000000000004",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000004",
+        "originFeatures" : [ "height" ]
+      }, {
+        "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007", "vecColHash_OPCollectionHashingVectorizer_000000000006", "combVec_VectorsCombiner_000000000008" ],
+        "name" : "description_4-stagesApplied_OPVector_000000000008",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000008",
+        "originFeatures" : [ "description" ]
+      } ]
+    }
+  }, {
+    "timestamp" : 1521649885260,
+    "sparkVersion" : "2.2.1",
+    "isModel" : false,
+    "uid" : "UnaryLambdaTransformer_00000000000a",
+    "class" : "com.salesforce.op.stages.base.unary.UnaryLambdaTransformer",
+    "paramMap" : {
+      "outputMetadata" : { },
+      "inputSchema" : {
+        "type" : "struct",
+        "fields" : [ ]
+      },
+      "inputFeatures" : [ {
+        "stages" : [ "textToken_TextTokenizer_000000000005", "textListNull_TextListNullTransformer_000000000007", "vecColHash_OPCollectionHashingVectorizer_000000000006", "combVec_VectorsCombiner_000000000008", "vecDateList_DateListVectorizer_000000000001", "vecNum_RealNNVectorizer_000000000004", "vecReal_RealVectorizer_000000000003", "vecSet_OpSetVectorizer_000000000002", "combVec_VectorsCombiner_000000000009" ],
+        "name" : "age-boarded-description-gender-height_9-stagesApplied_OPVector_000000000009",
+        "isResponse" : false,
+        "typeName" : "com.salesforce.op.features.types.OPVector",
+        "isRaw" : false,
+        "uid" : "OPVector_000000000009",
+        "originFeatures" : [ "age", "boarded", "description", "gender", "height" ]
+      } ]
+    }
+  } ],
+  "allFeatures" : [ {
+    "typeName" : "com.salesforce.op.features.types.Real",
+    "uid" : "Real_000000000001",
+    "name" : "age",
+    "isResponse" : false,
+    "originStage" : "FeatureGeneratorStage_000000000001",
+    "parents" : [ ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.DateList",
+    "uid" : "DateList_000000000008",
+    "name" : "boarded",
+    "isResponse" : false,
+    "originStage" : "FeatureGeneratorStage_000000000008",
+    "parents" : [ ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.Text",
+    "uid" : "Text_000000000007",
+    "name" : "description",
+    "isResponse" : false,
+    "originStage" : "FeatureGeneratorStage_000000000007",
+    "parents" : [ ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.MultiPickList",
+    "uid" : "MultiPickList_000000000002",
+    "name" : "gender",
+    "isResponse" : false,
+    "originStage" : "FeatureGeneratorStage_000000000002",
+    "parents" : [ ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.RealNN",
+    "uid" : "RealNN_000000000004",
+    "name" : "height",
+    "isResponse" : false,
+    "originStage" : "FeatureGeneratorStage_000000000004",
+    "parents" : [ ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.TextList",
+    "uid" : "TextList_000000000005",
+    "name" : "description_1-stagesApplied_TextList_000000000005",
+    "isResponse" : false,
+    "originStage" : "TextTokenizer_000000000005",
+    "parents" : [ "Text_000000000007" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000006",
+    "name" : "description_2-stagesApplied_OPVector_000000000006",
+    "isResponse" : false,
+    "originStage" : "OPCollectionHashingVectorizer_000000000006",
+    "parents" : [ "TextList_000000000005" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000007",
+    "name" : "description_2-stagesApplied_OPVector_000000000007",
+    "isResponse" : false,
+    "originStage" : "TextListNullTransformer_000000000007",
+    "parents" : [ "TextList_000000000005" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000001",
+    "name" : "boarded_1-stagesApplied_OPVector_000000000001",
+    "isResponse" : false,
+    "originStage" : "DateListVectorizer_000000000001",
+    "parents" : [ "DateList_000000000008" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000002",
+    "name" : "gender_1-stagesApplied_OPVector_000000000002",
+    "isResponse" : false,
+    "originStage" : "OpSetVectorizer_000000000002",
+    "parents" : [ "MultiPickList_000000000002" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000003",
+    "name" : "age_1-stagesApplied_OPVector_000000000003",
+    "isResponse" : false,
+    "originStage" : "RealVectorizer_000000000003",
+    "parents" : [ "Real_000000000001" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000004",
+    "name" : "height_1-stagesApplied_OPVector_000000000004",
+    "isResponse" : false,
+    "originStage" : "RealNNVectorizer_000000000004",
+    "parents" : [ "RealNN_000000000004" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000008",
+    "name" : "description_4-stagesApplied_OPVector_000000000008",
+    "isResponse" : false,
+    "originStage" : "VectorsCombiner_000000000008",
+    "parents" : [ "OPVector_000000000006", "OPVector_000000000007" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.OPVector",
+    "uid" : "OPVector_000000000009",
+    "name" : "age-boarded-description-gender-height_9-stagesApplied_OPVector_000000000009",
+    "isResponse" : false,
+    "originStage" : "VectorsCombiner_000000000009",
+    "parents" : [ "OPVector_000000000001", "OPVector_000000000002", "OPVector_000000000003", "OPVector_000000000004", "OPVector_000000000008" ]
+  }, {
+    "typeName" : "com.salesforce.op.features.types.Real",
+    "uid" : "Real_00000000000a",
+    "name" : "age-boarded-description-gender-height_10-stagesApplied_Real_00000000000a",
+    "isResponse" : false,
+    "originStage" : "UnaryLambdaTransformer_00000000000a",
+    "parents" : [ "OPVector_000000000009" ]
+  } ],
+  "parameters" : "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}",
+  "trainParameters" : "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}"
+}

@@ -5,6 +5,7 @@
 
 package com.salesforce.op.test
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import com.salesforce.op.utils.tuples.RichTuple._
@@ -12,6 +13,8 @@ import org.joda.time.Duration
 
 
 trait PassengerFeaturesTest {
+
+  UID.reset()
 
   val age = FeatureBuilder.Real[Passenger]
     .extract(_.getAge.toReal)
@@ -22,7 +25,7 @@ trait PassengerFeaturesTest {
   val genderPL = FeatureBuilder.PickList[Passenger].extract(p => p.getGender.toPickList).asPredictor
 
   val height = FeatureBuilder.RealNN[Passenger]
-    .extract(_.getHeight.toReal.toRealNN())
+    .extract(p => Option(p.getHeight).map(_.toDouble).toRealNN(0.0))
     .window(Duration.millis(300))
     .asPredictor
 

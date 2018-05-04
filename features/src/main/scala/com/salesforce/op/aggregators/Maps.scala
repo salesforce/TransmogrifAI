@@ -27,7 +27,6 @@ case object UnionCurrencyMap extends UnionSumNumericMap[Double, CurrencyMap]
 case object UnionRealMap extends UnionSumNumericMap[Double, RealMap]
 case object UnionIntegralMap extends UnionSumNumericMap[Long, IntegralMap]
 
-
 /**
  * Natural map monoid lifting averaging operator
  */

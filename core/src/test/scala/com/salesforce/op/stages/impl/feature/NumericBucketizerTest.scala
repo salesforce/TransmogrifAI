@@ -61,7 +61,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
   trait RealTest extends GenericTest {
     lazy val (data1, num) = TestFeatureBuilder("reals", reals)
     val realBucketizer =
-      new NumericBucketizer[Double, Real]()
+      new NumericBucketizer[Real]()
         .setInput(num)
         .setTrackNulls(false)
         .setBuckets(splits, bucketLabels)
@@ -69,7 +69,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     lazy val trackNullsRealBucketizer = realBucketizer.setTrackNulls(true)
 
     val realBucketizer2 =
-      new NumericBucketizer[Double, Real]()
+      new NumericBucketizer[Real]()
         .setInput(num)
         .setTrackNulls(false)
         .setBuckets(splits)
@@ -81,7 +81,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     lazy val (data1, num) = TestFeatureBuilder("integrals", integrals)
 
     val integralBucketizer =
-      new NumericBucketizer[Long, Integral]()
+      new NumericBucketizer[Integral]()
         .setInput(num)
         .setTrackNulls(false)
         .setBuckets(splits, bucketLabels)
@@ -89,16 +89,16 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     lazy val trackNullsIntegralBucketizer = integralBucketizer.setTrackNulls(true)
   }
 
-  Spec[NumericBucketizer[_, _]] should "take a single numeric feature as input and return a vector" in new RealTest {
+  Spec[NumericBucketizer[_]] should "take a single numeric feature as input and return a vector" in new RealTest {
     val vector = realBucketizer.getOutput()
 
-    vector.name shouldBe realBucketizer.outputName
+    vector.name shouldBe realBucketizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
 
   it should "validate the params correctly" in new RealTest {
-    val Bucketizer3 = new NumericBucketizer[Double, Real]().setInput(num)
+    val Bucketizer3 = new NumericBucketizer[Real]().setInput(num)
     // error because not enough bucket labels
     assertThrows[IllegalArgumentException](
       Bucketizer3.setBuckets(Array[Double](0, 1, 5, 10), Some(Array[String]("0-1K", "1K-5K")))
@@ -118,7 +118,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "update the params correctly" in new RealTest {
-    val buck = new NumericBucketizer[Double, Real]().setInput(num)
+    val buck = new NumericBucketizer[Real]().setInput(num)
     val splitz = Array(7.0, 8.0, 10.0, 11.0)
     buck.setBuckets(splitz)
     buck.getSplits shouldBe splitz
@@ -136,7 +136,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
   it should "throw an exception if the data is out of bounds when trackInvalid is false" in new GenericTest  {
     val vals = Seq(Double.PositiveInfinity, Double.NaN, -1, -100).map(_.toReal)
     lazy val (data, num) = TestFeatureBuilder("num", vals)
-    val buck = new NumericBucketizer[Double, Real]().setInput(num).setBuckets(splits).setTrackInvalid(false)
+    val buck = new NumericBucketizer[Real]().setInput(num).setBuckets(splits).setTrackInvalid(false)
 
     assertThrows[SparkException](buck.transform(data).collect())
   }
@@ -149,20 +149,20 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
       realBucketizer,
       num -> List(IndCol(Some("0-1")), IndCol(Some("1-5")), IndCol(Some("5-10")), IndCol(Some("10-Infinity")))
     )
-    OpVectorMetadata(realBucketizer.outputName, realBucketizer.getMetadata()) shouldEqual expectedMeta
+    OpVectorMetadata(realBucketizer.getOutputFeatureName, realBucketizer.getMetadata()) shouldEqual expectedMeta
 
     val expectedMeta2 = TestOpVectorMetadataBuilder(
       realBucketizer2,
       num -> List(IndCol(Some("[0.0-1.0)")), IndCol(Some("[1.0-5.0)")),
         IndCol(Some("[5.0-10.0)")), IndCol(Some("[10.0-Infinity)")))
     )
-    OpVectorMetadata(realBucketizer2.outputName, realBucketizer2.getMetadata()) shouldEqual expectedMeta2
+    OpVectorMetadata(realBucketizer2.getOutputFeatureName, realBucketizer2.getMetadata()) shouldEqual expectedMeta2
   }
 
   it should "work as a shortcut (reals)" in new RealTest {
     val vector = num.bucketize(trackNulls = false, splits = splits, bucketLabels = bucketLabels)
-    vector.originStage shouldBe a[NumericBucketizer[_, _]]
-    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_, _]]
+    vector.originStage shouldBe a[NumericBucketizer[_]]
+    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
 
     buck.transform(data1).collect(vector) shouldBe expectedAns
   }
@@ -177,7 +177,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(
-      trackNullsRealBucketizer.outputName,
+      trackNullsRealBucketizer.getOutputFeatureName,
       trackNullsRealBucketizer.getMetadata()
     ) shouldEqual expectedMeta
 
@@ -188,14 +188,14 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(
-      trackNullsRealBucketizer2.outputName,
+      trackNullsRealBucketizer2.getOutputFeatureName,
       trackNullsRealBucketizer2.getMetadata()
     ) shouldEqual expectedMeta2
   }
 
   it should "allow right inclusive splits (reals)" in new RealTest {
     val vector = num.bucketize(trackNulls = false, splits = splitsRightInclusive, splitInclusion = Inclusion.Right)
-    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_, _]]
+    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
     buck.transform(data1).collect(vector) shouldBe expectedRightInclusiveAns
   }
 
@@ -211,8 +211,8 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
       splitInclusion = Inclusion.Left
     )
 
-    buck.originStage shouldBe a[NumericBucketizer[_, _]]
-    val results = buck.originStage.asInstanceOf[NumericBucketizer[_, _]].transform(ds).collect(buck)
+    buck.originStage shouldBe a[NumericBucketizer[_]]
+    val results = buck.originStage.asInstanceOf[NumericBucketizer[_]].transform(ds).collect(buck)
 
     val (neg, pos, empty) =
       (Vectors.dense(1.0, 0.0, 0.0).toOPVector,
@@ -230,7 +230,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
       Seq(Real.empty, Double.NaN.toReal, Double.NegativeInfinity.toReal, Double.PositiveInfinity.toReal, Real(10.0))
     )
     val buck = num.bucketize(trackNulls = true, trackInvalid = true, splits = Array(0.0, 1.0, 5.0))
-    val stage = buck.originStage.asInstanceOf[NumericBucketizer[_, _]]
+    val stage = buck.originStage.asInstanceOf[NumericBucketizer[_]]
     val results = stage.transform(ds).collect(buck)
 
     results shouldBe Seq(
@@ -246,7 +246,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
         IndCol(Some(TransmogrifierDefaults.OtherString)), IndCol(Some(TransmogrifierDefaults.NullString))
       )
     )
-    OpVectorMetadata(stage.outputName, stage.getMetadata()) shouldEqual expectedMeta
+    OpVectorMetadata(stage.getOutputFeatureName, stage.getMetadata()) shouldEqual expectedMeta
   }
 
   it should "transform the data correctly (integrals)" in new IntegralTest {
@@ -257,13 +257,13 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
       integralBucketizer,
       num -> List(IndCol(Some("0-1")), IndCol(Some("1-5")), IndCol(Some("5-10")), IndCol(Some("10-Infinity")))
     )
-    OpVectorMetadata(integralBucketizer.outputName, integralBucketizer.getMetadata()) shouldEqual expectedMeta
+    OpVectorMetadata(integralBucketizer.getOutputFeatureName, integralBucketizer.getMetadata()) shouldEqual expectedMeta
   }
 
   it should "work as a shortcut (integrals)" in new IntegralTest {
     val vector = num.bucketize(trackNulls = false, splits = splits, bucketLabels = bucketLabels)
-    vector.originStage shouldBe a[NumericBucketizer[_, _]]
-    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_, _]]
+    vector.originStage shouldBe a[NumericBucketizer[_]]
+    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
     buck.transform(data1).collect(vector) shouldBe expectedAns
   }
 
@@ -277,14 +277,14 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
     OpVectorMetadata(
-      trackNullsIntegralBucketizer.outputName,
+      trackNullsIntegralBucketizer.getOutputFeatureName,
       trackNullsIntegralBucketizer.getMetadata()
     ) shouldEqual expectedMeta
   }
 
   it should "allow right inclusive splits (integrals)" in new IntegralTest {
     val vector = num.bucketize(trackNulls = false, splits = splitsRightInclusive, splitInclusion = Inclusion.Right)
-    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_, _]]
+    val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
     buck.transform(data1).collect(vector) shouldBe expectedRightInclusiveAns
   }
 

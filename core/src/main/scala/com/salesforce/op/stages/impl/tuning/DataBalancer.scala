@@ -92,51 +92,6 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
   }
 
   /**
-   *
-   * @param smallData      data with the minority class
-   * @param smallCount     smallData size
-   * @param bigData        data with the majority class
-   * @param bigCount       bigData size
-   * @param sampleF        targeted sample fraction of the training dataset
-   * @param maxTrainSample maximum size of the dataset
-   * @return balanced small and big data split into training and test sets
-   *         with downSample and upSample proportions and a boolean of whether or not logging the new counts
-   */
-  def getTrainingSplit(
-    smallData: Dataset[_],
-    smallCount: Long,
-    bigData: Dataset[_],
-    bigCount: Long,
-    sampleF: Double,
-    maxTrainSample: Int
-  ): (Dataset[LabelFeaturesKey], Double, Double) = {
-
-    import smallData.sparkSession.implicits._
-    val balancerSeed = getSeed
-
-    log.info(s"Sampling data to get $sampleF split versus $smallCount small and $bigCount big")
-
-    val trainProportion = 1.0 - getReserveTestFraction
-
-    // get downSample and upSample proportion of the training set
-    val (downSample, upSample) = getProportions(smallCount * trainProportion,
-      bigCount * trainProportion, sampleF, maxTrainSample)
-
-    val bigDataTrain = bigData.sample(withReplacement = false, downSample, seed = balancerSeed)
-
-    val smallDataTrain = upSample match {
-      case u if u > 1.0 => smallData.sample(withReplacement = true, u, seed = balancerSeed)
-      case 1.0 => smallData // if upSample == 1.0, no need to upSample
-      case u => smallData.sample(withReplacement = false, u, seed = balancerSeed) // downsample instead
-    }
-
-    val train = smallDataTrain.as[LabelFeaturesKey].union(bigDataTrain.as[LabelFeaturesKey])
-
-    (train, downSample, upSample)
-  }
-
-
-  /**
    * Split into a training set and a test set and balance the training set
    *
    * @param data to prepare for model training
@@ -147,84 +102,193 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     val ds = data.persist()
 
     val Array(negativeData, positiveData) = Array(0.0, 1.0).map(label => ds.filter(_._1 == label).persist())
+    val metadataBuilder = new MetadataBuilder()
+    val balancerSeed = getSeed
 
-    val positiveCount = positiveData.count()
-    val negativeCount = negativeData.count()
-    val totalCount = positiveCount + negativeCount
-
-    // feed metadata with counts and sample fraction
-    val metaDataBuilder = new MetadataBuilder()
-    metaDataBuilder.putLong(ModelSelectorBaseNames.Positive, positiveCount)
-    metaDataBuilder.putLong(ModelSelectorBaseNames.Negative, negativeCount)
-    metaDataBuilder.putDouble(ModelSelectorBaseNames.Desired, $(sampleFraction))
-
-
-    log.info(s"Data has $positiveCount positive and $negativeCount negative.")
-
-    val (smallCount, smallData, bigCount, bigData) =
-      if (positiveCount < negativeCount) (positiveCount, positiveData, negativeCount, negativeData)
-      else (negativeCount, negativeData, positiveCount, positiveData)
-
-    val trainData = {
-
-      if (smallCount.toDouble / totalCount.toDouble >= $(sampleFraction)) {
-        // if the current fraction is superior than the one expected
-        log.info(
-          s"Not resampling data: $smallCount small count and $bigCount big count is greater than" +
-            s" requested ${$(sampleFraction)}"
-        )
-
-        // if data is too big downsample
-        val maxTrainingSample = getMaxTrainingSample
-        val balancerSeed = getSeed
-
-          if (maxTrainingSample < totalCount) {
-            data.sample(withReplacement = false, maxTrainingSample / totalCount.toDouble, seed = balancerSeed)
-          } else data
-
-      } else {
-
-        if (smallCount < 100 || (smallCount + bigCount) < 500) {
-          log.warn("!!!Attention!!! - there is not enough data to build a good model!")
-        }
-
-        val (train, downSample, upSample) =
-          getTrainingSplit(smallData, smallCount, bigData, bigCount, getSampleFraction, getMaxTrainingSample)
-
-        // feed metadata with upsample and downsample
-        metaDataBuilder.putDouble(ModelSelectorBaseNames.UpSample, upSample)
-        metaDataBuilder.putDouble(ModelSelectorBaseNames.DownSample, downSample)
-
-        val (posFraction, negFraction) =
-          if (positiveCount < negativeCount) (upSample, downSample)
-          else (downSample, upSample)
-
-        val newPositiveCount = math.rint(positiveCount * posFraction)
-        val newNegativeCount = math.rint(negativeCount * negFraction)
-        log.info(s"After sampling see " +
-          s"$newPositiveCount positives and $newNegativeCount negatives, " +
-          s"sample fraction is ${
-            math.min(newPositiveCount, newNegativeCount) / (newPositiveCount + newNegativeCount)
-          }."
-        )
-
-        if (upSample >= 1.0) {
-          log.info(s"Upsampling by a factor $upSample. Downsampling by a factor $downSample.")
-        } else {
-          log.info(s"Both downsampling by a factor $upSample for small and by a factor $downSample for big.\n" +
-            s"To make upsampling happen, please increase the max training sample size '${maxTrainingSample.name}'")
-        }
-
-        train
-      }
-    }
-
-    new ModelData(trainData, metaDataBuilder)
+    // If these conditions are met, that means that we have enough information to balance the data : upSample,
+    // downSample and which class is in minority
+    if (isSet(isPositiveSmall) && isSet(downSampleFraction) && isSet(upSampleFraction)) {
+      val (down, up) = ($(downSampleFraction), $(upSampleFraction))
+      log.info(s"Fractions are already known : downSample of ${down}, upSample of ${up}")
+      val (smallData, bigData) = if ($(isPositiveSmall)) (positiveData, negativeData) else (negativeData, positiveData)
+      new ModelData(rebalance(smallData, up, bigData, down, balancerSeed), metadataBuilder)
+      // If this condition is met, that means that the data is already balanced, but need to be sampled
+    } else if (isSet(alreadyBalancedFraction)) {
+      val f = $(alreadyBalancedFraction)
+      log.info(s"Data is already balanced, yet it will be sampled by a fraction of $f")
+      new ModelData(sampleBalancedData(
+        fraction = f,
+        seed = balancerSeed,
+        data = data,
+        positiveData = positiveData,
+        negativeData = negativeData),
+        metadataBuilder
+      )
+      // Usual estimation by computing the sizes of the data
+    } else estimateAndBalance(
+      data = data,
+      positiveData = positiveData,
+      negativeData = negativeData,
+      metadataBuilder = metadataBuilder,
+      seed = balancerSeed
+    )
   }
 
   override def copy(extra: ParamMap): DataBalancer = {
     val copy = new DataBalancer(uid)
     copyValues(copy, extra)
+  }
+
+  /**
+   * Estimate if data needs to be balanced or not. If so, computes sample fractions and balance data
+   *
+   * @param data            input data
+   * @param positiveData    data with positives only
+   * @param negativeData    data with negatives only
+   * @param metadataBuilder metadata
+   * @param seed            seed
+   * @return balanced data
+   */
+  private[op] def estimateAndBalance(
+    data: Dataset[LabelFeaturesKey],
+    positiveData: Dataset[LabelFeaturesKey],
+    negativeData: Dataset[LabelFeaturesKey],
+    metadataBuilder: MetadataBuilder,
+    seed: Long
+  ): ModelData = {
+    val positiveCount = positiveData.count()
+    val negativeCount = negativeData.count()
+    val totalCount = positiveCount + negativeCount
+
+    // feed metadata with counts and sample fraction
+    metadataBuilder.putLong(ModelSelectorBaseNames.Positive, positiveCount)
+    metadataBuilder.putLong(ModelSelectorBaseNames.Negative, negativeCount)
+    metadataBuilder.putDouble(ModelSelectorBaseNames.Desired, $(sampleFraction))
+    log.info(s"Data has $positiveCount positive and $negativeCount negative.")
+
+    val (smallCount, smallData, bigCount, bigData) = {
+      val isPosSmall = positiveCount < negativeCount
+      setIsPositiveSmall(isPosSmall)
+      if (isPosSmall) (positiveCount, positiveData, negativeCount, negativeData)
+      else (negativeCount, negativeData, positiveCount, positiveData)
+    }
+    val maxTrainSample = getMaxTrainingSample
+
+    if (smallCount < 100 || (smallCount + bigCount) < 500) {
+      log.warn("!!!Attention!!! - there is not enough data to build a good model!")
+    }
+    val sampleF = getSampleFraction
+
+    // if the current fraction is superior than the one expected
+    if (smallCount.toDouble / totalCount.toDouble >= sampleF) {
+      log.info(
+        s"Not resampling data: $smallCount small count and $bigCount big count is greater than" +
+          s" requested ${sampleF}"
+      )
+
+      // if data is too big downsample
+      val fraction = if (maxTrainSample < totalCount) maxTrainSample / totalCount.toDouble else 1.0
+
+      setAlreadyBalancedFraction(fraction)
+
+      // sample
+      new ModelData(sampleBalancedData(
+        fraction = fraction,
+        seed = seed,
+        data = data,
+        positiveData = positiveData,
+        negativeData = negativeData
+      ),
+        metadataBuilder)
+    } else {
+      log.info(s"Sampling data to get $sampleF split versus $smallCount small and $bigCount big")
+      val (downSample, upSample) = getProportions(smallCount, bigCount, sampleF, maxTrainSample)
+
+      setDownSampleFraction(downSample)
+      setUpSampleFraction(upSample)
+
+      // feed metadata with upsample and downsample
+      metadataBuilder.putDouble(ModelSelectorBaseNames.UpSample, upSample)
+      metadataBuilder.putDouble(ModelSelectorBaseNames.DownSample, downSample)
+
+      val (posFraction, negFraction) =
+        if (positiveCount < negativeCount) (upSample, downSample)
+        else (downSample, upSample)
+
+      val newPositiveCount = math.rint(positiveCount * posFraction)
+      val newNegativeCount = math.rint(negativeCount * negFraction)
+      log.info(s"After sampling see " +
+        s"$newPositiveCount positives and $newNegativeCount negatives, " +
+        s"sample fraction is ${
+          math.min(newPositiveCount, newNegativeCount) / (newPositiveCount + newNegativeCount)
+        }."
+      )
+
+      if (upSample >= 1.0) {
+        log.info(s"Upsampling by a factor $upSample. Downsampling by a factor $downSample.")
+      } else {
+        log.info(s"Both downsampling by a factor $upSample for small and by a factor $downSample for big.\n" +
+          s"To make upsampling happen, please increase the max training sample size '${maxTrainingSample.name}'")
+      }
+
+      new ModelData(rebalance(smallData, upSample, bigData, downSample, seed), metadataBuilder)
+    }
+  }
+
+
+  /**
+   *
+   * @param smallData          data with the minority class
+   * @param upSampleFraction   fraction to sample minority data
+   * @param bigData            data with the majority class
+   * @param downSampleFraction fraction to sample minority data
+   *
+   * @return balanced small and big data split into training and test sets
+   *         with downSample and upSample proportions
+   */
+  private[op] def rebalance(
+    smallData: Dataset[_],
+    upSampleFraction: Double,
+    bigData: Dataset[_],
+    downSampleFraction: Double,
+    seed: Long
+  ): Dataset[LabelFeaturesKey] = {
+
+    import smallData.sparkSession.implicits._
+    val bigDataTrain = bigData.sample(withReplacement = false, downSampleFraction, seed = seed)
+    val smallDataTrain = upSampleFraction match {
+      case u if u > 1.0 => smallData.sample(withReplacement = true, u, seed = seed)
+      case 1.0 => smallData // if upSample == 1.0, no need to upSample
+      case u => smallData.sample(withReplacement = false, u, seed = seed) // downsample instead
+    }
+
+    smallDataTrain.as[LabelFeaturesKey].union(bigDataTrain.as[LabelFeaturesKey])
+
+  }
+
+  /**
+   * Sample already balanced data
+   *
+   * @param fraction
+   * @param seed
+   * @param data
+   * @param positiveData
+   * @param negativeData
+   * @return
+   */
+  private[op] def sampleBalancedData(
+    fraction: Double,
+    seed: Long,
+    data: Dataset[LabelFeaturesKey],
+    positiveData: Dataset[LabelFeaturesKey],
+    negativeData: Dataset[LabelFeaturesKey]
+  ): Dataset[LabelFeaturesKey] = {
+    fraction match {
+      case 1.0 => data // we don't sample
+      // stratified sampling
+      case r => negativeData.sample(withReplacement = false, fraction = r, seed = seed)
+        .union(positiveData.sample(withReplacement = false, fraction = r, seed = seed))
+    }
   }
 }
 
@@ -269,4 +333,71 @@ trait DataBalancerParams extends Params {
   }
 
   def getMaxTrainingSample: Int = $(maxTrainingSample)
+
+  /**
+   * Fraction to sample minority data
+   * Value should be > 0.0
+   *
+   * @group param
+   */
+  private[op] final val upSampleFraction = new DoubleParam(this, "upSampleFraction",
+    "fraction to sample minority data", ParamValidators.gt(0.0) // it can be a downSample fraction
+  )
+
+  private[op] def setUpSampleFraction(value: Double): this.type = {
+    set(upSampleFraction, value)
+  }
+
+  private[op] def getUpSampleFraction: Double = $(upSampleFraction)
+
+
+  /**
+   * Fraction to sample majority data
+   * Value should be in ]0.0, 1.0]
+   *
+   * @group param
+   */
+  private[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
+    "fraction to sample majority data", ParamValidators.inRange(
+      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
+    )
+  )
+
+  private[op] def setDownSampleFraction(value: Double): this.type = {
+    set(downSampleFraction, value)
+  }
+
+  private[op] def getDownSampleFraction: Double = $(downSampleFraction)
+
+  /**
+   * Whether or not positive data is in minority
+   * Value should be in true or false
+   *
+   * @group param
+   */
+  private[op] final val isPositiveSmall = new BooleanParam(this, "isPositiveSmall",
+    "whether or not positive data is in minority")
+
+  private[op] def setIsPositiveSmall(value: Boolean): this.type = {
+    set(isPositiveSmall, value)
+  }
+
+  private[op] def getIsPositiveSmall: Boolean = $(isPositiveSmall)
+
+  /**
+   * Sampling fraction in case the data is already balanced, but the size is greater than maxTrainingSample
+   * Value should be in ]0.0, 1.0]
+   *
+   * @group param
+   */
+  private[op] final val alreadyBalancedFraction = new DoubleParam(this, "alreadyBalancedFraction",
+    "sampling fraction in case the data is already balanced, but the size is greater than maxTrainingSample",
+    ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true)
+  )
+
+  private[op] def setAlreadyBalancedFraction(value: Double): this.type = {
+    set(alreadyBalancedFraction, value)
+  }
+
+  private[op] def getAlreadyBalancedFraction: Double = $(alreadyBalancedFraction)
 }

@@ -25,7 +25,7 @@ class SequenceTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
     toMP.setInput(age, weight)
     val transformedData = toMP.transform(passengersDataSet)
     val columns = transformedData.columns
-    assert(columns.contains(toMP.outputName))
+    assert(columns.contains(toMP.getOutputFeatureName))
     val output = toMP.getOutput()
     val answer = passengersArray.map(r =>
       toMP.transformFn(Seq(r.getFeatureType[Real](age), r.getFeatureType[Real](weight)))

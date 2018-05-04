@@ -51,7 +51,26 @@ case object UID {
     }
   }
 
-  private val counter = new AtomicInteger()
+  /**
+   * Resets the UID counter back to specified count.
+   * Can be useful when generating workflows programmatically, but the UIDs needs to be the same.
+   *
+   * @param v reset count to value v (default: 0)
+   * NOTE: Don't use this method unless you know what you are doing.
+   */
+  def reset(v: Int = 0): this.type = {
+    counter.set(v)
+    this
+  }
+
+  /**
+   * Gets current UID count
+   *
+   * @return UID counter value
+   */
+  def count(): Int = counter.get()
+
+  private val counter = new AtomicInteger(0)
 
   private def makeUID(prefix: String, isSequential: Boolean): String = {
     if (isSequential) {

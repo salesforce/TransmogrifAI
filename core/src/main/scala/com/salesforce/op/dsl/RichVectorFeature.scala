@@ -9,8 +9,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{Impurity, OpRandomForest}
-import com.salesforce.op.stages.impl.feature.OpLDA
+import com.salesforce.op.stages.impl.feature.{DropIndicesByTransformer, OpLDA}
 import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.feature.{IDF, IDFModel}
 
 
@@ -99,6 +100,23 @@ trait RichVectorFeature {
         .setOptimizer(optimizer)
         .setSubsamplingRate(subsamplingRate)
         .setSeed(seed)
+        .getOutput()
+    }
+
+    /**
+     * Allows columns to be dropped from a feature vector based on properties of the
+     * metadata about what is contained in each column (will work only on vectors)
+     * created with [[OpVectorMetadata]]
+     * @param matchFn function that goes from [[OpVectorColumnMetadata]] to boolean for dropping
+     *                columns (cases that evaluate to true will be dropped)
+     * @return new Vector with columns removed by function
+     */
+    def dropIndicesBy
+    (
+      matchFn: OpVectorColumnMetadata => Boolean
+    ): FeatureLike[OPVector] = {
+      new DropIndicesByTransformer(matchFn = matchFn)
+        .setInput(f)
         .getOutput()
     }
   }

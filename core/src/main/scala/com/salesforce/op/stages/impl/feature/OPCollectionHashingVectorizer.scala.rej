@@ -1,0 +1,48 @@
+diff a/core/src/main/scala/com/salesforce/op/stages/impl/feature/OPCollectionHashingVectorizer.scala b/core/src/main/scala/com/salesforce/op/stages/impl/feature/OPCollectionHashingVectorizer.scala	(rejected hunks)
+@@ -32,8 +33,45 @@ import scala.reflect.runtime.universe.TypeTag
+ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPCollectionHashingVectorizer[_]])
+   (implicit tti: TypeTag[T], val ttvi: TypeTag[T#Value])
+   extends SequenceTransformer[T, OPVector](operationName = "vecColHash", uid = uid)
+-  with VectorizerDefaults with PivotParams with CleanTextFun with HashingFun {
++  with VectorizerDefaults with PivotParams with CleanTextFun with HashingFun with HashingVectorizerParams {
+ 
++  /**
++   * Determine if the transformer should use a shared hash space for all features or not
++   *
++   * @return true if the shared hashing space to be used, false otherwise
++   */
++  def isSharedHashSpace: Boolean = this.isSharedHashSpace(makeHashingParams())
++
++  /**
++   * Get the underlying hashing transformer
++   *
++   * @return [[HashingTF]]
++   */
++  def hashingTF(): HashingTF = this.hashingTF(makeHashingParams())
++
++  protected def makeHashingParams() = HashingFunctionParams(
++    hashWithIndex = $(hashWithIndex),
++    prependFeatureName = $(prependFeatureName),
++    numFeatures = $(numFeatures),
++    numInputs = inN.length,
++    maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
++    forceSharedHashSpace = $(forceSharedHashSpace),
++    binaryFreq = $(binaryFreq),
++    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
++  )
++
++  override def transformFn: Seq[T] => OPVector = in => hash[T](in, getTransientFeatures(), makeHashingParams())
++
++  /**
++   * Function to be called on getMetadata
++   */
++  override def onGetMetadata(): Unit = {
++    val meta = makeVectorMetadata(getTransientFeatures(), makeHashingParams(), getOutputFeatureName)
++    setMetadata(meta.toMetadata)
++  }
++}
++
++private[op] trait HashingVectorizerParams extends Params {
+   final val numFeatures = new IntParam(
+     parent = this, name = "numFeatures",
+     doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",

@@ -50,24 +50,6 @@ class TransientFeatureTest extends FlatSpec with PassengerFeaturesTest with Test
     assertThrows[RuntimeException] { t.getFeature() }
   }
 
-  it should "allow setting the correct feature" in {
-    val t = TransientFeature(
-      name = height.name,
-      isResponse = height.isResponse,
-      isRaw = height.isRaw,
-      uid = height.uid,
-      typeName = height.typeName,
-      originFeatures = Seq(height.name),
-      stages = Seq()
-    )
-    compare(t.setFeature(height), height)
-  }
-
-  it should "error when setting an incorrect feature" in {
-    assertThrows[IllegalArgumentException] { tf.setFeature(null) }
-    assertThrows[IllegalArgumentException] { tf.setFeature(weight) }
-    assertThrows[IllegalArgumentException] { tf.setFeature(height.copy(uid = "blarg")) }
-  }
 
   it should "cast back to FeatureLike" in {
     tf.asFeatureLike[Real] shouldBe height

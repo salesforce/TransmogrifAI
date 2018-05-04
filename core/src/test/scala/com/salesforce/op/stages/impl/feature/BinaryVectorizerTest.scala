@@ -36,7 +36,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
   Spec[BinaryVectorizer] should "take an array of features as input and return a single vector feature" in {
     val vectorizer = new BinaryVectorizer().setInput(f1, f2)
     val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
@@ -58,7 +58,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
@@ -82,7 +82,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
@@ -106,7 +106,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(RootCol),
       f2 -> List(RootCol)
@@ -130,7 +130,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(RootCol),
       f2 -> List(RootCol)

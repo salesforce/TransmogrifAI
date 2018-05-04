@@ -6,8 +6,10 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Operators._
 import org.apache.spark.rdd.RDD
@@ -31,7 +33,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
     with VectorizerDefaults with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam {
+    with TrackNullsParam with MinSupportParam with OneHotFun {
 
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
 
@@ -52,26 +54,18 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     // Top K values for each categorical input
     val numToKeep = $(topK)
     val minSup = $(minSupport)
-    val topValues: Seq[Seq[String]] = countOccurrences
-      .map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
+    val topValues: Seq[Seq[String]] =
+      countOccurrences.map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
 
     // build metadata describing output
     val unseen = Option($(unseenName))
-    val columns = for {
-      (parentFeature, values) <- inN.zip(topValues)
-      parentFeatureType = parentFeature.typeName
-      // Append other/null indicators for each input (view here to avoid copying the array when appending the string)
-      value <-
-        if (shouldTrackNulls) values.map(Option(_)).view ++ Array(unseen, Option(TransmogrifierDefaults.NullString))
-        else values.map(Option(_)).view :+ unseen
-    } yield OpVectorColumnMetadata(
-      parentFeatureName = Seq(parentFeature.name),
-      parentFeatureType = Seq(parentFeatureType),
-      indicatorGroup = Option(parentFeature.name),
-      indicatorValue = value
+    val vecMetadata = makeVectorMetadata(
+      shouldTrackNulls = shouldTrackNulls,
+      unseen = unseen, topValues = topValues,
+      outputName = getOutputFeatureName,
+      features = getTransientFeatures(),
+      stageName = stageName
     )
-
-    val vecMetadata = OpVectorMetadata(outputName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
     setMetadata(vecMetadata.toMetadata)
 
     makeModel(
@@ -93,29 +87,9 @@ abstract class OpOneHotVectorizerModel[T <: FeatureType]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextFun {
+    with VectorizerDefaults with CleanTextFun with OneHotModelFun[T] {
 
-  protected def convertToSet(in: T): Set[_]
-
-  def transformFn: Seq[T] => OPVector = row => {
-    // Combine top values for each feature with categorical feature
-    val eachPivoted = row.zip(topValues).map { case (cat, top) =>
-      val theseCat = convertToSet(cat)
-        .groupBy(v => cleanTextFn(v.toString, shouldCleanText)).map { case (k, v) => k -> v.size }
-      val topPresent = top.zipWithIndex.collect { case (c, i) if theseCat.contains(c) => (i, theseCat(c).toDouble) }
-      val notPresent = theseCat.keySet.diff(top.toSet).toSeq
-      val notPresentVal = notPresent.map(theseCat).sum.toDouble
-      val nullVal = if (theseCat.isEmpty) 1.0 else 0.0
-      // Append the other and null entries to the vector (note topPresent is sparse, so use top.length as proxy for K)
-      if (shouldTrackNulls) topPresent ++ Array((top.length, notPresentVal), (top.length + 1, nullVal))
-      else topPresent :+ (top.length, notPresentVal)
-    }
-
-    // Fix indices for sparse vector
-    val reindexed = reindex(eachPivoted.map(_.toSeq))
-    val vector = makeSparseVector(reindexed)
-    vector.toOPVector
-  }
+  def transformFn: Seq[T] => OPVector = pivotFn(topValues, shouldCleanText, shouldTrackNulls)
 
 }
 
@@ -161,9 +135,8 @@ final class OpSetVectorizerModel[T <: OPSet[_]] private[op]
   shouldTrackNulls: Boolean,
   operationName: String,
   uid: String
-)(implicit tti: TypeTag[T]) extends OpOneHotVectorizerModel[T](topValues, shouldCleanText, shouldTrackNulls,
-  operationName, uid) {
-
+)(implicit tti: TypeTag[T])
+  extends OpOneHotVectorizerModel[T](topValues, shouldCleanText, shouldTrackNulls, operationName, uid) {
   override protected def convertToSet(in: T): Set[_] = in.value.toSet
 }
 
@@ -209,8 +182,64 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
   shouldTrackNulls: Boolean,
   operationName: String,
   uid: String
-)(implicit tti: TypeTag[T]) extends OpOneHotVectorizerModel[T](topValues, shouldCleanText, shouldTrackNulls,
-  operationName, uid) {
-
+)(implicit tti: TypeTag[T])
+  extends OpOneHotVectorizerModel[T](topValues, shouldCleanText, shouldTrackNulls, operationName, uid) {
   override protected def convertToSet(in: T): Set[_] = in.value.toSet
+}
+
+/**
+ * One Hot Functionality
+ */
+private[op] trait OneHotFun {
+
+  protected def makeVectorColumnMetadata(
+    shouldTrackNulls: Boolean, unseen: Option[String], topValues: Seq[Seq[String]], features: Array[TransientFeature]
+  ): Array[OpVectorColumnMetadata] = {
+    for {
+      (parentFeature, values) <- features.zip(topValues)
+      parentFeatureType = parentFeature.typeName
+      // Append other/null indicators for each input (view here to avoid copying the array when appending the string)
+      value <-
+      if (shouldTrackNulls) values.map(Option(_)).view ++ Array(unseen, Option(TransmogrifierDefaults.NullString))
+      else values.map(Option(_)).view :+ unseen
+    } yield parentFeature.toColumnMetaData(true).copy(indicatorValue = value)
+  }
+
+  protected def makeVectorMetadata(
+    shouldTrackNulls: Boolean, unseen: Option[String], topValues: Seq[Seq[String]], outputName: String,
+    features: Array[TransientFeature], stageName: String
+  ): OpVectorMetadata = {
+    val columns = makeVectorColumnMetadata(shouldTrackNulls, unseen, topValues, features)
+    OpVectorMetadata(outputName, columns, Transmogrifier.inputFeaturesToHistory(features, stageName))
+  }
+}
+
+/**
+ * One Hot Model Functionality
+ */
+private[op] trait OneHotModelFun[T <: FeatureType] extends CleanTextFun {
+  protected def convertToSet(in: T): Set[_]
+
+  protected def pivotFn(
+    topValues: Seq[Seq[String]], shouldCleanText: Boolean, shouldTrackNulls: Boolean
+  ): Seq[T] => OPVector = row => {
+    // Combine top values for each feature with categorical feature
+    val eachPivoted = row.zip(topValues).map { case (cat, top) =>
+      val theseCat = convertToSet(cat)
+        .groupBy(v => cleanTextFn(v.toString, shouldCleanText))
+        .map { case (k, v) => k -> v.size }
+      val topPresent = top.zipWithIndex.collect { case (c, i) if theseCat.contains(c) => (i, theseCat(c).toDouble) }
+      val notPresent = theseCat.keySet.diff(top.toSet).toSeq
+      val notPresentVal = notPresent.map(theseCat).sum.toDouble
+      val nullVal = if (theseCat.isEmpty) 1.0 else 0.0
+      // Append the other and null entries to the vector (note topPresent is sparse, so use top.length as proxy for K)
+      if (shouldTrackNulls) topPresent ++ Array((top.length, notPresentVal), (top.length + 1, nullVal))
+      else topPresent :+ (top.length, notPresentVal)
+    }
+
+    // Fix indices for sparse vector
+    val reindexed = reindex(eachPivoted)
+    val vector = makeSparseVector(reindexed)
+    vector.toOPVector
+  }
 }

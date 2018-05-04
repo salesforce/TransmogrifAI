@@ -46,6 +46,15 @@ class TestClass[T]
 
 class TestShouldFailClass(val x: Int, y: String)
 
+
+class TestClassVar {
+  var myVar: Option[String] = None
+  def setMyVar(s: String): this.type = {
+    myVar = Option(s)
+    this
+  }
+}
+
 @RunWith(classOf[JUnitRunner])
 class ReflectionUtilsTest extends FlatSpec with Matchers {
 
@@ -152,6 +161,13 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   it should "create a class tag from a weak type tag" in {
     val c = ReflectionUtils.classTagForWeakTypeTag[Map[String, Option[Long]]]
     c.toString() shouldBe "scala.collection.immutable.Map"
+  }
+
+  it should "allow you to find and use a setter for a class" in {
+    val myClass = new TestClassVar()
+    val setter = ReflectionUtils.reflectSetterMethod(myClass, "myVar")
+    setter.map(_.apply("yay"))
+    myClass.myVar shouldBe Some("yay")
   }
 
 }

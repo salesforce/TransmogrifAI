@@ -63,32 +63,20 @@ trait TextTokenizerParams extends Params {
     toLowercase -> TextTokenizer.ToLowercase
   )
 
-  /**
-   * Function used to convert input to output
-   */
-  def tokenizeFn(text: Text,
+  def tokenize(
+    text: Text,
     languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
     analyzer: TextAnalyzer = TextTokenizer.Analyzer
-  ): TextList = {
-
-    if (text.isEmpty) TextList.empty
-    else {
-      val language = {
-        if (!$(autoDetectLanguage)) getDefaultLanguage
-        else {
-          val threshold = $(autoDetectThreshold)
-          languageDetector
-            .detectLanguages(text.v.get)
-            .collectFirst { case (lang, confidence) if confidence > threshold => lang }
-            .getOrElse(getDefaultLanguage)
-        }
-      }
-      val txt = if ($(toLowercase)) text.v.get.toLowerCase else text.v.get
-      val tokens = analyzer.analyze(txt, language)
-      val minTokLen = $(minTokenLength)
-      tokens.filter(_.length >= minTokLen).toTextList
-    }
-  }
+  ): (Language, TextList) = TextTokenizer.tokenize(
+    text = text,
+    languageDetector = languageDetector,
+    analyzer = analyzer,
+    autoDetectLanguage = getAutoDetectLanguage,
+    defaultLanguage = getDefaultLanguage,
+    autoDetectThreshold = getAutoDetectThreshold,
+    toLowercase = getToLowercase,
+    minTokenLength = getMinTokenLength
+  )
 
 }
 
@@ -106,8 +94,7 @@ class TextTokenizer[T <: Text]
   uid: String = UID[TextTokenizer[_]]
 )(implicit tti: TypeTag[T])
   extends UnaryTransformer[T, TextList](operationName = "textToken", uid = uid) with TextTokenizerParams {
-
-  override def transformFn: T => TextList = text => super.tokenizeFn(text, languageDetector, analyzer)
+  def transformFn: T => TextList = text => tokenize(text, languageDetector, analyzer)._2
 }
 
 object TextTokenizer {
@@ -116,8 +103,47 @@ object TextTokenizer {
   val AnalyzerHtmlStrip: TextAnalyzer = new LuceneTextAnalyzer(LuceneTextAnalyzer.withHtmlStripping)
   val AutoDetectLanguage = false
   val AutoDetectThreshold = 0.99
-  val DefaultLanguage = Language.Unknown
+  val DefaultLanguage: Language = Language.Unknown
   val MinTokenLength = 1
   val ToLowercase = true
   val StripHtml = false
+
+  /**
+   * Language wise text tokenization
+   *
+   * @param text                text to tokenize
+   * @param languageDetector    language detector instance
+   * @param analyzer            text analyzer instance
+   * @param autoDetectLanguage  whether to attempt language detection
+   * @param defaultLanguage     default language
+   * @param autoDetectThreshold language detection threshold
+   * @param toLowercase         whether to convert all characters to lowercase before tokenizing
+   * @param minTokenLength      minimum token length
+   * @return detected language and tokens
+   */
+  def tokenize(
+    text: Text,
+    languageDetector: LanguageDetector = LanguageDetector,
+    analyzer: TextAnalyzer = Analyzer,
+    autoDetectLanguage: Boolean = AutoDetectLanguage,
+    defaultLanguage: Language = DefaultLanguage,
+    autoDetectThreshold: Double = AutoDetectThreshold,
+    toLowercase: Boolean = ToLowercase,
+    minTokenLength: Int = MinTokenLength
+  ): (Language, TextList) = text match {
+    case SomeValue(Some(txt)) =>
+      val language =
+        if (!autoDetectLanguage) defaultLanguage
+        else {
+          languageDetector
+            .detectLanguages(txt)
+            .collectFirst { case (lang, confidence) if confidence > autoDetectThreshold => lang }
+            .getOrElse(defaultLanguage)
+        }
+      val lowerTxt = if (toLowercase) txt.toLowerCase else txt
+      val tokens = analyzer.analyze(lowerTxt, language)
+      language -> tokens.filter(_.length >= minTokenLength).toTextList
+    case _ =>
+      defaultLanguage -> TextList.empty
+  }
 }

@@ -9,11 +9,11 @@ import com.salesforce.op.FeatureHistory
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages._
 import org.slf4j.LoggerFactory
+import scalax.collection.GraphPredef._
+import scalax.collection._
 
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.{Failure, Success, Try}
-import scalax.collection.GraphPredef._
-import scalax.collection._
 
 /**
  * Feature definition
@@ -46,7 +46,6 @@ trait FeatureLike[O <: FeatureType] {
    * The input features of the origin stage
    */
   val parents: Seq[OPFeature]
-
 
   /**
    * Weak type tag of the feature type O
@@ -97,9 +96,21 @@ trait FeatureLike[O <: FeatureType] {
    * and input parameters may not be commutative
    */
   final override def equals(in: Any): Boolean = in match {
+    case f: FeatureLike[O] => name == f.name && sameOrigin(f) && parents.map(_.uid) == f.parents.map(_.uid)
+    case _ => false
+  }
+
+  /**
+   * Tests the equality of the FeatureLike objects
+   *
+   * Origin Stage is tested by uid
+   *
+   * Parents are test by uid and order dependent. This is because they are used as inputs to the origin stage
+   * and input parameters may not be commutative
+   */
+  final def sameOrigin(in: Any): Boolean = in match {
     case f: FeatureLike[O] => {
-      name == f.name &&
-        isResponse == f.isResponse &&
+      isResponse == f.isResponse &&
         wtt.tpe =:= f.wtt.tpe && {
         originStage -> f.originStage match {
           case (null, null) => true
@@ -107,7 +118,7 @@ trait FeatureLike[O <: FeatureType] {
           case (_, null) => false
           case (os, fos) => os.uid == fos.uid
         }
-      } && parents.map(_.uid) == f.parents.map(_.uid)
+      }
     }
     case _ => false
   }
@@ -124,6 +135,19 @@ trait FeatureLike[O <: FeatureType] {
     val pids = parents.map(_.uid).mkString("[", ",", "]")
     s"${this.getClass.getSimpleName}(" +
       s"name = $name, uid = $uid, isResponse = $isResponse, originStage = $oid, parents = $pids)"
+  }
+
+  /**
+   * Construct a raw feature instance from this feature which can be applied on a Dataframe.
+   * Use this functionality when stacking workflows, e.g. when some features of a workflow
+   * are used as raw or input features of another workflow.
+   *
+   * @param isResponse should make response or a predictor feature
+   * @return new raw feature of the same type
+   */
+  final def asRaw(isResponse: Boolean = isResponse): FeatureLike[O] = {
+    val raw = FeatureBuilder.fromRow[O](name)(wtt)
+    if (isResponse) raw.asResponse else raw.asPredictor
   }
 
   /**

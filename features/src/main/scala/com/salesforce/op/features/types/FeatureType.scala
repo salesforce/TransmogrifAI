@@ -41,6 +41,7 @@ trait FeatureType extends Serializable {
    * Returns value shortcut
    */
   final def v: Value = value
+
   /**
    * Returns true is the value is non empty, false otherwise
    */
@@ -98,6 +99,17 @@ trait NonNullable extends FeatureType {
 }
 
 /**
+ * This exception is thrown when an empty or null value is passed into [[NonNullable]] feature type
+ *
+ * @param c   feature type class
+ * @param msg optional message
+ */
+class NonNullableEmptyException(c: Class[_ <: NonNullable], msg: Option[String] = None)
+  extends IllegalArgumentException(
+    s"${c.getSimpleName} cannot be empty${msg.map(m => s": $m").getOrElse("")}"
+  )
+
+/**
  * Location mixin
  */
 trait Location extends FeatureType
@@ -133,11 +145,11 @@ object SomeValue {
   def unapply[T <: FeatureType](v: T): Option[T#Value] = if (v.isEmpty) None else Some(v.value)
 }
 
-
 /**
  * Feature value type related functions
  */
 object FeatureType {
+
 
   /**
    * Returns feature type name
@@ -257,6 +269,7 @@ object FeatureType {
     classOf[PostalCodeMap] -> typeTag[PostalCodeMap],
     classOf[StreetMap] -> typeTag[StreetMap],
     classOf[GeolocationMap] -> typeTag[GeolocationMap],
+    classOf[Prediction] -> typeTag[Prediction],
     // Numerics
     classOf[Binary] -> typeTag[Binary],
     classOf[Currency] -> typeTag[Currency],

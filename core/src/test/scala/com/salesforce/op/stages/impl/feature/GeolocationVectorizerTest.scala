@@ -41,7 +41,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testVectorizer.getOutput()
     outputFeatures shouldBe new Feature[OPVector](
-      name = testVectorizer.outputName,
+      name = testVectorizer.getOutputFeatureName,
       originStage = testVectorizer,
       isResponse = false,
       parents = Array(inA, inB, inC, inD)
@@ -62,7 +62,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedConstant.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testModelConstant.outputName)
+      Array("inA", "inB", "inC", "inD", testModelConstant.getOutputFeatureName)
 
     val expectedConstant = Array(
       (Array(32.4, -100.2, 3.0), Array(38.6, -110.4, 2.0), Array(39.1, -111.3, 3.0), null,
@@ -94,7 +94,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMean.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testModelMean.outputName)
+      Array("inA", "inB", "inC", "inD", testModelMean.getOutputFeatureName)
 
     val expectedMean = Array(
       (Array(32.4, -100.2, 3.0), Array(38.6, -110.4, 2.0), Array(39.1, -111.3, 3.0), null,
@@ -134,7 +134,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMean.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testModelMean.outputName)
+      Array("inA", "inB", "inC", "inD", testModelMean.getOutputFeatureName)
 
     val expectedMean = Array(
       (Array(32.4, -100.2, 3.0), Array(38.6, -110.4, 2.0), Array(39.1, -111.3, 3.0), null,

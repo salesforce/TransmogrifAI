@@ -55,7 +55,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testVectorizer.getOutput()
     outputFeatures shouldBe new Feature[OPVector](
-      name = testVectorizer.outputName,
+      name = testVectorizer.getOutputFeatureName,
       originStage = testVectorizer,
       isResponse = false,
       parents = Array(inA, inB, inC)
@@ -74,7 +74,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedConstant.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", testVectorizer.outputName)
+      Array("inA", "inB", "inC", testVectorizer.getOutputFeatureName)
 
     val expectedZero = Array(
       (4.0, 2.0, null, Vectors.dense(4.0, 2.0, 4.2)),
@@ -100,7 +100,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMean.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", testVectorizer.outputName)
+      Array("inA", "inB", "inC", testVectorizer.getOutputFeatureName)
 
     val expectedMean = Array(
       (4.0, 2.0, null, Vectors.dense(4.0, 2.0, 0.0)),
@@ -122,7 +122,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     val transformedValuesZeroTracked = testDataTransformedConstantTracked.collect()
     // This is string because of vector type being private to spark ml
     testDataTransformedConstantTracked.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", testVectorizer.outputName)
+      Array("inA", "inB", "inC", testVectorizer.getOutputFeatureName)
 
     val expectedZeroTracked = Array(
       (4.0, 2.0, null, Vectors.dense(4.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
@@ -136,7 +136,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     transformedValuesZeroTracked.map(_.get(3)) shouldEqual expectedZeroTracked.map(_._4)
 
     val fieldMetadata = testDataTransformedConstantTracked
-      .select(testVectorizer.outputName).schema.fields
+      .select(testVectorizer.getOutputFeatureName).schema.fields
       .map(_.metadata).head
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -145,7 +145,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
+    OpVectorMetadata(testVectorizer.getOutputFeatureName, fieldMetadata) shouldBe expectedMeta
   }
 
   it should "keep track of null values if wanted, using fillWithMean" in {
@@ -155,7 +155,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMeanTracked.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", testVectorizer.outputName)
+      Array("inA", "inB", "inC", testVectorizer.getOutputFeatureName)
 
     val expectedMeanTracked = Array(
       (4.0, 2.0, null, Vectors.dense(4.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
@@ -169,7 +169,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     transformedValuesMeanTracked.map(_.get(3)) shouldEqual expectedMeanTracked.map(_._4)
 
     val fieldMetadata = testDataTransformedMeanTracked
-      .select(testVectorizer.outputName).schema.fields
+      .select(testVectorizer.getOutputFeatureName).schema.fields
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
@@ -177,7 +177,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       inB -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
+    OpVectorMetadata(testVectorizer.getOutputFeatureName, fieldMetadata) shouldBe expectedMeta
   }
 
   it should "work with columns of type Percent just as if they were Real" in {
@@ -188,7 +188,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMeanTracked.schema.fieldNames should contain theSameElementsAs
-      Array("inAPer", "inBPer", "inCPer", testVectorizer.outputName)
+      Array("inAPer", "inBPer", "inCPer", testVectorizer.getOutputFeatureName)
 
     val expectedMeanTracked = Array(
       (4.0, 2.0, null, Vectors.dense(4.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
@@ -202,7 +202,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     transformedValuesMeanTracked.map(_.get(3)) shouldEqual expectedMeanTracked.map(_._4)
 
     val fieldMetadata = testDataTransformedMeanTracked
-      .select(testVectorizer.outputName).schema.fields
+      .select(testVectorizer.getOutputFeatureName).schema.fields
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
@@ -210,7 +210,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       inBPer -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       inCPer -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
+    OpVectorMetadata(testVectorizer.getOutputFeatureName, fieldMetadata) shouldBe expectedMeta
   }
 
   it should "work on columns of type Currency" in {
@@ -219,7 +219,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     val testDataTransformedConstant = testModelConstant.transform(testDataCurrency)
 
     testDataTransformedConstant.schema.fieldNames should contain theSameElementsAs
-      Array("inACur", "inBCur", "inCCur", testVectorizer.outputName)
+      Array("inACur", "inBCur", "inCCur", testVectorizer.getOutputFeatureName)
 
     val transformedValuesConstant = testDataTransformedConstant.collect()
     val expectedZero = Array(
@@ -240,7 +240,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
     val testDataTransformedConstant = testModelConstant.transform(testDataPercent)
 
     testDataTransformedConstant.schema.fieldNames should contain theSameElementsAs
-      Array("inAPer", "inBPer", "inCPer", testVectorizer.outputName)
+      Array("inAPer", "inBPer", "inCPer", testVectorizer.getOutputFeatureName)
 
     val transformedValuesConstant = testDataTransformedConstant.collect()
     val expectedZero = Array(

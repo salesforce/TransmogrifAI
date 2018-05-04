@@ -8,18 +8,18 @@ package com.salesforce.op.stages.impl.feature
 import java.util.{Date => JDate}
 
 import com.salesforce.op.OpWorkflow
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorMetadata, _}
-import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.SparkSession
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 import scala.collection.Traversable
@@ -28,6 +28,8 @@ import scala.reflect.runtime.universe._
 
 @RunWith(classOf[JUnitRunner])
 class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
+
+  import OPMapVectorizerTestHelper._
 
   val log = LoggerFactory.getLogger(this.getClass)
   // loggingLevel(Level.INFO)
@@ -48,7 +50,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
@@ -292,6 +294,11 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     testFeatureToMap[Geolocation, GeolocationMap, Seq[Double]](GeolocationData, GeolocationData2, GeolocationData3)
   }
+}
+
+object OPMapVectorizerTestHelper extends Matchers {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Constructs a single OPMap feature from three input features of the corresponding type, where each input feature
@@ -305,8 +312,8 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
    * @tparam FM OPMap feature type (eg. IDMap, TextMap, IntegerMap)
    * @tparam MT Value type of map inside OPMap feature (eg. String, String, Int)
    */
-  private def testFeatureToMap[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
-  (f1Data: Seq[F], f2Data: Seq[F], f3Data: Seq[F]): Unit = {
+  def testFeatureToMap[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
+  (f1Data: Seq[F], f2Data: Seq[F], f3Data: Seq[F])(implicit spark: SparkSession): Unit = {
 
     val generatedData: Seq[(F, F, F)] = f1Data.zip(f2Data).zip(f3Data).map { case ((f1, f2), f3) => (f1, f2, f3) }
     val (rawDF, rawF1, rawF2, rawF3) = TestFeatureBuilder("f1", "f2", "f3", generatedData)
@@ -332,26 +339,8 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     log.info(s"summary.getMetadataArray('${OpVectorMetadata.ColumnsKey}'):\n{}",
       summary.getMetadataArray(OpVectorMetadata.ColumnsKey).toList
     )
-    val ftFactory = FeatureTypeFactory[FM]()
-
     // Transformer to construct a single map feature from the individual features
-    val mapTransformer = new TernaryLambdaTransformer[F, F, F, FM](operationName = "labelFunc",
-      transformFn = (f1, f2, f3) => {
-        // For all the maps, the value in the original feature type is an Option[MT], but can't figure out how
-        // to specify that here since that's not true in general for FeatureTypes (eg. RealNN)
-        def asMap(v: F, featureName: String): Map[String, Any] = {
-          v.value match {
-            case Some(s) => Map(featureName -> s)
-            case t: Traversable[_] if t.nonEmpty => Map(featureName -> t)
-            case _ => Map.empty
-          }
-        }
-        val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
-        ftFactory.newInstance(mapData)
-      }
-    )
-
-    val mapFeature = mapTransformer.setInput(rawF1, rawF2, rawF3).getOutput().asInstanceOf[Feature[FM]]
+    val mapFeature = makeTernaryOPMapTransformer[F, FM, MT](rawF1, rawF2, rawF3)
     val mapFeatureVector = Transmogrifier.transmogrify(Seq(mapFeature))(TransmogrifierTestDefaults).combine()
     val transformedMap = new OpWorkflow().setResultFeatures(mapFeatureVector).transform(rawDF)
     val mapSummary = transformedMap.schema(mapFeatureVector.name).metadata
@@ -416,4 +405,35 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     // TODO assert metadata
   }
+
+  /**
+   * Construct OPMap transformer for raw features
+   */
+  def makeTernaryOPMapTransformer[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
+  (
+    rawF1: FeatureLike[F],
+    rawF2: FeatureLike[F],
+    rawF3: FeatureLike[F]
+  ): Feature[FM] = {
+    val ftFactory = FeatureTypeFactory[FM]()
+
+    // Transformer to construct a single map feature from the individual features
+    val mapTransformer = new TernaryLambdaTransformer[F, F, F, FM](operationName = "mapify",
+      transformFn = (f1, f2, f3) => {
+        // For all the maps, the value in the original feature type is an Option[MT], but can't figure out how
+        // to specify that here since that's not true in general for FeatureTypes (eg. RealNN)
+        def asMap(v: F, featureName: String): Map[String, Any] = {
+          v.value match {
+            case Some(s) => Map(featureName -> s)
+            case t: Traversable[_] if t.nonEmpty => Map(featureName -> t)
+            case _ => Map.empty
+          }
+        }
+        val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
+        ftFactory.newInstance(mapData)
+      }
+    )
+    mapTransformer.setInput(rawF1, rawF2, rawF3).getOutput().asInstanceOf[Feature[FM]]
+  }
+
 }

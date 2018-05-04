@@ -156,7 +156,7 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
     dataSet.collect(stringMap, numericMap, booleanMap).foreach(r =>
       r.productIterator.forall(_.asInstanceOf[FeatureType].isEmpty) shouldBe true
     )
-    dataSet.collect(height).foreach(_ shouldBe RealNN.empty)
+    dataSet.collect(height).foreach(_ shouldBe RealNN(0.0))
   }
 
 }
