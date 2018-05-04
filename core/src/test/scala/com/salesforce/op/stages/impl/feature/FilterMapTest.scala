@@ -55,7 +55,7 @@ class FilterMapTest extends FlatSpec with TestSparkContext {
   classOf[FilterMap[_]].getSimpleName should "return single properly formed feature" in {
     val filtered = filter.getOutput()
 
-    filtered.name shouldBe filter.outputName
+    filtered.name shouldBe filter.getOutputFeatureName
     filtered.originStage shouldBe filter
     filtered.parents shouldBe Array(f1)
   }
@@ -151,7 +151,7 @@ class FilterMapTest extends FlatSpec with TestSparkContext {
   it should "filter correctly when using shortcut" in {
     val filtered = f1.filter(whiteList = Seq("Arthur", "Knight"), blackList = Seq())
 
-    filtered.name shouldBe filtered.originStage.outputName
+    filtered.name shouldBe filtered.originStage.getOutputFeatureName
     filtered.originStage shouldBe a[FilterMap[_]]
     filtered.parents shouldBe Array(f1)
   }

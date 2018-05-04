@@ -5,47 +5,55 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal}
 import com.salesforce.op.utils.numeric.Number
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
 class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
 
+  import DecisionTreeNumericBucketizerTestHelper._
+
   trait NormalData {
     val numericData: Seq[Real] = RandomReal.normal[Real]().withProbabilityOfEmpty(0.2).limit(1000)
-    val labelData: Seq[RealNN] = RandomBinary(probabilityOfSuccess = 0.4).limit(1000).map(_.toDouble.toRealNN)
+    val labelData: Seq[RealNN] = RandomBinary(probabilityOfSuccess = 0.4).limit(1000).map(_.toDouble.toRealNN(0.0))
     val (ds, numeric, label) = TestFeatureBuilder[Real, RealNN](numericData zip labelData)
     val expectedSplits = Array.empty[Double]
+    lazy val modelLocation = tempDir + "/dt-buck-test-model-" + org.joda.time.DateTime.now().getMillis
   }
 
   trait EmptyData {
     val (_, numeric, label) = TestFeatureBuilder[Real, RealNN](Seq[Real]() zip Seq[RealNN]())
-    val nulls = Seq[(java.lang.Double, java.lang.Double)]((1.0, null), (null, null))
+    val nulls = Seq[(java.lang.Double, java.lang.Double)](
+      (0.0: java.lang.Double) -> (null: java.lang.Double)
+    )
     import spark.implicits._
-    val ds = spark.createDataset(nulls).toDF(label.name, numeric.name)
+    val nullsDS = spark.createDataset(nulls).toDF(label.name, numeric.name)
+    val emptyDS = spark.createDataset(Seq[(java.lang.Double, java.lang.Double)]()).toDF(label.name, numeric.name)
     val expectedSplits = Array.empty[Double]
   }
 
   trait UniformData {
     val (min, max) = (0.0, 100.0)
-    val currencyData: Seq[Currency] = RandomReal.uniform[Currency](minValue = min, maxValue = max).limit(1000)
+    val currencyData: Seq[Currency] =
+      RandomReal.uniform[Currency](minValue = min, maxValue = max).withProbabilityOfEmpty(0.1).limit(1000)
     val labelData = currencyData.map(c => {
       c.value.map {
         case v if v < 15 => 0.0
         case v if v < 26 => 1.0
         case v if v < 91 => 2.0
         case _ => 3.0
-      }.toRealNN
+      }.toRealNN(0.0)
     })
     val (ds, currency, label) = TestFeatureBuilder("currency", "label", currencyData zip labelData)
     val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
@@ -67,7 +75,16 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
     )
   }
 
-  it should "should not find any splits on random data" in new NormalData {
+  it should "serialize correctly" in new NormalData {
+    val bucketizer = new DecisionTreeNumericBucketizer[Double, Real]().setInput(label, numeric).setTrackNulls(false)
+    val workflow = new OpWorkflow()
+    val model = workflow.setInputDataset(ds).setResultFeatures(bucketizer.getOutput()).train()
+    model.save(modelLocation)
+    val loaded = workflow.loadModel(modelLocation)
+    loaded.stages.map(_.uid) should contain (bucketizer.uid)
+  }
+
+  it should "not find any splits on random data" in new NormalData {
     val bucketizer = new DecisionTreeNumericBucketizer[Double, Real]().setInput(label, numeric).setTrackNulls(false)
     assertBucketizer(
       bucketizer, data = ds, shouldSplit = false, trackNulls = false, trackInvalid = false,
@@ -78,26 +95,30 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
   it should "work correctly on empty data" in new EmptyData {
     val bucketizer = new DecisionTreeNumericBucketizer[Double, Real]().setInput(label, numeric).setTrackNulls(false)
     assertBucketizer(
-      bucketizer, data = ds, shouldSplit = false, trackNulls = false, trackInvalid = false,
+      bucketizer, data = nullsDS, shouldSplit = false, trackNulls = false, trackInvalid = false,
+      expectedSplits = Array.empty, expectedTolerance = 0.0
+    )
+    a[IllegalArgumentException] should be thrownBy assertBucketizer(
+      bucketizer, data = emptyDS, shouldSplit = false, trackNulls = false, trackInvalid = false,
       expectedSplits = Array.empty, expectedTolerance = 0.0
     )
   }
 
   it should "work as a shortcut" in new NormalData {
-    val out = numeric.autoBucketize(label, trackNulls = false)
+    val out = numeric.autoBucketize(label, trackNulls = true)
     out.originStage shouldBe a[DecisionTreeNumericBucketizer[_, _]]
     assertBucketizer(
       bucketizer = out.originStage.asInstanceOf[DecisionTreeNumericBucketizer[_, _ <: OPNumeric[_]]],
-      data = ds, shouldSplit = false, trackNulls = false, trackInvalid = false,
+      data = ds, shouldSplit = false, trackNulls = true, trackInvalid = false,
       expectedSplits = Array.empty, expectedTolerance = 0.0
     )
   }
 
   it should "correctly bucketize when labels are specified" in new UniformData {
-    val out = currency.autoBucketize(label, trackNulls = false)
+    val out = currency.autoBucketize(label = label, trackNulls = true, trackInvalid = true, minInfoGain = 0.1)
     assertBucketizer(
       bucketizer = out.originStage.asInstanceOf[DecisionTreeNumericBucketizer[_, _ <: OPNumeric[_]]],
-      data = ds, shouldSplit = true, trackNulls = false, trackInvalid = false, expectedSplits = expectedSplits,
+      data = ds, shouldSplit = true, trackNulls = true, trackInvalid = true, expectedSplits = expectedSplits,
       expectedTolerance = 0.15
     )
   }
@@ -141,8 +162,10 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
   ): Unit = {
     val out = bucketizer.getOutput()
     val fitted = bucketizer.fit(data)
-    fitted shouldBe a[DecisionTreeNumericBucketizerModel[_, _]]
-    val model = fitted.asInstanceOf[DecisionTreeNumericBucketizerModel[_, _]]
+    fitted shouldBe a[DecisionTreeNumericBucketizerModel[_]]
+    val model = fitted.asInstanceOf[DecisionTreeNumericBucketizerModel[_]]
+    model.uid shouldBe bucketizer.uid
+    model.operationName shouldBe bucketizer.operationName
     model.shouldSplit shouldBe shouldSplit
     model.trackNulls shouldBe trackNulls
     model.trackInvalid shouldBe trackInvalid
@@ -150,30 +173,21 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
     val splits = model.splits
     assertSplits(splits = splits, expectedSplits = expectedSplits, expectedTolerance)
 
-    val meta = model.getMetadata().getSummaryMetadata()
-    meta.getBoolean(DecisionTreeNumericBucketizer.ShouldSplitKey) shouldBe shouldSplit
-    val metaSplits = meta.getDoubleArray(DecisionTreeNumericBucketizer.SplitsKey)
-    splits shouldBe metaSplits
-    assertSplits(splits = metaSplits, expectedSplits = expectedSplits, expectedTolerance)
-
     val res = model.transform(data).collect(out)
-    if (shouldSplit) {
-      val expectedSize = splits.length - 1 + (if (trackNulls) 1 else 0) + (if (trackInvalid) 1 else 0)
-      for {v <- res} v.value.size shouldBe expectedSize
-
-      val columnMeta: Array[OpVectorColumnMetadata] =
-        model.getMetadata().getMetadataArray(OpVectorMetadata.ColumnsKey)
-          .flatMap(OpVectorColumnMetadata.fromMetadata)
-
-      columnMeta.length shouldBe expectedSize
-    }
-    else {
-      res.foreach(_.value.size shouldBe 0)
-      model.getMetadata().getMetadataArray(OpVectorMetadata.ColumnsKey) shouldBe Nil
-    }
+    assertMetadata(
+      shouldSplit = Array(shouldSplit),
+      splits = Array(splits),
+      trackNulls = trackNulls, trackInvalid = trackInvalid,
+      model.getMetadata(), res
+    )
   }
 
-  private def assertSplits(splits: Array[Double], expectedSplits: Array[Double], expectedTolerance: Double): Unit = {
+
+}
+
+object DecisionTreeNumericBucketizerTestHelper extends Matchers {
+
+  def assertSplits(splits: Array[Double], expectedSplits: Array[Double], expectedTolerance: Double): Unit = {
     withClue(
       s"Bucketizer splits: ${splits.mkString("[", ",", "]")}, expected: ${expectedSplits.mkString("[", ",", "]")}"
     ) {
@@ -183,6 +197,29 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
       val diff = splits.zip(expectedSplits).map { case (s, e) => math.abs((s - e) / math.max(s, e)) }
       diff.filter(Number.isValid).foreach(_ should be <= expectedTolerance)
     }
+  }
+
+  def assertMetadata(
+    shouldSplit: Array[Boolean],
+    splits: Array[Array[Double]],
+    trackNulls: Boolean,
+    trackInvalid: Boolean,
+    stageMetadata: Metadata,
+    res: Array[OPVector]
+  ): Unit = {
+    val numOfActualSplits = shouldSplit.count(_ == true)
+    val expectedSize =
+      splits.flatten.length - numOfActualSplits +
+        (if (trackNulls) splits.length else 0) +
+        (if (trackInvalid) numOfActualSplits else 0)
+
+    for { v <- res } v.value.size shouldBe expectedSize
+
+    val columnMeta: Array[OpVectorColumnMetadata] =
+      stageMetadata.getMetadataArray(OpVectorMetadata.ColumnsKey)
+        .flatMap(OpVectorColumnMetadata.fromMetadata)
+
+    columnMeta.length shouldBe expectedSize
   }
 
 }

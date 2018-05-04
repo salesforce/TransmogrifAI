@@ -13,6 +13,7 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include
 import com.fasterxml.jackson.annotation.PropertyAccessor
 import com.fasterxml.jackson.core.JsonParser
 import com.fasterxml.jackson.databind._
+import com.fasterxml.jackson.databind.module.SimpleModule
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import com.fasterxml.jackson.module.scala.OpDefaultScalaModule
 import org.apache.commons.io.FilenameUtils
@@ -28,15 +29,16 @@ object JsonUtils {
   /**
    * Read object from a json or yaml file
    *
-   * @param file json or yaml file
+   * @param file   json or yaml file
+   * @param serdes custom serializers
    * @return Try[T]
    */
-  def fromFile[T: ClassTag](file: File): Try[T] = Try {
+  def fromFile[T: ClassTag](file: File, serdes: Seq[SerDes[_]] = Seq.empty): Try[T] = Try {
     val extension = FilenameUtils.getExtension(file.getPath).toLowerCase
     val mapper: ObjectMapper =
       extension match {
-        case "json" => jsonMapper
-        case y if "yml" == y || "yaml" == y => yamlMapper
+        case "json" => jsonMapper(serdes)
+        case y if "yml" == y || "yaml" == y => yamlMapper(serdes)
         case _ => throw new IllegalArgumentException(
           s"Unsupported file type '$extension'. Supported file types: json, yml, yaml")
       }
@@ -46,13 +48,14 @@ object JsonUtils {
   /**
    * Read object from a json or yaml string
    *
-   * @param str json or yaml string
+   * @param str    json or yaml string
+   * @param serdes custom serializers/deserializers
    * @return Try[T]
    */
-  def fromString[T: ClassTag](str: String): Try[T] = Try {
-    jsonMapper.readValue(str, classTag[T].runtimeClass)
+  def fromString[T: ClassTag](str: String, serdes: Seq[SerDes[_]] = Seq.empty): Try[T] = Try {
+    jsonMapper(serdes).readValue(str, classTag[T].runtimeClass)
   }.recover { case _ =>
-    yamlMapper.readValue(str, classTag[T].runtimeClass)
+    yamlMapper(serdes).readValue(str, classTag[T].runtimeClass)
   }.recover { case e =>
     throw new IllegalArgumentException("Unsupported format. Supported formats: json, yaml", e)
   }.map(_.asInstanceOf[T])
@@ -62,54 +65,68 @@ object JsonUtils {
    *
    * @param any    instance
    * @param pretty should pretty print
+   * @param serdes custom serializers/deserializers
    * @return json string of the instance
    */
-  def toJsonString(any: AnyRef, pretty: Boolean = true): String = {
-    val writer = if (pretty) jsonMapper.writerWithDefaultPrettyPrinter() else jsonMapper.writer()
+  def toJsonString(any: AnyRef, pretty: Boolean = true, serdes: Seq[SerDes[_]] = Seq.empty): String = {
+    val writer = if (pretty) jsonMapper(serdes).writerWithDefaultPrettyPrinter() else jsonMapper(serdes).writer()
     writer.writeValueAsString(any)
   }
 
   /**
    * Write an instance to json node
    *
-   * @param any instance
+   * @param any    instance
+   * @param serdes custom serializers/deserializers
    * @return root node of the resulting json tree
    */
-  def toJsonTree(any: AnyRef): JsonNode = jsonMapper.valueToTree(any)
+  def toJsonTree(any: AnyRef, serdes: Seq[SerDes[_]] = Seq.empty): JsonNode = jsonMapper(serdes).valueToTree(any)
 
   /**
    * Write json node into a Map
    *
-   * @param json json node
+   * @param json   json node
+   * @param serdes custom serializers/deserializers
    * @return Map
    */
-  def toMap(json: JsonNode): Map[String, Any] = jsonMapper.convertValue(json, Map.empty[String, Any].getClass)
+  def toMap(json: JsonNode, serdes: Seq[SerDes[_]] = Seq.empty): Map[String, Any] =
+    jsonMapper(serdes).convertValue(json, Map.empty[String, Any].getClass)
 
   /**
    * Write an instance to yaml string
    *
    * @param any    instance
    * @param pretty should pretty print
+   * @param serdes custom serializers/deserializers
    * @return yaml string of the instance
    */
-  def toYamlString(any: AnyRef, pretty: Boolean = true): String = {
-    val writer = if (pretty) yamlMapper.writerWithDefaultPrettyPrinter() else jsonMapper.writer()
+  def toYamlString(any: AnyRef, pretty: Boolean = true, serdes: Seq[SerDes[_]] = Seq.empty): String = {
+    val writer = if (pretty) yamlMapper(serdes).writerWithDefaultPrettyPrinter() else jsonMapper(serdes).writer()
     writer.writeValueAsString(any)
   }
 
-  private def jsonMapper: ObjectMapper = configureMapper {
+  private def jsonMapper(serdes: Seq[SerDes[_]]): ObjectMapper = configureMapper(serdes) {
     new ObjectMapper()
       .configure(JsonParser.Feature.ALLOW_COMMENTS, true)
       .configure(JsonParser.Feature.ALLOW_SINGLE_QUOTES, true)
       .configure(JsonParser.Feature.ALLOW_UNQUOTED_FIELD_NAMES, true)
   }
 
-  private def yamlMapper: ObjectMapper = configureMapper {
+  private def yamlMapper(serdes: Seq[SerDes[_]]): ObjectMapper = configureMapper(serdes) {
     new ObjectMapper(new YAMLFactory())
       .configure(JsonParser.Feature.ALLOW_YAML_COMMENTS, true)
   }
 
-  private def configureMapper(mapper: ObjectMapper): ObjectMapper = {
+  private def configureMapper(serdes: Seq[SerDes[_]])(mapper: ObjectMapper): ObjectMapper = {
+    if (serdes.nonEmpty) {
+      val extraSerdes = new SimpleModule()
+      serdes.foreach { serde =>
+        extraSerdes
+          .addSerializer(serde.ser)
+          .addDeserializer(serde.klazz.asInstanceOf[Class[Any]], serde.des)
+      }
+      mapper.registerModule(extraSerdes)
+    }
     mapper
       .setSerializationInclusion(Include.NON_NULL)
       .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -118,6 +135,11 @@ object JsonUtils {
   }
 
 }
+
+/**
+ * Custom serializer/deserializer container
+ */
+case class SerDes[T](klazz: Class[T], ser: JsonSerializer[T], des: JsonDeserializer[T])
 
 /**
  * To/from Json mixin

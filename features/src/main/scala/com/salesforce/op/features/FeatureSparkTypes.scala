@@ -16,7 +16,7 @@ import org.apache.spark.sql.functions.column
 import org.apache.spark.sql.types.{StructType, _}
 import org.apache.spark.sql.{Column, Encoder, Row, TypedColumn}
 
-import scala.collection.mutable.{ArrayBuffer, WrappedArray => MWrappedArray}
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
 
 /**
@@ -88,6 +88,7 @@ case object FeatureSparkTypes {
   val PostalCodeMap = mapType(PostalCode)
   val StreetMap = mapType(Street)
   val GeolocationMap = mapType(Geolocation)
+  val Prediction = mapType(Real)
 
   /**
    * Spark type of a feature type
@@ -129,6 +130,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.PostalCodeMap] => PostalCodeMap
     case wt if wt =:= weakTypeOf[t.StreetMap] => StreetMap
     case wt if wt =:= weakTypeOf[t.GeolocationMap] => GeolocationMap
+    case wt if wt =:= weakTypeOf[t.Prediction] => Prediction
 
     // Numerics
     case wt if wt =:= weakTypeOf[t.Binary] => Binary

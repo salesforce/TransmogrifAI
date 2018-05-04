@@ -8,13 +8,11 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, RandomForest}
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
 import com.salesforce.op.stages.impl.selector.StageOperationName
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
-import org.apache.spark.ml.Model
-import org.apache.spark.sql.Dataset
 
 
 /**
@@ -36,6 +34,8 @@ case object MultiClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed             random seed
+   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return MultiClassification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -43,10 +43,11 @@ case object MultiClassificationModelSelector {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): MultiClassificationModelSelector = {
     selector(
-      new OpCrossValidation[ProbClassifier](numFolds, seed, validationMetric),
+      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -61,6 +62,8 @@ case object MultiClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed             random seed
+   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return MultiClassification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -68,13 +71,15 @@ case object MultiClassificationModelSelector {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): MultiClassificationModelSelector = {
     selector(
-      new OpTrainValidationSplit[ProbClassifier](
+      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
         trainRatio,
         seed,
-        validationMetric
+        validationMetric,
+        stratify
       ),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
@@ -82,7 +87,7 @@ case object MultiClassificationModelSelector {
   }
 
   private def selector(
-    validator: OpValidator[ProbClassifier],
+    validator: OpValidator[ProbClassifierModel, ProbClassifier],
     splitter: Option[DataCutter],
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]]
   ): MultiClassificationModelSelector = {
@@ -130,7 +135,7 @@ case object MultiClassificationModelSelector {
  */
 private[op] class MultiClassificationModelSelector
 (
-  override val validator: OpValidator[ProbClassifier],
+  override val validator: OpValidator[ProbClassifierModel, ProbClassifier],
   override val splitter: Option[DataCutter],
   override val evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   override val uid: String = UID[MultiClassificationModelSelector]
@@ -155,7 +160,7 @@ private[op] class MultiClassificationModelSelector
  */
 private[op] class Stage1MultiClassificationModelSelector
 (
-  validator: OpValidator[ProbClassifier],
+  validator: OpValidator[ProbClassifierModel, ProbClassifier],
   splitter: Option[DataCutter],
   evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[Stage1MultiClassificationModelSelector],

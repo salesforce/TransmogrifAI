@@ -5,6 +5,8 @@
 
 package com.salesforce.op.features.types
 
+import org.apache.spark.ml.linalg.Vector
+
 
 class TextMap(val value: Map[String, String]) extends OPMap[String]
 object TextMap {
@@ -141,4 +143,52 @@ class GeolocationMap(val value: Map[String, Seq[Double]]) extends OPMap[Seq[Doub
 object GeolocationMap {
   def apply(value: Map[String, Seq[Double]]): GeolocationMap = new GeolocationMap(value)
   def empty: GeolocationMap = FeatureTypeDefaults.GeolocationMap
+}
+
+class Prediction private[op](value: Map[String, Double]) extends RealMap(value) with NonNullable {
+  import Prediction.Keys._
+
+  if (value == null || value.isEmpty) {
+    throw new NonNullableEmptyException(classOf[Prediction])
+  }
+  if (!value.contains(PredictionName)) {
+    throw new NonNullableEmptyException(classOf[Prediction],
+      msg = Some(s"value map must contain '$PredictionName' key")
+    )
+  }
+  require(
+    value.keys.forall(k =>
+      k == PredictionName || k.startsWith(RawPredictionName) || k.startsWith(ProbabilityName)
+    ),
+    s"value map must only contain valid keys: '$PredictionName' or " +
+      s"starting with '$RawPredictionName' or '$ProbabilityName'"
+  )
+  private def keysStartsWith(name: String): Array[String] = value.keys.filter(_.startsWith(name)).toArray.sorted
+  def prediction: Double = value(PredictionName)
+  def rawPrediction: Array[Double] = keysStartsWith(RawPredictionName).map(value)
+  def probability: Array[Double] = keysStartsWith(ProbabilityName).map(value)
+  def score: Array[Double] = {
+    val probKeys = keysStartsWith(ProbabilityName)
+    if (probKeys.nonEmpty) probKeys.map(value) else Array(value(PredictionName))
+  }
+}
+object Prediction {
+  object Keys {
+    val PredictionName = "prediction"
+    val RawPredictionName = "rawPrediction"
+    val ProbabilityName = "probability"
+  }
+  import Keys._
+
+  def apply(prediction: Double): Prediction = new Prediction(Map(PredictionName -> prediction))
+
+  def apply(prediction: Double, rawPrediction: Vector, probability: Vector): Prediction =
+    apply(prediction, rawPrediction = rawPrediction.toArray, probability = probability.toArray)
+
+  def apply(prediction: Double, rawPrediction: Array[Double], probability: Array[Double]): Prediction = {
+    val rawPred = rawPrediction.zipWithIndex.map { case (v, i) => s"${RawPredictionName}_$i" -> v }
+    val prob = probability.zipWithIndex.map { case (v, i) => s"${ProbabilityName}_$i" -> v }
+    val pred = PredictionName -> prediction
+    new Prediction((rawPred ++ prob).toMap + pred)
+  }
 }

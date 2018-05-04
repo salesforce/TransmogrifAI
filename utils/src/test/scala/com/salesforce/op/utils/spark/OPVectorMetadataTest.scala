@@ -25,10 +25,11 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
 
   // AttributeGroup and Attribute require non-empty names
   val genName: Gen[String] = Gen.nonEmptyListOf(alphaNumChar).map(_.mkString)
+  val genValue: Gen[String] = Gen.oneOf(genName, Gen.oneOf(Seq(OpVectorColumnMetadata.NullString)))
   val vecColTupleGen: Gen[OpVectorColumnTuple] = for {
     seq <- Gen.containerOf[Seq, String](genName)
     group <- Gen.option(genName)
-    value <- Gen.option(genName)
+    value <- Gen.option(genValue)
   } yield {
     (seq, seq, group, value, 0)
   }
@@ -148,10 +149,15 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
       } else {
         val colHist = vectorMeta.getColumnHistory()
         colHist.length shouldEqual columnsMeta.length
-        colHist.map(_.parentFeatureName) should contain theSameElementsAs columnsMeta.map(_.parentFeatureName)
-        colHist.map(_.parentFeatureType) should contain theSameElementsAs columnsMeta.map(_.parentFeatureType)
-        colHist.map(_.indicatorValue) should contain theSameElementsAs columnsMeta.map(_.indicatorValue)
-        colHist.map(_.indicatorGroup) should contain theSameElementsAs columnsMeta.map(_.indicatorGroup)
+        colHist.zip(columnsMeta).foreach { case (hist, meta) =>
+          hist.parentFeatureName shouldBe meta.parentFeatureName
+          hist.parentFeatureType shouldBe meta.parentFeatureType
+          hist.indicatorValue shouldBe meta.indicatorValue
+          hist.indicatorGroup shouldBe meta.indicatorGroup
+          hist.indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe meta.isNullIndicator
+          hist.parentFeatureType.foreach(p => p.contains(p) shouldBe meta.hasParentOfType(p))
+          hist.parentFeatureType.exists(p => p.contains("Map") || p.contains("Prediction")) shouldBe meta.hasMapParent()
+        }
         if (colHist.nonEmpty && colHist.head.parentFeatureName.nonEmpty) {
           colHist.head.parentFeatureName.flatMap(p => history(p).stages).distinct.sorted should
             contain theSameElementsAs colHist.head.parentFeatureStages

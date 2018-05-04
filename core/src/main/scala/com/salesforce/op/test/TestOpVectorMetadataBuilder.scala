@@ -139,7 +139,7 @@ object TestOpVectorMetadataBuilder {
         case IndColWithGroup(maybeName, _) => maybeName
       }
     )
-    OpVectorMetadata(stage.outputName, cols, hist)
+    OpVectorMetadata(stage.getOutputFeatureName, cols, hist)
   }
 
 }

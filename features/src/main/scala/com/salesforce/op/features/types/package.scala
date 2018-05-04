@@ -53,6 +53,11 @@ package object types extends FeatureTypeSparkConverters {
     def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
     def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
   }
+  implicit class JFloatConversions(val v: java.lang.Float) extends AnyVal {
+    def toReal: Real = new Real(Option(v).map(_.toDouble))
+    def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
+    def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
+  }
   implicit class JIntegerConversions(val v: java.lang.Integer) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toIntegral: Integral = new Integral(Option(v).map(_.toLong))
@@ -70,10 +75,17 @@ package object types extends FeatureTypeSparkConverters {
   }
   implicit class OptDoubleConversions(val v: Option[Double]) extends AnyVal {
     def toReal: Real = new Real(v)
-    def toRealNN: RealNN = new RealNN(v)
+    def toRealNN(default: Double): RealNN = new RealNN(v.getOrElse(default))
     def toCurrency: Currency = new Currency(v)
     def toPercent: Percent = new Percent(v)
     def toBinary: Binary = new Binary(v.map(_ != 0.0))
+  }
+  implicit class OptFloatConversions(val v: Option[Float]) extends AnyVal {
+    def toReal: Real = new Real(v.map(_.toDouble))
+    def toRealNN(default: Float): RealNN = new RealNN(v.getOrElse(default))
+    def toCurrency: Currency = new Currency(v.map(_.toDouble))
+    def toPercent: Percent = new Percent(v.map(_.toDouble))
+    def toBinary: Binary = new Binary(v.map(_ != 0f))
   }
   implicit class OptIntConversions(val v: Option[Int]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
@@ -99,9 +111,16 @@ package object types extends FeatureTypeSparkConverters {
     def toPercent: Percent = new Percent(v)
     def toBinary: Binary = new Binary(v != 0.0)
   }
+  implicit class FloatConversions(val v: Float) extends AnyVal {
+    def toReal: Real = new Real(v)
+    def toRealNN: RealNN = new RealNN(v)
+    def toCurrency: Currency = new Currency(v)
+    def toPercent: Percent = new Percent(v)
+    def toBinary: Binary = new Binary(v != 0f)
+  }
   implicit class IntConversions(val v: Int) extends AnyVal {
     def toReal: Real = new Real(v)
-    def toRealNN: RealNN = RealNN(v)
+    def toRealNN: RealNN = new RealNN(v)
     def toIntegral: Integral = new Integral(v.toLong)
     def toDate: Date = new Date(v.toLong)
     def toDateTime: DateTime = new DateTime(v.toLong)
@@ -109,6 +128,7 @@ package object types extends FeatureTypeSparkConverters {
   }
   implicit class LongConversions(val v: Long) extends AnyVal {
     def toReal: Real = new Real(v)
+    def toRealNN: RealNN = new RealNN(v)
     def toIntegral: Integral = new Integral(v)
     def toDate: Date = new Date(v)
     def toDateTime: DateTime = new DateTime(v)
@@ -123,11 +143,13 @@ package object types extends FeatureTypeSparkConverters {
     def toReal: Seq[Real] = v.map(_.toReal)
     def toRealNN: Seq[RealNN] = v.map(_.toRealNN)
     def toOPVector: OPVector = new OPVector(Vectors.dense(v.toArray))
+    def toGeolocation: Geolocation = new Geolocation(v)
   }
   implicit class SeqLongConversions(val v: Seq[Long]) extends AnyVal {
     def toDateList: DateList = new DateList(v)
     def toDateTimeList: DateTimeList = new DateTimeList(v)
     def toReal: Seq[Real] = v.map(_.toReal)
+    def toRealNN: Seq[RealNN] = v.map(_.toRealNN)
     def toIntegral: Seq[Integral] = v.map(_.toIntegral)
   }
   implicit class SeqStringConversions(val v: Seq[String]) extends AnyVal {
@@ -191,6 +213,7 @@ package object types extends FeatureTypeSparkConverters {
   }
   implicit class MapDoubleConversions(val v: Map[String, Double]) extends AnyVal {
     def toRealMap: RealMap = new RealMap(v)
+    def toPrediction: Prediction = new Prediction(v)
   }
   implicit class MapBooleanConversions(val v: Map[String, Boolean]) extends AnyVal {
     def toBinaryMap: BinaryMap = new BinaryMap(v)

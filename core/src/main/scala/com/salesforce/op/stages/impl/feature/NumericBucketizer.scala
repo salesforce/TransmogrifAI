@@ -12,7 +12,7 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.utils.numeric.Number
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import enumeratum._
-import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param._
 
 import scala.annotation.tailrec
@@ -24,28 +24,23 @@ import scala.reflect.runtime.universe.TypeTag
  * @param operationName unique name of the operation this stage performs
  * @param uid           uid for instance
  * @param tti1          type tag for numeric feature type
- * @param nev           numeric evidence for feature type value
- * @tparam N  numeric feature type value
  * @tparam I1 numeric feature type
  */
-class NumericBucketizer[N, I1 <: OPNumeric[N]]
+class NumericBucketizer[I1 <: OPNumeric[_]]
 (
   operationName: String = "numBuck",
-  uid: String = UID[NumericBucketizer[_, _]]
-)(
-  implicit val tti1: TypeTag[I1],
-  val nev: Numeric[N]
-) extends UnaryTransformer[I1, OPVector](operationName = operationName, uid = uid)
+  uid: String = UID[NumericBucketizer[_]]
+)(implicit val tti1: TypeTag[I1]) extends UnaryTransformer[I1, OPVector](operationName = operationName, uid = uid)
   with VectorizerDefaults with NumericBucketizerParams with NumericBucketizerMetadata {
 
   override def transformFn: I1 => OPVector = input =>
-    NumericBucketizer.bucketize[N, I1](
+    NumericBucketizer.bucketize(
       splits = $(splits),
       trackNulls = $(trackNulls),
       trackInvalid = $(trackInvalid),
       splitInclusion = Inclusion.withNameInsensitive($(splitInclusion)),
-      input
-    )
+      input.toDouble
+    ).toOPVector
 
   override def onGetMetadata(): Unit = {
     super.onGetMetadata()
@@ -124,32 +119,28 @@ private[op] trait NumericBucketizerMetadata {
     trackInvalid: Boolean,
     trackNulls: Boolean
   ): OpVectorMetadata = {
-    val bucketLabelCols = bucketLabels.map(bucketLabel => OpVectorColumnMetadata(
-      parentFeatureName = Seq(input.name),
-      parentFeatureType = Seq(input.typeName),
-      indicatorGroup = Option(input.name),
-      indicatorValue = Option(bucketLabel)
-    ))
-    val trackInvalidCol =
-      if (trackInvalid) Seq(OpVectorColumnMetadata(
-        parentFeatureName = Seq(input.name),
-        parentFeatureType = Seq(input.typeName),
-        indicatorGroup = Option(input.name),
-        indicatorValue = Some(TransmogrifierDefaults.OtherString)
-      ))
-      else Nil
+    val cols = makeVectorColumnMetadata(
+      input = input,
+      bucketLabels = bucketLabels,
+      indicatorGroup = Some(input.name),
+      trackInvalid = trackInvalid,
+      trackNulls = trackNulls
+    )
+    vectorMetadataFromInputFeatures.withColumns(cols)
+  }
 
-    val trackNullCol =
-      if (trackNulls) Seq(OpVectorColumnMetadata(
-        parentFeatureName = Seq(input.name),
-        parentFeatureType = Seq(input.typeName),
-        indicatorGroup = Option(input.name),
-        indicatorValue = Some(TransmogrifierDefaults.NullString)
-      ))
-      else Nil
-
-    val finalCols = bucketLabelCols ++ trackInvalidCol ++ trackNullCol
-    vectorMetadataFromInputFeatures.withColumns(finalCols)
+  protected def makeVectorColumnMetadata(
+    input: TransientFeature,
+    bucketLabels: Array[String],
+    indicatorGroup: Option[String],
+    trackInvalid: Boolean,
+    trackNulls: Boolean
+  ): Array[OpVectorColumnMetadata] = {
+    val meta = input.toColumnMetaData(true).copy(indicatorGroup = indicatorGroup)
+    val bucketLabelCols = bucketLabels.map(bucketLabel => meta.copy(indicatorValue = Option(bucketLabel)))
+    val trkInvCol = if (trackInvalid) Seq(meta.copy(indicatorValue = Some(TransmogrifierDefaults.OtherString))) else Nil
+    val trackNullCol = if (trackNulls) Seq(meta) else Nil
+    bucketLabelCols ++ trkInvCol ++ trackNullCol
   }
 
 }
@@ -162,25 +153,52 @@ object NumericBucketizer {
   /**
    * Computes bucket index for given numerical value and one-hot encodes it
    *
+   * @param shouldSplit    should or not apply bucket splits
    * @param splits         sorted list of split points for bucketizing
    * @param trackNulls     option to keep track of values that were missing
    * @param trackInvalid   option to keep track of invalid values,
    *                       eg. NaN, -/+Inf or values that fall outside the buckets
    * @param splitInclusion should the splits be left or right inclusive
    * @param input          input numerical value
-   * @param nev            numeric evidence for double conversion
    * @throws RuntimeException if input value falls outside the bounds of the specified buckets
    * @return one-hot encoded bucket index
    */
-  private[op] def bucketize[N, T <: OPNumeric[N]](
+  private[op] def bucketize(
+    shouldSplit: Boolean,
     splits: Array[Double],
     trackNulls: Boolean,
     trackInvalid: Boolean,
     splitInclusion: Inclusion,
-    input: T
-  )(implicit nev: Numeric[N]): OPVector = {
-    val numBuckets = splits.length - 1
+    input: Option[Double]
+  ): Vector = {
+    if (shouldSplit) bucketize(
+      splits = splits, trackNulls = trackNulls, trackInvalid = trackInvalid,
+      splitInclusion = splitInclusion, input = input
+    )
+    else if (trackNulls) Vectors.sparse(1, Array(0), Array(if (input.isEmpty) 1 else 0))
+    else OPVector.empty.value
+  }
 
+  /**
+   * Computes bucket index for given numerical value and one-hot encodes it
+   *
+   * @param splits         sorted list of split points for bucketizing
+   * @param trackNulls     option to keep track of values that were missing
+   * @param trackInvalid   option to keep track of invalid values,
+   *                       eg. NaN, -/+Inf or values that fall outside the buckets
+   * @param splitInclusion should the splits be left or right inclusive
+   * @param input          input numerical value
+   * @throws RuntimeException if input value falls outside the bounds of the specified buckets
+   * @return one-hot encoded bucket index
+   */
+  private[op] def bucketize(
+    splits: Array[Double],
+    trackNulls: Boolean,
+    trackInvalid: Boolean,
+    splitInclusion: Inclusion,
+    input: Option[Double]
+  ): Vector = {
+    val numBuckets = splits.length - 1
     /**
      * Computes bucket index for a num value for given splits
      * @return bucket index or -1 if no bucket was found
@@ -203,29 +221,22 @@ object NumericBucketizer {
         case Inclusion.Right => rightInclusiveIndex()
       }
     }
-
     // One-hot encode the bucket index, while tracking the invalid or error
     val vectorSize = numBuckets + (if (trackInvalid) 1 else 0) + (if (trackNulls) 1 else 0)
     val index: Option[Int] =
-      for { v <- input.value } yield {
-        val d = nev.toDouble(v)
+      for { d <- input } yield {
         val index = computeBucketIndex(d)
-
-        if (trackInvalid) {
-          if (index < 0 || !Number.isValid(d)) numBuckets else index
-        }
-        else {
-          if (index < 0) sys.error(s"Numeric value $v falls outside the bounds of the specified buckets") else index
-        }
+        if (index < 0 || !Number.isValid(d)) {
+          if (trackInvalid) numBuckets
+          else sys.error(s"Numeric value $d falls outside the bounds of the specified buckets")
+        } else index
       }
-
     val (indices, values) = index match {
       case Some(i) => Array(i) -> Array(1.0)
       case None if trackNulls => Array(vectorSize - 1) -> Array(1.0)
       case _ => Array.empty[Int] -> Array.empty[Double]
     }
-
-    Vectors.sparse(vectorSize, indices = indices, values = values).toOPVector
+    Vectors.sparse(vectorSize, indices = indices, values = values)
   }
 
   /**

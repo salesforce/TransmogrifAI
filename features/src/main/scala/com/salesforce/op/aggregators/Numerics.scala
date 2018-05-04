@@ -15,56 +15,70 @@ import scala.reflect.runtime.universe._
 /**
  * Aggregator that gives the sum of the numeric values
  */
-abstract class SumNumeric[N: Semigroup, T <: OPNumeric[N]](implicit val ttag: WeakTypeTag[T])
+abstract class SumNumeric[N: Semigroup, T <: OPNumeric[N]]
+(
+  val zero: Option[N] = None
+)(implicit val ttag: WeakTypeTag[T], semi: Semigroup[N])
   extends MonoidAggregator[Event[T], Option[N], T] with AggregatorDefaults[T] {
   val ftFactory = FeatureTypeFactory[T]()
-  val monoid = Monoid.optionMonoid[N]
+  val monoid = Monoid.from[Option[N]](zero)((l, r) => (l -> r).map(semi.plus))
 }
 case object SumReal extends SumNumeric[Double, Real]
-case object SumRealNN extends SumNumeric[Double, RealNN]
 case object SumCurrency extends SumNumeric[Double, Currency]
 case object SumIntegral extends SumNumeric[Long, Integral]
+case object SumRealNN extends SumNumeric[Double, RealNN](zero = Some(0.0))
+
 
 /**
  * Aggregator that gives the min or max of the numeric values
  */
 abstract class MinMaxNumeric[N, T <: OPNumeric[N]]
 (
-  isMin: Boolean
+  isMin: Boolean,
+  val zero: Option[N] = None
 )(implicit val ord: Ordering[N], val ttag: WeakTypeTag[T])
   extends MonoidAggregator[Event[T], Option[N], T] with AggregatorDefaults[T] {
   val ordFn = if (isMin) ord.min _ else ord.max _
   val ftFactory = FeatureTypeFactory[T]()
-  val monoid = Monoid.from[Option[N]](None)((l, r) => (l -> r).map(ordFn))
+  val monoid = Monoid.from[Option[N]](zero)((l, r) => (l -> r).map(ordFn))
 }
+case object MaxRealNN extends MinMaxNumeric[Double, RealNN](isMin = false, zero = Some(Double.NegativeInfinity))
 case object MaxReal extends MinMaxNumeric[Double, Real](isMin = false)
 case object MaxCurrency extends MinMaxNumeric[Double, Currency](isMin = false)
 case object MaxIntegral extends MinMaxNumeric[Long, Integral](isMin = false)
 case object MaxDate extends MinMaxNumeric[Long, Date](isMin = false)
 case object MaxDateTime extends MinMaxNumeric[Long, DateTime](isMin = false)
 case object MinReal extends MinMaxNumeric[Double, Real](isMin = true)
+case object MinRealNN extends MinMaxNumeric[Double, RealNN](isMin = true, zero = Some(Double.PositiveInfinity))
 case object MinCurrency extends MinMaxNumeric[Double, Currency](isMin = true)
 case object MinIntegral extends MinMaxNumeric[Long, Integral](isMin = true)
 case object MinDate extends MinMaxNumeric[Long, Date](isMin = true)
 case object MinDateTime extends MinMaxNumeric[Long, DateTime](isMin = true)
 
 
+
 /**
  * Aggregator that gives the mean of the real values
  */
-abstract class MeanDouble[A <: OPNumeric[Double]](presentFn: Option[Double] => A)
-  extends MonoidAggregator[Event[A], Option[(Double, Int)], A] {
-  def prepare(input: Event[A]): Option[(Double, Int)] = input.value.value.map((_, 1))
-  def present(reduction: Option[(Double, Int)]): A = presentFn(reduction.map {
+abstract class MeanDouble[T <: OPNumeric[Double]]
+(
+  val zero: Option[(Double, Int)] = None
+)(implicit val ttag: WeakTypeTag[T])
+  extends MonoidAggregator[Event[T], Option[(Double, Int)], T] {
+  val ftFactory = FeatureTypeFactory[T]()
+  def prepare(input: Event[T]): Option[(Double, Int)] = input.value.v.map((_, 1))
+  def present(reduction: Option[(Double, Int)]): T = ftFactory.newInstance(reduction.map {
     case (sum, count) if count != 0 => sum / count
     case _ => 0.0
   })
-  val monoid: Monoid[Option[(Double, Int)]] = Monoid.optionMonoid[(Double, Int)]
+  val semi = Semigroup.semigroup2[Double, Int]
+  val monoid = Monoid.from[Option[(Double, Int)]](zero)((l, r) => (l -> r).map(semi.plus))
 }
-case object MeanReal extends MeanDouble[Real](new Real(_))
-case object MeanCurrency extends MeanDouble[Currency](new Currency(_))
-case object MeanPercent extends MeanDouble[Percent](new Percent(_)) with PercentPrepare {
-  override def prepare(input: Event[Percent]): Option[(Double, Int)] = input.value.value.map(prepareFn(_) -> 1)
+case object MeanReal extends MeanDouble[Real]
+case object MeanRealNN extends MeanDouble[RealNN](zero = Some(0.0 -> 0))
+case object MeanCurrency extends MeanDouble[Currency]
+case object MeanPercent extends MeanDouble[Percent] with PercentPrepare {
+  override def prepare(input: Event[Percent]): Option[(Double, Int)] = input.value.v.map(prepareFn(_) -> 1)
 }
 
 /**

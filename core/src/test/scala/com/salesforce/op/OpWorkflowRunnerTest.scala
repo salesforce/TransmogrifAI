@@ -21,6 +21,7 @@ import org.scalactic.source
 import org.scalatest.AsyncFlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
+import org.apache.log4j.Level
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Promise
@@ -194,6 +195,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   private def doRun[R <: OpWorkflowRunnerResult: ClassTag](rc: OpWorkflowRunnerConfig, outFiles: File*): R = {
+    log.info("OpWorkflowRunnerConfig:\n{}", rc.toString)
     val res = testRunner.run(rc.runType, rc.toOpParams.get)
     for {outFile <- outFiles} {
       outFile.exists shouldBe true

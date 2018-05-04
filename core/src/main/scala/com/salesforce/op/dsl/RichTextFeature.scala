@@ -85,8 +85,9 @@ trait RichTextFeature {
      * @param autoDetectThreshold  Language detection threshold. If none of the detected languages have
      *                             confidence greater than the threshold then defaultLanguage is used.
      * @param minTokenLength       minimum token length, >= 1.
-     * @param trackNulls           indicates whether or not to track null values in a separate column. Since features
-     *                             my be combined into a shared hash space here, the
+     * @param trackNulls           indicates whether or not to track null values in a separate column.
+     *                             Since features may be combined into a shared hash space here, the null value
+     *                             should be tracked separately
      * @param toLowercase          indicates whether to convert all characters to lowercase before analyzing
      * @param numHashes            number of features (hashes) to generate
      * @param hashWithIndex        include indices when hashing a feature that has them (OPLists or OPVectors)
@@ -141,6 +142,78 @@ trait RichTextFeature {
         new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
       }
       else hashedFeatures
+    }
+
+    /**
+     * Vectorize text features by treating low cardinality text features as categoricals and
+     * applying hashing trick to high caridinality ones.
+     *
+     * @param maxCategoricalCardinality max cardinality for a text feature to be treated as categorical
+     * @param numHashes                 number of features (hashes) to generate
+     * @param autoDetectLanguage        indicates whether to attempt language detection
+     * @param minTokenLength            minimum token length, >= 1.
+     * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
+     * @param cleanText                 indicates whether to ignore capitalization and punctuation
+     * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param topK                      number of most common elements to be used as categorical pivots
+     * @param minSupport                minimum number of occurences an element must have to appear in pivot
+     * @param unseenName                name to give indexes which do not have a label name associated with them
+     * @param hashWithIndex             include indices when hashing a feature that has them (OPLists or OPVectors)
+     * @param binaryFreq                if true, term frequency vector will be binary such that non-zero term
+     *                                  counts will be set to 1.0
+     * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
+     * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
+     *                                  confidence greater than the threshold then defaultLanguage is used.
+     * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
+     *                                  failed to make a good enough prediction.
+     * @param hashAlgorithm             hash algorithm to use
+     * @param others                    additional text features
+     * @return result feature of type Vector
+     */
+    // scalastyle:off parameter.number
+    def smartVectorize
+    (
+      maxCategoricalCardinality: Int,
+      numHashes: Int,
+      autoDetectLanguage: Boolean,
+      minTokenLength: Int,
+      toLowercase: Boolean,
+      cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      topK: Int = TransmogrifierDefaults.TopK,
+      minSupport: Int = TransmogrifierDefaults.MinSupport,
+      unseenName: String = TransmogrifierDefaults.OtherString,
+      hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
+      binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
+      prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
+      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
+      forceSharedHashSpace: Boolean = false,
+      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
+      hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      others: Array[FeatureLike[T]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      // scalastyle:on parameter.number
+      new SmartTextVectorizer[T]()
+        .setInput(f +: others)
+        .setMaxCardinality(maxCategoricalCardinality)
+        .setCleanText(cleanText)
+        .setTrackNulls(trackNulls)
+        .setAutoDetectLanguage(autoDetectLanguage)
+        .setAutoDetectThreshold(autoDetectThreshold)
+        .setDefaultLanguage(defaultLanguage)
+        .setMinTokenLength(minTokenLength)
+        .setToLowercase(toLowercase)
+        .setTopK(topK)
+        .setMinSupport(minSupport)
+        .setUnseenName(unseenName)
+        .setNumFeatures(numHashes)
+        .setHashWithIndex(hashWithIndex)
+        .setPrependFeatureName(prependFeatureName)
+        .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashAlgorithm(hashAlgorithm)
+        .setBinaryFreq(binaryFreq)
+        .getOutput()
     }
 
     /**
@@ -210,6 +283,7 @@ trait RichTextFeature {
      *                            confidence greater than the threshold then defaultLanguage is used.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
+     * @param stripHtml           indicates whether to strip HTML tags from the text or not before analyzing
      * @return tokenized feature
      */
     def tokenize(
@@ -217,11 +291,12 @@ trait RichTextFeature {
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase
+      toLowercase: Boolean = TextTokenizer.ToLowercase,
+      stripHtml: Boolean = TextTokenizer.StripHtml
     ): FeatureLike[TextList] =
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
-        analyzer = TextTokenizer.Analyzer,
+        analyzer = if (stripHtml) TextTokenizer.AnalyzerHtmlStrip else TextTokenizer.Analyzer,
         autoDetectLanguage = autoDetectLanguage,
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,

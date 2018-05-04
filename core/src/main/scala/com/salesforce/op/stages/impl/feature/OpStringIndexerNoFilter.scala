@@ -35,7 +35,7 @@ class OpStringIndexerNoFilter[I <: Text]
     val otherPos = labels.length
 
     val cleanedLabels = labels.map(_.getOrElse("null")) :+ unseen
-    val metadata = NominalAttribute.defaultAttr.withName(outputName).withValues(cleanedLabels).toMetadata()
+    val metadata = NominalAttribute.defaultAttr.withName(getOutputFeatureName).withValues(cleanedLabels).toMetadata()
     setMetadata(metadata)
 
     new OpStringIndexerNoFilterModel[I](labels, otherPos, operationName = operationName, uid = uid)

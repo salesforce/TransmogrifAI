@@ -71,7 +71,8 @@ O <: FeatureType, M <: Model[M], E <: Estimator[M] with Params]
       val p3 = e.getParam(inputParam3Name)
       val p4 = e.getParam(inputParam4Name)
       val po = e.getParam(outputParamName)
-      e.set(p1, in1.name).set(p2, in2.name).set(p3, in3.name).set(p4, in4.name).set(po, outputName).fit(dataset)
+      e.set(p1, in1.name).set(p2, in2.name).set(p3, in3.name).set(p4, in4.name).set(po, getOutputFeatureName)
+        .fit(dataset)
     }
 
     new SwQuaternaryModel[I1, I2, I3, I4, O, M] (
@@ -80,7 +81,7 @@ O <: FeatureType, M <: Model[M], E <: Estimator[M] with Params]
       inputParam3Name,
       inputParam4Name,
       outputParamName,
-      outputName,
+      getOutputFeatureName,
       model,
       uid
     ).setParent(this).setInput(
@@ -89,6 +90,8 @@ O <: FeatureType, M <: Model[M], E <: Estimator[M] with Params]
       in3.asFeatureLike[I3],
       in4.asFeatureLike[I4]
     )
+      .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2], in3.asFeatureLike[I3], in4.asFeatureLike[I4])
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

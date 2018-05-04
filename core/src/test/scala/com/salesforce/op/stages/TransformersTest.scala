@@ -36,10 +36,9 @@ class TransformersTest extends FlatSpec with Matchers with PassengerFeaturesTest
     heightHeight.originStage shouldBe a[Transformer]
   }
   it should "scaling numeric values" in {
-    val scaledHeight: FeatureLike[RealNN] = height.map[RealNN](_.toRealNN()).zNormalize()
+    val scaledHeight: FeatureLike[RealNN] = height.zNormalize()
     val history = scaledHeight.history()
-    history.stages.head.contains("map") shouldBe true
-    history.stages.last.contains("stdScaled") shouldBe true
+    history.stages.head.contains("stdScaled") shouldBe true
     scaledHeight.originStage shouldBe a[Estimator[_]]
   }
   it should "allow multiplication between numerics and nullable numerics variations" in {

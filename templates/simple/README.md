@@ -70,4 +70,4 @@ To evaluate your project, run
 
 - [Optimus Prime](https://github.com/salesforce/op)
 - [Wiki](https://github.com/salesforce/op/wiki)
-- [Hello World examples](https://github.com/salesforce/optimus-prime-helloworld)
+- [Hello World examples](https://github.com/salesforce/op/tree/master/helloworld)

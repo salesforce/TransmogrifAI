@@ -9,13 +9,13 @@ import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
-import com.salesforce.op.stages.impl.regression.RegressorType.Regressor
+import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBase, StageParamNames}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.makeOutputName
-import org.apache.spark.ml.Model
-import org.apache.spark.sql.Dataset
+
+import scala.util.Try
 
 
 /**
@@ -47,7 +47,7 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed
   ): RegressionModelSelector = {
     selector(
-      validator = new OpCrossValidation[Regressor](numFolds, seed, validationMetric),
+      validator = new OpCrossValidation[RegressorModel, Regressor](numFolds, seed, validationMetric),
       dataSplitter = dataSplitter,
       trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
@@ -72,7 +72,7 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed
   ): RegressionModelSelector = {
     selector(
-      validator = new OpTrainValidationSplit[Regressor](
+      validator = new OpTrainValidationSplit[RegressorModel, Regressor](
         trainRatio,
         seed,
         validationMetric
@@ -83,7 +83,7 @@ case object RegressionModelSelector {
   }
 
   private def selector(
-    validator: OpValidator[Regressor],
+    validator: OpValidator[RegressorModel, Regressor],
     dataSplitter: Option[DataSplitter],
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]): RegressionModelSelector = {
     new RegressionModelSelector(
@@ -139,16 +139,15 @@ case object RegressionModelSelector {
  */
 private[op] class RegressionModelSelector
 (
-  validator: OpValidator[Regressor],
+  validator: OpValidator[RegressorModel, Regressor],
   val dataSplitter: Option[DataSplitter],
   evaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[RegressionModelSelector]
-) extends ModelSelectorBase[Regressor](validator = validator, splitter = dataSplitter,
+) extends ModelSelectorBase[RegressorModel, Regressor](validator = validator, splitter = dataSplitter,
   evaluators = evaluators, uid = uid)
   with SelectorRegressors {
 
   final override protected def getOutputsColNamesMap(f1: TransientFeature, f2: TransientFeature): Map[String, String] =
     Map(StageParamNames.outputParam1Name -> makeOutputName(outputFeatureUid, Seq(f1, f2)))
 
-  final override protected def getModelInfo: Seq[ModelInfo[Regressor]] = modelInfo
 }

@@ -11,8 +11,8 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 
 case class FeatureBuilderContainerTest(s: String, l: Long, d: Double)
@@ -22,9 +22,7 @@ case class FeatureBuilderContainerTest(s: String, l: Long, d: Double)
 class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
 
   Spec(TestFeatureBuilder.getClass) should "infer features from a dataset" in {
-    // scalastyle:off
     import spark.implicits._
-    // scalastyle:on
     val ds = Seq(
       FeatureBuilderContainerTest("blah1", 10, 2.0),
       FeatureBuilderContainerTest("blah2", 11, 3.0)
@@ -43,9 +41,7 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
   it should "create a dataset with one feature" in {
     val res@(ds, f1) = TestFeatureBuilder[Real](Seq(Real(1), Real(2L), Real(3.1f), Real(4.5)))
 
-    f1.name shouldBe "f1"
-    f1.typeName shouldBe FeatureType.typeName[Real]
-
+    assertFeature(f1)(name = "f1", in = ds.head(), out = Real(1.0))
     assertResults(ds, res, expected = Seq(1, 2L, 3.1f, 4.5))
   }
 
@@ -55,11 +51,8 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
         (Text("one"), Integral(1)), (Text("two"), Integral(2)), (Text("NULL"), Integral.empty)
       )
     )
-    f1.name shouldBe "f1"
-    f1.typeName shouldBe FeatureType.typeName[Text]
-    f2.name shouldBe "f2"
-    f2.typeName shouldBe FeatureType.typeName[Integral]
-
+    assertFeature(f1)(name = "f1", in = ds.head(), out = Text("one"))
+    assertFeature(f2)(name = "f2", in = ds.head(), out = Integral(1))
     assertResults(ds, res, expected = Seq(("one", 1), ("two", 2), ("NULL", null)))
   }
 
@@ -89,6 +82,9 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
     f3.name shouldBe "f3"
     f3.typeName shouldBe FeatureType.typeName[Real]
 
+    assertFeature(f1)(name = "f1", in = ds.head(), out = Text("one"))
+    assertFeature(f2)(name = "f2", in = ds.head(), out = Integral(1))
+    assertFeature(f3)(name = "f3", in = ds.head(), out = Real(1.0))
     assertResults(ds, res, expected = Seq(("one", 1, 1.0), ("two", 2, 2.3), ("NULL", null, null)))
   }
 
@@ -100,36 +96,25 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
         (Text("NULL"), Integral.empty, Real.empty, Integral(1))
       )
     )
-    f1.name shouldBe "f1"
-    f1.typeName shouldBe FeatureType.typeName[Text]
-    f2.name shouldBe "f2"
-    f2.typeName shouldBe FeatureType.typeName[Integral]
-    f3.name shouldBe "f3"
-    f3.typeName shouldBe FeatureType.typeName[Real]
-    f4.name shouldBe "f4"
-    f4.typeName shouldBe FeatureType.typeName[Integral]
-
+    assertFeature(f1)(name = "f1", in = ds.head(), out = Text("one"))
+    assertFeature(f2)(name = "f2", in = ds.head(), out = Integral(1))
+    assertFeature(f3)(name = "f3", in = ds.head(), out = Real(1.0))
+    assertFeature(f4)(name = "f4", in = ds.head(), out = Integral(-1))
     assertResults(ds, res, expected = Seq(("one", 1, 1.0, -1), ("two", 2, 2.3, 1), ("NULL", null, null, 1)))
   }
 
   it should "create a dataset with five features" in {
     val res@(ds, f1, f2, f3, f4, f5) = TestFeatureBuilder(
       Seq[(Text, Integral, Real, Integral, MultiPickList)](
-        (Text("one"), Integral(1), Real(1.0), Integral(-1), new MultiPickList(Set("1", "2", "2"))),
-        (Text("two"), Integral(2), Real(2.3), Integral(1), new MultiPickList(Set("3", "4")))
+        (Text("one"), Integral(1), Real(1.0), Integral(-1), MultiPickList(Set("1", "2", "2"))),
+        (Text("two"), Integral(2), Real(2.3), Integral(1), MultiPickList(Set("3", "4")))
       )
     )
-    f1.name shouldBe "f1"
-    f1.typeName shouldBe FeatureType.typeName[Text]
-    f2.name shouldBe "f2"
-    f2.typeName shouldBe FeatureType.typeName[Integral]
-    f3.name shouldBe "f3"
-    f3.typeName shouldBe FeatureType.typeName[Real]
-    f4.name shouldBe "f4"
-    f4.typeName shouldBe FeatureType.typeName[Integral]
-    f5.name shouldBe "f5"
-    f5.typeName shouldBe FeatureType.typeName[MultiPickList]
-
+    assertFeature(f1)(name = "f1", in = ds.head(), out = Text("one"))
+    assertFeature(f2)(name = "f2", in = ds.head(), out = Integral(1))
+    assertFeature(f3)(name = "f3", in = ds.head(), out = Real(1.0))
+    assertFeature(f4)(name = "f4", in = ds.head(), out = Integral(-1))
+    assertFeature(f5)(name = "f5", in = ds.head(), out = MultiPickList(Set("1", "2", "2")))
     assertResults(ds, res, expected = Seq(("one", 1, 1.0, -1, List("1", "2")), ("two", 2, 2.3, 1, List("3", "4"))))
   }
 
@@ -142,6 +127,5 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
     ds.collect().map(row => features.map(f => row.getAny(f.name))) should contain theSameElementsInOrderAs
       expected.map{ case v: Product => v; case v => Tuple1(v) }.map(_.productIterator.toArray)
   }
-
 
 }

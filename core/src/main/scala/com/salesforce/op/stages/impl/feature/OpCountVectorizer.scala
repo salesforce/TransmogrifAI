@@ -94,7 +94,9 @@ class OpCountVectorizer(uid: String = UID[OpCountVectorizer])
     )
 
     model.setMetadata(
-      OpVectorMetadata(outputName, metadataCols, Transmogrifier.inputFeaturesToHistory(tf, stageName)).toMetadata)
+      OpVectorMetadata(getOutputFeatureName, metadataCols,
+        Transmogrifier.inputFeaturesToHistory(tf, stageName)).toMetadata
+    )
     model
   }
 }

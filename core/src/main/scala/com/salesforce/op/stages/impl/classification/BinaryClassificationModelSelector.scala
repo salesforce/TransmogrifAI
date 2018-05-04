@@ -8,7 +8,7 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import org.apache.spark.ml.Model
@@ -36,17 +36,20 @@ case object BinaryClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
    * @param seed             random seed
+   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return Classification Model Selector with a Cross Validation
    */
   def withCrossValidation(
     splitter: Option[Splitter] = Option(DataSplitter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.error(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpCrossValidation[ProbClassifier](numFolds, seed, validationMetric),
+      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -61,17 +64,20 @@ case object BinaryClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
    * @param seed             random seed
+   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return Classification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
     splitter: Option[Splitter] = Option(DataSplitter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.error(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpTrainValidationSplit[ProbClassifier](trainRatio, seed, validationMetric),
+      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](trainRatio, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -79,7 +85,7 @@ case object BinaryClassificationModelSelector {
 
 
   private def selector(
-    validator: OpValidator[ProbClassifier],
+    validator: OpValidator[ProbClassifierModel, ProbClassifier],
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]]
   ): BinaryClassificationModelSelector = {
@@ -126,7 +132,7 @@ case object BinaryClassificationModelSelector {
  */
 private[op] class BinaryClassificationModelSelector
 (
-  override val validator: OpValidator[ProbClassifier],
+  override val validator: OpValidator[ProbClassifierModel, ProbClassifier],
   override val splitter: Option[Splitter],
   override val evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   override val uid: String = UID[BinaryClassificationModelSelector]
@@ -148,7 +154,7 @@ private[op] class BinaryClassificationModelSelector
  */
 private[op] class Stage1BinaryClassificationModelSelector
 (
-  validator: OpValidator[ProbClassifier],
+  validator: OpValidator[ProbClassifierModel, ProbClassifier],
   splitter: Option[Splitter],
   evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
   uid: String = UID[Stage1BinaryClassificationModelSelector],

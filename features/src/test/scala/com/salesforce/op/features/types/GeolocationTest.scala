@@ -21,7 +21,6 @@ class GeolocationTest extends FlatSpec with TestCommon {
     myGeolocation shouldBe a[FeatureType]
     myGeolocation shouldBe a[OPCollection]
     myGeolocation shouldBe a[OPList[_]]
-    println(PaloAlto ._1 + 1)
   }
 
   it should "behave on missing data" in {
@@ -31,10 +30,10 @@ class GeolocationTest extends FlatSpec with TestCommon {
     sut.accuracy shouldBe GeolocationAccuracy.Unknown
   }
 
-  it should "not accept missing longitude" in {
-    assertThrows[IllegalArgumentException] {
-      new Geolocation(List(PaloAlto._1))
-    }
+  it should "not accept missing value" in {
+    assertThrows[IllegalArgumentException](new Geolocation(List(PaloAlto._1)))
+    assertThrows[IllegalArgumentException](new Geolocation(List(PaloAlto._1, PaloAlto._2)))
+    assertThrows[IllegalArgumentException](new Geolocation((PaloAlto._1, PaloAlto._2, 123456.0)))
   }
 
   it should "compare values correctly" in {

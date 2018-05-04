@@ -11,47 +11,38 @@ import enumeratum.values.{IntEnum, IntEnumEntry}
 import org.apache.lucene.spatial3d.geom.{GeoPoint, PlanetModel}
 import Geolocation._
 
+import scala.util.Try
+
 /**
  * Represented as a list of latitude, longitude, accuracy (only populated if all are present)
  *
  * @param value a list of latitude, longitude, accuracy
  */
 class Geolocation(val value: Seq[Double]) extends OPList[Double] with Location {
-  validate() // validate the coordinates on construction
-  def this(lat: Double, lon: Double, accuracy: GeolocationAccuracy) =
-    this(geolocationData(lat, lon, accuracy))
-
+  require(isEmpty || value.length == 3, s"Geolocation must have lat, lon, and accuracy, or be empty: $value")
+  if (!isEmpty) {
+    Geolocation.validate(lat, lon)
+    require(Try(accuracy).isSuccess, "Invalid accuracy value provided")
+  }
+  def this(lat: Double, lon: Double, accuracy: GeolocationAccuracy) = this(geolocationData(lat, lon, accuracy))
   def this(v: (Double, Double, Double)) = this(geolocationData(v._1, v._2, v._3))
   def lat: Double = if (isEmpty) Double.NaN else value(0)
   def lon: Double = if (isEmpty) Double.NaN else value(1)
   def latitude: Double = lat
   def longitude: Double = lon
-
-  def accuracy: GeolocationAccuracy =
+  def accuracy: GeolocationAccuracy = {
     if (isEmpty) GeolocationAccuracy.Unknown else GeolocationAccuracy.withValue(value(2).toInt)
-
+  }
   def toGeoPoint: GeoPoint = {
     // If this Geolocation object is empty, then return the zero vector as the GeoPoint since we use
     // GeoPoint coordinates in aggregation functions
     if (isEmpty) Geolocation.EmptyGeoPoint
     else new GeoPoint(PlanetModel.WGS84, math.toRadians(lat), math.toRadians(lon))
   }
-
-  /**
-   * Validates the coordinates
-   * @throws IllegalArgumentException when data are wrong
-   */
-  def validate(): Unit = {
-    require(isEmpty || value.length == 3,
-      s"Geolocation must have lat, lon, and accuracy, or be empty: $value")
-    if (!isEmpty) Geolocation.validate(lat, lon)
-  }
-
   override def toString: String = {
     val vals = if (nonEmpty) f"$lat%.5f, $lon%.5f, $accuracy" else ""
     s"${getClass.getSimpleName}($vals)"
   }
-
 }
 /**
  * Represented as a list of latitude, longitude, accuracy (only populated if all are present)
@@ -81,7 +72,6 @@ object Geolocation {
     GeoUtils.checkLatitude(lat)
     GeoUtils.checkLongitude(lon)
   }
-
   val EquatorInMiles = 24901.0
   val EarthRadius = 3959.0
 }

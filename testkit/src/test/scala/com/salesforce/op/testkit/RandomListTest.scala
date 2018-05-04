@@ -81,20 +81,14 @@ class RandomListTest extends FlatSpec with TestCommon with Assertions {
   Spec[UniformGeolocation] should "generate uniformly distributed geolocations" in {
     val sut = RandomList.ofGeolocations
     val segment = sut limit numTries
-    segment foreach (pos => {
-      pos.validate()
-      pos.value.length shouldBe 3
-    })
+    segment foreach (_.value.length shouldBe 3)
   }
 
   Spec[NormalGeolocation] should "generate geolocations around given point" in {
     for {accuracy <- GeolocationAccuracy.values} {
       val geolocation = RandomList.ofGeolocationsNear(37.444136, 122.163160, accuracy)
       val segment = geolocation limit numTries
-      segment foreach (pos => {
-        pos.validate()
-        pos.value.length shouldBe 3
-      })
+      segment foreach (_.value.length shouldBe 3)
     }
   }
 }

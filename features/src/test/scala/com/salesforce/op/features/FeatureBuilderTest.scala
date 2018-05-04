@@ -12,10 +12,11 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.FeatureGeneratorStage
 import com.salesforce.op.test.{Passenger, TestCommon}
 import com.twitter.algebird.MonoidAggregator
+import org.apache.spark.sql.Row
 import org.joda.time.Duration
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.runtime.universe._
 
@@ -34,15 +35,25 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
 
   Spec(FeatureBuilder.getClass) should "build a simple feature with a custom name" in {
     val f1 = FeatureBuilder.Real[Passenger]("a").extract(p => Option(p.getAge).map(_.toDouble).toReal).asPredictor
-    assertFeature[Passenger, Real](f1, in = passenger, out = 1.toReal, name = "a")
+    assertFeature[Passenger, Real](f1)(in = passenger, out = 1.toReal, name = "a")
 
     val f2 = FeatureBuilder[Passenger, Real]("b").extract(p => Option(p.getAge).map(_.toDouble).toReal).asResponse
-    assertFeature[Passenger, Real](f2, in = passenger, isResponse = true, out = 1.toReal, name = "b")
+    assertFeature[Passenger, Real](f2)(in = passenger, isResponse = true, out = 1.toReal, name = "b")
   }
 
   it should "build a simple feature using macro" in {
     val feature = FeatureBuilder.Real[Passenger].extract(p => Option(p.getAge).map(_.toDouble).toReal).asResponse
-    assertFeature[Passenger, Real](feature, in = passenger, out = 1.toReal, isResponse = true)
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal, isResponse = true)
+  }
+
+  it should "build a simple feature from Row with a custom name" in {
+    val feature = FeatureBuilder.fromRow[Text](name = "feat", Some(1)).asPredictor
+    assertFeature[Row, Text](feature)(name = "feat", in = Row(1.0, "2"), out = "2".toText, isResponse = false)
+  }
+
+  it should "build a simple feature from Row using macro" in {
+    val feature = FeatureBuilder.fromRow[Real](0).asResponse
+    assertFeature[Row, Real](feature)(name = name, in = Row(1.0, "2"), out = 1.toReal, isResponse = true)
   }
 
   it should "return a default if extract throws an exception" in {
@@ -51,7 +62,7 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
         .extract(p => Option(p.getAge / 0).map(_.toDouble).toReal, 123.toReal)
         .asResponse
 
-    assertFeature[Passenger, Real](feature, in = passenger, out = 123.toReal, isResponse = true)
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 123.toReal, isResponse = true)
   }
 
   it should "build an aggregated feature" in {
@@ -60,8 +71,7 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
         .extract(p => Option(p.getAge).map(_.toDouble).toReal).aggregate(MaxReal)
         .asPredictor
 
-    assertFeature[Passenger, Real](
-      feature, in = passenger, out = 1.toReal, aggregator = _ => MaxReal)
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal, aggregator = _ => MaxReal)
   }
 
   it should "build an aggregated feature with an aggregate window" in {
@@ -71,8 +81,8 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
         .window(new Duration(123))
         .asPredictor
 
-    assertFeature[Passenger, Real](
-      feature, in = passenger, out = 1.toReal, aggregateWindow = Some(new Duration(123)))
+    assertFeature[Passenger, Real](feature)(name = name,
+      in = passenger, out = 1.toReal, aggregateWindow = Some(new Duration(123)))
   }
 
   it should "build an aggregated feature with a custom aggregator" in {
@@ -82,7 +92,7 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
         .aggregate(MaxReal)
         .asPredictor
 
-    assertFeature[Passenger, Real](feature, in = passenger, out = 1.toReal, aggregator = _ => MaxReal)
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal, aggregator = _ => MaxReal)
   }
 
   it should "build an aggregated feature with a custom aggregate function" in {
@@ -92,9 +102,8 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
         .aggregate((v1, _) => v1)
         .asPredictor
 
-    assertFeature[Passenger, Real](
-      feature, in = passenger, out = 1.toReal, aggregator = _ =>
-        feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
+      aggregator = _ => feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
     )
   }
 
@@ -104,18 +113,37 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
       .aggregate(Real.empty.v, (v1, _) => v1)
       .asPredictor
 
-    assertFeature[Passenger, Real](
-      feature, in = passenger, out = 1.toReal, aggregator = _ =>
-        feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
+    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
+      aggregator = _ => feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
     )
   }
 
-  private def assertFeature[I, O <: FeatureType](
-    f: Feature[O], in: I, out: O,
-    name: String = name,
-    isResponse: Boolean = false,
+}
+
+/**
+ * Assert feature instance on a given input/output
+ */
+object assertFeature extends Matchers {
+
+  /**
+   * Assert feature instance on a given input/output
+   *
+   * @param f               feature to assert
+   * @param in              input value
+   * @param out             expected output value
+   * @param name            expected name
+   * @param isResponse      is expected to be a response
+   * @param aggregator      expected aggregator
+   * @param aggregateWindow expected aggregate window
+   * @param tti             expected input typetag
+   * @param wtt             expected output typetag
+   * @tparam I input type
+   * @tparam O output feature type
+   */
+  def apply[I, O <: FeatureType](f: FeatureLike[O])(
+    in: I, out: O, name: String, isResponse: Boolean = false,
     aggregator: WeakTypeTag[O] => MonoidAggregator[Event[O], _, O] =
-      (wtt: WeakTypeTag[O]) => MonoidAggregatorDefaults.aggregatorOf[O](wtt),
+    (wtt: WeakTypeTag[O]) => MonoidAggregatorDefaults.aggregatorOf[O](wtt),
     aggregateWindow: Option[Duration] = None
   )(implicit tti: WeakTypeTag[I], wtt: WeakTypeTag[O]): Unit = {
     f.name shouldBe name
@@ -132,7 +160,7 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
     fg.aggregator shouldBe aggregator(wtt)
     fg.extractFn(in) shouldBe out
     fg.extractSource.nonEmpty shouldBe true // TODO we should eval the code here: eval(fg.extractSource)(in)
-    fg.outputName shouldBe name
+    fg.getOutputFeatureName shouldBe name
     fg.outputIsResponse shouldBe isResponse
     fg.aggregateWindow shouldBe aggregateWindow
     fg.uid.startsWith(classOf[FeatureGeneratorStage[I, O]].getSimpleName) shouldBe true

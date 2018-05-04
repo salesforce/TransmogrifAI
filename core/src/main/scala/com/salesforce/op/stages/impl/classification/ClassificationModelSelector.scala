@@ -10,7 +10,7 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpClassificationEvaluato
 import com.salesforce.op.features.{FeatureLike, TransientFeature}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{OpValidator, _}
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
@@ -28,7 +28,7 @@ import org.apache.spark.sql.{DataFrame, Dataset}
  */
 private[op] abstract class ClassificationModelSelector
 (
-  val validator: OpValidator[ProbClassifier],
+  val validator: OpValidator[ProbClassifierModel, ProbClassifier],
   val splitter: Option[Splitter],
   val evaluators: Seq[OpEvaluatorBase[_]],
   val uid: String = UID[ClassificationModelSelector]
@@ -144,13 +144,13 @@ final class BestModel private[op]
  */
 private[classification] abstract class Stage1ClassificationModelSelector
 (
-  validator: OpValidator[ProbClassifier],
+  validator: OpValidator[ProbClassifierModel, ProbClassifier],
   splitter: Option[Splitter],
   evaluators: Seq[OpClassificationEvaluatorBase[_ <: com.salesforce.op.evaluators.EvaluationMetrics]],
   uid: String = UID[Stage1ClassificationModelSelector],
   val stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
   val stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
-) extends ModelSelectorBase[ProbClassifier](validator = validator, splitter = splitter,
+) extends ModelSelectorBase[ProbClassifierModel, ProbClassifier](validator = validator, splitter = splitter,
   evaluators = evaluators, uid = uid) with SelectorClassifiers {
 
   final override protected def getOutputsColNamesMap(
@@ -162,5 +162,4 @@ private[classification] abstract class Stage1ClassificationModelSelector
     )
   }
 
-  final override protected def getModelInfo: Seq[ModelInfo[ProbClassifier]] = modelInfo
 }

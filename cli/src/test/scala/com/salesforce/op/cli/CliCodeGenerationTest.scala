@@ -5,10 +5,11 @@
 
 package com.salesforce.op.cli
 
+import language.postfixOps
+import java.io.File
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
-import scala.language.postfixOps
 
 /**
  * Test for generator operations
@@ -44,6 +45,7 @@ class CliCodeGenerationTest extends CliTestBase {
       ProjectName,
       "--overwrite"
     )
+
     result.outcome shouldBe Crashed("wrong arguments", 1)
     result.err should include("Error: File '/home/alone' not found")
   }
@@ -74,7 +76,9 @@ class CliCodeGenerationTest extends CliTestBase {
       ProjectName,
       "--overwrite"
     )
-    assertResult(result, Succeeded)
+    withClue(result.err) {
+      result.outcome shouldBe Succeeded
+    }
   }
 
   it should "work with autogeneration" in {
@@ -90,6 +94,35 @@ class CliCodeGenerationTest extends CliTestBase {
       "--overwrite"
     )
     assertResult(result, Succeeded)
+
+    val folder = new File(ProjectName.toLowerCase)
+    folder.exists() shouldBe true
+
+    val expectedContent =
+      Set("README.md", "gradle", "gradlew", "spark.gradle", ".gitignore",
+        "build.gradle", "gradle.properties", "settings.gradle", "src")
+
+    val content = folder.list()
+    content.toSet shouldBe expectedContent
+
+  }
+
+  it should "react properly on missing headers in data file" in {
+    val sut = new Sut
+    val result = sut.run(
+      "gen",
+      "--input", findFile("test-data/PassengerDataAll.csv"),
+      "--id", "passengerId",
+      "--response", "survived",
+      "--auto", "Passenger",
+      ProjectName,
+      "--overwrite")
+
+    result.outcome shouldBe a[Crashed]
+    result.err should include("Bad data file")
+    val folder = new File(ProjectName.toLowerCase)
+    folder.exists() shouldBe false
+
   }
 
   it should "complain properly if neither avro nor auto is specified" in {

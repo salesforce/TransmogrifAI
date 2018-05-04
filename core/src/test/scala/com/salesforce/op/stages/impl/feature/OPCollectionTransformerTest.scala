@@ -10,8 +10,8 @@ import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
 class OPCollectionTransformerTest extends FlatSpec with TestSparkContext {
@@ -57,6 +57,19 @@ class OPCollectionTransformerTest extends FlatSpec with TestSparkContext {
     )
 
     actualOutput shouldEqual expectedOutput
+  }
+
+  it should "throw an error in incompatible types" in {
+    val t = new UnaryLambdaTransformer[Email, Real]("testUnary", transformFn = _.value.map(_.length).toReal)
+    the[IllegalArgumentException] thrownBy {
+      new OPMapTransformer[Email, Real, EmailMap, IntegralMap](t, operationName = "map")
+    }
+    the[IllegalArgumentException] thrownBy {
+      new OPListTransformer[Email, Real, DateTimeList, DateTimeList](t, operationName = "list")
+    }
+    the[IllegalArgumentException] thrownBy {
+      new OPSetTransformer[Email, Real, MultiPickList, MultiPickList](t, operationName = "set")
+    }
   }
 
   it should "be able to turn an EmailMap into an IntegralMap even if the supplied" +

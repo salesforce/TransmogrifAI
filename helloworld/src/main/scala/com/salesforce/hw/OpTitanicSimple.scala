@@ -80,7 +80,7 @@ object OpTitanicSimple {
 
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
 
-    val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN).asPredictor
+    val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN(Double.NaN)).asPredictor
 
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
 

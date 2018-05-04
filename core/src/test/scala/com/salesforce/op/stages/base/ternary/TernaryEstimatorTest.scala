@@ -31,7 +31,7 @@ class TernaryEstimatorTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testEstimator.setInput(gender, survived, numericMap).getOutput()
     outputFeatures shouldBe new Feature[Real](
-      name = testEstimator.outputName,
+      name = testEstimator.getOutputFeatureName,
       originStage = testEstimator,
       isResponse = true,
       parents = Array(gender, survived, numericMap)
@@ -61,7 +61,7 @@ class TernaryEstimatorTest extends FlatSpec with PassengerSparkFixtureTest {
       Seq(StructField(gender.name, ArrayType(StringType, true), true),
         StructField(survived.name, BooleanType, true),
         StructField(numericMap.name, MapType(StringType, DoubleType, true), true),
-        StructField(testEstimator.outputName, DoubleType, true)))
+        StructField(testEstimator.getOutputFeatureName, DoubleType, true)))
 
     testDataTransformed.collect(gender, survived, numericMap, testModel.getOutput()) shouldEqual Array(
       (Set("Male").toMultiPickList, false.toBinary, new RealMap(Map("Male" -> 2.0)), 0.8.toReal),

@@ -27,13 +27,12 @@ class AliasTransformer[I <: FeatureType](val name: String, uid: String = UID[Ali
   (implicit tti: TypeTag[I], ttov: TypeTag[I#Value])
   extends UnaryTransformer[I, I](operationName = "alias", uid = uid)(tti = tti, tto = tti, ttov = ttov) {
 
+  setOutputFeatureName(name)
   override def transformFn: I => I = identity
-  override def outputName: String = name
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val newSchema = transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val meta = newSchema(in1.name).metadata
-    dataset.select(col("*"), col(in1.name).as(outputName, meta))
+    dataset.select(col("*"), col(in1.name).as(getOutputFeatureName, meta))
   }
 
 }

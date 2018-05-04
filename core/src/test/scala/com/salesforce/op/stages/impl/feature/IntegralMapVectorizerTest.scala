@@ -53,7 +53,7 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
   Spec[IntegralMapVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = baseVectorizer.getOutput()
 
-    vector.name shouldBe baseVectorizer.outputName
+    vector.name shouldBe baseVectorizer.getOutputFeatureName
     vector.parents should contain theSameElementsAs Array(m1, m2)
     vector.originStage shouldBe baseVectorizer
     vector.typeName shouldBe FeatureType.typeName[OPVector]
@@ -74,9 +74,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
 
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "track nulls" in {
@@ -92,9 +92,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
 
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
   it should "use the correct fill value for missing keys" in {
@@ -109,9 +109,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     ).map(_.toOPVector)
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "track nulls with the correct fill value for missing keys" in {
@@ -127,9 +127,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
 
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMetaTrackNulls
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMetaTrackNulls
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
   }
 
   it should "correctly whitelist keys" in {
@@ -151,9 +151,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "correctly track nulls with whitelist keys" in {
@@ -176,9 +176,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "correctly backlist keys" in {
@@ -199,9 +199,9 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "track nulls with backlist keys" in {
@@ -224,8 +224,8 @@ class IntegralMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    transformed.schema.toOpVectorMetadata(vectorizer.outputName) shouldEqual expectedMeta
+    transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 }

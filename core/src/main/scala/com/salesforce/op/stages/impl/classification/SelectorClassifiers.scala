@@ -30,20 +30,20 @@ object ClassificationModelsToTry extends Enum[ClassificationModelsToTry] {
 /**
  * Logistic Regression Classifier for Model Selector
  */
-private[classification] trait HasLogisticRegression extends Params
+private[op] trait HasLogisticRegression extends Params
   with SubStage[Stage1ClassificationModelSelector] {
   val sparkLR = new LogisticRegression()
 
   final val useLR = new BooleanParam(this, "useLR", "boolean to decide to use LogisticRegression in the model selector")
   setDefault(useLR, false)
 
-  private[classification] val lRGrid = new ParamGridBuilder()
+  private[op] val lRGrid = new ParamGridBuilder()
 
 
   /**
    * Logistic Regression Params
    */
-  private[classification] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
+  private[op] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkLR.getParam(pName).asInstanceOf[Param[T]]
     lRGrid.addGrid(p, values)
     subStage.foreach(_.setLRParams[T](pName, values))
@@ -118,7 +118,7 @@ private[classification] trait HasLogisticRegression extends Params
 /**
  * Random Forest Classifier for Model Selector
  */
-private[classification] trait HasRandomForestClassifier
+private[op] trait HasRandomForestClassifier
   extends HasRandomForestBase[ProbClassifier, SelectorClassifiers] {
   override val sparkRF: ProbClassifier = new RandomForestClassifier()
 }
@@ -126,7 +126,7 @@ private[classification] trait HasRandomForestClassifier
 /**
  * Decision Tree Classifier For Model Selector
  */
-private[classification] trait HasDecisionTreeClassifier
+private[op] trait HasDecisionTreeClassifier
   extends HasDecisionTreeBase[ProbClassifier, SelectorClassifiers] {
   override val sparkDT: ProbClassifier = new DecisionTreeClassifier()
 }
@@ -145,19 +145,19 @@ object ModelType extends Enum[ModelType] {
 /**
  * Naive Bayes Classifier for Model Selector
  */
-private[classification] trait HasNaiveBayes extends Params with SubStage[Stage1ClassificationModelSelector] {
+private[op] trait HasNaiveBayes extends Params with SubStage[Stage1ClassificationModelSelector] {
   val sparkNB = new NaiveBayes()
 
   final val useNB = new BooleanParam(this, "useNB", "boolean to decide to use NaiveBayes in the model selector")
   setDefault(useNB, false)
 
-  private[impl] val nBGrid = new ParamGridBuilder()
+  private[op] val nBGrid = new ParamGridBuilder()
 
   /**
    * Naive Bayes Params
    */
 
-  private[impl] def setNBParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
+  private[op] def setNBParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkNB.getParam(pName).asInstanceOf[Param[T]]
     nBGrid.addGrid(p, values)
     subStage.map(_.setNBParams[T](pName, values))
@@ -186,12 +186,11 @@ private[classification] trait HasNaiveBayes extends Params with SubStage[Stage1C
 /**
  * Classifiers to try in the Model Selector
  */
-private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade to spark 2.2
+private[op] trait SelectorClassifiers // TODO add GBT to binary when upgrade to spark 2.2
   extends HasLogisticRegression
     with HasRandomForestClassifier
     with HasDecisionTreeClassifier
-    with HasNaiveBayes
-    with SelectorModels[ProbClassifier, Stage1ClassificationModelSelector] {
+    with HasNaiveBayes {
 
   /**
    * Set param for Thresholds of all classifiers to adjust the probability of predicting each class.
@@ -241,10 +240,11 @@ private[impl] trait SelectorClassifiers // TODO add GBT to binary when upgrade t
   }
 
 
-  final override protected[impl] def modelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
+  final protected def getModelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
     ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
     ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
     ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
     ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
   )
+
 }

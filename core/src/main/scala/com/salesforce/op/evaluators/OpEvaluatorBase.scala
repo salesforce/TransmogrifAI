@@ -218,7 +218,7 @@ private[op] case object OpMetricsNames {
 /**
  * Contains evaluator names used in logging
  */
-private[op] case object OpEvaluatorNames {
+case object OpEvaluatorNames {
   val binary = "binEval"
   val multi = "multiEval"
   val regression = "regEval"

@@ -12,9 +12,6 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
 /**
  * Case class of data used in model selectors for data prep and cross validation
- * @param label label trying to predict
- * @param features features used to predict
- * @param key unique key for entity trying to score
  */
 case object SelectorData {
   type LabelFeaturesKey = (Double, Vector, String)
@@ -59,7 +56,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
 
 }
 
-private[impl] trait SplitterParams extends Params {
+trait SplitterParams extends Params {
 
   /**
    * Seed for data splitting
@@ -93,7 +90,7 @@ object SplitterParamsDefault {
 
   val ReserveTestFractionDefault = 0.1
   val SampleFractionDefault = 0.1
-  val MaxTrainingSampleDefault = 100000
+  val MaxTrainingSampleDefault = 1E6.toInt
   val MaxLabelCategoriesDefault = 100
   val MinLabelFractionDefault = 0.0
 }

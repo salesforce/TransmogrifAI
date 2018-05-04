@@ -12,7 +12,7 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Params}
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
 import org.joda.time.{DateTime, DateTimeZone, Days}
@@ -126,8 +126,18 @@ class IntegralMapVectorizer[T <: OPMap[Long]](uid: String = UID[IntegralMapVecto
 class DateMapVectorizer[T <: OPMap[Long]](uid: String = UID[DateMapVectorizer[T]])(implicit tti: TypeTag[T])
   extends OPMapVectorizer[Long, T](uid = uid, operationName = "vecDateMap", convertFn = intMapToRealMap) {
 
+  val referenceDate = new Param[DateTime](parent = this, name = "referenceDate",
+    doc = "Reference date used to compare time to")
+  def setReferenceDate(date: DateTime): this.type = set(referenceDate, date)
+  def getReferenceDate(): DateTime = $(referenceDate)
+
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[Long, T] =
-    new DateMapVectorizerModel(args, operationName = operationName, uid = uid)
+    new DateMapVectorizerModel(
+      args,
+      referenceDate = getReferenceDate(),
+      operationName = operationName,
+      uid = uid
+    )
 
 }
 
@@ -148,12 +158,34 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
 
   def setPrependFeatureName(v: Boolean): this.type = set(prependFeatureName, v)
 
+  final val numFeatures = new IntParam(
+    parent = this, name = "numFeatures",
+    doc = s"number of features (hashes) to generate (default: ${TransmogrifierDefaults.DefaultNumOfFeatures})",
+    isValid = ParamValidators.inRange(
+      lowerBound = 0, upperBound = TransmogrifierDefaults.MaxNumOfFeatures,
+      lowerInclusive = false, upperInclusive = true
+    )
+  )
+  setDefault(numFeatures, TransmogrifierDefaults.DefaultNumOfFeatures)
+
+  def setNumFeatures(v: Int): this.type = set(numFeatures, v)
+
+  final val forceSharedHashSpace = new BooleanParam(
+    parent = this, name = "forceSharedHashSpace",
+    doc = s"if true, then force the hash space to be shared among all included features"
+  )
+  setDefault(forceSharedHashSpace, false)
+
+  def setForceSharedHashSpace(v: Boolean): this.type = set(forceSharedHashSpace, v)
+
   def getFillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = Seq.empty
 
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[String, T] =
     new TextMapHashingVectorizerModel[T](
       args = args.copy(shouldCleanValues = $(cleanText)),
       shouldPrependFeatureName = $(prependFeatureName),
+      numFeatures = $(numFeatures),
+      forceSharedHash = $(forceSharedHashSpace),
       operationName = operationName,
       uid = uid
     )
@@ -268,6 +300,7 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
  * @param shouldCleanKeys   should clean map keys
  * @param shouldCleanValues should clean map values
  * @param defaultValue      default value to replace with
+ * @param trackNulls        add column to track null values for each map key
  */
 sealed case class OPMapVectorizerModelArgs
 (
@@ -334,12 +367,12 @@ final class IntegralMapVectorizerModel[T <: OPMap[Long]] private[op]
 final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
 (
   args: OPMapVectorizerModelArgs,
+  val referenceDate: org.joda.time.DateTime,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Long, T](args = args, operationName = operationName, uid = uid) {
   val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
-  val referenceDate = TransmogrifierDefaults.ReferenceDate
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
     dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
@@ -363,6 +396,8 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
 (
   args: OPMapVectorizerModelArgs,
   val shouldPrependFeatureName: Boolean,
+  val numFeatures: Int,
+  val forceSharedHash: Boolean,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
@@ -373,10 +408,10 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
     hashWithIndex = TransmogrifierDefaults.HashWithIndex,
     // Need to not prepend the feature name in the tests, so allow this to be settable
     prependFeatureName = shouldPrependFeatureName,
-    numFeatures = TransmogrifierDefaults.DefaultNumOfFeatures,
+    numFeatures = numFeatures,
     numInputs = 1, // All tokens are combined into a single TextList before hashing
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = TransmogrifierDefaults.ForceSharedHashSpace,
+    forceSharedHashSpace = forceSharedHash,
     binaryFreq = TransmogrifierDefaults.BinaryFreq,
     hashAlgorithm = TransmogrifierDefaults.HashAlgorithm
   )
@@ -390,19 +425,19 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
         val keys = args.allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = args.shouldCleanKeys, shouldCleanValue = args.shouldCleanValues)
         val mapValues = cleaned.map { case (k, v) => v.toText }
-        mapValues.map(tokenizeFn(_)).toSeq
+        mapValues.map(tokenize(_)._2).toSeq
     }
     val allTokens = tokenSeq.flatMap(_.value).toTextList
 
     // TODO make sure this also works when we are not using the shared hash space
-    hash(hashingParams, Seq(allTokens))
+    hash[TextList](Seq(allTokens), getTransientFeatures(), hashingParams)
   }
 
   // TODO: Set this metadata in the estimator
   override def onGetMetadata(): Unit = {
     val metaBuilder = new MetadataBuilder()
     // Add all the maps' keys to the metadata
-    metaBuilder.withMetadata(makeVectorMetadata(hashingParams, outputName).toMetadata)
+    metaBuilder.withMetadata(makeVectorMetadata(getTransientFeatures(), hashingParams, getOutputFeatureName).toMetadata)
     metaBuilder.putStringArray(TextMapHashingVectorizerNames.MapKeys, args.allKeys.flatten.toArray)
 
     setMetadata(metaBuilder.build())

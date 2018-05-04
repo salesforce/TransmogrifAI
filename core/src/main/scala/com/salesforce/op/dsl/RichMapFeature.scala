@@ -9,6 +9,7 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{BinaryMap, _}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
+import com.salesforce.op.utils.text.Language
 
 import scala.reflect.runtime.universe._
 
@@ -164,6 +165,8 @@ trait RichMapFeature {
      * @param whiteListKeys            keys to whitelist
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
+     * @param numHashes                size of hash space
+     * @param forceSharedHash          use a shared space for hashes
      *
      * @return an OPVector feature
      */
@@ -174,7 +177,9 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
+      forceSharedHash: Boolean = TransmogrifierDefaults.ForceSharedHashSpace
     ): FeatureLike[OPVector] = {
       val hashedFeatures = new TextMapHashingVectorizer[TextMap]()
         .setInput(f +: others)
@@ -184,6 +189,8 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
+        .setNumFeatures(numHashes)
+        .setForceSharedHashSpace(forceSharedHash)
         .getOutput()
 
       /**
@@ -196,6 +203,78 @@ trait RichMapFeature {
         new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
       }
       else hashedFeatures
+    }
+
+    /**
+     * Vectorize text map features by treating low cardinality text features as categoricals and
+     * applying hashing trick to high caridinality ones.
+     *
+     * @param maxCategoricalCardinality max cardinality for a text feature to be treated as categorical
+     * @param numHashes                 number of features (hashes) to generate
+     * @param autoDetectLanguage        indicates whether to attempt language detection
+     * @param minTokenLength            minimum token length, >= 1.
+     * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
+     * @param cleanText                 indicates whether to ignore capitalization and punctuation
+     * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param topK                      number of most common elements to be used as categorical pivots
+     * @param minSupport                minimum number of occurences an element must have to appear in pivot
+     * @param unseenName                name to give indexes which do not have a label name associated with them
+     * @param hashWithIndex             include indices when hashing a feature that has them (OPLists or OPVectors)
+     * @param binaryFreq                if true, term frequency vector will be binary such that non-zero term
+     *                                  counts will be set to 1.0
+     * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
+     * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
+     *                                  confidence greater than the threshold then defaultLanguage is used.
+     * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
+     *                                  failed to make a good enough prediction.
+     * @param hashAlgorithm             hash algorithm to use
+     * @param others                    additional text features
+     * @return result feature of type Vector
+     */
+    // scalastyle:off parameter.number
+    def smartVectorize
+    (
+      maxCategoricalCardinality: Int,
+      numHashes: Int,
+      autoDetectLanguage: Boolean,
+      minTokenLength: Int,
+      toLowercase: Boolean,
+      cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      topK: Int = TransmogrifierDefaults.TopK,
+      minSupport: Int = TransmogrifierDefaults.MinSupport,
+      unseenName: String = TransmogrifierDefaults.OtherString,
+      hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
+      binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
+      prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
+      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
+      forceSharedHashSpace: Boolean = false,
+      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
+      hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      others: Array[FeatureLike[TextMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      // scalastyle:on parameter.number
+      new SmartTextMapVectorizer[TextMap]()
+        .setInput(f +: others)
+        .setMaxCardinality(maxCategoricalCardinality)
+        .setCleanText(cleanText)
+        .setTrackNulls(trackNulls)
+        .setAutoDetectLanguage(autoDetectLanguage)
+        .setAutoDetectThreshold(autoDetectThreshold)
+        .setDefaultLanguage(defaultLanguage)
+        .setMinTokenLength(minTokenLength)
+        .setToLowercase(toLowercase)
+        .setTopK(topK)
+        .setMinSupport(minSupport)
+        .setUnseenName(unseenName)
+        .setNumFeatures(numHashes)
+        .setHashWithIndex(hashWithIndex)
+        .setPrependFeatureName(prependFeatureName)
+        .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashAlgorithm(hashAlgorithm)
+        .setBinaryFreq(binaryFreq)
+        .getOutput()
     }
   }
 
@@ -216,6 +295,8 @@ trait RichMapFeature {
      * @param whiteListKeys            keys to whitelist
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
+     * @param numHashes                size of hash space
+     * @param forceSharedHash          use a shared space for hashes
      *
      * @return an OPVector feature
      */
@@ -226,7 +307,9 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
+      forceSharedHash: Boolean = TransmogrifierDefaults.ForceSharedHashSpace
     ): FeatureLike[OPVector] = {
       val hashedFeatures = new TextMapHashingVectorizer[TextAreaMap]()
         .setInput(f +: others)
@@ -236,6 +319,8 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
+        .setNumFeatures(numHashes)
+        .setForceSharedHashSpace(forceSharedHash)
         .getOutput()
 
       /* Note: Text is tokenized into a TextList, and then null tracking is applied. For maps, we do null
@@ -247,6 +332,78 @@ trait RichMapFeature {
         new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
       }
       else hashedFeatures
+    }
+
+    /**
+     * Vectorize textarea map features by treating low cardinality text features as categoricals and
+     * applying hashing trick to high caridinality ones.
+     *
+     * @param maxCategoricalCardinality max cardinality for a text feature to be treated as categorical
+     * @param numHashes                 number of features (hashes) to generate
+     * @param autoDetectLanguage        indicates whether to attempt language detection
+     * @param minTokenLength            minimum token length, >= 1.
+     * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
+     * @param cleanText                 indicates whether to ignore capitalization and punctuation
+     * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param topK                      number of most common elements to be used as categorical pivots
+     * @param minSupport                minimum number of occurences an element must have to appear in pivot
+     * @param unseenName                name to give indexes which do not have a label name associated with them
+     * @param hashWithIndex             include indices when hashing a feature that has them (OPLists or OPVectors)
+     * @param binaryFreq                if true, term frequency vector will be binary such that non-zero term
+     *                                  counts will be set to 1.0
+     * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
+     * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
+     *                                  confidence greater than the threshold then defaultLanguage is used.
+     * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
+     *                                  failed to make a good enough prediction.
+     * @param hashAlgorithm             hash algorithm to use
+     * @param others                    additional text features
+     * @return result feature of type Vector
+     */
+    // scalastyle:off parameter.number
+    def smartVectorize
+    (
+      maxCategoricalCardinality: Int,
+      numHashes: Int,
+      autoDetectLanguage: Boolean,
+      minTokenLength: Int,
+      toLowercase: Boolean,
+      cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      topK: Int = TransmogrifierDefaults.TopK,
+      minSupport: Int = TransmogrifierDefaults.MinSupport,
+      unseenName: String = TransmogrifierDefaults.OtherString,
+      hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
+      binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
+      prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
+      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
+      forceSharedHashSpace: Boolean = false,
+      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
+      hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      others: Array[FeatureLike[TextAreaMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      // scalastyle:on parameter.number
+      new SmartTextMapVectorizer[TextAreaMap]()
+        .setInput(f +: others)
+        .setMaxCardinality(maxCategoricalCardinality)
+        .setCleanText(cleanText)
+        .setTrackNulls(trackNulls)
+        .setAutoDetectLanguage(autoDetectLanguage)
+        .setAutoDetectThreshold(autoDetectThreshold)
+        .setDefaultLanguage(defaultLanguage)
+        .setMinTokenLength(minTokenLength)
+        .setToLowercase(toLowercase)
+        .setTopK(topK)
+        .setMinSupport(minSupport)
+        .setUnseenName(unseenName)
+        .setNumFeatures(numHashes)
+        .setHashWithIndex(hashWithIndex)
+        .setPrependFeatureName(prependFeatureName)
+        .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashAlgorithm(hashAlgorithm)
+        .setBinaryFreq(binaryFreq)
+        .getOutput()
     }
   }
 
@@ -304,6 +461,37 @@ trait RichMapFeature {
     (implicit val ttiv: TypeTag[T#Value]) {
 
     /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label         label feature
+     * @param trackNulls    option to keep track of values that were missing
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     */
+    def autoBucketize(
+      label: FeatureLike[RealNN],
+      trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericMapBucketizer[Double, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys).getOutput()
+    }
+
+    /**
      * Apply RealMapVectorizer on any OPMap that has double values
      *
      * @param others        other features of the same type
@@ -343,6 +531,37 @@ trait RichMapFeature {
    */
   implicit class RichIntegralMapFeature[T <: OPMap[Long] : TypeTag](val f: FeatureLike[T])
     (implicit val ttiv: TypeTag[T#Value]) {
+
+    /**
+     * Apply a smart bucketizer transformer
+     *
+     * @param label         label feature
+     * @param trackNulls    option to keep track of values that were missing
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     */
+    def autoBucketize(
+      label: FeatureLike[RealNN],
+      trackNulls: Boolean,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DecisionTreeNumericMapBucketizer[Long, T]()
+        .setInput(label, f)
+        .setTrackInvalid(trackInvalid)
+        .setTrackNulls(trackNulls)
+        .setMinInfoGain(minInfoGain)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys).getOutput()
+    }
 
     /**
      * Apply IntegralMapVectorizer on any OPMap that has long values
@@ -393,7 +612,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
-     *
+     * @param referenceDate reference date to subtract off before converting to vector
      * @return an OPVector feature
      */
     def vectorize(
@@ -402,7 +621,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
     ): FeatureLike[OPVector] = {
       new DateMapVectorizer()
         .setInput(f +: others)
@@ -411,6 +631,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setReferenceDate(referenceDate)
         .getOutput()
     }
   }
@@ -430,6 +651,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param referenceDate reference date to subtract off before converting to vector
      * @return an OPVector feature
      */
     def vectorize(
@@ -438,7 +660,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[DateTimeMap]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
     ): FeatureLike[OPVector] = {
       new DateMapVectorizer()
         .setInput(f +: others)
@@ -447,6 +670,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setReferenceDate(referenceDate)
         .getOutput()
     }
   }

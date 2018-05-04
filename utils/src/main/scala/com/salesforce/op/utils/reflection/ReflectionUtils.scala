@@ -108,6 +108,30 @@ object ReflectionUtils {
     bestCtor(klazz, classType, classMirror, ctorArgs)
   }
 
+
+  /**
+   * Find setter methods for the provided method name
+   * @param instance     class to find method for
+   * @param setterName   name of method to find
+   * @param classLoader  class loader to use
+   * @tparam T  type of instance to copy
+   * @return    reflected method to set type
+   */
+  def reflectSetterMethod[T: ClassTag](
+    instance: T,
+    setterName: String,
+    classLoader: ClassLoader = defaultClassLoader
+  ): Option[MethodMirror] = {
+    val klazz = instance.getClass
+    val (runtimeMirror, classMirror) = mirrors(klazz, classLoader)
+    val classType = runtimeMirror.classSymbol(klazz).toType
+    val tMembers = classType.members
+    val settrs = tMembers.collect { case m: MethodSymbol if m.isPublic &&
+      termNameStr(m.name).compareToIgnoreCase(s"set$setterName") == 0 => m }
+    val instanceMirror = runtimeMirror.reflect(instance)
+    settrs.headOption.map(instanceMirror.reflectMethod(_))
+  }
+
   /**
    * Find the class by name
    *

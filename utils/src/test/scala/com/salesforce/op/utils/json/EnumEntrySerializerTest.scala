@@ -10,27 +10,46 @@ import enumeratum.{Enum, EnumEntry}
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Extraction}
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.FunSpec
 import org.scalatest.junit.JUnitRunner
+
+import scala.util.Success
 
 
 @RunWith(classOf[JUnitRunner])
-class EnumEntrySerializerTest extends FlatSpec with TestCommon {
+class EnumEntrySerializerTest extends FunSpec with TestCommon {
 
-  implicit val formats = DefaultFormats + EnumEntrySerializer[TestEnumType](TestEnumType)
+  implicit val formats = DefaultFormats + EnumEntrySerializer.json4s[TestEnumType](TestEnumType)
+  val serdes = Seq(EnumEntrySerializer.jackson[TestEnumType](TestEnumType))
 
   val data = TestData(a = TestEnumType.One, b = Seq(TestEnumType.Two, TestEnumType.Three))
   val dataJson = """{"a":"One","b":["Two","Three"]}"""
 
-  Spec(EnumEntrySerializer.getClass) should "write enum entries" in {
-    compact(Extraction.decompose(data)) shouldBe dataJson
+  describe("EnumEntrySerializer") {
+    describe("(json4s)") {
+      it("write enum entries") {
+        compact(Extraction.decompose(data)) shouldBe dataJson
+      }
+      it("read enum entries") {
+        parse(dataJson).extract[TestData] shouldBe data
+      }
+      it("read enum entries ignoring case") {
+        parse(dataJson.toLowerCase).extract[TestData] shouldBe data
+      }
+    }
+    describe("(jackson)") {
+      it("write enum entries") {
+        JsonUtils.toJsonString(data, pretty = false, serdes = serdes) shouldBe dataJson
+      }
+      it("read enum entries") {
+        JsonUtils.fromString[TestData](dataJson, serdes = serdes) shouldBe Success(data)
+      }
+      it("read enum entries ignoring case") {
+        JsonUtils.fromString[TestData](dataJson.toLowerCase, serdes = serdes) shouldBe Success(data)
+      }
+    }
   }
-  it should "read enum entries" in {
-    parse(dataJson).extract[TestData] shouldBe data
-  }
-  it should "read enum entries ignoring case" in {
-    parse(dataJson.toLowerCase).extract[TestData] shouldBe data
-  }
+
 }
 
 private[json] case class TestData(a: TestEnumType, b: Seq[TestEnumType])

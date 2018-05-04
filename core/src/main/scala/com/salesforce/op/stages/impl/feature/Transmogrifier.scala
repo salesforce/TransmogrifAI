@@ -12,7 +12,6 @@ import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
-import enumeratum._
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
@@ -22,29 +21,14 @@ import org.apache.spark.sql.{Dataset, Encoders}
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
 
-
 /**
- * Hashing Algorithms
- */
-sealed trait HashAlgorithm extends EnumEntry with Serializable
-
-object HashAlgorithm extends Enum[HashAlgorithm] {
-  val values = findValues
-
-  case object MurMur3 extends HashAlgorithm
-
-  case object Native extends HashAlgorithm
-
-}
-
-/**
- * Transmogrifier Defaults trait allows innection of params into Transmogrifier
+ * Transmogrifier Defaults trait allows injection of params into Transmogrifier
  */
 private[op] trait TransmogrifierDefaults {
   val NullString: String = OpVectorColumnMetadata.NullString
   val OtherString: String = "OTHER"
-  val DefaultNumOfFeatures: Int = 256
-  val MaxNumOfFeatures: Int = 8192
+  val DefaultNumOfFeatures: Int = 512
+  val MaxNumOfFeatures: Int = 16384
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
   val ReferenceDate: org.joda.time.DateTime = DateTimeUtils.now()
   val TopK: Int = 20
@@ -322,6 +306,8 @@ private[op] case object Transmogrifier {
 trait VectorizerDefaults extends OpPipelineStageBase {
   self: PipelineStage =>
 
+  implicit def booleanToDouble(v: Boolean): Double = if (v) 1.0 else 0.0
+
   // TODO once track nulls is everywhere put track nulls param here and avoid making the metadata twice
   abstract override def onSetInput(): Unit = {
     super.onSetInput()
@@ -367,14 +353,16 @@ trait VectorizerDefaults extends OpPipelineStageBase {
       metadata = $(outputMetadata)
     )
   )
+}
 
+case object VectorizerUtils {
   /**
    * Function to reindex a sequence of vectorized categoricals or maps when flattening
    *
    * @param seq sequence of all previous vectorized values
    * @return next index for concatenating the sequence
    */
-  protected def nextIndex(seq: Seq[(Int, Double)]): Int = seq.lastOption.map(_._1 + 1).getOrElse(0)
+  def nextIndex(seq: Seq[(Int, Double)]): Int = seq.lastOption.map(_._1 + 1).getOrElse(0)
 
   /**
    * Function to flatten sequences of (Index, Value) tuples and reindex them sequentially
@@ -385,7 +373,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
    * @param seq sequence to flatten
    * @return flattened and reindex values
    */
-  protected def reindex(seq: Seq[Seq[(Int, Double)]]): Seq[(Int, Double)] = {
+  def reindex(seq: Seq[Seq[(Int, Double)]]): Seq[(Int, Double)] = {
     val acc = new ArrayBuffer[(Int, Double)](seq.length)
     var next = 0
     seq.foreach(curr => {
@@ -406,7 +394,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
    * @param size size of the one-hot vector
    * @return one-hot vector with 1.0 in position value
    */
-  protected def oneHot(pos: Int, size: Int): Array[Double] = {
+  def oneHot(pos: Int, size: Int): Array[Double] = {
     assert(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
     val arr = new Array[Double](size)
     arr(pos) = 1.0
@@ -419,13 +407,12 @@ trait VectorizerDefaults extends OpPipelineStageBase {
    * @param seq Input sequence containing tuples of indicies and values
    * @return the vector representation of those values
    */
-  protected def makeSparseVector(seq: Seq[(Int, Double)]): Vector = {
+  def makeSparseVector(seq: Seq[(Int, Double)]): Vector = {
     val size = nextIndex(seq)
     if (size == 0) Vectors.dense(Array.empty[Double])
     else Vectors.sparse(size, seq).compressed
   }
 
-  protected implicit def booleanToDouble(v: Boolean): Double = if (v) 1.0 else 0.0
 
 }
 
@@ -485,60 +472,40 @@ trait CleanTextMapFun extends CleanTextFun {
 }
 
 trait TextParams extends Params {
-  self: CleanTextFun =>
-
   final val cleanText = new BooleanParam(
     parent = this, name = "cleanText", doc = "ignore capitalization and punctuation in grouping categories"
   )
-
   setDefault(cleanText, TransmogrifierDefaults.CleanText)
-
   def setCleanText(clean: Boolean): this.type = set(cleanText, clean)
 }
 
 
 trait PivotParams extends TextParams {
-  self: CleanTextFun =>
-
   final val topK = new IntParam(
     parent = this, name = "topK", doc = "number of elements to keep for each vector",
     isValid = ParamValidators.gt(0L)
   )
-
   setDefault(topK, TransmogrifierDefaults.TopK)
-
-  def setTopK(numberToKeep: Int): this.type = {
-    set(topK, numberToKeep)
-  }
+  def setTopK(numberToKeep: Int): this.type = set(topK, numberToKeep)
 }
 
 trait MinSupportParam extends Params {
-
   final val minSupport = new IntParam(
     parent = this, name = "minSupport", doc = "minimum number of occurences an element must have to appear in pivot",
     isValid = ParamValidators.gtEq(0L)
   )
-
   setDefault(minSupport, TransmogrifierDefaults.MinSupport)
-
-  def setMinSupport(min: Int): this.type = {
-    set(minSupport, min)
-  }
-
+  def setMinSupport(min: Int): this.type = set(minSupport, min)
 }
 
 
 trait SaveOthersParams extends Params {
-
   final val unseenName: Param[String] = new Param(this, "unseenName",
-    "Name to give indexes which do not have a label name associated with them.")
-
-  final def getUnseenName: String = $(unseenName)
-
-  final def setUnseenName(unseenNameIn: String): this.type = set(unseenName, unseenNameIn)
-
+    "Name to give indexes which do not have a label name associated with them."
+  )
   setDefault(unseenName, TransmogrifierDefaults.OtherString)
-
+  def getUnseenName: String = $(unseenName)
+  def setUnseenName(unseenNameIn: String): this.type = set(unseenName, unseenNameIn)
 }
 
 
@@ -604,7 +571,7 @@ trait MapStringPivotHelper extends SaveOthersParams {
     shouldCleanValues: Boolean
   ): Dataset[SeqMapMap] = in.map(seq =>
     seq.map { kc =>
-      val filteredMap = filterKeys[V](kc, shouldCleanKeys, shouldCleanValues)
+      val filteredMap = filterKeys[V](kc, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
       convertToMapOfMaps(filteredMap)
     }
   )
@@ -624,7 +591,27 @@ trait MapStringPivotHelper extends SaveOthersParams {
     }
   }
 
-  protected def createOutputVectorMetadata
+  protected def makeVectorColumnMetadata
+  (
+    topValues: SeqSeqTupArr,
+    inputFeatures: Array[TransientFeature],
+    unseenName: String,
+    trackNulls: Boolean = false
+  ): Array[OpVectorColumnMetadata] = {
+    for {
+      (f, kvPairs) <- inputFeatures.zip(topValues)
+      (key, values) <- kvPairs
+      value <- values.view ++ Seq(unseenName) ++ // view here to avoid copying the array when appending the string
+        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil)
+    } yield OpVectorColumnMetadata(
+      parentFeatureName = Seq(f.name),
+      parentFeatureType = Seq(f.typeName),
+      indicatorGroup = Option(key),
+      indicatorValue = Option(value)
+    )
+  }
+
+  protected def makeOutputVectorMetadata
   (
     topValues: SeqSeqTupArr,
     inputFeatures: Array[TransientFeature],
@@ -633,20 +620,8 @@ trait MapStringPivotHelper extends SaveOthersParams {
     stageName: String,
     trackNulls: Boolean = false // todo remove default and use this for other maps
   ): OpVectorMetadata = {
-    // names of input features to store in metadata
     val otherValueString = $(unseenName)
-    val cols = for {
-      (f, kvPairs) <- inputFeatures.zip(topValues)
-      (key, values) <- kvPairs
-      value <- values.view ++ Seq(otherValueString) ++ // view here to avoid copying the array when appending the string
-        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil)
-    } yield OpVectorColumnMetadata(
-      parentFeatureName = Seq(f.name),
-      parentFeatureType = Seq(f.typeName),
-      indicatorGroup = Option(key),
-      indicatorValue = Option(value)
-    )
+    val cols = makeVectorColumnMetadata(topValues, inputFeatures, otherValueString, trackNulls)
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
   }
-
 }

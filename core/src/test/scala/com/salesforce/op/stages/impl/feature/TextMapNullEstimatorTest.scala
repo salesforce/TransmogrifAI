@@ -31,7 +31,7 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
     val vectorizer = new TextMapNullEstimator[TextMap]().setInput(f1)
     val vector = vectorizer.getOutput()
 
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
@@ -49,7 +49,7 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
     transformed.collect(vector) shouldBe expected
 
     val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
       f1 -> List(
         IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k1"),

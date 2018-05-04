@@ -7,11 +7,13 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.OpPipelineStage
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
 import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature.{AliasTransformer, ToOccurTransformer}
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -176,17 +178,23 @@ trait RichFeature {
     }
 
     /**
-     * Create an alias of this feature by capturing the val name
+     * Create an alias of this feature by capturing the val name (note will not work on raw features)
      * @return alias of the feature
      */
     def alias(implicit name: sourcecode.Name): FeatureLike[A] = alias(name = name.value)
 
     /**
-     * Create an alias of this feature with the desired name
+     * Create an alias of this feature with the desired name (note will not work on raw features)
      * @param name desired feature name
      * @return alias of the feature
      */
-    def alias(name: String): FeatureLike[A] = feature.transformWith(new AliasTransformer[A](name = name))
+    def alias(name: String): FeatureLike[A] = {
+      feature.originStage match {
+        case _: SparkWrapperParams[_] => feature.transformWith(new AliasTransformer(name))
+        case _ if feature.isRaw => feature.transformWith(new AliasTransformer(name))
+        case s => s.setOutputFeatureName(name).getOutput()
+      }
+    }
 
   }
 

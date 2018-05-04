@@ -58,7 +58,7 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
     Integral.empty,
     Percent.empty,
     Real.empty,
-    RealNN.empty,
+    RealNN(0.0),
     // Sets
     MultiPickList.empty,
     // Text
@@ -109,6 +109,7 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
     PostalCodeMap(Map("a" -> "94071")),
     StreetMap(Map("a" -> "Emerson Ave")),
     GeolocationMap(Map("a" -> Seq(1.0, 1.0, 1.0))),
+    Prediction(1.0, Array(0.0, 1.0), Array(2.0, 3.0)),
     // Numerics
     Binary(true),
     Currency(1.0),
@@ -162,7 +163,7 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
   property("should be only few non nullable types") {
     forAll(featureTypesVals) { ft =>
       whenever(!ft.isNullable) {
-        ft.isInstanceOf[RealNN] || ft.isInstanceOf[OPVector] shouldBe true
+        ft.isInstanceOf[RealNN] || ft.isInstanceOf[Prediction] shouldBe true
         ft shouldBe a[NonNullable]
       }
     }

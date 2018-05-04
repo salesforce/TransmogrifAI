@@ -121,9 +121,9 @@ class OpRandomForestTest extends FlatSpec with TestSparkContext {
 
   it should "be implemented using shortcuts" in {
     val (raw, prob, pred) = features.randomForest(label = label, impurity = Gini)
-    raw.name shouldBe raw.originStage.outputName
-    prob.name shouldBe prob.originStage.outputName
-    pred.name shouldBe pred.originStage.outputName
+    raw.name shouldBe raw.originStage.getOutputFeatureName
+    prob.name shouldBe prob.originStage.getOutputFeatureName
+    pred.name shouldBe pred.originStage.getOutputFeatureName
   }
 
   it should "return a model for multiClassification problem" in {

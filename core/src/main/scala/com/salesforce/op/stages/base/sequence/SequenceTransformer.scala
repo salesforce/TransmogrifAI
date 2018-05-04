@@ -49,15 +49,12 @@ trait OpTransformerN[I <: FeatureType, O <: FeatureType]
    * @return a new dataset containing a column for the transformed feature
    */
   override def transform(dataset: Dataset[_]): DataFrame = {
-    val newSchema = transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
-
-    val columns = inN.map(in => dataset.col(in.name))
-    assert(columns.nonEmpty, "Inputs cannot be empty")
-
+    assert(inN.nonEmpty, "Inputs cannot be empty")
+    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val functionUDF = FeatureSparkTypes.udfN[I, O](transformFn)
-    val meta = newSchema(outputName).metadata
-    dataset.select(col("*"), functionUDF(struct(columns: _*)).as(outputName, meta))
+    val meta = newSchema(getOutputFeatureName).metadata
+    val columns = inN.map(in => dataset.col(in.name))
+    dataset.select(col("*"), functionUDF(struct(columns: _*)).as(getOutputFeatureName, meta))
   }
 
   private val transformNFn = FeatureSparkTypes.transformN[I, O](transformFn)

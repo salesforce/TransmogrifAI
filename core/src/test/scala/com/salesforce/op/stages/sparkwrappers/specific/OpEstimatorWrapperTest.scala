@@ -46,7 +46,7 @@ class OpEstimatorWrapperTest extends FlatSpec with TestSparkContext with Prestig
   it should "should have the expected feature name" in {
     val wrappedEstimator =
       new OpEstimatorWrapper[OPVector, OPVector, MinMaxScaler, MinMaxScalerModel](new MinMaxScaler()).setInput(income)
-    wrappedEstimator.getOutput().name shouldBe wrappedEstimator.outputName
+    wrappedEstimator.getOutput().name shouldBe wrappedEstimator.getOutputFeatureName
   }
 
   private def fitScalerModel(baseScaler: MinMaxScaler): MinMaxScalerModel = {

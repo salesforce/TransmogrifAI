@@ -42,7 +42,7 @@ object Solver extends Enum[Solver] {
 /**
  * Linear Regression for Model Selector
  */
-private[regression] trait HasLinearRegression extends Params
+private[op] trait HasLinearRegression extends Params
   with SubStage[RegressionModelSelector] {
   val sparkLR = new LinearRegression()
 
@@ -51,13 +51,13 @@ private[regression] trait HasLinearRegression extends Params
   )
   setDefault(useLR, false)
 
-  private[regression] val lRGrid = new ParamGridBuilder()
+  private[op] val lRGrid = new ParamGridBuilder()
 
 
   /**
    * Linear Regression Params
    */
-  private[regression] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
+  private[op] def setLRParams[T: ClassTag](pName: String, values: Seq[T]): this.type = {
     val p: Param[T] = sparkLR.getParam(pName).asInstanceOf[Param[T]]
     lRGrid.addGrid(p, values)
     subStage.foreach(_.setLRParams[T](pName, values))
@@ -136,7 +136,7 @@ private[regression] trait HasLinearRegression extends Params
 /**
  * RandomForest Regressor for Model Selector
  */
-private[regression] trait HasRandomForestRegressor
+private[op] trait HasRandomForestRegressor
   extends HasRandomForestBase[Regressor, SelectorRegressors] {
   override val sparkRF: Regressor = new RandomForestRegressor().asInstanceOf[Regressor]
 }
@@ -144,7 +144,7 @@ private[regression] trait HasRandomForestRegressor
 /**
  * Decision Tree Regressor for Model Selector
  */
-private[regression] trait HasDecisionTreeRegressor
+private[op] trait HasDecisionTreeRegressor
   extends HasDecisionTreeBase[Regressor, SelectorRegressors] {
   override val sparkDT: Regressor = new DecisionTreeRegressor().asInstanceOf[Regressor]
 }
@@ -153,7 +153,7 @@ private[regression] trait HasDecisionTreeRegressor
 /**
  * GradientBoostedTree Regressor for Model Selector
  */
-private[regression] trait HasGradientBoostedTreeRegression
+private[op] trait HasGradientBoostedTreeRegression
   extends HasGradientBoostedTreeBase[Regressor, SelectorRegressors] {
   override val sparkGBT: Regressor = new GBTRegressor().asInstanceOf[Regressor]
 }
@@ -171,12 +171,11 @@ object LossType extends Enum[LossType] {
 /**
  * Regressors to try in the Model Selector
  */
-private[impl] trait SelectorRegressors
+private[op] trait SelectorRegressors
   extends HasLinearRegression
     with HasRandomForestRegressor
     with HasDecisionTreeRegressor
-    with HasGradientBoostedTreeRegression
-    with SelectorModels[Regressor, RegressionModelSelector] {
+    with HasGradientBoostedTreeRegression {
 
   // scalastyle:off
   import RegressionModelsToTry._
@@ -199,9 +198,10 @@ private[impl] trait SelectorRegressors
     this
   }
 
-  final override protected[impl] def modelInfo: Seq[ModelInfo[Regressor]] =
-    Seq(ModelInfo(sparkLR.asInstanceOf[Regressor], lRGrid, useLR),
-      ModelInfo(sparkRF.asInstanceOf[Regressor], rFGrid, useRF),
-      ModelInfo(sparkDT.asInstanceOf[Regressor], dTGrid, useDT),
-      ModelInfo(sparkGBT.asInstanceOf[Regressor], gBTGrid, useGBT))
+  final protected def getModelInfo: Seq[ModelInfo[Regressor]] = Seq(
+    ModelInfo(sparkLR.asInstanceOf[Regressor], lRGrid, useLR),
+    ModelInfo(sparkRF.asInstanceOf[Regressor], rFGrid, useRF),
+    ModelInfo(sparkDT.asInstanceOf[Regressor], dTGrid, useDT),
+    ModelInfo(sparkGBT.asInstanceOf[Regressor], gBTGrid, useGBT)
+  )
 }

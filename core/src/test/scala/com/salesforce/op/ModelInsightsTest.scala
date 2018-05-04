@@ -224,6 +224,19 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
   }
 
+  it should "have feature insights for features that are removed by the raw feature filter" in {
+    val model = new OpWorkflow()
+      .setResultFeatures(predLin, prob)
+      .setParameters(params)
+      .withRawFeatureFilter(Option(simpleReader), Option(dataReader), 50, 0.2, 0.3, 2, 0.5)
+      .train()
+    val insights = model.modelInsights(pred)
+    model.blacklistedFeatures should contain theSameElementsAs Array(height)
+    val heightIn = insights.features.find(_.featureName == height.name).get
+    heightIn.derivedFeatures.size shouldBe 1
+    heightIn.derivedFeatures.head.excluded shouldBe Some(true)
+  }
+
   val labelName = "l"
 
   val summary = SanityCheckerSummary(
@@ -231,15 +244,28 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       CorrelationType.Pearson),
     dropped = Seq("f1_0"),
     featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
-      min = Seq(1.1, 1.2, 1.3, 1.0), mean = Seq(2.1, 2.2, 2.3, 2.0), variance = Seq(3.1, 3.2, 3.3, 3.0),
-      numNull = Seq(4.1, 4.2, 4.3, 4.0)),
+      min = Seq(1.1, 1.2, 1.3, 1.0), mean = Seq(2.1, 2.2, 2.3, 2.0), variance = Seq(3.1, 3.2, 3.3, 3.0)),
     names = Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2", labelName),
-    categoricalStats = CategoricalStats(
-      categoricalFeatures = Array("f0_f0_f2_1", "f0_f0_f3_2"),
-      cramersVs = Array(6.2, 6.3),
-      pointwiseMutualInfos = Map("0" -> Array(7.2, 7.3), "1" -> Array(8.2, 8.3), "2" -> Array(9.2, 9.3)),
-      mutualInfos = Array(10.2, 10.3),
-      counts = Map("0" -> Array(11.2, 11.3, 11.0), "1" -> Array(12.2, 12.3, 12.0), "2" -> Array(13.2, 13.3, 13.0))
+    categoricalStats = Array(
+      CategoricalGroupStats(
+        group = "f0_f0_f2",
+        categoricalFeatures = Array("f0_f0_f2_1"),
+        contingencyMatrix = Map("0" -> Array(13.0, 17.0), "1" -> Array(5.0, 15.0), "2" -> Array(14.0, 36.0)),
+        cramersV = 6.2,
+        pointwiseMutualInfo = Map("0" -> Array(7.2), "1" -> Array(8.2), "2" -> Array(9.2)),
+        mutualInfo = 10.2,
+        maxRuleConfidences = Array(0.0),
+        supports = Array(1.0)
+      ), CategoricalGroupStats(
+        group = "f0_f0_f2",
+        categoricalFeatures = Array( "f0_f0_f3_2"),
+        contingencyMatrix = Map("0" -> Array(11.0, 12.0), "1" -> Array(12.0, 12.0), "2" -> Array(13.0, 12.0)),
+        cramersV = 6.3,
+        pointwiseMutualInfo = Map("0" -> Array(7.3), "1" -> Array(8.3), "2" -> Array(9.3)),
+        mutualInfo = 10.3,
+        maxRuleConfidences = Array(0.0),
+        supports = Array(1.0)
+      )
     )
   )
 
@@ -251,13 +277,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     "fv",
     OpVectorColumnMetadata(
       parentFeatureName = Seq("f1"),
-      parentFeatureType = Seq(FeatureTypeDefaults.Real.getClass.getName),
+      parentFeatureType = Seq(classOf[Real].getName),
       indicatorGroup = None,
       indicatorValue = None
     ) +: Array("f2", "f3").map { name =>
       OpVectorColumnMetadata(
         parentFeatureName = Seq("f0"),
-        parentFeatureType = Seq(FeatureTypeDefaults.PickList.getClass.getName),
+        parentFeatureType = Seq(classOf[PickList].getName),
         indicatorGroup = Option("f0"),
         indicatorValue = Option(name)
       )
@@ -269,20 +295,22 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
     labelSum.labelName shouldBe Some(labelName)
     labelSum.rawFeatureName shouldBe lbl.history().originFeatures
-    labelSum.rawFeatureType shouldBe Seq(FeatureTypeDefaults.RealNN.getClass.getName)
+    labelSum.rawFeatureType shouldBe Seq(classOf[RealNN].getName)
     labelSum.stagesApplied shouldBe lbl.history().stages
     labelSum.sampleSize shouldBe Some(3.0)
     labelSum.distribution.get.isInstanceOf[Discrete] shouldBe true
     labelSum.distribution.get.asInstanceOf[Discrete].domain should contain theSameElementsAs Array("0", "1", "2")
-    labelSum.distribution.get.asInstanceOf[Discrete].prob should contain theSameElementsAs Array(11.0, 12.0, 13.0)
+    labelSum.distribution.get.asInstanceOf[Discrete].prob should contain theSameElementsAs Array(0.3, 0.2, 0.5)
   }
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
-    val featureInsights = ModelInsights.getFeatureInsights(Option(meta), Option(summary), None, Array(f1, f0))
+    val featureInsights = ModelInsights.getFeatureInsights(
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty
+    )
     featureInsights.size shouldBe 2
 
     val f1In = featureInsights.find(_.featureName == "f1").get
-    f1In.featureType shouldBe FeatureTypeDefaults.Real.getClass.getName
+    f1In.featureType shouldBe classOf[Real].getName
     f1In.derivedFeatures.size shouldBe 1
 
     val f1InDer = f1In.derivedFeatures.head
@@ -301,11 +329,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f1InDer.max shouldBe Some(0.1)
     f1InDer.mean shouldBe Some(2.1)
     f1InDer.variance shouldBe Some(3.1)
-    f1InDer.numberOfNulls shouldBe Some(4.1)
 
     val f0In = featureInsights.find(_.featureName == "f0").get
     f0In.featureName shouldBe "f0"
-    f0In.featureType shouldBe FeatureTypeDefaults.PickList.getClass.getName
+    f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
 
     val f0InDer2 = f0In.derivedFeatures.head
@@ -318,13 +345,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer2.cramersV shouldBe Some(6.2)
     f0InDer2.mutualInformation shouldBe Some(10.2)
     f0InDer2.pointwiseMutualInformation shouldBe Map("0" -> 7.2, "1" -> 8.2, "2" -> 9.2)
-    f0InDer2.countMatrix shouldBe Map("0" -> 11.2, "1" -> 12.2, "2" -> 13.2)
+    f0InDer2.countMatrix shouldBe Map("0" -> 13.0, "1" -> 5.0, "2" -> 14.0)
     f0InDer2.contribution shouldBe Seq.empty
     f0InDer2.min shouldBe Some(1.2)
     f0InDer2.max shouldBe Some(0.2)
     f0InDer2.mean shouldBe Some(2.2)
     f0InDer2.variance shouldBe Some(3.2)
-    f0InDer2.numberOfNulls shouldBe Some(4.2)
 
     val f0InDer3 = f0In.derivedFeatures.last
     f0InDer3.derivedFeatureName shouldBe "f0_f0_f3_2"
@@ -336,13 +362,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer3.cramersV shouldBe Some(6.3)
     f0InDer3.mutualInformation shouldBe Some(10.3)
     f0InDer3.pointwiseMutualInformation shouldBe Map("0" -> 7.3, "1" -> 8.3, "2" -> 9.3)
-    f0InDer3.countMatrix shouldBe Map("0" -> 11.3, "1" -> 12.3, "2" -> 13.3)
+    f0InDer3.countMatrix shouldBe Map("0" -> 11.0, "1" -> 12.0, "2" -> 13.0)
     f0InDer3.contribution shouldBe Seq.empty
     f0InDer3.min shouldBe Some(1.3)
     f0InDer3.max shouldBe Some(0.3)
     f0InDer3.mean shouldBe Some(2.3)
     f0InDer3.variance shouldBe Some(3.3)
-    f0InDer3.numberOfNulls shouldBe Some(4.3)
   }
 
 }

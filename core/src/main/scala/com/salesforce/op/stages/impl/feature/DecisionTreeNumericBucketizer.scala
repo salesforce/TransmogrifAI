@@ -7,16 +7,17 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.AllowLabelAsInput
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.classification.Impurity
 import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.classification.DecisionTreeClassifier
-import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.tree.RichNode._
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.sql.types.Metadata
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -26,6 +27,7 @@ import scala.reflect.runtime.universe.TypeTag
  * @param operationName unique name of the operation this stage performs
  * @param uid           uid for instance
  * @param tti2          type tag for numeric feature type
+ * @param ttiv2         type tag for numeric feature value type
  * @param nev           numeric evidence for feature type value
  * @tparam N  numeric feature type value
  * @tparam I2 numeric feature type
@@ -36,61 +38,30 @@ class DecisionTreeNumericBucketizer[N, I2 <: OPNumeric[N]]
   uid: String = UID[DecisionTreeNumericBucketizer[_, _]]
 )(
   implicit tti2: TypeTag[I2],
+  ttiv2: TypeTag[I2#Value],
   val nev: Numeric[N]
 ) extends BinaryEstimator[RealNN, I2, OPVector](operationName = operationName, uid = uid)
   with DecisionTreeNumericBucketizerParams
   with VectorizerDefaults with TrackInvalidParam
-  with TrackNullsParam with NumericBucketizerMetadata {
-
-  // Since we bucketize based on the label information we override the response function allowing label leakage here,
-  // except the cases where both input features are responses
-  override protected def outputIsResponse: Boolean = getTransientFeatures().forall(_.isResponse)
+  with TrackNullsParam with NumericBucketizerMetadata
+  with AllowLabelAsInput[OPVector] {
 
   def fitFn(dataset: Dataset[(Option[Double], Option[N])]): BinaryModel[RealNN, I2, OPVector] = {
     import dataset.sparkSession.implicits._
 
-    val (labelColumn, featureColumn) = in1.name -> in2.name
-    val ds = dataset.filter(_._2.isDefined) // drop the missing feature values
+    require(!dataset.isEmpty, "Dataset is empty, buckets cannot be computed.")
 
-    val splits: Array[Double] = {
-      // Check if input data is empty - prevents from decision tree classifier to fail
-      if (ds.isEmpty) {
-        logWarning(s"Unable to find buckets for feature '$featureColumn' since it contains only empty values.")
-        Array.empty
-      }
-      else {
-        val data =
-          ds.map { case (label, feature) => label -> Vectors.dense(Array(nev.toDouble(feature.get))) }
-            .toDF(labelColumn, featureColumn)
+    val data: Dataset[(Double, Double)] =
+      dataset
+        .filter(_._2.isDefined) // drop the missing feature values
+        .map { case (l, v) => l.get -> nev.toDouble(v.get) }
 
-        new DecisionTreeClassifier()
-          .setImpurity(getImpurity)
-          .setMaxDepth(getMaxDepth)
-          .setMaxBins(getMaxBins)
-          .setMinInstancesPerNode(getMinInstancesPerNode)
-          .setMinInfoGain(getMinInfoGain)
-          .setLabelCol(labelColumn)
-          .setFeaturesCol(featureColumn)
-          .fit(data)
-          .rootNode.splits
-      }
-    }
-    val theSplits = Double.NegativeInfinity +: splits :+ Double.PositiveInfinity
-
-    // TODO: additionally add logic to inspect the gain from the trained decision tree model
-    // and figure out if we need to split at all, otherwise simply produce an empty vector
-    val shouldSplit = NumericBucketizer.checkSplits(theSplits)
-
-    val (finalSplits, bucketLabels) =
-      if (shouldSplit) {
-        theSplits -> NumericBucketizer.splitsToBucketLabels(theSplits, DecisionTreeNumericBucketizer.Inclusion)
-      }
-      else Array.empty[Double] -> Array.empty[String]
+    val Splits(shouldSplit, finalSplits, bucketLabels) = computeSplits(data, featureName = in2.name)
 
     val meta = makeMetadata(shouldSplit, finalSplits, bucketLabels)
     setMetadata(meta)
 
-    new DecisionTreeNumericBucketizerModel[N, I2](
+    new DecisionTreeNumericBucketizerModel[I2](
       shouldSplit = shouldSplit,
       splits = finalSplits,
       trackNulls = $(trackNulls),
@@ -100,22 +71,17 @@ class DecisionTreeNumericBucketizer[N, I2 <: OPNumeric[N]]
     )
   }
 
-  private def makeMetadata(shouldSplit: Boolean, splits: Array[Double], bucketLabels: Array[String]): Metadata = {
-    val vectorMeta = makeVectorMetadata(
-      input = in2, bucketLabels = bucketLabels,
-      trackNulls = shouldSplit && $(trackNulls),
+  private def makeMetadata(shouldSplit: Boolean, splits: Array[Double], bucketLabels: Array[String]): Metadata =
+    makeVectorMetadata(
+      input = in2,
+      bucketLabels = bucketLabels,
+      trackNulls = $(trackNulls),
       trackInvalid = shouldSplit && $(trackInvalid)
-    )
-    val splitsMeta = new MetadataBuilder()
-      .putBoolean(DecisionTreeNumericBucketizer.ShouldSplitKey, shouldSplit)
-      .putDoubleArray(DecisionTreeNumericBucketizer.SplitsKey, splits)
-      .build()
-    vectorMeta.toMetadata.withSummaryMetadata(splitsMeta)
-  }
+    ).toMetadata
 
 }
 
-final class DecisionTreeNumericBucketizerModel[N, I2 <: OPNumeric[N]] private[op]
+final class DecisionTreeNumericBucketizerModel[I2 <: OPNumeric[_]] private[op]
 (
   val shouldSplit: Boolean,
   val splits: Array[Double],
@@ -123,24 +89,25 @@ final class DecisionTreeNumericBucketizerModel[N, I2 <: OPNumeric[N]] private[op
   val trackInvalid: Boolean,
   operationName: String,
   uid: String
-)(
-  implicit tti2: TypeTag[I2],
-  val nev: Numeric[N]
-) extends BinaryModel[RealNN, I2, OPVector](operationName = operationName, uid = uid) {
+)(implicit tti2: TypeTag[I2])
+  extends BinaryModel[RealNN, I2, OPVector](operationName = operationName, uid = uid)
+  with AllowLabelAsInput[OPVector] {
 
   def transformFn: (RealNN, I2) => OPVector = (_, input) =>
-    if (shouldSplit) NumericBucketizer.bucketize[N, I2](
+    NumericBucketizer.bucketize(
+      shouldSplit = shouldSplit,
       splits = splits,
       trackNulls = trackNulls,
       trackInvalid = trackInvalid,
       splitInclusion = DecisionTreeNumericBucketizer.Inclusion,
-      input
-    )
-    else OPVector.empty
+      input = input.toDouble
+    ).toOPVector
 
 }
 
-trait DecisionTreeNumericBucketizerParams extends Params {
+
+trait DecisionTreeNumericBucketizerParams {
+  self: PipelineStage =>
 
   /**
    * Criterion used for information gain calculation (case-insensitive).
@@ -243,6 +210,59 @@ trait DecisionTreeNumericBucketizerParams extends Params {
     impurity -> DecisionTreeNumericBucketizer.Impurity.sparkName
   )
 
+  /**
+   * Computed splits
+   *
+   * @param shouldSplit  should or not split
+   * @param splits       computed split values
+   * @param bucketLabels bucket labels
+   */
+  case class Splits(shouldSplit: Boolean, splits: Array[Double], bucketLabels: Array[String])
+
+  /**
+   * Compute splits using [[DecisionTreeClassifier]]
+   *
+   * @param data        input dataset of (label, feature) tuples
+   * @param featureName feature name
+   * @return computed [[Splits]]
+   */
+  protected def computeSplits(data: Dataset[(Double, Double)], featureName: String): Splits = {
+    import data.sparkSession.implicits._
+
+    val splits: Array[Double] = {
+      // Check if input data is empty - prevents from decision tree classifier to fail
+      if (data.isEmpty) {
+        logWarning(s"Unable to find buckets for feature '$featureName' since it contains only empty values.")
+        Array.empty
+      }
+      else {
+        val ds = data.map { case (label, v) => label -> Vectors.dense(Array(v)) }
+        new DecisionTreeClassifier()
+          .setImpurity(getImpurity)
+          .setMaxDepth(getMaxDepth)
+          .setMaxBins(getMaxBins)
+          .setMinInstancesPerNode(getMinInstancesPerNode)
+          .setMinInfoGain(getMinInfoGain)
+          .setLabelCol(ds.columns(0))
+          .setFeaturesCol(ds.columns(1))
+          .fit(ds)
+          .rootNode.splits
+      }
+    }
+    val theSplits = Double.NegativeInfinity +: splits :+ Double.PositiveInfinity
+
+    // TODO: additionally add logic to inspect the gain from the trained decision tree model
+    // and figure out if we need to split at all, otherwise simply produce an empty vector
+    val shouldSplit = NumericBucketizer.checkSplits(theSplits)
+
+    val (finalSplits, bucketLabels) =
+      if (shouldSplit) {
+        theSplits -> NumericBucketizer.splitsToBucketLabels(theSplits, DecisionTreeNumericBucketizer.Inclusion)
+      } else Array.empty[Double] -> Array.empty[String]
+
+    Splits(shouldSplit, finalSplits, bucketLabels)
+  }
+
 }
 
 case object DecisionTreeNumericBucketizer {
@@ -250,8 +270,6 @@ case object DecisionTreeNumericBucketizer {
   val MaxDepth: Int = 5
   val MaxBins: Int = 32
   val MinInstancesPerNode: Int = 1
-  val MinInfoGain: Double = 0.1
-  val ShouldSplitKey = "shouldSplit"
-  val SplitsKey = "splits"
+  val MinInfoGain: Double = 0.01
   val Inclusion = com.salesforce.op.stages.impl.feature.Inclusion.Right
 }

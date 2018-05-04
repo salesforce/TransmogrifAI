@@ -62,8 +62,7 @@ abstract class UnaryEstimator[I <: FeatureType, O <: FeatureType]
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): UnaryModel[I, O] = {
-    transformSchema(dataset.schema)
-    setInputSchema(dataset.schema)
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val df = dataset.select(in1.name)
     val ds = df.map(r => iConvert.fromSpark(r.get(0)).value)
@@ -73,6 +72,7 @@ abstract class UnaryEstimator[I <: FeatureType, O <: FeatureType]
       .setParent(this)
       .setInput(in1.asFeatureLike[I])
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

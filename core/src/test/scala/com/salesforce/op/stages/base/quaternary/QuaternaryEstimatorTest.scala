@@ -31,7 +31,7 @@ class QuaternaryEstimatorTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testEstimator.setInput(age, stringMap, booleanMap, gender).getOutput()
     outputFeatures shouldBe new Feature[Real](
-      name = testEstimator.outputName,
+      name = testEstimator.getOutputFeatureName,
       originStage = testEstimator,
       isResponse = false,
       parents = Array(age, stringMap, booleanMap, gender)
@@ -49,7 +49,7 @@ class QuaternaryEstimatorTest extends FlatSpec with PassengerSparkFixtureTest {
         StructField(stringMap.name, MapType(StringType, StringType, true), true),
         StructField(booleanMap.name, MapType(StringType, BooleanType, true), true),
         StructField(gender.name, ArrayType(StringType, true), true),
-        StructField(testEstimator.outputName, DoubleType, true)
+        StructField(testEstimator.getOutputFeatureName, DoubleType, true)
       )
     )
 

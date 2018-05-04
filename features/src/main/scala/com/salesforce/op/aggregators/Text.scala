@@ -47,14 +47,10 @@ case object ConcatStreet extends ConcatTextWithSeparator[Street]
  */
 case object ModePickList extends MonoidAggregator[Event[PickList], Map[String, Int], PickList] {
   override def prepare(input: Event[PickList]): Map[String, Int] =
-    input.value.value.map(x => Map(x -> 1)).getOrElse(Map.empty[String, Int])
+    input.value.map(x => Map(x -> 1)).getOrElse(Map.empty[String, Int])
   override def present(reduction: Map[String, Int]): PickList = {
     // Only return an empty PickList if the all the PickLists in the aggregation are empty
-    if (reduction.isEmpty) PickList.empty
-    else {
-      val res: String = reduction.toSeq.sortBy(x => (-x._2, x._1)).head._1
-      PickList(res)
-    }
+    if (reduction.isEmpty) PickList.empty else reduction.minBy(x => (-x._2, x._1))._1.toPickList
   }
   val monoid: Monoid[Map[String, Int]] = Monoid.mapMonoid[String, Int]
 }

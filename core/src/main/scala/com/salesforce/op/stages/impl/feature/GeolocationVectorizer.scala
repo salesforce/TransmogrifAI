@@ -6,7 +6,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
-import com.salesforce.op.aggregators.{GeolocationFunctions, Geolocations}
+import com.salesforce.op.aggregators.{GeolocationFunctions, GeolocationMidpoint}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.utils.spark.OpVectorMetadata
@@ -60,11 +60,11 @@ class GeolocationVectorizer
         Seq.empty[Array[Double]]
       } else {
         preparedData.reduce((a, b) =>
-          a.zip(b).map { case (g1, g2) => Geolocations.monoid.plus(g1, g2) }
+          a.zip(b).map { case (g1, g2) => GeolocationMidpoint.monoid.plus(g1, g2) }
         )
       }
 
-    val means = reducedData.map(Geolocations.present(_).value)
+    val means = reducedData.map(GeolocationMidpoint.present(_).value)
     means
   }
 

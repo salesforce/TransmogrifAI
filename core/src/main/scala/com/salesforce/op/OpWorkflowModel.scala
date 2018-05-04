@@ -50,6 +50,21 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     this
   }
 
+  protected[op] def setBlacklist(features: Array[OPFeature]): this.type = {
+    blacklistedFeatures = features
+    this
+  }
+
+  /**
+   * Used to generate dataframe from reader and raw features list
+   *
+   * @return Dataframe with all the features generated + persisted
+   */
+  protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
+    require(reader.nonEmpty, "Data reader must be set")
+    checkReadersAndFeatures()
+    reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+  }
 
   /**
    * Returns a dataframe containing all the columns generated up to the feature input
@@ -58,8 +73,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @throws IllegalArgumentException if a feature is not part of this workflow
    * @return Dataframe containing columns corresponding to all of the features generated before the feature given
    */
-  def computeDataUpTo(feature: OPFeature)(implicit spark: SparkSession): DataFrame = {
-    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = true)
+  def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
+    (implicit spark: SparkSession): DataFrame = {
+    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = true, persistEveryKStages = persistEveryKStages)
   }
 
   /**
@@ -72,6 +88,21 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    */
   def getOriginStageOf[T <: FeatureType](feature: FeatureLike[T]): OpPipelineStage[T] = {
     findOriginStage(feature).asInstanceOf[OpPipelineStage[T]]
+  }
+
+  /**
+   * Gets the updated version of a feature when the DAG has been modified with a raw feature filter
+   *
+   * @param features feature want a the updated history for
+   * @throws IllegalArgumentException if a feature is not part of this workflow
+   * @return Updated instance of feature
+   */
+  // TODO change this method to give you raw features for use in stacked workflows
+  def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
+    val allFeatures = rawFeatures ++ blacklistedFeatures ++ stages.map(_.getOutput())
+    features.map{f => allFeatures.find(_.sameOrigin(f))
+      .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
+    }
   }
 
   /**
@@ -103,7 +134,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       case Some(_) =>
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
-        ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams)
+        ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams, blacklistedFeatures)
     }
   }
 
@@ -169,10 +200,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    */
   def score(
     path: Option[String] = None,
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores
   )(implicit spark: SparkSession): DataFrame = {
     val (scores, _) = scoreFn(
       keepRawFeatures = keepRawFeatures,
@@ -207,10 +238,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   def scoreAndEvaluate(
     evaluator: OpEvaluatorBase[_ <: EvaluationMetrics],
     path: Option[String] = None,
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores,
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores,
     metricsPath: Option[String] = None
   )(implicit spark: SparkSession): (DataFrame, EvaluationMetrics) = {
     val (scores, metrics) = scoreFn(
@@ -240,10 +271,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   private[op] def scoreFn(
-    keepRawFeatures: Boolean = OpWorkflowModel.keepRawFeatures,
-    keepIntermediateFeatures: Boolean = OpWorkflowModel.keepIntermediateFeatures,
-    persistEveryKStages: Int = OpWorkflowModel.persistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.persistScores,
+    keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
+    keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
+    persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
+    persistScores: Boolean = OpWorkflowModel.PersistScores,
     evaluator: Option[OpEvaluatorBase[_ <: EvaluationMetrics]] = None,
     metricsPath: Option[String] = None
   )(implicit spark: SparkSession): Option[String] => (DataFrame, Option[EvaluationMetrics]) = {
@@ -252,7 +283,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     // TODO: replace 'stages' with 'stagesDag'. (is a breaking change for serialization, but would simplify scoreFn)
 
     // Pre-compute transformations dag
-    val dag = computeStagesDAG(resultFeatures)
+    val dag = DAG.compute(resultFeatures)
 
     (path: Option[String]) => {
       // Generate the dataframe with raw features
@@ -312,7 +343,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val featuresToKeep: Array[String] = (keepRawFeatures, keepIntermediateFeatures) match {
       case (true, true) => Array.empty
       case (true, false) => (rawFeatures ++ resultFeatures).map(_.name) :+ KeyFieldName
-      case (false, true) => stages.map(_.outputName) :+ KeyFieldName
+      case (false, true) => stages.map(_.getOutputFeatureName) :+ KeyFieldName
       case (false, false) => resultFeatures.map(_.name) :+ KeyFieldName
     }
     val scores = featuresToKeep.distinct.toList.sorted match {
@@ -338,9 +369,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
 
 case object OpWorkflowModel {
 
-  val keepRawFeatures = false
-  val keepIntermediateFeatures = false
-  val persistEveryKStages = 5
-  val persistScores = true
+  val KeepRawFeatures = false
+  val KeepIntermediateFeatures = false
+  val PersistEveryKStages = 5
+  val PersistScores = true
 
 }

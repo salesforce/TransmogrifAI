@@ -10,7 +10,7 @@ import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeatur
 import com.salesforce.op.stages.{OpPipelineStageReader, _}
 import OpPipelineStageReadWriteShared._
 import org.apache.spark.ml.util.MLReader
-import org.json4s.JsonAST.{JArray, JValue}
+import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
 import scala.util.{Failure, Success, Try}
@@ -57,10 +57,24 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json))
+      blacklist <- Try(resolveBlacklist(json))
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
+      .setBlacklist(blacklist)
+  }
+
+  private def resolveBlacklist(json: JValue): Array[OPFeature] = {
+    if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
+      val blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[JArray].arr
+      val allFeatures = workflow.rawFeatures ++ workflow.blacklistedFeatures ++
+        workflow.stages.flatMap(s => s.getInputFeatures()) ++
+        workflow.resultFeatures
+      blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid.extract[String])).toArray
+    } else {
+      Array.empty[OPFeature]
+    }
   }
 
   private def resolveFeaturesAndStages(json: JValue): (Array[OPStage], Array[OPFeature]) = {

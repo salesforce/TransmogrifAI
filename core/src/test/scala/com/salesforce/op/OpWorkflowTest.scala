@@ -6,17 +6,18 @@
 package com.salesforce.op
 
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types._
+import com.salesforce.op.filters.RawFeatureFilter
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.readers._
 import com.salesforce.op.stages.base.unary._
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, Stage1BinaryClassificationModelSelector}
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning.DataBalancer
-import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.BooleanParam
@@ -48,6 +49,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   private lazy val workflowLocation = tempDir + "/op-workflow-test-model-" + DateTime.now().getMillis
   private lazy val workflowLocation2 = tempDir + "/op-workflow-test-model-2-" + DateTime.now().getMillis
   private lazy val workflowLocation3 = tempDir + "/op-workflow-test-model-3-" + DateTime.now().getMillis
+  private lazy val workflowLocation4 = tempDir + "/op-workflow-test-model-4-" + DateTime.now().getMillis
 
   Spec[OpWorkflow] should "correctly trace the history of stages needed to create the final output" in {
     workflow.getResultFeatures() shouldBe Array(whyNotNormed, weightNormed)
@@ -94,6 +96,65 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     error.getMessage.contains(weightNoUid.originStage.uid) shouldBe true
   }
 
+  it should "have a raw filter feature when specified" in {
+    val wf = new OpWorkflow()
+      .setResultFeatures(whyNotNormed, weightNormed)
+      .withRawFeatureFilter(Option(dataReader), None)
+    wf.rawFeatureFilter.get.isInstanceOf[RawFeatureFilter[_]] shouldBe true
+  }
+
+  it should "correctly remove blacklisted features when possible" in {
+    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
+    val survivedNum = survived.occurs()
+    val checked = survivedNum.sanityCheck(fv)
+    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, checked).getOutput()
+    val wf = new OpWorkflow()
+      .setResultFeatures(whyNotNormed, prob)
+      .withRawFeatureFilter(Option(dataReader), None)
+    wf.rawFeatures should contain theSameElementsAs
+      Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
+
+    val blacklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
+    wf.setBlacklist(blacklist)
+    wf.getBlacklist() should contain theSameElementsAs blacklist
+    wf.rawFeatures should contain theSameElementsAs
+      Array(boarded, booleanMap, height, survived, weight)
+    wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
+      Array(boarded, booleanMap, height, survived, weight)
+  }
+
+  it should "correctly allow you to interact with updated features when things are blacklisted" in {
+    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
+    val survivedNum = survived.occurs()
+    val checked = survivedNum.sanityCheck(fv)
+    val (pred, rawPred, prob) = BinaryClassificationModelSelector
+      .withTrainValidationSplit(splitter = None, seed = 42, validationMetric = Evaluators.BinaryClassification.error())
+      .setInput(survivedNum, checked).getOutput()
+    val wf = new OpWorkflow()
+      .setResultFeatures(whyNotNormed, prob)
+      .withRawFeatureFilter(Option(dataReader), None, minFillRate = 0.7)
+
+    val wfM = wf.train()
+    val data = wfM.score()
+    data.schema.fields.size shouldBe 3
+    val Array(whyNotNormed2, prob2) = wfM.getUpdatedFeatures(Array(whyNotNormed, prob))
+    data.select(whyNotNormed2.name, prob2.name).count() shouldBe 6
+  }
+
+  it should "throw an error when it is not possible to remove blacklisted features" in {
+    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
+    val survivedNum = survived.occurs()
+    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+    val wf = new OpWorkflow()
+      .setResultFeatures(whyNotNormed, prob)
+      .withRawFeatureFilter(Option(dataReader), None)
+
+    val error = intercept[RuntimeException](
+      wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap))
+    )
+    error.getMessage.contains("creation of required result feature (height-weight_4-stagesApplied_Real")
+  }
+
   it should "be able to compute a partial dataset in both workflow and workflow model" in {
     val fields =
       List(KeyFieldName, height.name, weight.name, heightNormed.name, density.name, densityByHeightNormed.name)
@@ -132,6 +193,20 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     model.reader.get shouldBe workflow.reader.get
   }
 
+  it should "use the raw feature filter to generate data instead of the reader when the filter is specified" in {
+    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
+    val survivedNum = survived.occurs()
+    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+    val wf = new OpWorkflow()
+      .setResultFeatures(pred, rawPred, prob)
+      .withRawFeatureFilter( Option(dataReader), Option(simpleReader),
+        maxFillRatioDiff = 1.0 ) // only height and the female key of maps should meet this criteria
+    val data = wf.computeDataUpTo(weight)
+
+    data.schema.fields.map(_.name).toSet shouldEqual
+      Set("key", "height", "survived", "stringMap", "numericMap", "booleanMap")
+  }
+
   it should "return a model that transforms the data correctly" in {
     val model = workflow.setReader(dataReader).train()
     val data = model.score()
@@ -140,8 +215,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     data.schema.fields.map(_.dataType) should contain only(StringType, DoubleType)
 
-    val partialData = model.computeDataUpTo(density)
-    partialData.schema.fieldNames should contain theSameElementsAs List("weight", "height", KeyFieldName)
+    val partialData = model.computeDataUpTo(density).schema.fieldNames
+    List("weight", "height", KeyFieldName).forall(n => partialData.contains(n)) shouldBe true
   }
 
   it should "leave the intermediate features in the scoring output, if requested to" in {
@@ -149,7 +224,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val data = model.score(keepRawFeatures = false, keepIntermediateFeatures = true)
 
     data.schema.fieldNames should contain theSameElementsAs
-      (workflow.stages.map(_.outputName) :+ KeyFieldName).distinct
+      (workflow.stages.map(_.getOutputFeatureName) :+ KeyFieldName).distinct
   }
 
   it should "leave the raw features in the scoring output, if requested to" in {
@@ -182,9 +257,46 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     workflow.stages.collect {
       case net: NormEstimatorTest[_] => net.getTest
-    } should contain theSameElementsAs Array(false, true, true)
+    } should contain theSameElementsAs Array(true, true, true)
 
     workflow.setParameters(new OpParams())
+  }
+
+  it should "correctly set parameters on the workflow even when the params are not spark params" in {
+    val features = Seq(height, weight, gender, age).transmogrify()
+    val survivedNum = survived.occurs()
+    val (pred, rawPred, prob) =
+      BinaryClassificationModelSelector.withCrossValidation(
+        seed = 4242,
+        splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)))
+        .setModelsToTry(LogisticRegression)
+        .setLogisticRegressionRegParam(0.01)
+        .setInput(survivedNum, features)
+        .getOutput()
+    val newWorkflow = new OpWorkflow().setResultFeatures(features, pred)
+
+    newWorkflow.stages.collect {
+      case bc: Stage1BinaryClassificationModelSelector =>
+        bc.get(bc.useLR) shouldBe Some(true)
+        bc.get(bc.useRF) shouldBe Some(false)
+        bc.lRGrid.build().length shouldBe 1
+    }
+
+    newWorkflow.setParameters(
+      OpParams(stageParams =
+        Map("Stage1BinaryClassificationModelSelector" ->
+          Map("LogisticRegressionRegParam" -> Seq(0.05, 0.5, 5),
+            "ModelsToTry" -> Seq(LogisticRegression, RandomForest)
+          ))
+      )
+    )
+    newWorkflow.stages.collect {
+      case bc: Stage1BinaryClassificationModelSelector =>
+        bc.get(bc.useLR) shouldBe Some(true)
+        bc.get(bc.useRF) shouldBe Some(true)
+        bc.lRGrid.build().length shouldBe 3
+    }
+
   }
 
   it should "allow addition of features to a fitted workflow by producing a new workflow with the fitted stages" in {
@@ -339,10 +451,12 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "work with data passed in RDD rather than DataReader" in {
-    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
-    val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
-    val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
-    val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
+    val (ds, f1, f2, f3) = TestFeatureBuilder(Seq(
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal)
+    ))
+    val rdd = ds.rdd
     val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
     val wf = new OpWorkflow().setResultFeatures(f).setInputRDD(rdd)
     val modelLocation = checkpointDir + "/setInputRDD"
@@ -352,12 +466,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "work with data passed in Dataset rather than DataReader" in {
-    import spark.implicits._
-    val rdd = sc.parallelize(Seq((1.0, 2.0, 3.0), (1.0, 2.0, 3.0), (1.0, 2.0, 3.0)))
-    val ds = spark.createDataset(rdd)
-    val f1 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._1.toReal).asPredictor
-    val f2 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._2.toReal).asPredictor
-    val f3 = FeatureBuilder.Real[(Double, Double, Double)].extract(_._3.toReal).asPredictor
+    val (ds, f1, f2, f3) = TestFeatureBuilder(Seq(
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal),
+      (1.0.toReal, 2.0.toReal, 3.0.toReal)
+    ))
     val f = (f1 + f2 + f3).fillMissingWithMean().zNormalize()
     val wf = new OpWorkflow().setResultFeatures(f).setInputDataset(ds)
     val modelLocation = checkpointDir + "/setInputDataset"
@@ -403,7 +516,7 @@ final class NormEstimatorTestModel[I <: Real] private[op]
   uid: String
 )(implicit tti: TypeTag[I])
   extends UnaryModel[I, Real](operationName = operationName, uid = uid) {
-  def transformFn: I => Real = _.map(v => (v - min) / (max - min)).toReal
+  def transformFn: I => Real = _.v.map(v => (v - min) / (max - min)).toReal
 }
 
 object NormEstimatorTest {

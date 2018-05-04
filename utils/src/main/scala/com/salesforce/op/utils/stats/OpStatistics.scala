@@ -11,26 +11,67 @@ import org.apache.spark.mllib.stat.Statistics
 object OpStatistics {
 
   /**
-   * 2-element result tuple containing (Map of label values to pointwise mutual information values,
-   * total mutual information between the feature and the label)
+   * Two-element result tuple containing a map of labels to values which is used for eg. pointwise mutual information
+   * or the contingency matrix itself.
    */
-  type PointwiseMutualInfo = Map[Int, Array[Double]]
+  object LabelWiseValues {
+    type Type = Map[String, Array[Double]]
+    def empty: Type = Map.empty
+  }
 
   /**
-   * Container class for statistics calculated from contingency tables constructed from categorical variables
+   * Converts a matrix object into a map from column index -> Array of column values
    *
-   * @param cramersV            Map between feature name in feature vector and Cramer's V value
+   * @param arr   Input matrix (can be dense or sparse)
+   * @return      Map from column index -> Array of column values
+   */
+  private def matrixToLableWiseStats(arr: Matrix): LabelWiseValues.Type = {
+    arr.colIter.zipWithIndex.map {
+      case (vec, idx) => idx.toString -> vec.toArray
+    }.toMap
+  }
+
+  /**
+   * Container for association rule confidence and supports
+   *
+   * @param maxConfidences  Array of maximum confidence values, one per contingency matrix row
+   * @param supports        Array of support values for each categorical value, one per contingency matrix row
+   */
+  case class ConfidenceResults(maxConfidences: Array[Double], supports: Array[Double])
+
+  /**
+   * Container class for statistics calculated from contingency matrices constructed from categorical variables
+   *
+   * @param chiSquaredResults   Chi-squared test results for the given contingency matrix
    * @param pointwiseMutualInfo Map between feature name in feature vector and map of pointwise mutual information
    *                            values between that feature and all values the label can take
+   * @param contingencyMatrix   Actual (unfiltered) contingency matrix that the rest of the results are calculated from
    * @param mutualInfo          Map between feature name in feature vector and the mutual information with the label
+   * @param confidenceResults   Association rule details (confidences + supports)
    */
-  case class ContingencyStats(cramersV: Double, pointwiseMutualInfo: PointwiseMutualInfo, mutualInfo: Double)
+  case class ContingencyStats
+  (
+    chiSquaredResults: ChiSquaredResults,
+    pointwiseMutualInfo: LabelWiseValues.Type,
+    contingencyMatrix: LabelWiseValues.Type,
+    mutualInfo: Double,
+    confidenceResults: ConfidenceResults
+  )
+
+  /**
+   * Case class for holding results of the Chi-squared statistical test we use for calculating Cramer's V
+   *
+   * @param cramersV        Cramer's V value
+   * @param chiSquaredStat  Actual Chi-squared statistic
+   * @param pValue          P-value
+   */
+  case class ChiSquaredResults(cramersV: Double, chiSquaredStat: Double, pValue: Double)
 
   /**
    * Filters out empty rows and columns from the contingency matrix
    *
-   * @param contingency
-   * @return
+   * @param contingency   Input contingency matrix (each column represents a label, each row a feature value)
+   * @return              Contingency matrix with any row or col consisting entirely of zeroes removed
    */
   private def filterEmpties(contingency: Matrix): Matrix = {
     if (contingency.numActives <= 0) return contingency
@@ -69,36 +110,39 @@ object OpStatistics {
   }
 
   /**
-   * Compute Cramer's V statistic based on the given contingency matrix and sample size. This will filter out the
-   * empty rows/cols from the contingency matrix before calculating Cramer's V since the chi-squared statistic
-   * used inside the Cramer's V calculation cannot be done on matrices with any rows/cols of all zeros
+   * Compute Cramer's V statistic (and other goodies from the chi-squared test) based on the given contingency matrix
+   * and sample size. This will filter out the empty rows/cols from the contingency matrix before calculating
+   * Cramer's V since the chi-squared statistic used inside the Cramer's V calculation cannot be done on matrices
+   * with any rows/cols of all zeros
    *
    * @see https://goo.gl/Fw6ZMN
    *
    * @param contingency Contingency matrix
-   * @return Cramer's V value for that contingency matrix
+   * @return ChiSquaredResults object containing results for that contingency matrix
    */
-  private[stats] def cramersV(contingency: Matrix): Double = {
+  private[stats] def chiSquaredTest(contingency: Matrix): ChiSquaredResults = {
     val filteredMatrix = filterEmpties(contingency)
-    cramersVOnFiltered(filteredMatrix)
+    chiSquaredTestOnFiltered(filteredMatrix)
   }
 
   /**
    * Cramer's V calculation, assuming the matrix passed in has had all its empty rows and columns filtered out. It
-   * will return Double.NaN if the contingency matrix does not have 2 or more rows/cols (each).
+   * will return Double.NaN if the contingency matrix does not have 2 or more rows/cols (each). Note
+   * that unlike the default behavior of scipy.stats.chi2_contingency, the chi-squared test here does not apply any
+   * corrections to the contingency matrix (eg. Yates').
    *
    * @param filteredMatrix Contingency matrix with no rows/cols of zeros
-   * @return Cramer's V value for that contingency matrix
+   * @return ChiSquaredResults object containing results for that contingency matrix
    */
-  private[stats] def cramersVOnFiltered(filteredMatrix: Matrix): Double = {
+  private[stats] def chiSquaredTestOnFiltered(filteredMatrix: Matrix): ChiSquaredResults = {
     if (filteredMatrix.numRows > 1 && filteredMatrix.numCols > 1) {
       val cols = filteredMatrix.numCols
       val sampleSize = filteredMatrix.multiply(new DenseMatrix(cols, 1, Array.fill(cols)(1.0))).values.sum
-      val chiSquare = Statistics.chiSqTest(filteredMatrix).statistic
-      val phiSquare = chiSquare / sampleSize
+      val chiSquareRes = Statistics.chiSqTest(filteredMatrix)
+      val phiSquare = chiSquareRes.statistic / sampleSize
       val denom = math.min(filteredMatrix.numRows - 1, filteredMatrix.numCols - 1)
-      math.sqrt(phiSquare / denom)
-    } else Double.NaN
+      ChiSquaredResults(math.sqrt(phiSquare / denom), chiSquareRes.statistic, chiSquareRes.pValue)
+    } else ChiSquaredResults(Double.NaN, Double.NaN, Double.NaN)
   }
 
   /**
@@ -110,7 +154,7 @@ object OpStatistics {
    * @return 2-element result tuple containing (Map of label values to pointwise mutual information values,
    *         total mutual information between the feature and the label)
    */
-  private[stats] def mutualInfoWithFilter(contingency: Matrix): (PointwiseMutualInfo, Double) = {
+  private[stats] def mutualInfoWithFilter(contingency: Matrix): (LabelWiseValues.Type, Double) = {
     val filteredMatrix = filterEmpties(contingency)
     mutualInfo(filteredMatrix)
   }
@@ -122,7 +166,7 @@ object OpStatistics {
    * @return 2-element result tuple containing (Map of label values to pointwise mutual information values,
    *         total mutual information between the feature and the label)
    */
-  private[stats] def mutualInfo(contingency: Matrix): (PointwiseMutualInfo, Double) = {
+  private[stats] def mutualInfo(contingency: Matrix): (LabelWiseValues.Type, Double) = {
     // First check contingency matrix to see make sure we can compute a chi-squared test on it
     val (rows, cols) = (contingency.numRows, contingency.numCols)
     // Add all the columns together
@@ -151,12 +195,33 @@ object OpStatistics {
 
     // We really want it to be a map to an array of doubles where the map key is the label (column index) and the
     // value is the array of PMI values for each of the features contained in the contingency matrix
-    val pmiMap = pmiArray.groupBy(_._1).mapValues(_.map(_._2))
+    val pmiMap = pmiArray.groupBy(_._1).map{
+      case (label, pmiValues) => label.toString -> pmiValues.map(_._2)
+    }
 
     // The mutual information is also easily calculated from all the pmi values and the contingency matrix
     val mi = pmiArray.map(_._2).zip(contingency.toArray).map { case (pmi, count) => pmi * count / sampleSize }.sum
 
     pmiMap -> mi
+  }
+
+  /**
+   * Calculates the max confidence of all the association rules per row. The confidence of the (i,j)th entry of
+   * the contingency matrix expresses how often the rule (choice i => label j) is satisfied.
+   *
+   * @param contingency
+   * @return
+   */
+  private[stats] def maxConfidences(contingency: Matrix): ConfidenceResults = {
+    val summedCols = contingency.multiply(new DenseMatrix(contingency.numCols, 1, Array.fill(contingency.numCols)(1.0)))
+    // summedCols.values.sum should be equal to the size of the data, so should always be >0 here
+    val supports = summedCols.values.map(_ / summedCols.values.sum)
+    val maxConfidences = contingency.rowIter.zip(summedCols.values.iterator).map(f => {
+      // If there is no support for this choice, just return 0 for the confidence instead of NaN or dividing by zero
+      if (f._2 == 0) 0 else f._1(f._1.argmax) / f._2
+    }).toArray
+
+    ConfidenceResults(maxConfidences = maxConfidences, supports = supports)
   }
 
   /**
@@ -171,31 +236,84 @@ object OpStatistics {
     val filteredMatrix = filterEmpties(contingency)
     // check if filteredMatrix is entirely empty
     if (filteredMatrix.numActives <= 0) {
-      return ContingencyStats(cramersV = Double.NaN, pointwiseMutualInfo = Map.empty, mutualInfo = 0.0)
+      ContingencyStats(
+        ChiSquaredResults(cramersV = Double.NaN, chiSquaredStat = Double.NaN, pValue = Double.NaN),
+        pointwiseMutualInfo = Map.empty,
+        contingencyMatrix = Map.empty,
+        mutualInfo = Double.NaN,
+        confidenceResults = ConfidenceResults(Array.empty, Array.empty)
+      )
     }
-    // If we filter out empty columns, then we don't end up with the right number of elements in pmiMap
-    val (pmiMap, mi) = mutualInfo(contingency) // mutualInfoOnFiltered(filteredMatrix)
-    val cvMap = cramersVOnFiltered(filteredMatrix)
+    else {
+      // If we filter out empty columns, then we don't end up with the right number of elements in pmiMap
+      val (pmiMap, mi) = mutualInfo(contingency) // mutualInfoOnFiltered(filteredMatrix)
+      val cvRes = chiSquaredTestOnFiltered(filteredMatrix)
+      val confRes = maxConfidences(contingency)
 
-    ContingencyStats(cramersV = cvMap, pointwiseMutualInfo = pmiMap, mutualInfo = mi)
+      ContingencyStats(
+        ChiSquaredResults(cramersV = cvRes.cramersV, chiSquaredStat = cvRes.chiSquaredStat, pValue = cvRes.pValue),
+        pointwiseMutualInfo = pmiMap,
+        contingencyMatrix = matrixToLableWiseStats(contingency),
+        mutualInfo = mi,
+        confidenceResults = confRes
+      )
+    }
   }
 
   /**
-   * Same as above method, except in this case, we are only passed one column, but have a 2x2 matrix. We need to
-   * return just one column of PMI values in order for the feature names to match the values in the PMI arrays.
-   * This function will only return the PMI values for the nullIndicator column
+   * Same as contingencyStats method, but specialized to MultiPickLists. The standard contingency table stats are
+   * not technically valid for MultiPickLists because the choices are not independent from each other (multipicklists
+   * are multi-hot encoded instead of one-hot encoded).
+   *
+   * There are several strategies to deal with this to calculate statistics similar to Cramer's V. We follow
+   * https://cran.r-project.org/web/packages/MRCV/vignettes/MRCV-vignette.pdf for inspiration, but use a slightly
+   * different scheme where we compute stats from a 2 x numLabels contingency matrix for each choice separately, and
+   * take the max of these Cramer's V values (one per choice) as the Cramer's V value for the entire MultiPickList. See
+   * BadFeatureZooTest for testing how this performs on different types of relations between MultiPickLists and the
+   * label.
    *
    * @param contingency Matrix of co-occurrences of feature values with label values. Each row represents a different
    *                    feature choice, while each column represents a different label value.
+   * @param labelCounts Array of counts of each label, used to construct the 2 x numLabels contingency matrices for
+   *                    each choice
    * @return ContingencyStats object containing all the statistics we calculate from contingency matrices
    */
-  def contingencyStatsFromSingleColumn(contingency: Matrix): ContingencyStats = {
-    val res = contingencyStats(contingency)
-    // The first row of the contingency matrix (first element of each column) is the actual content of the
-    // nullIndicator column so only use those PMI values
-    val truncatedPMI = res.pointwiseMutualInfo.mapValues(v => Array(v.head))
+  def contingencyStatsFromMultiPickList(contingency: Matrix, labelCounts: Array[Double]): ContingencyStats = {
+    // Filter the empty rows and columns out of the matrix
+    val filteredMatrix = filterEmpties(contingency)
 
-    ContingencyStats(cramersV = res.cramersV, pointwiseMutualInfo = truncatedPMI, mutualInfo = res.mutualInfo)
+    val cols = contingency.numCols
+
+    // Iterate through all the rows (multipicklist choices) of the matrix, and construct 2 x numLabels contingency
+    // matrices of just that single choice and compute statistics for each of those
+    val singleRowStats = filteredMatrix.rowIter.map(row => {
+      val singleChoiceValues = row.toArray.zipWithIndex.flatMap { case (x, i) => Array(x, labelCounts(i) - x) }
+      val singleChoiceContingencyMatrix = new DenseMatrix(numRows = 2, numCols = cols, values = singleChoiceValues)
+      contingencyStats(singleChoiceContingencyMatrix)
+    }).toArray
+
+    // Index of contingency matrix stats that has the largest Cramer's V
+    val winningIndex = singleRowStats.zipWithIndex.maxBy(_._1.chiSquaredResults.cramersV)._2
+    val winningStats = singleRowStats(winningIndex)
+
+    val fullMatrixStats = contingencyStats(contingency)
+    /*
+    Other potential Cramer's V values we tested, for completeness:
+    val sampleSize = filteredMatrix.multiply(new DenseMatrix(cols, 1, Array.fill(cols)(1.0))).values.sum
+
+    val avgCramersV = singleRowStats.map(_.cramersV).sum / singleRowStats.length
+    val adjustedCramersV = math.sqrt(avgChiSquaredStat / sampleSize)
+    val fullMatrixCramersV = fullMatrixStats.cramersV
+     */
+
+    // TODO: Figure out something better to do about PMI and MI for multipicklists than using the full matrix ones
+    ContingencyStats(
+      chiSquaredResults = winningStats.chiSquaredResults,
+      pointwiseMutualInfo = fullMatrixStats.pointwiseMutualInfo,
+      contingencyMatrix = matrixToLableWiseStats(contingency),
+      mutualInfo = fullMatrixStats.mutualInfo,
+      confidenceResults = fullMatrixStats.confidenceResults
+    )
   }
 
 }
