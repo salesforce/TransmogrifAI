@@ -8,6 +8,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe._
@@ -43,14 +44,13 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
 
     val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val theTrackNulls = $(trackNulls)
-
-    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName, theTrackNulls)
+    val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
+      stageName, $(trackNulls))
     setMetadata(vectorMeta.toMetadata)
 
     new MultiPickListMapVectorizerModel(
       topValues = topValues, shouldCleanKeys = shouldCleanKeys, shouldCleanValues = shouldCleanValues,
-      trackNulls = theTrackNulls, operationName = operationName, uid = uid
+      trackNulls = $(trackNulls), operationName = operationName, uid = uid
     )
   }
 

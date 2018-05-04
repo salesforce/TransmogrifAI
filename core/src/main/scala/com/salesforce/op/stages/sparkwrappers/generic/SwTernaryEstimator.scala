@@ -65,12 +65,14 @@ M <: Model[M], E <: Estimator[M] with Params]
       val p2 = e.getParam(inputParam2Name)
       val p3 = e.getParam(inputParam3Name)
       val po = e.getParam(outputParamName)
-      e.set(p1, in1.name).set(p2, in2.name).set(p3, in3.name).set(po, outputName).fit(dataset)
+      e.set(p1, in1.name).set(p2, in2.name).set(p3, in3.name).set(po, getOutputFeatureName).fit(dataset)
     }
 
     new SwTernaryModel[I1, I2, I3, O, M] (inputParam1Name, inputParam2Name, inputParam3Name, outputParamName,
       operationName, model, uid
-    ).setParent(this).setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2], in3.asFeatureLike[I3])
+    ).setParent(this)
+      .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2], in3.asFeatureLike[I3])
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

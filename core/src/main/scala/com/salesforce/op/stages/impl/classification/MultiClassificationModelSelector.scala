@@ -34,6 +34,8 @@ case object MultiClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed             random seed
+   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return MultiClassification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -41,10 +43,11 @@ case object MultiClassificationModelSelector {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): MultiClassificationModelSelector = {
     selector(
-      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric),
+      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -59,6 +62,8 @@ case object MultiClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
    * @param seed             random seed
+   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return MultiClassification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -66,13 +71,15 @@ case object MultiClassificationModelSelector {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): MultiClassificationModelSelector = {
     selector(
       new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
         trainRatio,
         seed,
-        validationMetric
+        validationMetric,
+        stratify
       ),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators

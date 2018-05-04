@@ -28,6 +28,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
 
   def stage: OpPipelineStageBase
   val expected: Array[Real]
+  val hasOutputName = true
 
   private val log = LoggerFactory.getLogger(this.getClass)
   private lazy val writer = new OpPipelineStageWriter(stage)
@@ -48,8 +49,13 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "write paramMap" in {
     val params = (stageJson \ FN.ParamMap.entryName).extract[Map[String, Any]]
-    params should have size 3
-    params.keys shouldBe Set("outputMetadata", "inputFeatures", "inputSchema")
+    if (hasOutputName) {
+      params should have size 4
+      params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema", "outputFeatureName")
+    } else {
+      params should have size 3
+      params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema")
+    }
   }
   it should "write outputMetadata" in {
     val metadataStr = compact(render((stageJson \ FN.ParamMap.entryName) \ "outputMetadata"))

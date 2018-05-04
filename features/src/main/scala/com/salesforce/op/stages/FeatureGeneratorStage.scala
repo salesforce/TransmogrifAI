@@ -38,7 +38,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   val extractFn: I => O,
   val extractSource: String,
   val aggregator: MonoidAggregator[Event[O], _, O],
-  override val outputName: String,
+  outputName: String,
   override val outputIsResponse: Boolean,
   val aggregateWindow: Option[Duration] = None,
   val uid: String = UID[FeatureGeneratorStage[I, O]]
@@ -46,6 +46,8 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   implicit val tti: WeakTypeTag[I],
   val tto: WeakTypeTag[O]
 ) extends PipelineStage with OpPipelineStage[O] with HasIn1 {
+
+  setOutputFeatureName(outputName)
 
   override type InputFeatures = OPFeature
 
@@ -57,7 +59,8 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
 
   // The output has to be val
   private final val output = Feature[O](
-    uid = outputFeatureUid, name = outputName, originStage = this, isResponse = outputIsResponse, parents = Seq.empty
+    uid = outputFeatureUid, name = getOutputFeatureName, originStage = this,
+    isResponse = outputIsResponse, parents = Seq.empty
   )
 
   val featureAggregator: FeatureAggregator[I, O, _, O] =
@@ -70,7 +73,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
 
   override def getOutput(): FeatureLike[O] = output
 
-  def operationName: String = s"$aggregator($outputName)"
+  def operationName: String = s"$aggregator($getOutputFeatureName)"
 
   /**
    * Check if the stage is serializable

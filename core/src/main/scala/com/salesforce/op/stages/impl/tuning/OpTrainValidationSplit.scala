@@ -20,10 +20,12 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
 import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
 import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.{Estimator, Model}
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.StructType
 
@@ -32,7 +34,8 @@ private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
 (
   val trainRatio: Double = ValidatorParamDefaults.TrainRatio,
   val seed: Long = ValidatorParamDefaults.Seed,
-  val evaluator: OpEvaluatorBase[_]
+  val evaluator: OpEvaluatorBase[_],
+  val stratify: Boolean = ValidatorParamDefaults.Stratify
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorBaseNames.TrainValSplitResults
@@ -49,13 +52,9 @@ private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
 
     val schema = dataset.schema
     import dataset.sparkSession.implicits._
-    val rdd = dataset.as[LabelFeaturesKey].rdd
-    // group by ID then split
-    val Array(trainingRDD, validationRDD) = rdd
-      .map { case (label, features, key) => key -> Row(label, features) }
-      .groupByKey()
-      .randomSplit(Array(trainRatio, 1 - trainRatio), seed)
-      .map(_.values.flatMap(identity))
+    val rdd = dataset.as[LabelFeaturesKey].rdd.persist()
+
+    val (trainingRDD, validationRDD) = createTrainValidationSplits(rdd).head
 
     val sparkSession = dataset.sparkSession
     val newSchema = StructType(schema.dropRight(1)) // dropping key
@@ -93,6 +92,7 @@ private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
     }
     trainingDataset.unpersist()
     validationDataset.unpersist()
+    rdd.unpersist()
 
     val model =
       if (evaluator.isLargerBetter) groupedSummary.maxBy(_.bestMetric)
@@ -102,4 +102,42 @@ private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
     wrapBestModel(groupedSummary.toArray, bestModel, s"$trainRatio training split")
   }
 
+  // TODO : Implement our own startified split method for better performance in a separate PR
+  /**
+   * Creates Train Validation Splits For TS
+   * @param rdd
+   * @return
+   */
+  private[op] override def createTrainValidationSplits(
+    rdd: RDD[(Double, Vector, String)]): Array[(RDD[Row], RDD[Row])] = {
+
+    val Array(trainData, validateData) = {
+      if (stratify && isClassification) {
+        log.info(s"Creating stratified train/validation with training ratio of $trainRatio")
+
+        val classes = rdd.map(_._1).distinct().collect()
+        // Creates RDD grouped by classes (0, 1, 2, 3, ..., K)
+        val rddByClass = classes.map(label => rdd.filter(_._1 == label)
+          .map { case (label, features, key) => key -> Seq(Row(label, features)) }.reduceByKey(_ ++ _))
+
+        // Train/Validation data for each class
+        val splitByClass = rddByClass.map(_.randomSplit(Array(trainRatio, 1 - trainRatio), seed)
+          .map(_.values.flatMap(identity)))
+
+        if (splitByClass.isEmpty) throw new Error("Train Validation Data Grouped by class is empty")
+        // Merging Train/Validation data one by one
+        splitByClass.reduce[Array[RDD[Row]]] {
+          case (Array(train1: RDD[Row], validate1: RDD[Row]), Array(train2: RDD[Row], validate2: RDD[Row])) =>
+            Array(train1.union(train2), validate1.union(validate2))
+        }
+
+      } else {
+        rdd.map { case (label, features, key) => key -> Seq(Row(label, features)) }
+          .reduceByKey(_ ++ _)
+          .randomSplit(Array(trainRatio, 1 - trainRatio), seed)
+          .map(_.values.flatMap(identity))
+      }
+    }
+    Array((trainData, validateData))
+  }
 }

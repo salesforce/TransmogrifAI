@@ -90,7 +90,10 @@ case class OpVectorColumnMetadata
    * Does column have parent features that are maps
    * @return boolean indicating whether parent feature type sequence contains Map types
    */
-  def hasMapParent(): Boolean = hasParentOfType("Map")
+  def hasMapParent(): Boolean = {
+    // TODO: move this class to `features` or `core` sub project to avoid mentioning types as strings
+    hasParentOfType("Map") || hasParentOfType("Prediction")
+  }
 
   /**
    * Does column have parent features of specified feature type

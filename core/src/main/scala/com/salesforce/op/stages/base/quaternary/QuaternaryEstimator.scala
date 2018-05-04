@@ -103,6 +103,7 @@ I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
       .setParent(this)
       .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2], in3.asFeatureLike[I3], in4.asFeatureLike[I4])
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 }
 

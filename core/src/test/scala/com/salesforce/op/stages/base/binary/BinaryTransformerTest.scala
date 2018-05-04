@@ -27,7 +27,7 @@ class BinaryTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
     val feats = bmi.getOutput()
 
     feats shouldBe new Feature[Real](
-      name = bmi.outputName,
+      name = bmi.getOutputFeatureName,
       originStage = bmi,
       isResponse = false,
       parents = Array(weight, height)
@@ -37,7 +37,7 @@ class BinaryTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "add column to DataFrame when transformed" in {
     val transformedData = bmi.transform(passengersDataSet)
     val columns = transformedData.columns
-    assert(columns.contains(bmi.outputName))
+    assert(columns.contains(bmi.getOutputFeatureName))
     val output = bmi.getOutput()
     val answer = passengersArray.map(r =>
       bmi.transformFn(r.getFeatureType[Real](weight), r.getFeatureType[RealNN](height))

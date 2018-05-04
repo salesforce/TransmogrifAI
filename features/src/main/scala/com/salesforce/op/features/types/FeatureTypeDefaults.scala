@@ -19,7 +19,6 @@ case object FeatureTypeDefaults {
   val Binary = new t.Binary(None)
   val Integral = new t.Integral(None)
   val Real = new t.Real(None)
-  val RealNN = new t.RealNN(Some(0.0))
   val Date = new t.Date(None)
   val DateTime = new t.DateTime(None)
   val Currency = new t.Currency(None)
@@ -130,7 +129,6 @@ case object FeatureTypeDefaults {
       case wt if wt =:= weakTypeOf[t.Integral] => Integral
       case wt if wt =:= weakTypeOf[t.Percent] => Percent
       case wt if wt =:= weakTypeOf[t.Real] => Real
-      case wt if wt =:= weakTypeOf[t.RealNN] => RealNN
 
       // Sets
       case wt if wt =:= weakTypeOf[t.MultiPickList] => MultiPickList

@@ -64,13 +64,11 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
     SparkDefaultParamsReadWrite.getAndSetParams(stage, metadata)
-    stage.getTransientFeatures().foreach(f => {
-      val feature = inputFeatures.find(_.uid == f.uid).getOrElse(
-        throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'")
-      )
-      f.setFeature(feature)
-    })
-    stage
+    val matchingFeatures = stage.getTransientFeatures().map{ f =>
+      inputFeatures.find( i => i.uid == f.uid && i.isResponse == f.isResponse && i.typeName == f.typeName )
+        .getOrElse( throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'") )
+    }
+    stage.setInputFeatureArray(matchingFeatures)
   }
 
   /**

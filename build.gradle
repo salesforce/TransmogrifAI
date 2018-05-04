@@ -63,6 +63,7 @@ configure(allProjs) {
         scalafmtVersion = '1.0.0-RC1'
         hadoopVersion = 'hadoop2'
         scalajCollVersion = '0.1.2'
+        json4sVersion = '3.2.11' // matches Spark dependency version
         jodaTimeVersion = '2.9.4'
         jodaConvertVersion = '1.8.1'
         algebirdVersion = '0.12.3'
@@ -256,7 +257,7 @@ configure(allProjs) {
 
 task wrapper(type: Wrapper) {
     description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.5.1'
+    gradleVersion = '4.6'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {

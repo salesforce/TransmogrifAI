@@ -9,8 +9,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import org.apache.spark.sql.{DataFrame, Dataset}
 import org.slf4j.LoggerFactory
 
 case object DataCutter {
@@ -34,13 +35,13 @@ case object DataCutter {
     new DataCutter()
       .setSeed(seed)
       .setReserveTestFraction(reserveTestFraction)
-      .setMaxLabelCategores(maxLabelCategories)
+      .setMaxLabelCategories(maxLabelCategories)
       .setMinLabelFraction(minLabelFraction)
   }
 }
 
 /**
- * Instance that will make a holdout set and prepare the data for multicalss modeling
+ * Instance that will make a holdout set and prepare the data for multiclass modeling
  * Creates instance that will split data into training and test set filtering out any labels that don't
  * meet the minimum fraction cutoff or fall in the top N labels specified.
  *
@@ -49,7 +50,6 @@ case object DataCutter {
 class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-
 
   /**
    * function to use to prepare the dataset for modeling
@@ -61,36 +61,54 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
     import data.sparkSession.implicits._
 
+    val keep =
+      if (!isSet(labelsToKeep) || !isSet(labelsToDrop)) {
+        val labels = data.map(r => r._1 -> 1L)
+        val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
+        val (resKeep, resDrop) = estimate(labelCounts)
+        labelCounts.unpersist()
+        setLabels(resKeep, resDrop)
+        resKeep
+      } else getLabelsToKeep.toSet
+
+    val dataUse = data.filter(r => keep.contains(r._1))
+
+    val labelsMeta = new MetadataBuilder()
+      .putDoubleArray(ModelSelectorBaseNames.LabelsKept, getLabelsToKeep)
+      .putDoubleArray(ModelSelectorBaseNames.LabelsDropped, getLabelsToDrop)
+
+    new ModelData(dataUse, labelsMeta)
+  }
+
+  /**
+   * Estimate the labels to keep and update metadata
+   *
+   * @param labelCounts
+   * @return Set of labels to keep & to drop
+   */
+  private[op] def estimate(labelCounts: DataFrame): (Set[Double], Set[Double]) = {
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
 
-    val labels = data.map(r => r._1 -> 1L)
-    val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
-    val totalValues = labelCounts.groupBy().sum(labelCounts.columns(1)).first().getLong(0).toDouble
+    val colCount = labelCounts.columns(1)
+    val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
     val labelsKeep = labelCounts
       .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
-      .sort($"sum(_2)".desc)
+      .sort(col(colCount).desc)
       .take(maxLabels)
       .map(_.getDouble(0))
 
     val labelSet = labelsKeep.toSet
-    val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0))
+    val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0)).toSet
 
     if (labelSet.size > 1) {
-      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: ${labelsDropped.toSet}")
+      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: $labelsDropped")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
         s"Label counts were: ${labelCounts.collect().toSeq}")
     }
-
-    val dataUse = data.filter(r => labelSet.contains(r._1))
-
-    val metadata = new MetadataBuilder()
-    metadata.putDoubleArray(ModelSelectorBaseNames.LabelsKept, labelsKeep)
-    metadata.putDoubleArray(ModelSelectorBaseNames.LabelsDropped, labelsDropped)
-
-    new ModelData(dataUse, metadata)
+    labelSet -> labelsDropped
   }
 
   override def copy(extra: ParamMap): DataCutter = {
@@ -107,7 +125,7 @@ private[impl] trait DataCutterParams extends Params {
   )
   setDefault(maxLabelCategories, SplitterParamsDefault.MaxLabelCategoriesDefault)
 
-  def setMaxLabelCategores(value: Int): this.type = {
+  def setMaxLabelCategories(value: Int): this.type = {
     set(maxLabelCategories, value)
   }
 
@@ -125,5 +143,20 @@ private[impl] trait DataCutterParams extends Params {
   }
 
   def getMinLabelFraction: Double = $(minLabelFraction)
+
+  private[op] final val labelsToKeep = new DoubleArrayParam(this, "labelsToKeep",
+    "labels to keep when applying the data cutter")
+
+  private[op] def setLabels(keep: Set[Double], drop: Set[Double]): this.type = {
+    set(labelsToKeep, keep.toArray.sorted)
+    set(labelsToDrop, drop.toArray.sorted)
+  }
+
+  private[op] def getLabelsToKeep: Array[Double] = $(labelsToKeep)
+
+  private[op] final val labelsToDrop = new DoubleArrayParam(this, "labelsDropped",
+    "labels to drop when applying the data cutter")
+
+  private[op] def getLabelsToDrop: Array[Double] = $(labelsToDrop)
 
 }

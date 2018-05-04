@@ -6,7 +6,7 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features._
-import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.features.types.{FeatureType, OPVector}
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataType._
 import org.apache.spark.ml.param._
@@ -158,15 +158,35 @@ trait OpPipelineStage[O <: FeatureType] extends OpPipelineStageBase {
   protected[op] def outputFeatureUid: String
 
   /**
+   * The name that the output feature and column should have if unset will use the default name
+   */
+  final private[op] val outputFeatureName = new Param[String](
+    parent = this, name = "outputFeatureName",
+    doc = "output name that overrides default output name for feature made by this stage"
+  )
+
+  def setOutputFeatureName(name: String): this.type = set(outputFeatureName, name)
+
+  /**
    * Name of output feature (i.e. column created by this stage)
    */
-  protected[op] def outputName: String = makeOutputName(outputFeatureUid, getTransientFeatures())
+  final def getOutputFeatureName: String =
+    get(outputFeatureName).getOrElse(makeOutputName(outputFeatureUid, getTransientFeatures()))
 
   /**
    * Should output feature be a response? Yes, if any of the input features are.
    * @return true if the the output feature should be a response
    */
   protected def outputIsResponse: Boolean = getTransientFeatures().exists(_.isResponse)
+
+}
+
+private[op] trait AllowLabelAsInput[O <: FeatureType] extends OpPipelineStage[O] {
+  self: PipelineStage =>
+
+  // Since we use label information we override the response function allowing label leakage here,
+  // except the cases where both input features are responses
+  abstract override def outputIsResponse: Boolean = getTransientFeatures().forall(_.isResponse)
 
 }
 
@@ -192,7 +212,7 @@ trait OpPipelineStage1[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
 
   override def getOutput(): FeatureLike[O] = new Feature[O](
     uid = outputFeatureUid,
-    name = outputName,
+    name = getOutputFeatureName,
     originStage = this,
     isResponse = outputIsResponse,
     parents = getInputFeatures()
@@ -291,7 +311,7 @@ trait OpPipelineStage2[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
 
   override def getOutput(): FeatureLike[O] = new Feature[O](
     uid = outputFeatureUid,
-    name = outputName,
+    name = getOutputFeatureName,
     originStage = this,
     isResponse = outputIsResponse,
     parents = getInputFeatures()
@@ -393,7 +413,7 @@ trait OpPipelineStage3[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, 
 
   override def getOutput(): FeatureLike[O] = new Feature[O](
     uid = outputFeatureUid,
-    name = outputName,
+    name = getOutputFeatureName,
     originStage = this,
     isResponse = outputIsResponse,
     parents = getInputFeatures()
@@ -462,7 +482,7 @@ trait OpPipelineStage4[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, 
 
   override def getOutput(): FeatureLike[O] = new Feature[O](
     uid = outputFeatureUid,
-    name = outputName,
+    name = getOutputFeatureName,
     originStage = this,
     isResponse = outputIsResponse,
     parents = getInputFeatures()
@@ -496,7 +516,7 @@ trait OpPipelineStageN[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
 
   override def getOutput(): FeatureLike[O] = new Feature[O](
     uid = outputFeatureUid,
-    name = outputName,
+    name = getOutputFeatureName,
     originStage = this,
     isResponse = outputIsResponse,
     parents = getInputFeatures()

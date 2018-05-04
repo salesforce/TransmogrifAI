@@ -59,12 +59,13 @@ M <: Model[M], E <: Estimator[M] with Params]
       val p1 = e.getParam(inputParam1Name)
       val p2 = e.getParam(inputParam2Name)
       val po = e.getParam(outputParamName)
-      e.set(p1, in1.name).set(p2, in2.name).set(po, outputName).fit(dataset)
+      e.set(p1, in1.name).set(p2, in2.name).set(po, getOutputFeatureName).fit(dataset)
     }
 
     new SwBinaryModel[I1, I2, O, M](inputParam1Name, inputParam2Name, outputParamName, operationName, model, uid)
       .setParent(this)
       .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2])
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

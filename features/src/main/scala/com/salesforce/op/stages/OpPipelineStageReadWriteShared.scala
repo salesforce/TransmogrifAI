@@ -5,8 +5,10 @@
 
 package com.salesforce.op.stages
 
+import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import enumeratum._
+import org.json4s.ext.JodaTimeSerializers
 import org.json4s.{DefaultFormats, Formats}
 
 
@@ -50,6 +52,10 @@ object OpPipelineStageReadWriteShared {
   case class AnyValue(`type`: AnyValueTypes, value: Any)
 
   implicit val formats: Formats =
-    DefaultFormats + EnumEntrySerializer[AnyValueTypes](AnyValueTypes) + new SpecialDoubleSerializer
+    DefaultFormats ++
+      JodaTimeSerializers.all +
+      EnumEntrySerializer.json4s[AnyValueTypes](AnyValueTypes) +
+      EnumEntrySerializer.json4s[HashAlgorithm](HashAlgorithm) +
+      new SpecialDoubleSerializer
 
 }

@@ -31,7 +31,7 @@ class UnaryTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
     val feats = scaleBy2.getOutput()
 
     feats shouldBe new Feature[Real](
-      name = scaleBy2.outputName,
+      name = scaleBy2.getOutputFeatureName,
       originStage = scaleBy2,
       isResponse = false,
       parents = Array(weight)
@@ -43,7 +43,7 @@ class UnaryTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
     val transformedData = scaleBy2.transform(passengersDataSet)
     val output = scaleBy2.getOutput()
     val answer = passengersArray.map(r => scaleBy2.transformFn(r.getFeatureType[Real](weight)))
-    transformedData.columns.contains(scaleBy2.outputName) shouldBe true
+    transformedData.columns.contains(scaleBy2.getOutputFeatureName) shouldBe true
     transformedData.collect(output) shouldBe answer
   }
 
@@ -52,7 +52,7 @@ class UnaryTransformerTest extends FlatSpec with PassengerSparkFixtureTest {
     val transformedData = toCat.transform(passengersDataSet)
     val output = toCat.getOutput()
     val answer = passengersArray.map(r => toCat.transformFn(r.getFeatureType[Real](weight)))
-    transformedData.columns.contains(toCat.outputName)  shouldBe true
+    transformedData.columns.contains(toCat.getOutputFeatureName)  shouldBe true
     transformedData.collect(output) shouldBe answer
   }
 

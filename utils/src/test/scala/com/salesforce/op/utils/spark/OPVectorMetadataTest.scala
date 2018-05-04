@@ -156,7 +156,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
           hist.indicatorGroup shouldBe meta.indicatorGroup
           hist.indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe meta.isNullIndicator
           hist.parentFeatureType.foreach(p => p.contains(p) shouldBe meta.hasParentOfType(p))
-          hist.parentFeatureType.exists(_.contains("Map")) shouldBe meta.hasMapParent()
+          hist.parentFeatureType.exists(p => p.contains("Map") || p.contains("Prediction")) shouldBe meta.hasMapParent()
         }
         if (colHist.nonEmpty && colHist.head.parentFeatureName.nonEmpty) {
           colHist.head.parentFeatureName.flatMap(p => history(p).stages).distinct.sorted should

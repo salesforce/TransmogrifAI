@@ -38,7 +38,7 @@ private[stages] trait SwTransformer1[I <: FeatureType, O <: FeatureType, T <: Tr
     getSparkMlStage().map { t =>
       val pi = t.getParam(inputParamName)
       val po = t.getParam(outputParamName)
-      t.set(pi, in1.name).set(po, outputName).transform(dataset)
+      t.set(pi, in1.name).set(po, getOutputFeatureName).transform(dataset)
     }.getOrElse(dataset.toDF())
   }
 

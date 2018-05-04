@@ -13,18 +13,19 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.stages.impl.tuning.{OpCrossValidation, _}
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier}
+import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier, LogisticRegression => SparkLR}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.MetadataBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -66,7 +67,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val inputNames = modelSelector.stage1.getInputFeatures().map(_.name)
     inputNames should have length 2
     inputNames shouldBe Array(label.name, features.name)
-    modelSelector.stage1.getOutput().name shouldBe modelSelector.stage1.outputName
+    modelSelector.stage1.getOutput().name shouldBe modelSelector.stage1.getOutputFeatureName
     the[IllegalArgumentException] thrownBy {
       modelSelector.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
@@ -77,8 +78,8 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val inputNames = modelSelector.stage2.getInputFeatures().map(_.name)
     inputNames should have length 3
-    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.outputName)
-    modelSelector.stage2.getOutput().name shouldBe modelSelector.stage2.outputName
+    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.getOutputFeatureName)
+    modelSelector.stage2.getOutput().name shouldBe modelSelector.stage2.getOutputFeatureName
 
   }
 
@@ -87,10 +88,10 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val inputNames = modelSelector.stage3.getInputFeatures().map(_.name)
     inputNames should have length 4
-    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.outputName,
-      modelSelector.stage2.outputName
+    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.getOutputFeatureName,
+      modelSelector.stage2.getOutputFeatureName
     )
-    modelSelector.stage3.getOutput().name shouldBe modelSelector.stage3.outputName
+    modelSelector.stage3.getOutput().name shouldBe modelSelector.stage3.getOutputFeatureName
   }
 
   it should "have proper outputs corresponding to the stages" in {
@@ -449,6 +450,26 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         )
       }
     }
+  }
+
+  it should "fit and predict a model specified in the var bestEstimator" in {
+    val modelSelector: BinaryClassificationModelSelector = BinaryClassificationModelSelector().setInput(label, features)
+    val myParam = 42
+    val myMetaName = "myMeta"
+    val myMetaValue = 348954389534875.432423
+    val myMetadata = new MetadataBuilder().putDouble(myMetaName, myMetaValue)
+    val myEstimatorName = "myEstimator"
+    val myEstimator = new SparkLR().setMaxIter(myParam)
+
+    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, myMetadata)
+    modelSelector.stage1.bestEstimator = Option(bestEstimator)
+    val fitted = modelSelector.fit(data)
+
+    fitted.getParams.get(myEstimator.maxIter).get shouldBe myParam
+
+    val meta = fitted.stage1.getMetadata().getMetadata("summary")
+    meta.getDouble(myMetaName) shouldBe myMetaValue
+    meta.getString("bestModelName") shouldBe myEstimatorName
   }
 
 }

@@ -38,7 +38,7 @@ class OpLogisticRegressionTest extends FlatSpec with TestSparkContext {
     val inputNames = logReg.stage1.getInputFeatures().map(_.name)
     inputNames should have length 2
     inputNames shouldBe Array(feature1.name, feature2.name)
-    logReg.stage1.getOutput().name shouldBe logReg.stage1.outputName
+    logReg.stage1.getOutput().name shouldBe logReg.stage1.getOutputFeatureName
     the[IllegalArgumentException] thrownBy {
       logReg.setInput(feature1.copy(isResponse = true), feature2.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
@@ -48,8 +48,8 @@ class OpLogisticRegressionTest extends FlatSpec with TestSparkContext {
     assert(logReg.stage2.isInstanceOf[SwTernaryTransformer[_, _, _, _, _]])
     val inputNames = logReg.stage2.getInputFeatures().map(_.name)
     inputNames should have length 3
-    inputNames shouldBe Array(feature1.name, feature2.name, logReg.stage1.outputName)
-    logReg.stage2.getOutput().name shouldBe logReg.stage2.outputName
+    inputNames shouldBe Array(feature1.name, feature2.name, logReg.stage1.getOutputFeatureName)
+    logReg.stage2.getOutput().name shouldBe logReg.stage2.getOutputFeatureName
 
   }
 
@@ -57,9 +57,10 @@ class OpLogisticRegressionTest extends FlatSpec with TestSparkContext {
     assert(logReg.stage3.isInstanceOf[SwQuaternaryTransformer[_, _, _, _, _, _]])
     val inputNames = logReg.stage3.getInputFeatures().map(_.name)
     inputNames should have length 4
-    inputNames shouldBe Array(feature1.name, feature2.name, logReg.stage1.outputName, logReg.stage2.outputName)
+    inputNames shouldBe Array(feature1.name, feature2.name, logReg.stage1.getOutputFeatureName,
+      logReg.stage2.getOutputFeatureName)
 
-    logReg.stage3.getOutput().name shouldBe logReg.stage3.outputName
+    logReg.stage3.getOutput().name shouldBe logReg.stage3.getOutputFeatureName
   }
 
   it should "have proper outputs corresponding to the stages" in {

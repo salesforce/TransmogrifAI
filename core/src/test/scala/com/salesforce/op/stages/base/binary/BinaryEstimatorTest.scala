@@ -42,7 +42,7 @@ class BinaryEstimatorTest extends FlatSpec with TestSparkContext with Assertions
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testEstimator.setInput(city, country).getOutput()
     outputFeatures shouldBe new Feature[OPVector](
-      name = testEstimator.outputName,
+      name = testEstimator.getOutputFeatureName,
       originStage = testEstimator,
       isResponse = false,
       parents = Array(city, country)

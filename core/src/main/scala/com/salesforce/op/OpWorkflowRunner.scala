@@ -12,7 +12,7 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.readers.{Reader, StreamingReader}
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.json.{EnumEntrySerializer, JsonLike, JsonUtils}
 import com.salesforce.op.utils.spark.RichRDD._
 import com.salesforce.op.utils.spark.{AppMetrics, OpSparkListener}
 import com.salesforce.op.utils.version.VersionInfo
@@ -361,6 +361,11 @@ case class OpWorkflowRunnerConfig
   modelLocation: Option[String] = None,
   metricsLocation: Option[String] = None
 ) extends JsonLike {
+
+  override def toJson(pretty: Boolean = true): String = {
+    val serdes = EnumEntrySerializer.jackson[OpWorkflowRunType](OpWorkflowRunType)
+    JsonUtils.toJsonString(this, pretty = pretty, serdes = Seq(serdes))
+  }
 
   /**
    * Convert the runner config into OpParams

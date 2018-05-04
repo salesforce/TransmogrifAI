@@ -45,7 +45,7 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
     val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(ds)
     val results = transformedData.select(hashed.name).collect(hashed)
 
-    hashed.name shouldBe hashed.originStage.outputName
+    hashed.name shouldBe hashed.originStage.getOutputFeatureName
 
     // scalastyle:off
     results.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures) shouldBe true

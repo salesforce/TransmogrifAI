@@ -36,17 +36,20 @@ case object BinaryClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
    * @param seed             random seed
+   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return Classification Model Selector with a Cross Validation
    */
   def withCrossValidation(
     splitter: Option[Splitter] = Option(DataSplitter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.error(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric),
+      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
@@ -61,17 +64,20 @@ case object BinaryClassificationModelSelector {
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
    *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
    * @param seed             random seed
+   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
+   *                         impact the runtime.
    * @return Classification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
     splitter: Option[Splitter] = Option(DataSplitter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.error(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    stratify: Boolean = ValidatorParamDefaults.Stratify
   ): BinaryClassificationModelSelector = {
     selector(
-      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](trainRatio, seed, validationMetric),
+      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](trainRatio, seed, validationMetric, stratify),
       splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )

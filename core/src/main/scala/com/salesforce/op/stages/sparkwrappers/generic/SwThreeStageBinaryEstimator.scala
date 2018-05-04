@@ -88,7 +88,7 @@ O3 <: FeatureType, M <: Model[M], E <: Estimator[M]]
   private lazy val outputs = $(sparkOutputColParamNames).zip(
     Array(outputName1, outputName2, outputName3))
 
-  private[op] lazy val stage1 = new SwBinaryEstimator[I1, I2, O1, M, E](
+  private[op] lazy val stage1 = new SwBinaryEstimatorSpecial[I1, I2, O1, M, E](
     inputParam1Name = $(sparkInputColParamNames)(0),
     inputParam2Name = $(sparkInputColParamNames)(1),
     outputParamName = $(sparkOutputColParamNames)(0),
@@ -96,7 +96,8 @@ O3 <: FeatureType, M <: Model[M], E <: Estimator[M]]
     sparkMlStageIn = getSparkMlStage().map { spk => // set all the outputs for this stage
       outputs.foldLeft(spk) { case (s, (pname, pvalue)) => s.set(s.getParam(pname), pvalue) }
     },
-    uid = stage1uid
+    uid = stage1uid,
+    outputs
   ).setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2])
 
   private[op] lazy val stage2 = new SwTernaryTransformer[I1, I2, O1, O2, M](
@@ -198,4 +199,36 @@ O2 <: FeatureType, O3 <: FeatureType, M <: Model[M]]
 
   override def getOutput(): (FeatureLike[O1], FeatureLike[O2], FeatureLike[O3]) =
     (stage1.getOutput(), stage2.getOutput(), stage3.getOutput())
+}
+
+/**
+ * Wrapper for any spark estimator that has two inputs and three outputs (for use in three stage wrapper)
+ */
+private[op] class SwBinaryEstimatorSpecial[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType,
+M <: Model[M], E <: Estimator[M]]
+(
+  inputParam1Name: String,
+  inputParam2Name: String,
+  outputParamName: String,
+  operationName: String,
+  private val sparkMlStageIn: Option[E],
+  uid: String = UID[SwBinaryEstimator[I1, I2, O, M, E]],
+  val outputNames: Array[(String, String)]
+)(
+  implicit tti1: TypeTag[I1],
+  tti2: TypeTag[I2],
+  tto: TypeTag[O],
+  ttov: TypeTag[O#Value]
+) extends SwBinaryEstimator[I1, I2, O, M, E] (inputParam1Name = inputParam1Name, inputParam2Name = inputParam2Name,
+  outputParamName = outputParamName, operationName = operationName, sparkMlStageIn = sparkMlStageIn,
+  uid = uid)(tti1 = tti1, tti2 = tti2, tto = tto, ttov = ttov){
+
+  override def setOutputFeatureName(m: String): this.type = {
+    getSparkMlStage().map { spk => // set all the outputs for this stage
+      outputNames.zipWithIndex.foldLeft(spk) { case (s, ((pname, pvalue), i)) =>
+        val newName = updateOutputName(m, pvalue, i)
+        s.set(s.getParam(pname), newName)
+      }}
+    set(outputFeatureName, m)
+  }
 }

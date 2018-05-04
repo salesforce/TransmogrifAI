@@ -9,7 +9,7 @@ import org.apache.spark.ml.classification.{ProbabilisticClassificationModel, Pro
 import org.apache.spark.ml.linalg.Vector
 
 
-private[classification] object ProbabilisticClassifierType {
+private[op] object ProbabilisticClassifierType {
   type ProbClassifierModel = ProbabilisticClassificationModel[Vector, _]
 
   type ProbClassifier = ProbabilisticClassifier[Vector,

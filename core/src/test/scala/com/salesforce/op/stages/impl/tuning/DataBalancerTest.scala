@@ -34,6 +34,8 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
       .map(v => (0.0, Vectors.dense(v.toArray.map(_ + 10.0)), "B")).toDS()
   }
 
+  val data = positiveData.union(negativeData)
+
   val dataBalancer = new DataBalancer().setSeed(seed)
 
   Spec[DataBalancer] should "compute the sample proportions" in {
@@ -46,15 +48,13 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "rebalance the dataset correctly" in {
-    val (resampled, downSample, upSample) =
-      dataBalancer.getTrainingSplit(negativeData, smallCount, positiveData, bigCount, sampleFraction, maxTrainingSample)
+    val (downSample, upSample) = dataBalancer.getProportions(smallCount, bigCount, sampleFraction, maxTrainingSample)
+    val reSampled = dataBalancer.rebalance(negativeData, upSample, positiveData, downSample, seed)
 
-    val Array(negData, posData) = Array(0.0, 1.0).map(label => resampled.filter(_._1 == label).persist())
-
+    val Array(negData, posData) = Array(0.0, 1.0).map(label => reSampled.filter(_._1 == label).persist())
     val negativeCount = negData.count()
     val positiveCount = posData.count()
 
-    println(math.abs(negativeCount.toDouble / (negativeCount + positiveCount) - sampleFraction))
     math.abs(negativeCount.toDouble / (negativeCount + positiveCount) - sampleFraction) should be < 0.05
   }
 
@@ -62,6 +62,65 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     val (train, test) = dataBalancer.setReserveTestFraction(0.0).split(negativeData.union(positiveData))
     test.count() shouldBe 0
     train.count() shouldBe smallCount + bigCount
+  }
+
+  it should "balance and remember the fractions" in {
+    val fraction = 0.4
+    val maxSize = 2000
+
+    val balancer = new DataBalancer()
+      .setSampleFraction(fraction)
+      .setMaxTrainingSample(maxSize)
+      .setSeed(11L)
+
+    val ModelData(expected, _) = balancer.prepare(data)
+
+    val (downSample, upSample) = balancer.getProportions(smallCount, bigCount, fraction, maxSize)
+
+    balancer.getUpSampleFraction shouldBe upSample
+    balancer.getDownSampleFraction shouldBe downSample
+    balancer.getIsPositiveSmall shouldBe false
+
+    // Rerun balancer with set params
+    val ModelData(expected2, _) = balancer.prepare(data)
+    expected.collect() shouldBe expected2.collect()
+  }
+
+  it should "remember that data is already balanced" in {
+    val fraction = 0.01
+    val maxSize = 20000
+
+    val balancer = new DataBalancer()
+      .setSampleFraction(fraction)
+      .setMaxTrainingSample(maxSize)
+      .setSeed(11L)
+
+    val ModelData(expected, _) = balancer.prepare(data)
+    balancer.getAlreadyBalancedFraction shouldBe 1.0
+
+    // Rerun balancer with set params
+    val ModelData(expected2, _) = balancer.prepare(data)
+    expected.collect() shouldBe expected2.collect()
+
+  }
+
+
+  it should "remember that data is already balanced, but needs to be sample because too big" in {
+    val fraction = 0.01
+    val maxSize = 100
+
+    val balancer = new DataBalancer()
+      .setSampleFraction(fraction)
+      .setMaxTrainingSample(maxSize)
+      .setSeed(11L)
+
+    val ModelData(expected, _) = balancer.prepare(data)
+    balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
+
+    // Rerun balancer with set params
+    val ModelData(expected2, _) = balancer.prepare(data)
+    expected.collect() shouldBe expected2.collect()
+
   }
 
   it should "set the data balancing params correctly" in {

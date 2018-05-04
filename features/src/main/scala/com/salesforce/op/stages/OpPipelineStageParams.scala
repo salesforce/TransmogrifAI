@@ -50,6 +50,8 @@ trait InputParams extends Params {
     this
   }
 
+  private[op] def setInputFeatureArray[S <: OPFeature](features: Array[S]): this.type = setInputFeatures(features)
+
   /**
    * Gets the input features
    * Note: this method IS NOT safe to use outside the driver, please use [[getTransientFeatures]] method instead

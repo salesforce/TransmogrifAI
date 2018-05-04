@@ -5,10 +5,12 @@
 
 package com.salesforce.op.features
 
+import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.aggregators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.{FeatureGeneratorStage, OpPipelineStage}
 import com.twitter.algebird.MonoidAggregator
+import org.apache.spark.sql.Row
 import org.joda.time.Duration
 
 import scala.language.experimental.macros
@@ -53,6 +55,7 @@ object FeatureBuilder {
   def PostalCodeMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, PostalCodeMap] = PostalCodeMap(name.value)
   def StreetMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, StreetMap] = StreetMap(name.value)
   def GeolocationMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, GeolocationMap] = GeolocationMap(name.value)
+  def Prediction[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, Prediction] = Prediction(name.value)
 
   // Numerics
   def Binary[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, Binary] = Binary(name.value)
@@ -116,6 +119,7 @@ object FeatureBuilder {
   def PostalCodeMap[I: WeakTypeTag](name: String): FeatureBuilder[I, PostalCodeMap] = FeatureBuilder[I, PostalCodeMap](name = name)
   def StreetMap[I: WeakTypeTag](name: String): FeatureBuilder[I, StreetMap] = FeatureBuilder[I, StreetMap](name = name)
   def GeolocationMap[I: WeakTypeTag](name: String): FeatureBuilder[I, GeolocationMap] = FeatureBuilder[I, GeolocationMap](name = name)
+  def Prediction[I: WeakTypeTag](name: String): FeatureBuilder[I, Prediction] = FeatureBuilder[I, Prediction](name = name)
 
   // Numerics
   def Binary[I: WeakTypeTag](name: String): FeatureBuilder[I, Binary] = FeatureBuilder[I, Binary](name = name)
@@ -148,7 +152,20 @@ object FeatureBuilder {
 
   def apply[I: WeakTypeTag, O <: FeatureType : WeakTypeTag](name: String): FeatureBuilder[I, O] = new FeatureBuilder[I, O](name)
 
+  def fromRow[O <: FeatureType: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, None)
+  def fromRow[O <: FeatureType: WeakTypeTag](name: String): FeatureBuilderWithExtract[Row, O] = fromRow[O](name, None)
+  def fromRow[O <: FeatureType: WeakTypeTag](index: Int)(implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, Some(index))
+  def fromRow[O <: FeatureType: WeakTypeTag](name: String, index: Option[Int]): FeatureBuilderWithExtract[Row, O] = {
+    val c = FeatureTypeSparkConverter[O]()
+    new FeatureBuilderWithExtract[Row, O](
+      name = name,
+      extractFn = (r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name))),
+      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))"
+    )
+  }
+
   // scalastyle:on
+
 }
 
 /**

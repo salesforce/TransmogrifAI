@@ -7,6 +7,7 @@ package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.AllowLabelAsInput
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.preparators.CorrelationType.Pearson
@@ -14,6 +15,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stats.OpStatistics
 import enumeratum._
+import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, Vector => OldVector, Vectors => OldVectors}
@@ -21,23 +23,31 @@ import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
+import org.slf4j.impl.Log4jLoggerAdapter
 
 import scala.math.min
-import scala.reflect.runtime.universe._
 import scala.util.Try
 
 
 trait SanityCheckerParams extends Params {
-  final lazy val sampleLowerLimit = new IntParam(
+
+  final val logLevel = new Param[String](
+    parent = this, name = "logLevel",
+    doc = "sets log level (INFO, WARN, ERROR, DEBUG etc.)",
+    isValid = (s: String) => Try(Level.toLevel(s)).isSuccess
+  )
+  private[op] def setLogLevel(level: Level): this.type = set(logLevel, level.toString)
+
+  final val sampleLowerLimit = new IntParam(
     parent = this, name = "sampleLowerLimit",
-    doc = "ULowerer limit on number of samples in downsampled data set (note: sample limit will not be exact, due " +
+    doc = "Lower limit on number of samples in downsampled data set (note: sample limit will not be exact, due " +
       "to Spark's dataset sampling behavior)",
     isValid = ParamValidators.gtEq(lowerBound = 0)
   )
   def setSampleLowerLimit(value: Int): this.type = set(sampleLowerLimit, value)
   def getSampleLowerLimit: Int = $(sampleLowerLimit)
 
-  final lazy val sampleUpperLimit = new IntParam(
+  final val sampleUpperLimit = new IntParam(
     parent = this, name = "sampleUpperLimit",
     doc = "Upper limit on number of samples in downsampled data set (note: sample limit will not be exact, due " +
       "to Spark's dataset sampling behavior)",
@@ -46,7 +56,7 @@ trait SanityCheckerParams extends Params {
   def setSampleUpperLimit(value: Int): this.type = set(sampleUpperLimit, value)
   def getSampleUpperLimit: Int = $(sampleUpperLimit)
 
-  final lazy val checkSample = new DoubleParam(
+  final val checkSample = new DoubleParam(
     parent = this, name = "checkSample",
     doc = "Rate to downsample the data for statistical calculations (note: actual sampling will not be exact " +
       "due to Spark's dataset sampling behavior)",
@@ -55,21 +65,21 @@ trait SanityCheckerParams extends Params {
   def setCheckSample(value: Double): this.type = set(checkSample, value)
   def getCheckSample: Double = $(checkSample)
 
-  final lazy val sampleSeed = new LongParam(
+  final val sampleSeed = new LongParam(
     parent = this, name = "sampleSeed",
     doc = "Seed to use when sampling"
   )
   def setSampleSeed(value: Long): this.type = set(sampleSeed, value)
   def getSampleSeed: Long = $(sampleSeed)
 
-  final lazy val removeBadFeatures = new BooleanParam(
+  final val removeBadFeatures = new BooleanParam(
     parent = this, name = "removeBadFeatures",
     doc = "If set to true, this will automatically remove all the bad features from the feature vector"
   )
   def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
   def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
 
-  final lazy val maxCorrelation = new DoubleParam(
+  final val maxCorrelation = new DoubleParam(
     parent = this, name = "maxCorrelation",
     doc = "Maximum correlation (absolute value) allowed between a feature in the feature vector and the label",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
@@ -77,7 +87,7 @@ trait SanityCheckerParams extends Params {
   def setMaxCorrelation(value: Double): this.type = set(maxCorrelation, value)
   def getMaxCorrelation: Double = $(maxCorrelation)
 
-  final lazy val minCorrelation = new DoubleParam(
+  final val minCorrelation = new DoubleParam(
     parent = this, name = "minCorrelation",
     doc = "Minimum correlation (absolute value) allowed between a feature in the feature vector and the label",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
@@ -85,21 +95,21 @@ trait SanityCheckerParams extends Params {
   def setMinCorrelation(value: Double): this.type = set(minCorrelation, value)
   def getMinCorrelation: Double = $(minCorrelation)
 
-  final lazy val correlationType = new Param[CorrelationType](
+  final val correlationType = new Param[CorrelationType](
     parent = this, name = "correlationType",
     doc = "Which coefficient to use for computing correlation"
   )
   def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value)
   def getCorrelationType: CorrelationType = $(correlationType)
 
-  final lazy val minVariance = new DoubleParam(
+  final val minVariance = new DoubleParam(
     parent = this, name = "minVariance",
     doc = "Minimum amount of variance allowed for each feature and label"
   )
   def setMinVariance(value: Double): this.type = set(minVariance, value)
   def getMinVariance: Double = $(minVariance)
 
-  final lazy val maxCramersV = new DoubleParam(
+  final val maxCramersV = new DoubleParam(
     parent = this, name = "maxCramersV",
     doc = "Maximum categorical correlation value (Cramer's V) allowed between a categorical feature in the" +
       "feature vector and a categorical label",
@@ -108,7 +118,7 @@ trait SanityCheckerParams extends Params {
   def setMaxCramersV(value: Double): this.type = set(maxCramersV, value)
   def getMaxCramersV: Double = $(maxCramersV)
 
-  final lazy val categoricalLabel = new BooleanParam(
+  final val categoricalLabel = new BooleanParam(
     parent = this, name = "categoricalLabel",
     doc = "If true, then label is treated as categorical (eg. Cramer's V will be calculated between it and " +
       "categorical features). If this is not set, then use a max class fraction of 0.1 to estimate whether label is" +
@@ -117,13 +127,33 @@ trait SanityCheckerParams extends Params {
   def setCategoricalLabel(value: Boolean): this.type = set(categoricalLabel, value)
   def getCategoricalLabel: Boolean = $(categoricalLabel)
 
-  final lazy val removeFeatureGroup = new BooleanParam(
+  final val removeFeatureGroup = new BooleanParam(
     parent = this, name = "removeFeatureGroup",
     doc = "If true, remove all features descended from a parent feature (parent is direct parent before" +
       " vectorization) which has derived features that meet the exclusion criteria."
   )
   def setRemoveFeatureGroup(value: Boolean): this.type = set(removeFeatureGroup, value)
   def getRemoveFeatureGroup: Boolean = $(removeFeatureGroup)
+
+  final val maxRuleConfidence = new DoubleParam(
+    parent = this, name = "maxRuleConfidence",
+    doc = "Maximum allowed confidence of association rules in categorical variables. A categorical variable will be " +
+      "removed if there is a choice where the maximum confidence is above this threshold, and the support for that " +
+      "choice is above the min rule support parameter, defined below.",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+  )
+  def setMaxRuleConfidence(value: Double): this.type = set(maxRuleConfidence, value)
+  def getMaxRuleConfidence: Double = $(maxRuleConfidence)
+
+  final val minRequiredRuleSupport = new DoubleParam(
+    parent = this, name = "minRuleSupport",
+    doc = "Categoricals can be removed if an association rule is found between one of the choices and a categorical " +
+      "label where the confidence of that rule is above maxRuleConfidence and the support fraction of that choice is " +
+      "above minRuleSupport.",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0, lowerInclusive = true, upperInclusive = true)
+  )
+  def setMinRequiredRuleSupport(value: Double): this.type = set(minRequiredRuleSupport, value)
+  def getMinRequiredRuleSupport: Double = $(minRequiredRuleSupport)
 
   setDefault(
     checkSample -> SanityChecker.CheckSample,
@@ -136,7 +166,9 @@ trait SanityCheckerParams extends Params {
     maxCramersV -> SanityChecker.MaxCramersV,
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
     removeFeatureGroup -> SanityChecker.RemoveFeatureGroup,
-    correlationType -> SanityChecker.CorrelationType
+    correlationType -> SanityChecker.CorrelationType,
+    maxRuleConfidence -> SanityChecker.MaxRuleConfidence,
+    minRequiredRuleSupport -> SanityChecker.MinRequiredRuleSupport
   )
 }
 
@@ -151,20 +183,19 @@ trait SanityCheckerParams extends Params {
 class SanityChecker(uid: String = UID[SanityChecker])
   extends BinaryEstimator[RealNN, OPVector, OPVector](
     operationName = classOf[SanityChecker].getSimpleName, uid = uid
-  ) with SanityCheckerParams {
+  ) with SanityCheckerParams with AllowLabelAsInput[OPVector] {
 
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
   }
-  override protected def outputIsResponse: Boolean = false
 
   private def makeColumnStatistics(
     metaCols: Seq[OpVectorColumnMetadata],
     labelColumnIndex: Int,
     corrMatrix: Matrix,
     statsSummary: MultivariateStatisticalSummary,
-    categoricalStats: CategoricalStats
+    categoricalStats: Array[CategoricalGroupStats]
   ): Array[ColumnStatistics] = {
     // precompute all statistics to avoid rebuilding the vectors every time
     val means = statsSummary.mean
@@ -172,13 +203,13 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val mins = statsSummary.min
     val count = statsSummary.count
     val variances = statsSummary.variance
-    val cramersVMap = categoricalStats.categoricalFeatures.zip(categoricalStats.cramersVs).toMap[String, Double]
+    val cramersVMap = categoricalStats.flatMap(f => f.categoricalFeatures.map(c => c -> f.cramersV))
+      .toMap[String, Double]
 
     // build map from indicator group name to any null indicator it may have
-    val nullIndicators: Map[String, (OpVectorColumnMetadata, Int)] = {
-      val nullGroups = for {
-        col <- metaCols
-        if col.isNullIndicator
+    val nullGroups = for {
+      col <- metaCols
+      if col.isNullIndicator
         indicatorGroup <- col.indicatorGroup
       } yield (indicatorGroup, (col, col.index))
 
@@ -186,15 +217,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
         case (group, cols) =>
           require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
       }
-      nullGroups.toMap
-    }
-
-    def numNulls(col: OpVectorColumnMetadata) =
-      nullIndicators.get(col.makeColName()).fold(0.0) { case (_, i) => means(i) * count }
 
     def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map{ case(k, v) =>
       // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
-      k -> v.filterNot(_._2.isNaN).foldLeft(0.0)((a, b) => math.max(a, b._2))
+      k -> v.filterNot(_._2.isNaN).foldLeft(0.0)((a, b) => math.max(a, math.abs(b._2)))
     }
 
     def corrParentMap(fn: OpVectorColumnMetadata => Seq[String]) =
@@ -211,6 +237,20 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val cramersVParent = cramersVParentMap(_.parentNamesWithMapKeys())
     val cramersVParentNoKeys = cramersVParentMap(_.parentFeatureName)
 
+    // These are the categorical features that are alone in their feature group. This means that they are
+    // null indicator columns coming from non-categorical features, so they correspond to a 2x2 contingency matrix
+    // and thus two support and maxRuleConfidence values
+    val supportMap = categoricalStats.flatMap(f =>
+      if (f.categoricalFeatures.length == 1) Array(f.categoricalFeatures.head -> f.supports.toSeq)
+      else {
+        f.categoricalFeatures.zip(f.supports).map(f => f._1 -> Seq(f._2))
+      }).toMap
+    val maxRuleConfMap = categoricalStats.flatMap(f =>
+      if (f.categoricalFeatures.length == 1) Array(f.categoricalFeatures.head -> f.maxRuleConfidences.toSeq)
+      else {
+        f.categoricalFeatures.zip(f.maxRuleConfidences).map(f => f._1 -> Seq(f._2))
+      }).toMap
+
     // TODO: For Hashing vectorizers, there is no indicator group, so check for parentNamesWithMapKeys()
     // inside cramersVParent first and then check without keys for removal. This will over-remove features (eg.
     // an entire map), but should only affect custom map vectorizers that don't set indicator groups on columns.
@@ -220,8 +260,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val featuresStats = metaCols.map {
       col =>
         val i = col.index
+        val name = col.makeColName()
         ColumnStatistics(
-          name = col.makeColName(),
+          name = name,
           column = Some(col),
           isLabel = false,
           count = count,
@@ -229,11 +270,12 @@ class SanityChecker(uid: String = UID[SanityChecker])
           min = mins(i),
           max = maxs(i),
           variance = variances(i),
-          numNulls = numNulls(col),
           corrLabel = Option(corrMatrix(i, labelColumnIndex)),
-          cramersV = cramersVMap.get(col.makeColName()),
+          cramersV = cramersVMap.get(name),
           parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
-          parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys)
+          parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys),
+          maxRuleConfidences = maxRuleConfMap.getOrElse(name, Seq.empty),
+          supports = supportMap.getOrElse(name, Seq.empty)
         )
     }
     val labelStats = ColumnStatistics(
@@ -245,11 +287,12 @@ class SanityChecker(uid: String = UID[SanityChecker])
       min = mins(labelColumnIndex),
       max = maxs(labelColumnIndex),
       variance = variances(labelColumnIndex),
-      numNulls = 0.0,
       corrLabel = None,
       cramersV = None,
       parentCorr = None,
-      parentCramersV = None
+      parentCramersV = None,
+      maxRuleConfidences = Seq.empty,
+      supports = Seq.empty
     )
     (labelStats +: featuresStats).toArray
   }
@@ -259,7 +302,24 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val minCorr = $(minCorrelation)
     val maxCorr = $(maxCorrelation)
     val maxCramV = $(maxCramersV)
+    val maxRuleConf = $(maxRuleConfidence)
+    val minReqRuleSupport = $(minRequiredRuleSupport)
     val removeFromParent = $(removeFeatureGroup)
+
+    // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
+    // to remove a feature from a single column stats (eg. associate rule confidence/support check)
+    val groupByGroups = stats.groupBy(_.column.flatMap(_.indicatorGroup))
+    val ruleConfGroupsToDrop = groupByGroups.toSeq.flatMap{
+      case (Some(group), colStats) =>
+        val colsToRemove = colStats.filter(f =>
+          f.maxRuleConfidences.zip(f.supports).exists{
+            case (maxConf, sup) => (maxConf > maxRuleConf) && (sup > minReqRuleSupport)
+          })
+        if (colsToRemove.nonEmpty) Option(group) else None
+
+      case _ => None
+    }
+
     for {
       col <- stats
       reasons = col.reasonsToRemove(
@@ -267,7 +327,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
         minCorrelation = minCorr,
         maxCorrelation = maxCorr,
         maxCramersV = maxCramV,
-        removeFeatureGroup = removeFromParent
+        maxRuleConfidence = maxRuleConf,
+        minRequiredRuleSupport = minReqRuleSupport,
+        removeFeatureGroup = removeFromParent,
+        removedGroups = ruleConfGroupsToDrop
       )
       if reasons.nonEmpty
     } yield {
@@ -281,12 +344,21 @@ class SanityChecker(uid: String = UID[SanityChecker])
     featureSize: Int,
     columnMeta: Seq[OpVectorColumnMetadata],
     data: Dataset[(RealNN#Value, OPVector#Value)]
-  ): CategoricalStats = {
+  ): Array[CategoricalGroupStats] = {
     implicit val encDoubleArray: Encoder[Array[Double]] = ExpressionEncoder()
 
+    // Figure out which columns correspond to multipicklists so that we can make the "OTHER" columns at most 1 so
+    // that we can still use contingency matrices to calculate Cramer's V values
+    val mplIndices = columnMeta.zipWithIndex.filter{
+      case (col, index) => col.hasParentOfType(FeatureType.shortTypeName[MultiPickList])
+    }.map(_._2)
+
     val contingencyDataset = data.groupByKey(_._1).mapValues {
-      // Add in the label with the features so we can get the number of positive responses in the same reduction
-      case (label, features) => features.toArray :+ 1.0
+      // Group by label and then add in a 1.0 so we can get the total occurrences for each label in one reduction
+      case (_, features) => features.toArray.zipWithIndex.map{
+        case (feat, index) if mplIndices.contains(index) => math.min(feat, 1.0)
+        case (feat, _) => feat
+      } :+ 1.0
     }.reduceGroups((a, b) => a.zip(b).map(f => f._1 + f._2))
 
     // Only calculate this if the label is categorical. Either the user specifies the label is categorical with
@@ -296,25 +368,25 @@ class SanityChecker(uid: String = UID[SanityChecker])
     if (isDefined(categoricalLabel) && $(categoricalLabel) || distictLabel < min(100.0, sampleSize * 0.1)) {
 
       val contingencyWithKeys = contingencyDataset.collect()
-      val contingency = contingencyWithKeys.sortBy(_._1).map { case (realNN, vec) => vec }
+      val contingency = contingencyWithKeys.sortBy(_._1).map { case (_, vec) => vec }
 
       logInfo("Label is assumed to be categorical since either categoricalLabel = true or " +
         "number of distinct labels < count * 0.1")
 
       // Only perform Cramer's V calculation on columns that have an indicatorGroup and indicatorValue defined (right
       // now, the only things that will have indicatorValue defined and indicatorGroup be None is numeric maps)
-      val columnsWithIndicator = columnMeta.filter { f =>
-        f.indicatorGroup.isDefined && f.indicatorValue.isDefined &&
-          !f.hasParentOfType(FeatureType.shortTypeName[MultiPickList])
-      }
+      val columnsWithIndicator = columnMeta.filter(f => f.indicatorGroup.isDefined && f.indicatorValue.isDefined)
       val colIndicesByIndicatorGroup =
         columnsWithIndicator
           .map { meta => meta.indicatorGroup.get -> meta }
           .groupBy(_._1)
-          .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index)) }
+          // Keep track of the group, column name, column index, and whether the parent was a multipicklist or not
+          .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index),
+            cols.exists(_._2.hasParentOfType(FeatureType.shortTypeName[MultiPickList])))
+          }
 
-      val statsTuple = colIndicesByIndicatorGroup.flatMap {
-        case (group, colNames, valueIndices) =>
+      colIndicesByIndicatorGroup.map {
+        case (group, colNames, valueIndices, isMpl) =>
           val groupContingency =
             if (valueIndices.length == 1) {
               // parentFeatureNames only has a single indicator column, construct the other from label sums
@@ -325,42 +397,32 @@ class SanityChecker(uid: String = UID[SanityChecker])
             } else contingency.flatMap { features => valueIndices.map(features.apply) }
 
           // columns are label value, rows are feature value
+          val contingencyMatrix = if (valueIndices.length == 1) {
+            new DenseMatrix(2, groupContingency.length / 2, groupContingency)
+          }
+          else new DenseMatrix(valueIndices.length, groupContingency.length / valueIndices.length, groupContingency)
+
           val cStats =
-            if (valueIndices.length == 1) {
-              val contingencyMatrix = new DenseMatrix(2, groupContingency.length / 2, groupContingency)
-              OpStatistics.contingencyStatsFromSingleColumn(contingencyMatrix)
-            } else {
-              val contingencyMatrix = new DenseMatrix(valueIndices.length,
-                groupContingency.length / valueIndices.length, groupContingency)
-              OpStatistics.contingencyStats(contingencyMatrix)
-            }
+            if (isMpl) {
+              val labelCounts = contingency.map(_.last)
+              OpStatistics.contingencyStatsFromMultiPickList(contingencyMatrix, labelCounts)
+            } else OpStatistics.contingencyStats(contingencyMatrix)
 
-          // Return all of the results in a single tuple, so we don't have to iterate through and construct the
-          // contingency matrices again
-          colNames.map(c => (c, group, cStats.cramersV, cStats.pointwiseMutualInfo, cStats.mutualInfo))
-      }
-
-      // PMI map contains an array entry for each feature in the group so get the first for the group and combine
-      // across features
-      val statsTuplePerGroup = statsTuple.groupBy(_._2).map { case (k, v) => v.head }
-      val reducedPMI = statsTuplePerGroup.map(_._4).foldLeft(Map.empty[String, Array[Double]]) {
-        case (l, r) => r.map { case (k, v) => k.toString -> (l.getOrElse(k.toString, Array.empty[Double]) ++ v) }
-      }
-
-      val catIndicies = colIndicesByIndicatorGroup.toSeq.flatMap(_._3)
-
-      CategoricalStats(
-        categoricalFeatures = statsTuple.map(_._1).toArray,
-        cramersVs = statsTuple.map(_._3).toArray,
-        pointwiseMutualInfos = reducedPMI,
-        mutualInfos = statsTuple.map(_._5).toArray,
-        counts = contingencyWithKeys.toMap
-          .map{ case (k, v) => k.toString -> (catIndicies.map(v.apply) :+ v.last).toArray }
-      )
+          CategoricalGroupStats(
+            group = group,
+            categoricalFeatures = colNames.toArray,
+            contingencyMatrix = cStats.contingencyMatrix,
+            pointwiseMutualInfo = cStats.pointwiseMutualInfo,
+            cramersV = cStats.chiSquaredResults.cramersV,
+            mutualInfo = cStats.mutualInfo,
+            maxRuleConfidences = cStats.confidenceResults.maxConfidences,
+            supports = cStats.confidenceResults.supports
+          )
+      }.toArray
     } else {
       logInfo(s"Label is assumed to be continuous since number of distinct labels = $distictLabel" +
         s"which is greater than 10% the size of the sample $sampleSize skipping calculation of Cramer's V")
-      CategoricalStats()
+      Array.empty[CategoricalGroupStats]
     }
   }
 
@@ -382,6 +444,12 @@ class SanityChecker(uid: String = UID[SanityChecker])
    * list of features to be removed.
    */
   override def fitFn(data: Dataset[(RealNN#Value, OPVector#Value)]): BinaryModel[RealNN, OPVector, OPVector] = {
+    // Set the desired log level
+    if (isSet(logLevel)) {
+      Option(log).collect { case l: Log4jLoggerAdapter =>
+        LogManager.getLogger(l.getName).setLevel(Level.toLevel($(logLevel)))
+      }
+    }
     val sampSeed = $(sampleSeed)
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)
@@ -436,13 +504,14 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val vectorMetaColumns = vectorMeta.columns
     val featureNames = vectorMetaColumns.map(_.makeColName())
 
-    logInfo(s"Calculating ${corrType.name} correlations")
-    val covariance = Statistics.corr(vectorRows, corrType.name)
+    logInfo(s"Calculating ${corrType.sparkName} correlations")
+    val covariance = Statistics.corr(vectorRows, corrType.sparkName)
 
     // Only calculate this if the label is categorical, so ignore if user has flagged label as not categorical
     val categoricalStats =
       if (isDefined(categoricalLabel) && !$(categoricalLabel)) {
-        CategoricalStats()
+        // CategoricalStats2()
+        Array.empty[CategoricalGroupStats]
       } else {
         logInfo("Attempting to calculate Cramer's V between each categorical feature and the label")
         categoricalTests(count, featureSize, vectorMetaColumns, sampleData)
@@ -458,7 +527,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
 
-    val outputMeta = OpVectorMetadata(outputName, outputFeatures, vectorMeta.history)
+    val outputMeta = OpVectorMetadata(getOutputFeatureName, outputFeatures, vectorMeta.history)
 
     // TODO: Refactor so that everything is constructed directly from our Array[ColumnStatistics], stats
     val summary = new SanityCheckerSummary(
@@ -492,7 +561,8 @@ final class SanityCheckerModel private[op]
   val removeBadFeatures: Boolean,
   operationName: String,
   uid: String
-) extends BinaryModel[RealNN, OPVector, OPVector](operationName = operationName, uid = uid) {
+) extends BinaryModel[RealNN, OPVector, OPVector](operationName = operationName, uid = uid)
+  with AllowLabelAsInput[OPVector] {
 
   /**
    * The SanityChecker's core 'transformer' function, which removes the features recommended to be removed.
@@ -522,6 +592,9 @@ object SanityChecker {
   val RemoveBadFeatures = false
   val RemoveFeatureGroup = true
   val CorrelationType = Pearson
+  // These settings will make the maxRuleConfidence check off by default
+  val MaxRuleConfidence = 1.0
+  val MinRequiredRuleSupport = 1.0
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
 }
@@ -541,21 +614,27 @@ private[op] case class ColumnStatistics
   min: Double,
   max: Double,
   variance: Double,
-  numNulls: Double,
   corrLabel: Option[Double],
   cramersV: Option[Double],
   parentCorr: Option[Double],
-  parentCramersV: Option[Double]
+  parentCramersV: Option[Double],
+  // Need to be able to hold up to two maxRuleConfidences or supports for the case of nullIndicator columns coming
+  // from non-categorical features (since they will correspond to a 2x2 contingency matrix)
+  maxRuleConfidences: Seq[Double],
+  supports: Seq[Double]
 ) {
 
   /**
    * Given a minimum variance, maximum variance, and maximum correlation, decide if there is a reason to remove
    * this column. If so, return a list of the reasons why. If not, then return an empty list.
    *
-   * @param minVariance    Minimum variance
-   * @param maxCorrelation Maximum correlation
-   * @param minCorrelation Minimum correlation
-   * @param maxCramersV    Maximum Cramer's V value
+   * @param minVariance         Minimum variance
+   * @param maxCorrelation      Maximum correlation
+   * @param minCorrelation      Minimum correlation
+   * @param maxCramersV         Maximum Cramer's V value
+   * @param maxRuleConfidence   Minimum association rule confidence between
+   * @param minRequiredRuleSupport  Minimum required support to throw away a group
+   * @param removedGroups       Pre-determined feature groups to remove (eg. via maxRuleConfidence)
    * @return List[String] if reason to remove, nil otherwise
    */
   def reasonsToRemove(
@@ -563,7 +642,10 @@ private[op] case class ColumnStatistics
     maxCorrelation: Double,
     minCorrelation: Double,
     maxCramersV: Double,
-    removeFeatureGroup: Boolean
+    maxRuleConfidence: Double,
+    minRequiredRuleSupport: Double,
+    removeFeatureGroup: Boolean,
+    removedGroups: Seq[String]
   ): List[String] = {
     if (isLabel) List() // never remove the label!
     else {
@@ -580,7 +662,16 @@ private[op] case class ColumnStatistics
         ),
         cramersV.filter(_ > maxCramersV).map(cv =>
           s"Cramer's V $cv higher than max Cramer's V $maxCramersV"
-        )).flatten
+        ),
+        maxRuleConfidences.zip(supports).collectFirst {
+          case (conf, sup) if (conf > maxRuleConfidence && sup > minRequiredRuleSupport) =>
+            s"Max association rule confidence $conf is above threshold of $maxRuleConfidence and support $sup is " +
+            s"above the required support threshold of $minRequiredRuleSupport"
+        },
+        column.flatMap(_.indicatorGroup).filter(removedGroups.contains(_)).map(ig =>
+          s"other feature in indicator group $ig flagged for removal via rule confidence checks"
+        )
+      ).flatten
 
       val parentExclusionReasons =
         if (removeFeatureGroup) List(
@@ -598,7 +689,7 @@ private[op] case class ColumnStatistics
   override def toString: String = {
     val description = if (isLabel) "Label" else s"Feature"
     s"$description $name has: " +
-      s"samples = $count, mean = $mean, min = $min, max = $max, variance = $variance, number of nulls = $numNulls" +
+      s"samples = $count, mean = $mean, min = $min, max = $max, variance = $variance" +
       corrLabel.fold("") { corr => s"\n$description $name has $corr correlation with label" } +
       cramersV.fold("") { corr => s"\n$description $name has $corr cramersV with label" } +
       parentCramersV.fold("") { corr => s"\n$description $name has parent feature $corr cramersV with label" }
@@ -609,9 +700,9 @@ private[op] case class ColumnStatistics
 /**
  * Represents a kind of correlation coefficient.
  *
- * @param name The spark name of the correlation coefficient
+ * @param sparkName The spark name of the correlation coefficient
  */
-sealed abstract class CorrelationType(val name: String) extends EnumEntry with Serializable
+sealed abstract class CorrelationType(val sparkName: String) extends EnumEntry with Serializable
 
 object CorrelationType extends Enum[CorrelationType] {
   val values: Seq[CorrelationType] = findValues

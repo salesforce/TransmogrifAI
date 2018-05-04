@@ -5,14 +5,18 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.features.OPFeature
+import com.salesforce.op.features.{Feature, OPFeature}
+import com.salesforce.op.filters.RawFeatureFilter
+import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.stages.FitStagesUtil
-import org.apache.spark.ml._
+import org.apache.spark.annotation.Experimental
+import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
-import scala.util.{Failure, Try}
+import scala.collection.mutable.{MutableList => MList}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -23,6 +27,9 @@ import scala.util.{Failure, Try}
  * @param uid unique id for the workflow
  */
 class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
+
+  // raw feature filter stage which can be used in place of a reader
+  private[op] var rawFeatureFilter: Option[RawFeatureFilter[_]] = None
 
   /**
    * Set stage and reader parameters from OpWorkflowParams object for run
@@ -50,13 +57,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     resultFeatures = featuresArr
     rawFeatures = featuresArr.flatMap(_.rawFeatures).distinct.sortBy(_.name)
     checkUnmatchedFeatures()
-    setStages(features = featuresArr)
+    setStagesDAG(features = featuresArr)
     validateStages()
 
     if (log.isDebugEnabled) {
       log.debug(s"\nDependency graphs resolved into a stage sequence of:\n{}",
         getStages().map(s =>
-          s" ${s.uid}[${s.getInputFeatures().map(_.name).mkString(",")}] --> ${s.outputName}"
+          s" ${s.uid}[${s.getInputFeatures().map(_.name).mkString(",")}] --> ${s.getOutputFeatureName}"
         ).mkString("\n")
       )
       log.debug("*" * 80)
@@ -68,29 +75,75 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   }
 
   /**
+   * Will set the blacklisted features variable and if list is non-empty it will
+   * @param features list of features to blacklist
+   */
+  private[op] def setBlacklist(features: Array[OPFeature]): Unit = {
+    blacklistedFeatures = features
+    if (blacklistedFeatures.nonEmpty) {
+      val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
+      val allUpdated: MList[OPFeature] = MList.empty
+
+      val initialResultFeatures = getResultFeatures()
+      initialResultFeatures
+        .foreach{ f => if (allBlacklisted.contains(f)) throw new IllegalArgumentException(
+          s"Blacklist of features (${allBlacklisted.map(_.name).mkString(", ")})" +
+            s" from RawFeatureFilter contained the result feature ${f.name}" )
+        }
+
+      val initialStages = getStages() // ordered by DAG so dont need to recompute DAG
+      // for each stage remove anything blacklisted from the inputs and update any changed input features
+      initialStages.foreach { stg =>
+        val inFeatures = stg.getInputFeatures()
+        val blacklistRemoved = inFeatures.filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+        val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
+        val oldOutput = stg.getOutput()
+        Try{
+          stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()
+        } match {
+          case Success(out) => allUpdated += out
+          case Failure(e) =>
+            if (initialResultFeatures.contains(oldOutput)) throw new RuntimeException(
+              s"Blacklist of features (${allBlacklisted.map(_.name).mkString(", ")}) \n" +
+                s" created by RawFeatureFilter contained features critical to the creation of required result" +
+                s" feature (${oldOutput.name}) though the path: \n ${oldOutput.prettyParentStages} \n", e)
+            else allBlacklisted += oldOutput
+        }
+      }
+
+      // Update the whole DAG with the blacklisted features expunged
+      val updatedResultFeatures = initialResultFeatures
+        .map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
+      setResultFeatures(updatedResultFeatures: _*)
+    }
+  }
+
+  /**
    * Set parameters from stage params map unless param is set in code.
    * Note: Will NOT override parameter values that have been
    * set previously in code OR with a previous set of parameters.
    */
   private def setStageParameters(stages: Array[OPStage]): Unit = {
+    val stageIds = stages.flatMap(s => Seq(s.getClass.getSimpleName, s.uid)).toSet
+    val unmatchedStages = parameters.stageParams.keySet.filter(stageIds.contains)
+    if (unmatchedStages.nonEmpty) log.error(s"Parameter settings with stage ids: $unmatchedStages had no matching" +
+      s"stages in this workflow. Ids for the stages in this workflow are: ${stageIds.mkString(", ")}")
     for {
       (stageName, stageParams) <- parameters.stageParams
-      stage <- stages.filter(s => s.getClass.getSimpleName == stageName || s.uid.startsWith(s"${stageName}_"))
+      stage <- stages.filter(s => s.getClass.getSimpleName == stageName || s.uid == stageName)
       (k, v) <- stageParams
     } {
-      val setStage = Try {
-        val paramId = stage.getParam(k) // match on selectors??
-        if (!stage.isSet(paramId)) {
-          stage.set(paramId, v)
-          log.info(s"Set parameter $k to value $v for stage $stage")
-        } else log.warn(
-          s"Parameter $k was not set to value $v because it has already been set with value ${stage.get(paramId)}"
-        )
-      }
+      val setStage =
+        Try {
+          stage.set(stage.getParam(k), v)
+        } orElse {
+          Try { ReflectionUtils.reflectSetterMethod(stage, k).get.apply(v) }
+        }
       if (setStage.isFailure) log.error(
         s"Setting parameter $k with value $v for stage $stage with params ${stage.params.toList} failed with an error",
         setStage.failed.get
       )
+      else log.info(s"Set parameter $k to value $v for stage $stage")
     }
   }
 
@@ -99,9 +152,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *
    * @param features final features passed into setInput
    */
-  private def setStages(features: Array[OPFeature]): OpWorkflow.this.type = {
+  private def setStagesDAG(features: Array[OPFeature]): OpWorkflow.this.type = {
     // Unique stages layered by distance
-    val uniqueStagesLayered = computeStagesDAG(features)
+    val uniqueStagesLayered = DAG.compute(features)
 
     if (log.isDebugEnabled) {
       val total = uniqueStagesLayered.map(_.length).sum
@@ -119,6 +172,31 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
     setStageParameters(uniqueStages)
     setStages(uniqueStages)
+  }
+
+  /**
+   * Used to generate dataframe from reader and raw features list
+   *
+   * @return Dataframe with all the features generated + persisted
+   */
+  protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
+    (reader, rawFeatureFilter) match {
+      case (None, None) => throw new IllegalArgumentException("Data reader must be set either directly on the" +
+        " workflow or through the RawFeatureFilter")
+      case (Some(r), None) =>
+        checkReadersAndFeatures()
+        r.generateDataFrame(rawFeatures, parameters).persist()
+      case (rd, Some(rf)) =>
+        rd match {
+          case None => setReader(rf.trainingReader)
+          case Some(r) => if (r != rf.trainingReader) log.warn("Workflow data reader and RawFeatureFilter training" +
+            " reader do not match! The RawFeatureFilter training reader will be used to generate the data for training")
+        }
+        checkReadersAndFeatures()
+        val (dataframe, blacklist) = rf.generateFilteredRaw(rawFeatures, parameters)
+        setBlacklist(blacklist)
+        dataframe
+    }
   }
 
   /**
@@ -218,6 +296,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setStages(fittedStages)
         .setFeatures(newResultFeatures)
         .setParameters(getParameters())
+        .setBlacklist(getBlacklist())
 
     reader.map(model.setReader).getOrElse(model)
   }
@@ -256,6 +335,39 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
     (implicit spark: SparkSession): DataFrame = {
     computeDataUpTo(stopStage = findOriginStageId(feature), fitted = false, persistEveryKStages)
+  }
+
+  /**
+   * Add a raw features filter to the workflow to look at fill rates and distributions of raw features and exclude
+   * features that do not meet specifications from modeling DAG
+   *
+   * @param trainingReader training reader to use in filter if not suplied will fall back to reader specified for
+   *                       workflow (note that this reader will take precidence over readers directly input to the
+   *                       workflow if both are supplied)
+   * @param scoringReader scoring reader to use in filter if not supplied will do the checks possible with only
+   *                      training data avaialable
+   * @param bins number of bins to use in estimating feature distributions
+   * @param minFillRate minimum non-null fraction of instances that a feature should contain
+   * @param maxFillDifference maximum absolute difference in fill rate between scoring and training data for a feature
+   * @param maxFillRatioDiff maximum difference in fill ratio (symetric) between scoring and training data for a feature
+   * @param maxJSDivergence maximum Jensen-Shannon divergence between the training and scoring distributions
+   *                        for a feature
+   * @param protectedFeatures list of features that should never be removed (features that are used to create them will
+   *                          also be protected)
+   * @tparam T Type of the data read in
+   */
+  @Experimental
+  def withRawFeatureFilter[T](trainingReader: Option[Reader[T]], scoringReader: Option[Reader[T]],
+    bins: Int = 100, minFillRate: Double = 0.001, maxFillDifference: Double = 0.90,
+    maxFillRatioDiff: Double = 20.0, maxJSDivergence: Double = 0.90, protectedFeatures: Array[OPFeature] = Array.empty
+  ): this.type = {
+    val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
+    require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
+      "as the reader for the workflow")
+    val protectedRawFeatures = protectedFeatures.flatMap(_.rawFeatures).map(_.name).toSet
+    rawFeatureFilter = Option( new RawFeatureFilter(training.get, scoringReader, bins, minFillRate,
+      maxFillDifference, maxFillRatioDiff, maxJSDivergence, protectedRawFeatures) )
+    this
   }
 
 }
