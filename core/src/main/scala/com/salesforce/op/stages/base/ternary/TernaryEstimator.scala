@@ -93,6 +93,7 @@ abstract class TernaryEstimator[I1 <: FeatureType, I2 <: FeatureType, I3 <: Feat
       .setParent(this)
       .setInput(in1.asFeatureLike[I1], in2.asFeatureLike[I2], in3.asFeatureLike[I3])
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

@@ -54,8 +54,8 @@ trait OpTransformer2[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
   override def transform(dataset: Dataset[_]): DataFrame = {
     val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val functionUDF = FeatureSparkTypes.udf2[I1, I2, O](transformFn)
-    val meta = newSchema(outputName).metadata
-    dataset.select(col("*"), functionUDF(col(in1.name), col(in2.name)).as(outputName, meta))
+    val meta = newSchema(getOutputFeatureName).metadata
+    dataset.select(col("*"), functionUDF(col(in1.name), col(in2.name)).as(getOutputFeatureName, meta))
   }
 
   private val transform2Fn = FeatureSparkTypes.transform2[I1, I2, O](transformFn)

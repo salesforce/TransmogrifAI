@@ -21,7 +21,7 @@ object DateList {
   def empty: DateList = FeatureTypeDefaults.DateList
 }
 
-class DateTimeList(val value: Seq[Long]) extends OPList[Long] {
+class DateTimeList(value: Seq[Long]) extends DateList(value) {
   def this(v: Long*)(implicit d: DummyImplicit) = this(v)
 }
 object DateTimeList {

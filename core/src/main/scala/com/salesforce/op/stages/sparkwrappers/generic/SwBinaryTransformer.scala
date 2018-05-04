@@ -41,7 +41,7 @@ T <: Transformer with Params]
       val p1 = t.getParam(inputParam1Name)
       val p2 = t.getParam(inputParam2Name)
       val po = t.getParam(outputParamName)
-      t.set(p1, in1.name).set(p2, in2.name).set(po, outputName).transform(dataset)
+      t.set(p1, in1.name).set(p2, in2.name).set(po, getOutputFeatureName).transform(dataset)
     }.getOrElse(dataset.toDF())
   }
 

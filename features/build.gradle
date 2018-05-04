@@ -15,4 +15,7 @@ dependencies {
 
     // Needed for Base64 contents streaming
     compile "commons-io:commons-io:$commonsIOVersion"
+
+    // Json4s extensions (needed for Joda time)
+    compile "org.json4s:json4s-ext_$scalaVersion:$json4sVersion"
 }

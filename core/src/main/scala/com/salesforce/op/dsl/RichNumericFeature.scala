@@ -253,7 +253,7 @@ trait RichNumericFeature {
       bucketLabels: Option[Array[String]] = None
     ): FeatureLike[OPVector] = {
       f.transformWith(
-        new NumericBucketizer[Double, T]()
+        new NumericBucketizer[T]()
           .setBuckets(splits, bucketLabels)
           .setTrackNulls(trackNulls)
           .setSplitInclusion(splitInclusion)
@@ -515,7 +515,7 @@ trait RichNumericFeature {
       bucketLabels: Option[Array[String]] = None
     ): FeatureLike[OPVector] = {
       f.transformWith(
-        new NumericBucketizer[Long, T]()
+        new NumericBucketizer[T]()
           .setBuckets(splits, bucketLabels)
           .setTrackNulls(trackNulls)
           .setSplitInclusion(splitInclusion)

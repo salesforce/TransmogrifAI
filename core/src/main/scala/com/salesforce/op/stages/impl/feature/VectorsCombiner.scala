@@ -48,7 +48,7 @@ class VectorsCombiner(uid: String = UID[VectorsCombiner])
       case (f, i) => Try(OpVectorMetadata(schema(f.name))).getOrElse(f.toVectorMetaData(vectorSize(f, i)))
     }
 
-    val outMeta = OpVectorMetadata.flatten(outputName, attributes)
+    val outMeta = OpVectorMetadata.flatten(getOutputFeatureName, attributes)
     setMetadata(outMeta.toMetadata)
   }
 

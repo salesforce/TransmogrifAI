@@ -35,7 +35,7 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     val model = percentile.originStage.asInstanceOf[Estimator[_]].fit(scoresDF)
     val scoresTransformed = model.asInstanceOf[Transformer].transform(scoresDF)
 
-    percentile.name shouldBe percentile.originStage.outputName
+    percentile.name shouldBe percentile.originStage.getOutputFeatureName
     scoresTransformed.select(min(percentile.name)).first.getDouble(0) should equal (0.0)
     scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal (99.0)
   }

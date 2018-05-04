@@ -45,14 +45,14 @@ private[op] trait StageOperationName {
  *
  * @tparam MS model selector
  */
-private[impl] trait SubStage[+MS <: SubStage[MS]] {
+private[op] trait SubStage[+MS <: SubStage[MS]] {
   protected def subStage: Option[MS] = None
 }
 
 /**
  * Random Forest for Model Selector
  */
-private[impl] trait HasRandomForestBase[E <: Estimator[_], +MS <: HasRandomForestBase[E, MS]]
+private[op] trait HasRandomForestBase[E <: Estimator[_], +MS <: HasRandomForestBase[E, MS]]
   extends Params with SubStage[MS] {
 
   val sparkRF: E
@@ -62,7 +62,7 @@ private[impl] trait HasRandomForestBase[E <: Estimator[_], +MS <: HasRandomFores
   )
   setDefault(useRF, false)
 
-  private[impl] val rFGrid = new ParamGridBuilder()
+  private[op] val rFGrid = new ParamGridBuilder()
 
 
   /**
@@ -152,7 +152,7 @@ private[impl] trait HasRandomForestBase[E <: Estimator[_], +MS <: HasRandomFores
 /**
  * Decision Tree for Model Selector
  */
-private[impl] trait HasDecisionTreeBase[E <: Estimator[_], +MS <: HasDecisionTreeBase[E, MS]]
+private[op] trait HasDecisionTreeBase[E <: Estimator[_], +MS <: HasDecisionTreeBase[E, MS]]
   extends Params with SubStage[MS] {
 
   val sparkDT: E
@@ -162,7 +162,7 @@ private[impl] trait HasDecisionTreeBase[E <: Estimator[_], +MS <: HasDecisionTre
   )
   setDefault(useDT, false)
 
-  private[impl] val dTGrid = new ParamGridBuilder()
+  private[op] val dTGrid = new ParamGridBuilder()
 
   /**
    * Decision Tree Params
@@ -244,7 +244,7 @@ private[op] trait HasGradientBoostedTreeBase[E <: Estimator[_], +MS <: HasGradie
   )
   setDefault(useGBT, false)
 
-  private[impl] val gBTGrid = new ParamGridBuilder()
+  private[op] val gBTGrid = new ParamGridBuilder()
 
   /**
    * Gradient Boosted Tree Params

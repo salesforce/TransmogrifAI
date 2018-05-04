@@ -10,6 +10,7 @@ import java.text.DateFormatSymbols
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
+import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.OpVectorColumnMetadata
 import enumeratum._

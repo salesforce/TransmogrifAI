@@ -5,8 +5,10 @@
 
 package com.salesforce.op.stages.impl.preparators
 
+import scala.util.{Failure, Success, Try}
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.mllib.linalg.DenseMatrix
+import com.salesforce.op.utils.stats.OpStatistics
+import com.salesforce.op.utils.stats.OpStatistics.LabelWiseValues
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
@@ -20,10 +22,14 @@ case object SanityCheckerNames {
   val CorrelationType: String = "correlationType"
   val CategoricalStats: String = "categoricalStats"
   val CategoricalFeatures: String = "categoricalFeatures"
+  val Group: String = "group"
   val CramersVIsNaN: String = "cramersVIsNaN"
   val CramersV: String = "cramersV"
   val MutualInfo: String = "mutualInfo"
+  val ContingencyMatrix: String = "contingencyMatrix"
   val PointwiseMutualInfoAgainstLabel: String = "pointwiseMutualInfoAgainstLabel"
+  val MaxRuleConfidence: String = "maxRuleConfidence"
+  val Support: String = "support"
   val CountMatrix: String = "countMatrix"
   val Names: String = "names"
   val FeaturesIn: String = "features"
@@ -55,12 +61,12 @@ case class SanityCheckerSummary
   dropped: Seq[String],
   featuresStatistics: SummaryStatistics,
   names: Seq[String],
-  categoricalStats: CategoricalStats
+  categoricalStats: Array[CategoricalGroupStats]
 ) {
 
   private[op] def this(
     stats: Array[ColumnStatistics],
-    catStats: CategoricalStats,
+    catStats: Array[CategoricalGroupStats],
     dropped: Seq[String],
     colStats: MultivariateStatisticalSummary,
     names: Seq[String],
@@ -74,7 +80,7 @@ case class SanityCheckerSummary
         correlationType
       ),
       dropped = dropped,
-      featuresStatistics = new SummaryStatistics(colStats, stats.map(_.numNulls), sample),
+      featuresStatistics = new SummaryStatistics(colStats, sample),
       names = names,
       categoricalStats = catStats
     )
@@ -91,7 +97,7 @@ case class SanityCheckerSummary
     summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
     summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata())
     summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
-    summaryMeta.putMetadata(SanityCheckerNames.CategoricalStats, categoricalStats.toMetadata())
+    summaryMeta.putMetadataArray(SanityCheckerNames.CategoricalStats, categoricalStats.map(_.toMetadata()))
     summaryMeta.build()
   }
 
@@ -114,18 +120,16 @@ case class SummaryStatistics
   max: Seq[Double],
   min: Seq[Double],
   mean: Seq[Double],
-  variance: Seq[Double],
-  numNull: Seq[Double]
+  variance: Seq[Double]
 ) {
 
-  private[op] def this(colStats: MultivariateStatisticalSummary, trackNulls: Array[Double], sample: Double) = this(
+  private[op] def this(colStats: MultivariateStatisticalSummary, sample: Double) = this(
     count = colStats.count,
     sampleFraction = sample,
     max = colStats.max.toArray,
     min = colStats.min.toArray,
     mean = colStats.mean.toArray,
-    variance = colStats.variance.toArray,
-    numNull = trackNulls
+    variance = colStats.variance.toArray
   )
 
   /**
@@ -141,11 +145,53 @@ case class SummaryStatistics
     meta.putDoubleArray(SanityCheckerNames.Min, min.toArray)
     meta.putDoubleArray(SanityCheckerNames.Mean, mean.toArray)
     meta.putDoubleArray(SanityCheckerNames.Variance, variance.toArray)
-    meta.putDoubleArray(SanityCheckerNames.NumNull, numNull.toArray)
     meta.build()
   }
 
 }
+
+/**
+ * Container for categorical stats coming from a single group (and therefore a single contingency matrix)
+ *
+ * @param group               Indicator group for this contingency matrix
+ * @param categoricalFeatures Array of categorical features belonging to this group
+ * @param contingencyMatrix   Contingency matrix for this feature group
+ * @param pointwiseMutualInfo Matrix of PMI values in Map form (label -> PMI values)
+ * @param cramersV            Cramer's V value for this feature group (how strongly correlated is it with the label)
+ * @param mutualInfo          Mutual info value for this feature group
+ * @param maxRuleConfidences  Array (one value per contingency matrix row) containing the largest association rule
+ *                            confidence for that row (over all the labels)
+ * @param supports            Array (one value per contingency matrix row) containing the supports for each categorical
+ *                            choice (fraction of dats in which it is chosen)
+ */
+case class CategoricalGroupStats
+(
+  group: String,
+  categoricalFeatures: Array[String],
+  contingencyMatrix: LabelWiseValues.Type,
+  pointwiseMutualInfo: LabelWiseValues.Type,
+  cramersV: Double,
+  mutualInfo: Double,
+  maxRuleConfidences: Array[Double],
+  supports: Array[Double]
+) {
+  /**
+   * @return metadata of this specific categorical group
+   */
+  def toMetadata(): Metadata = {
+    val meta = new MetadataBuilder()
+    meta.putString(SanityCheckerNames.Group, group)
+    meta.putStringArray(SanityCheckerNames.CategoricalFeatures, categoricalFeatures)
+    meta.putMetadata(SanityCheckerNames.ContingencyMatrix, contingencyMatrix.toMetadata)
+    meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel, pointwiseMutualInfo.toMetadata)
+    meta.putDouble(SanityCheckerNames.CramersV, if (cramersV.isNaN) 0 else cramersV)
+    meta.putDouble(SanityCheckerNames.MutualInfo, mutualInfo)
+    meta.putDoubleArray(SanityCheckerNames.MaxRuleConfidence, maxRuleConfidences)
+    meta.putDoubleArray(SanityCheckerNames.Support, supports)
+    meta.build()
+  }
+}
+
 
 /**
  * Container class for statistics calculated from contingency tables constructed from categorical variables
@@ -156,16 +202,17 @@ case class SummaryStatistics
  * @param pointwiseMutualInfos Map from label value (as a string) to an Array (over features) of PMI values
  * @param mutualInfos          Values of MI for each feature (should be the same for everything coming from the same
  *                             contingency matrix)
- * @param counts               Counts of occurance for categoricals (n x m array of arrays where n = number of labels
+ * @param counts               Counts of occurrence for categoricals (n x m array of arrays where n = number of labels
  *                             and m = number of features + 1 with last element being occurance count of labels
  */
+@deprecated("Functionality replaced by Array[CategoricalGroupStats]", "3.3.0")
 case class CategoricalStats
 (
   categoricalFeatures: Array[String] = Array.empty,
   cramersVs: Array[Double] = Array.empty,
-  pointwiseMutualInfos: CategoricalStats.PointwiseMutualInfos.Type = CategoricalStats.PointwiseMutualInfos.empty,
+  pointwiseMutualInfos: LabelWiseValues.Type = LabelWiseValues.empty,
   mutualInfos: Array[Double] = Array.empty,
-  counts: CategoricalStats.PointwiseMutualInfos.Type = CategoricalStats.PointwiseMutualInfos.empty
+  counts: LabelWiseValues.Type = LabelWiseValues.empty
 ) {
   // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
   def toMetadata(): Metadata = {
@@ -179,17 +226,6 @@ case class CategoricalStats
     counts.map{ case (k, v) => countMeta.putDoubleArray(k, v)}
     meta.putMetadata(SanityCheckerNames.CountMatrix, countMeta.build())
     meta.build()
-  }
-}
-
-object CategoricalStats {
-  /**
-   * Pointwise mutual information (PMI) values:
-   * Map from label value (as a string) to an Array (over features) of PMI values
-   */
-  object PointwiseMutualInfos {
-    type Type = Map[String, Array[Double]]
-    def empty: Type = Map.empty
   }
 }
 
@@ -227,7 +263,7 @@ case class Correlations
     corrMeta.putStringArray(SanityCheckerNames.FeaturesIn, featuresIn.toArray)
     corrMeta.putDoubleArray(SanityCheckerNames.Values, values.toArray)
     corrMeta.putStringArray(SanityCheckerNames.CorrelationsWLabelIsNaN, nanCorrs.toArray)
-    corrMeta.putString(SanityCheckerNames.CorrelationType, corrType.name)
+    corrMeta.putString(SanityCheckerNames.CorrelationType, corrType.sparkName)
     corrMeta.build()
   }
 }
@@ -252,11 +288,11 @@ case object SanityCheckerSummary {
       max = wrapped.getArray[Double](SanityCheckerNames.Max).toSeq,
       min = wrapped.getArray[Double](SanityCheckerNames.Min).toSeq,
       mean = wrapped.getArray[Double](SanityCheckerNames.Mean).toSeq,
-      variance = wrapped.getArray[Double](SanityCheckerNames.Variance).toSeq,
-      numNull = wrapped.getArray[Double](SanityCheckerNames.NumNull).toSeq
+      variance = wrapped.getArray[Double](SanityCheckerNames.Variance).toSeq
     )
   }
 
+  @deprecated("CategoricalStats replaced by Array[CategoricalGroupStats]", "3.3.0")
   private def categoricalStatsFromMetadata(meta: Metadata): CategoricalStats = {
     val wrapped = meta.wrapped
     CategoricalStats(
@@ -264,9 +300,28 @@ case object SanityCheckerSummary {
       cramersVs = wrapped.getArray[Double](SanityCheckerNames.CramersV),
       mutualInfos = wrapped.getArray[Double](SanityCheckerNames.MutualInfo),
       pointwiseMutualInfos = meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
-        .underlyingMap.asInstanceOf[CategoricalStats.PointwiseMutualInfos.Type],
-      counts = meta.getMetadata(SanityCheckerNames.CountMatrix)
-        .underlyingMap.asInstanceOf[CategoricalStats.PointwiseMutualInfos.Type]
+        .underlyingMap.asInstanceOf[LabelWiseValues.Type],
+      counts = if (meta.contains(SanityCheckerNames.CountMatrix)) {
+        meta.getMetadata(SanityCheckerNames.CountMatrix)
+          .underlyingMap.asInstanceOf[LabelWiseValues.Type]
+      }
+      else OpStatistics.LabelWiseValues.empty
+    )
+  }
+
+  private def categoricalGroupStatsFromMetadata(meta: Metadata): CategoricalGroupStats = {
+    val wrapped = meta.wrapped
+    CategoricalGroupStats(
+      group = wrapped.get[String](SanityCheckerNames.Group),
+      categoricalFeatures = wrapped.getArray[String](SanityCheckerNames.CategoricalFeatures),
+      contingencyMatrix = meta.getMetadata(SanityCheckerNames.ContingencyMatrix)
+        .underlyingMap.asInstanceOf[LabelWiseValues.Type],
+      pointwiseMutualInfo = meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
+        .underlyingMap.asInstanceOf[LabelWiseValues.Type],
+      cramersV = wrapped.get[Double](SanityCheckerNames.CramersV),
+      mutualInfo = wrapped.get[Double](SanityCheckerNames.MutualInfo),
+      maxRuleConfidences = wrapped.getArray[Double](SanityCheckerNames.MaxRuleConfidence),
+      supports = wrapped.getArray[Double](SanityCheckerNames.Support)
     )
   }
 
@@ -278,13 +333,54 @@ case object SanityCheckerSummary {
    */
   def fromMetadata(meta: Metadata): SanityCheckerSummary = {
     val wrapped = meta.wrapped
-    SanityCheckerSummary(
-      correlationsWLabel = correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel)),
-      dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
-      featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
-      names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
-      categoricalStats = categoricalStatsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CategoricalStats))
-    )
+    // Try parsing as an older version of metadata (pre-3.3.0) if this doesn't work
+    Try {
+      SanityCheckerSummary(
+        correlationsWLabel = correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel)),
+        dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
+        featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
+        names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
+        categoricalStats = wrapped.getArray[Metadata](SanityCheckerNames.CategoricalStats)
+          .map(categoricalGroupStatsFromMetadata)
+      )
+    } match {
+      case Success(summary) => summary
+      // Parse it under the old format
+      case Failure(_) =>
+        val oldCatStats = categoricalStatsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CategoricalStats))
+        SanityCheckerSummary(
+          // Try to parse correlations under an even older OP 3.1 format (for PLS backwards compatibility)
+          correlationsWLabel = Try(
+            correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel))
+          ) match {
+            case Success(corr) => corr
+            case Failure(_) =>
+              Correlations(
+                featuresIn = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
+                  .getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
+                values = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
+                  .getArray[Double](SanityCheckerNames.Values).toSeq,
+                nanCorrs = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
+                corrType = wrapped.get[String](SanityCheckerNames.CorrelationType) match {
+                  case CorrelationType.Pearson.`sparkName` => CorrelationType.Pearson
+                  case CorrelationType.Spearman.`sparkName` => CorrelationType.Spearman
+                }
+              )
+          },
+          dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
+          featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
+          names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
+          categoricalStats = Array(CategoricalGroupStats(
+            group = "Unknown - deprecated metadata",
+            categoricalFeatures = oldCatStats.categoricalFeatures,
+            contingencyMatrix = oldCatStats.counts,
+            pointwiseMutualInfo = oldCatStats.pointwiseMutualInfos,
+            cramersV = oldCatStats.cramersVs.head,
+            mutualInfo = oldCatStats.mutualInfos.head,
+            maxRuleConfidences = Array.empty[Double],
+            supports = Array.empty[Double]
+          ))
+        )
+    }
   }
-
 }

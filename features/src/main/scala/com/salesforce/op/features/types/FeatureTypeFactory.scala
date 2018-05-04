@@ -117,6 +117,8 @@ case object FeatureTypeFactory {
       case t if t =:= weakTypeOf[GeolocationMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.GeolocationMap
         else new GeolocationMap(value.asInstanceOf[Map[String, Seq[Double]]])
+      case t if t =:= weakTypeOf[Prediction] => (value: Any) =>
+        new Prediction(value.asInstanceOf[Map[String, Double]])
 
       // Numerics
       case t if t =:= weakTypeOf[Binary] => (value: Any) =>
@@ -134,7 +136,7 @@ case object FeatureTypeFactory {
       case t if t =:= weakTypeOf[Real] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Real else new Real(value.asInstanceOf[Option[Double]])
       case t if t =:= weakTypeOf[RealNN] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.RealNN else new RealNN(value.asInstanceOf[Option[Double]])
+        new RealNN(value.asInstanceOf[Option[Double]])
 
       // Sets
       case t if t =:= weakTypeOf[MultiPickList] => (value: Any) =>

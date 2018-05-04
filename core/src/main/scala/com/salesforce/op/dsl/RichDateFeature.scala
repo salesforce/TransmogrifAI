@@ -8,7 +8,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.{DateListPivot, TransmogrifierDefaults}
+import com.salesforce.op.stages.impl.feature.{DateListPivot, DateToUnitCircleTransformer, TimePeriod, TransmogrifierDefaults}
 import org.joda.time.{DateTime => JDateTime}
 
 
@@ -29,6 +29,19 @@ trait RichDateFeature {
     def toDateList(): FeatureLike[DateList] = {
       f.transformWith(
         new UnaryLambdaTransformer[Date, DateList](operationName = "dateToList", _.value.toSeq.toDateList)
+      )
+    }
+
+    /**
+     * transforms a Date field into a cartesian coordinate representation
+     * of an extracted time period on the unit circle
+     *
+     * @param timePeriod The time period to extract from the timestamp
+     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     */
+    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
+      f.transformWith(
+        new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod)
       )
     }
 
@@ -83,6 +96,18 @@ trait RichDateFeature {
       )
     }
 
+    /**
+     * transforms a DateTime field into a cartesian coordinate representation
+     * of an extracted time period on the unit circle
+     *
+     * @param timePeriod The time period to extract from the timestamp
+     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     */
+    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
+      f.transformWith(
+        new DateToUnitCircleTransformer[DateTime]().setTimePeriod(timePeriod)
+      )
+    }
 
     /**
      * Converts a sequence of DateTime features into DateTimeList feature and then applies DateTimeList vectorizer.

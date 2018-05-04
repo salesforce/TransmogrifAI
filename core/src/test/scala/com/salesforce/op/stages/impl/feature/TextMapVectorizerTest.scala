@@ -56,7 +56,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
 
   Spec[TextMapPivotVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
@@ -65,7 +65,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.fit(dataSet)
     fitted.isInstanceOf[SequenceModel[_, _]]
     val vectorMetadata = fitted.getMetadata()
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(vectorizer,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
       top -> List(
         IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"), IndColWithGroup(Some("D"), "A"),
         IndColWithGroup(Some("E"), "A"), IndColWithGroup(Some("OTHER"), "A"),
@@ -85,7 +86,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
@@ -101,7 +102,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(20, Array(2, 3, 7, 10, 15, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(20, Array(2, 4, 9, 12, 13, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -117,7 +118,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(false).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(17, Array(3, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(4, 12, 15), Array(1.0, 1.0, 1.0)),
@@ -125,7 +126,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(17, Array(1, 3, 14), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     transformed.collect(vector) shouldBe expected
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(vectorizer,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
       top -> List(
         IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
         IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -144,7 +146,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(true).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(23, Array(3, 4, 8, 11, 18, 22), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(23, Array(3, 5, 10, 14, 16, 20), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -152,7 +154,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(23, Array(1, 4, 10, 14, 18, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     transformed.collect(vector) shouldBe expected
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(vectorizer,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
       top -> List(
         IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
         IndColWithGroup(nullIndicatorValue, "c"), IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -173,7 +176,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(1).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(12, Array(2, 4, 6), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(3, 8, 11), Array(1.0, 1.0, 1.0)),
@@ -187,7 +190,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setTopK(1).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(18, Array(2, 3, 6, 9, 14, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(18, Array(2, 4, 8, 11, 12, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -225,7 +228,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setMinSupport(0).fit(dataSetEmpty)
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
@@ -247,7 +250,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setMinSupport(0).fit(dataSetEmpty)
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
@@ -281,7 +284,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(5, Array(0, 3), Array(1.0, 1.0)),
       Vectors.sparse(5, Array(1), Array(1.0)),
@@ -295,7 +298,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(7, Array(0, 4), Array(1.0, 1.0)),
       Vectors.sparse(7, Array(1, 6), Array(1.0, 1.0)),
@@ -310,7 +313,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       .fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(9, Array(2), Array(1.0)),
       Vectors.sparse(9, Array(5, 7), Array(1.0, 1.0)),
@@ -325,7 +328,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       .fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.outputName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(13, Array(2, 3, 9, 12), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(2, 5, 7, 10), Array(1.0, 1.0, 1.0, 1.0)),

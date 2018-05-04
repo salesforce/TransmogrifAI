@@ -47,8 +47,8 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   } yield List[Double](lat, lon, acc.toDouble)
 
   // Map generation
-  private def mapGen[T](valGen: Gen[T]): Gen[Map[String, T]] = {
-    Gen.nonEmptyMap(for {k <- textGen; v <- valGen} yield (k, v))
+  private def mapGen[T](valGen: Gen[T], keyGen: Gen[String] = textGen): Gen[Map[String, T]] = {
+    Gen.nonEmptyMap(for {k <- keyGen; v <- valGen} yield (k, v))
   }
   private final val binaryMapGen = mapGen(binaryGen)
   private final val doubleMapGen = mapGen(doubleGen)
@@ -58,11 +58,12 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   private final val geoMapGen = mapGen(geoGen)
   private final val longListMapGen = mapGen(longListGen) // Currently unused?
   private final val textListMapGen = mapGen(textListGen) // Currently unused?
+  private final val predictionGen = mapGen(keyGen = Gen.oneOf(Seq(Prediction.Keys.PredictionName)), valGen = doubleGen)
 
   property("OPNumeric types should correctly wrap their corresponding Option types") {
     forAll { (x: Option[Double]) =>
       checkOptionVals(Real(x), x)
-      checkOptionVals(RealNN(x), if (x.isEmpty) Some(0.0) else x)
+      checkOptionVals(RealNN(x.getOrElse(0.0)), if (x.isEmpty) Some(0.0) else x)
       checkOptionVals(Percent(x), x)
       checkOptionVals(Currency(x), x)
     }
@@ -116,6 +117,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
       checkVals(RealMap(x), x)
       checkVals(CurrencyMap(x), x)
       checkVals(PercentMap(x), x)
+      checkVals(RealMap(x), x)
     }
     forAll(longMapGen) { x =>
       checkVals(IntegralMap(x), x)
@@ -140,6 +142,23 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
     }
     forAll(setMapGen) { x => checkVals(MultiPickListMap(x), x) }
     forAll(geoMapGen) { x => checkVals(GeolocationMap(x), x) }
+    forAll(predictionGen) { x => checkVals(new Prediction(x), x) }
+    forAll(doubleGen) { x => checkVals(Prediction(x), Map(Prediction.Keys.PredictionName -> x)) }
+    forAll(doubleMapGen) { x =>
+      val error = intercept[NonNullableEmptyException](new Prediction(x))
+      error.getMessage shouldBe
+        s"Prediction cannot be empty: value map must contain '${Prediction.Keys.PredictionName}' key"
+    }
+    forAll(vectorGen) { v =>
+      val a = v.toArray
+      val rawPred = a.zipWithIndex.map { case (v, i) => s"${Prediction.Keys.RawPredictionName}_$i" -> v }
+      val prob = a.zipWithIndex.map { case (v, i) => s"${Prediction.Keys.ProbabilityName}_$i" -> v }
+      val pred = Prediction.Keys.PredictionName -> a.head
+      val expected = (rawPred ++ prob).toMap + pred
+      checkVals(Prediction(a.head, v, v), expected)
+      checkVals(Prediction(a.head, a, a), expected)
+    }
+
   }
 
   /**
@@ -160,7 +179,6 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
         f.toDouble shouldBe v.map(x => if (x == true) 1.0 else 0.0)
       case (f: OPNumeric[_], v) =>
         f.toDouble shouldBe v
-        f.toDouble(default = 947.21) shouldBe v.getOrElse(947.21)
       case (f: Text, v) =>
         f.value shouldBe v // Nothing extra to check here yet
       case _ =>

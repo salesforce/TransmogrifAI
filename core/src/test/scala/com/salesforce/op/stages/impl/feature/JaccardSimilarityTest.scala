@@ -30,14 +30,14 @@ class JaccardSimilarityTest extends FlatSpec with TestSparkContext {
   classOf[JaccardSimilarity].getSimpleName should "return single properly formed feature" in {
     val jaccard = jacSimTrans.getOutput()
 
-    jaccard.name shouldBe jacSimTrans.outputName
+    jaccard.name shouldBe jacSimTrans.getOutputFeatureName
     jaccard.parents shouldBe Array(f1, f2)
     jaccard.originStage shouldBe jacSimTrans
   }
   it should "have a shortcut" in {
     val jaccard = f1.jaccardSimilarity(f2)
 
-    jaccard.name shouldBe jaccard.originStage.outputName
+    jaccard.name shouldBe jaccard.originStage.getOutputFeatureName
     jaccard.parents shouldBe Array(f1, f2)
     jaccard.originStage shouldBe a[JaccardSimilarity]
   }

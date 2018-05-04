@@ -44,7 +44,7 @@ class UnaryEstimatorTest extends FlatSpec with TestSparkContext {
     val outputFeatures = testEstimator.setInput(f1).getOutput()
 
     outputFeatures shouldBe new Feature[Real](
-      name = testEstimator.outputName,
+      name = testEstimator.getOutputFeatureName,
       originStage = testEstimator,
       isResponse = false,
       parents = Array(f1)
@@ -98,5 +98,5 @@ class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
 
 final class MinMaxNormEstimatorModel private[op](val min: Double, val max: Double, operationName: String, uid: String)
   extends UnaryModel[Real, Real](operationName = operationName, uid = uid) {
-  def transformFn: Real => Real = _.map(v => (v - min) / (max - min)).toReal
+  def transformFn: Real => Real = _.v.map(v => (v - min) / (max - min)).toReal
 }

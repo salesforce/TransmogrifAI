@@ -51,12 +51,13 @@ class SwUnaryEstimator[I <: FeatureType, O <: FeatureType, M <: Model[M], E <: E
     val model = getSparkMlStage().map { e =>
       val pi = e.getParam(inputParamName)
       val po = e.getParam(outputParamName)
-      e.set(pi, in1.name).set(po, outputName).fit(dataset)
+      e.set(pi, in1.name).set(po, getOutputFeatureName).fit(dataset)
     }
 
     new SwUnaryModel[I, O, M](inputParamName, outputParamName, operationName, model, uid)
       .setParent(this)
       .setInput(in1.asFeatureLike[I])
+      .setOutputFeatureName(getOutputFeatureName)
   }
 }
 

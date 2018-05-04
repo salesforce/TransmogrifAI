@@ -60,7 +60,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
   it should "return a single output feature of the correct type" in {
     val outputFeatures = testVectorizer.getOutput()
     outputFeatures shouldBe new Feature[OPVector](
-      name = testVectorizer.outputName,
+      name = testVectorizer.getOutputFeatureName,
       originStage = testVectorizer,
       isResponse = false,
       parents = Array(inA, inB, inC, inD)
@@ -79,7 +79,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedConstant.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testVectorizer.outputName)
+      Array("inA", "inB", "inC", "inD", testVectorizer.getOutputFeatureName)
 
     val expectedZero = Array(
       (4L, 2L, 2L, null, Vectors.dense(4.0, 2.0, 2.0, 3.0)),
@@ -108,7 +108,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMode.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testVectorizer.outputName)
+      Array("inA", "inB", "inC", "inD", testVectorizer.getOutputFeatureName)
 
     val expectedMode = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
@@ -134,7 +134,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedConstantTracked.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testVectorizer.outputName)
+      Array("inA", "inB", "inC", "inD", testVectorizer.getOutputFeatureName)
 
     val expectedZeroTracked = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 0.0, 2.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
@@ -151,7 +151,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
     transformedValuesZeroTracked.map(_.get(4)) shouldEqual expectedZeroTracked.map(_._5)
 
     val fieldMetadata = testDataTransformedConstantTracked
-      .select(testVectorizer.outputName).schema.fields
+      .select(testVectorizer.getOutputFeatureName).schema.fields
       .map(_.metadata).head
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -161,7 +161,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       inD -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
+    OpVectorMetadata(testVectorizer.getOutputFeatureName, fieldMetadata) shouldBe expectedMeta
   }
 
 
@@ -172,7 +172,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedModeTracked.schema.fieldNames should contain theSameElementsAs
-      Array("inA", "inB", "inC", "inD", testVectorizer.outputName)
+      Array("inA", "inB", "inC", "inD", testVectorizer.getOutputFeatureName)
 
     val expectedModeTracked = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 0.0, 2.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
@@ -189,7 +189,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
     transformedValuesModeTracked.map(_.get(4)) shouldEqual expectedModeTracked.map(_._5)
 
     val fieldMetadata = testDataTransformedModeTracked
-      .select(testVectorizer.outputName).schema.fields
+      .select(testVectorizer.getOutputFeatureName).schema.fields
       .map(_.metadata).head
     val expectedMeta = TestOpVectorMetadataBuilder(
       testVectorizer,
@@ -198,7 +198,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       inC -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       inD -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(testVectorizer.outputName, fieldMetadata) shouldBe expectedMeta
+    OpVectorMetadata(testVectorizer.getOutputFeatureName, fieldMetadata) shouldBe expectedMeta
   }
 
   it should "work the same with DateTime columns as if they were Integral" in {
@@ -214,7 +214,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMode.schema.fieldNames should contain theSameElementsAs
-      Array("inADT", "inBDT", "inCDT", "inDDT", testVectorizer.outputName)
+      Array("inADT", "inBDT", "inCDT", "inDDT", testVectorizer.getOutputFeatureName)
 
     val expectedMode = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
@@ -244,7 +244,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMode.schema.fieldNames should contain theSameElementsAs
-      Array("inAD", "inBD", "inCD", "inDD", testVectorizer.outputName)
+      Array("inAD", "inBD", "inCD", "inDD", testVectorizer.getOutputFeatureName)
 
     val expectedMode = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
@@ -274,7 +274,7 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
 
     // This is string because of vector type being private to spark ml
     testDataTransformedMode.schema.fieldNames should contain theSameElementsAs
-      Array("inADT", "inBDT", "inCDT", "inDDT", testVectorizer.outputName)
+      Array("inADT", "inBDT", "inCDT", "inDDT", testVectorizer.getOutputFeatureName)
 
     val expectedMode = Array(
       (4.0, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),

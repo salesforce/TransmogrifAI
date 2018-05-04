@@ -191,7 +191,7 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     val (ds, pn, cc) = TestFeatureBuilder(Seq[(Phone, Text)]((Phone("5105556666"), Text("US"))))
     val result = pn.parsePhone(cc)
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     result.parents shouldBe Array(pn, cc)
     result.originStage shouldBe a[ParsePhoneNumber]
 
@@ -203,14 +203,14 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     val (ds, pn) = TestFeatureBuilder(Seq[Phone](Phone("5105556666"), Phone("99995105556666"), Phone.empty))
     val result = pn.parsePhoneDefaultCountry()
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     result.parents shouldBe Array(pn)
     result.originStage shouldBe a[ParsePhoneDefaultCountry]
 
     val data = new OpWorkflow().setResultFeatures(result).transform(ds)
     val ans = data.take(3, result)
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     ans should contain theSameElementsInOrderAs Array(Phone("+15105556666"), Phone(None), Phone.empty)
   }
 
@@ -259,7 +259,7 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     val (ds, pn, cc) = TestFeatureBuilder(Seq[(Phone, Text)]((Phone("5105556666"), Text("US"))))
     val result = pn.isValidPhone(cc, namesAndCode)
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     result.parents shouldBe Array(pn, cc)
     result.originStage shouldBe a[IsValidPhoneNumber]
 
@@ -271,25 +271,25 @@ class PhoneNumberParserTest extends FlatSpec with TestSparkContext {
     val (ds, pn) = TestFeatureBuilder(Seq[Phone](Phone("5105556666"), Phone("99995105556666"), Phone.empty))
     val result = pn.isValidPhoneDefaultCountry()
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     result.parents shouldBe Array(pn)
     result.originStage shouldBe a[IsValidPhoneDefaultCountry]
 
     val data = new OpWorkflow().setResultFeatures(result).transform(ds)
     val ans = data.take(3, result)
 
-    result.name shouldBe result.originStage.outputName
+    result.name shouldBe result.originStage.getOutputFeatureName
     ans should contain theSameElementsInOrderAs Array(Binary(true), Binary(false), Binary.empty)
   }
   it should "correctly identify valid phone numbers on a random sample" in {
     val result = pGood.isValidPhoneDefaultCountry()
     val data = new OpWorkflow().setResultFeatures(result).transform(goodPhones)
-    data.collect(result).forall(_.toDouble() == 1.0) shouldBe true
+    data.collect(result).forall(_.toDouble.getOrElse(0.0) == 1.0) shouldBe true
   }
   it should "correctly identify invalid phone numbers on a random sample" in {
     val result = pBad.isValidPhoneDefaultCountry()
     val data = new OpWorkflow().setResultFeatures(result).transform(badPhones)
-    data.collect(result).forall(_.toDouble() == 0.0) shouldBe true
+    data.collect(result).forall(_.toDouble.getOrElse(0.0) == 0.0) shouldBe true
   }
 
 

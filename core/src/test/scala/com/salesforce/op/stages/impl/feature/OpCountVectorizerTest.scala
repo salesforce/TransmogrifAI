@@ -48,7 +48,8 @@ class OpCountVectorizerTest extends FlatSpec with TestSparkContext {
       f2 -> List(IndVal(Some("b")), IndVal(Some("a")), IndVal(Some("c")))
     )
     // cannot just do equals because fitting is nondeterministic
-    OpVectorMetadata(f2vec.outputName, vectorMetadata).columns should contain theSameElementsAs expectedMeta.columns
+    OpVectorMetadata(f2vec.getOutputFeatureName, vectorMetadata).columns should contain theSameElementsAs
+      expectedMeta.columns
   }
 
   it should "convert array of strings into count vector (shortcut version)" in {

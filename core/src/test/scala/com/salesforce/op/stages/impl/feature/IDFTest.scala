@@ -34,7 +34,7 @@ class IDFTest extends FlatSpec with TestSparkContext {
     val transformedData = model.asInstanceOf[Transformer].transform(ds)
     val results = transformedData.select(idf.name).collect(idf)
 
-    idf.name shouldBe idf.originStage.outputName
+    idf.name shouldBe idf.originStage.getOutputFeatureName
 
     val expectedIdf = Vectors.dense(Array(0, 3, 1, 2).map { x =>
       math.log((data.length + 1.0) / (x + 1.0))
@@ -52,7 +52,7 @@ class IDFTest extends FlatSpec with TestSparkContext {
     val model = idf.originStage.asInstanceOf[Estimator[_]].fit(ds)
     val transformedData = model.asInstanceOf[Transformer].transform(ds)
     val results = transformedData.select(idf.name).collect(idf)
-    idf.name shouldBe idf.originStage.outputName
+    idf.name shouldBe idf.originStage.getOutputFeatureName
 
     val expectedIdf = Vectors.dense(Array(0, 3, 1, 2).map { x =>
       if (x > 0) math.log((data.length + 1.0) / (x + 1.0)) else 0

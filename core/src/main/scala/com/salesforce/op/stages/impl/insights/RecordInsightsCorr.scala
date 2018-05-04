@@ -18,10 +18,6 @@ import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import com.twitter.algebird.Operators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
-import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{write => jwrite}
 
 import scala.util.Try
 
@@ -90,7 +86,7 @@ class RecordInsightsCorr(uid: String = UID[RecordInsightsCorr]) extends
         OldVectors.dense(features.values ++ densePred.values)
     }.persist()
 
-    val scoreCorr = Statistics.corr(combinedVector, getCorrelationType.name)
+    val scoreCorr = Statistics.corr(combinedVector, getCorrelationType.sparkName)
       .colIter.slice(fsize, fsize + psize)
       .map(_.toArray).toArray
 
@@ -136,24 +132,6 @@ private[op] final class RecordInsightsCorrModel
   }
 }
 
-
-object RecordInsightsParser {
-
-  /**
-   * All insights take the for sequence of tuples from index of prediction explained to importance value
-   */
-  type Insights = Seq[(Int, Double)]
-
-  def insightToText(insight: (OpVectorColumnHistory, Insights)): (String, String) = {
-    implicit val formats = Serialization.formats(ShortTypeHints(List(classOf[Tuple2[Int, Double]])))
-    insight._1.toJson(false) -> jwrite(insight._2)
-  }
-
-  def parseInsights(insights: TextMap): Map[OpVectorColumnHistory, Insights] = {
-    implicit val formats: DefaultFormats = DefaultFormats
-    insights.value.map { case (k, v) => OpVectorColumnHistory.fromJson(k) -> parse(v).extract[Seq[(Int, Double)]] }
-  }
-}
 
 /**
  * Represents a kind of scaling to do on feature before computing importance

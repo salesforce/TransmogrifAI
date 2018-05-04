@@ -205,7 +205,7 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
     expected: Array[TextList]
   ) = {
     val output = tokenizer.setInput(input).getOutput()
-    output.name shouldBe tokenizer.outputName
+    output.name shouldBe tokenizer.getOutputFeatureName
     output.parents shouldBe Array(input)
     output.originStage shouldBe tokenizer
 

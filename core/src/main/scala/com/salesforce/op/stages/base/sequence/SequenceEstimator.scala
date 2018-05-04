@@ -77,6 +77,7 @@ abstract class SequenceEstimator[I <: FeatureType, O <: FeatureType]
       .setParent(this)
       .setInput(inN.map(_.asFeatureLike[I]))
       .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
   }
 
 }

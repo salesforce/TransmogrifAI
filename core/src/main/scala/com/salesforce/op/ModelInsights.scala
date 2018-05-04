@@ -88,7 +88,7 @@ case class Continuous(min: Double, max: Double, mean: Double, variance: Double) 
  * Summary of label distribution for discrete label
  *
  * @param domain sequence of all unique values observed in data
- * @param prob   probablities of each unique value observed in data (order is matched to domain order)
+ * @param prob   probabilities of each unique value observed in data (order is matched to domain order)
  */
 case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
 
@@ -109,7 +109,7 @@ case class FeatureInsights(featureName: String, featureType: String, derivedFeat
  * @param derivedFeatureGroup        grouping of this feature if the feature is a pivot
  * @param derivedFeatureValue        value of the feature if the feature is a numeric encoding of a non-numeric feature
  *                                   or bucket
- * @param excluded                   was this derived feature exluded from the model by the sanity checker
+ * @param excluded                   was this derived feature excluded from the model by the sanity checker
  * @param corr                       the correlation of this feature with the label
  * @param cramersV                   the cramersV of this feature with the label
  *                                   (when both label and feature are categorical)
@@ -118,7 +118,7 @@ case class FeatureInsights(featureName: String, featureType: String, derivedFeat
  *                                   (categorical features only)
  * @param pointwiseMutualInformation the mutual information of this feature with each value of the label
  *                                   (categorical features only)
- * @param countMatrix                the counts of the occurance of this feature with each of the label values
+ * @param countMatrix                the counts of the occurrence of this feature with each of the label values
  *                                   (categorical features only)
  * @param contribution               the contribution of this feature to the model
  *                                   (eg feature importance for random forest, weight for logistic regression)
@@ -126,7 +126,6 @@ case class FeatureInsights(featureName: String, featureType: String, derivedFeat
  * @param max                        the max value of this feature
  * @param mean                       the mean value of this feature
  * @param variance                   the variance of this feature
- * @param numberOfNulls              the number of nulls in this feature
  */
 case class Insights
 (
@@ -144,8 +143,7 @@ case class Insights
   min: Option[Double] = None,
   max: Option[Double] = None,
   mean: Option[Double] = None,
-  variance: Option[Double] = None,
-  numberOfNulls: Option[Double] = None
+  variance: Option[Double] = None
 )
 
 case object ModelInsights {
@@ -173,7 +171,8 @@ case object ModelInsights {
   private[op] def extractFromStages(
     stages: Array[OPStage],
     rawFeatures: Array[features.OPFeature],
-    trainingParams: OpParams
+    trainingParams: OpParams,
+    blacklistedFeatures: Array[features.OPFeature]
   ): ModelInsights = {
     val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
     val sanityChecker = sanityCheckers.lastOption
@@ -207,17 +206,17 @@ case object ModelInsights {
         .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelectorBase[_, _]])))
         // finally try to get it from the last vector stage
         .orElse(
-          stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
-            .map(v => OpVectorMetadata(v.outputName, v.getMetadata()))
-        )
+        stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
+          .map(v => OpVectorMetadata(v.getOutputFeatureName, v.getMetadata()))
+      )
     }
     log.info(
       s"Found ${vectorInput.map(_.name + " as feature vector").getOrElse("no feature vector")}" +
-      s" to fill in model insights"
+        s" to fill in model insights"
     )
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
-      features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures),
+      features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures, blacklistedFeatures),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = getStageInfo(stages)
@@ -234,7 +233,7 @@ case object ModelInsights {
         val raw = l.rawFeatures
         val sample = summary.map(_.featuresStatistics.count)
         val info: Option[LabelInfo] = summary.map { s =>
-          if (s.categoricalStats.counts.isEmpty) {
+          if (s.categoricalStats.isEmpty) {
             Continuous(
               min = s.featuresStatistics.min.last,
               max = s.featuresStatistics.max.last,
@@ -242,10 +241,15 @@ case object ModelInsights {
               variance = s.featuresStatistics.variance.last
             )
           } else {
-            val counts = s.categoricalStats.counts.mapValues(_.last).toSeq.sortBy(_._1)
+            // Can pick any contingency matrix to compute the label stats
+            val labelCounts = s.categoricalStats.head.contingencyMatrix.map{
+              case (k, v) => k -> v.sum
+            }.toSeq.sortBy(_._1)
+            val totalCount = labelCounts.foldLeft(0.0)((acc, el) => acc + el._2)
+
             Discrete(
-              domain = counts.map(_._1),
-              prob = counts.map(_._2)
+              domain = labelCounts.map(_._1),
+              prob = labelCounts.map(_._2 / totalCount)
             )
           }
         }
@@ -258,11 +262,12 @@ case object ModelInsights {
     vectorInfo: Option[OpVectorMetadata],
     summary: Option[SanityCheckerSummary],
     model: Option[SelectedModel],
-    rawFeatures: Array[features.OPFeature]
+    rawFeatures: Array[features.OPFeature],
+    blacklistedFeatures: Array[features.OPFeature]
   ): Seq[FeatureInsights] = {
     val contributions = getModelContributions(model)
 
-    val allInsights = (vectorInfo, summary) match {
+    val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
         val droppedSet = s.dropped.toSet
         val indexInToIndexKept = v.columns
@@ -270,8 +275,16 @@ case object ModelInsights {
           .zipWithIndex.toMap
 
         v.getColumnHistory().map { h =>
-          val catIndex = s.categoricalStats.categoricalFeatures.indexOf(h.columnName)
+          val catGroupIndex = s.categoricalStats.zipWithIndex.collectFirst {
+            case (groupStats, index) if groupStats.categoricalFeatures.contains(h.columnName) => index
+          }
+          val catIndexWithinGroup = catGroupIndex match {
+            case Some(groupIndex) =>
+              Some(s.categoricalStats(groupIndex).categoricalFeatures.indexOf(h.columnName))
+            case _ => None
+          }
           val keptIndex = indexInToIndexKept.get(h.index)
+
           h.parentFeatureOrigins ->
             Insights(
               derivedFeatureName = h.columnName,
@@ -280,16 +293,23 @@ case object ModelInsights {
               derivedFeatureValue = h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlationsWLabel, h.columnName),
-              cramersV = getIfExists(catIndex, s.categoricalStats.cramersVs),
-              mutualInformation = getIfExists(catIndex, s.categoricalStats.mutualInfos),
-              pointwiseMutualInformation = getIfExists(catIndex, s.categoricalStats.pointwiseMutualInfos),
-              countMatrix = getIfExists(catIndex, s.categoricalStats.counts),
+              cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
+              mutualInformation = catGroupIndex.map(i => s.categoricalStats(i).mutualInfo),
+              pointwiseMutualInformation = (catGroupIndex, catIndexWithinGroup) match {
+                case (Some(groupIdx), Some(idx)) =>
+                  getIfExists(idx, s.categoricalStats(groupIdx).pointwiseMutualInfo)
+                case _ => Map.empty[String, Double]
+              },
+              countMatrix = (catGroupIndex, catIndexWithinGroup) match {
+                case (Some(groupIdx), Some(idx)) =>
+                  getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
+                case _ => Map.empty[String, Double]
+              },
               contribution = keptIndex.map(i => contributions.map(_.applyOrElse(i, Seq.empty))).getOrElse(Seq.empty),
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
-              variance = getIfExists(h.index, s.featuresStatistics.variance),
-              numberOfNulls = getIfExists(h.index, s.featuresStatistics.numNull)
+              variance = getIfExists(h.index, s.featuresStatistics.variance)
             )
         }
       case (Some(v), None) => v.getColumnHistory().map { h =>
@@ -305,13 +325,24 @@ case object ModelInsights {
       case (None, _) => Seq.empty
     }
 
-    allInsights.flatMap { case (feature, insights) => feature.map(_ -> insights) }.groupBy(_._1).map {
-      case (fname, seq) =>
-        val ftype = rawFeatures.find(_.name == fname)
-          .getOrElse(throw new RuntimeException(s"No raw feature with name $fname found in raw features"))
-          .typeName
-        FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2))
-    }.toSeq
+    val blacklistInsights = blacklistedFeatures.map{ f =>
+      Seq(f.name) -> Insights(derivedFeatureName = f.name, stagesApplied = Seq.empty, derivedFeatureGroup = None,
+        derivedFeatureValue = None, excluded = Some(true))
+    }
+
+    val allInsights = featureInsights ++ blacklistInsights
+    val allFeatures = rawFeatures ++ blacklistedFeatures
+
+    allInsights
+      .flatMap { case (feature, insights) => feature.map(_ -> insights) }
+      .groupBy(_._1)
+      .map {
+        case (fname, seq) =>
+          val ftype = allFeatures.find(_.name == fname)
+            .getOrElse(throw new RuntimeException(s"No raw feature with name $fname found in raw features"))
+            .typeName
+          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2))
+      }.toSeq
   }
 
   private def getIfExists[T](index: Int, values: Seq[T]): Option[T] =

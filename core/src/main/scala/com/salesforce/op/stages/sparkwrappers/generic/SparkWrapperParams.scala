@@ -63,7 +63,7 @@ private[op] trait SparkWrapperParams[S <: PipelineStage with Params] extends Par
   def getSavePath(): String = $(savePath)
 
   /**
-   * Method to set spark parameters by string. Note will not set inputs or outputs as those shoudl be taken from
+   * Method to set spark parameters by string. Note will not set inputs or outputs as those should be taken from
    * the input features and output name respectively
    *
    * @param paramName string name of parameter want to set

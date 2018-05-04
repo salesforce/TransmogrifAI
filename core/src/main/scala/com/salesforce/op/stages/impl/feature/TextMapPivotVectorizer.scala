@@ -8,6 +8,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe.TypeTag
@@ -39,7 +40,9 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 
     val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val vectorMeta = createOutputVectorMetadata(topValues, inN, operationName, outputName, stageName, $(trackNulls))
+
+    val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
+      stageName, $(trackNulls))
     setMetadata(vectorMeta.toMetadata)
 
     new TextMapPivotVectorizerModel[T](
@@ -64,9 +67,25 @@ final class TextMapPivotVectorizerModel[T <: OPMap[String]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun {
+    with VectorizerDefaults with TextMapPivotVectorizerModelFun[T] {
 
-  def transformFn: Seq[T] => OPVector = row => {
+  def transformFn: Seq[T] => OPVector = pivotFn(
+    topValues = topValues,
+    shouldCleanKeys = shouldCleanKeys,
+    shouldCleanValues = shouldCleanValues,
+    shouldTrackNulls = trackNulls
+  )
+}
+
+/**
+ * Text Map Pivot Vectorizer Model Functionality
+ */
+private[op] trait TextMapPivotVectorizerModelFun[T <: OPMap[String]] extends CleanTextMapFun {
+  protected def pivotFn
+  (
+    topValues: Seq[Seq[(String, Array[String])]], shouldCleanKeys: Boolean, shouldCleanValues: Boolean,
+    shouldTrackNulls: Boolean
+  ): Seq[T] => OPVector = row => {
     // Combine top values for each feature with map feature
     val eachPivoted =
       row.zip(topValues).map { case (map, topMap) =>
@@ -75,13 +94,13 @@ final class TextMapPivotVectorizerModel[T <: OPMap[String]] private[op]
         topMap.map { case (mapKey, top) =>
           val sizeOfVector = top.length
           cleanedMap.get(mapKey) match {
-            case None => if (trackNulls) Seq(sizeOfVector + 1 -> 1.0) else Seq(sizeOfVector -> 0.0)
+            case None => if (shouldTrackNulls) Seq(sizeOfVector + 1 -> 1.0) else Seq(sizeOfVector -> 0.0)
             case Some(cv) =>
               val v = top.indexOf(cv) match {
                 case i if i < 0 => Seq(sizeOfVector -> 1.0)
                 case i => Seq(i -> 1.0, sizeOfVector -> 0.0)
               }
-              if (trackNulls) v ++ Seq(sizeOfVector + 1 -> 0.0) else v
+              if (shouldTrackNulls) v ++ Seq(sizeOfVector + 1 -> 0.0) else v
           }
         }
       }

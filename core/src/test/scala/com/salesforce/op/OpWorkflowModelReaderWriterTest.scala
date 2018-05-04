@@ -5,9 +5,11 @@
 
 package com.salesforce.op
 
+import java.io.File
+
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.features.types.RealNN
+import com.salesforce.op.features.types.{Real, RealNN}
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.sparkwrappers.generic.SwUnaryEstimator
@@ -35,10 +37,18 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
   var saveFlowPath: String = _
   var saveModelPath: String = _
 
+  val saveFlowPathStable: String = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
+
   override protected def beforeEach(): Unit = {
     super.beforeEach()
     saveFlowPath = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
     saveModelPath = tempDir + "/op-rw-wf-model-test-" + DateTime.now().getMillis
+  }
+
+
+  override def afterAll: Unit = {
+    super.afterAll
+    deleteRecursively(new File(saveFlowPathStable))
   }
 
   // dummy data source
@@ -202,10 +212,12 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
   }
 
   trait VectorizedFlow {
-    val cat = Seq(gender, boarded, height).transmogrify()
+    UID.reset()
+    val cat = Seq(gender, boarded, height, age, description).transmogrify()
+    val catHead = cat.map[Real](v => Real(v.value.toArray.headOption))
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
-      .setResultFeatures(cat)
+      .setResultFeatures(catHead)
   }
 
   it should "load workflow model with vectorized feature" in new VectorizedFlow {
@@ -214,6 +226,31 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     wfM.save(saveFlowPath)
     val wfMR = wf.loadModel(saveFlowPath)
     compareWorkflowModels(wfMR, wfM)
+  }
+
+  it should "save a workflow model that has a RawFeatureFilter" in new VectorizedFlow {
+    wf.withRawFeatureFilter(Some(dataReader), None, minFillRate = 0.8)
+    val wfM = wf.train()
+    wfM.save(saveFlowPathStable)
+    wf.getBlacklist().map(_.name) should contain theSameElementsAs Array("age", "description")
+    val wfMR = wf.loadModel(saveFlowPathStable)
+    wfMR.getBlacklist().map(_.name) should contain theSameElementsAs Array("age", "description")
+    compareWorkflowModels(wfM, wfMR)
+  }
+
+  it should "load a workflow model that has a RawFeatureFiler and a different workflow" in new VectorizedFlow {
+    val wfM = wf.loadModel(saveFlowPathStable)
+    wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
+    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
+      Array("age", "boarded", "description", "gender", "height")
+    wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
+      Array("boarded", "gender", "height")
+    wfM.getBlacklist().map(_.name) should contain theSameElementsAs Array("age", "description")
+  }
+
+  it should "be able to load a old version of a saved model" in new VectorizedFlow {
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion")
+    wfM.getBlacklist().isEmpty shouldBe true
   }
 
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
@@ -240,6 +277,7 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     wf1.uid shouldBe wf2.uid
     compareParams(wf1.parameters, wf2.parameters)
     compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
+    compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
   }
@@ -249,6 +287,7 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     compareParams(wf1.trainingParams, wf2.trainingParams)
     compareParams(wf1.parameters, wf2.parameters)
     compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
+    compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
   }

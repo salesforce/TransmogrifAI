@@ -44,7 +44,7 @@ class LangDetectorTest extends FlatSpec with TestSparkContext {
   classOf[LangDetector[_]].getSimpleName should "return single properly formed feature" in {
     val output1 = langDetector.getOutput()
 
-    output1.name shouldBe langDetector.outputName
+    output1.name shouldBe langDetector.getOutputFeatureName
     output1.parents shouldBe Array(f1)
     output1.originStage shouldBe langDetector
   }

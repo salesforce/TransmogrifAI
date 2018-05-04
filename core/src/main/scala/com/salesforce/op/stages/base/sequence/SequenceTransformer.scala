@@ -52,9 +52,9 @@ trait OpTransformerN[I <: FeatureType, O <: FeatureType]
     assert(inN.nonEmpty, "Inputs cannot be empty")
     val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val functionUDF = FeatureSparkTypes.udfN[I, O](transformFn)
-    val meta = newSchema(outputName).metadata
+    val meta = newSchema(getOutputFeatureName).metadata
     val columns = inN.map(in => dataset.col(in.name))
-    dataset.select(col("*"), functionUDF(struct(columns: _*)).as(outputName, meta))
+    dataset.select(col("*"), functionUDF(struct(columns: _*)).as(getOutputFeatureName, meta))
   }
 
   private val transformNFn = FeatureSparkTypes.transformN[I, O](transformFn)

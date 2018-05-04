@@ -6,6 +6,7 @@
 package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.UID
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.evaluators.{EvaluationMetrics, _}
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
@@ -16,14 +17,14 @@ import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.param._
-import org.apache.spark.ml.{Estimator, Model, PipelineStage, Transformer}
+import org.apache.spark.ml.{Estimator, Model, Transformer}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 import scala.reflect.runtime.universe._
+import scala.util.Try
 
 
 case object ModelSelectorBaseNames {
@@ -141,6 +142,9 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
   }
 
 
+  @transient private[op] var bestEstimator: Option[BestEstimator[E]] = None
+
+
   final val operationName: String = StageParamNames.stage1OperationName
 
 
@@ -161,9 +165,20 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
    */
   protected def getModelInfo: Seq[ModelInfo[E]]
 
-
   // Map (name of param, value of param) of output column names
-  lazy val outputsColNamesMap: Map[String, String] = getOutputsColNamesMap(in1, in2)
+  def outputsColNamesMap: Map[String, String] = {
+    val defaultNames = getOutputsColNamesMap(in1, in2)
+    val overrideName = get(outputFeatureName)
+
+    overrideName.map { on =>
+      Seq(StageParamNames.outputParam1Name, StageParamNames.outputParam2Name, StageParamNames.outputParam3Name)
+        .take(defaultNames.size) // only have 1 output for some selectors
+        .zipWithIndex.map { case (k, i) => k -> updateOutputName(on, defaultNames(k), i) }.toMap
+    }.getOrElse {
+      defaultNames
+    }
+  }
+
   lazy val labelColName: String = in1.name
 
   /**
@@ -174,9 +189,8 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
    * @return best model
    */
   final override def fit(dataset: Dataset[_]): SelectedModel = {
-    import dataset.sparkSession.implicits._
 
-    setInputSchema(dataset.schema).transformSchema(dataset.schema)
+    import dataset.sparkSession.implicits._
 
     val datasetWithID =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
@@ -187,13 +201,20 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
           .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
           .as[LabelFeaturesKey].persist()
       }
+    require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
     val ModelData(trainData, met) = splitter match {
       case Some(spltr) => spltr.prepare(datasetWithID)
       case None => new ModelData(datasetWithID, new MetadataBuilder())
     }
 
-    val bestModel = validator.validate(getModelInfo.filter(m => $(m.useModel)), trainData, in1.name, in2.name)
+
+    val bestModel = bestEstimator.map { case BestEstimator(name, estimator, meta) =>
+      new BestModel(name = name, model = estimator.fit(trainData).asInstanceOf[M], metadata = Option(meta))
+    }.getOrElse {
+      setInputSchema(dataset.schema).transformSchema(dataset.schema)
+      validator.validate(getModelInfo.filter(m => $(m.useModel)), trainData, in1.name, in2.name)
+    }
     bestModel.metadata.foreach(meta => setMetadata(meta.build))
     val bestClassifier = bestModel.model.parent
     log.info(s"Selected model : ${bestClassifier.getClass.getSimpleName}")

@@ -34,6 +34,18 @@ class OpParamsTest extends FlatSpec with TestCommon {
     assertParams(workflowParams.get)
   }
 
+  it should "correctly swap reader params" in {
+    val switched = expectedParamsSimple.switchReaderParams()
+    readerParamsCompare(expectedParamsSimple.readerParams, switched.alternateReaderParams)
+    readerParamsCompare(expectedParamsSimple.alternateReaderParams, switched.readerParams)
+  }
+
+  it should "load parameters with two sets of reader params specified" in {
+    val workflowParams = OpParams.fromFile(resourceFile(name = "OpParamsWithAltReader.json"))
+    val expectedWithAlt = expectedParamsSimple.withValues(alternateReadLocations = Map("Passenger" -> "abc"))
+    assertParams(workflowParams.get, expectedWithAlt)
+  }
+
   it should "correctly load parameters with a complex reader format" in {
     val params = OpParams.fromFile(resourceFile(name = "OpParamsComplex.json"))
     val readerParams = params.get.readerParams
@@ -68,16 +80,20 @@ class OpParamsTest extends FlatSpec with TestCommon {
     workflowParams.failed.get shouldBe a[IllegalArgumentException]
   }
 
-  private def assertParams(loaded: OpParams, expected: OpParams = expectedParamsSimple): Unit = {
-    log.info("loaded:\n" + loaded)
-    log.info("expected:\n" + expected)
-    expected.stageParams shouldBe loaded.stageParams
-    expected.readerParams.keySet shouldBe loaded.readerParams.keySet
-    expected.readerParams.values zip loaded.readerParams.values foreach { case (r1, r2) =>
+  private def readerParamsCompare(rp1: Map[String, ReaderParams], rp2: Map[String, ReaderParams]): Unit = {
+    rp1.keySet shouldBe rp2.keySet
+    rp1.values zip rp2.values foreach { case (r1, r2) =>
       r1.partitions shouldBe r2.partitions
       r1.path shouldBe r2.path
       r1.customParams shouldBe r2.customParams
     }
+  }
+
+  private def assertParams(loaded: OpParams, expected: OpParams = expectedParamsSimple): Unit = {
+    log.info("loaded:\n" + loaded)
+    log.info("expected:\n" + expected)
+    expected.stageParams shouldBe loaded.stageParams
+    readerParamsCompare(expected.readerParams, loaded.readerParams)
     expected.modelLocation shouldBe loaded.modelLocation
     expected.writeLocation shouldBe loaded.writeLocation
     expected.metricsLocation shouldBe loaded.metricsLocation
@@ -90,6 +106,7 @@ class OpParamsTest extends FlatSpec with TestCommon {
     expected.logStageMetrics shouldBe loaded.logStageMetrics
     expected.collectStageMetrics shouldBe loaded.collectStageMetrics
     expected.customParams shouldBe loaded.customParams
+    readerParamsCompare(expected.alternateReaderParams, loaded.alternateReaderParams)
   }
 
 }

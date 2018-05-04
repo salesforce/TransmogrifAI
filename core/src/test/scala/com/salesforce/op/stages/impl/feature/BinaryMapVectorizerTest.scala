@@ -34,7 +34,7 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
   Spec[BinaryMapVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = vectorizer.getOutput()
 
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.parents should contain theSameElementsAs Array(m1, m2)
     vector.originStage shouldBe vectorizer
     vector.typeName shouldBe FeatureType.typeName[OPVector]
@@ -58,7 +58,7 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    val field = transformed.schema(vectorizer.outputName)
+    val field = transformed.schema(vectorizer.getOutputFeatureName)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
@@ -86,7 +86,7 @@ class BinaryMapVectorizerTest extends FlatSpec with TestSparkContext {
     )
 
     transformed.collect(vector) shouldBe expected
-    val field = transformed.schema(vectorizer.outputName)
+    val field = transformed.schema(vectorizer.getOutputFeatureName)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta

@@ -9,6 +9,7 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
+import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature.{Inclusion, TransmogrifierDefaults}
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
@@ -18,9 +19,13 @@ import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.apache.log4j.Level
+import org.apache.spark.internal.Logging
 
 @RunWith(classOf[JUnitRunner])
-class BadFeatureZooTest extends FlatSpec with TestSparkContext {
+class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
+
+  // loggingLevel(Level.INFO)
 
   Spec[SanityChecker] should "correctly identify label leakage in PickList features using the Cramer's V criteria" +
     "when the label corresponds to a binary classification problem" in {
@@ -65,7 +70,107 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     // (9 choices + "other" + empty = 11 total dropped columns)
     retrieved.dropped.forall(_.startsWith("picklist")) shouldBe true
     retrieved.dropped.length shouldBe 11
-    retrieved.categoricalStats.categoricalFeatures.length shouldBe retrieved.names.length - 2
+    retrieved.categoricalStats.flatMap(_.categoricalFeatures).length shouldBe
+      retrieved.names.length - 2
+  }
+
+  ignore should "Group Indicator Groups separately for transformations computed on same feature" in {
+    val ageData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 20.0)
+      .withProbabilityOfEmpty(0.5).limit(200) ++ RandomReal.uniform[Real](minValue = 40.0, maxValue = 70.0)
+      .withProbabilityOfEmpty(0.0).limit(100)
+    val (rawDF, rawAge) = TestFeatureBuilder("age", ageData)
+    val labelTransformer = new UnaryLambdaTransformer[Real, RealNN](operationName = "labelFunc",
+      transformFn = p => p.value match {
+        case Some(x) if Some(x).get > 30.0 => RealNN(1.0)
+        case _ => RealNN(0.0)
+      }
+    )
+    val labelData = labelTransformer.setInput(rawAge).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+    rawAge.bucketize(trackNulls = true,
+      splits = Array(Double.NegativeInfinity, 30.0, Double.PositiveInfinity),
+      splitInclusion = Inclusion.Right
+    )
+    val ageBuckets = rawAge.autoBucketize(labelData, trackNulls = true)
+    val genFeatureVector = Seq(ageBuckets,
+      rawAge.vectorize(fillValue = 0.0, fillWithMean = true, trackNulls = true)
+    ).transmogrify()
+    val transformed = new OpWorkflow().setResultFeatures(genFeatureVector).transform(rawDF)
+    val metaCols = OpVectorMetadata(transformed.schema(genFeatureVector.name)).columns
+    val nullGroups = for {
+      col <- metaCols
+      if col.isNullIndicator
+      indicatorGroup <- col.indicatorGroup
+    } yield (indicatorGroup, (col, col.index))
+    nullGroups.groupBy(_._1).foreach {
+      case (group, cols) =>
+        require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
+    }
+  }
+
+  ignore should "Compute The same Cramer's V value a categorical feature whether or not other categorical " +
+    "features are derived from the same parent feature" in {
+    /* Generate an age feature for which young ages imply label is 1, old ages imply label is 0 and an empty age
+    implies a random label.  If we generate an autoBucketize feature from age, it should have a high Cramer's V.
+    If we also generate a vectorize feature and a bug causes a combining of the contingency matrix for the two features
+    because both have the same indicator group, then the Cramer's V of the new matrix will be lower because we add an
+    extra duplicate row of noise from the second null indicator.
+     */
+    val ageData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 20.0)
+      .withProbabilityOfEmpty(0.5).limit(200) ++ RandomReal.uniform[Real](minValue = 40.0, maxValue = 70.0)
+      .withProbabilityOfEmpty(0.0).limit(100)
+    val (rawDF, rawAge) = TestFeatureBuilder("age", ageData)
+    val labelTransformer = new UnaryLambdaTransformer[Real, RealNN](operationName = "labelFunc",
+      transformFn = p => p.value match {
+        case Some(x) if Some(x).get > 30.0 => RealNN(1.0)
+        case Some(_) => RealNN(0.0)
+        case _ => RandomIntegral.integrals(0, 2).withProbabilityOfEmpty(0.0).limit(1).head.toDouble.get.toRealNN
+      }
+    )
+    val labelData = labelTransformer.setInput(rawAge).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+    val ageBuckets = rawAge.autoBucketize(labelData, trackNulls = true)
+    val genFeatureVector = Seq(ageBuckets,
+      rawAge.vectorize(fillValue = 0.0, fillWithMean = true, trackNulls = true)
+      ).transmogrify()
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setMaxCramersV(1.0)
+      .setMaxCorrelation(1.0)
+      .setInput(labelData, genFeatureVector)
+      .setRemoveBadFeatures(true)
+      .getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(checkedFeatures).transform(rawDF)
+    val metaCols = OpVectorMetadata(transformed.schema(genFeatureVector.name)).columns
+    val nullGroups = for {
+      col <- metaCols
+      if col.isNullIndicator
+        indicatorGroup <- col.indicatorGroup
+      } yield (indicatorGroup, (col, col.index))
+    nullGroups.groupBy(_._1).foreach {
+      case (group, cols) =>
+        require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
+    }
+    val summary = transformed.schema(checkedFeatures.name).metadata
+    val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
+    val asJson = retrieved.toMetadata().wrapped.prettyJson
+
+    // Create a new workflow without the age.vectorize() feature.  Cramer's V should be the same for the remaining
+    // features but will differ if we collapse the indicator groups with rawAge.vectorize and rawAge.autoBucketize
+    val genFeatureVector2 = Seq(ageBuckets).transmogrify()
+    val checkedFeatures2 = new SanityChecker()
+      .setCheckSample(1.0)
+      .setMaxCramersV(1.0)
+      .setMaxCorrelation(1.0)
+      .setInput(labelData, genFeatureVector2)
+      .setRemoveBadFeatures(true)
+      .getOutput()
+    val transformed2 = new OpWorkflow().setResultFeatures(checkedFeatures2).transform(rawDF)
+    val summary2 = transformed2.schema(checkedFeatures2.name).metadata
+    val retrieved2 = SanityCheckerSummary.fromMetadata(summary2.getSummaryMetadata())
+    val asJson2 = retrieved2.toMetadata().wrapped.prettyJson
+
+    retrieved.categoricalStats.head.cramersV shouldBe retrieved2.categoricalStats.head.cramersV
   }
 
   it should "not fail to run or serialize when passed empty features" in {
@@ -84,7 +189,6 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
       }
     val (rawDF, rawCity, rawCountry, rawPickList, rawCurrency) =
       TestFeatureBuilder("city", "country", "picklist", "currency", generatedData)
-
     // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
     val labelTransformer = new UnaryLambdaTransformer[PickList, RealNN](operationName = "labelFunc",
       transformFn = p => p.value match {
@@ -247,7 +351,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     retrieved.dropped.length shouldBe 11
   }
 
-  it should "correctly identify label leakage due to null indicators and throw away corresponding parent features" in {
+  it should "correctly identify label leakage due to null indicators and throw away corresponding parent" +
+    "features" in {
     // First set up the raw features:
     val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.4).take(1000).toList
     val realData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 1.0)
@@ -522,7 +627,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     )
   }
 
-  it should "not try to compute Cramer's V between categorical features and numeric labels (eg. for regression)" in {
+  it should "not try to compute Cramer's V between categorical features and numeric labels" +
+    "(eg. for regression)" in {
     // First set up the raw features:
     val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.2).take(1000).toList
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.2).take(1000).toList
@@ -556,14 +662,17 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
   }
 
   // TODO: Check for throwing out features from maps once vectorizers have been fixed to track null values
-  it should "not calculate Cramer's V on features coming from multipicklists" in {
+  it should "calculate a modified Cramer's V on features coming from multipicklists" in {
     // First set up the raw features:
     val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).limit(1000)
     val domain = List("Strawberry Milk", "Chocolate Milk", "Soy Milk", "Almond Milk")
     val picklistMapData: Seq[PickListMap] = RandomMap.of[PickList, PickListMap](RandomText.pickLists(domain), 1, 3)
       .limit(1000)
-    val multiPickListData: Seq[MultiPickList] = RandomMultiPickList.of(RandomText.countries, maxLen = 5)
-      .limit(1000)
+    val domainSize = 20
+    val maxChoices = 2
+    val multiPickListData: Seq[MultiPickList] = RandomMultiPickList.of(
+      RandomText.textFromDomain(domain = List.range(0, domainSize).map(_.toString)), minLen = 0, maxLen = maxChoices
+    ).limit(1000)
 
     // Generate the raw features and corresponding dataframe
     val generatedData: Seq[(Currency, MultiPickList, PickListMap)] =
@@ -573,13 +682,24 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     val (rawDF, rawCurrency, rawMultiPickList, rawPicklistMap) =
       TestFeatureBuilder("currency", "multipicklist", "picklistMap", generatedData)
 
-    val labelTransformer2 = new UnaryLambdaTransformer[PickListMap, RealNN](operationName = "labelFunc",
+    val ruleLabel = 3 // Label to assign if the row satisfies the rule (other rows will be in [0, ruleLabel - 1])
+    val labelTransformer = new UnaryLambdaTransformer[MultiPickList, RealNN](operationName = "labelFunc",
+      // Lots of cases here for generating different types of relations for testing
       transformFn = p => p.value match {
-        case j if j.contains("k1") => RealNN(1.0)
-        case _ => RealNN(0.0)
+        // case j if j == Set("0") => RealNN(ruleLabel)
+        // case j if j == Set("0", "1") => RealNN(ruleLabel)
+        case j if j.contains("3") => RealNN(ruleLabel)
+        // case j if !j.contains("3") => RealNN(ruleLabel)
+        // case j if j.contains("0") && j.contains("1") => RealNN(ruleLabel)
+        // case j if j.contains("0") && j.contains("1") && j.contains("2") => RealNN(ruleLabel)
+        // case j if j.contains("0") || j.contains("1") => RealNN(ruleLabel)
+        // case j if j.contains("1") || j.contains("2") || j.contains("3") => RealNN(ruleLabel)
+        // case _ => RealNN(ruleLabel)
+        // Need to do up to ruleLabel + 1 for completely random data
+        case _ => RandomIntegral.integrals(from = 0, to = ruleLabel).limit(1).head.toDouble.get.toRealNN
       }
     )
-    val labelData = labelTransformer2.setInput(rawPicklistMap).getOutput().asInstanceOf[Feature[RealNN]]
+    val labelData = labelTransformer.setInput(rawMultiPickList).getOutput().asInstanceOf[Feature[RealNN]]
       .copy(isResponse = true)
 
     val genFeatureVector = Seq(rawCurrency, rawMultiPickList, rawPicklistMap).transmogrify()
@@ -593,11 +713,9 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     val summary = transformed.schema(checkedFeatures.name).metadata
     val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
 
-    // should have one categorical feature from currency, none from multipicklist, and a variable amount from
-    // the picklistMap (depending on how often choices rise above minSupport)
-    retrieved.categoricalStats.categoricalFeatures.count(_.startsWith("multipicklist")) shouldBe 0
-    retrieved.categoricalStats.categoricalFeatures.count(_.startsWith("currency")) shouldBe 1
-    retrieved.categoricalStats.categoricalFeatures.count(_.startsWith("picklistMap")) > 1 shouldBe true
+    // Should drop all multiPickList columns (topK + Other + null indicator column)
+    retrieved.categoricalStats.flatMap(_.categoricalFeatures)
+      .count(_.startsWith("multipicklist")) shouldBe TransmogrifierDefaults.TopK + 2
   }
 
   it should "throw out all features from the same parent when the correlation is too high" in {
@@ -642,7 +760,92 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext {
     retrieved.dropped should contain theSameElementsAs inputColumns.columns
       .filter(c => c.parentFeatureName.contains("currency") || c.indicatorValue.contains("OTHER")
         || c.index == 7).map(_.makeColName()) // TODO : better match
-    retrieved.categoricalStats.cramersVs.size shouldBe 0
+    retrieved.categoricalStats.length shouldBe 0
+  }
+
+  it should "correctly combine positive and negative correlations of sibling features using absolute values" in {
+    // First set up the raw features:
+    val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C"))
+      .withProbabilityOfEmpty(0.2).limit(1000)
+    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+      .withProbabilityOfEmpty(0.2).limit(1000)
+
+    // Generate the raw features and corresponding dataframe
+    val generatedData: Seq[(PickList, Currency)] = pickListData.zip(currencyData)
+    val (rawDF, rawPickList, rawCurrency) = TestFeatureBuilder("picklist", "currency", generatedData)
+
+    // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+    val labelTransformer = new UnaryLambdaTransformer[PickList, RealNN](operationName = "labelFunc",
+      transformFn = p => p.value match {
+        case Some("A") | Some("B") => RealNN(1.0)
+        case Some("C") => RealNN(0.0)
+        case _ => RandomIntegral.integrals(0, 2).withProbabilityOfEmpty(0.0).limit(1).head.toDouble.get.toRealNN
+      }
+    )
+    val labelData = labelTransformer.setInput(rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+    val genFeatureVector = Seq(rawPickList, rawCurrency).transmogrify()
+
+    // Want to remove feature only due to sibling feature correlations, so turn off Cramer's V here
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setMaxCramersV(1.0)
+      .setMaxCorrelation(0.6)
+      .setInput(labelData, genFeatureVector)
+      .setRemoveBadFeatures(true)
+      .getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(checkedFeatures).transform(rawDF)
+    val summary = transformed.schema(checkedFeatures.name).metadata
+    val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
+
+    // Check that all the PickList features are dropped and they are the only ones dropped
+    // (3 choices + "other" + empty = 5 total dropped columns)
+    retrieved.dropped.forall(_.startsWith("picklist")) shouldBe true
+    retrieved.dropped.length shouldBe 5
+  }
+
+  it should "remove categorical features similar to 'titanic body' by checking for high rule confidence when the" +
+    "support is high enough" in {
+    // First set up the raw features:
+    val bodyData: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.9).limit(1000)
+    val boatData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C"))
+      .withProbabilityOfEmpty(0.8).limit(1000)
+    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+      .withProbabilityOfEmpty(0.8).limit(1000)
+
+    val generatedRawData: Seq[(ID, PickList, Currency)] = bodyData.zip(boatData).zip(currencyData).map{
+      case ((id, pi), cu) => (id, pi, cu)
+    }
+    val (rawDF, rawId, rawPickList, rawCurrency) = TestFeatureBuilder("body", "boat", "currency", generatedRawData)
+
+    // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+    val labelTransformer = new BinaryLambdaTransformer[ID, PickList, RealNN](operationName = "labelFunc",
+      transformFn = (body, boat) => (body.value, boat.value) match {
+        case (Some(_), _) => RealNN(1.0)
+        case (None, Some(_)) => RealNN(0.0)
+        case (None, None) => RandomIntegral.integrals(0, 2).withProbabilityOfEmpty(0.0).limit(1)
+          .head.toDouble.get.toRealNN
+      }
+    )
+    val labelData = labelTransformer.setInput(rawId, rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+    val genFeatureVector = Seq(rawId, rawPickList, rawCurrency).transmogrify()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setMaxRuleConfidence(0.99)
+      .setMinRequiredRuleSupport(0.05)
+      .setInput(labelData, genFeatureVector)
+      .setRemoveBadFeatures(true)
+      .getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(checkedFeatures).transform(rawDF)
+    val summary = transformed.schema(checkedFeatures.name).metadata
+    val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
+
+    // Both derived features coming from body should be thrown out
+    retrieved.dropped.count(_.startsWith("body")) shouldBe 2
   }
 
   private def expectedRevenueLeakage(

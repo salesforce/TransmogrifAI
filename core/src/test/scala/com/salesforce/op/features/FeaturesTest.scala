@@ -86,10 +86,34 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         //  val survivedNumeric = new NumericTransformer.setInputCol(survived)
       }
       "can be changed" in {
-        val foo = age.alias
+        val foo = (age + height).alias
         foo.name shouldBe "foo"
-        val bar = age.alias("bar")
+        val bar = (age / height).alias("bar")
         bar.name shouldBe "bar"
+      }
+    }
+    "isRaw" should {
+      "be true for raw features" in {
+        height.isRaw shouldBe true
+        weight.isRaw shouldBe true
+      }
+      "be false for non raw features" in {
+        (height + weight).isRaw shouldBe false
+        (weight / 2 + age + 1).isRaw shouldBe false
+      }
+    }
+    "asRaw" should {
+      "be a new raw feature of the same type" in {
+        val f = weight / 2 + age
+        val raw = f.asRaw()
+        raw.isRaw shouldBe true
+        raw should not be f
+        raw.uid should not be f.uid
+        raw.originStage.uid should not be f.originStage.uid
+        raw.typeName shouldBe f.typeName
+        raw.isResponse shouldBe f.isResponse
+        raw.wtt.tpe =:= f.wtt.tpe shouldBe true
+        raw.parents shouldBe Nil
       }
     }
     "isSubtypeOf" should {
@@ -127,6 +151,20 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         }
       }
 
+    }
+    "pretty parent stages" should {
+      "print a single stage tree" in {
+        height.prettyParentStages shouldBe "+-- SumRealNN(height)\n"
+      }
+      "print a multi stage tree" in {
+        ((height / 2) * weight + 1).prettyParentStages shouldBe
+          """|+-- plusS
+             ||    +-- multiply
+             ||    |    +-- SumReal(weight)
+             ||    |    +-- divideS
+             ||    |    |    +-- SumRealNN(height)
+             |""".stripMargin
+      }
     }
     // TODO: test other feature methods
 

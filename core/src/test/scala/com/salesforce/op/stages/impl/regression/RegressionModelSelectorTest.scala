@@ -9,18 +9,22 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.CompareParamGrid
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
+import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames}
-import com.salesforce.op.stages.impl.tuning.OpCrossValidation
+import com.salesforce.op.stages.impl.tuning.{BestEstimator, OpCrossValidation}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.classification.DecisionTreeClassifier
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.regression.{DecisionTreeRegressor, GBTRegressor, RandomForestRegressor}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.types.MetadataBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -49,7 +53,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val inputNames = modelSelector.getInputFeatures().map(_.name)
     inputNames should have length 2
     inputNames shouldBe Array(label.name, features.name)
-    modelSelector.getOutput().name shouldBe modelSelector.outputName
+    modelSelector.getOutput().name shouldBe modelSelector.getOutputFeatureName
     the[IllegalArgumentException] thrownBy {
       modelSelector.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
@@ -353,6 +357,22 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
         )
       }
     }
+  }
+
+  it should "fit and predict a model specified in the var bestEstimator" in {
+    val modelSelector: RegressionModelSelector = RegressionModelSelector().setInput(label, features)
+    val myParam = true
+    val myEstimatorName = "myEstimatorIsAwesome"
+    val myEstimator = new GBTRegressor().setCacheNodeIds(myParam)
+
+    val bestEstimator = new BestEstimator[Regressor](myEstimatorName, myEstimator.asInstanceOf[Regressor])
+    modelSelector.bestEstimator = Option(bestEstimator)
+    val fitted = modelSelector.fit(data)
+
+    fitted.getSparkMlStage().get.extractParamMap().get(myEstimator.cacheNodeIds).get shouldBe myParam
+
+    val meta = fitted.getMetadata().getMetadata("summary")
+    meta.getString("bestModelName") shouldBe myEstimatorName
   }
 
   private def assertScores(scores: Array[RealNN], labels: Array[RealNN]) = {

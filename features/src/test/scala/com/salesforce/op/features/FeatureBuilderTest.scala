@@ -12,10 +12,11 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.FeatureGeneratorStage
 import com.salesforce.op.test.{Passenger, TestCommon}
 import com.twitter.algebird.MonoidAggregator
+import org.apache.spark.sql.Row
 import org.joda.time.Duration
 import org.junit.runner.RunWith
-import org.scalatest.{FlatSpec, Matchers}
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FlatSpec, Matchers}
 
 import scala.reflect.runtime.universe._
 
@@ -43,6 +44,16 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
   it should "build a simple feature using macro" in {
     val feature = FeatureBuilder.Real[Passenger].extract(p => Option(p.getAge).map(_.toDouble).toReal).asResponse
     assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal, isResponse = true)
+  }
+
+  it should "build a simple feature from Row with a custom name" in {
+    val feature = FeatureBuilder.fromRow[Text](name = "feat", Some(1)).asPredictor
+    assertFeature[Row, Text](feature)(name = "feat", in = Row(1.0, "2"), out = "2".toText, isResponse = false)
+  }
+
+  it should "build a simple feature from Row using macro" in {
+    val feature = FeatureBuilder.fromRow[Real](0).asResponse
+    assertFeature[Row, Real](feature)(name = name, in = Row(1.0, "2"), out = 1.toReal, isResponse = true)
   }
 
   it should "return a default if extract throws an exception" in {
@@ -149,7 +160,7 @@ object assertFeature extends Matchers {
     fg.aggregator shouldBe aggregator(wtt)
     fg.extractFn(in) shouldBe out
     fg.extractSource.nonEmpty shouldBe true // TODO we should eval the code here: eval(fg.extractSource)(in)
-    fg.outputName shouldBe name
+    fg.getOutputFeatureName shouldBe name
     fg.outputIsResponse shouldBe isResponse
     fg.aggregateWindow shouldBe aggregateWindow
     fg.uid.startsWith(classOf[FeatureGeneratorStage[I, O]].getSimpleName) shouldBe true

@@ -29,6 +29,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 import FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.CompareParamGrid
 import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.sql.types.MetadataBuilder
 import org.slf4j.LoggerFactory
 
 
@@ -72,15 +73,15 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val inputNames = modelSelector.stage1.getInputFeatures().map(_.name)
     inputNames should have length 2
     inputNames shouldBe Array(label.name, features.name)
-    modelSelector.stage1.getOutput().name shouldBe modelSelector.stage1.outputName
+    modelSelector.stage1.getOutput().name shouldBe modelSelector.stage1.getOutputFeatureName
   }
 
   it should "have properly formed stage2" in {
     assert(modelSelector.stage2.isInstanceOf[SwTernaryTransformer[_, _, _, _, _]])
     val inputNames = modelSelector.stage2.getInputFeatures().map(_.name)
     inputNames should have length 3
-    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.outputName)
-    modelSelector.stage2.getOutput().name shouldBe modelSelector.stage2.outputName
+    inputNames shouldBe Array(label.name, features.name, modelSelector.stage1.getOutputFeatureName)
+    modelSelector.stage2.getOutput().name shouldBe modelSelector.stage2.getOutputFeatureName
   }
 
   it should "have properly formed stage3" in {
@@ -88,9 +89,9 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val inputNames = modelSelector.stage3.getInputFeatures().map(_.name)
     inputNames should have length 4
     inputNames shouldBe Array(label.name,
-      features.name, modelSelector.stage1.outputName, modelSelector.stage2.outputName
+      features.name, modelSelector.stage1.getOutputFeatureName, modelSelector.stage2.getOutputFeatureName
     )
-    modelSelector.stage3.getOutput().name shouldBe modelSelector.stage3.outputName
+    modelSelector.stage3.getOutput().name shouldBe modelSelector.stage3.getOutputFeatureName
   }
 
   it should "have proper outputs corresponding to the stages" in {
@@ -369,5 +370,23 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     }
   }
 
+  it should "fit and predict a model specified in the var bestEstimator" in {
+    val modelSelector: MultiClassificationModelSelector = MultiClassificationModelSelector().setInput(label, features)
+    val myParam = "entropy"
+    val myMetaName = "myMeta"
+    val myMetaValue = "This is a string metadata"
+    val myMetadata = new MetadataBuilder().putString(myMetaName, myMetaValue)
+    val myEstimatorName = "myEstimatorIsAwesome"
+    val myEstimator = new DecisionTreeClassifier().setImpurity(myParam)
 
+    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, myMetadata)
+    modelSelector.stage1.bestEstimator = Option(bestEstimator)
+    val fitted = modelSelector.fit(data)
+
+    fitted.getParams.get(myEstimator.impurity).get shouldBe myParam
+
+    val meta = fitted.stage1.getMetadata().getMetadata("summary")
+    meta.getString(myMetaName) shouldBe myMetaValue
+    meta.getString("bestModelName") shouldBe myEstimatorName
+  }
 }

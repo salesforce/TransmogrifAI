@@ -59,35 +59,6 @@ class TransientFeature
   )
 
   /**
-   * Set the underlying FeatureLike[_] instance.
-   * NOTE: feature instance must match the transient feature uid, name typeName etc.
-   *
-   * @param f FeatureLike[_] instance
-   * @throws IllegalArgumentException if feature instance does not match transient feature uid / name / typeName etc.
-   * @return this instance
-   */
-  def setFeature(f: OPFeature): this.type = {
-    lazy val history = f.history()
-    val requirements = Seq(
-      (() => f != null, () => "feature is null"),
-      (() => name == f.name, () => s"names do not match: $name != ${f.name}"),
-      (() => isResponse == f.isResponse, () => s"feature isResponse value is invalid: $isResponse != ${f.isResponse}"),
-      (() => isRaw == f.isRaw, () => s"feature isRaw value is invalid: $isRaw != ${f.isRaw}"),
-      (() => uid == f.uid, () => s"UIDs do not match: $uid != ${f.uid}"),
-      (() => typeName == f.typeName, () => s"types do not match: $typeName != ${f.typeName}"),
-      (() => originFeatures sameElements history.originFeatures,
-        () => s"origin features do not match: $originFeatures != ${history.originFeatures}"),
-      (() => stages sameElements history.stages,
-        () => s"stages do not match: $stages != ${history.stages}")
-    )
-    requirements.dropWhile(_._1.apply()).headOption.foreach { case (_, error) =>
-      throw new IllegalArgumentException(s"Setting feature for transient feature '$uid' failed: " + error.apply())
-    }
-    this.feature = f
-    this
-  }
-
-  /**
    * Return the underlying FeatureLike[_] instance
    *
    * @throws RuntimeException in case the feature is null

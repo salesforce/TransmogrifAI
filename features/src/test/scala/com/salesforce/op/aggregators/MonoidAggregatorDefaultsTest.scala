@@ -77,7 +77,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   val geoBaseEmpty = Seq(Seq.empty[Double], Seq.empty[Double], Seq.empty[Double])
 
   private val realTestSeq = doubleBase.map(Real(_))
-  private val realNNTestSeq = doubleBase.map(RealNN(_))
+  private val realNNTestSeq = doubleBase.map(_.toRealNN(0.0))
   private val binaryTestSeq = booleanBase.map(Binary(_))
   private val integralTestSeq = longBase.map(Integral(_))
   private val percentTestSeq = doubleBase.map(new Percent(_))
@@ -137,8 +137,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
 
   Spec(MonoidAggregatorDefaults.getClass) should "throw an error on unknown feature type" in {
     assertThrows[IllegalArgumentException](
-      aggregatorOf[FeatureType](
-        weakTypeTag[Double].asInstanceOf[WeakTypeTag[FeatureType]])
+      aggregatorOf[FeatureType](weakTypeTag[Double].asInstanceOf[WeakTypeTag[FeatureType]])
     )
   }
 

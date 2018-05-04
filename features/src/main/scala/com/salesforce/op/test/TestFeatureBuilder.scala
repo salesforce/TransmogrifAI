@@ -7,9 +7,8 @@ package com.salesforce.op.test
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter, Real}
-import com.salesforce.op.features.{Feature, FeatureBuilderWithExtract, FeatureSparkTypes}
+import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureSparkTypes}
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.StructType
@@ -31,7 +30,7 @@ case object TestFeatureBuilder {
   /**
    * Build features from a given dataset
    *
-   * @param ds dataset
+   * @param ds          dataset
    * @param nonNullable non nullable fields
    * @return array of features
    */
@@ -40,7 +39,7 @@ case object TestFeatureBuilder {
   /**
    * Build features from a given schema
    *
-   * @param schema schema
+   * @param schema      schema
    * @param nonNullable non nullable fields
    * @return array of features
    */
@@ -272,12 +271,6 @@ case object TestFeatureBuilder {
     )).toDF()
   }
 
-  private def feature[T <: FeatureType](name: String)(implicit tt: TypeTag[T]) = {
-    val conv = FeatureTypeSparkConverter[T]()(tt)
-    new FeatureBuilderWithExtract[Row, T](
-      name = name,
-      extractFn = (r: Row) => conv.fromSpark(r.getAny(name)),
-      extractSource = "(r: Row) => conv.fromSpark(r.getAny(name))"
-    ).asPredictor
-  }
+  private def feature[T <: FeatureType](name: String)(implicit tt: TypeTag[T]) =
+    FeatureBuilder.fromRow[T](name)(tt).asPredictor
 }

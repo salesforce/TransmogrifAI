@@ -59,7 +59,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
 
   Spec[OpSetVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.outputName
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
     vector.originStage shouldBe vectorizer
@@ -77,7 +77,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       bot -> List(IndCol(Some("X")), IndCol(Some("Y")), IndCol(Some("Z")), IndCol(Some("OTHER")),
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     fitted.getInputFeatures() shouldBe Array(top, bot)
     fitted.parent shouldBe vectorizer
   }
@@ -115,7 +115,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       bot -> List(IndCol(Some("x")), IndCol(Some("y")), IndCol(Some("Z")), IndCol(Some("z")), IndCol(Some("OTHER")),
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "throw an error if you try to set the topK to 0 or a negative number" in {
@@ -162,7 +162,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       ),
       bot -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     val expected2 = Array(
       Vectors.dense(1.0, 1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 2.0, 0.0),
@@ -192,7 +192,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       top -> List(IndCol(Some("A")), IndCol(Some("B")), IndCol(Some("OTHER"))),
       bot -> List(IndCol(Some("OTHER")))
     )
-    OpVectorMetadata(localVectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(localVectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     val expected2 = Array(
       Vectors.dense(1.0, 1.0, 0.0, 1.0),
       Vectors.dense(1.0, 0.0, 0.0, 2.0),
@@ -214,7 +214,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       vectorizer,
       top -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.outputName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "be implemented as 'pivot' shortcut" in {
