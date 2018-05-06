@@ -86,8 +86,8 @@ case class Schema
   email: Option[String],
   phone: Option[String],
   age: Int,
-  subject:Option[String],
-  zipcode:Option[String],
+  subject: Option[String],
+  zipcode: Option[String],
   label: int
 )
 
