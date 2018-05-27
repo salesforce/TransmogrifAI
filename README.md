@@ -86,8 +86,8 @@ case class Schema
   email: Option[String],
   phone: Option[String],
   age: Int,
-  subject:Option[String],
-  zipcode:Option[String],
+  subject: Option[String],
+  zipcode: Option[String],
   label: int
 )
 
@@ -181,5 +181,4 @@ See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programm
 
 ## License
 
-Copyright (c) 2017, Salesforce.com, Inc.
-All rights reserved.
+[BSD 3-clause](LICENSE.txt) © Salesforce.com, Inc.
