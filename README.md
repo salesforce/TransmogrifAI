@@ -181,5 +181,4 @@ See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programm
 
 ## License
 
-Copyright (c) 2017, Salesforce.com, Inc.
-All rights reserved.
+[BSD 3-clause](LICENSE.txt) © Salesforce.com, Inc.
