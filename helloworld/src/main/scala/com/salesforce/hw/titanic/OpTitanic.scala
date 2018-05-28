@@ -63,12 +63,7 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
 
-  // val namePick = name.map[PickList](_.value.toPickList)
-
-  val featureVector = Seq(
-    pClass, name, sex, age, sibSp,
-    parch, ticket, cabin, embarked
-  ).transmogrify()
+  val featureVector = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()
 
   val checkedFeatures = new SanityChecker()
     .setCheckSample(1.0)
