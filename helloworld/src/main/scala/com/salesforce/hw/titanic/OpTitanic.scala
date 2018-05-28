@@ -38,7 +38,6 @@ import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
-import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 
