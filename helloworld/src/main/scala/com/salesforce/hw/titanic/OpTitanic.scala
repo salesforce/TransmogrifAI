@@ -65,12 +65,9 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
 
   val featureVector = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()
 
-  val checkedFeatures = new SanityChecker()
-    .setCheckSample(1.0)
-    .setSampleSeed(randomSeed)
-    .setInput(survived, featureVector)
-    .setRemoveBadFeatures(true)
-    .getOutput()
+  val checkedFeatures = survived.sanityCheck(featureVector,
+    checkSample = 1.0, sampleSeed = randomSeed, removeBadFeatures = true
+  )
 
   val splitter = DataSplitter(seed = randomSeed, reserveTestFraction = 0.1)
 
