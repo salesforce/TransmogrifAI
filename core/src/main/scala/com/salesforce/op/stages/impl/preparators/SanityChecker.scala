@@ -40,6 +40,8 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType.Pearson
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stats.OpStatistics
+import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
 import enumeratum._
 import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
@@ -47,8 +49,7 @@ import org.apache.spark.ml.param._
 import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
 import scala.math.min
@@ -369,32 +370,33 @@ class SanityChecker(uid: String = UID[SanityChecker])
     sampleSize: Long,
     featureSize: Int,
     columnMeta: Seq[OpVectorColumnMetadata],
-    data: Dataset[(RealNN#Value, OPVector#Value)]
+    data: RDD[(Double, OPVector#Value)]
   ): Array[CategoricalGroupStats] = {
-    implicit val encDoubleArray: Encoder[Array[Double]] = ExpressionEncoder()
-
-    // Figure out which columns correspond to multipicklists so that we can make the "OTHER" columns at most 1 so
+    // Figure out which columns correspond to MultiPickList values so that we can make the "OTHER" columns at most 1 so
     // that we can still use contingency matrices to calculate Cramer's V values
-    val mplIndices = columnMeta.zipWithIndex.filter{
-      case (col, index) => col.hasParentOfType(FeatureType.shortTypeName[MultiPickList])
-    }.map(_._2)
+    val multiPickList = FeatureType.shortTypeName[MultiPickList]
+    val multiPickListIndices = columnMeta.zipWithIndex.collect {
+      case (col, index) if col.hasParentOfType(multiPickList) => index
+    }.toSet
 
-    val contingencyDataset = data.groupByKey(_._1).mapValues {
-      // Group by label and then add in a 1.0 so we can get the total occurrences for each label in one reduction
-      case (_, features) => features.toArray.zipWithIndex.map{
-        case (feat, index) if mplIndices.contains(index) => math.min(feat, 1.0)
-        case (feat, _) => feat
-      } :+ 1.0
-    }.reduceGroups((a, b) => a.zip(b).map(f => f._1 + f._2))
+    // Group by label and then add in a 1.0 so we can get the total occurrences for each label in one reduction
+    val contingencyData = data.map { case (label, featuresVector) =>
+      val contingency = new Array[Double](featuresVector.size + 1)
+      featuresVector.foreachActive { case (i, value) =>
+        contingency(i) = if (multiPickListIndices.contains(i)) math.min(value, 1.0) else value
+      }
+      contingency(featuresVector.size) = 1.0
+      label -> contingency
+    }.reduceByKey(_ + _).persist()
 
     // Only calculate this if the label is categorical. Either the user specifies the label is categorical with
     // the categoricalLabel param, or if that is not set we assume the label is categorical if the number
     // of distinct labels is less than the min of 100 and sample size * 0.1
-    val distictLabel = contingencyDataset.count()
-    if (isDefined(categoricalLabel) && $(categoricalLabel) || distictLabel < min(100.0, sampleSize * 0.1)) {
-
-      val contingencyWithKeys = contingencyDataset.collect()
-      val contingency = contingencyWithKeys.sortBy(_._1).map { case (_, vec) => vec }
+    val distinctLabels = contingencyData.count()
+    val stats =
+      if (isDefined(categoricalLabel) && $(categoricalLabel) || distinctLabels < min(100.0, sampleSize * 0.1)) {
+      val contingencyWithKeys = contingencyData.collect()
+      val contingency = contingencyWithKeys.sortBy(_._1).map { case (_, vector) => vector }
 
       logInfo("Label is assumed to be categorical since either categoricalLabel = true or " +
         "number of distinct labels < count * 0.1")
@@ -406,9 +408,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
         columnsWithIndicator
           .map { meta => meta.indicatorGroup.get -> meta }
           .groupBy(_._1)
-          // Keep track of the group, column name, column index, and whether the parent was a multipicklist or not
+          // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
           .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index),
-            cols.exists(_._2.hasParentOfType(FeatureType.shortTypeName[MultiPickList])))
+            cols.exists(_._2.hasParentOfType(multiPickList)))
           }
 
       colIndicesByIndicatorGroup.map {
@@ -446,10 +448,12 @@ class SanityChecker(uid: String = UID[SanityChecker])
           )
       }.toArray
     } else {
-      logInfo(s"Label is assumed to be continuous since number of distinct labels = $distictLabel" +
+      logInfo(s"Label is assumed to be continuous since number of distinct labels = $distinctLabels" +
         s"which is greater than 10% the size of the sample $sampleSize skipping calculation of Cramer's V")
       Array.empty[CategoricalGroupStats]
     }
+    contingencyData.unpersist(blocking = false)
+    stats
   }
 
   /**
@@ -480,32 +484,33 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)
 
-    val dataCount = data.persist().count()
+    val dataCount = data.count()
     val sampleFraction = fraction(dataCount)
-    val sampleData = if (sampleFraction < 1.0) {
-      logInfo(s"Sampling the data for Sanity Checker with sample $sampleFraction and seed $sampSeed")
-      data.sample(
-        withReplacement = false,
-        fraction = sampleFraction,
-        seed = sampSeed
-      )
-    } else {
-      logInfo(s"NOT sampling the data for Sanity Checker, since the calculated check sample is $sampleFraction")
-      data
+    val sampleData: RDD[(Double, OPVector#Value)] = {
+      if (sampleFraction < 1.0) {
+        logInfo(s"Sampling the data for Sanity Checker with sample $sampleFraction and seed $sampSeed")
+        data.sample(withReplacement = false, fraction = sampleFraction, seed = sampSeed).rdd
+      } else {
+        logInfo(s"NOT sampling the data for Sanity Checker, since the calculated check sample is $sampleFraction")
+        data.rdd
+      }
+    } map {
+      case (Some(label), features) => label -> features
+      case _ =>
+        // Should not happen, since label is of RealNN feature type
+        throw new IllegalArgumentException("Sanity checker input missing label for row")
     }
+    sampleData.persist()
 
-    implicit val enc: Encoder[OldVector] = ExpressionEncoder()
     logInfo("Getting vector rows")
     val vectorRows: RDD[OldVector] = sampleData.map {
-      case (Some(label), sparse: SparseVector) =>
-        val newSize = sparse.size + 1
-        if (label != 0.0) OldVectors.sparse(newSize, sparse.indices :+ sparse.size, sparse.values :+ label)
-        else OldVectors.sparse(newSize, sparse.indices, sparse.values)
-      case (Some(label), dense: DenseVector) =>
+      case (0.0, sparse: SparseVector) =>
+        OldVectors.sparse(sparse.size + 1, sparse.indices, sparse.values)
+      case (label, sparse: SparseVector) =>
+        OldVectors.sparse(sparse.size + 1, sparse.indices :+ sparse.size, sparse.values :+ label)
+      case (label, dense: DenseVector) =>
         OldVectors.dense(dense.toArray :+ label)
-      case (label, _) => throw new IllegalArgumentException("Sanity checker input missing label for row")
-    }.rdd.persist()
-    data.unpersist(blocking = false)
+    }.persist()
 
     logInfo("Calculating columns stats")
     val colStats = Statistics.colStats(vectorRows)
@@ -515,15 +520,13 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val featureSize = vectorRows.first().size - 1
     require(featureSize > 0, "Feature vector passed in is empty, check your vectorizers")
 
-    val labelColumn = featureSize // label column goes at end of vector
-
     // handle any possible serialization errors if users give us wrong metadata
-    val vectorMeta = Try {
+    val vectorMeta = try {
       OpVectorMetadata(getInputSchema()(in2.name))
-    }.recover {
+    } catch {
       case e: NoSuchElementException =>
         throw new IllegalArgumentException("Vector input metadata is malformed: ", e)
-    }.get
+    }
 
     require(featureSize == vectorMeta.size,
       "Number of columns in vector metadata did not match number of columns in data, check your vectorizers")
@@ -536,7 +539,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
     // Only calculate this if the label is categorical, so ignore if user has flagged label as not categorical
     val categoricalStats =
       if (isDefined(categoricalLabel) && !$(categoricalLabel)) {
-        // CategoricalStats2()
         Array.empty[CategoricalGroupStats]
       } else {
         logInfo("Attempting to calculate Cramer's V between each categorical feature and the label")
@@ -544,7 +546,11 @@ class SanityChecker(uid: String = UID[SanityChecker])
       }
 
     logInfo("Logging all statistics")
-    val stats = makeColumnStatistics(vectorMetaColumns, labelColumn, covariance, colStats, categoricalStats)
+    val stats = makeColumnStatistics(
+      vectorMetaColumns,
+      labelColumnIndex = featureSize, // label column goes at end of vector
+      covariance, colStats, categoricalStats
+    )
     stats.foreach { stat => logInfo(stat.toString) }
 
     logInfo("Calculating features to remove")
@@ -567,6 +573,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     )
     setMetadata(outputMeta.toMetadata.withSummaryMetadata(summary.toMetadata()))
 
+    sampleData.unpersist(blocking = false)
     vectorRows.unpersist(blocking = false)
 
     require(indicesToKeep.length > 0,
