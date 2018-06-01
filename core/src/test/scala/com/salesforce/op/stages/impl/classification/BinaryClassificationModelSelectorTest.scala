@@ -32,16 +32,16 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning.{OpCrossValidation, _}
+import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier, LogisticRegression => SparkLR}
@@ -80,11 +80,9 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
   val data = positiveData.union(negativeData).toDF("label", "features")
 
-  val Array(rawLabel: Feature[RealNN]@unchecked, features: Feature[OPVector]@unchecked) =
-    TestFeatureBuilder(data, nonNullable = data.schema.fields.map(_.name).toSet)
-
-  val label = rawLabel.copy(isResponse = true)
-
+  val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+    data, response = "label", nonNullable = Set("features")
+  )
   val modelSelector = BinaryClassificationModelSelector().setInput(label, features)
 
   Spec[BinaryClassificationModelSelector] should "have properly formed stage1" in {
@@ -95,7 +93,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     inputNames shouldBe Array(label.name, features.name)
     modelSelector.stage1.getOutput().name shouldBe modelSelector.stage1.getOutputFeatureName
     the[IllegalArgumentException] thrownBy {
-      modelSelector.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
+      modelSelector.setInput(label, features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }
 
