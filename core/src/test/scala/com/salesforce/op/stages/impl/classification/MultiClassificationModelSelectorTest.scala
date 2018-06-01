@@ -31,15 +31,17 @@
 
 package com.salesforce.op.stages.impl.classification
 
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureBuilder}
+import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
+import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.classification.{DecisionTreeClassifier, LogisticRegressionModel, RandomForestClassifier}
@@ -49,13 +51,10 @@ import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
-import FunctionalityForClassificationTests._
-import com.salesforce.op.stages.impl.CompareParamGrid
-import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.sql.types.MetadataBuilder
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
 
@@ -87,12 +86,11 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   val data = label0Data.union(label1Data).union(label2Data).toDF("label", "features")
 
-  val Array(rawLabel: Feature[RealNN]@unchecked, features: Feature[OPVector]@unchecked) =
-    TestFeatureBuilder(data, nonNullable = data.schema.fields.map(_.name).toSet)
+  val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+    data, response = "label", nonNullable = Set("features")
+  )
 
-  val label = rawLabel.copy(isResponse = true)
-
-  val modelSelector = MultiClassificationModelSelector().setInput(label, features)
+  val modelSelector = MultiClassificationModelSelector().setInput(label.asInstanceOf[Feature[RealNN]], features)
 
   Spec[MultiClassificationModelSelector] should "have properly formed stage1" in {
     assert(modelSelector.stage1.isInstanceOf[Stage1MultiClassificationModelSelector])
