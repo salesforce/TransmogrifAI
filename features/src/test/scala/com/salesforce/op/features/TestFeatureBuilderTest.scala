@@ -47,24 +47,7 @@ case class FeatureBuilderContainerTest(s: String, l: Long, d: Double)
 @RunWith(classOf[JUnitRunner])
 class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
 
-  Spec(TestFeatureBuilder.getClass) should "infer features from a dataset" in {
-    import spark.implicits._
-    val ds = Seq(
-      FeatureBuilderContainerTest("blah1", 10, 2.0),
-      FeatureBuilderContainerTest("blah2", 11, 3.0)
-    ).toDS.toDF()
-
-    val features@Array(f1, f2, f3) = TestFeatureBuilder(ds, Set.empty[String])
-
-    f1.name shouldBe "s"
-    f1.typeName shouldBe FeatureType.typeName[Text]
-    f2.name shouldBe "l"
-    f2.typeName shouldBe FeatureType.typeName[Integral]
-    f3.name shouldBe "d"
-    f3.typeName shouldBe FeatureType.typeName[Real]
-  }
-
-  it should "create a dataset with one feature" in {
+  Spec(TestFeatureBuilder.getClass)  should "create a dataset with one feature" in {
     val res@(ds, f1) = TestFeatureBuilder[Real](Seq(Real(1), Real(2L), Real(3.1f), Real(4.5)))
 
     assertFeature(f1)(name = "f1", in = ds.head(), out = Real(1.0))

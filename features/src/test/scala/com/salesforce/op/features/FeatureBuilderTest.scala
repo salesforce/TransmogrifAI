@@ -36,9 +36,9 @@ import java.util
 import com.salesforce.op.aggregators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.FeatureGeneratorStage
-import com.salesforce.op.test.{Passenger, TestCommon}
+import com.salesforce.op.test.{Passenger, TestSparkContext}
 import com.twitter.algebird.MonoidAggregator
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{DataFrame, Row}
 import org.joda.time.Duration
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -48,7 +48,7 @@ import scala.reflect.runtime.universe._
 
 
 @RunWith(classOf[JUnitRunner])
-class FeatureBuilderTest extends FlatSpec with TestCommon {
+class FeatureBuilderTest extends FlatSpec with TestSparkContext {
   private val name = "feature"
   private val passenger =
     Passenger.newBuilder()
@@ -58,6 +58,9 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
       .setNumericMap(new util.HashMap[String, java.lang.Double]())
       .setBooleanMap(new util.HashMap[String, java.lang.Boolean]())
       .build()
+
+  import spark.implicits._
+  private val data: DataFrame = Seq(FeatureBuilderContainerTest("blah1", 10, d = 2.0)).toDS.toDF()
 
   Spec(FeatureBuilder.getClass) should "build a simple feature with a custom name" in {
     val f1 = FeatureBuilder.Real[Passenger]("a").extract(p => Option(p.getAge).map(_.toDouble).toReal).asPredictor
@@ -80,6 +83,25 @@ class FeatureBuilderTest extends FlatSpec with TestCommon {
   it should "build a simple feature from Row using macro" in {
     val feature = FeatureBuilder.fromRow[Real](0).asResponse
     assertFeature[Row, Real](feature)(name = name, in = Row(1.0, "2"), out = 1.toReal, isResponse = true)
+  }
+
+  it should "build features from a dataframe" in {
+    val row = data.head()
+    val (label, Array(fs, fl)) = FeatureBuilder.fromDataFrame[RealNN](data, response = "d")
+    assertFeature(label)(name = "d", in = row, out = 2.0.toRealNN, isResponse = true)
+    assertFeature(fs.asInstanceOf[Feature[Text]])(name = "s", in = row, out = "blah1".toText, isResponse = false)
+    assertFeature(fl.asInstanceOf[Feature[Integral]])(name = "l", in = row, out = 10.toIntegral, isResponse = false)
+  }
+
+  it should "error on invalid response" in {
+    intercept[RuntimeException](FeatureBuilder.fromDataFrame[RealNN](data, response = "non_existent"))
+      .getMessage shouldBe "Response feature 'non_existent' was not found in dataframe schema"
+    intercept[RuntimeException](FeatureBuilder.fromDataFrame[RealNN](data, response = "s")).getMessage shouldBe
+      "Response feature 's' is of type com.salesforce.op.features.types.Text, " +
+        "but expected com.salesforce.op.features.types.RealNN"
+    intercept[RuntimeException](FeatureBuilder.fromDataFrame[Text](data, response = "d")).getMessage shouldBe
+      "Response feature 'd' is of type com.salesforce.op.features.types.RealNN, " +
+        "but expected com.salesforce.op.features.types.Text"
   }
 
   it should "return a default if extract throws an exception" in {

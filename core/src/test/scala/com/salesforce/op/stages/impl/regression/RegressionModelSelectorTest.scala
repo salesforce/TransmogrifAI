@@ -32,25 +32,21 @@
 package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames}
-import com.salesforce.op.stages.impl.tuning.{BestEstimator, OpCrossValidation}
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.impl.tuning.BestEstimator
+import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.DecisionTreeClassifier
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.regression.{DecisionTreeRegressor, GBTRegressor, RandomForestRegressor}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.types.MetadataBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -68,12 +64,10 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
 
   val data = sc.parallelize(rawData).toDF("label", "features")
 
-  val Array(rawLabel: Feature[RealNN]@unchecked, features: Feature[OPVector]@unchecked) =
-    TestFeatureBuilder(data, nonNullable = data.schema.fields.map(_.name).toSet)
-
-  val label = rawLabel.copy(isResponse = true)
-
-  val modelSelector = RegressionModelSelector().setInput(label, features)
+  val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+    data, response = "label", nonNullable = Set("features")
+  )
+  val modelSelector = RegressionModelSelector().setInput(label.asInstanceOf[Feature[RealNN]], features)
 
   Spec[RegressionModelSelector] should "be properly set" in {
     val inputNames = modelSelector.getInputFeatures().map(_.name)
@@ -81,7 +75,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     inputNames shouldBe Array(label.name, features.name)
     modelSelector.getOutput().name shouldBe modelSelector.getOutputFeatureName
     the[IllegalArgumentException] thrownBy {
-      modelSelector.setInput(label.copy(isResponse = true), features.copy(isResponse = true))
+      modelSelector.setInput(label, features.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }
 
