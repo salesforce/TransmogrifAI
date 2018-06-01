@@ -31,10 +31,8 @@
 
 package com.salesforce.op.test
 
-import com.salesforce.op.UID
-import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter, Real}
+import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
 import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureSparkTypes}
-import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.StructType
@@ -48,42 +46,6 @@ case object TestFeatureBuilder {
 
   case object DefaultFeatureNames {
     val (f1, f2, f3, f4, f5) = ("f1", "f2", "f3", "f4", "f5")
-  }
-
-  private val dummyFeature = feature[Real]("dummy")
-  private lazy val DefaultFeatureArgs = ReflectionUtils.bestCtorWithArgs(dummyFeature)._2.toMap
-
-  /**
-   * Build features from a given dataset
-   *
-   * @param ds          dataset
-   * @param nonNullable non nullable fields
-   * @return array of features
-   */
-  def apply(ds: DataFrame, nonNullable: Set[String]): Array[Feature[_ <: FeatureType]] = apply(ds.schema, nonNullable)
-
-  /**
-   * Build features from a given schema
-   *
-   * @param schema      schema
-   * @param nonNullable non nullable fields
-   * @return array of features
-   */
-  def apply(schema: StructType, nonNullable: Set[String]): Array[Feature[_ <: FeatureType]] = {
-    val featureClass = classOf[Feature[_ <: FeatureType]]
-
-    schema.fields.map(field => {
-      val isNullable = !nonNullable.contains(field.name)
-      def ctorArgs(argName: String, argSymbol: Symbol): scala.util.Try[Any] = scala.util.Try {
-        argName match {
-          case "name" => field.name
-          case "uid" => UID(featureClass)
-          case "wtt" => FeatureSparkTypes.featureTypeTagOf(field.dataType, isNullable)
-          case n => DefaultFeatureArgs(n)
-        }
-      }
-      ReflectionUtils.newInstance[Feature[_ <: FeatureType]](featureClass, ctorArgs)
-    })
   }
 
   /**
@@ -297,6 +259,6 @@ case object TestFeatureBuilder {
     )).toDF()
   }
 
-  private def feature[T <: FeatureType](name: String)(implicit tt: TypeTag[T]) =
+  private def feature[T <: FeatureType](name: String)(implicit tt: WeakTypeTag[T]) =
     FeatureBuilder.fromRow[T](name)(tt).asPredictor
 }
