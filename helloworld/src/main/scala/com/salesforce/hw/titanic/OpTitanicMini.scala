@@ -47,6 +47,7 @@ object OpTitanicMini {
 
   def main(args: Array[String]): Unit = {
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
+    import spark.implicits._
 
     // Read Titanic data as a DataFrame
     val readPath = Option(args(0))
