@@ -1,7 +1,7 @@
-# Hello World project for Optimus Prime apps
+# Hello World project for Octopus Prime apps
 
 There are four example workflows in this project:
-1) **(start here)** A very simple classifier based on the Titanic dataset `com.salesforce.hw.OpTitanicSimple`
+1) **(start here)** A minimalistic classifier based on the Titanic dataset `com.salesforce.hw.titanic.OpTitanicMini`
 2) A simple classifier based on the Titanic dataset with examples of overriding default reader behavior  - `com.salesforce.hw.titanic.OpTitanic`
 3) A simple classifier for multiclass labels on the Iris dataset - `com.salesforce.hw.iris.OpIris`
 4) A simple regression based on boston housing data - `com.salesforce.hw.boston.OpBoston`
@@ -14,12 +14,12 @@ Each project can be either be run with the gradle task, `sparkSubmit` (**recomme
 
 Note: make sure you have all the [Prerequisites](https://github.com/salesforce/op/wiki/Bootstrap-Your-First-Project#prerequisites).
 
-### Titanic Simple
+### Titanic Mini
 
 First, build project with `./gradlew installDist`. Then run:
 
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanicMini -Dargs="\
 `pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 
