@@ -50,7 +50,7 @@ ext {
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='3.3.0'
+    opVersion='3.3.1'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
 
