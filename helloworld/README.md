@@ -1,7 +1,7 @@
 # Hello World project for Octopus Prime apps
 
 There are four example workflows in this project:
-1) **(start here)** A minimalistic classifier based on the Titanic dataset `com.salesforce.hw.titanic.OpTitanicMini`
+1) **(start here)** A minimal classifier based on the Titanic dataset `com.salesforce.hw.titanic.OpTitanicMini`
 2) A simple classifier based on the Titanic dataset with examples of overriding default reader behavior  - `com.salesforce.hw.titanic.OpTitanic`
 3) A simple classifier for multiclass labels on the Iris dataset - `com.salesforce.hw.iris.OpIris`
 4) A simple regression based on boston housing data - `com.salesforce.hw.boston.OpBoston`

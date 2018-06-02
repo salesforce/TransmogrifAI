@@ -40,10 +40,25 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 /**
- * A minimalistic Titanic Survival example with Octopus Prime
+ * A minimal Titanic Survival example with Octopus Prime
  */
-// scalastyle:off
 object OpTitanicMini {
+
+  case class Passenger
+  (
+    id: Long,
+    survived: Double,
+    pClass: Option[Long],
+    name: Option[String],
+    sex: Option[String],
+    age: Option[Double],
+    sibSp: Option[Long],
+    parCh: Option[Long],
+    ticket: Option[String],
+    fare: Option[Double],
+    cabin: Option[String],
+    embarked: Option[String]
+  )
 
   def main(args: Array[String]): Unit = {
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
@@ -56,7 +71,7 @@ object OpTitanicMini {
     // Materialize features and apply automatic vectorization
     val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
     val featureVector = features.toSeq.transmogrify()
-    val checkedFeatures =survived.sanityCheck(featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
+    val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
 
     // Train a binary classification model and show summary
     val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
@@ -64,18 +79,3 @@ object OpTitanicMini {
   }
 
 }
-
-case class Passenger(
-  id: Long,
-  survived: Double,
-  pClass: Option[Long],
-  name: Option[String],
-  sex: Option[String],
-  age: Option[Double],
-  sibSp: Option[Long],
-  parCh: Option[Long],
-  ticket: Option[String],
-  fare: Option[Double],
-  cabin: Option[String],
-  embarked: Option[String]
-)
