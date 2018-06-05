@@ -47,7 +47,6 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
 
   override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[BostonKryoRegistrator]
 
-
   ////////////////////////////////////////////////////////////////////////////////
   // READERS DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
@@ -66,7 +65,7 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
     }
   }
 
-  val trainingReader = new CustomReader[BostonHouse](key = _.rowId.toString){
+  val trainingReader = new CustomReader[BostonHouse](key = _.rowId.toString) {
     def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[BostonHouse], Dataset[BostonHouse]] = {
       val Array(train, _) = customRead(Some(getFinalReadPath(params)), spark).randomSplit(weights = Array(0.9, 0.1),
         seed = randomSeed)
@@ -74,7 +73,7 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
     }
   }
 
-  val scoringReader = new CustomReader[BostonHouse](key = _.rowId.toString){
+  val scoringReader = new CustomReader[BostonHouse](key = _.rowId.toString) {
     def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[BostonHouse], Dataset[BostonHouse]] = {
       val Array(_, test) = customRead(Some(getFinalReadPath(params)), spark).randomSplit(weights = Array(0.9, 0.1),
         seed = randomSeed)
@@ -87,8 +86,7 @@ object OpBoston extends OpAppWithRunner with BostonFeatures {
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
 
-  val houseFeatures = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b,
-    lstat).transmogrify()
+  val houseFeatures = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
 
   val prediction = RegressionModelSelector
     .withCrossValidation(dataSplitter = Option(DataSplitter(seed = randomSeed)), seed = randomSeed)
