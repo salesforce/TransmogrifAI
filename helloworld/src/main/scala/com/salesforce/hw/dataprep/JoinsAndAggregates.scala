@@ -32,7 +32,7 @@
 package com.salesforce.hw.dataprep
 
 import com.salesforce.op._
-import com.salesforce.op.aggregators.{CutOffTime, SumRealNN}
+import com.salesforce.op.aggregators.{CutOffTime, SumRealNN, SumReal}
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.{AggregateParams, DataReaders}
@@ -74,21 +74,21 @@ object JoinsAndAggregates {
     implicit val spark = SparkSession.builder.config(conf).getOrCreate()
     import spark.implicits._
 
-    val numClicksYday = FeatureBuilder.RealNN[Click]
-      .extract(click => 1.toRealNN)
-      .aggregate(SumRealNN)
+    val numClicksYday = FeatureBuilder.Real[Click]
+      .extract(click => 1.toReal)
+      .aggregate(SumReal)
       .window(Duration.standardDays(1))
       .asPredictor
 
-    val numSendsLastWeek = FeatureBuilder.RealNN[Send]
-      .extract(send => 1.toRealNN)
-      .aggregate(SumRealNN)
+    val numSendsLastWeek = FeatureBuilder.Real[Send]
+      .extract(send => 1.toReal)
+      .aggregate(SumReal)
       .window(Duration.standardDays(7))
       .asPredictor
 
-    val numClicksTomorrow = FeatureBuilder.RealNN[Click]
-      .extract(click => 1.toRealNN)
-      .aggregate(SumRealNN)
+    val numClicksTomorrow = FeatureBuilder.Real[Click]
+      .extract(click => 1.toReal)
+      .aggregate(SumReal)
       .window(Duration.standardDays(1))
       .asResponse
 

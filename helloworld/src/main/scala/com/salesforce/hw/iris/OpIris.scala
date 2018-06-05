@@ -47,7 +47,6 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
 
   override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[IrisKryoRegistrator]
 
-
   ////////////////////////////////////////////////////////////////////////////////
   // READER DEFINITIONS
   /////////////////////////////////////////////////////////////////////////////////
@@ -66,31 +65,30 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
     }
   }
 
-
   ////////////////////////////////////////////////////////////////////////////////
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
 
-  private val labels = irisClass.indexed()
+  val labels = irisClass.indexed()
 
-  private val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrify()
+  val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrify()
 
   val (pred, raw, prob) = MultiClassificationModelSelector
     .withCrossValidation(splitter = Some(DataCutter(reserveTestFraction = 0.2, seed = randomSeed)), seed = randomSeed)
     .setDecisionTreeSeed(randomSeed)
     .setInput(labels, features).getOutput()
 
-  private val evaluator = Evaluators.MultiClassification.f1()
+  val evaluator = Evaluators.MultiClassification.f1()
     .setLabelCol(labels)
     .setPredictionCol(pred)
     .setRawPredictionCol(raw)
     .setProbabilityCol(prob)
 
-  private val wf = new OpWorkflow().setResultFeatures(pred, raw, prob, labels)
+  val workflow = new OpWorkflow().setResultFeatures(pred, raw, prob, labels)
 
   def runner(opParams: OpParams): OpWorkflowRunner =
     new OpWorkflowRunner(
-      workflow = wf,
+      workflow = workflow,
       trainingReader = irisReader,
       scoringReader = irisReader,
       evaluationReader = Option(irisReader),
