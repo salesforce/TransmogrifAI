@@ -32,6 +32,8 @@
 package com.salesforce.hw.titanic
 
 import com.salesforce.op._
+import com.salesforce.op.features._
+import com.salesforce.op.features.types._
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
@@ -43,8 +45,6 @@ import com.salesforce.op.utils.kryo.OpKryoRegistrator
  * Octopus Prime example classification app using the Titanic dataset
  */
 object OpTitanic extends OpAppWithRunner with TitanicFeatures {
-
-  override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[TitanicKryoRegistrator]
 
   ////////////////////////////////////////////////////////////////////////////////
   // READER DEFINITION
@@ -87,7 +87,7 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
 
   ////////////////////////////////////////////////////////////////////////////////
   // APPLICATION RUNNER DEFINITION
-
+  /////////////////////////////////////////////////////////////////////////////////
   def runner(opParams: OpParams): OpWorkflowRunner =
     new OpWorkflowRunner(
       workflow = workflow,
@@ -97,5 +97,7 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
       evaluator = Option(evaluator),
       featureToComputeUpTo = Option(featureVector)
     )
+
+  override def kryoRegistrator: Class[_ <: OpKryoRegistrator] = classOf[TitanicKryoRegistrator]
 
 }
