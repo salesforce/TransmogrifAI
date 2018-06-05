@@ -65,17 +65,21 @@ object OpTitanicMini {
     import spark.implicits._
 
     // Read Titanic data as a DataFrame
-    val readPath = Option(args(0))
-    val passengersData = DataReaders.Simple.csvCase[Passenger](readPath).readDataset().toDF()
+    val pathToData = Option(args(0))
+    val passengersData = DataReaders.Simple.csvCase[Passenger](pathToData, key = _.id.toString).readDataset().toDF()
 
-    // Materialize features and apply automatic vectorization
+    // Automated feature engineering
     val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
-    val featureVector = features.toSeq.transmogrify()
+    val featureVector = features.toSeq.autoTransform()
+
+    // Automated feature selection
     val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
 
-    // Train a binary classification model and show summary
+    // Automated model selection
     val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
-    new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).withRawFeatureFilter(None, None).train()
+    val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
+
+    println(s"Model summary:${model.summary()}")
   }
 
 }
