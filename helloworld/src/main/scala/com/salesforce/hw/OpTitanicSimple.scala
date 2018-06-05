@@ -36,7 +36,8 @@ import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataReaders
-import com.salesforce.op.stages.impl.classification.OpLogisticRegression
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
@@ -145,8 +146,9 @@ object OpTitanicSimple {
 
     // Define the model we want to use (here a simple logistic regression) and get the resulting output
     val (prediction, rawPrediction, prob) =
-      new OpLogisticRegression()
-        .setInput(survived, finalFeatures).getOutput
+      BinaryClassificationModelSelector.withTrainValidationSplit()
+        .setModelsToTry(LogisticRegression)
+        .setInput(survived, finalFeatures).getOutput()
 
     val evaluator = Evaluators.BinaryClassification()
       .setLabelCol(survived)
