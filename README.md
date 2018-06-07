@@ -125,8 +125,8 @@ repositories {
        credentials {
            // Generate github api token here - https://goo.gl/ANZ9oz
            // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
-           username = System.getenv("GITHUB_API_TOKEN")
-           password "" // leave the password empty
+           username = System.getenv("GITHUB_API_TOKEN") // use your token as a username
+           password "" // leave the password blank
        }
        authentication { digest(BasicAuthentication) }
     }
