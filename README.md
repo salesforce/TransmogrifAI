@@ -134,8 +134,8 @@ repositories {
 ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '8'
-    sparkVersion = <SPARK_VERSION> // Set the required Spark version here
-    opVersion = <OP_VERSION> // Set the required OP version here
+    sparkVersion = 2.2.1
+    opVersion = 3.3.1
 }
 dependencies {
     // Scala
