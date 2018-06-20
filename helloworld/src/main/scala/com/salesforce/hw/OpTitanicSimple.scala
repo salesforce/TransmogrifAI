@@ -107,7 +107,7 @@ object OpTitanicSimple {
 
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
 
-    val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN(Double.NaN)).asPredictor
+    val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
 
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
 
@@ -130,7 +130,7 @@ object OpTitanicSimple {
     val estimatedCostOfTickets = familySize * fare
     // val pivotedSex = sex.map[PickList](v => v).pivot()
     val pivotedSex = sex.pivot()
-    val normedAge = age.zNormalize()
+    val normedAge = age.fillMissingWithMean().zNormalize()
     val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
 
     // Define a feature of type vector containing all the predictors you'd like to use
@@ -154,6 +154,7 @@ object OpTitanicSimple {
       .setLabelCol(survived)
       .setRawPredictionCol(rawPrediction)
       .setPredictionCol(prediction)
+      .setProbabilityCol(prob)
 
     ////////////////////////////////////////////////////////////////////////////////
     // WORKFLOW
