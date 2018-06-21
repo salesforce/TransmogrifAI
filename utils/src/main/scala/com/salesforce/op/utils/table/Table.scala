@@ -122,7 +122,7 @@ case class Table[T <: Product](
     val columnSizes = columns.map(c => math.max(1, c.length)).toArray
     val cellSizes = rowVals.map(_.map(_.length).toArray).foldLeft(columnSizes)(_ + _)
     val bracket = formatRow(Seq.fill(cellSizes.length)(""), cellSizes, _ => Alignment.Left, sep = "+", fill = "-")
-    val rowWidth = bracket.length - 4  // cellSizes.sum + 2 * cellSizes.length + 1
+    val rowWidth = bracket.length - 4
     val cleanBracket = formatRow(Seq(""), Seq(rowWidth), _ => Alignment.Left, sep = "+", fill = "-")
     val maybeName = Option(name) match {
       case Some(n) if n.nonEmpty => Seq(cleanBracket, formatRow(Seq(name), Seq(rowWidth), _ => nameAlignment))
@@ -133,8 +133,6 @@ case class Table[T <: Product](
 
     (maybeName ++ Seq(cleanBracket, columnsHeader, bracket) ++ formattedRows :+ bracket).mkString("\n")
   }
-
-
 
   override def toString: String = prettyString
 
