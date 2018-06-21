@@ -105,8 +105,9 @@ case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String 
       case Some(n) if n.nonEmpty => Seq(cleanBracket, formatRow(Seq(name), Seq(rowWidth), _ => nameAlignment))
       case _ => Seq.empty
     }
-    val columnsHeader = formatRow(columns, cellSizes, columnAlignments.getOrElse(_, defaultColumnAlignment))
-    val formattedRows = rowVals.map(formatRow(_, cellSizes, columnAlignments.getOrElse(_, defaultColumnAlignment)))
+    val alignment: String => Alignment = columnAlignments.getOrElse(_, defaultColumnAlignment)
+    val columnsHeader = formatRow(columns, cellSizes, alignment)
+    val formattedRows = rowVals.map(formatRow(_, cellSizes, alignment))
 
     (maybeName ++ Seq(cleanBracket, columnsHeader, bracket) ++ formattedRows :+ bracket).mkString("\n")
   }
