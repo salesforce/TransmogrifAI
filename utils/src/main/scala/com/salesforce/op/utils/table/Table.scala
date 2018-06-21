@@ -49,22 +49,11 @@ import enumeratum._
  * +------+--------+--------------+---------+
  *
  * @param columns non empty sequence of column names
- * @param rows non empty sequence of rows
- * @param name table name
- * @param nameAlignment table name alignment when printing
- * @param columnAlignments column name & values alignment when printing
- *                         (if not set defaults to [[defaultColumnAlignment]])
- * @param defaultColumnAlignment default column name & values alignment when printing
+ * @param rows    non empty sequence of rows
+ * @param name    table name
  * @tparam T row type
  */
-case class Table[T <: Product](
-  columns: Seq[String],
-  rows: Seq[T],
-  name: String = "",
-  nameAlignment: Alignment = Alignment.Center,
-  columnAlignments: Map[String, Alignment] = Map.empty,
-  defaultColumnAlignment: Alignment = Alignment.Left
-) {
+case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String = "") {
   require(columns.nonEmpty, "columns cannot be empty")
   require(rows.nonEmpty, "rows cannot be empty")
   require(columns.length == rows.head.productArity,
@@ -83,7 +72,7 @@ case class Table[T <: Product](
   private def formatRow(
     values: Iterable[String],
     cellSizes: Iterable[Int],
-    alignment: String => Alignment = columnAlignments.getOrElse(_, defaultColumnAlignment),
+    alignment: String => Alignment,
     sep: String = "|",
     fill: String = " "
   ): String = {
@@ -96,10 +85,17 @@ case class Table[T <: Product](
   /**
    * Pretty print table
    *
+   * @param nameAlignment          table name alignment
+   * @param columnAlignments       column name & values alignment
+   * @param defaultColumnAlignment default column name & values alignment
    * @return pretty printed table
    */
-  def prettyString: String = {
-    val rowVals= rows.map(_.productIterator.map(v => Option(v).map(_.toString).getOrElse("")).toSeq)
+  def prettyString(
+    nameAlignment: Alignment = Alignment.Center,
+    columnAlignments: Map[String, Alignment] = Map.empty,
+    defaultColumnAlignment: Alignment = Alignment.Left
+  ): String = {
+    val rowVals = rows.map(_.productIterator.map(v => Option(v).map(_.toString).getOrElse("")).toSeq)
     val columnSizes = columns.map(c => math.max(1, c.length)).toArray
     val cellSizes = rowVals.map(_.map(_.length).toArray).foldLeft(columnSizes)(_ + _)
     val bracket = formatRow(Seq.fill(cellSizes.length)(""), cellSizes, _ => Alignment.Left, sep = "+", fill = "-")
@@ -109,13 +105,13 @@ case class Table[T <: Product](
       case Some(n) if n.nonEmpty => Seq(cleanBracket, formatRow(Seq(name), Seq(rowWidth), _ => nameAlignment))
       case _ => Seq.empty
     }
-    val columnsHeader = formatRow(columns, cellSizes)
-    val formattedRows = rowVals.map(formatRow(_, cellSizes))
+    val columnsHeader = formatRow(columns, cellSizes, columnAlignments.getOrElse(_, defaultColumnAlignment))
+    val formattedRows = rowVals.map(formatRow(_, cellSizes, columnAlignments.getOrElse(_, defaultColumnAlignment)))
 
     (maybeName ++ Seq(cleanBracket, columnsHeader, bracket) ++ formattedRows :+ bracket).mkString("\n")
   }
 
-  override def toString: String = prettyString
+  override def toString: String = prettyString()
 
 }
 

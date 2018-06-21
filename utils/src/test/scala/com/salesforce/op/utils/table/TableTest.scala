@@ -65,7 +65,7 @@ class TableTest extends FlatSpec with TestCommon {
     }.getMessage shouldBe "requirement failed: columns length must match rows arity (1!=4)"
   }
   it should "pretty print a table" in {
-    Table(columns = columns, rows = transactions).prettyString shouldBe
+    Table(columns = columns, rows = transactions).prettyString() shouldBe
       """|+----------------------------------------+
          || date | amount | source       | status  |
          |+------+--------+--------------+---------+
@@ -76,10 +76,10 @@ class TableTest extends FlatSpec with TestCommon {
   }
   it should "have a pretty toString as well" in {
     val table = Table(columns = columns, rows = transactions)
-    table.prettyString shouldBe table.toString
+    table.prettyString() shouldBe table.toString
   }
   it should "pretty print a table with a name" in {
-    Table(columns = columns, rows = transactions, name = "Transactions").prettyString shouldBe
+    Table(columns = columns, rows = transactions, name = "Transactions").prettyString() shouldBe
       """|+----------------------------------------+
          ||              Transactions              |
          |+----------------------------------------+
@@ -91,7 +91,7 @@ class TableTest extends FlatSpec with TestCommon {
          |+------+--------+--------------+---------+""".stripMargin
   }
   it should "pretty print a table with a name aligned left" in {
-    Table(columns = columns, rows = transactions, name = "Transactions", nameAlignment = Left).prettyString shouldBe
+    Table(columns = columns, rows = transactions, name = "Transactions").prettyString(nameAlignment = Left) shouldBe
       """|+----------------------------------------+
          || Transactions                           |
          |+----------------------------------------+
@@ -103,7 +103,7 @@ class TableTest extends FlatSpec with TestCommon {
          |+------+--------+--------------+---------+""".stripMargin
   }
   it should "pretty print a table with right column alignment" in {
-    Table(columns = columns, rows = transactions, defaultColumnAlignment = Right).prettyString shouldBe
+    Table(columns = columns, rows = transactions).prettyString(defaultColumnAlignment = Right) shouldBe
       """|+----------------------------------------+
          || date | amount |       source |  status |
          |+------+--------+--------------+---------+
@@ -113,7 +113,7 @@ class TableTest extends FlatSpec with TestCommon {
          |+------+--------+--------------+---------+""".stripMargin
   }
   it should "pretty print a table with center column alignment" in {
-    Table(columns = columns, rows = transactions, defaultColumnAlignment = Center).prettyString shouldBe
+    Table(columns = columns, rows = transactions).prettyString(defaultColumnAlignment = Center) shouldBe
       """|+----------------------------------------+
          || date | amount |    source    | status  |
          |+------+--------+--------------+---------+
@@ -123,10 +123,10 @@ class TableTest extends FlatSpec with TestCommon {
          |+------+--------+--------------+---------+""".stripMargin
   }
   it should "pretty print a table with custom column alignment" in {
-    Table(columns = columns, rows = transactions, name = "Transactions",
-      nameAlignment = Center, defaultColumnAlignment = Right,
-      columnAlignments = Map("date" -> Right, "amount" -> Left, "status" -> Center)
-    ).prettyString shouldBe
+    Table(columns = columns, rows = transactions, name = "Transactions")
+      .prettyString(
+        nameAlignment = Center, defaultColumnAlignment = Right,
+        columnAlignments = Map("date" -> Right, "amount" -> Left, "status" -> Center)) shouldBe
       """|+----------------------------------------+
          ||              Transactions              |
          |+----------------------------------------+
@@ -139,7 +139,7 @@ class TableTest extends FlatSpec with TestCommon {
   }
   it should "pretty print a table even if data is bad" in {
     val badData1 = Seq(Tuple2(null, "one"), "2" -> "", (null, null), "3" -> Transaction(1, 1.0, "?", "?"))
-    Table(columns = Seq("c1", "c2"), rows = badData1, name = "Bad Data").prettyString shouldBe
+    Table(columns = Seq("c1", "c2"), rows = badData1, name = "Bad Data").prettyString() shouldBe
       """|+-----------------------------+
          ||          Bad Data           |
          |+-----------------------------+
@@ -153,7 +153,7 @@ class TableTest extends FlatSpec with TestCommon {
   }
   it should "pretty print a table even if data is really bad" in {
     val badData2 = Seq(null, "", 1).map(Tuple1(_))
-    Table(columns = Seq(""), rows = badData2).prettyString shouldBe
+    Table(columns = Seq(""), rows = badData2).prettyString() shouldBe
       """|+---+
          ||   |
          |+---+
