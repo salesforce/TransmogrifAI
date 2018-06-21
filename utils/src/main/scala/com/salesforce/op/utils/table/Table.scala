@@ -35,25 +35,6 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import enumeratum._
 
-
-/**
- * Simple table representation consisting of rows, i.e:
- *
- * +----------------------------------------+
- * |              Transactions              |
- * +----------------------------------------+
- * | date | amount | source       | status  |
- * +------+--------+--------------+---------+
- * | 1    | 4.95   | Cafe Venetia | Success |
- * | 2    | 12.65  | Sprout       | Success |
- * | 3    | 4.75   | Caltrain     | Pending |
- * +------+--------+--------------+---------+
- *
- * @param columns non empty sequence of column names
- * @param rows non empty sequence of rows
- * @param name table name
- * @tparam T row type
- */
 /**
  * Simple table representation consisting of rows, i.e:
  *
