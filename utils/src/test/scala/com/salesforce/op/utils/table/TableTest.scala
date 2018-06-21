@@ -184,5 +184,14 @@ class TableTest extends FlatSpec with TestCommon {
          || 1 |
          |+---+""".stripMargin
   }
+  it should "pretty print in timely fashion" in {
+    val columns = Seq("c1", "c2", "c3", "c4", "c5")
+    val rows = (0 until 100000).map(i => (i, i + 1, i - 1, i + i, i * i))
+    Table(columns, rows).prettyString() // warmup
+    val start = System.currentTimeMillis()
+    Table(columns, rows).prettyString()
+    val elapsed = System.currentTimeMillis() - start
+    elapsed should be < 5000L
+  }
 
 }
