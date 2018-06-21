@@ -42,6 +42,8 @@ case class Transaction(date: Long, amount: Double, source: String, status: Strin
 @RunWith(classOf[JUnitRunner])
 class TableTest extends FlatSpec with TestCommon {
 
+  // scalastyle:off indentation
+
   val columns = Seq("date", "amount", "source", "status")
   val transactions = Seq(
     Transaction(1, 4.95, "Cafe Venetia", "Success"),
