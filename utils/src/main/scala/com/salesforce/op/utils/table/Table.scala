@@ -31,9 +31,31 @@
 
 package com.salesforce.op.utils.table
 
-import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import enumeratum._
+
+
+object Table {
+  /**
+   * Simple factory for creating table instance with rows of [[Product]] types
+   *
+   * @param columns non empty sequence of column names
+   * @param rows    non empty sequence of rows
+   * @param name    table name
+   * @tparam T row type of [[Product]]
+   */
+  def apply[T <: Product](columns: Seq[String], rows: Seq[T], name: String = ""): Table = {
+    require(columns.nonEmpty, "columns cannot be empty")
+    require(rows.nonEmpty, "rows cannot be empty")
+    require(columns.length == rows.head.productArity,
+      s"columns length must match rows arity (${columns.length}!=${rows.head.productArity})")
+    val rowVals = rows.map(_.productIterator.map(v => Option(v).map(_.toString).getOrElse("")).toSeq)
+    new Table(columns, rowVals, name)
+  }
+
+  private implicit val max = Semigroup.from[Int](math.max)
+  private implicit val monoid: Monoid[Array[Int]] = Monoid.arrayMonoid[Int]
+}
 
 /**
  * Simple table representation consisting of rows, i.e:
@@ -51,17 +73,8 @@ import enumeratum._
  * @param columns non empty sequence of column names
  * @param rows    non empty sequence of rows
  * @param name    table name
- * @tparam T row type
  */
-case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String = "") {
-  require(columns.nonEmpty, "columns cannot be empty")
-  require(rows.nonEmpty, "rows cannot be empty")
-  require(columns.length == rows.head.productArity,
-    s"columns length must match rows arity (${columns.length}!=${rows.head.productArity})")
-
-  private implicit val max = Semigroup.from[Int](math.max)
-  private implicit val monoid: Monoid[Array[Int]] = Monoid.arrayMonoid[Int]
-
+class Table private(columns: Seq[String], rows: Seq[Seq[String]], name: String) {
   private def formatCell(v: String, size: Int, sep: String, fill: String): PartialFunction[Alignment, String] = {
     case Alignment.Left => v + fill * (size - v.length)
     case Alignment.Right => fill * (size - v.length) + v
@@ -82,6 +95,26 @@ case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String 
     formatted.mkString(s"$sep$fill", s"$fill$sep$fill", s"$fill$sep")
   }
 
+  private def sortColumns(ascending: Boolean): Table = {
+    val (columnsSorted, indices) = columns.zipWithIndex.sortBy(_._1).unzip
+    val rowsSorted = rows.map(row => row.zip(indices).sortBy(_._2).unzip._1)
+    new Table(
+      columns = if (ascending) columnsSorted else columnsSorted.reverse,
+      rows = if (ascending) rowsSorted else rowsSorted.map(_.reverse),
+      name = name
+    )
+  }
+
+  /**
+   * Sort table columns in alphabetical order
+   */
+  def sortColumnsAsc: Table = sortColumns(ascending = true)
+
+  /**
+   * Sort table columns in inverse alphabetical order
+   */
+  def sortColumnsDesc: Table = sortColumns(ascending = false)
+
   /**
    * Pretty print table
    *
@@ -95,9 +128,8 @@ case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String 
     columnAlignments: Map[String, Alignment] = Map.empty,
     defaultColumnAlignment: Alignment = Alignment.Left
   ): String = {
-    val rowVals = rows.map(_.productIterator.map(v => Option(v).map(_.toString).getOrElse("")).toSeq)
     val columnSizes = columns.map(c => math.max(1, c.length)).toArray
-    val cellSizes = rowVals.map(_.map(_.length).toArray).foldLeft(columnSizes)(_ + _)
+    val cellSizes = rows.map(_.map(_.length).toArray).foldLeft(columnSizes)(Table.monoid.plus)
     val bracket = formatRow(Seq.fill(cellSizes.length)(""), cellSizes, _ => Alignment.Left, sep = "+", fill = "-")
     val rowWidth = bracket.length - 4
     val cleanBracket = formatRow(Seq(""), Seq(rowWidth), _ => Alignment.Left, sep = "+", fill = "-")
@@ -107,7 +139,7 @@ case class Table[T <: Product](columns: Seq[String], rows: Seq[T], name: String 
     }
     val alignment: String => Alignment = columnAlignments.getOrElse(_, defaultColumnAlignment)
     val columnsHeader = formatRow(columns, cellSizes, alignment)
-    val formattedRows = rowVals.map(formatRow(_, cellSizes, alignment))
+    val formattedRows = rows.map(formatRow(_, cellSizes, alignment))
 
     (maybeName ++ Seq(cleanBracket, columnsHeader, bracket) ++ formattedRows :+ bracket).mkString("\n")
   }

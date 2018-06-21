@@ -51,7 +51,7 @@ class TableTest extends FlatSpec with TestCommon {
     Transaction(3, 4.75, "Caltrain", "Pending")
   )
 
-  Spec[Table[_]] should "error on missing columns" in {
+  Spec[Table] should "error on missing columns" in {
     intercept[IllegalArgumentException] {
       Table(columns = Seq.empty, rows = transactions)
     }.getMessage shouldBe "requirement failed: columns cannot be empty"
@@ -79,6 +79,26 @@ class TableTest extends FlatSpec with TestCommon {
   it should "have a pretty toString as well" in {
     val table = Table(columns = columns, rows = transactions)
     table.prettyString() shouldBe table.toString
+  }
+  it should "sort columns in ascending order" in {
+    Table(columns = columns, rows = transactions).sortColumnsAsc.prettyString() shouldBe
+      """|+----------------------------------------+
+         || amount | date | source       | status  |
+         |+--------+------+--------------+---------+
+         || 4.95   | 1    | Cafe Venetia | Success |
+         || 12.65  | 2    | Sprout       | Success |
+         || 4.75   | 3    | Caltrain     | Pending |
+         |+--------+------+--------------+---------+""".stripMargin
+  }
+  it should "sort columns in descending order" in {
+    Table(columns = columns, rows = transactions).sortColumnsDesc.prettyString() shouldBe
+      """|+----------------------------------------+
+         || status  | source       | date | amount |
+         |+---------+--------------+------+--------+
+         || Success | Cafe Venetia | 1    | 4.95   |
+         || Success | Sprout       | 2    | 12.65  |
+         || Pending | Caltrain     | 3    | 4.75   |
+         |+---------+--------------+------+--------+""".stripMargin
   }
   it should "pretty print a table with a name" in {
     Table(columns = columns, rows = transactions, name = "Transactions").prettyString() shouldBe
