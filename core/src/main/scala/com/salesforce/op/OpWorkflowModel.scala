@@ -261,6 +261,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       table.prettyString(columnAlignments = Map(holdOutCol -> Right, trainingCol -> Right))
     }
 
+    // TODO: Sanity checker results (if any)
+
     summary.mkString("\n")
   }
 
