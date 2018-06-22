@@ -35,14 +35,13 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.stages.impl.selector.StageParamNames
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml._
-import org.apache.spark.rdd.RDD
+import com.salesforce.op.utils.table.Alignment._
+import com.salesforce.op.utils.table.Table
 import org.apache.spark.sql.types.Metadata
-import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
 import org.json4s.jackson.JsonMethods.{pretty, render}
@@ -190,15 +189,43 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return compact print friendly string
    */
   def summaryPretty(): String = {
-    val prediction = resultFeatures.find(_.name == StageParamNames.outputParam1Name).orElse(
-      stages.map(_.getOutput()).find(_.name == StageParamNames.outputParam1Name)
-    ).getOrElse(
-      throw new Exception("No prediction feature is defined")
-    )
-    val insights = modelInsights(prediction)
+    val response = resultFeatures.find(_.isResponse).getOrElse(throw new Exception("No response feature is defined"))
+    val insights = modelInsights(response)
+    val summary = new ArrayBuffer[String]()
 
-    // TODO
-    throw new NotImplementedError
+    // Selected model information
+    summary += {
+      val bestModelType = insights.selectedModelType
+      val name = s"Selected model - $bestModelType"
+      val validationResults = insights.selectedModelValidationResults.toSeq ++ Seq(
+        "name" -> insights.selectedModelName,
+        "uid" -> insights.selectedModelUID,
+        "modelType" -> insights.selectedModelType
+      )
+      val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults.sortBy(_._1))
+      table.prettyString()
+    }
+
+    // Model evaluation metrics
+    summary += {
+      val name = "Model Evaluation Metrics"
+      val trainEvaluationMetrics = insights.selectedModelTrainEvalMetrics
+      val testEvaluationMetrics = insights.selectedModelTestEvalMetrics
+      val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
+      val trainMetrics = trainEvaluationMetrics.toMap.map { case (k, v) => k -> v.toString }.toSeq.sortBy(_._1)
+      val table = testEvaluationMetrics match {
+        case Some(testMetrics) =>
+          val testMetricsMap = testMetrics.toMap
+          val rows = trainMetrics.map { case (k, v) => (k, v.toString, testMetricsMap(k).toString) }
+          Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows)
+        case None =>
+          Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetrics)
+      }
+      table.prettyString(columnAlignments = Map(holdOutCol -> Right, trainingCol -> Right))
+    }
+
+
+    summary.mkString("\n\n")
   }
 
   /**

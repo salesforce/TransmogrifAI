@@ -39,13 +39,13 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{D
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.{DecisionTreeRegression, GBTRegression, LinearRegression, RandomForestRegression}
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, ModelSelectorBaseNames, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames._
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, SelectedModel}
 import com.salesforce.op.stages.{OPStage, OpPipelineStageParams, OpPipelineStageParamsNames}
 import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
-import enumeratum.EnumEntry
+import enumeratum._
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
@@ -79,30 +79,42 @@ case class ModelInsights
 ) {
 
   /**
-   * Best model UID
+   * Selected model UID
    */
-  def bestModelUid: String = selectedModelInfo(BestModelUid).toString
+  def selectedModelUID: String = selectedModelInfo(BestModelUid).toString
 
   /**
-   * Best model name
+   * Selected model name
    */
-  def bestModelName: String = selectedModelInfo(BestModelName).toString
+  def selectedModelName: String = selectedModelInfo(BestModelName).toString
 
   /**
-   * Best model type, i.e. LogisticRegression, RandomForest etc.
+   * Selected model type, i.e. LogisticRegression, RandomForest etc.
    */
-  def bestModelType: EnumEntry = {
-    classificationModelTypeOfUID.orElse(regressionModelTypeOfUID).lift(bestModelUid).getOrElse(
-      throw new Exception(s"Unsupported model type for best model '$bestModelUid'"))
+  def selectedModelType: EnumEntry = {
+    classificationModelTypeOfUID.orElse(regressionModelTypeOfUID).lift(selectedModelUID).getOrElse(
+      throw new Exception(s"Unsupported model type for best model '$selectedModelUID'"))
   }
 
   /**
-   * Best model validation results computed during Cross Validation or Train Validation Split
+   * Selected model validation results computed during Cross Validation or Train Validation Split
    */
-  def bestModelValidationResults: Map[String, String] = validationResults(bestModelName)
+  def selectedModelValidationResults: Map[String, String] = validationResults(selectedModelName)
 
   /**
-   * Validation results computed during Cross Validation or Train Validation Split
+   * Train set evaluation metrics for selected model
+   */
+  def selectedModelTrainEvalMetrics: EvaluationMetrics = evaluationMetrics(TrainingEval)
+
+  /**
+   * Test set evaluation metrics (if any) for selected model
+   */
+  def selectedModelTestEvalMetrics: Option[EvaluationMetrics] = {
+    selectedModelInfo.get(HoldOutEval).map(_ => evaluationMetrics(HoldOutEval))
+  }
+
+  /**
+   * Validation results for all models computed during Cross Validation or Train Validation Split
    *
    * @return validation results keyed by model name
    */
@@ -119,15 +131,13 @@ case class ModelInsights
   }
 
   /**
-   * Train set evaluation metrics
+   * Problem type, i.e. Binary Classification, Multi Classification or Regression
    */
-  def trainEvaluationMetrics: EvaluationMetrics = evaluationMetrics(TrainingEval)
-
-  /**
-   * Test set evaluation metrics (if any)
-   */
-  def testEvaluationMetrics: Option[EvaluationMetrics] = {
-    selectedModelInfo.get(HoldOutEval).map(_ => evaluationMetrics(HoldOutEval))
+  def problemType: ProblemType = selectedModelTrainEvalMetrics match {
+    case _: BinaryClassificationMetrics => ProblemType.BinaryClassification
+    case _: MultiClassificationMetrics => ProblemType.MultiClassification
+    case _: RegressionMetrics => ProblemType.Regression
+    case _ => ProblemType.Unknown
   }
 
   /**
@@ -190,6 +200,15 @@ case class ModelInsights
       case t => throw new Exception(s"Unsupported metrics type '$t'")
     }
   }
+}
+
+sealed trait ProblemType extends EnumEntry with Serializable
+  object ProblemType extends Enum[ProblemType] {
+  val values = findValues
+  case object BinaryClassification extends ProblemType
+  case object MultiClassification extends ProblemType
+  case object Regression extends ProblemType
+  case object Unknown extends ProblemType
 }
 
 /**
