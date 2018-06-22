@@ -196,7 +196,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       throw new Exception("No prediction feature is defined")
     )
     val insights = modelInsights(prediction)
-    ???
+
+    // TODO
+    throw new NotImplementedError
   }
 
   /**

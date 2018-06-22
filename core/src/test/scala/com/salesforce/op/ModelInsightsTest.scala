@@ -246,7 +246,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.bestModelType shouldBe LogisticRegression
     val bestModelValidationResults = insights.bestModelValidationResults
     bestModelValidationResults.size shouldBe 15
-    println(bestModelValidationResults)
     bestModelValidationResults.get("area under PR") shouldBe Some("0.0")
     val validationResults = insights.validationResults
     validationResults.size shouldBe 2
@@ -256,7 +255,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "return test/train evaluation metrics" in {
     val insights = workflowModel.modelInsights(prob)
     insights.trainEvaluationMetrics shouldBe
-      BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0)
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0)
     insights.testEvaluationMetrics shouldBe Some(
       BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0)
     )
