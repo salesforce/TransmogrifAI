@@ -33,9 +33,10 @@ package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
-import org.scalatest.{Assertion, Matchers, PropSpec}
+import org.scalactic.source
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
+import org.scalatest.{Assertion, Matchers, PropSpec}
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
@@ -127,12 +128,32 @@ class FeatureTypeFactoryTest
 trait FeatureTypeAsserts {
   self: Matchers =>
 
-  def assertCreate(ft: => FeatureType): Assertion = Try(ft) match {
-    case Failure(e) =>
-      e shouldBe a[NonNullableEmptyException]
-    case Success(v) =>
-      v should not be null
-      v shouldBe a[FeatureType]
+  /**
+   * Asserts creation of the feature type value
+   *
+   * @param makeIt make block for feature
+   * @return [[Assertion]]
+   */
+  def assertCreate(makeIt: => FeatureType)(implicit pos: source.Position): Assertion =
+    assertCreate(makeIt, (v: FeatureType) => assert(true))
+
+  /**
+   * Asserts creation of the feature type value
+   *
+   * @param makeIt    make block for feature
+   * @param assertion optional assertion
+   * @return [[Assertion]]
+   */
+  def assertCreate(makeIt: => FeatureType, assertion: FeatureType => Assertion)
+    (implicit pos: source.Position): Assertion = {
+    Try(makeIt) match {
+      case Failure(e) =>
+        e shouldBe a[NonNullableEmptyException]
+      case Success(v) =>
+        v should not be null
+        v shouldBe a[FeatureType]
+        assertion(v)
+    }
   }
 
 }

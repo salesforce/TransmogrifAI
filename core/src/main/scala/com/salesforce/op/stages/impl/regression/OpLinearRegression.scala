@@ -32,19 +32,23 @@
 package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op._
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapper
-import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
+import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel, OpLinearRegressionParams}
+
+import scala.reflect.runtime.universe.TypeTag
+
 
 /**
- * Wrapper around spark ml linear regression for use with OP pipelines
+ * Wrapper around spark ml linear regression [[org.apache.spark.ml.regression.LinearRegression]]
  */
 class OpLinearRegression(uid: String = UID[OpLinearRegression])
-  extends OpPredictorWrapper[RealNN, RealNN, LinearRegression, LinearRegressionModel](
+  extends OpPredictorWrapper[LinearRegression, LinearRegressionModel](
     predictor = new LinearRegression(),
     uid = uid
-){
+) with OpLinearRegressionParams {
 
   override protected def onSetInput(): Unit = {
     super.onSetInput()
@@ -57,23 +61,44 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
    *
    * @group setParam
    */
-  def setRegParam(value: Double): this.type = {
-    getSparkStage.setRegParam(value)
-    this
-  }
+  def setRegParam(value: Double): this.type = set(regParam, value)
+  setDefault(regParam -> 0.0)
+
+  /**
+   * Set if we should fit the intercept.
+   * Default is true.
+   *
+   * @group setParam
+   */
+  def setFitIntercept(value: Boolean): this.type = set(fitIntercept, value)
+  setDefault(fitIntercept -> true)
+
+  /**
+   * Whether to standardize the training features before fitting the model.
+   * The coefficients of models will be always returned on the original scale,
+   * so it will be transparent for users.
+   * Default is true.
+   *
+   * @note With/without standardization, the models should be always converged
+   * to the same solution when no regularization is applied. In R's GLMNET package,
+   * the default behavior is true as well.
+   *
+   * @group setParam
+   */
+  def setStandardization(value: Boolean): this.type = set(standardization, value)
+  setDefault(standardization -> true)
 
   /**
    * Set the ElasticNet mixing parameter.
-   * For alpha = 0, the penalty is an L2 penalty. For alpha = 1, it is an L1 penalty.
-   * For 0 < alpha < 1, the penalty is a combination of L1 and L2.
+   * For alpha = 0, the penalty is an L2 penalty.
+   * For alpha = 1, it is an L1 penalty.
+   * For alpha in (0,1), the penalty is a combination of L1 and L2.
    * Default is 0.0 which is an L2 penalty.
    *
    * @group setParam
    */
-  def setElasticNetParam(value: Double): this.type = {
-    getSparkStage.setElasticNetParam(value)
-    this
-  }
+  def setElasticNetParam(value: Double): this.type = set(elasticNetParam, value)
+  setDefault(elasticNetParam -> 0.0)
 
   /**
    * Set the maximum number of iterations.
@@ -81,10 +106,8 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
    *
    * @group setParam
    */
-  def setMaxIter(value: Int): this.type = {
-    getSparkStage.setMaxIter(value)
-    this
-  }
+  def setMaxIter(value: Int): this.type = set(maxIter, value)
+  setDefault(maxIter -> 100)
 
   /**
    * Set the convergence tolerance of iterations.
@@ -93,125 +116,72 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
    *
    * @group setParam
    */
-  def setTol(value: Double): this.type = {
-    getSparkStage.setTol(value)
-    this
-  }
-
-  /**
-   * Whether to fit an intercept term.
-   * Default is true.
-   *
-   * @group setParam
-   */
-  def setFitIntercept(value: Boolean): this.type = {
-    getSparkStage.setFitIntercept(value)
-    this
-  }
-
-  /**
-   * Whether to standardize the training features before fitting the model.
-   * The coefficients of models will be always returned on the original scale,
-   * so it will be transparent for users. Note that with/without standardization,
-   * the models should be always converged to the same solution when no regularization
-   * is applied. In R's GLMNET package, the default behavior is true as well.
-   * Default is true.
-   *
-   * @group setParam
-   */
-  def setStandardization(value: Boolean): this.type = {
-    getSparkStage.setStandardization(value)
-    this
-  }
+  def setTol(value: Double): this.type = set(tol, value)
+  setDefault(tol -> 1E-6)
 
   /**
    * Whether to over-/under-sample training instances according to the given weights in weightCol.
-   * If not set or empty String, all instances are treated equally (weight 1.0).
+   * If not set or empty, all instances are treated equally (weight 1.0).
    * Default is not set, so all instances have weight one.
    *
    * @group setParam
    */
-  def setWeightCol(value: String): this.type = {
-    getSparkStage.setWeightCol(value)
-    this
-  }
+  def setWeightCol(value: String): this.type = set(weightCol, value)
 
   /**
-   * Set the solver algorithm used for optimization. In case of linear regression, this can be "l-bfgs", "normal" and
-   * "auto".
-   * "l-bfgs": Limited-memory BFGS which is a limited-memory quasi-Newton optimization method.
-   * "normal": Normal Equation as an analytical solution to the linear regression problem.
-   * "auto" (default): solver algorithm is selected automatically. The Normal Equations solver will be used when
-   * possible, but this will automatically fall back to iterative optimization methods when needed.
+   * Set the solver algorithm used for optimization.
+   * In case of linear regression, this can be "l-bfgs", "normal" and "auto".
+   *  - "l-bfgs" denotes Limited-memory BFGS which is a limited-memory quasi-Newton
+   *    optimization method.
+   *  - "normal" denotes using Normal Equation as an analytical solution to the linear regression
+   *    problem.  This solver is limited to `LinearRegression.MAX_FEATURES_FOR_NORMAL_SOLVER`.
+   *  - "auto" (default) means that the solver algorithm is selected automatically.
+   *    The Normal Equations solver will be used when possible, but this will automatically fall
+   *    back to iterative optimization methods when needed.
    *
    * @group setParam
    */
   def setSolver(value: String): this.type = {
-    getSparkStage.setSolver(value)
-    this
+    require(Set("auto", "l-bfgs", "normal").contains(value),
+      s"Solver $value was not supported. Supported options: auto, l-bfgs, normal")
+    set(solver, value)
   }
+  setDefault(solver -> "auto")
 
   /**
-   * Get the regularization parameter.
+   * Suggested depth for treeAggregate (greater than or equal to 2).
+   * If the dimensions of features or the number of partitions are large,
+   * this param could be adjusted to a larger size.
+   * Default is 2.
    *
+   * @group expertSetParam
    */
-  def getRegParam: Double = {
-    getSparkStage.getRegParam
-  }
+  def setAggregationDepth(value: Int): this.type = set(aggregationDepth, value)
+  setDefault(aggregationDepth -> 2)
 
-  /**
-   * Get the ElasticNet mixing parameter.
-   *
-   */
-  def getElasticNetParam: Double = {
-    getSparkStage.getElasticNetParam
-  }
-
-  /**
-   * Get the maximum number of iterations.
-   *
-   */
-  def getMaxIter: Int = {
-    getSparkStage.getMaxIter
-  }
-
-  /**
-   * Get the convergence tolerance of iterations.
-   *
-   */
-  def getTol: Double = {
-    getSparkStage.getTol
-  }
-
-  /**
-   * Get the fit intercept boolean parameter
-   *
-   */
-  def getFitIntercept: Boolean = {
-    getSparkStage.getFitIntercept
-  }
-
-  /**
-   * Get the standardization boolean parameter
-   *
-   */
-  def getStandardization: Boolean = {
-    getSparkStage.getStandardization
-  }
-
-  /**
-   * Get the weights in weightCol defining whether to over-/under-sample training instances
-   *
-   */
-  def getWeightCol: String = {
-    getSparkStage.getWeightCol
-  }
-
-  /**
-   * Get the solver algorithm used for optimization
-   *
-   */
-  def getSolver: String = {
-    getSparkStage.getSolver
-  }
 }
+
+
+/**
+ * Class that takes in a spark LinearRegressionModel and wraps it into an OP model which returns a
+ * Prediction feature
+ * @param sparkModel model to wrap
+ * @param uid uid to give stage
+ * @param operationName unique name of the operation this stage performs
+ */
+class OpLinearRegressionModel
+(
+  sparkModel: LinearRegressionModel,
+  uid: String = UID[OpLinearRegressionModel],
+  operationName: String = classOf[LinearRegression].getSimpleName
+)(
+  implicit tti1: TypeTag[RealNN],
+  tti2: TypeTag[OPVector],
+  tto: TypeTag[Prediction],
+  ttov: TypeTag[Prediction#Value]
+) extends OpPredictionModel[LinearRegressionModel](
+  sparkModel = sparkModel, uid = uid, operationName = operationName
+) {
+  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
+}
+

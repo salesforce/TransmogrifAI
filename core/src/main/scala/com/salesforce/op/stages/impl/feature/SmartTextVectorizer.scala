@@ -72,9 +72,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     numFeatures = $(numFeatures),
     numInputs = inN.length,
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = $(forceSharedHashSpace),
+    forceSharedHashSpace = getForceSharedHashSpace,
     binaryFreq = $(binaryFreq),
-    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
+    hashAlgorithm = getHashAlgorithm,
+    hashSpaceStrategy = getHashSpaceStrategy
   )
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
@@ -213,9 +214,9 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     (row: Seq[Text]) => {
       val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
-      val textTokens: Seq[TextList] = rowText.map(tokenize(_)._2)
+      val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
-      val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(rowText)) else Seq.empty
+      val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
 
       VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
     }
@@ -224,11 +225,9 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   private def getTextTransientFeatures: Array[TransientFeature] =
     SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
 
-  private def getNullIndicatorsVector(features: Seq[Text]): OPVector = {
-    val nullIndicators = features.map { f =>
-      val theseCat = convertToSet(f)
-        .groupBy(v => cleanTextFn(v.toString, args.shouldCleanText)).map { case (k, v) => k -> v.size }
-      val nullVal = if (theseCat.isEmpty) 1.0 else 0.0
+  private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
+    val nullIndicators = textTokens.map { tokens =>
+      val nullVal = if (tokens.isEmpty) 1.0 else 0.0
       Seq(0 -> nullVal)
     }
     val reindexed = reindex(nullIndicators)
@@ -243,7 +242,7 @@ trait MaxCardinalityParams extends Params {
     doc = "max number of distinct values a categorical feature can have",
     isValid = ParamValidators.inRange(lowerBound = 1, upperBound = SmartTextVectorizer.MaxCardinality)
   )
+  final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
+  final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
-  def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
-  def getMaxCardinality: Int = $(maxCardinality)
 }

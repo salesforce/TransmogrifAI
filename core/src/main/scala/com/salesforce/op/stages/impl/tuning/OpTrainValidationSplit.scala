@@ -20,17 +20,16 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
+import com.salesforce.op.evaluators.OpEvaluatorBase
 import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
-import org.apache.spark.ml.linalg.Vector
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 
-private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
+private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
 (
   val trainRatio: Double = ValidatorParamDefaults.TrainRatio,
   val seed: Long = ValidatorParamDefaults.Seed,
@@ -40,104 +39,100 @@ private[impl] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
 
   val validationName: String = ModelSelectorBaseNames.TrainValSplitResults
 
-  private[op] def validate(
+  private[op] override def validate[T](
     modelInfo: Seq[ModelInfo[E]],
-    dataset: Dataset[_],
+    dataset: Dataset[T],
     label: String,
-    features: String
-  ): BestModel[M] = {
-    // get param that stores the label column
-    val labelCol = evaluator.getParam(ValidatorParamDefaults.labelCol)
-    evaluator.set(labelCol, label)
+    features: String,
+    dag: Option[StagesDAG] = None,
+    splitter: Option[Splitter] = None,
+    stratifyCondition: Boolean = isClassification && stratify
+  )(implicit spark: SparkSession): BestEstimator[E] = {
 
+    dataset.persist()
     val schema = dataset.schema
-    import dataset.sparkSession.implicits._
-    val rdd = dataset.as[LabelFeaturesKey].rdd.persist()
 
-    val (trainingRDD, validationRDD) = createTrainValidationSplits(rdd).head
+    val (training, validation) = createTrainValidationSplits(
+      stratifyCondition = stratifyCondition,
+      dataset = dataset,
+      label = label,
+      splitter = splitter
+    ).head
 
-    val sparkSession = dataset.sparkSession
-    val newSchema = StructType(schema.dropRight(1)) // dropping key
-    val trainingDataset = sparkSession.createDataFrame(trainingRDD, newSchema).persist()
-    val validationDataset = sparkSession.createDataFrame(validationRDD, newSchema).persist()
+    val trainingDataset = dataset.sparkSession.createDataFrame(training, schema)
+    val validationDataset = dataset.sparkSession.createDataFrame(validation, schema)
 
-    // multi-model training
-    val modelWithGrid = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
-    val groupedSummary = modelWithGrid.par.map {
-      case (estimator, paramGrids, name) =>
-        val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-        val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
-        estimator.set(pi1, label).set(pi2, features)
-
-        val numModels = paramGrids.length
-        val metrics = new Array[Double](paramGrids.length)
-
-        log.info(s"Train split with multiple sets of parameters.")
-        val models = estimator.fit(trainingDataset, paramGrids).asInstanceOf[Seq[M]]
-        var i = 0
-        while (i < numModels) {
-          val metric = evaluator.evaluate(models(i).transform(validationDataset, paramGrids(i)))
-          log.info(s"Got metric $metric for model $name trained with ${paramGrids(i)}.")
-          metrics(i) = metric
-          i += 1
-        }
-        log.info(s"Train validation split for $name metrics: {}", metrics.toSeq.mkString(","))
-        val (bestMetric, bestIndex) =
-          if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
-          else metrics.zipWithIndex.minBy(_._1)
-        log.info(s"Best set of parameters:\n${paramGrids(bestIndex)} for $name")
-        log.info(s"Best train validation split metric: $bestMetric.")
-
-        ValidatedModel(estimator, bestIndex, metrics, paramGrids)
+    // If there is a TS DAG, then run it
+    val (newTrain, newTest) = suppressLoggingForFun() {
+      dag.map(theDAG => applyDAG(
+        dag = theDAG,
+        training = trainingDataset,
+        validation = validationDataset,
+        label = label,
+        features = features,
+        splitter = splitter
+      )).getOrElse(trainingDataset, validationDataset)
     }
-    trainingDataset.unpersist()
-    validationDataset.unpersist()
-    rdd.unpersist()
+    // multi-model training
+    val modelsWithGrids = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
 
-    val model =
-      if (evaluator.isLargerBetter) groupedSummary.maxBy(_.bestMetric)
-      else groupedSummary.minBy(_.bestMetric)
+    val groupedSummary = getSummary(
+      modelsWithGrids = modelsWithGrids, label = label, features = features,
+      train = newTrain, test = newTest
+    )
 
-    val bestModel = model.model.fit(dataset, model.bestGrid).asInstanceOf[M]
-    wrapBestModel(groupedSummary.toArray, bestModel, s"$trainRatio training split")
+    dataset.unpersist()
+
+    val model = getValidatedModel(groupedSummary)
+    wrapBestEstimator(groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$trainRatio training split")
   }
 
-  // TODO : Implement our own startified split method for better performance in a separate PR
   /**
    * Creates Train Validation Splits For TS
-   * @param rdd
-   * @return
+   *
+   * @param stratifyCondition condition to do stratify ts
+   * @param dataset dataset to split
+   * @param label name of label in dataset
+   * @param splitter  used to estimate splitter params prior to ts
+   * @return Array[(Train, Test)]
    */
-  private[op] override def createTrainValidationSplits(
-    rdd: RDD[(Double, Vector, String)]): Array[(RDD[Row], RDD[Row])] = {
+  private[op] override def createTrainValidationSplits[T](
+    stratifyCondition: Boolean,
+    dataset: Dataset[T],
+    label: String,
+    splitter: Option[Splitter] = None
+  ): Array[(RDD[Row], RDD[Row])] = {
 
-    val Array(trainData, validateData) = {
-      if (stratify && isClassification) {
-        log.info(s"Creating stratified train/validation with training ratio of $trainRatio")
+    // get param that stores the label column
+    val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)
+    evaluator.set(labelCol, label)
 
-        val classes = rdd.map(_._1).distinct().collect()
-        // Creates RDD grouped by classes (0, 1, 2, 3, ..., K)
-        val rddByClass = classes.map(label => rdd.filter(_._1 == label)
-          .map { case (label, features, key) => key -> Seq(Row(label, features)) }.reduceByKey(_ ++ _))
-
-        // Train/Validation data for each class
-        val splitByClass = rddByClass.map(_.randomSplit(Array(trainRatio, 1 - trainRatio), seed)
-          .map(_.values.flatMap(identity)))
-
-        if (splitByClass.isEmpty) throw new Error("Train Validation Data Grouped by class is empty")
-        // Merging Train/Validation data one by one
-        splitByClass.reduce[Array[RDD[Row]]] {
-          case (Array(train1: RDD[Row], validate1: RDD[Row]), Array(train2: RDD[Row], validate2: RDD[Row])) =>
-            Array(train1.union(train2), validate1.union(validate2))
-        }
-
-      } else {
-        rdd.map { case (label, features, key) => key -> Seq(Row(label, features)) }
-          .reduceByKey(_ ++ _)
-          .randomSplit(Array(trainRatio, 1 - trainRatio), seed)
-          .map(_.values.flatMap(identity))
-      }
+    val Array(train, test) = if (stratifyCondition) {
+      val rddsByClass = prepareStratification(
+        dataset = dataset,
+        message = s"Creating stratified train/validation with training ratio of $trainRatio",
+        label = label,
+        splitter = splitter
+      )
+      stratifyTrainValidationSplit(rddsByClass)
+    } else {
+      val rddRow = dataset.toDF().rdd
+      rddRow.randomSplit(Array(trainRatio, 1 - trainRatio), seed)
     }
-    Array((trainData, validateData))
+    Array((train, test))
   }
+
+  private def stratifyTrainValidationSplit(rddsByClass: Array[RDD[Row]]): Array[RDD[Row]] = {
+    // Train/Validation data for each class
+    val splitByClass = rddsByClass.map(_.randomSplit(Array(trainRatio, 1 - trainRatio), seed))
+
+    if (splitByClass.isEmpty) throw new Error("Train Validation Data Grouped by class is empty")
+    // Merging Train/Validation data one by one
+    splitByClass.reduce[Array[RDD[Row]]] {
+      case (Array(train1: RDD[Row], validate1: RDD[Row]), Array(train2: RDD[Row], validate2: RDD[Row])) =>
+        Array(train1.union(train2), validate1.union(validate2))
+    }
+  }
+
 }
+

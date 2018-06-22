@@ -34,7 +34,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.{Impurity, OpRandomForest}
+import com.salesforce.op.stages.impl.classification.{Impurity, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.feature.{DropIndicesByTransformer, OpLDA}
 import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -86,8 +86,8 @@ trait RichVectorFeature {
       impurity: Impurity = Impurity.Entropy,
       seed: Long = util.Random.nextLong,
       thresholds: Array[Double] = Array.empty
-    ): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
-      val OpRF = new OpRandomForest().setInput(label, f)
+    ): (FeatureLike[Prediction]) = {
+      val OpRF = new OpRandomForestClassifier().setInput(label, f)
       if (thresholds.nonEmpty) OpRF.setThresholds(thresholds)
 
       OpRF.setMaxDepth(maxDepth)
@@ -96,7 +96,7 @@ trait RichVectorFeature {
         .setMinInfoGain(minInfoGain)
         .setSubsamplingRate(subSamplingRate)
         .setNumTrees(numTrees)
-        .setImpurity(impurity)
+        .setImpurity(impurity.sparkName)
         .setSeed(seed)
         .getOutput()
     }

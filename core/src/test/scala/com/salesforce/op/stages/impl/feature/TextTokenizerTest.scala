@@ -70,15 +70,15 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
 
   trait English {
     val expected = Array(
-      List("i'v", "got", "love", "bunch", "coconut").toTextList,
-      List("all", "stand", "row").toTextList,
-      List("big", "on", "small", "on", "some", "big", "your", "head").toTextList,
-      List("bodi", "big", "on", "small", "h1", "on", "h1", "some", "big", "your", "head", "bodi").toTextList,
+      List("got", "love", "bunch", "coconut").toTextList,
+      List("stand", "row").toTextList,
+      List("big", "on", "small", "on", "big", "head").toTextList,
+      List("bodi", "big", "on", "small", "h1", "on", "h1", "big", "head", "bodi").toTextList,
       TextList.empty
     )
     val expectedHtml = {
       val copy = expected.toList.toArray
-      copy(3) = List("big", "on", "small", "on", "some", "big", "your", "head").toTextList
+      copy(3) = List("big", "on", "small", "on", "big", "head").toTextList
       copy
     }
   }
@@ -188,10 +188,10 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
       input = english,
       tokenizer = tokenized.originStage.asInstanceOf[TextTokenizer[Text]],
       expected = Array(
-        List("i've", "got", "lovely", "bunch", "coconuts").toTextList,
-        List("all", "standing", "row").toTextList,
-        List("big", "ones", "small", "ones", "some", "big", "your", "head").toTextList,
-        List("body", "big", "ones", "small", "h1", "ones", "h1", "some", "big", "your", "head", "body").toTextList,
+        List("got", "lovely", "bunch", "coconuts").toTextList,
+        List("standing", "row").toTextList,
+        List("big", "ones", "small", "ones", "big", "head").toTextList,
+        List("body", "big", "ones", "small", "h1", "ones", "h1", "big", "head", "body").toTextList,
         TextList.empty
       )
     )

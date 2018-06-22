@@ -32,35 +32,27 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.sparkwrappers.specific.OpProbabilisticClassifierWrapper
-import org.apache.spark.ml.classification.{LogisticRegression, LogisticRegressionModel}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
+import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
+import org.apache.spark.ml.classification.{LogisticRegression, LogisticRegressionModel, OpLogisticRegressionParams}
+import org.apache.spark.ml.linalg.{Matrix, Vector}
+
+import scala.reflect.runtime.universe.TypeTag
 
 /**
- * Wrapper around spark ml logistic regression for use with OP pipelines
+ * Wrapper around spark ml logistic regression [[org.apache.spark.ml.classification.LogisticRegression]]
  */
 class OpLogisticRegression(uid: String = UID[OpLogisticRegression])
-  extends OpProbabilisticClassifierWrapper[LogisticRegression, LogisticRegressionModel](
-    new LogisticRegression(),
+  extends OpPredictorWrapper[LogisticRegression, LogisticRegressionModel](
+    predictor = new LogisticRegression(),
     uid = uid
-  ) {
+  ) with OpLogisticRegressionParams {
 
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
-  }
-
-  /**
-   * Set thresholds in multiclass (or binary) classification to adjust the probability of
-   * predicting each class. Array must have length equal to the number of classes, with values >= 0.
-   * The class with largest value p/t is predicted, where p is the original probability of that
-   * class and t is the class' threshold.
-   *
-   * @group setParam
-   */
-  def setThresholds(value: Array[Double]): this.type = {
-    getSparkStage.setThresholds(value)
-    this
   }
 
   /**
@@ -69,23 +61,23 @@ class OpLogisticRegression(uid: String = UID[OpLogisticRegression])
    *
    * @group setParam
    */
-  def setRegParam(value: Double): this.type = {
-    getSparkStage.setRegParam(value)
-    this
-  }
+  def setRegParam(value: Double): this.type = set(regParam, value)
+  setDefault(regParam -> 0.0)
 
   /**
    * Set the ElasticNet mixing parameter.
-   * For alpha = 0, the penalty is an L2 penalty. For alpha = 1, it is an L1 penalty.
-   * For 0 < alpha < 1, the penalty is a combination of L1 and L2.
+   * For alpha = 0, the penalty is an L2 penalty.
+   * For alpha = 1, it is an L1 penalty.
+   * For alpha in (0,1), the penalty is a combination of L1 and L2.
    * Default is 0.0 which is an L2 penalty.
+   *
+   * Note: Fitting under bound constrained optimization only supports L2 regularization,
+   * so throws exception if this param is non-zero value.
    *
    * @group setParam
    */
-  def setElasticNetParam(value: Double): this.type = {
-    getSparkStage.setElasticNetParam(value)
-    this
-  }
+  def setElasticNetParam(value: Double): this.type = set(elasticNetParam, value)
+  setDefault(elasticNetParam -> 0.0)
 
   /**
    * Set the maximum number of iterations.
@@ -93,22 +85,18 @@ class OpLogisticRegression(uid: String = UID[OpLogisticRegression])
    *
    * @group setParam
    */
-  def setMaxIter(value: Int): this.type = {
-    getSparkStage.setMaxIter(value)
-    this
-  }
+  def setMaxIter(value: Int): this.type = set(maxIter, value)
+  setDefault(maxIter -> 100)
 
   /**
    * Set the convergence tolerance of iterations.
-   * Smaller value will lead to higher accuracy with the cost of more iterations.
+   * Smaller value will lead to higher accuracy at the cost of more iterations.
    * Default is 1E-6.
    *
    * @group setParam
    */
-  def setTol(value: Double): this.type = {
-    getSparkStage.setTol(value)
-    this
-  }
+  def setTol(value: Double): this.type = set(tol, value)
+  setDefault(tol -> 1E-6)
 
   /**
    * Whether to fit an intercept term.
@@ -116,10 +104,17 @@ class OpLogisticRegression(uid: String = UID[OpLogisticRegression])
    *
    * @group setParam
    */
-  def setFitIntercept(value: Boolean): this.type = {
-    getSparkStage.setFitIntercept(value)
-    this
-  }
+  def setFitIntercept(value: Boolean): this.type = set(fitIntercept, value)
+  setDefault(fitIntercept -> true)
+
+  /**
+   * Sets the value of param [[family]].
+   * Default is "auto".
+   *
+   * @group setParam
+   */
+  def setFamily(value: String): this.type = set(family, value)
+  setDefault(family -> "auto")
 
   /**
    * Whether to standardize the training features before fitting the model.
@@ -131,21 +126,89 @@ class OpLogisticRegression(uid: String = UID[OpLogisticRegression])
    *
    * @group setParam
    */
-  def setStandardization(value: Boolean): this.type = {
-    getSparkStage.setStandardization(value)
-    this
-  }
+  def setStandardization(value: Boolean): this.type = set(standardization, value)
+  setDefault(standardization -> true)
+
+  override def setThreshold(value: Double): this.type = super.setThreshold(value)
+
 
   /**
-   * Whether to over-/under-sample training instances according to the given weights in weightCol.
-   * If not set or empty String, all instances are treated equally (weight 1.0).
+   * Sets the value of param [[weightCol]].
+   * If this is not set or empty, we treat all instance weights as 1.0.
    * Default is not set, so all instances have weight one.
    *
    * @group setParam
    */
-  def setWeightCol(value: String): this.type = {
-    getSparkStage.setWeightCol(value)
-    this
-  }
+  def setWeightCol(value: String): this.type = set(weightCol, value)
+
+  override def setThresholds(value: Array[Double]): this.type = super.setThresholds(value)
+
+  /**
+   * Suggested depth for treeAggregate (greater than or equal to 2).
+   * If the dimensions of features or the number of partitions are large,
+   * this param could be adjusted to a larger size.
+   * Default is 2.
+   *
+   * @group expertSetParam
+   */
+  def setAggregationDepth(value: Int): this.type = set(aggregationDepth, value)
+  setDefault(aggregationDepth -> 2)
+
+  /**
+   * Set the lower bounds on coefficients if fitting under bound constrained optimization.
+   *
+   * @group expertSetParam
+   */
+  def setLowerBoundsOnCoefficients(value: Matrix): this.type = set(lowerBoundsOnCoefficients, value)
+
+  /**
+   * Set the upper bounds on coefficients if fitting under bound constrained optimization.
+   *
+   * @group expertSetParam
+   */
+  def setUpperBoundsOnCoefficients(value: Matrix): this.type = set(upperBoundsOnCoefficients, value)
+
+  /**
+   * Set the lower bounds on intercepts if fitting under bound constrained optimization.
+   *
+   * @group expertSetParam
+   */
+  def setLowerBoundsOnIntercepts(value: Vector): this.type = set(lowerBoundsOnIntercepts, value)
+
+  /**
+   * Set the upper bounds on intercepts if fitting under bound constrained optimization.
+   *
+   * @group expertSetParam
+   */
+  def setUpperBoundsOnIntercepts(value: Vector): this.type = set(upperBoundsOnIntercepts, value)
 
 }
+
+
+/**
+ * Class that takes in a spark LogisticRegressionModel and wraps it into an OP model which returns a
+ * Prediction feature
+ *
+ * @param sparkModel    model to wrap
+ * @param uid           uid to give stage
+ * @param operationName unique name of the operation this stage performs
+ */
+class OpLogisticRegressionModel
+(
+  sparkModel: LogisticRegressionModel,
+  operationName: String = classOf[LogisticRegression].getSimpleName,
+  uid: String = UID[OpLogisticRegressionModel]
+)(
+  implicit tti1: TypeTag[RealNN],
+  tti2: TypeTag[OPVector],
+  tto: TypeTag[Prediction],
+  ttov: TypeTag[Prediction#Value]
+) extends OpProbabilisticClassifierModel[LogisticRegressionModel](
+  sparkModel = sparkModel, uid = uid, operationName = operationName
+) {
+  @transient lazy val predictRawMirror = reflectMethod(getSparkMlStage().get, "predictRaw")
+  @transient lazy val raw2probabilityMirror = reflectMethod(getSparkMlStage().get, "raw2probability")
+  @transient lazy val probability2predictionMirror =
+    reflectMethod(getSparkMlStage().get, "probability2prediction")
+}
+

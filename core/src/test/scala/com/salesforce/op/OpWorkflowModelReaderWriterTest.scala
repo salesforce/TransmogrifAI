@@ -51,7 +51,8 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtureTest with BeforeAndAfterEach {
+class OpWorkflowModelReaderWriterTest
+  extends FlatSpec with UIDReset with PassengerSparkFixtureTest with BeforeAndAfterEach {
 
   implicit val jsonFormats: Formats = DefaultFormats
   val log = LoggerFactory.getLogger(this.getClass)
@@ -70,7 +71,6 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     saveFlowPath = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
     saveModelPath = tempDir + "/op-rw-wf-model-test-" + DateTime.now().getMillis
   }
-
 
   override def afterAll: Unit = {
     super.afterAll
@@ -237,8 +237,7 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     compareWorkflowModels(model, wfMR)
   }
 
-  trait VectorizedFlow {
-    UID.reset()
+  trait VectorizedFlow extends UIDReset {
     val cat = Seq(gender, boarded, height, age, description).transmogrify()
     val catHead = cat.map[Real](v => Real(v.value.toArray.headOption))
     val wf = new OpWorkflow()
@@ -323,4 +322,8 @@ class OpWorkflowModelReaderWriterTest extends FlatSpec with PassengerSparkFixtur
     p1.readerParams.toString() shouldBe p2.readerParams.toString()
     p1.customParams shouldBe p2.customParams
   }
+}
+
+trait UIDReset {
+  UID.reset()
 }

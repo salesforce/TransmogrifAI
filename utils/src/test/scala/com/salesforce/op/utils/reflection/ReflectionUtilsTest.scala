@@ -79,6 +79,8 @@ class TestClassVar {
     myVar = Option(s)
     this
   }
+  private def getValue: Int = 2
+  def getValuePerf: Int = 2
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -107,6 +109,14 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     tTag.tpe shouldBe aliasTag.tpe.dealias
     tTag shouldBe dealiasedTag
     dealiasedTag.tpe shouldBe aliasTag.tpe.dealias
+  }
+
+  it should "deep dealias types" in {
+    val tt = typeTag[Map[String, Seq[(Double, ListStringAlias)]]].tpe
+    ReflectionUtils.dealisedTypeName(tt) shouldBe
+      "scala.collection.immutable.Map[" +
+        "java.lang.String," +
+        "scala.collection.Seq[scala.Tuple2[scala.Double,scala.collection.immutable.List[java.lang.String]]]]"
   }
 
   it should "allow copying a class" in {
@@ -191,9 +201,31 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
 
   it should "allow you to find and use a setter for a class" in {
     val myClass = new TestClassVar()
-    val setter = ReflectionUtils.reflectSetterMethod(myClass, "myVar")
-    setter.map(_.apply("yay"))
+    val setter = ReflectionUtils.reflectSetterMethod(myClass, "myVar", Seq("yay"))
     myClass.myVar shouldBe Some("yay")
   }
 
+  it should "allow you to find and use a private method for a class" in {
+    val myClass = new TestClassVar()
+    val value = ReflectionUtils.reflectMethod(myClass, "getValue").apply()
+    value shouldBe 2
+  }
+
+  it should "reflected method should be fast to execute" in {
+    val myClass = new TestClassVar()
+    val method = ReflectionUtils.reflectMethod(myClass, "getValue")
+    val max = 100000
+    def measure(fun: => Int): Long = {
+      val start = System.currentTimeMillis()
+      (0 until max).foreach(_ => fun shouldBe 2)
+      System.currentTimeMillis() - start
+    }
+    val warmUp = measure(method.apply().asInstanceOf[Int]) -> measure(myClass.getValuePerf) // warm up
+    val elapsedReflect = measure(method.apply().asInstanceOf[Int])
+    val actual = measure(myClass.getValuePerf)
+
+    elapsedReflect should be <= 5 * actual
+  }
+
 }
+

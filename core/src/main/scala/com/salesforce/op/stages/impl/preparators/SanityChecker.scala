@@ -162,6 +162,14 @@ trait SanityCheckerParams extends Params {
   def setRemoveFeatureGroup(value: Boolean): this.type = set(removeFeatureGroup, value)
   def getRemoveFeatureGroup: Boolean = $(removeFeatureGroup)
 
+  final val protectTextSharedHash = new BooleanParam(
+    parent = this, name = "protectTextSharedHash",
+    doc = "If true, an individual hash is dropped/kept independently of related null indicators and" +
+      " other hashes in the same shared hash space."
+  )
+  def setProtectTextSharedHash(value: Boolean): this.type = set(protectTextSharedHash, value)
+  def getProtectTextSharedHash: Boolean = $(protectTextSharedHash)
+
   final val maxRuleConfidence = new DoubleParam(
     parent = this, name = "maxRuleConfidence",
     doc = "Maximum allowed confidence of association rules in categorical variables. A categorical variable will be " +
@@ -193,6 +201,7 @@ trait SanityCheckerParams extends Params {
     maxCramersV -> SanityChecker.MaxCramersV,
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
     removeFeatureGroup -> SanityChecker.RemoveFeatureGroup,
+    protectTextSharedHash -> SanityChecker.ProtectTextSharedHash,
     correlationType -> SanityChecker.CorrelationType,
     maxRuleConfidence -> SanityChecker.MaxRuleConfidence,
     minRequiredRuleSupport -> SanityChecker.MinRequiredRuleSupport
@@ -240,10 +249,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
         indicatorGroup <- col.indicatorGroup
       } yield (indicatorGroup, (col, col.index))
 
-      nullGroups.groupBy(_._1).foreach {
-        case (group, cols) =>
-          require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
-      }
+    nullGroups.groupBy(_._1).foreach {
+      case (group, cols) =>
+        require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
+    }
 
     def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map{ case(k, v) =>
       // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
@@ -332,6 +341,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val maxRuleConf = $(maxRuleConfidence)
     val minReqRuleSupport = $(minRequiredRuleSupport)
     val removeFromParent = $(removeFeatureGroup)
+    val textSharedHashProtected = $(protectTextSharedHash)
 
     // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
     // to remove a feature from a single column stats (eg. associate rule confidence/support check)
@@ -357,6 +367,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         maxRuleConfidence = maxRuleConf,
         minRequiredRuleSupport = minReqRuleSupport,
         removeFeatureGroup = removeFromParent,
+        protectTextSharedHash = textSharedHashProtected,
         removedGroups = ruleConfGroupsToDrop
       )
       if reasons.nonEmpty
@@ -374,9 +385,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
   ): Array[CategoricalGroupStats] = {
     // Figure out which columns correspond to MultiPickList values so that we can make the "OTHER" columns at most 1 so
     // that we can still use contingency matrices to calculate Cramer's V values
-    val multiPickList = FeatureType.shortTypeName[MultiPickList]
     val multiPickListIndices = columnMeta.zipWithIndex.collect {
-      case (col, index) if col.hasParentOfType(multiPickList) => index
+      case (col, index) if col.hasParentOfSubType[MultiPickList] => index
     }.toSet
 
     // Group by label and then add in a 1.0 so we can get the total occurrences for each label in one reduction
@@ -410,7 +420,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
           .groupBy(_._1)
           // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
           .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index),
-            cols.exists(_._2.hasParentOfType(multiPickList)))
+            cols.exists(_._2.hasParentOfSubType[MultiPickList]))
           }
 
       colIndicesByIndicatorGroup.map {
@@ -624,6 +634,7 @@ object SanityChecker {
   val MaxCramersV = 0.95
   val RemoveBadFeatures = false
   val RemoveFeatureGroup = true
+  val ProtectTextSharedHash = false
   val CorrelationType = Pearson
   // These settings will make the maxRuleConfidence check off by default
   val MaxRuleConfidence = 1.0
@@ -667,6 +678,8 @@ private[op] case class ColumnStatistics
    * @param maxCramersV         Maximum Cramer's V value
    * @param maxRuleConfidence   Minimum association rule confidence between
    * @param minRequiredRuleSupport  Minimum required support to throw away a group
+   * @param removeFeatureGroup   Whether to remove entire feature group when any group value is flagged for removal
+   * @param protectTextSharedHash   Whether to protect text shared hash from related null indicator and other hashes
    * @param removedGroups       Pre-determined feature groups to remove (eg. via maxRuleConfidence)
    * @return List[String] if reason to remove, nil otherwise
    */
@@ -678,6 +691,7 @@ private[op] case class ColumnStatistics
     maxRuleConfidence: Double,
     minRequiredRuleSupport: Double,
     removeFeatureGroup: Boolean,
+    protectTextSharedHash: Boolean,
     removedGroups: Seq[String]
   ): List[String] = {
     if (isLabel) List() // never remove the label!
@@ -707,16 +721,29 @@ private[op] case class ColumnStatistics
       ).flatten
 
       val parentExclusionReasons =
-        if (removeFeatureGroup) List(
-          parentCramersV.filter(_ > maxCramersV).map(cv =>
-            s"Cramer's V $cv for something in parent feature set higher than max Cramer's V $maxCramersV"),
-          parentCorr.filter(_ > maxCorrelation).map(corr =>
-            s"correlation $corr for something in parent feature set higher than max correlation $maxCorrelation")
-        ).flatten
-        else List.empty[String]
+        if (removeFeatureGroup && (!column.forall(isTextSharedHash) || !protectTextSharedHash)) {
+          List(
+            parentCramersV.filter(_ > maxCramersV).map(cv =>
+              s"Cramer's V $cv for something in parent feature set higher than max Cramer's V $maxCramersV"),
+            parentCorr.filter(_ > maxCorrelation).map(corr =>
+              s"correlation $corr for something in parent feature set higher than max correlation $maxCorrelation")
+          ).flatten
+        } else List.empty[String]
 
       exclusionReasons ++ parentExclusionReasons
     }
+  }
+
+  /**
+   * Is column a shared hash feature that is derived from Text, TextArea, TextMap, or TextAreaMap
+   *
+   * @param metadata     metadata of column
+   * @return
+   */
+  def isTextSharedHash(metadata: OpVectorColumnMetadata): Boolean = {
+    val isDerivedFromText = metadata.hasParentOfType[Text] || metadata.hasParentOfType[TextArea] ||
+      metadata.hasParentOfType[TextMap] || metadata.hasParentOfType[TextAreaMap]
+    isDerivedFromText && metadata.indicatorGroup.isEmpty && metadata.indicatorValue.isEmpty
   }
 
   override def toString: String = {
@@ -752,3 +779,4 @@ object CorrelationType extends Enum[CorrelationType] {
    */
   case object Spearman extends CorrelationType("spearman")
 }
+

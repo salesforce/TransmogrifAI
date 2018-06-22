@@ -38,7 +38,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import org.apache.commons.io.input.BoundedInputStream
-import org.apache.spark.ml.param.{Param, Params}
+import org.apache.spark.ml.param.{LongParam, Param, Params}
 import org.apache.tika.detect.{DefaultDetector, Detector}
 import org.apache.tika.metadata.{HttpHeaders, Metadata}
 import org.apache.tika.mime.MediaType
@@ -84,7 +84,7 @@ private[op] trait MimeTypeDetectorParams extends Params {
   )
   def setTypeHint(value: String): this.type = set(typeHint, value)
 
-  final val maxBytesToParse = new Param[Long](
+  final val maxBytesToParse = new LongParam(
     parent = this, name = "maxBytesToParse", doc = "maximum number of bytes to parse during detection",
     isValid = (v: Long) => v >= 0L
   )

@@ -1,0 +1,4 @@
+jar {
+    // Avoid compressing models, cause it's quite slow
+    entryCompression = ZipEntryCompression.STORED
+}

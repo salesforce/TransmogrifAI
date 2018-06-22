@@ -37,7 +37,8 @@ import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.stages.impl.classification.OpLogisticRegression
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestSparkStreamingContext}
 import com.salesforce.op.utils.spark.AppMetrics
 import com.salesforce.op.utils.spark.RichDataset._
@@ -68,10 +69,15 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   private val features = Seq(height, weight, gender, description, age).transmogrify()
   private val survivedNum = survived.occurs()
 
-  val (pred, raw, prob) = new OpLogisticRegression().setInput(survivedNum, features).getOutput()
+  // TODO put back LR when evaluators work with prediction features
+  val (pred, raw, prob) = BinaryClassificationModelSelector.withTrainValidationSplit(None)
+    .setModelsToTry(LogisticRegression)
+    .setLogisticRegressionRegParam(0)
+    .setInput(survivedNum, features).getOutput()
   private val workflow = new OpWorkflow().setResultFeatures(pred, raw, survivedNum).setReader(dataReader)
   private val evaluator =
     Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred).setRawPredictionCol(raw)
+      .setProbabilityCol(prob)
 
   val metricsPromise = Promise[AppMetrics]()
 
@@ -138,7 +144,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
       metricsLocation = Some(modelMetricsLocation.toString)
     )
     val res = doRun[TrainResult](runConfig, modelLocation, modelMetricsLocation)
-    res.modelSummary shouldBe "{ }"
+    res.modelSummary.nonEmpty shouldBe true
   }
 
   it should "score a dataset with a trained model" in {

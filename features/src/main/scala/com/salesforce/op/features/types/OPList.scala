@@ -34,11 +34,19 @@ package com.salesforce.op.features.types
 import scala.reflect.ClassTag
 
 /**
- * A base class for all the list feature types
+ * A base class for all the list Feature Types
+ *
  * @tparam A item type
  */
 abstract class OPList[A](implicit val cta: ClassTag[A]) extends OPCollection {
   override type Value = Seq[A]
+
   final def isEmpty: Boolean = value.isEmpty
+
+  /**
+   * Converts list to an array
+   *
+   * @return array of A
+   */
   final def toArray: Array[A] = value.toArray(cta)
 }
