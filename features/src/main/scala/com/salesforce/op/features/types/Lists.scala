@@ -31,6 +31,11 @@
 
 package com.salesforce.op.features.types
 
+/**
+ * A list of text values
+ *
+ * @param value list of text values
+ */
 class TextList(val value: Seq[String]) extends OPList[String] {
   def this(v: String*)(implicit d: DummyImplicit) = this(v)
 }
@@ -39,6 +44,11 @@ object TextList {
   def empty: TextList = FeatureTypeDefaults.TextList
 }
 
+/**
+ * A list of date values
+ *
+ * @param value list of date values (values assumed to be in ms since Epoch)
+ */
 class DateList(val value: Seq[Long]) extends OPList[Long] {
   def this(v: Long*)(implicit d: DummyImplicit) = this(v)
 }
@@ -47,6 +57,11 @@ object DateList {
   def empty: DateList = FeatureTypeDefaults.DateList
 }
 
+/**
+ * A list of date & time values
+ *
+ * @param value list of date & time values (values assumed to be in ms since Epoch)
+ */
 class DateTimeList(value: Seq[Long]) extends DateList(value) {
   def this(v: Long*)(implicit d: DummyImplicit) = this(v)
 }

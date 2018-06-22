@@ -31,84 +31,33 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.DAG.{Layer, StagesDAG}
+import com.salesforce.op.utils.stages.FitStagesUtil._
+import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.stages.FitStagesUtil
+import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable.ListBuffer
 import scala.reflect.runtime.universe.WeakTypeTag
-
-private[op] case object DAG {
-
-  private[op] type Layer = Array[(OPStage, Int)]
-  private[op] type StagesDAG = Array[Layer]
-
-  /**
-   * Computes stages DAG
-   *
-   * @param features array if features in workflow
-   * @return unique stages layered by distance (desc order)
-   */
-  def compute(features: Array[OPFeature]): StagesDAG = {
-
-    val (failures, parents) = features.map(_.parentStages()).partition(_.isFailure)
-
-    if (failures.nonEmpty) {
-      throw new IllegalArgumentException("Failed to compute stages DAG", failures.head.failed.get)
-    }
-
-    // Stages sorted by distance
-    val sortedByDistance: Array[(OPStage, Int)] = parents.flatMap(_.get)
-
-    // Stages layered by distance
-    val layeredByDistance: StagesDAG = createLayers(sortedByDistance)
-
-
-    // Unique stages layered by distance
-    layeredByDistance
-      .foldLeft(Set.empty[OPStage], Array.empty[Array[(OPStage, Int)]]) {
-        case ((seen, filtered), uncleaned) =>
-          // filter out any seen stages. also add distinct to filter out any duplicate stages in layer
-          val unseen = uncleaned.filterNot(v => seen.contains(v._1)).distinct
-          val nowSeen = seen ++ unseen.map(_._1)
-          (nowSeen, filtered :+ unseen)
-      }._2
-  }
-
-  /**
-   * Layers Stages by distance
-   *
-   * @param stages stages sorted by distance
-   * @return stages layered by distance
-   */
-  def createLayers(stages: Array[(OPStage, Int)]): StagesDAG = {
-    stages.groupBy(_._2).toArray
-      .map(_._2.sortBy(_._1.getOutputFeatureName))
-      .sortBy(s => -s.head._2)
-  }
-}
 
 /**
  * Parameters for pipelines and pipeline models
  */
 private[op] trait OpWorkflowCore {
 
-  @transient implicit protected lazy val log = LoggerFactory.getLogger(this.getClass)
+  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   // the uid of the stage
   def uid: String
 
-  // Model Selector
-  private[op] type MS = ModelSelectorBase[_ <: Model[_], _ <: Estimator[_]]
+  // whether the CV/TV is performed on the workflow level
+  private[op] var isWorkflowCV = false
 
   // the data reader for the workflow or model
   private[op] var reader: Option[Reader[_]] = None
@@ -135,6 +84,19 @@ private[op] trait OpWorkflowCore {
 
   private[op] final def setRawFeatures(features: Array[OPFeature]): this.type = {
     rawFeatures = features
+    this
+  }
+
+  /**
+   * :: Experimental ::
+   * Decides whether the cross-validation/train-validation-split will be done at workflow level
+   * This will remove issues with data leakage, however it will impact the runtime
+   *
+   * @return this workflow that will train part of the DAG in the cross-validation/train validation split
+   */
+  @Experimental
+  final def withWorkflowCV: this.type = {
+    isWorkflowCV = true
     this
   }
 
@@ -257,83 +219,6 @@ private[op] trait OpWorkflowCore {
   protected def generateRawData()(implicit spark: SparkSession): DataFrame
 
   /**
-   * Fit the estimators to return a sequence of only transformers
-   * Modified version of Spark 2.x Pipeline
-   *
-   * @param data                dataframe to fit on
-   * @param stagesToFit         stages that need to be converted to transformers
-   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
-   * @return fitted transformers
-   */
-  protected def fitStages(data: DataFrame, stagesToFit: Array[OPStage], persistEveryKStages: Int)
-    (implicit spark: SparkSession): Array[OPStage] = {
-
-    // TODO may want to make workflow take an optional reserve fraction
-    val splitters = stagesToFit.collect{ case s: ModelSelectorBase[_, _] => s.splitter }.flatten
-    val splitter = splitters.reduceOption{ (a, b) => if (a.getReserveTestFraction > b.getReserveTestFraction) a else b }
-    val (train, test) = splitter.map(_.split(data)).getOrElse{ (data, spark.emptyDataFrame) }
-    val hasTest = !test.isEmpty
-
-    val dag = DAG.compute(resultFeatures)
-      .map(_.filter(s => stagesToFit.contains(s._1)))
-      .filter(_.nonEmpty)
-
-    // Search for the last estimator
-    val indexOfLastEstimator = dag
-      .collect { case seq if seq.exists( _._1.isInstanceOf[Estimator[_]] ) => seq.head._2 }
-      .lastOption
-
-    val transformers = ListBuffer.empty[OPStage]
-
-    dag.foldLeft((train.toDF(), test.toDF())) {
-      case ((currTrain, currTest), stagesLayer) =>
-        val index = stagesLayer.head._2
-
-        val (newTrain, newTest, fitTransform) = FitStagesUtil.fitAndTransform(
-          train = currTrain,
-          test = currTest,
-          stages = stagesLayer.map(_._1),
-          transformData = indexOfLastEstimator.exists(_ < index), // only need to update for fit before last estimator
-          persistEveryKStages = persistEveryKStages,
-          doTest = Some(hasTest)
-        )
-
-        transformers.append(fitTransform: _*)
-        newTrain -> newTest
-    }
-    transformers.toArray
-  }
-
-
-  /**
-   * Returns a Dataframe containing all the columns generated up to the stop stage
-   * @param stopStage last stage to apply
-   * @param persistEveryKStages persist data in transforms every k stages for performance improvement
-   * @return Dataframe containing columns corresponding to all of the features generated before the feature given
-   */
-  protected def computeDataUpTo(stopStage: Option[Int], fitted: Boolean, persistEveryKStages: Int)
-    (implicit spark: SparkSession): DataFrame = {
-    if (stopStage.isEmpty) {
-      log.warn("Could not find origin stage for feature in workflow!! Defaulting to generate raw features.")
-      generateRawData()
-    } else {
-      val featureStages = stages.slice(0, stopStage.get)
-      log.info("Found parent stage and computing features up to that stage:\n{}",
-        featureStages.map(s => s.uid + " --> " + s.getOutputFeatureName).mkString("\n")
-      )
-      val rawData = generateRawData()
-
-      if (!fitted) {
-        val stages = fitStages(rawData, featureStages, persistEveryKStages)
-          .map(_.asInstanceOf[Transformer])
-        FitStagesUtil.applySparkTransformations(rawData, stages, persistEveryKStages) // TODO use DAG transform
-      } else {
-        featureStages.foldLeft(rawData)((data, stage) => stage.asInstanceOf[Transformer].transform(data))
-      }
-    }
-  }
-
-  /**
    * Returns a dataframe containing all the columns generated up to the feature input
    *
    * @param feature             input feature to compute up to
@@ -354,64 +239,6 @@ private[op] trait OpWorkflowCore {
   }
 
   /**
-   * Method that cut DAG in order to perform proper CV/TS
-   *
-   * @param dag DAG in the workflow to be cut
-   * @return (Model Selector, nonCVTS DAG -to be done outside of CV/TS, CVTS DAG -to apply in the CV/TS)
-   */
-  protected[op] def cutDAG(dag: StagesDAG): (Option[MS], StagesDAG, StagesDAG) = {
-    if (dag.isEmpty) (None, Array.empty, Array.empty) else {
-      // creates Array containing every Model Selector in the DAG
-      val modelSelectorArrays = dag.flatten.collect { case (ms: MS, dist: Int) => (ms, dist) }
-      val modelSelector = modelSelectorArrays.toList match {
-        case Nil => None
-        case List(ms) => Option(ms)
-        case modelSelectors => throw new IllegalArgumentException(
-          s"OpWorkflow can contain at most 1 Model Selector. Found ${modelSelectors.length} Model Selectors :" +
-            s" ${modelSelectors.map(_._1).mkString(",")}")
-      }
-
-      // nonCVTS and CVTS DAGs
-      val (nonCVTSDAG: StagesDAG, cVTSDAG: StagesDAG) = modelSelector.map { case (ms, dist) =>
-        // Optimize the DAG by removing stages unrelated to ModelSelector
-        val modelSelectorDAG = DAG.compute(Array(ms.getOutput())).dropRight(1)
-
-        // Create the DAG without Model Selector. It will be used to compute the final nonCVTS DAG.
-        val nonMSDAG: StagesDAG = {
-          dag.filter(_.exists(_._2 >= dist)).toList match {
-            case stages :: Nil => Array(stages.filterNot(_._1.isInstanceOf[MS]))
-            case xs :+ x => xs.toArray :+ x.filterNot(_._1.isInstanceOf[MS])
-          }
-        }.filter(!_.isEmpty) // Remove empty layers
-
-        // Index of first CVTS stage in ModelSelector DAG
-        val firstCVTSIndex = modelSelectorDAG.toList.indexWhere(_.exists(stage => {
-          val inputs = stage._1.getTransientFeatures()
-          inputs.exists(_.isResponse) && inputs.exists(!_.isResponse)
-        }))
-
-        // If no CVTS stages, the whole DAG is not in the CV/TS
-        if (firstCVTSIndex == -1) (nonMSDAG, Array.empty[Layer]) else {
-
-          val cVTSDAG = modelSelectorDAG.drop(firstCVTSIndex)
-
-          // nonCVTSDAG is the complementary DAG
-          // The rule is "nonCVTSDAG = nonMSDAG - CVTSDAG"
-          val nonCVTSDAG = {
-            val flattenedCVTSDAG = cVTSDAG.flatten.map(_._1)
-            nonMSDAG.map(_.filterNot { case (stage: OPStage, _) => flattenedCVTSDAG.contains(stage) })
-              .filter(!_.isEmpty) // Remove empty layers
-          }
-
-          (nonCVTSDAG, cVTSDAG)
-        }
-      }.getOrElse((Array.empty[Layer], Array.empty[Layer]))
-      (modelSelector.map(_._1), nonCVTSDAG, cVTSDAG)
-    }
-  }
-
-
-  /**
    * Efficiently applies all fitted stages grouping by level in the DAG where possible
    *
    * @param rawData             data to transform
@@ -425,6 +252,9 @@ private[op] trait OpWorkflowCore {
   )(implicit spark: SparkSession): DataFrame = {
     // A holder for the last persisted rdd
     var lastPersisted: Option[DataFrame] = None
+    if (dag.exists(_.exists(_._1.isInstanceOf[Estimator[_]]))) {
+      throw new IllegalArgumentException("Cannot apply transformations to DAG that contains estimators")
+    }
 
     // Apply stages layer by layer
     dag.foldLeft(rawData) { case (df, stagesLayer) =>

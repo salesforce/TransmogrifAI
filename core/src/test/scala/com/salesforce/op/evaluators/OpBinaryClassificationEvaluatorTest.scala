@@ -32,9 +32,9 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
-import com.salesforce.op.evaluators.MultiClassEvalMetrics._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.OpLogisticRegression
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.evaluation._
 import org.apache.spark.ml.linalg.Vectors
@@ -102,11 +102,16 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   )
   val one_label = one_rawLabel.copy(isResponse = true)
 
-  val testEstimator = new OpLogisticRegression().setInput(label, features)
-  val (pred, rawPred, _) = testEstimator.getOutput()
+  // TODO put back LR when evaluators work with prediction features
+  val testEstimator = BinaryClassificationModelSelector()
+    .setModelsToTry(LogisticRegression)
+    .setLogisticRegressionRegParam(0)
+    .setInput(label, features)
+  val (pred, rawPred, prob) = testEstimator.getOutput()
   val testEvaluator = new OpBinaryClassificationEvaluator().setLabelCol(label)
     .setPredictionCol(pred)
     .setRawPredictionCol(rawPred)
+    .setProbabilityCol(prob)
   val model = testEstimator.fit(ds)
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator()
   val sparkMulticlassEvaluator = new MulticlassClassificationEvaluator()
@@ -122,8 +127,9 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     sparkBinaryEvaluator.setLabelCol(label.name).setRawPredictionCol(rawPred.name)
     sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(pred.name)
 
-    metrics.AuROC shouldBe sparkBinaryEvaluator.setMetricName(AuROC.sparkEntryName).evaluate(transformedData)
-    metrics.AuPR shouldBe sparkBinaryEvaluator.setMetricName(AuPR.sparkEntryName).evaluate(transformedData)
+    // TODO: These are no longer the same since we now use probabilities as thresholds, and Spark uses rawPredictions
+    // metrics.AuROC shouldBe sparkBinaryEvaluator.setMetricName(AuROC.sparkEntryName).evaluate(transformedData)
+    // metrics.AuPR shouldBe sparkBinaryEvaluator.setMetricName(AuPR.sparkEntryName).evaluate(transformedData)
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       transformedData.select(pred.name, test_label.name).rdd

@@ -32,6 +32,7 @@
 package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.lucene.geo.GeoUtils
 import org.apache.spark.ml.linalg.DenseVector
 import org.junit.runner.RunWith
@@ -237,8 +238,8 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
    * @tparam FT feature type (OP type)
    */
   private def checkTypeTags[FT <: FeatureType](implicit vtt: TypeTag[FT#Value]): Assertion = {
-    withClue(s"Feature value type ${vtt.tpe} (dealised: ${vtt.tpe.dealias})") {
-      val tt = Try(FeatureType.featureValueTypeTag(vtt.tpe.dealias.toString))
+    withClue(s"Feature value type ${vtt.tpe} (dealised: ${ReflectionUtils.dealisedTypeName(vtt.tpe)}): ") {
+      val tt = Try(FeatureType.featureValueTypeTag(ReflectionUtils.dealisedTypeName(vtt.tpe)))
       if (tt.isFailure) fail(tt.failed.get)
       tt.get.tpe =:= vtt.tpe shouldBe true
       FeatureType.isFeatureValueType(vtt) shouldBe true

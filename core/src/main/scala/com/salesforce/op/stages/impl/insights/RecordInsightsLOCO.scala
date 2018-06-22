@@ -34,12 +34,13 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.SparkModelConverter._
-import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
-import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.annotation.Experimental
+import org.apache.spark.ml.Model
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.IntParam
+
 import scala.collection.mutable.PriorityQueue
 
 /**
@@ -48,7 +49,8 @@ import scala.collection.mutable.PriorityQueue
  * @param model         model instance that you wish to explain
  * @param uid           uid for instance
  */
-class RecordInsightsLOCO[T <: SparkWrapperParams[_]]
+@Experimental
+class RecordInsightsLOCO[T <: Model[T]]
 (
   val model: T,
   uid: String = UID[RecordInsightsLOCO[_]]
@@ -62,7 +64,7 @@ class RecordInsightsLOCO[T <: SparkWrapperParams[_]]
   def getTopK: Int = $(topK)
   setDefault(topK -> 20)
 
-  private val modelApply = toOP(model.getSparkMlStage().map(_.asInstanceOf[Transformer])).transformFn
+  private val modelApply = toOPUnchecked(model).transformFn
   private val labelDummy = RealNN(0.0)
 
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))

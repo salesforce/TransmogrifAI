@@ -31,7 +31,6 @@
 
 package com.salesforce.op.test
 
-import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import com.salesforce.op.utils.tuples.RichTuple._
@@ -39,8 +38,6 @@ import org.joda.time.Duration
 
 
 trait PassengerFeaturesTest {
-
-  UID.reset()
 
   val age = FeatureBuilder.Real[Passenger]
     .extract(_.getAge.toReal)
@@ -64,6 +61,7 @@ trait PassengerFeaturesTest {
   val booleanMap = FeatureBuilder.BinaryMap[Passenger].extract(p => p.getBooleanMap.toBinaryMap).asPredictor
   val survived = FeatureBuilder.Binary[Passenger].extract(p => Option(p.getSurvived).map(_ == 1).toBinary).asResponse
   val boardedTime = FeatureBuilder.Date[Passenger].extract(_.getBoarded.toLong.toDate).asPredictor
+  val boardedTimeAsDateTime = FeatureBuilder.DateTime[Passenger].extract(_.getBoarded.toLong.toDateTime).asPredictor
 
   val rawFeatures: Array[OPFeature] = Array(
     survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap

@@ -34,24 +34,23 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.{ProbClassifier, ProbClassifierModel}
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomIntegral, RandomReal, RandomVector}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions.monotonically_increasing_id
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.sql.types.MetadataBuilder
+import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
 class OpValidatorTest extends FlatSpec with TestSparkContext {
   // Random Data
   val count = 1000
   val sizeOfVector = 2
-  val seed = 1234L
+  val seed = 12345L
   val p = 0.325
   val multiClassProbabilities = Array(0.21, 0.29, 0.5)
   val vectors = RandomVector.sparse(RandomReal.uniform[Real](-1.0, 1.0), sizeOfVector).take(count)
@@ -75,27 +74,27 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
     stratify = true
   )
 
-  val rdd = data.withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id()).rdd
+  val binaryDS = data.select(label, features)
+  val multiDS = data.select(multiLabel, features)
 
-  val binaryRDD = rdd.map {
-    case Row(label, features, _, index) => (label, features, index).asInstanceOf[LabelFeaturesKey]
-  }
-
-  val multiRDD = rdd.map {
-    case Row(_, features, multiLabel, index) => (multiLabel, features, index).asInstanceOf[LabelFeaturesKey]
-  }
+  val condition = cv.isClassification && cv.stratify
+  val balancer = Option(new DataBalancer())
+  val cutter = Option(new DataCutter())
 
 
   Spec[OpCrossValidation[_, _]] should "stratify binary class data" in {
-    val splits = cv.createTrainValidationSplits(binaryRDD)
+    val splits = cv.createTrainValidationSplits(condition, binaryDS, label.name, balancer)
+    splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
+    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {
-    val splits = cv.createTrainValidationSplits(multiRDD)
+    val splits = cv.createTrainValidationSplits(condition, multiDS, multiLabel.name, cutter)
+    splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
@@ -104,15 +103,16 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
 
 
   Spec[OpTrainValidationSplit[_, _]] should "stratify binary class data" in {
-    val splits = ts.createTrainValidationSplits(binaryRDD)
+    val splits = ts.createTrainValidationSplits(condition, binaryDS, label.name, balancer)
     splits.foreach { case (train, validate) =>
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
+    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {
-    val splits = ts.createTrainValidationSplits(multiRDD)
+    val splits = ts.createTrainValidationSplits(condition, multiDS, multiLabel.name, cutter)
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
@@ -132,7 +132,8 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
     }.groupByKey().mapValues(_.size / n).sortBy(_._1).values.collect()
 
     fractions zip fractionsByClass map { case (expected, actual) =>
-      math.abs(expected - actual) should be < 0.05 }
+      math.abs(expected - actual) should be < 0.065
+    }
   }
 
 }

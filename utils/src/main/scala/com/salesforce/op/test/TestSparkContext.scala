@@ -36,9 +36,8 @@ import org.scalatest.Suite
 trait TestSparkContext extends TempDirectoryTest with TestCommon {
   self: Suite =>
 
-  // Remove Logging of OWLQN and LBFGS used in LogisticRegression
-  Logger.getLogger("breeze.optimize.OWLQN").setLevel(Level.WARN)
-  Logger.getLogger("breeze.optimize.LBFGS").setLevel(Level.WARN)
+  // Remove Breeze logging noise
+  Logger.getLogger("breeze.optimize").setLevel(Level.WARN)
 
   lazy val kryoClasses: Array[Class[_]] = Array(
     classOf[com.salesforce.op.test.Passenger],

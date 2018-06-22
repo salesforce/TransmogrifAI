@@ -32,10 +32,11 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op._
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
 import com.salesforce.op.stages.base.binary.BinaryModel
-import com.salesforce.op.stages.impl.feature.RealNNVectorizer
+import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -60,8 +61,39 @@ case class SanityCheckDataTest
 
 case class SCDataTest(label: RealNN, features: OPVector)
 
+case class TextRawData
+(
+  id: String,
+  target: Double,
+  textMap: Map[String, String]
+)
+
 @RunWith(classOf[JUnitRunner])
 class SanityCheckerTest extends FlatSpec with TestSparkContext {
+
+  private val textRawData = Seq(
+    TextRawData("0", 1.0, Map("color" -> "red", "fruit" -> "berry", "beverage" -> "tea")),
+    TextRawData("1", 1.0, Map("color" -> "orange", "fruit" -> "berry", "beverage" -> "coffee")),
+    TextRawData("2", 1.0, Map("color" -> "yello", "fruit" -> "berry", "beverage" -> "water")),
+    TextRawData("3", 1.0, Map("color" -> "green", "fruit" -> "berry")),
+    TextRawData("4", 1.0, Map("color" -> "blue", "fruit" -> "berry")),
+    TextRawData("5", 1.0, Map("color" -> "indigo", "fruit" -> "berry")),
+    TextRawData("6", 0.0, Map("fruit" -> "peach")),
+    TextRawData("7", 0.0, Map("fruit" -> "peach")),
+    TextRawData("8", 0.0, Map("fruit" -> "mango")),
+    TextRawData("9", 0.0, Map("beverage" -> "tea")),
+    TextRawData("10", 0.0, Map("beverage" -> "coffee")),
+    TextRawData("11", 0.0, Map("beverage" -> "water"))
+  ).map( textRawData =>
+    (
+      textRawData.id.toText,
+      textRawData.target.toRealNN,
+      textRawData.textMap.toTextMap
+    )
+  )
+
+  val (textData, id, target, textMap) = TestFeatureBuilder("id", "target", "textMap", textRawData)
+  val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
 
   // scalastyle:off
   private val data = Seq(
@@ -312,6 +344,76 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       sanityChecker.fit(testData)
     } should have message
       "requirement failed: The sanity checker has dropped all of your features, check your input data quality"
+  }
+
+  it should "remove individual text hash features independently" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setInput(textMap).getOutput()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, smartMapVectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
+    val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
+      "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
+      "textMap_beverage_NullIndicatorValue_10"
+    )
+    val featuresWithNaNCorr = Seq("textMap_7")
+
+    validateTransformerOutput(checkedFeatures.name, transformed, featuresWithCorr, featuresToDrop, featuresWithNaNCorr)
+  }
+
+  it should "remove text hash features as groups" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Separate)
+      .setInput(textMap).getOutput()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, smartMapVectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq("textMap_color_0", "textMap_color_1", "textMap_color_2", "textMap_color_3",
+      "textMap_fruit_4", "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
+      "textMap_beverage_8", "textMap_beverage_9",
+      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13"
+    )
+    val featuresWithCorr = Seq("textMap_color_0", "textMap_color_3",
+      "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
+      "textMap_beverage_10", "textMap_beverage_11",
+      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13",
+      "textMap_beverage_NullIndicatorValue_14"
+    )
+    val featuresWithNaNCorr = Seq("textMap_color_1", "textMap_color_2", "textMap_fruit_4",
+      "textMap_beverage_8", "textMap_beverage_9"
+    )
+
+    validateTransformerOutput(checkedFeatures.name, transformed, featuresWithCorr, featuresToDrop, featuresWithNaNCorr)
   }
 
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],

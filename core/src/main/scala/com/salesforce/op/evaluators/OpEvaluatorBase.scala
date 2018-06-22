@@ -118,7 +118,6 @@ trait EvaluationMetrics extends JsonLike {
    * @return metadata
    */
   def toMetadata: Metadata = this.toMap.toMetadata
-
 }
 
 
@@ -205,6 +204,10 @@ sealed abstract class ClassificationEvalMetric(val sparkEntryName: String) exten
  */
 object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
+  case object Precision extends ClassificationEvalMetric("precision")
+  case object Recall extends ClassificationEvalMetric("recall")
+  case object F1 extends ClassificationEvalMetric("f1")
+  case object Error extends ClassificationEvalMetric("accuracy")
   case object AuROC extends ClassificationEvalMetric("areaUnderROC")
   case object AuPR extends ClassificationEvalMetric("areaUnderPR")
 }
@@ -218,7 +221,9 @@ object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object Recall extends ClassificationEvalMetric("weightedRecall")
   case object F1 extends ClassificationEvalMetric("f1")
   case object Error extends ClassificationEvalMetric("accuracy")
+  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics")
 }
+
 
 /**
  * Contains the names of metrics used in logging

@@ -35,7 +35,9 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal}
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -80,6 +82,17 @@ class DecisionTreeNumericMapBucketizerTest extends FlatSpec with TestSparkContex
     val currencyMapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](f1, f2, f3)
     val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
   }
+
+  lazy val (data, target, currencyMap, realMap) = TestFeatureBuilder("target", "currencyMap", "realMap2",
+    Seq[(RealNN, CurrencyMap, RealMap)](
+      (1.0.toRealNN, CurrencyMap(Map("c0" -> 10)), RealMap.empty),
+      (1.0.toRealNN, CurrencyMap(Map("c0" -> 10)), RealMap.empty),
+      (1.0.toRealNN, CurrencyMap(Map("c0" -> 8)), RealMap.empty),
+      (0.0.toRealNN, CurrencyMap(Map("c0" -> 5)), RealMap.empty),
+      (0.0.toRealNN, CurrencyMap(Map("c0" -> 3)), RealMap.empty),
+      (0.0.toRealNN, CurrencyMap(Map("c0" -> 0)), RealMap.empty)
+    )
+  )
 
   Spec[DecisionTreeNumericMapBucketizer[_, _]] should "produce output that is never a response, " +
     "except the case where both inputs are" in new NormalData {
@@ -141,6 +154,24 @@ class DecisionTreeNumericMapBucketizerTest extends FlatSpec with TestSparkContex
       trackNulls = true, trackInvalid = true,
       expectedTolerance = 0.15
     )
+  }
+
+  it should "drop empty numeric map" in {
+    val targetResponse = target.copy(isResponse = true)
+    val currencyMapBkts = currencyMap.autoBucketize(label = targetResponse, trackNulls = false, minInfoGain = 0.1)
+    val realMapBkts = realMap.autoBucketize(label = targetResponse, trackNulls = false, minInfoGain = 0.1)
+    val featureVector = Seq(currencyMapBkts, realMapBkts).transmogrify(Some(targetResponse))
+
+    val transformed = new OpWorkflow().setResultFeatures(currencyMapBkts, realMapBkts, featureVector).transform(data)
+
+    // featureVector should consist of bucketized features from currencyMap and no feature from realMap
+    val featureVectorMeta = OpVectorMetadata(transformed.schema(featureVector.name))
+    featureVectorMeta.columns.length shouldBe 2
+    featureVectorMeta.columns.foreach{ col =>
+      col.parentFeatureName should contain theSameElementsAs Seq("currencyMap")
+      col.parentFeatureType should contain theSameElementsAs Seq("com.salesforce.op.features.types.CurrencyMap")
+      col.indicatorGroup shouldBe Some("c0")
+    }
   }
 
   private def assertBucketizer

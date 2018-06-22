@@ -33,9 +33,8 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.types.MetadataBuilder
 import org.slf4j.LoggerFactory
 
@@ -74,6 +73,7 @@ case object DataBalancer {
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+  @transient private[op] val metadataBuilder = new MetadataBuilder()
 
   /**
    * Computes the upSample and downSample proportions.
@@ -120,44 +120,23 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
   /**
    * Split into a training set and a test set and balance the training set
    *
-   * @param data to prepare for model training
+   * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set
    */
-  def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
+  def prepare(data: Dataset[Row]): ModelData = {
 
     val ds = data.persist()
 
-    val Array(negativeData, positiveData) = Array(0.0, 1.0).map(label => ds.filter(_._1 == label).persist())
-    val metadataBuilder = new MetadataBuilder()
+    val Array(negativeData, positiveData) = Array(0.0, 1.0).map(label => ds.filter(_.getDouble(0) == label).persist())
     val balancerSeed = getSeed
 
-    // If these conditions are met, that means that we have enough information to balance the data : upSample,
-    // downSample and which class is in minority
-    if (isSet(isPositiveSmall) && isSet(downSampleFraction) && isSet(upSampleFraction)) {
-      val (down, up) = ($(downSampleFraction), $(upSampleFraction))
-      log.info(s"Fractions are already known : downSample of ${down}, upSample of ${up}")
-      val (smallData, bigData) = if ($(isPositiveSmall)) (positiveData, negativeData) else (negativeData, positiveData)
-      new ModelData(rebalance(smallData, up, bigData, down, balancerSeed), metadataBuilder)
-      // If this condition is met, that means that the data is already balanced, but need to be sampled
-    } else if (isSet(alreadyBalancedFraction)) {
-      val f = $(alreadyBalancedFraction)
-      log.info(s"Data is already balanced, yet it will be sampled by a fraction of $f")
-      new ModelData(sampleBalancedData(
-        fraction = f,
-        seed = balancerSeed,
-        data = data,
-        positiveData = positiveData,
-        negativeData = negativeData),
-        metadataBuilder
-      )
-      // Usual estimation by computing the sizes of the data
-    } else estimateAndBalance(
-      data = data,
+    prepareData(
+      data = ds,
       positiveData = positiveData,
       negativeData = negativeData,
-      metadataBuilder = metadataBuilder,
       seed = balancerSeed
     )
+
   }
 
   override def copy(extra: ParamMap): DataBalancer = {
@@ -165,67 +144,55 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     copyValues(copy, extra)
   }
 
+
+
   /**
-   * Estimate if data needs to be balanced or not. If so, computes sample fractions and balance data
+   * Estimate if data needs to be balanced or not. If so, computes sample fractions and sets the appropriate params
    *
    * @param data            input data
    * @param positiveData    data with positives only
    * @param negativeData    data with negatives only
-   * @param metadataBuilder metadata
    * @param seed            seed
    * @return balanced data
    */
-  private[op] def estimateAndBalance(
-    data: Dataset[LabelFeaturesKey],
-    positiveData: Dataset[LabelFeaturesKey],
-    negativeData: Dataset[LabelFeaturesKey],
-    metadataBuilder: MetadataBuilder,
+  private[op] def estimate[T](
+    data: Dataset[T],
+    positiveData: Dataset[T],
+    negativeData: Dataset[T],
     seed: Long
-  ): ModelData = {
+  ): Unit = {
     val positiveCount = positiveData.count()
     val negativeCount = negativeData.count()
     val totalCount = positiveCount + negativeCount
+    val sampleF = getSampleFraction
 
     // feed metadata with counts and sample fraction
     metadataBuilder.putLong(ModelSelectorBaseNames.Positive, positiveCount)
     metadataBuilder.putLong(ModelSelectorBaseNames.Negative, negativeCount)
-    metadataBuilder.putDouble(ModelSelectorBaseNames.Desired, $(sampleFraction))
+    metadataBuilder.putDouble(ModelSelectorBaseNames.Desired, sampleF)
     log.info(s"Data has $positiveCount positive and $negativeCount negative.")
 
-    val (smallCount, smallData, bigCount, bigData) = {
+    val (smallCount, bigCount) = {
       val isPosSmall = positiveCount < negativeCount
       setIsPositiveSmall(isPosSmall)
-      if (isPosSmall) (positiveCount, positiveData, negativeCount, negativeData)
-      else (negativeCount, negativeData, positiveCount, positiveData)
+      if (isPosSmall) (positiveCount, negativeCount)
+      else (negativeCount, positiveCount)
     }
     val maxTrainSample = getMaxTrainingSample
 
     if (smallCount < 100 || (smallCount + bigCount) < 500) {
       log.warn("!!!Attention!!! - there is not enough data to build a good model!")
     }
-    val sampleF = getSampleFraction
 
-    // if the current fraction is superior than the one expected
     if (smallCount.toDouble / totalCount.toDouble >= sampleF) {
       log.info(
         s"Not resampling data: $smallCount small count and $bigCount big count is greater than" +
           s" requested ${sampleF}"
       )
-
       // if data is too big downsample
       val fraction = if (maxTrainSample < totalCount) maxTrainSample / totalCount.toDouble else 1.0
-
       setAlreadyBalancedFraction(fraction)
 
-      // sample
-      new ModelData(sampleBalancedData(
-        fraction = fraction,
-        seed = seed,
-        data = data,
-        positiveData = positiveData,
-        negativeData = negativeData
-      ),
-        metadataBuilder)
     } else {
       log.info(s"Sampling data to get $sampleF split versus $smallCount small and $bigCount big")
       val (downSample, upSample) = getProportions(smallCount, bigCount, sampleF, maxTrainSample)
@@ -257,7 +224,42 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
           s"To make upsampling happen, please increase the max training sample size '${maxTrainingSample.name}'")
       }
 
-      new ModelData(rebalance(smallData, upSample, bigData, downSample, seed), metadataBuilder)
+    }
+  }
+  /**
+   * Preparing data
+   *
+   * @param data            input data
+   * @param positiveData    data with positives only
+   * @param negativeData    data with negatives only
+   * @param seed            seed
+   * @return balanced data
+   */
+  private[op] def prepareData[T](
+    data: Dataset[T],
+    positiveData: Dataset[T],
+    negativeData: Dataset[T],
+    seed: Long
+  ): ModelData = {
+
+    if (!(isSet(isPositiveSmall) || isSet(downSampleFraction) ||
+      isSet(upSampleFraction) || isSet(alreadyBalancedFraction))) {
+      estimate(data = data, positiveData = positiveData, negativeData = negativeData, seed = seed)
+    }
+
+    // If these conditions are met, that means that we have enough information to balance the data : upSample,
+    // downSample and which class is in minority
+    if (isSet(isPositiveSmall) && isSet(downSampleFraction) && isSet(upSampleFraction)) {
+      val (down, up) = ($(downSampleFraction), $(upSampleFraction))
+      log.info(s"Sample fractions: downSample of ${down}, upSample of ${up}")
+      val (smallData, bigData) = if ($(isPositiveSmall)) (positiveData, negativeData) else (negativeData, positiveData)
+      new ModelData(rebalance(smallData, up, bigData, down, seed).toDF(), metadataBuilder)
+    } else { // Data is already balanced, but need to be sampled
+      val fraction = $(alreadyBalancedFraction)
+      log.info(s"Data is already balanced, yet it will be sampled by a fraction of $fraction")
+      val balanced = sampleBalancedData(fraction = fraction, seed = seed,
+        data = data, positiveData = positiveData, negativeData = negativeData).toDF()
+      new ModelData(balanced, metadataBuilder)
     }
   }
 
@@ -272,13 +274,13 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @return balanced small and big data split into training and test sets
    *         with downSample and upSample proportions
    */
-  private[op] def rebalance(
-    smallData: Dataset[_],
+  private[op] def rebalance[T](
+    smallData: Dataset[T],
     upSampleFraction: Double,
-    bigData: Dataset[_],
+    bigData: Dataset[T],
     downSampleFraction: Double,
     seed: Long
-  ): Dataset[LabelFeaturesKey] = {
+  ): Dataset[T] = {
 
     import smallData.sparkSession.implicits._
     val bigDataTrain = bigData.sample(withReplacement = false, downSampleFraction, seed = seed)
@@ -288,27 +290,26 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
       case u => smallData.sample(withReplacement = false, u, seed = seed) // downsample instead
     }
 
-    smallDataTrain.as[LabelFeaturesKey].union(bigDataTrain.as[LabelFeaturesKey])
-
+    smallDataTrain.union(bigDataTrain)
   }
 
   /**
    * Sample already balanced data
    *
-   * @param fraction
-   * @param seed
-   * @param data
-   * @param positiveData
-   * @param negativeData
+   * @param fraction subsample to take
+   * @param seed seed to use in sampling
+   * @param data full dataset in case no sampling is needed
+   * @param positiveData positive data for stratified sampling
+   * @param negativeData negative data for stratified sampling
    * @return
    */
-  private[op] def sampleBalancedData(
+  private[op] def sampleBalancedData[T](
     fraction: Double,
     seed: Long,
-    data: Dataset[LabelFeaturesKey],
-    positiveData: Dataset[LabelFeaturesKey],
-    negativeData: Dataset[LabelFeaturesKey]
-  ): Dataset[LabelFeaturesKey] = {
+    data: Dataset[T],
+    positiveData: Dataset[T],
+    negativeData: Dataset[T]
+  ): Dataset[T] = {
     fraction match {
       case 1.0 => data // we don't sample
       // stratified sampling

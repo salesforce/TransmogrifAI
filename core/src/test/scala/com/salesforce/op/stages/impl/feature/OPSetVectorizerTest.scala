@@ -266,8 +266,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorizedStage = untypedVectorizedStage.asInstanceOf[OpSetVectorizer[_]]
 
     val inputDF = TestOpWorkflowBuilder(df, vectorized).computeDataUpTo(vectorized)
-    val vectorizedDF = vectorizedStage.fit(inputDF).transform(inputDF)
-    val featArray = vectorizedDF.collect(vectorized)
+    val featArray = inputDF.collect(vectorized)
     featArray.foreach { opVec => opVec.value.size shouldBe 5 }
   }
 

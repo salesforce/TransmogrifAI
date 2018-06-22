@@ -47,7 +47,7 @@ class DataSplitterTest extends FlatSpec with TestSparkContext {
 
   val data =
     RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
-      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDS()
+      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
 
   val dataSplitter = new DataSplitter().setSeed(seed)
 

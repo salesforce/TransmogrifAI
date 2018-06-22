@@ -37,7 +37,7 @@ import org.apache.spark.ml.linalg.Vectors
 import scala.reflect.runtime.universe._
 
 /**
- * Default Feature Type values
+ * Default values for Feature Types
  */
 case object FeatureTypeDefaults {
 

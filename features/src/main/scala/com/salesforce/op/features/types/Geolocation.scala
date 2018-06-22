@@ -40,7 +40,8 @@ import Geolocation._
 import scala.util.Try
 
 /**
- * Represented as a list of latitude, longitude, accuracy (only populated if all are present)
+ * Represented as a list of latitude, longitude, accuracy
+ * The value is only populated if all are present, otherwise [[IllegalArgumentException]] is thrown.
  *
  * @param value a list of latitude, longitude, accuracy
  */
@@ -52,13 +53,33 @@ class Geolocation(val value: Seq[Double]) extends OPList[Double] with Location {
   }
   def this(lat: Double, lon: Double, accuracy: GeolocationAccuracy) = this(geolocationData(lat, lon, accuracy))
   def this(v: (Double, Double, Double)) = this(geolocationData(v._1, v._2, v._3))
+  /**
+   * Latitude value
+   */
   def lat: Double = if (isEmpty) Double.NaN else value(0)
+  /**
+   * Longitude value
+   */
   def lon: Double = if (isEmpty) Double.NaN else value(1)
+  /**
+   * Latitude value
+   */
   def latitude: Double = lat
+  /**
+   * Longitude value
+   */
   def longitude: Double = lon
+
+  /**
+   * Geolocation accuracy value [[GeolocationAccuracy]]
+   */
   def accuracy: GeolocationAccuracy = {
     if (isEmpty) GeolocationAccuracy.Unknown else GeolocationAccuracy.withValue(value(2).toInt)
   }
+
+  /**
+   * Convert to [[GeoPoint]] value
+   */
   def toGeoPoint: GeoPoint = {
     // If this Geolocation object is empty, then return the zero vector as the GeoPoint since we use
     // GeoPoint coordinates in aggregation functions
@@ -110,14 +131,17 @@ sealed abstract class GeolocationAccuracy
 (
   val value: Int,
   val name: String,
-  val rangeInMiles: Double) extends IntEnumEntry {
-  lazy val rangeInUnits: Double = rangeInMiles / EarthRadius
+  val rangeInMiles: Double
+) extends IntEnumEntry {
+  /**
+   * Range in units of Earth Radius
+   */
+  def rangeInUnits: Double = rangeInMiles / EarthRadius
 }
 
 case object GeolocationAccuracy extends IntEnum[GeolocationAccuracy] {
   val values: List[GeolocationAccuracy] = findValues.toList sortBy(_.rangeInMiles)
 
-  def geoUnitsToMiles(u: Double): Double = u * EarthRadius
 
   // No match for the address was found
   case object Unknown extends GeolocationAccuracy(0, name = "Unknown", rangeInMiles = EquatorInMiles / 2)
@@ -142,14 +166,40 @@ case object GeolocationAccuracy extends IntEnum[GeolocationAccuracy] {
   // Center of the state
   case object State extends GeolocationAccuracy(10, name = "State", rangeInMiles = 150.0)
 
+  /**
+   * Convert units of Earth Radius into miles
+   *
+   * @param u units of Earth Radius
+   * @return miles
+   */
+  def geoUnitsToMiles(u: Double): Double = u * EarthRadius
+
+  /**
+   * Construct accuracy value for a given range in miles
+   *
+   * @param miles range in miles
+   * @return accuracy
+   */
   def forRangeInMiles(miles: Double): GeolocationAccuracy = {
     val result = values.dropWhile(_.rangeInMiles < miles * 0.99).headOption getOrElse Unknown
     result
   }
 
+  /**
+   * Construct accuracy value for a given range in units of Earth Radius
+   *
+   * @param units units of Earth Radius
+   * @return accuracy
+   */
   def forRangeInUnits(units: Double): GeolocationAccuracy =
     forRangeInMiles(geoUnitsToMiles(units))
 
+  /**
+   * Find the worst accuracy value
+   *
+   * @param accuracies list of accuracies
+   * @return worst accuracy
+   */
   def worst(accuracies: GeolocationAccuracy*): GeolocationAccuracy = {
     forRangeInMiles((Unknown :: accuracies.toList) map (_.rangeInMiles) max)
   }

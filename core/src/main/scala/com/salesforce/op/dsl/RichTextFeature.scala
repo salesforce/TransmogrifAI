@@ -191,6 +191,7 @@ trait RichTextFeature {
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
      * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
@@ -215,6 +216,7 @@ trait RichTextFeature {
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       forceSharedHashSpace: Boolean = false,
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[T]] = Array.empty
@@ -237,6 +239,7 @@ trait RichTextFeature {
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
         .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
         .getOutput()
@@ -249,8 +252,8 @@ trait RichTextFeature {
      * The indices are in [0, numLabels), ordered by label frequencies.
      * So the most frequent label gets index 0.
      *
-     * @param unseenName     name to give strings that appear in transform but not in fit
-     * @param handleInvalid   how to transform values not seen in fitting
+     * @param unseenName    name to give strings that appear in transform but not in fit
+     * @param handleInvalid how to transform values not seen in fitting
      * @see [[OpIndexToString]] for the inverse transformation
      *
      * @return indexed real feature
@@ -263,7 +266,7 @@ trait RichTextFeature {
         case StringIndexerHandleInvalid.NoFilter => f.transformWith(
           new OpStringIndexerNoFilter[T]().setUnseenName(unseenName)
         )
-        case _ => f.transformWith( new OpStringIndexer[T]().setHandleInvalid(handleInvalid) )
+        case _ => f.transformWith(new OpStringIndexer[T]().setHandleInvalid(handleInvalid))
       }
     }
 
@@ -273,10 +276,10 @@ trait RichTextFeature {
      * @param languageDetector    a language detector instance
      * @param analyzer            a text analyzer instance
      * @param autoDetectLanguage  indicates whether to attempt language detection
-     * @param defaultLanguage     default language to assume in case autoDetectLanguage is disabled or
-     *                            failed to make a good enough prediction.
      * @param autoDetectThreshold Language detection threshold. If none of the detected languages have
      *                            confidence greater than the threshold then defaultLanguage is used.
+     * @param defaultLanguage     default language to assume in case autoDetectLanguage is disabled or
+     *                            failed to make a good enough prediction.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
      * @return tokenized feature
@@ -303,10 +306,10 @@ trait RichTextFeature {
      * Tokenize text using [[LuceneTextAnalyzer]] with [[OptimaizeLanguageDetector]]
      *
      * @param autoDetectLanguage  indicates whether to attempt language detection
-     * @param defaultLanguage     a language to assume in case no language was detected or
-     *                            when autoDetectLanguage is set to false
      * @param autoDetectThreshold Language detection threshold. If none of the detected languages have
      *                            confidence greater than the threshold then defaultLanguage is used.
+     * @param defaultLanguage     default language to assume in case autoDetectLanguage is disabled or
+     *                            failed to make a good enough prediction.
      * @param minTokenLength      minimum token length, >= 1.
      * @param toLowercase         indicates whether to convert all characters to lowercase before analyzing
      * @param stripHtml           indicates whether to strip HTML tags from the text or not before analyzing
@@ -379,6 +382,37 @@ trait RichTextFeature {
     def detectLanguages(languageDetector: LanguageDetector = LangDetector.DefaultDetector): FeatureLike[RealMap] =
       f.transformWith(new LangDetector[T](languageDetector))
 
+    /**
+     * Find name entities of the text using OpenNLP [[OpenNLPAnalyzer]]
+     *
+     * @param languageDetector    a language detector instance
+     * @param analyzer            a text analyzer instance
+     * @param sentenceSplitter    sentence splitter
+     * @param tagger              name entity recognition tagger
+     * @param autoDetectLanguage  indicates whether to attempt language detection
+     * @param autoDetectThreshold Language detection threshold. If none of the detected languages have
+     *                            confidence greater than the threshold then defaultLanguage is used.
+     * @param defaultLanguage     default language to assume in case autoDetectLanguage is disabled or
+     *                            failed to make a good enough prediction.
+     * @return name entity sets feature
+     */
+    def recognizeEntities
+    (
+      languageDetector: LanguageDetector = NameEntityRecognizer.LanguageDetector,
+      analyzer: TextAnalyzer = NameEntityRecognizer.Analyzer,
+      sentenceSplitter: SentenceSplitter = NameEntityRecognizer.Splitter,
+      tagger: NameEntityTagger[_ <: TaggerResult] = NameEntityRecognizer.Tagger,
+      autoDetectLanguage: Boolean = NameEntityRecognizer.AutoDetectLanguage,
+      autoDetectThreshold: Double = NameEntityRecognizer.AutoDetectThreshold,
+      defaultLanguage: Language = NameEntityRecognizer.DefaultLanguage
+    ): FeatureLike[MultiPickListMap] = {
+      f.transformWith(
+        new NameEntityRecognizer[T](languageDetector, analyzer, sentenceSplitter, tagger)
+          .setAutoDetectLanguage(autoDetectLanguage)
+          .setAutoDetectThreshold(autoDetectThreshold)
+          .setDefaultLanguage(defaultLanguage)
+      )
+    }
   }
 
   implicit class RichPhoneFeature(val f: FeatureLike[Phone]) {
@@ -480,10 +514,10 @@ trait RichTextFeature {
      * 0 if invalid and with an optional second element idicating if the phone number was null
      *
      * @param defaultRegion region against which to check phone validity
-     * @param isStrict strict validation means cannot have extra digits
-     * @param trackNulls produce column indicating if the number was null
-     * @param fillValue value to fill in for nulls in vactor creation
-     * @param others other phone numbers to vectorize
+     * @param isStrict      strict validation means cannot have extra digits
+     * @param trackNulls    produce column indicating if the number was null
+     * @param fillValue     value to fill in for nulls in vactor creation
+     * @param others        other phone numbers to vectorize
      * @return vector feature containing information about phone number
      */
     def vectorize(
@@ -503,12 +537,14 @@ trait RichTextFeature {
 
     /**
      * Extract email prefixes
+     *
      * @return email prefix
      */
     def toEmailPrefix: FeatureLike[Text] = f.map[Text](_.prefix.toText, "prefix")
 
     /**
      * Extract email domains
+     *
      * @return email domain
      */
     def toEmailDomain: FeatureLike[Text] = f.map[Text](_.domain.toText, "domain")
@@ -518,10 +554,10 @@ trait RichTextFeature {
      * and keeping the top K occurrences of each feature, along with an extra column per feature
      * indicating how many values were not in the top K.
      *
-     * @param others Other [[Email]] features
-     * @param topK How many values to keep in the vector
+     * @param others     Other [[Email]] features
+     * @param topK       How many values to keep in the vector
      * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText If true, ignores capitalization and punctuations when grouping categories
+     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
      * @return The vectorized features
      */
@@ -563,6 +599,7 @@ trait RichTextFeature {
     /**
      * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
      * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
+     *
      * @param protocols url protocols to consider valid, i.e. http, https, ftp etc.
      */
     def isValidUrl(protocols: Array[String]): FeatureLike[Binary] = f.exists(_.isValid(protocols))
@@ -572,10 +609,10 @@ trait RichTextFeature {
      * and keeping the top K occurrences of each feature, along with an extra column per feature
      * indicating how many values were not in the top K.
      *
-     * @param others Other [[URL]] features
-     * @param topK How many values to keep in the vector
+     * @param others     Other [[URL]] features
+     * @param topK       How many values to keep in the vector
      * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText If true, ignores capitalization and punctuations when grouping categories
+     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
      * @return The vectorized features
      */
@@ -613,12 +650,12 @@ trait RichTextFeature {
      * Extracts Base64 features (MIME type etc.),
      * then converts those into PickList features and vectorizes them.
      *
-     * @param topK            number of values to keep for each key
-     * @param minSupport      min times a value must occur to be retained in pivot
-     * @param cleanText       clean text before pivoting
+     * @param topK       number of values to keep for each key
+     * @param minSupport min times a value must occur to be retained in pivot
+     * @param cleanText  clean text before pivoting
      * @param trackNulls keep an extra column that indicated if feature was null
-     * @param typeHint        MIME type hint, i.e. 'application/json', 'text/plain' etc.
-     * @param others          other features of the same type
+     * @param typeHint   MIME type hint, i.e. 'application/json', 'text/plain' etc.
+     * @param others     other features of the same type
      * @return result feature of type vector
      */
     def vectorize(
@@ -646,10 +683,10 @@ trait RichTextFeature {
      * Converts a sequence of [[PickList]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others Other [[PickList]] features to include in pivot
-     * @param topK How many values to keep in the vector
+     * @param others     Other [[PickList]] features to include in pivot
+     * @param topK       How many values to keep in the vector
      * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText If true, ignores capitalization and punctuations when grouping categories
+     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
      * @return The vectorized features
      */
@@ -672,10 +709,10 @@ trait RichTextFeature {
      * Converts a sequence of [[ComboBox]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others Other [[ComboBox]] features to include in pivot
-     * @param topK How many values to keep in the vector
+     * @param others     Other [[ComboBox]] features to include in pivot
+     * @param topK       How many values to keep in the vector
      * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText If true, ignores capitalization and punctuations when grouping categories
+     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
      * @return The vectorized features
      */
@@ -698,10 +735,10 @@ trait RichTextFeature {
      * Converts a sequence of [[ID]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others Other [[ID]] features to include in pivot
-     * @param topK How many values to keep in the vector
+     * @param others     Other [[ID]] features to include in pivot
+     * @param topK       How many values to keep in the vector
      * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText If true, ignores capitalization and punctuations when grouping categories
+     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
      * @return The vectorized features
      */

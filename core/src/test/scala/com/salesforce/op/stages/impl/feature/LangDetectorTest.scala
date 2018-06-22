@@ -32,20 +32,19 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.ml.Transformer
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class LangDetectorTest extends FlatSpec with TestSparkContext {
+class LangDetectorTest extends OpTransformerSpec[RealMap, LangDetector[Text]] {
 
   // scalastyle:off
-  val (ds, f1, f2, f3) = TestFeatureBuilder(
+  val (inputData, f1, f2, f3) = TestFeatureBuilder(
     Seq(
       (
         "I've got a lovely bunch of coconuts".toText,
@@ -65,37 +64,31 @@ class LangDetectorTest extends FlatSpec with TestSparkContext {
     )
   )
   // scalastyle:on
-  val langDetector = new LangDetector[Text]().setInput(f1)
+  val transformer = new LangDetector[Text]().setInput(f1)
 
-  classOf[LangDetector[_]].getSimpleName should "return single properly formed feature" in {
-    val output1 = langDetector.getOutput()
+  private val langMap = f1.detectLanguages()
 
-    output1.name shouldBe langDetector.getOutputFeatureName
-    output1.parents shouldBe Array(f1)
-    output1.originStage shouldBe langDetector
-  }
+  // English result
+  val expectedResult: Seq[RealMap] = Seq(
+    Map("en" -> 0.9999984360934321),
+    Map("en" -> 0.9999900853228016),
+    Map("en" -> 0.9999900116744931)
+  ).map(_.toRealMap)
 
   it should "return empty RealMap when input text is empty" in {
-    langDetector.transformFn(Text.empty) shouldBe RealMap.empty
-  }
-
-  it should "detect English language" in {
-    assertDetectionResults(
-      results = langDetector.setInput(f1).transform(ds).collect(langDetector.getOutput()),
-      expectedLanguage = Language.English
-    )
+    transformer.transformFn(Text.empty) shouldBe RealMap.empty
   }
 
   it should "detect Japanese language" in {
     assertDetectionResults(
-      results = langDetector.setInput(f2).transform(ds).collect(langDetector.getOutput()),
+      results = transformer.setInput(f2).transform(inputData).collect(transformer.getOutput()),
       expectedLanguage = Language.Japanese
     )
   }
 
   it should "detect French language" in {
     assertDetectionResults(
-      results = langDetector.setInput(f3).transform(ds).collect(langDetector.getOutput()),
+      results = transformer.setInput(f3).transform(inputData).collect(transformer.getOutput()),
       expectedLanguage = Language.French
     )
   }
@@ -104,7 +97,7 @@ class LangDetectorTest extends FlatSpec with TestSparkContext {
     val tokenized = f1.detectLanguages()
 
     assertDetectionResults(
-      results = tokenized.originStage.asInstanceOf[Transformer].transform(ds).collect(tokenized),
+      results = tokenized.originStage.asInstanceOf[Transformer].transform(inputData).collect(tokenized),
       expectedLanguage = Language.English
     )
   }

@@ -38,7 +38,7 @@ import scala.reflect.runtime.universe._
 
 
 /**
- * Feature type from/to Spark primitives converter, i.e Real from/to Double etc.
+ * Feature Type from/to Spark primitives converter, i.e Real from/to Double etc.
  *
  * @tparam T feature type
  */
@@ -83,6 +83,30 @@ case object FeatureTypeSparkConverter {
       def fromSpark(value: Any): T = maker(value)
     }
 
+  /**
+   * For a given feature type class (or [[FeatureType.typeName]]) from/to Spark primitives converter,
+   * i.e Real from/to Double etc.
+   *
+   * @param featureTypeName full class name of the feature type, see [[FeatureType.typeName]]
+   * @throws IllegalArgumentException if feature type name is unknown
+   * @return feature type from/to Spark primitives converter
+   */
+  def fromFeatureTypeName(featureTypeName: String): FeatureTypeSparkConverter[_ <: FeatureType] = {
+    featureTypeSparkConverters.get(featureTypeName) match {
+      case Some(converter) => converter
+      case None => throw new IllegalArgumentException(s"Unknown feature type '$featureTypeName'")
+    }
+  }
+
+  /**
+   * A map from feature type class to [[FeatureTypeSparkConverter]]
+   */
+  private[types] val featureTypeSparkConverters: Map[String, FeatureTypeSparkConverter[_ <: FeatureType]] =
+    FeatureType.featureTypeTags.map {
+      case (featureTypeClass, featureTypeTag) =>
+        featureTypeClass.getName ->
+          FeatureTypeSparkConverter[FeatureType]()(featureTypeTag.asInstanceOf[WeakTypeTag[FeatureType]])
+    }
 
   /**
    * Converts feature type into a Spark primitive value

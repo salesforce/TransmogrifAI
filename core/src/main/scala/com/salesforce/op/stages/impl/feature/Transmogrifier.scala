@@ -64,6 +64,7 @@ private[op] trait TransmogrifierDefaults {
   val HashWithIndex: Boolean = false
   val PrependFeatureName: Boolean = true
   val ForceSharedHashSpace: Boolean = true
+  val HashSpaceStrategy: HashSpaceStrategy = com.salesforce.op.stages.impl.feature.HashSpaceStrategy.Auto
   val CleanText: Boolean = true
   val CleanKeys: Boolean = false
   val HashAlgorithm: HashAlgorithm = com.salesforce.op.stages.impl.feature.HashAlgorithm.MurMur3
@@ -75,6 +76,7 @@ private[op] trait TransmogrifierDefaults {
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
+  val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -86,10 +88,12 @@ private[op] case object Transmogrifier {
    *
    * @param features input features
    * @param defaults transmogrifier defaults (allows params injection)
+   * @param label optional label feature to be passed into stages that require the label column
    * @return vectorized features grouped by type
    */
   def transmogrify(
-    features: Seq[FeatureLike[_]]
+    features: Seq[FeatureLike[_]],
+    label: Option[FeatureLike[RealNN]] = None
   )(implicit defaults: TransmogrifierDefaults): Iterable[FeatureLike[OPVector]] = {
     import defaults._
     def castSeqAs[U <: FeatureType](f: Seq[FeatureLike[_]]) = f.map(_.asInstanceOf[FeatureLike[U]])
@@ -141,7 +145,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[CurrencyMap] =>
           val (f, other) = castAs[CurrencyMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
-            trackNulls = TrackNulls)
+            trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[DateMap] =>
           val (f, other) = castAs[DateMap](g) // TODO make better default
           f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
@@ -159,7 +163,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[IntegralMap] =>
           val (f, other) = castAs[IntegralMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other,
-            trackNulls = TrackNulls)
+            trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[MultiPickListMap] =>
           val (f, other) = castAs[MultiPickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -167,7 +171,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[PercentMap] =>
           val (f, other) = castAs[PercentMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
-            trackNulls = TrackNulls)
+            trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[PhoneMap] =>
           val (f, other) = castAs[PhoneMap](g) // TODO make better default
           f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other, trackNulls = TrackNulls)
@@ -178,7 +182,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[RealMap] =>
           val (f, other) = castAs[RealMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
-            trackNulls = TrackNulls)
+            trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g)
           // Explicitly set cleanText to false here in order to match behavior of Text vectorization
@@ -223,7 +227,8 @@ private[op] case object Transmogrifier {
           f.vectorize(fillValue = BinaryFillValue, trackNulls = TrackNulls, others = other)
         case t if t =:= weakTypeOf[Currency] =>
           val (f, other) = castAs[Currency](g)
-          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls,
+            trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Date] =>
           val (f, other) = castAs[Date](g)
           f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
@@ -232,13 +237,16 @@ private[op] case object Transmogrifier {
           f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
-          f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls, others = other)
+          f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
+            trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Percent] =>
           val (f, other) = castAs[Percent](g)
-          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls,
+            trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Real] =>
           val (f, other) = castAs[Real](g)
-          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls, others = other)
+          f.vectorize(fillValue = FillValue, fillWithMean = FillWithMean, trackNulls = TrackNulls,
+            trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[RealNN] =>
           val (f, other) = castAs[RealNN](g)
           f.vectorize(other)

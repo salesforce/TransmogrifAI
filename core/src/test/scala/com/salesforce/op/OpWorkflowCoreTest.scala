@@ -32,7 +32,7 @@
 package com.salesforce.op
 
 
-import com.salesforce.op.DAG._
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
@@ -43,8 +43,8 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal, RandomVector}
 import org.apache.spark.ml.{Estimator, Model}
 import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
@@ -74,13 +74,15 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   // Workflow
   val wf = new OpWorkflow()
 
-
   Spec[OpWorkflowCore] should "handle empty DAG" in {
     assert(
       res = cutDAG(wf),
-      modelSelector = None,
-      nonCVTSDAG = Array.empty[Layer],
-      cVTSDAG = Array.empty[Layer]
+      expected = CutDAG(
+        modelSelector = None,
+        before = Array.empty[Layer],
+        during = Array.empty[Layer],
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -90,9 +92,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array.empty[Layer],
-      cVTSDAG = Array.empty[Layer]
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array.empty[Layer],
+        during = Array.empty[Layer],
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -104,9 +109,31 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array(Array((lda, 2))),
-      cVTSDAG = Array(Array((sanityChecker, 1)))
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array(Array((lda, 2))),
+        during = Array(Array((sanityChecker, 1))),
+        after = Array.empty[Layer]
+      )
+    )
+  }
+
+  it should "cut simple DAG with nonCVTS and cVTS stage and stages after CV" in {
+    val ldaFeatures = lda.setInput(features).getOutput()
+    val checkedFeatures = sanityChecker.setInput(label, ldaFeatures).getOutput()
+    val ms = BinaryClassificationModelSelector()
+    val (pred, _, _) = ms.setInput(label, checkedFeatures).getOutput()
+    val zNormalize = new OpScalarStandardScaler()
+    val realPred = zNormalize.setInput(pred).getOutput()
+
+    assert(
+      res = cutDAG(wf.setResultFeatures(realPred)),
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 1)),
+        before = Array(Array((lda, 3))),
+        during = Array(Array((sanityChecker, 2))),
+        after = Array(Array((zNormalize, 0)))
+      )
     )
   }
 
@@ -117,9 +144,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array.empty[Layer],
-      cVTSDAG = Array(Array((sanityChecker, 1)))
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array.empty[Layer],
+        during = Array(Array((sanityChecker, 1))),
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -130,9 +160,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array(Array((lda, 1))),
-      cVTSDAG = Array.empty[Layer]
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array(Array((lda, 1))),
+        during = Array.empty[Layer],
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -142,9 +175,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(checkedFeatures)),
-      modelSelector = None,
-      nonCVTSDAG = Array.empty[Layer],
-      cVTSDAG = Array.empty[Layer]
+      expected = CutDAG(
+        modelSelector = None,
+        before = Array.empty[Layer],
+        during = Array.empty[Layer],
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -176,13 +212,16 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     val ldaFeatures = lda.setInput(features).getOutput()
     val checkedFeatures = sanityChecker.setInput(label2, ldaFeatures).getOutput()
     val (pred, _, _) = ms.setInput(label, features).getOutput()
-    val (predLogReg, _, _) = logReg.setInput(label2, checkedFeatures).getOutput()
+    val predLogReg = logReg.setInput(label2, checkedFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred, predLogReg)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array(Array((lda, 2)), Array((sanityChecker, 1)), Array((logReg.stage1, 0))),
-      cVTSDAG = Array.empty[Layer]
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array(Array((lda, 2)), Array((sanityChecker, 1)), Array((logReg, 0))),
+        during = Array.empty[Layer],
+        after = Array.empty[Layer]
+      )
     )
   }
 
@@ -196,34 +235,27 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
-      modelSelector = Option(ms.stage1),
-      nonCVTSDAG = Array(Array((lda, 2), (zNormalize, 2))),
-      cVTSDAG = Array(Array((sanityChecker, 1)))
+      expected = CutDAG(
+        modelSelector = Option((ms.stage1, 0)),
+        before = Array(Array((lda, 2), (zNormalize, 2))),
+        during = Array(Array((sanityChecker, 1))),
+        after = Array.empty[Layer]
+      )
     )
-  }
-
-  /**
-   * Shortcut function to cut DAG
-   *
-   * @param wf Workflow
-   * @return Cut DAG
-   */
-  private def cutDAG(wf: OpWorkflow): (Option[MS], StagesDAG, StagesDAG) = {
-    wf.cutDAG(DAG.compute(wf.getResultFeatures()))
   }
 
   /**
    * Compare Actual and expected cut DAGs
    *
-   * @param res             Actual results
-   * @param modelSelector   Expected Model Selector
-   * @param nonCVTSDAG Expected nonCVTS DAG
-   * @param cVTSDAG   Expected cVTS DAG
+   * @param res      actual cut
+   * @param expected expected cut
    */
-  private def assert(res: (Option[MS], StagesDAG, StagesDAG),
-    modelSelector: Option[MS], nonCVTSDAG: StagesDAG, cVTSDAG: StagesDAG): Unit = {
-    res._1 shouldBe modelSelector
-    res._2 shouldBe nonCVTSDAG
-    res._3 shouldBe cVTSDAG
+  private def assert(res: CutDAG, expected: CutDAG): Unit = {
+    res.modelSelector shouldBe expected.modelSelector
+    res.before should contain theSameElementsInOrderAs expected.before
+    res.during should contain theSameElementsInOrderAs expected.during
+    res.after should contain theSameElementsInOrderAs expected.after
   }
 }
+
+

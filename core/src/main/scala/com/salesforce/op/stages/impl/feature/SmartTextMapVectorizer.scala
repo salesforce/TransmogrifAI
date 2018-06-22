@@ -40,8 +40,8 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.macros.caseclass
 import com.twitter.algebird.Semigroup
+import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
 
@@ -84,9 +84,10 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     numFeatures = $(numFeatures),
     numInputs = inN.length,
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = $(forceSharedHashSpace),
+    forceSharedHashSpace = getForceSharedHashSpace,
     binaryFreq = $(binaryFreq),
-    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
+    hashAlgorithm = getHashAlgorithm,
+    hashSpaceStrategy = getHashSpaceStrategy
   )
 
   private def makeVectorMetadata(args: SmartTextMapVectorizerModelArgs): OpVectorMetadata = {
@@ -244,14 +245,14 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   private def partitionRow(row: Seq[OPMap[String]]):
   (Seq[OPMap[String]], Seq[Seq[String]], Seq[OPMap[String]], Seq[Seq[String]]) = {
     val (rowCategorical, keysCategorical) =
-      row.view.zip(args.categoricalKeys).collect{ case (elements, keys) if keys.nonEmpty =>
-        val filtered = elements.value.filter{ case (k, v) => keys.contains(k) }
+      row.view.zip(args.categoricalKeys).collect { case (elements, keys) if keys.nonEmpty =>
+        val filtered = elements.value.filter { case (k, v) => keys.contains(k) }
         (TextMap(filtered), keys)
       }.unzip
 
     val (rowText, keysText) =
-      row.view.zip(args.textKeys).collect{ case (elements, keys) if keys.nonEmpty =>
-        val filtered = elements.value.filter{ case (k, v) => keys.contains(k) }
+      row.view.zip(args.textKeys).collect { case (elements, keys) if keys.nonEmpty =>
+        val filtered = elements.value.filter { case (k, v) => keys.contains(k) }
         (TextMap(filtered), keys)
       }.unzip
 
@@ -261,17 +262,17 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   def transformFn: Seq[T] => OPVector = row => {
     val (rowCategorical, keysCategorical, rowText, keysText) = partitionRow(row)
     val categoricalVector = categoricalPivotFn(rowCategorical)
-    val rowTextTokenized = rowText.map( m => m.value.map{ case (k, v) => k -> tokenize(v.toText)._2 } )
+    val rowTextTokenized = rowText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
-      if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowText)) else Nil
+      if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowTextTokenized)) else Nil
     VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
   }
 
-  private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[OPMap[String]]): OPVector = {
+  private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
     val nullIndicators = keysSeq.zip(inputs).flatMap{ case (keys, input) =>
       keys.map{ k =>
-        val nullVal = if (input.value.contains(k)) 0.0 else 1.0
+        val nullVal = if (input.get(k).forall(_.isEmpty)) 1.0 else 0.0
         Seq(0 -> nullVal)
       }
     }
@@ -280,3 +281,4 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     vector.toOPVector
   }
 }
+
