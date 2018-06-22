@@ -88,7 +88,8 @@ object Evaluators {
      * Recall
      */
     def recall(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(
+        name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
