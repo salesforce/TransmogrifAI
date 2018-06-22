@@ -391,6 +391,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     summary.contains(""""regParam" : "0.01"""") shouldBe true
     summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
     summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
+
+    val prettySummary = fittedWorkflow.summaryPretty()
+    log.info(prettySummary)
+    prettySummary.contains("Selected model - LogisticRegression") shouldBe true
+    prettySummary.contains("Model Evaluation Metrics") shouldBe true
   }
 
   it should "be able to refit a workflow with calibrated probability" in {

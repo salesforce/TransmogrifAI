@@ -34,6 +34,7 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{OPVector, RealNN}
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{DecisionTree, LogisticRegression, NaiveBayes, RandomForest}
 import com.salesforce.op.stages.impl.preparators._
@@ -91,10 +92,7 @@ case class ModelInsights
   /**
    * Selected model type, i.e. LogisticRegression, RandomForest etc.
    */
-  def selectedModelType: EnumEntry = {
-    classificationModelTypeOfUID.orElse(regressionModelTypeOfUID).lift(selectedModelUID).getOrElse(
-      throw new Exception(s"Unsupported model type for best model '$selectedModelUID'"))
-  }
+  def selectedModelType: ModelsToTry = modelType(selectedModelName).get
 
   /**
    * Selected model validation results computed during Cross Validation or Train Validation Split
@@ -131,6 +129,47 @@ case class ModelInsights
   }
 
   /**
+   * Validation results for a specified model type computed during Cross Validation or Train Validation Split
+   *
+   * @return validation results keyed by model name
+   */
+  def validationResults(mType: ModelsToTry): Map[String, Map[String, String]] = {
+    validationResults.filter { case (modelName, _) => modelType(modelName).toOption.contains(mType) }
+  }
+
+  /**
+   * All validated model types
+   */
+  def validatedModelTypes: Set[ModelsToTry] =
+    validationResults.keys.flatMap(modelName => modelType(modelName).toOption).toSet
+
+  /**
+   * Validation type, i.e TrainValidationSplit, CrossValidation
+   */
+  def validationType: ValidationType = {
+    if (getMap[String, Any](selectedModelInfo, TrainValSplitResults).isSuccess) ValidationType.TrainValidationSplit
+    else if (getMap[String, Any](selectedModelInfo, CrossValResults).isSuccess) ValidationType.CrossValidation
+    else throw new Exception(s"Failed to determine validation type")
+  }
+
+  /**
+   * Evaluation metric type, i.e. AuPR, AuROC, F1 etc.
+   */
+  def evaluationMetricType: EnumEntry with EvalMetric = {
+    val knownEvalMetrics = {
+      (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++ RegressionEvalMetrics.values)
+        .map(m => m.humanFriendlyName -> m).toMap
+    }
+    val evalMetrics = validationResults.flatMap(_._2.keys).flatMap(knownEvalMetrics.get).toSet.toList
+    evalMetrics match {
+      case evalMetric :: Nil => evalMetric
+      case Nil => throw new Exception("Unable to determine evaluation metric type: no metrics were found")
+      case metrics => throw new Exception(
+        s"Unable to determine evaluation metric type since: multiple metrics were found - " + metrics.mkString(","))
+    }
+  }
+
+  /**
    * Problem type, i.e. Binary Classification, Multi Classification or Regression
    */
   def problemType: ProblemType = selectedModelTrainEvalMetrics match {
@@ -151,17 +190,22 @@ case class ModelInsights
     if (pretty) writePretty(this) else write(this)
   }
 
-  private def classificationModelTypeOfUID: PartialFunction[String, ClassificationModelsToTry] = {
-    case uid if uid.startsWith("logreg") => LogisticRegression
-    case uid if uid.startsWith("rfc") => RandomForest
-    case uid if uid.startsWith("dtc") => DecisionTree
-    case uid if uid.startsWith("nb") => NaiveBayes
+  private def modelType(modelName: String): Try[ModelsToTry] = Try {
+    classificationModelType.orElse(regressionModelType).lift(modelName).getOrElse(
+      throw new Exception(s"Unsupported model type for best model '$modelName'"))
   }
-  private def regressionModelTypeOfUID: PartialFunction[String, RegressionModelsToTry] = {
-    case uid if uid.startsWith("linReg") => LinearRegression
-    case uid if uid.startsWith("rfr") => RandomForestRegression
-    case uid if uid.startsWith("dtr") => DecisionTreeRegression
-    case uid if uid.startsWith("gbtr") => GBTRegression
+
+  private def classificationModelType: PartialFunction[String, ClassificationModelsToTry] = {
+    case v if v.startsWith("logreg") => LogisticRegression
+    case v if v.startsWith("rfc") => RandomForest
+    case v if v.startsWith("dtc") => DecisionTree
+    case v if v.startsWith("nb") => NaiveBayes
+  }
+  private def regressionModelType: PartialFunction[String, RegressionModelsToTry] = {
+    case v if v.startsWith("linReg") => LinearRegression
+    case v if v.startsWith("rfr") => RandomForestRegression
+    case v if v.startsWith("dtr") => DecisionTreeRegression
+    case v if v.startsWith("gbtr") => GBTRegression
   }
   private def evaluationMetrics(metricsName: String): EvaluationMetrics = {
     val res = for {
@@ -209,6 +253,13 @@ sealed trait ProblemType extends EnumEntry with Serializable
   case object MultiClassification extends ProblemType
   case object Regression extends ProblemType
   case object Unknown extends ProblemType
+}
+
+sealed abstract class ValidationType(val humanFriendlyName: String) extends EnumEntry with Serializable
+object ValidationType extends Enum[ValidationType] {
+  val values = findValues
+  case object CrossValidation extends ValidationType("Cross Validation")
+  case object TrainValidationSplit extends ValidationType("Train Validation Split")
 }
 
 /**

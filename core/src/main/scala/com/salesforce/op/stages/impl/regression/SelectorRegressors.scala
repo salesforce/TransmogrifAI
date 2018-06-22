@@ -31,6 +31,7 @@
 
 package com.salesforce.op.stages.impl.regression
 
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector._
 import org.apache.spark.ml.param.{BooleanParam, Param, Params}
@@ -44,7 +45,7 @@ import scala.reflect.ClassTag
 /**
  * Enumeration of possible regression models in Model Selector
  */
-sealed trait RegressionModelsToTry extends EnumEntry with Serializable
+sealed trait RegressionModelsToTry extends ModelsToTry
 
 object RegressionModelsToTry extends Enum[RegressionModelsToTry] {
   val values = findValues

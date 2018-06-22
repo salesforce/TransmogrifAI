@@ -48,6 +48,7 @@ import org.json4s.jackson.JsonMethods.{pretty, render}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
+import scala.util.Try
 
 
 /**
@@ -186,12 +187,48 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   /**
    * Pulls all summary metadata of transformers and puts them into compact print friendly string
    *
-   * @return compact print friendly string
+   * @return a compact print friendly string
    */
   def summaryPretty(): String = {
     val response = resultFeatures.find(_.isResponse).getOrElse(throw new Exception("No response feature is defined"))
     val insights = modelInsights(response)
     val summary = new ArrayBuffer[String]()
+
+    // Validation results
+    summary += {
+      val validatedModelTypes = insights.validatedModelTypes
+      val validationType = insights.validationType.humanFriendlyName
+      val evalMetric = insights.evaluationMetricType.humanFriendlyName
+      "Evaluated %s model%s using %s and %s metric.".format(
+        validatedModelTypes.mkString(", "),
+        if (validatedModelTypes.size > 1) "s" else "",
+        validationType, // TODO add number of folds or train/split ratio if possible
+        evalMetric
+      )
+    }
+    summary += {
+      val modelEvalRes = for {
+        modelType <- insights.validatedModelTypes
+        modelValidationResults = insights.validationResults(modelType)
+        evalMetric = insights.evaluationMetricType.humanFriendlyName
+      } yield {
+        val evalMetricValues = modelValidationResults.flatMap { case (_, metrics) =>
+          metrics.get(evalMetric).flatMap(v => Try(v.toDouble).toOption)
+        }
+        val minMetricValue = evalMetricValues.reduceOption[Double](math.min).getOrElse(Double.NaN)
+        val maxMetricValue = evalMetricValues.reduceOption[Double](math.max).getOrElse(Double.NaN)
+
+        "Evaluated %d %s model%s with %s metric between [%s, %s].".format(
+          modelValidationResults.size,
+          modelType,
+          if (modelValidationResults.size > 1) "s" else "",
+          evalMetric,
+          minMetricValue,
+          maxMetricValue
+        )
+      }
+      modelEvalRes.mkString("\n")
+    }
 
     // Selected model information
     summary += {
@@ -224,8 +261,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       table.prettyString(columnAlignments = Map(holdOutCol -> Right, trainingCol -> Right))
     }
 
-
-    summary.mkString("\n\n")
+    summary.mkString("\n")
   }
 
   /**

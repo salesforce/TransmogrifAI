@@ -31,11 +31,11 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.BinaryClassificationMetrics
+import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, BinaryClassificationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, NaiveBayes}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
@@ -246,14 +246,20 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.selectedModelType shouldBe LogisticRegression
     val bestModelValidationResults = insights.selectedModelValidationResults
     bestModelValidationResults.size shouldBe 15
-    bestModelValidationResults.get("area under PR") shouldBe Some("0.0")
+    bestModelValidationResults.get(BinaryClassEvalMetrics.AuPR.humanFriendlyName) shouldBe Some("0.0")
     val validationResults = insights.validationResults
     validationResults.size shouldBe 2
     validationResults.get(insights.selectedModelName) shouldBe Some(bestModelValidationResults)
+    insights.validationResults(LogisticRegression) shouldBe validationResults
+    insights.validationResults(NaiveBayes) shouldBe Map.empty
   }
 
   it should "return test/train evaluation metrics" in {
     val insights = workflowModel.modelInsights(prob)
+    insights.evaluationMetricType shouldBe BinaryClassEvalMetrics.AuPR
+    insights.validationType shouldBe ValidationType.CrossValidation
+    insights.validatedModelTypes shouldBe Set(LogisticRegression)
+
     insights.problemType shouldBe ProblemType.BinaryClassification
     insights.selectedModelTrainEvalMetrics shouldBe
       BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0)

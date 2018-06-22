@@ -101,13 +101,3 @@ case class RegressionMetrics
   R2: Double,
   MeanAbsoluteError: Double
 ) extends EvaluationMetrics
-
-/* Regression Metrics */
-sealed abstract class RegressionEvalMetric(val sparkEntryName: String) extends EnumEntry with Serializable
-object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
-  val values: Seq[RegressionEvalMetric] = findValues
-  case object RootMeanSquaredError extends RegressionEvalMetric("rmse")
-  case object MeanSquaredError extends RegressionEvalMetric("mse")
-  case object R2 extends RegressionEvalMetric("r2")
-  case object MeanAbsoluteError extends RegressionEvalMetric("mae")
-}

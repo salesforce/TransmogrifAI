@@ -57,7 +57,8 @@ object Evaluators {
      * Area under ROC
      */
     def auROC(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.auROC, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(
+        name = BinaryClassEvalMetrics.AuROC.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuROC, dataset)
       }
@@ -66,7 +67,7 @@ object Evaluators {
      * Area under Precision/Recall curve
      */
     def auPR(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.auPR, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuPR, dataset)
       }
@@ -75,7 +76,8 @@ object Evaluators {
      * Precision
      */
     def precision(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.precision, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(
+        name = MultiClassEvalMetrics.Precision.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
@@ -86,7 +88,7 @@ object Evaluators {
      * Recall
      */
     def recall(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.recall, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
@@ -97,7 +99,7 @@ object Evaluators {
      * F1 score
      */
     def f1(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.f1, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.F1.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           new MulticlassMetrics(
@@ -109,7 +111,8 @@ object Evaluators {
      * Prediction error
      */
     def error(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = OpMetricsNames.error, isLargerBetter = false) {
+      new OpBinaryClassificationEvaluator(
+        name = MultiClassEvalMetrics.Error.humanFriendlyName, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getMultiEvaluatorMetric(MultiClassEvalMetrics.Error, dataset)
       }
@@ -162,7 +165,8 @@ object Evaluators {
      * Weighted Precision
      */
     def precision(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = OpMetricsNames.precision, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(
+        name = MultiClassEvalMetrics.Precision.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Precision, dataset)
       }
@@ -171,7 +175,7 @@ object Evaluators {
      * Weighted Recall
      */
     def recall(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = OpMetricsNames.recall, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Recall, dataset)
       }
@@ -180,7 +184,7 @@ object Evaluators {
      * F1 Score
      */
     def f1(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = OpMetricsNames.f1, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.F1.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.F1, dataset)
       }
@@ -189,7 +193,7 @@ object Evaluators {
      * Prediction Error
      */
     def error(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = OpMetricsNames.error, isLargerBetter = false) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Error.humanFriendlyName, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getMultiEvaluatorMetric(MultiClassEvalMetrics.Error, dataset)
       }
@@ -252,7 +256,8 @@ object Evaluators {
      * Mean Squared Error
      */
     def mse(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = OpMetricsNames.meanSquaredError, isLargerBetter = false) {
+      new OpRegressionEvaluator(
+        name = RegressionEvalMetrics.MeanSquaredError.humanFriendlyName, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataset)
       }
@@ -261,7 +266,8 @@ object Evaluators {
      * Mean Absolute Error
      */
     def mae(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = OpMetricsNames.meanAbsoluteError, isLargerBetter = false) {
+      new OpRegressionEvaluator(
+        name = RegressionEvalMetrics.MeanAbsoluteError.humanFriendlyName, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataset)
       }
@@ -270,7 +276,7 @@ object Evaluators {
      * R2
      */
     def r2(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = OpMetricsNames.r2, isLargerBetter = true) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.R2.humanFriendlyName, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataset)
       }
@@ -279,7 +285,8 @@ object Evaluators {
      * Root Mean Squared Error
      */
     def rmse(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = OpMetricsNames.rootMeanSquaredError, isLargerBetter = false) {
+      new OpRegressionEvaluator(
+        name = RegressionEvalMetrics.RootMeanSquaredError.humanFriendlyName, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataset)
       }
