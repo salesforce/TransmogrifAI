@@ -31,23 +31,33 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{OPVector, RealNN}
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{DecisionTree, LogisticRegression, NaiveBayes, RandomForest}
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, SelectedModel}
+import com.salesforce.op.stages.impl.regression.RegressionModelsToTry
+import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.{DecisionTreeRegression, GBTRegression, LinearRegression, RandomForestRegression}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, ModelSelectorBaseNames, SelectedModel}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStageParams, OpPipelineStageParamsNames}
+import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
+import enumeratum.EnumEntry
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
 import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
+import org.apache.spark.sql.types.Metadata
 import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization.{write, writePretty}
 import org.slf4j.LoggerFactory
 
-import scala.util.Try
+import scala.reflect.ClassTag
+import scala.util.{Failure, Success, Try}
 
 /**
  * Summary of all model insights
@@ -68,9 +78,117 @@ case class ModelInsights
   stageInfo: Map[String, Any]
 ) {
 
+  /**
+   * Best model UID
+   */
+  def bestModelUid: String = selectedModelInfo(BestModelUid).toString
+
+  /**
+   * Best model name
+   */
+  def bestModelName: String = selectedModelInfo(BestModelName).toString
+
+  /**
+   * Best model type, i.e. LogisticRegression, RandomForest etc.
+   */
+  def bestModelType: EnumEntry = {
+    classificationModelTypeOfUID.orElse(regressionModelTypeOfUID).lift(bestModelUid).getOrElse(
+      throw new Exception(s"Unsupported model type for best model '$bestModelUid'"))
+  }
+
+  /**
+   * Best model validation results computed during Cross Validation or Train Validation Split
+   */
+  def bestModelValidationResults: Map[String, String] = validationResults(bestModelName)
+
+  /**
+   * Validation results computed during Cross Validation or Train Validation Split
+   *
+   * @return validation results keyed by model name
+   */
+  def validationResults: Map[String, Map[String, String]] = {
+    val res = for {
+      results <- getMap[String, Any](selectedModelInfo, TrainValSplitResults).recoverWith {
+        case e => getMap[String, Any](selectedModelInfo, CrossValResults)
+      }
+    } yield results.keys.map(k => k -> getMap[String, String](results, k).getOrElse(Map.empty))
+    res match {
+      case Failure(e) => throw new Exception(s"Failed to extract validation results", e)
+      case Success(ok) => ok.toMap
+    }
+  }
+
+  /**
+   * Train set evaluation metrics
+   */
+  def trainEvaluationMetrics: EvaluationMetrics = evaluationMetrics(TrainingEval)
+
+  /**
+   * Test set evaluation metrics (if any)
+   */
+  def testEvaluationMetrics: Option[EvaluationMetrics] = {
+    selectedModelInfo.get(HoldOutEval).map(_ => evaluationMetrics(HoldOutEval))
+  }
+
+  /**
+   * Serialize to json string
+   *
+   * @param pretty should pretty format
+   * @return json string
+   */
   def toJson(pretty: Boolean = true): String = {
     implicit val formats = DefaultFormats
     if (pretty) writePretty(this) else write(this)
+  }
+
+  private def classificationModelTypeOfUID: PartialFunction[String, ClassificationModelsToTry] = {
+    case uid if uid.startsWith("logreg") => LogisticRegression
+    case uid if uid.startsWith("rfc") => RandomForest
+    case uid if uid.startsWith("dtc") => DecisionTree
+    case uid if uid.startsWith("nb") => NaiveBayes
+  }
+  private def regressionModelTypeOfUID: PartialFunction[String, RegressionModelsToTry] = {
+    case uid if uid.startsWith("linReg") => LinearRegression
+    case uid if uid.startsWith("rfr") => RandomForestRegression
+    case uid if uid.startsWith("dtr") => DecisionTreeRegression
+    case uid if uid.startsWith("gbtr") => GBTRegression
+  }
+  private def evaluationMetrics(metricsName: String): EvaluationMetrics = {
+    val res = for {
+      metricsMap <- getMap[String, Double](selectedModelInfo, metricsName)
+      evalMetrics <- Try(toEvaluationMetrics(metricsMap))
+    } yield evalMetrics
+    res match {
+      case Failure(e) => throw new Exception(s"Failed to extract '$metricsName' metrics", e)
+      case Success(ok) => ok
+    }
+  }
+  private def getMap[K, V](m: Map[String, Any], name: String): Try[Map[K, V]] = Try {
+    m(name) match {
+      case m: Map[String, Any]@unchecked => m("map").asInstanceOf[Map[K, V]]
+      case m: Metadata => m.underlyingMap.asInstanceOf[Map[K, V]]
+    }
+  }
+
+  private val MetricName = "\\((.*)\\)\\_(.*)".r
+
+  private def toEvaluationMetrics(metrics: Map[String, Double]): EvaluationMetrics = {
+    import OpEvaluatorNames._
+    val metricsType = metrics.keys.headOption match {
+      case Some(MetricName(t, _)) if Set(binary, multi, regression).contains(t) => t
+      case v => throw new Exception(s"Invalid model metric '$v'")
+    }
+    def parse[T <: EvaluationMetrics : ClassTag] = {
+      val vals = metrics.map { case (MetricName(_, name), value) => name -> value }
+      val valsJson = JsonUtils.toJsonString(vals)
+      JsonUtils.fromString[T](valsJson).get
+    }
+    metricsType match {
+      case `binary` => parse[BinaryClassificationMetrics]
+      case `multi` => parse[MultiClassificationMetrics]
+      case `regression` => parse[RegressionMetrics]
+      case t => throw new Exception(s"Unsupported metrics type '$t'")
+    }
   }
 }
 

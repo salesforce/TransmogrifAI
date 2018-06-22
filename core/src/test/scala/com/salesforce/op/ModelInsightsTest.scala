@@ -31,14 +31,16 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators.BinaryClassificationMetrics
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.{FeatureTypeDefaults, PickList, Real, RealNN}
+import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
 import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.junit.runner.RunWith
@@ -55,11 +57,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   private val descrVec = description.vectorize(10, false, 1, true)
   private val features = Seq(density, age, generVec, weight, descrVec).transmogrify()
   private val label = survived.occurs()
-  private val checked = label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false,
-    checkSample = 1.0)
+  private val checked =
+    label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
 
   val (pred, rawPred, prob) = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = None)
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)))
     .setModelsToTry(LogisticRegression)
     .setLogisticRegressionRegParam(0.01, 0.1)
     .setInput(label, checked)
@@ -119,7 +121,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(6.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -170,7 +172,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(6.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -235,6 +237,29 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
     lin.size shouldBe 1
     lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
+  }
+
+  it should "return best model information" in {
+    val insights = workflowModel.modelInsights(prob)
+    insights.bestModelUid should startWith("logreg_")
+    insights.bestModelName should startWith("logreg_")
+    insights.bestModelType shouldBe LogisticRegression
+    val bestModelValidationResults = insights.bestModelValidationResults
+    bestModelValidationResults.size shouldBe 15
+    println(bestModelValidationResults)
+    bestModelValidationResults.get("area under PR") shouldBe Some("0.0")
+    val validationResults = insights.validationResults
+    validationResults.size shouldBe 2
+    validationResults.get(insights.bestModelName) shouldBe Some(bestModelValidationResults)
+  }
+
+  it should "return test/train evaluation metrics" in {
+    val insights = workflowModel.modelInsights(prob)
+    insights.trainEvaluationMetrics shouldBe
+      BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0)
+    insights.testEvaluationMetrics shouldBe Some(
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0)
+    )
   }
 
   it should "correctly serialize and deserialize from json" in {

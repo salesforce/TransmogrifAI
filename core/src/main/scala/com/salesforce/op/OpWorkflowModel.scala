@@ -35,6 +35,7 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
+import com.salesforce.op.stages.impl.selector.StageParamNames
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -165,7 +166,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   /**
-   * Pulls all summary metadata off of transformers
+   * Pulls all summary metadata of transformers and puts them in json
    *
    * @return json summary
    */
@@ -177,11 +178,26 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )
 
   /**
-   * Pulls all summary metadata off of transformers and puts them in a pretty json string
+   * Pulls all summary metadata of transformers and puts them into json string
    *
-   * @return string summary
+   * @return json string summary
    */
   def summary(): String = pretty(render(summaryJson()))
+
+  /**
+   * Pulls all summary metadata of transformers and puts them into compact print friendly string
+   *
+   * @return compact print friendly string
+   */
+  def summaryPretty(): String = {
+    val prediction = resultFeatures.find(_.name == StageParamNames.outputParam1Name).orElse(
+      stages.map(_.getOutput()).find(_.name == StageParamNames.outputParam1Name)
+    ).getOrElse(
+      throw new Exception("No prediction feature is defined")
+    )
+    val insights = modelInsights(prediction)
+    ???
+  }
 
   /**
    * Save this model to a path
