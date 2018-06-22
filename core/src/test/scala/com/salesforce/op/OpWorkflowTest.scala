@@ -394,7 +394,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val prettySummary = fittedWorkflow.summaryPretty()
     log.info(prettySummary)
-    prettySummary.contains("Selected model - LogisticRegression") shouldBe true
+    prettySummary.contains(s"Selected Model - $LogisticRegression") shouldBe true
+    prettySummary.contains("| area under PR    | 0.25") shouldBe true
     prettySummary.contains("Model Evaluation Metrics") shouldBe true
   }
 

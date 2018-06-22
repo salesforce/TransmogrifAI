@@ -233,7 +233,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     // Selected model information
     summary += {
       val bestModelType = insights.selectedModelType
-      val name = s"Selected model - $bestModelType"
+      val name = s"Selected Model - $bestModelType"
       val validationResults = insights.selectedModelValidationResults.toSeq ++ Seq(
         "name" -> insights.selectedModelName,
         "uid" -> insights.selectedModelUID,
