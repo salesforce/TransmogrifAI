@@ -31,7 +31,11 @@
 
 package com.salesforce.op.features.types
 
-
+/**
+ * Multi picklist value that represents a multiple selection from a set of values
+ *
+ * @param value multiple selection from a set of values
+ */
 class MultiPickList(val value: Set[String]) extends OPSet[String] {
   type Value = Set[String]
 }

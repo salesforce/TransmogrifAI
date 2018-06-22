@@ -75,3 +75,4 @@ class UIDTest extends FlatSpec with TestCommon {
     intercept[IllegalArgumentException](UID.fromString("foo")).getMessage shouldBe "Invalid UID: foo"
   }
 }
+

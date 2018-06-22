@@ -32,7 +32,8 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.regression.OpLinearRegression
+import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.ParamMap
@@ -54,7 +55,11 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   )
 
   val label = rawLabel.copy(isResponse = true)
-  val testEstimator = new OpLinearRegression().setInput(label, features)
+  // TODO put back LR when evaluators work with prediction features
+  val testEstimator = RegressionModelSelector.withTrainValidationSplit(dataSplitter = None, trainRatio = 0.5)
+    .setModelsToTry(LinearRegression)
+    .setLinearRegressionRegParam(0)
+    .setInput(label, features)
 
   val prediction = testEstimator.getOutput()
   val testEvaluator = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction)

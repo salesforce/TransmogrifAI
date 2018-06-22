@@ -76,6 +76,20 @@ class TransientFeatureTest extends FlatSpec with PassengerFeaturesTest with Test
     assertThrows[RuntimeException] { t.getFeature() }
   }
 
+  it should "be equal to self" in {
+    tf shouldBe tf
+    tf.equals(tf) shouldBe true
+  }
+
+  it should "not be equal to a different instance" in {
+    val other = TransientFeature(weight)
+    tf should not be other
+    tf.equals(other) shouldBe false
+  }
+
+  it should "have hash code of it's uid" in {
+    tf.hashCode() shouldBe tf.uid.hashCode
+  }
 
   it should "cast back to FeatureLike" in {
     tf.asFeatureLike[Real] shouldBe height

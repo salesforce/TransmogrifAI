@@ -47,8 +47,10 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
 
   val (ds, f1) = TestFeatureBuilder(
     Seq[(TextMap)](
-      TextMap(Map("k1" -> "A giraffe drinks by the watering hole", "k2" -> "Cheese")),
-      TextMap(Map("k2" -> "French Fries")),
+      TextMap(Map("k1" -> "A giraffe drinks by the watering hole", "k2" -> "Cheese", "k3" -> "Hello", "k4" -> "Bye")),
+      // scalastyle:off
+      TextMap(Map("k2" -> "French Fries", "k4" -> "\uA7BC\u10C8\u2829\u29BA\u23E1")),
+      // scalastyle:on
       TextMap(Map("k3" -> "Hip-hop Pottamus"))
     )
   )
@@ -68,9 +70,9 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
     val vector = vectorizer.getOutput()
 
     val expected = Array(
-      Array(0.0, 0.0, 1.0),
-      Array(1.0, 0.0, 1.0),
-      Array(1.0, 1.0, 0.0)
+      Array(0.0, 0.0, 0.0, 0.0),
+      Array(1.0, 0.0, 1.0, 1.0),
+      Array(1.0, 1.0, 0.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
 
@@ -80,7 +82,8 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
       f1 -> List(
         IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k1"),
         IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k2"),
-        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k3")
+        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k3"),
+        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k4")
       )
     )
   }

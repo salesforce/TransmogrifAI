@@ -36,7 +36,9 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
+import com.salesforce.op.stages.impl.feature.HashSpaceStrategy.findValues
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.feature.HashingTF
@@ -97,6 +99,16 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
   }
 }
 
+sealed trait HashSpaceStrategy extends EnumEntry with Serializable
+
+object HashSpaceStrategy extends Enum[HashSpaceStrategy] {
+  val values: Seq[HashSpaceStrategy] = findValues
+
+  case object Shared extends HashSpaceStrategy
+  case object Separate extends HashSpaceStrategy
+  case object Auto extends HashSpaceStrategy
+}
+
 private[op] trait HashingVectorizerParams extends Params {
   final val numFeatures = new IntParam(
     parent = this, name = "numFeatures",
@@ -115,11 +127,22 @@ private[op] trait HashingVectorizerParams extends Params {
   )
   def setHashWithIndex(v: Boolean): this.type = set(hashWithIndex, v)
 
+  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
   final val forceSharedHashSpace = new BooleanParam(
     parent = this, name = "forceSharedHashSpace",
     doc = s"if true, then force the hash space to be shared among all included features"
   )
+  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
   def setForceSharedHashSpace(v: Boolean): this.type = set(forceSharedHashSpace, v)
+  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
+  def getForceSharedHashSpace: Boolean = $(forceSharedHashSpace)
+
+  final val hashSpaceStrategy: Param[String] = new Param[String](this, "hashSpaceStrategy",
+    "Strategy to determine whether to use shared or separate hash space for input text features",
+    (value: String) => HashSpaceStrategy.withNameInsensitiveOption(value).isDefined
+  )
+  def setHashSpaceStrategy(v: HashSpaceStrategy): this.type = set(hashSpaceStrategy, v.entryName)
+  def getHashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.withNameInsensitive($(hashSpaceStrategy))
 
   final val prependFeatureName = new BooleanParam(
     parent = this, name = "prependFeatureName",
@@ -132,6 +155,7 @@ private[op] trait HashingVectorizerParams extends Params {
     isValid = (s: String) => HashAlgorithm.withNameInsensitiveOption(s).isDefined
   )
   def setHashAlgorithm(h: HashAlgorithm): this.type = set(hashAlgorithm, h.toString.toLowerCase)
+  def getHashAlgorithm: HashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
 
   final val binaryFreq = new BooleanParam(
     parent = this, name = "binaryFreq",
@@ -145,7 +169,8 @@ private[op] trait HashingVectorizerParams extends Params {
     forceSharedHashSpace -> false,
     prependFeatureName -> TransmogrifierDefaults.PrependFeatureName,
     hashAlgorithm -> TransmogrifierDefaults.HashAlgorithm.toString.toLowerCase,
-    binaryFreq -> TransmogrifierDefaults.BinaryFreq
+    binaryFreq -> TransmogrifierDefaults.BinaryFreq,
+    hashSpaceStrategy -> HashSpaceStrategy.Auto.toString
   )
 
 }
@@ -162,6 +187,7 @@ private[op] trait HashingVectorizerParams extends Params {
  * @param binaryFreq           if true, term frequency vector will be binary such that non-zero term counts
  *                             will be set to 1.0
  * @param hashAlgorithm        hash algorithm to use
+ * @param hashSpaceStrategy    strategy to determine whether to use shared hash space for all included features
  */
 case class HashingFunctionParams
 (
@@ -172,7 +198,8 @@ case class HashingFunctionParams
   maxNumOfFeatures: Int,
   forceSharedHashSpace: Boolean,
   binaryFreq: Boolean,
-  hashAlgorithm: HashAlgorithm
+  hashAlgorithm: HashAlgorithm,
+  hashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.Auto
 )
 
 /**
@@ -189,7 +216,12 @@ private[op] trait HashingFun {
   protected def isSharedHashSpace(p: HashingFunctionParams, numFeatures: Option[Int] = None): Boolean = {
     val numHashes = p.numFeatures
     val numOfFeatures = numFeatures.getOrElse(p.numInputs)
-    (numHashes * numOfFeatures) > p.maxNumOfFeatures || p.forceSharedHashSpace
+    import HashSpaceStrategy._
+    p.hashSpaceStrategy match {
+      case s if p.forceSharedHashSpace || s.equals(Shared) => true
+      case Separate => false
+      case Auto => (numHashes * numOfFeatures) > p.maxNumOfFeatures
+    }
   }
 
   /**

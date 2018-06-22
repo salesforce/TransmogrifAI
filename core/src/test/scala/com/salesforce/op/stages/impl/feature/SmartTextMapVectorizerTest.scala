@@ -151,14 +151,16 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
   }
 
-  it should "detect two non categorical text features" in {
+  it should "use separate hash space for each text feature" in {
     val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setMaxCardinality(1).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setCleanKeys(false)
+      .setHashSpaceStrategy(HashSpaceStrategy.Separate)
       .setInput(m1, m2).getOutput()
 
     val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setMaxCardinality(1).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Separate)
       .setInput(f1, f2).getOutput()
 
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
@@ -172,8 +174,76 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
-      if (m.index < 4) m.indicatorGroup shouldBe Option(f1.name)
-      else m.indicatorGroup shouldBe Option(f2.name)
+      if (m.index < 4 || m.index == 8) m.indicatorGroup shouldBe Option(f1.name)
+      else if (m.index < 8 || m.index == 9) m.indicatorGroup shouldBe Option(f2.name)
+      m.indicatorValue shouldBe f.indicatorValue
+    }
+
+    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+  }
+
+  it should "use shared hash space for two text features" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(1).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setNumFeatures(4).setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setInput(m1, m2).getOutput()
+
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(1).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setNumFeatures(4).setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val result = transformed.collect(smartMapVectorized, smartVectorized)
+
+    val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    mapMeta.history.keys shouldBe Set(m1.name, m2.name)
+    mapMeta.columns.length shouldBe meta.columns.length
+
+    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+      m.parentFeatureName shouldBe Array(m1.name)
+      m.parentFeatureType shouldBe Array(m1.typeName)
+      if (m.index == 4) {
+        assert(m.indicatorGroup === Option(f1.name), s"first null indicator should be from ${f1.name}")
+      } else if (m.index == 5) {
+        assert(m.indicatorGroup === Option(f2.name), s"second null indicator should be from ${f2.name}")
+      }
+      m.indicatorValue shouldBe f.indicatorValue
+    }
+
+    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+  }
+
+  it should "use shared hash space for two text features again" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(1).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setNumFeatures(TransmogrifierDefaults.MaxNumOfFeatures).setHashSpaceStrategy(HashSpaceStrategy.Auto)
+      .setInput(m1, m2).getOutput()
+
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(1).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setNumFeatures(TransmogrifierDefaults.MaxNumOfFeatures).setHashSpaceStrategy(HashSpaceStrategy.Auto)
+      .setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val result = transformed.collect(smartMapVectorized, smartVectorized)
+
+    val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    mapMeta.history.keys shouldBe Set(m1.name, m2.name)
+    mapMeta.columns.length shouldBe meta.columns.length
+
+    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+      m.parentFeatureName shouldBe Array(m1.name)
+      m.parentFeatureType shouldBe Array(m1.typeName)
+      if (m.index == TransmogrifierDefaults.MaxNumOfFeatures) {
+        assert(m.indicatorGroup === Option(f1.name), s"first null indicator should be from ${f1.name}")
+      } else if (m.index > TransmogrifierDefaults.MaxNumOfFeatures) {
+        assert(m.indicatorGroup === Option(f2.name), s"second null indicator should be from ${f2.name}")
+      }
       m.indicatorValue shouldBe f.indicatorValue
     }
 

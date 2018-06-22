@@ -110,7 +110,6 @@ class TransientFeature
    */
   def asFeatureLike[I <: FeatureType]: FeatureLike[I] = getFeature().asInstanceOf[FeatureLike[I]]
 
-
   /**
    * Transform trasient feature into column metadata for use vectors
    * (for when each feature creates one column of a vector)
@@ -167,6 +166,27 @@ class TransientFeature
     val json = render(toJson)
     if (pretty) JsonMethods.pretty(json) else compact(json)
   }
+
+  /**
+   * Tests the equality of the TransientFeature objects
+   */
+  override def equals(that: Any): Boolean = {
+    that match {
+      case t: TransientFeature =>
+        t.name == name && t.isResponse == isResponse && t.isRaw == isRaw &&
+          t.uid == uid && t.typeName == typeName && t.originFeatures == originFeatures &&
+          t.stages == stages
+      case _ => false
+    }
+  }
+
+  /**
+   * Returns the hash code of this feature
+   *
+   * @return hash code
+   */
+  override def hashCode(): Int = uid.hashCode
+
 }
 
 object TransientFeature {

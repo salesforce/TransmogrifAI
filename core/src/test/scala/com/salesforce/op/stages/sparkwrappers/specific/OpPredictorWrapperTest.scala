@@ -32,6 +32,7 @@
 package com.salesforce.op.stages.sparkwrappers.specific
 
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.test.{PrestigeData, TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.regression.{LinearRegression, LinearRegressionModel}
@@ -46,11 +47,11 @@ class OpPredictorWrapperTest extends FlatSpec with TestSparkContext with Prestig
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  val (ds, targetLabel, featureVector) = TestFeatureBuilder[Real, OPVector](
-    prestigeSeq.map(p => p.prestige.toReal -> Vectors.dense(p.education, p.income, p.women).toOPVector)
+  val (ds, targetLabel, featureVector) = TestFeatureBuilder[RealNN, OPVector](
+    prestigeSeq.map(p => p.prestige.toRealNN -> Vectors.dense(p.education, p.income, p.women).toOPVector)
   )
 
-  Spec[OpPredictorWrapper[_, _, _, _]] should
+  Spec[OpPredictorWrapper[_, _]] should
     "be able to run a simple logistic regression model (fitIntercept=true)" in {
     val lrModel: LinearRegressionModel = fitLinRegModel(fitIntercept = true)
     lrModel.intercept.abs should be > 1E-6
@@ -69,12 +70,11 @@ class OpPredictorWrapperTest extends FlatSpec with TestSparkContext with Prestig
         .setElasticNetParam(0.8)
         .setFitIntercept(fitIntercept)
 
-    val lr =
-      new OpPredictorWrapper[Real, Real, LinearRegression, LinearRegressionModel](lrBase)
-        .setInput(targetLabel, featureVector)
+    val lr = new OpPredictorWrapper[LinearRegression, LinearRegressionModel](lrBase)
+      .setInput(targetLabel, featureVector)
 
     // Fit the model
-    val model = lr.fit(ds)
+    val model = lr.fit(ds).asInstanceOf[SparkWrapperParams[LinearRegressionModel]]
     val lrModel = model.getSparkMlStage().get
 
     // Print the coefficients and intercept for linear regression

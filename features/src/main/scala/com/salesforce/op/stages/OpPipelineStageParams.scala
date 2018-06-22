@@ -38,7 +38,7 @@ import org.apache.spark.sql.types.{Metadata, StructType}
 
 
 /**
- * Parameters and functionalities shared across the input features
+ * Parameters and functions shared across the input features
  */
 trait InputParams extends Params {
 

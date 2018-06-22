@@ -33,8 +33,12 @@ package com.salesforce.op.evaluators
 
 import com.salesforce.op.UID
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
-import org.apache.spark.sql.Dataset
+import org.apache.spark.mllib.evaluation.{BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.types.DoubleType
 import org.slf4j.LoggerFactory
 
 /**
@@ -52,7 +56,8 @@ private[op] class OpBinaryClassificationEvaluator
 (
   override val name: String = OpEvaluatorNames.binary,
   override val isLargerBetter: Boolean = true,
-  override val uid: String = UID[OpBinaryClassificationEvaluator]
+  override val uid: String = UID[OpBinaryClassificationEvaluator],
+  val numBins: Int = 100
 ) extends OpBinaryClassificationEvaluatorBase[BinaryClassificationMetrics](uid = uid) {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
@@ -60,22 +65,21 @@ private[op] class OpBinaryClassificationEvaluator
   def getDefaultMetric: BinaryClassificationMetrics => Double = _.AuROC
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationMetrics = {
-    val (labelColName, rawPredictionColName, predictionColName) = (getLabelCol, getRawPredictionCol, getPredictionCol)
+    val (labelColName, rawPredictionColName, predictionColName, probabilityColName) =
+      (getLabelCol, getRawPredictionCol, getPredictionCol, getProbabilityCol)
 
     log.debug(
-      "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n",
-      labelColName, rawPredictionColName, predictionColName
+      "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
+      labelColName, rawPredictionColName, predictionColName, probabilityColName
     )
-
-    val Array(aUROC, aUPR) =
-      Array(BinaryClassEvalMetrics.AuROC, BinaryClassEvalMetrics.AuPR).map(getBinaryEvaluatorMetric(_, data))
 
     import data.sparkSession.implicits._
     val rdd = data.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
     if (rdd.isEmpty()) {
       log.error("The dataset is empty")
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Seq(), Seq(), Seq(), Seq())
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -94,11 +98,23 @@ private[op] class OpBinaryClassificationEvaluator
       val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
       val error = if (tp + fp + tn + fn == 0.0) 0.0 else (fp + fn) / (tp + fp + tn + fn)
 
+      val scoreAndLabels =
+        data.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map {
+          case Row(prob: Vector, label: Double) => (prob(1), label)
+          case Row(prob: Double, label: Double) => (prob, label)
+        }
+      val sparkMLMetrics = new SparkMLBinaryClassificationMetrics(scoreAndLabels = scoreAndLabels, numBins = numBins)
+      val thresholds = sparkMLMetrics.thresholds().collect()
+      val precisionByThreshold = sparkMLMetrics.precisionByThreshold().collect().map(_._2)
+      val recallByThreshold = sparkMLMetrics.recallByThreshold().collect().map(_._2)
+      val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
+      val aUROC = sparkMLMetrics.areaUnderROC()
+      val aUPR = sparkMLMetrics.areaUnderPR()
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
-        AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn
+        AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
+        thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold
       )
-
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
     }
@@ -147,5 +163,9 @@ case class BinaryClassificationMetrics
   TP: Double,
   TN: Double,
   FP: Double,
-  FN: Double
+  FN: Double,
+  thresholds: Seq[Double],
+  precisionByThreshold: Seq[Double],
+  recallByThreshold: Seq[Double],
+  falsePositiveRateByThreshold: Seq[Double]
 ) extends EvaluationMetrics

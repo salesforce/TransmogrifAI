@@ -33,11 +33,19 @@ package com.salesforce.op.features.types
 
 
 /**
- * A base class for all the numeric feature types
+ * A base class for all the numeric Feature Types
+ *
  * @tparam N number type (Long, Double etc)
  */
 abstract class OPNumeric[N] extends FeatureType {
   type Value = Option[N]
+
+  /**
+   * Convert numeric value to [[Double]] representation
+   *
+   * @return [[Double]] representation of numeric value
+   */
   def toDouble: Option[Double]
+
   final def isEmpty: Boolean = value.isEmpty
 }
