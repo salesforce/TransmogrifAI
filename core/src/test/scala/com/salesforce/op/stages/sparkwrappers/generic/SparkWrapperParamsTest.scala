@@ -66,13 +66,4 @@ class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestC
     swEstimator.getSparkMlStage() shouldBe None
   }
 
-  it should "when setting the stage it should also set path" in {
-    // should should be none because nothing is set
-    swEstimator.getStageSavePath().get shouldBe swEstimator.getSavePath()
-
-    swEstimator.setSavePath(path)
-    swEstimator.setSparkMlStage(Some(new StandardScaler()))
-
-    swEstimator.getStageSavePath().get shouldBe swEstimator.getSavePath()
-  }
 }

@@ -76,8 +76,7 @@ object ConditionalAggregation {
       .asPredictor
 
     val numPurchasesNextDay = FeatureBuilder.RealNN[WebVisit]
-      .extract(visit => visit.productId.map{_ => 1D}
-        .toRealNN(throw new IllegalArgumentException("Found null in number of webvisits")))
+      .extract(visit => visit.productId.map(_ => 1.0).toRealNN(0.0))
       .aggregate(SumRealNN)
       .window(Duration.standardDays(1))
       .asResponse

@@ -95,7 +95,6 @@ trait RichDateFeature {
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
-      // vectorize DateList
       f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate, trackNulls = trackNulls,
         others = others.map(_.toDateList()))
     }

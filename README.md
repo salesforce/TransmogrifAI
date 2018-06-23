@@ -1,122 +1,121 @@
 # Octopus Prime (aka Optimus Prime) [![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
 
-Abstract away the redundant, repeatable feature engineering, feature selection and model selection tasks slowing down ML development.
-
-## Overview
-Octopus Prime (aka Optimus Prime) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
+Octopus Prime is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
 
+Use Octopus Prime if you need a machine learning library to:
 
-Use Optimus Prime if you need a machine learning library to:
-
-* Build machine learning applications in hours, not months
-* Build machine learning models without having a machine learning background
+* Build production ready machine learning applications in hours, not months
+* Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-Optimus Prime is compatible with Spark 2.2.1 and Scala 2.11.
+Octopus Prime is compatible with Spark 2.2.1 and Scala 2.11.
 
 [Skip to Quick Start and Documentation](https://github.com/salesforce/op#quick-start-and-documentation)
 
-## Motivation
-_Building real life machine learning applications need fair amount of tribal knowledge and intuition. Coupled with the explosion of ML use cases in the world that need to be addressed, there are not enough data scientists to build all the applications and democratize it. Automation is the solution to making machine learning truly accessible._
+## Predicting Titanic Survivors with Octopus Prime
 
-Creating a ML model for a particular application requires many steps, usually manually performed by a data scientist or engineer. These steps include ETL, feature engineering, model selection (including hyper-parameter tuning), safeguarding against data leakage, operationalizing models, scoring and updating models.
-
-![Alt text](resources/pipeline.png?raw=true)
-
-If your organization or product has multiple use cases, it is necessary to create many individually tuned models (for each such use case). Scaling this is difficult, time consuming and expensive.
-
-![Alt text](resources/pipelineN.png?raw=true)
-
-Optimus Prime provides a solution for these use cases by automating feature engineering, feature selection (including data leakage detection), model selection and hyper-parameter tuning with a simple interface that allows users to focus on what they are trying to model rather than ML details.
-
-## AutoML
-The AutoML functionality provided by Optimus Prime allows development of specialized machine learning applications across many different customers in a code-once "meta" workflow.
-
-### Feature engineering
-Optimus Prime vectorizers (shortcut  ```.autoTransform()``` , aka ```.transmogrify()``` ) take in a sequence of features, automatically apply default transformations to them based on feature types (e.g. split Emails and pivot out the top K domains) and combine them into a single vector. This is in essence the automatic feature engineering Stage of Optimus Prime.
-![Alt text](resources/feateng.png?raw=true)
+The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using Octopus Prime:
 
 ```scala
-val features = Seq(email, phone, age, subject, zipcode).autoTransform()
+import com.salesforce.op._
+import com.salesforce.op.readers._
+import com.salesforce.op.features._
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.classification._
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.SparkSession
+
+implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
+import spark.implicits._
+
+// Read Titanic data as a DataFrame
+val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).readDataset().toDF()
+
+// Extract response and predictor variables
+val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
+
+// Automated feature engineering of predictors
+val featureVector = features.toSeq.autoTransform()
+
+// Automated feature selection
+val checkedFeatures = survived.sanityCheck(
+  featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
+
+// Automated model selection
+val (pred, raw, prob) = BinaryClassificationModelSelector()
+  .setInput(survived, checkedFeatures).getOutput()
+val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
+
+println(s"Model summary: \n${model.summary()}")
 ```
-Of course specific feature engineering is also possible and can be used in combination with automatic type specific transformations.
+Model summary:
 
-This can be manipulated directly by users (using type safe operations with editor tab completion) to achieve the desired feature engineering steps:
-
-```scala
-val ageGroup = age.bucketize(splits = Seq(0, 10, 18, 40, 60, 120)).toMultiPickList().pivot()
 ```
-### Feature Selection
-The feature selection step happens within the sanity checker. It does the following:
+Evaluated Logistic Regression, Random Forest models with 3 folds and AuPR metric.
+Evaluated 3 Logistic Regression models with AuPR between [0.6751930383321765, 0.7768725281794376]
+Evaluated 16 Random Forest models with AuPR between [0.7781671467343991, 0.8104798040316159]
 
-1. Analyze every feature and out put descriptive statistics such as mean, min, max, variance, number of nulls to ensure features have acceptable ranges
-2. Compute association of every feature to the label (correlations, cramersV, pointwise mutual information and other statistical tests) and drop those with low predictive power
-3. Detect data leakage (having information that mirrors what you are trying to predict - which would not be available in scoring).
+Selected model Random Forest classifier with parameters:
+|-----------------------|:------------:|
+| Model Param           |     Value    |
+|-----------------------|:------------:|
+| modelType             | RandomForest |
+| featureSubsetStrategy |         auto |
+| impurity              |         gini |
+| maxBins               |           32 |
+| maxDepth              |           12 |
+| minInfoGain           |        0.001 |
+| minInstancesPerNode   |           10 |
+| numTrees              |           50 |
+| subsamplingRate       |          1.0 |
+|-----------------------|:------------:|
 
+Model evaluation metrics:
+|-------------|:------------------:|:-------------------:|
+| Metric Name | Hold Out Set Value |  Training Set Value |
+|-------------|:------------------:|:-------------------:|
+| Precision   |               0.85 |   0.773851590106007 |
+| Recall      | 0.6538461538461539 |  0.6930379746835443 |
+| F1          | 0.7391304347826088 |  0.7312186978297163 |
+| AuROC       | 0.8821603927986905 |  0.8766642291593114 |
+| AuPR        | 0.8225075757571668 |   0.850331080886535 |
+| Error       | 0.1643835616438356 | 0.19682151589242053 |
+| TP          |               17.0 |               219.0 |
+| TN          |               44.0 |               438.0 |
+| FP          |                3.0 |                64.0 |
+| FN          |                9.0 |                97.0 |
+|-------------|:------------------:|:-------------------:|
 
-```scala
-val checkedFeatures = new SanityChecker().setInput(label, features).getOutput()
-```
+Top model insights computed using correlation:
+|-----------------------|:--------------------:|
+| Top Positive Insights |      Correlation     |
+|-----------------------|:--------------------:|
+| sex = "female"        |   0.5177801026737666 |
+| cabin = "OTHER"       |   0.3331391338844782 |
+| pClass = 1            |   0.3059642953159715 |
+|-----------------------|:--------------------:|
+| Top Negative Insights |      Correlation     |
+|-----------------------|:--------------------:|
+| sex = "male"          |  -0.5100301587292186 |
+| pClass = 3            |  -0.5075774968534326 |
+| cabin = null          | -0.31463114463832633 |
+|-----------------------|:--------------------:|
 
-### Model selection and tuning
-Optimus Prime will select the best model and hyper-parameters for you based on the class of modeling you are doing (eg. Classification, Regression etc.).
-Smart model selection and comparison gives the next layer of improvements over traditional ML workflows.
-
-```scala
-val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(label, checkedFeatures).getOutput()
-```
-
-Of course, you can use a single model with manually chosen hyper-parameters if you prefer.
-
-```scala
-val (pred, raw, prob) = new OpRandomForest()
-   .setMaxDepth(5)
-   .setMinInfoGain(0.1)
-   .setNumTrees(100)
-   .setInput(label, checkedFeatures)
-   .getOutput()
-```
-### Putting it all together
-
-```scala
-case class Schema
-(
-  id: Int,
-  email: Option[String],
-  phone: Option[String],
-  age: Int,
-  subject: Option[String],
-  zipcode: Option[String],
-  label: int
-)
-
-//Build Features
-val email = FeatureBuilder.Email[Schema].extract(asEmail(_.getEmail)).asPredictor
-val phone = FeatureBuilder.Phone[Schema].extract(asPhone(_.getPhone)).asPredictor
-val subject = FeatureBuilder.Text[Schema].extract(asText(_.getSubject)).asPredictor
-val zipcode = FeatureBuilder.PostalCode[Schema].extract(asPostalCode(_.getZipcode)).asPredictor
-val age = FeatureBuilder.Real[Schema].extract(_.getAge.toReal).asPredictor
-val label = FeatureBuilder.RealNN[Schema].extract(_.label.toRealNN).asResponse
-
-//Automated Feature Engineering
-val features = Seq(email, phone, age, subject, zipcode).autoTransform()
-
-//Automated Feature Selection
-val checkedFeatures = new SanityChecker().setInput(label, features).getOutput()
-
-//Automated Model Selection
-val (prediction, rawPrediction, probability) = BinaryClassificationModelSelector().setInput(label, checkedFeatures).getOutput()
-
-//Training Data
-val trainDataReader = DataReaders.Simple.csvCase[Schema](path = Some("PathToDataFile"), key = _.id.toString)
-
-//Create and fit workflow
-val workflow = new OpWorkflow().setResultFeatures(label, rawPrediction, probability, prediction).setReader(trainDataReader)
-val fittedWorkflow = workflow.train()
+Top model insights computed using CramersV:
+|-----------------------|:--------------------:|
+|      Top Insights     |       CramersV       |
+|-----------------------|:--------------------:|
+| sex                   |    0.525557139885501 |
+| embarked              |  0.31582347194683386 |
+| age                   |  0.21582347194683386 |
+|-----------------------|:--------------------:|
 ```
 
-## Adding OP into an existing project
+While this may seem a bit too magical, for those who want more control, Octopus Prime also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
+
+
+## Adding OP into your project
 You can simply add OP as a regular dependency to your existing project. Example for gradle below:
 
 ```groovy
@@ -126,8 +125,8 @@ repositories {
        credentials {
            // Generate github api token here - https://goo.gl/ANZ9oz
            // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
-           username = System.getenv("GITHUB_API_TOKEN")
-           password "" // leave the password empty
+           username = System.getenv("GITHUB_API_TOKEN") // use your token as a username
+           password "" // leave the password blank
        }
        authentication { digest(BasicAuthentication) }
     }
@@ -135,8 +134,8 @@ repositories {
 ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '8'
-    sparkVersion = <SPARK_VERSION> // Set the required Spark version here
-    opVersion = <OP_VERSION> // Set the required OP version here
+    sparkVersion = '2.2.1'
+    opVersion = '3.3.1'
 }
 dependencies {
     // Scala
@@ -144,7 +143,7 @@ dependencies {
     scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
     compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
 
-    // Spark (needed only at compile / test time)
+    // Spark
     compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
     testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
     compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
@@ -152,32 +151,18 @@ dependencies {
     compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
-    // Optimus Prime
+    // Octopus Prime
     compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
 
-    // Other depdendecies
+    // All your other depdendecies go below
 }
 ```
-
-## Abstractions
-
-Optimus Prime is designed to simplify the creation of machine learning workflows. To this end we have created an abstraction for creating and running machine learning workflows.
-The abstraction is made up of Features, Stages, Workflows and Readers which interact as shown in the diagram below.
-
-![Alt text](resources/abstractions.png?raw=true)
-
-**Features:** The primary abstraction that users of Optimus Prime interact with are Features. Features are essentially type-safe pointers to data columns with additional metadata built in. Features are the elements which users manipulate and interact with in order to define all steps in the machine learning workflow. In our abstraction Features are acted on by Stages in order to produce new Features. Part of the metadata contained in Features is strict type information about the column. This is used both to determine which Stages can be called on a given Feature and which Stages should be called when automatic feature engineering Stages are used. Because the output of every Stage is a Feature or set of Features, any sequence of type safe operations can be strung together to create a machine learning workflow.
-
-**Stages:** Stages define actions that you wish to perform on Features in your workflow. Those familiar with Spark ML will recognize the idea of Stages being either Transformers or Estimators. Transformers provide functions for transforming one or more Features in your data to one or more new Features. Estimators provide algorithms which when applied to one or more Features produce Transformers. The Optimus Prime Transformers and Estimators extend Spark ML Transformers and Estimators and can be used as standard Spark stages if desired. In both Spark ML and Optimus Prime when Stages are used within a workflow the user does not need to distinguish between types of Stages (Estimator or Transformer), this distinction is only important for developers developing new Estimators or Transformers.
-
-**Workflows and Readers:** Once the final desired Feature, or Features, have been defined they are materialized by feeding the final Features into a Workflow. The Workflow will trace back how the final Features were created and make an optimized DAG of Stage executions in order to produce the final Features. The Workflow must also be provided a DataReader. The DataReader can do complex data pre-processing steps or simply load a dataset. The key component of the DataReader is that the type of the data produced by the reader must match the type of the data expected by the initial feature generation stages.
 
 ## Quick Start and Documentation
 
 See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
 
 See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programming API (can also be viewed [locally](docs/README.md)).
-
 
 ## License
 

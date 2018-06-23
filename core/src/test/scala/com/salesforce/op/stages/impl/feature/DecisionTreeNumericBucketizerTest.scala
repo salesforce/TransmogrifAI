@@ -249,3 +249,4 @@ object DecisionTreeNumericBucketizerTestHelper extends Matchers {
   }
 
 }
+

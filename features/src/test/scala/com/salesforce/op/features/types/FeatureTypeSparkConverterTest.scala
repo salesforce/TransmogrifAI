@@ -33,6 +33,7 @@ package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
+import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
@@ -44,60 +45,13 @@ import scala.concurrent.duration._
 class FeatureTypeSparkConverterTest
   extends PropSpec with PropertyChecks with TestCommon with ConcurrentCheck with FeatureTypeAsserts {
 
-  val featureTypeConverters: TableFor1[FeatureTypeSparkConverter[_ <: FeatureType]] = Table("ft",
-    // Vector
-    FeatureTypeSparkConverter[OPVector](),
-    // Lists
-    FeatureTypeSparkConverter[TextList](),
-    FeatureTypeSparkConverter[DateList](),
-    FeatureTypeSparkConverter[DateTimeList](),
-    // Maps
-    FeatureTypeSparkConverter[Base64Map](),
-    FeatureTypeSparkConverter[BinaryMap](),
-    FeatureTypeSparkConverter[ComboBoxMap](),
-    FeatureTypeSparkConverter[CurrencyMap](),
-    FeatureTypeSparkConverter[DateMap](),
-    FeatureTypeSparkConverter[DateTimeMap](),
-    FeatureTypeSparkConverter[EmailMap](),
-    FeatureTypeSparkConverter[IDMap](),
-    FeatureTypeSparkConverter[IntegralMap](),
-    FeatureTypeSparkConverter[MultiPickListMap](),
-    FeatureTypeSparkConverter[PercentMap](),
-    FeatureTypeSparkConverter[PhoneMap](),
-    FeatureTypeSparkConverter[PickListMap](),
-    FeatureTypeSparkConverter[RealMap](),
-    FeatureTypeSparkConverter[TextAreaMap](),
-    FeatureTypeSparkConverter[TextMap](),
-    FeatureTypeSparkConverter[URLMap](),
-    FeatureTypeSparkConverter[CountryMap](),
-    FeatureTypeSparkConverter[StateMap](),
-    FeatureTypeSparkConverter[CityMap](),
-    FeatureTypeSparkConverter[PostalCodeMap](),
-    FeatureTypeSparkConverter[StreetMap](),
-    FeatureTypeSparkConverter[GeolocationMap](),
-    FeatureTypeSparkConverter[Prediction](),
-    // Numerics
-    FeatureTypeSparkConverter[Binary](),
-    FeatureTypeSparkConverter[Currency](),
-    FeatureTypeSparkConverter[Date](),
-    FeatureTypeSparkConverter[DateTime](),
-    FeatureTypeSparkConverter[Integral](),
-    FeatureTypeSparkConverter[Percent](),
-    FeatureTypeSparkConverter[Real](),
-    FeatureTypeSparkConverter[RealNN](),
-    // Sets
-    FeatureTypeSparkConverter[MultiPickList](),
-    // Text
-    FeatureTypeSparkConverter[Base64](),
-    FeatureTypeSparkConverter[ComboBox](),
-    FeatureTypeSparkConverter[Email](),
-    FeatureTypeSparkConverter[ID](),
-    FeatureTypeSparkConverter[Phone](),
-    FeatureTypeSparkConverter[PickList](),
-    FeatureTypeSparkConverter[Text](),
-    FeatureTypeSparkConverter[TextArea](),
-    FeatureTypeSparkConverter[URL]()
+  val featureTypeConverters: TableFor1[FeatureTypeSparkConverter[_ <: FeatureType]] = Table("ftc",
+    FeatureTypeSparkConverter.featureTypeSparkConverters.values.toSeq: _*
   )
+  val featureTypeNames: TableFor1[String] = Table("ftnames",
+    FeatureTypeSparkConverter.featureTypeSparkConverters.keys.toSeq: _*
+  )
+  val bogusNames = Gen.alphaNumStr
 
   property("is a feature type converter") {
     forAll(featureTypeConverters) { ft => ft shouldBe a[FeatureTypeSparkConverter[_]] }
@@ -105,14 +59,40 @@ class FeatureTypeSparkConverterTest
   property("is serializable") {
     forAll(featureTypeConverters) { ft => ft shouldBe a[Serializable] }
   }
+  property("make a converter by feature type name") {
+    forAll(featureTypeNames) { featureTypeName =>
+      val ft: FeatureTypeSparkConverter[_ <: FeatureType] =
+        FeatureTypeSparkConverter.fromFeatureTypeName(featureTypeName)
+      assertCreate(ft.fromSpark(null))
+    }
+  }
+  property("error on making a converter on no existent feature type name") {
+    forAll(bogusNames) { bogusName =>
+      intercept[IllegalArgumentException](
+        FeatureTypeSparkConverter.fromFeatureTypeName(bogusName)
+      ).getMessage shouldBe s"Unknown feature type '$bogusName'"
+    }
+  }
   property("create a feature type instance of null") {
     forAll(featureTypeConverters)(ft => assertCreate(ft.fromSpark(null)))
   }
-  property("create a feature type instance in a timely fashion") {
+  property("create a feature type instance of null and back") {
+    forAll(featureTypeConverters) { ft =>
+      assertCreate(ft.fromSpark(null), (v: FeatureType) => {
+        ft.asInstanceOf[FeatureTypeSparkConverter[FeatureType]].toSpark(v) shouldBe (null: Any)
+        FeatureTypeSparkConverter.toSpark(v) shouldBe (null: Any)
+      })
+    }
+  }
+  property("create a feature type instance and back in a timely fashion") {
     forAllConcurrentCheck[FeatureTypeSparkConverter[_ <: FeatureType]](
       numThreads = 10, numInstancesPerThread = 50000, atMost = 10.seconds,
       table = featureTypeConverters,
-      functionCheck = ft => assertCreate(ft.fromSpark(null))
+      functionCheck = ft => {
+        assertCreate(ft.fromSpark(null), (v: FeatureType) => {
+          ft.asInstanceOf[FeatureTypeSparkConverter[FeatureType]].toSpark(v) shouldBe (null: Any)
+        })
+      }
     )
   }
 }

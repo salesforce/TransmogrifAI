@@ -32,9 +32,8 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.MetadataBuilder
 
 case object DataSplitter {
@@ -70,7 +69,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[LabelFeaturesKey]): ModelData =
+  def prepare(data: Dataset[Row]): ModelData =
     new ModelData(data, new MetadataBuilder())
 
   override def copy(extra: ParamMap): DataSplitter = {

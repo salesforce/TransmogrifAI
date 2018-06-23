@@ -53,8 +53,8 @@ configure(allProjs) {
     ext {
         scalaVersion = '2.11'
         scalaVersionRevision = '8'
-        scalaTestVersion = '3.0.0'
-        scalaCheckVersion = '1.13.5'
+        scalaTestVersion = '3.0.5'
+        scalaCheckVersion = '1.14.0'
         junitVersion = '4.11'
         avroVersion = '1.7.7'
         sparkVersion = '2.2.1'
@@ -68,7 +68,7 @@ configure(allProjs) {
         jodaConvertVersion = '1.8.1'
         algebirdVersion = '0.12.3'
         jacksonVersion = '2.7.3'
-        luceneVersion = '7.1.0'
+        luceneVersion = '7.3.0'
         enumeratumVersion = '1.4.12'
         scoptVersion = '3.5.0'
         googleLibPhoneNumberVersion = '8.8.5'
@@ -179,7 +179,8 @@ configure(allProjs) {
         header = rootProject.file('LICENSE.txt')
         ignoreFailures = true
         include '**/*.java', '**/*.scala'
-        exclude '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.scala',
+        exclude '**/org/apache/spark/ml/SparkDefaultParamsReadWrite.scala',
+                '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.scala',
                 '**/com/salesforce/op/test/TestSparkContext.scala',
                 '**/com/salesforce/op/test/TempDirectoryTest.scala',
                 '**/com/salesforce/op/utils/io/DirectOutputCommitter.scala',

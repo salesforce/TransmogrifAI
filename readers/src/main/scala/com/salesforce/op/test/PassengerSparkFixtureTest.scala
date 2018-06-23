@@ -57,13 +57,13 @@ trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesT
       key = _.getPassengerId.toString // Entity to score
     )
 
-  val simpleCsvReader = DataReaders.Simple.csv[PassengerCSV](
+  lazy val simpleCsvReader = DataReaders.Simple.csv[PassengerCSV](
     path = Some(passengerCsvPath), // Path should be optional so can also pass in as a parameter
     schema = PassengerCSV.getClassSchema.toString, // Input schema
     key = _.getPassengerId.toString // Entity to score
   )
 
-  val simpleStreamingReader = StreamingReaders.Simple.avro[Passenger](
+  lazy val simpleStreamingReader = StreamingReaders.Simple.avro[Passenger](
     key = _.getPassengerId.toString  // Entity to score
   )
 

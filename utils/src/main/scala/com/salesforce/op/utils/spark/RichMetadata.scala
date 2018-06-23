@@ -34,6 +34,7 @@ package com.salesforce.op.utils.spark
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
+import shapeless._
 
 object RichMetadata {
 
@@ -103,7 +104,7 @@ object RichMetadata {
             case (Some(av: String), Some(bv: String)) => av + bv
             case (Some(av: Metadata), Some(bv: Metadata)) => av.deepMerge(bv)
             case (Some(av), Some(bv)) => throw new RuntimeException(
-              s"Failed to merge metadatas for key $key due to incompatible value types '$av' and '$bv'"
+              s"Failed to merge metadata for key $key due to incompatible value types '$av' and '$bv'"
             )
           }
         res += key -> resVal
@@ -150,24 +151,40 @@ object RichMetadata {
     }
   }
 
+  private val booleanSeq = TypeCase[Seq[Boolean]]
+  private val longSeq = TypeCase[Seq[Long]]
+  private val intSeq = TypeCase[Seq[Int]]
+  private val doubleSeq = TypeCase[Seq[Double]]
+  private val stringSeq = TypeCase[Seq[String]]
+
   /**
    * Enrichment functions for Maps
    * @param theMap Map[String, Any]
    */
   implicit class RichMap(val theMap: Map[String, Any]) extends AnyVal {
 
-    def toMetadata: Metadata = theMap.foldLeft(new MetadataBuilder()) {
-      case (m, (k, v: Boolean)) => m.putBoolean(k, v)
-      case (m, (k, v: Double)) => m.putDouble(k, v)
-      case (m, (k, v: Long)) => m.putLong(k, v)
-      case (m, (k, v: String)) => m.putString(k, v)
-      case (m, (k, v: Array[Boolean])) => m.putBooleanArray(k, v)
-      case (m, (k, v: Array[Double])) => m.putDoubleArray(k, v)
-      case (m, (k, v: Array[Long])) => m.putLongArray(k, v)
-      case (m, (k, v: Array[String])) => m.putStringArray(k, v)
-      case (_, (k, v)) => throw new RuntimeException(s"Key '$k' has unsupported value type")
-    }.build()
-
+    def toMetadata: Metadata = {
+      val builder = new MetadataBuilder()
+      def unsupported(k: String) = throw new RuntimeException(s"Key '$k' has unsupported value type")
+      def putCollection(key: String, seq: Seq[Any]): MetadataBuilder = seq match {
+        case booleanSeq(v) => builder.putBooleanArray(key, v.toArray)
+        case intSeq(v) => builder.putLongArray(key, v.map(_.toLong).toArray)
+        case longSeq(v) => builder.putLongArray(key, v.toArray)
+        case doubleSeq(v) => builder.putDoubleArray(key, v.toArray)
+        case stringSeq(v) => builder.putStringArray(key, v.toArray)
+        case _ => unsupported(key)
+      }
+      theMap.foldLeft(builder) {
+        case (m, (k, v: Boolean)) => m.putBoolean(k, v)
+        case (m, (k, v: Double)) => m.putDouble(k, v)
+        case (m, (k, v: Long)) => m.putLong(k, v)
+        case (m, (k, v: String)) => m.putString(k, v)
+        case (m, (k, v: Seq[_])) => putCollection(k, v)
+        case (m, (k, v: Array[_])) => putCollection(k, v)
+        case (m, (k, v: Map[_, _])) => m.putMetadata(k, v.map { case (k, v) => k.toString -> v }.toMetadata)
+        case (_, (k, _)) => unsupported(k)
+      }.build()
+    }
   }
 
 }

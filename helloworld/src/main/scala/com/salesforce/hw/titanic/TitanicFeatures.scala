@@ -36,11 +36,9 @@ import com.salesforce.op.features.types._
 
 trait TitanicFeatures extends Serializable {
 
-  val survived =
-    FeatureBuilder.RealNN[Passenger].extract(_.getSurvived.toDouble.toRealNN).asResponse
+  val survived = FeatureBuilder.RealNN[Passenger].extract(_.getSurvived.toDouble.toRealNN).asResponse
 
-  val pClass =
-    FeatureBuilder.PickList[Passenger].extract(d => Option(d.getPclass).map(_.toString).toPickList).asPredictor
+  val pClass = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getPclass).map(_.toString).toPickList).asPredictor // scalastyle:off
 
   val name = FeatureBuilder.Text[Passenger].extract(d => Option(d.getName).toText).asPredictor
 

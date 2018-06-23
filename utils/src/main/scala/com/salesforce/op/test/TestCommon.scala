@@ -64,7 +64,6 @@ trait TestCommon extends Matchers with Assertions {
   case object Spec {
     def apply[T: ClassTag]: String = apply(classTag[T].runtimeClass)
     def apply[T1: ClassTag, T2: ClassTag]: String = apply[T2] + "[" + apply[T1] + "]"
-
     def apply(klazz: Class[_]): String = klazz.getSimpleName.stripSuffix("$")
   }
 

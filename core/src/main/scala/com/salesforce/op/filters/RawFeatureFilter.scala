@@ -31,19 +31,23 @@
 
 package com.salesforce.op.filters
 
+import scala.math.{abs, min}
+
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
-import com.salesforce.op.filters.FeatureDistrib.ProcessedSeq
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextTokenizer}
+import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
-import com.salesforce.op.utils.text.Language
 import com.twitter.algebird.Monoid
 import com.twitter.algebird.Semigroup
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
+import org.apache.spark.mllib.linalg.{Matrix, Vector}
+import org.apache.spark.mllib.stat.Statistics
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 import org.slf4j.LoggerFactory
@@ -59,6 +63,9 @@ import org.slf4j.LoggerFactory
  * @param maxFillDifference maximum acceptable fill rate difference between training and scoring data to be kept
  * @param maxFillRatioDiff maximum acceptable fill ratio between training and scoring (larger / smaller)
  * @param maxJSDivergence maximum Jensen-Shannon divergence between training and scoring distributions to be kept
+ * @param maxCorrelation maximum absolute correlation allowed between raw predictor null indicator and label
+ * @param correlationType type of correlation metric to use
+ * @param jsDivergenceProtectedFeatures features that are protected from removal by JS divergence check
  * @param protectedFeatures features that are protected from removal
  * @tparam T datatype of the reader
  */
@@ -71,11 +78,14 @@ class RawFeatureFilter[T]
   val maxFillDifference: Double,
   val maxFillRatioDiff: Double,
   val maxJSDivergence: Double,
+  val maxCorrelation: Double,
+  val correlationType: CorrelationType = CorrelationType.Pearson,
+  val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty
 ) extends Serializable {
 
-  assert(bins > 1 && bins <= FeatureDistrib.MaxBins, s"Invalid bin size $bins," +
-    s" bins must be between 1 and ${FeatureDistrib.MaxBins}")
+  assert(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
+    s" bins must be between 1 and ${FeatureDistribution.MaxBins}")
   assert(minFill >= 0.0 && minFill <= 1.0, s"Invalid minFill size $minFill, minFill must be between 0 and 1")
   assert(maxFillDifference >= 0.0 && maxFillDifference <= 1.0, s"Invalid maxFillDifference size $maxFillDifference," +
     s" maxFillDifference must be between 0 and 1")
@@ -90,80 +100,69 @@ class RawFeatureFilter[T]
     .setBinary(false)
     .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
 
-  private def tokenize(s: String) = TextTokenizer.Analyzer.analyze(s, Language.Unknown)
-
-  /**
-   * Turn features into a sequence that will have stats computed on it based on the type of the feature
-   * @param value feature value
-   * @tparam T type of the feature
-   * @return a tuple containing whether the feature was empty and a sequence of either doubles or strings
-   */
-  private def prepareFeatures[T <: FeatureType](value: T): (Boolean, ProcessedSeq) = {
-    value match {
-      case v: Text => v.isEmpty -> Left(v.value.map(tokenize).getOrElse(Seq.empty)) // TODO are empty strings == nulls
-      case v: OPNumeric[_] => v.isEmpty -> Right(v.toDouble.toSeq)
-      case v: OPVector => v.isEmpty -> Right(v.value.toArray.toSeq)
-      case v: Geolocation => v.isEmpty -> Right(v.value)
-      case v: TextList => v.isEmpty -> Left(v.value)
-      case v: DateList => v.isEmpty -> Right(v.value.map(_.toDouble))
-      case v: MultiPickList => v.isEmpty -> Left(v.value.toSeq)
-      case _ => throw new RuntimeException(s"Feature type $value is not supported in RawFeatureFilter")
-    }
-  }
-
-
-  /**
-   * Turn map features into a map of sequences that will have stats computed on it based on the type of the feature
-   * @param value feature value
-   * @tparam T type of the map feature
-   * @return a map from the keys to a sequence of either doubles or strings
-   */
-  private def prepareMapFeatures[T <: FeatureType](value: T): Map[String, ProcessedSeq] = {
-    value match {
-      case v: MultiPickListMap => v.value.map{ case (k, e) => k -> Left(e.toSeq) }
-      case v: GeolocationMap => v.value.map{ case (k, e) => k -> Right(e) }
-      case v: OPMap[_] => v.value.map { case (k, e) => e match {
-        case d: Double => k -> Right(Seq(d))
-        case s: String => k -> Left(tokenize(s))
-        case l: Long => k -> Right(Seq(l.toDouble))
-        case b: Boolean => k -> Right(Seq(if (b) 1.0 else 0.0))
-      }}
-      case _ => throw new RuntimeException(s"Feature type $value is not supported in RawFeatureFilter")
-    }
-  }
 
   /**
    * Get binned counts of the feature distribution and empty count for each raw feature
    * @param data data frame to compute counts on
-   * @param rawFeatures list of raw features contained in the dataframe
+   * @param features list of raw, non-protected, features contained in the dataframe
+   * @param allFeatureInfo existing feature info to use
    * @return a sequence of distribution summaries for each raw feature
    */
-  // TODO do these computations on a per label basis??
-  private[op] def computeFeatureStats(data: DataFrame, rawFeatures: Array[OPFeature],
-    featureSummaries: Option[AllFeatureInformation] = None): AllFeatureInformation = {
-    val (mapTranFeatures, tranFeatures) = rawFeatures
-      .map(f => TransientFeature(f) -> FeatureTypeSparkConverter()(f.wtt))
-      .partition(_._1.getFeature().isSubtypeOf[OPMap[_]])
+  private[op] def computeFeatureStats(
+    data: DataFrame,
+    features: Array[OPFeature],
+    allFeatureInfo: Option[AllFeatureInformation] = None): AllFeatureInformation = {
+    val (responses, predictors): (Array[TransientFeature], Array[TransientFeature]) = {
+      val (allResponses, allPredictors) = features.partition(_.isResponse)
+      val respOut = allResponses.map(TransientFeature(_)).flatMap {
+        case f if f.getFeature().isSubtypeOf[OPNumeric[_]] =>
+          log.info("Using numeric response: {}", f.name)
+          Option(f)
+        case f =>
+          log.info("Not using non-numeric response in raw feature filter: {}", f.name)
+          None
+      }
+      val predOut = allPredictors.map(TransientFeature(_))
 
-    val preparedFeatures = data.rdd.map{ row =>
-      tranFeatures.map(f => prepareFeatures(row.getFeatureType(f._1)(f._2))) ->
-        mapTranFeatures.map(mf => prepareMapFeatures(row.getFeatureType(mf._1)(mf._2)))
+      (respOut, predOut)
     }
+    val preparedFeatures: RDD[PreparedFeatures] =
+      data.rdd.map(PreparedFeatures(_, responses, predictors))
+    // Have to use the training summaries do process scoring for comparison
+    val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
+      allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
+        .getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
+    val (responseSummariesArr, predictorSummariesArr): (Array[(FeatureKey, Summary)], Array[(FeatureKey, Summary)]) =
+      (responseSummaries.toArray, predictorSummaries.toArray)
+    val (responseDistributions, predictorDistributions): (Array[FeatureDistribution], Array[FeatureDistribution]) =
+      preparedFeatures
+        .map(_.getFeatureDistributions(
+          responseSummaries = responseSummariesArr,
+          predictorSummaries = predictorSummariesArr,
+          bins = bins,
+          hasher = hasher))
+        .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
+    val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
+      allFeatureInfo.map(_.correlationInfo).getOrElse {
+        val emptyCorr: Map[FeatureKey, Map[FeatureKey, Double]] = Map()
+        val responseKeys: Array[FeatureKey] = responseSummariesArr.map(_._1)
+        val predictorKeys: Array[FeatureKey] = predictorSummariesArr.map(_._1)
+        val corrRDD: RDD[Vector] = preparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, predictorKeys))
+        val corrMatrix: Matrix = Statistics.corr(corrRDD, correlationType.sparkName)
 
-    val (summaryFeatures, summaryMapFeatures) = // Have to use the training summaries do process scoring for comparison
-      featureSummaries.map{ fs => fs.featureSummaries -> fs.mapFeatureSummaries }.getOrElse{
-        preparedFeatures.map { case (features, mapFeatures) =>
-          features.map(f => Summary(f._2)) -> mapFeatures.map(mf => mf.map { case (k, v) => k -> Summary(v) })
-        }.reduce(_ + _)
+        responseKeys.zipWithIndex.map { case (responseKey, i) =>
+          responseKey -> predictorKeys.zipWithIndex.map { case (predictorKey, j) =>
+            predictorKey -> min(abs(corrMatrix(i, j + responseKeys.length)), 1.0)
+          }.toMap
+        }.toMap
       }
 
-    val featureDistrib = preparedFeatures
-      .map{ case (features, mapFeatures) =>
-        FeatureDistrib.getDistributions(tranFeatures.map(_._1), features, summaryFeatures, bins, hasher) ++
-          FeatureDistrib.getMapDistributions(mapTranFeatures.map(_._1), mapFeatures, summaryMapFeatures, bins, hasher) }
-      .reduce(_ + _)
-
-    AllFeatureInformation(summaryFeatures, summaryMapFeatures, featureDistrib)
+    AllFeatureInformation(
+      responseSummaries = responseSummaries,
+      responseDistributions = responseDistributions,
+      predictorSummaries = predictorSummaries,
+      predictorDistributions = predictorDistributions,
+      correlationInfo = correlationInfo)
   }
 
   /**
@@ -171,12 +170,14 @@ class RawFeatureFilter[T]
    * features should be dropped (including maps with all keys dropped) and which map keys need to be dropped
    * @param trainingDistribs summary of distributions for training data features
    * @param scoringDistribs summary of distributions for scoring data features (may be an empty seq)
+   * @param correlationInfo info needed to determine feature to drop based on null label-leakage correlation
    * @return a list of feature names that should be dropped and a map of map keys that should be dropped
    *         Map(featureName -> key)
    */
   private[op] def getFeaturesToExclude(
-    trainingDistribs: Seq[FeatureDistrib],
-    scoringDistribs: Seq[FeatureDistrib]
+    trainingDistribs: Seq[FeatureDistribution],
+    scoringDistribs: Seq[FeatureDistribution],
+    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
   ): (Seq[String], Map[String, Set[String]]) = {
 
     def logExcluded(excluded: Seq[Boolean], message: String): Unit = {
@@ -185,14 +186,29 @@ class RawFeatureFilter[T]
       log.info(s"$message: ${featuresDropped.mkString(", ")}")
     }
 
-    val featureSize = trainingDistribs.size
+    val featureSize = trainingDistribs.length
 
     val trainingUnfilled = trainingDistribs.map(_.fillRate() < minFill)
     logExcluded(trainingUnfilled, s"Features excluded because training fill rate did not meet min required ($minFill)")
 
+    val trainingNullLabelLeakers = {
+      if (correlationInfo.isEmpty) Seq.fill(featureSize)(false)
+      else {
+        val absoluteCorrs = correlationInfo.map(_._2)
+        for {distrib <- trainingDistribs} yield {
+          // Only filter if feature absolute null-label leakage correlation is greater than allowed correlation
+          val nullLabelLeakerIndicators = absoluteCorrs.map(_.get(distrib.featureKey).exists(_ > maxCorrelation))
+          nullLabelLeakerIndicators.exists(identity(_))
+        }
+      }
+    }
+    logExcluded(
+      trainingNullLabelLeakers,
+      s"Features excluded because null indicator correlation (absolute) exceeded max allowed ($maxCorrelation)")
+
     val scoringUnfilled =
       if (scoringDistribs.nonEmpty) {
-        assert(scoringDistribs.length == trainingDistribs.length, "scoring and training features must match")
+        assert(scoringDistribs.length == featureSize, "scoring and training features must match")
         val su = scoringDistribs.map(_.fillRate() < minFill)
         logExcluded(su, s"Features excluded because scoring fill rate did not meet min required ($minFill)")
         su
@@ -206,7 +222,9 @@ class RawFeatureFilter[T]
         log.info(combined.map { case (t, s) => s"\n$t\n$s\nTrain Fill=${t.fillRate()}, Score Fill=${s.fillRate()}, " +
           s"JS Divergence=${t.jsDivergence(s)}, Fill Rate Difference=${t.relativeFillRate(s)}, " +
           s"Fill Ratio Difference=${t.relativeFillRatio(s)}" }.mkString("\n"))
-        val kl = combined.map { case (t, s) => t.jsDivergence(s) > maxJSDivergence }
+        val kl = combined.map { case (t, s) =>
+          !jsDivergenceProtectedFeatures.contains(t.name) && t.jsDivergence(s) > maxJSDivergence
+        }
         logExcluded(kl, s"Features excluded because JS Divergence exceeded max allowed ($maxJSDivergence)")
         val mf = combined.map { case (t, s) => t.relativeFillRate(s) > maxFillDifference }
         logExcluded(mf, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
@@ -217,8 +235,8 @@ class RawFeatureFilter[T]
         Seq.fill(featureSize)(false)
       }
 
-    val allExcludeReasons = trainingUnfilled.zip(scoringUnfilled).zip(distribMismatches)
-      .map{ case ((t, s), d) => t || s || d }
+    val allExcludeReasons = trainingUnfilled.zip(scoringUnfilled).zip(distribMismatches).zip(trainingNullLabelLeakers)
+      .map{ case (((t, s), d), n) => t || s || d || n }
 
     val (toDrop, toKeep) = trainingDistribs.zip(allExcludeReasons).partition(_._2)
 
@@ -243,14 +261,12 @@ class RawFeatureFilter[T]
   def generateFilteredRaw(rawFeatures: Array[OPFeature], parameters: OpParams)
     (implicit spark: SparkSession): (DataFrame, Array[OPFeature]) = {
 
-    val (_, predictorFeatures) = rawFeatures.partition(f => f.isResponse || protectedFeatures.contains(f.name) )
-
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
     assert(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
-    val trainingSummary = computeFeatureStats(trainData, predictorFeatures) // TODO also response summaries??
+    val trainingSummary = computeFeatureStats(trainData, rawFeatures) // TODO also response summaries??
     log.info("Computed summary stats for training features")
-    log.debug(trainingSummary.featureDistributions.mkString("\n"))
+    log.debug(trainingSummary.predictorDistributions.mkString("\n"))
 
     val scoreData = scoreReader.flatMap{ s =>
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
@@ -263,16 +279,16 @@ class RawFeatureFilter[T]
     }
 
     val scoringSummary = scoreData.map{ sd =>
-      val ss = computeFeatureStats(sd, predictorFeatures, Some(trainingSummary)) // TODO also response summaries??
+      val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary)) // TODO also response summaries??
       log.info("Computed summary stats for scoring features")
-      log.debug(ss.featureDistributions.mkString("\n"))
+      log.debug(ss.predictorDistributions.mkString("\n"))
       ss
     }
 
     val (featuresToDropNames, mapKeysToDrop) = getFeaturesToExclude(
-      trainingSummary.featureDistributions,
-      scoringSummary.toSeq.flatMap(_.featureDistributions)
-    )
+      trainingSummary.predictorDistributions.filterNot(d => protectedFeatures.contains(d.name)),
+      scoringSummary.toSeq.flatMap(_.predictorDistributions.filterNot(d => protectedFeatures.contains(d.name))),
+      trainingSummary.correlationInfo)
     val (featuresToDrop, featuresToKeep) = rawFeatures.partition(rf => featuresToDropNames.contains(rf.name))
     val featuresToKeepNames = Array(DataFrameFieldNames.KeyFieldName) ++ featuresToKeep.map(_.name)
 
@@ -296,228 +312,4 @@ class RawFeatureFilter[T]
 
     cleanedData -> featuresToDrop
   }
-}
-
-private[op] case class AllFeatureInformation
-(
-  featureSummaries: Array[Summary],
-  mapFeatureSummaries: Array[Map[String, Summary]],
-  featureDistributions: Array[FeatureDistrib]
-)
-
-/**
- * Class used to get summaries of prepped features so know how to bin it for distributions
- * @param min minimum value seen
- * @param max maximum value seen
- */
-private[op] case class Summary(min: Double, max: Double)
-
-private[op] case object Summary {
-
-  val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity)
-
-  implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
-    override def zero = empty
-    override def plus(l: Summary, r: Summary) = Summary(math.min(l.min, r.min), math.max(l.max, r.max))
-  }
-
-  def apply(preppedFeature: ProcessedSeq): Summary = {
-    preppedFeature match {
-      case Left(v) => Summary(v.size, v.size)
-      case Right(v) => monoid.sum(v.map(d => Summary(d, d)))
-    }
-  }
-}
-
-
-/**
- * Class containing summary information for a feature
- * @param name name of the feature
- * @param key map key associated with distribution (when the feature is a map)
- * @param count total count of feature seen
- * @param nulls number of empties seen in feature
- * @param distribution binned counts of feature values (hashed for strings, evently spaced bins for numerics)
- * @param summaryInfo either min and max of data (for text data) or splits used for bins for numeric data
- */
-case class FeatureDistrib
-(
-  name: String,
-  key: Option[String],
-  count: Long,
-  nulls: Long,
-  distribution: Array[Double],
-  summaryInfo: Array[Double]
-) {
-
-  /**
-   * Check that feature distributions below to the same feature and key
-   * @param fd distribution to compare to
-   */
-  def checkMatch(fd: FeatureDistrib): Unit =
-    assert(name == fd.name && key == fd.key, "Name and key must match to compare or combine FeatureDistrib")
-
-  /**
-   * Get fill rate of feature
-   * @return fraction of data that is non empty
-   */
-  def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
-
-  /**
-   * Combine feature distributions
-   * @param fd other feature distribution (from the same feature)
-   * @return summed distribution information
-   */
-  def reduce(fd: FeatureDistrib): FeatureDistrib = {
-    checkMatch(fd)
-    val combinedDist = distribution + fd.distribution
-    // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
-    val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistrib(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary)
-  }
-
-  /**
-   * Ratio of fill rates between the two distributions symetric with larger value on the top
-   * @param fd feature distribution to compare to
-   * @return ratio of fill rates
-   */
-  def relativeFillRatio(fd: FeatureDistrib): Double = {
-    checkMatch(fd)
-    val (thisFill, thatFill) = (fillRate(), fd.fillRate())
-    val (small, large) = if (thisFill < thatFill) (thisFill, thatFill) else (thatFill, thisFill)
-    if (small == 0.0) Double.PositiveInfinity else large / small
-  }
-
-  /**
-   * Absolute difference in empty rates
-   * @param fd feature distribution to compare to
-   * @return fill rate ratio with larger fill rate on the bottom
-   */
-  def relativeFillRate(fd: FeatureDistrib): Double = {
-    checkMatch(fd)
-    math.abs(fillRate() - fd.fillRate())
-  }
-
-  /**
-   * Jensen-Shannon divergence from this distribution to the other distribution fed in
-   * @param fd other feature distribution
-   * @return the KL divergence
-   */
-  def jsDivergence(fd: FeatureDistrib): Double = {
-    checkMatch(fd)
-    val combinedCounts = distribution.zip(fd.distribution).filterNot{ case (a, b) => a == 0.0 && b == 0.0 }
-    val (thisCount, thatCount) = combinedCounts
-      .fold[(Double, Double)]( (0, 0)){ case ((a1, b1), (a2, b2)) => (a1 + a2, b1 + b2) }
-    val probs = combinedCounts.map{ case (a, b) => a / thisCount -> b / thatCount }
-    val meanProb = probs.map{ case (a, b) => (a + b) / 2}
-    def log2(x: Double) = math.log10(x) / math.log10(2.0)
-    def klDivergence(a: Double, b: Double) = if (a == 0.0) 0.0 else a * log2(a / b)
-    probs.zip(meanProb).map{ case ((a, b), m) => 0.5 * klDivergence(a, m) + 0.5 * klDivergence(b, m) }.sum
-  }
-
-  override def toString(): String = {
-    s"Name=$name, Key=$key, Count=$count, Nulls=$nulls, Histogram=${distribution.toList}, BinInfo=${summaryInfo.toList}"
-  }
-}
-
-private[op] case object FeatureDistrib {
-
-  type ProcessedSeq = Either[Seq[String], Seq[Double]]
-
-  val MaxBins = 100000
-
-  implicit val semigroup: Semigroup[FeatureDistrib] = new Semigroup[FeatureDistrib] {
-    override def plus(l: FeatureDistrib, r: FeatureDistrib) = l.reduce(r)
-  }
-
-  /**
-   * Function to put data into histogram of counts
-   * @param values values to bin
-   * @param sum summary info for feature (max and min)
-   * @param bins number of bins to produce
-   * @param hasher hasing function to use for text
-   * @return the bin information and the binned counts
-   */
-  // TODO avoid wrapping and unwrapping??
-  private def histValues(
-    values: ProcessedSeq,
-    sum: Summary,
-    bins: Int,
-    hasher: HashingTF
-  ): (Array[Double], Array[Double]) = {
-    values match {
-      case Left(seq) => Array(sum.min, sum.max) -> hasher.transform(seq).toArray // TODO use summary info to pick hashes
-      case Right(seq) => // TODO use kernel fit instead of histogram
-        if (sum == Summary.empty) {
-          Array(sum.min, sum.max) -> seq.toArray // the seq will always be empty in this case
-        } else if (sum.min < sum.max) {
-          val step = (sum.max - sum.min) / (bins - 2.0) // total number of bins includes one for edge and one for other
-          val splits = (0 until bins).map(b => sum.min + step * b).toArray
-          val binned = seq.map { v =>
-            NumericBucketizer.bucketize(
-              splits = splits, trackNulls = false, trackInvalid = true,
-              splitInclusion = Inclusion.Left, input = Option(v)
-            ).toArray
-          }
-          val hist = binned.fold(new Array[Double](bins))(_ + _)
-          splits -> hist
-        } else {
-          val same = seq.map(v => if (v == sum.max) 1.0 else 0.0).sum
-          val other = seq.map(v => if (v != sum.max) 1.0 else 0.0).sum
-          Array(sum.min, sum.max) -> Array(same, other)
-        }
-    }
-  }
-
-  /**
-   * Create the distributions for regular features
-   * @param features list of transient features
-   * @param values values of the features processed into a sequence of either doubles or strings with boolean
-   *               indicating if original feature was empty
-   * @param summary summary statistics about feature
-   * @param bins number of bins to put numerics into
-   * @param hasher hash function to use on strings
-   * @return feature distribution for single feature value to be aggregated
-   */
-  def getDistributions(
-    features: Array[TransientFeature],
-    values: Array[(Boolean, ProcessedSeq)],
-    summary: Array[Summary],
-    bins: Int,
-    hasher: HashingTF
-  ): Array[FeatureDistrib] = {
-    features.zip(values).zip(summary).map{
-      case ((tf, (isNull, seq)), sum) =>
-        val isNullCount = if (isNull) 1 else 0
-        val (info, histogram) = histValues(seq, sum, bins, hasher)
-        FeatureDistrib(tf.name, None, 1, isNullCount, histogram, info)
-    }
-  }
-
-  /**
-   * Create the distributions for map features
-   * @param features list of transient map features
-   * @param values values of the features processed into a map from key to sequence of either doubles or strings
-   * @param summary map from key to summary statistics about feature
-   * @param bins number of bins to put numerics into
-   * @param hasher hash function to use on strings
-   * @return feature distribution for single feature and key value to be aggregated
-   */
-  def getMapDistributions(
-    features: Array[TransientFeature],
-    values: Array[Map[String, ProcessedSeq]],
-    summary: Array[Map[String, Summary]],
-    bins: Int,
-    hasher: HashingTF
-  ): Array[FeatureDistrib] = {
-    features.zip(values).zip(summary).flatMap {
-      case ((tf, map), sum) => sum.map { case (key, seq) =>
-        val isNullCount = if (map.contains(key)) 0 else 1
-        val (info, histogram) = map.get(key)
-          .map(seq => histValues(seq, sum(key), bins, hasher))
-          .getOrElse(Array(sum(key).min, sum(key).max), Array.fill(bins)(0.0))
-        FeatureDistrib(tf.name, Some(key), 1, isNullCount, histogram, info)
-      }
-    }
-  }
-
 }

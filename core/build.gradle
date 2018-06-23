@@ -1,5 +1,6 @@
 dependencies {
     compile project(':readers')
+    testRuntime project(':models')
     testCompile project(':testkit')
 
     // Google libphonenumber
@@ -16,6 +17,7 @@ dependencies {
     // Lucene text analysis
     compile "org.apache.lucene:lucene-analyzers-common:$luceneVersion"
     compile "org.apache.lucene:lucene-analyzers-kuromoji:$luceneVersion"
+    compile "org.apache.lucene:lucene-analyzers-opennlp:$luceneVersion"
     compile "org.apache.lucene:lucene-suggest:$luceneVersion"
 
     // Scopt

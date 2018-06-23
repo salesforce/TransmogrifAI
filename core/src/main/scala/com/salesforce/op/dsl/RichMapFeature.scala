@@ -252,6 +252,7 @@ trait RichMapFeature {
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
      * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
@@ -276,6 +277,7 @@ trait RichMapFeature {
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       forceSharedHashSpace: Boolean = false,
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[TextMap]] = Array.empty
@@ -298,6 +300,7 @@ trait RichMapFeature {
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
         .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
         .getOutput()
@@ -381,6 +384,7 @@ trait RichMapFeature {
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
      * @param forceSharedHashSpace      force the hash space to be shared among all included features
+     * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
      * @param hashAlgorithm             hash algorithm to use
@@ -405,6 +409,7 @@ trait RichMapFeature {
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       forceSharedHashSpace: Boolean = false,
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty
@@ -427,6 +432,7 @@ trait RichMapFeature {
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
         .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
         .getOutput()
@@ -518,7 +524,7 @@ trait RichMapFeature {
     }
 
     /**
-     * Apply RealMapVectorizer on any OPMap that has double values
+     * Apply RealMapVectorizer or auto bucketizer (when label is present) on any OPMap that has double values
      *
      * @param others        other features of the same type
      * @param defaultValue  value to give missing keys on pivot
@@ -526,6 +532,10 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param label         optional label column to be passed into autoBucketizer if present
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
      *
      * @return an OPVector feature
      */
@@ -536,17 +546,29 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+      label: Option[FeatureLike[RealNN]] = None
     ): FeatureLike[OPVector] = {
-      new RealMapVectorizer[T]()
-        .setInput(f +: others)
-        .setFillWithMean(fillWithMean)
-        .setDefaultValue(defaultValue)
-        .setCleanKeys(cleanKeys)
-        .setWhiteListKeys(whiteListKeys)
-        .setBlackListKeys(blackListKeys)
-        .setTrackNulls(trackNulls)
-        .getOutput()
+      label match {
+        case None =>
+          new RealMapVectorizer[T]()
+            .setInput(f +: others)
+            .setFillWithMean(fillWithMean)
+            .setDefaultValue(defaultValue)
+            .setCleanKeys(cleanKeys)
+            .setWhiteListKeys(whiteListKeys)
+            .setBlackListKeys(blackListKeys)
+            .setTrackNulls(trackNulls)
+            .getOutput()
+        case Some(lbl) =>
+          autoBucketize(
+            label = lbl, trackNulls = trackNulls, trackInvalid = trackInvalid,
+            minInfoGain = minInfoGain, cleanKeys = cleanKeys,
+            whiteListKeys = whiteListKeys, blackListKeys = blackListKeys
+          )
+      }
     }
   }
 
@@ -590,7 +612,7 @@ trait RichMapFeature {
     }
 
     /**
-     * Apply IntegralMapVectorizer on any OPMap that has long values
+     * Apply IntegralMapVectorizer or auto bucketizer (when label is present) on any OPMap that has long values
      *
      * @param others        other features of the same type
      * @param defaultValue  value to give missing keys on pivot
@@ -598,6 +620,10 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param label         optional label column to be passed into autoBucketizer if present
+     * @param trackInvalid  option to keep track of invalid values,
+     *                      eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain   minimum info gain, one of the stopping criteria of the Decision Tree
      *
      * @return an OPVector feature
      */
@@ -608,17 +634,29 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+      label: Option[FeatureLike[RealNN]] = None
     ): FeatureLike[OPVector] = {
-      new IntegralMapVectorizer[T]()
-        .setInput(f +: others)
-        .setFillWithMode(fillWithMode)
-        .setDefaultValue(defaultValue)
-        .setCleanKeys(cleanKeys)
-        .setWhiteListKeys(whiteListKeys)
-        .setBlackListKeys(blackListKeys)
-        .setTrackNulls(trackNulls)
-        .getOutput()
+      label match {
+        case None =>
+          new IntegralMapVectorizer[T]()
+            .setInput(f +: others)
+            .setFillWithMode(fillWithMode)
+            .setDefaultValue(defaultValue)
+            .setCleanKeys(cleanKeys)
+            .setWhiteListKeys(whiteListKeys)
+            .setBlackListKeys(blackListKeys)
+            .setTrackNulls(trackNulls)
+            .getOutput()
+        case Some(lbl) =>
+          autoBucketize(
+            label = lbl, trackNulls = trackNulls, trackInvalid = trackInvalid,
+            minInfoGain = minInfoGain, cleanKeys = cleanKeys,
+            whiteListKeys = whiteListKeys, blackListKeys = blackListKeys
+          )
+      }
     }
   }
 

@@ -460,7 +460,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     testEstimator.evaluators.foreach {
       case evaluator: OpBinaryClassificationEvaluator => {
-        MultiClassEvalMetrics.values.foreach(metric =>
+        BinaryClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
             metadata => assert(metadata.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
               s"Metric ${metric.entryName} is not present in metadata: " + metadata.json)

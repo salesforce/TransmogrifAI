@@ -64,18 +64,20 @@ trait RichFeaturesCollection {
      * Convert features into a single vector feature using the feature engineering steps most likely to provide
      * good results based on the types of the individual features passed in
      *
+     * @param label optional label feature to be passed into stages that require the label column
      * @return vector feature
      */
-    def transmogrify(): FeatureLike[OPVector] =
-      Transmogrifier.transmogrify(features.toSeq)(TransmogrifierDefaults).combine()
+    def transmogrify(label: Option[FeatureLike[RealNN]] = None): FeatureLike[OPVector] =
+      Transmogrifier.transmogrify(features = features.toSeq, label = label)(TransmogrifierDefaults).combine()
 
     /**
      * Convert features into a single vector feature using the feature engineering steps most likely to provide
-     * good results based on the types of the individual features passed in.
+     * good results based on the types of the individual features passed in
      *
+     * @param label optional label feature to be passed into stages that require the label column
      * @return vector feature
      */
-    def autoTransform(): FeatureLike[OPVector] = transmogrify()
+    def autoTransform(label: Option[FeatureLike[RealNN]] = None): FeatureLike[OPVector] = transmogrify(label = label)
 
   }
 

@@ -36,19 +36,21 @@ import java.io.FileInputStream
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.commons.io.IOUtils
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class MimeTypeDetectorTest extends FlatSpec with TestSparkContext with Base64TestData {
+class MimeTypeDetectorTest extends OpTransformerSpec[Text, MimeTypeDetector] with Base64TestData {
+  val inputData = randomData
+  val transformer = new MimeTypeDetector().setInput(randomBase64)
+  val expectedResult = expectedRandom
 
-  Spec[MimeTypeDetector] should "validate the type hint" in {
+  it should "validate the type hint" in {
     assertThrows[IllegalArgumentException](new MimeTypeDetector().setTypeHint("blarg"))
   }
   it should "validate the ma bytes to parse" in {
@@ -73,8 +75,8 @@ class MimeTypeDetectorTest extends FlatSpec with TestSparkContext with Base64Tes
 
     result.collect(mime) should contain theSameElementsInOrderAs expectedMimeJson
   }
-
 }
+
 
 trait Base64TestData {
   self: TestSparkContext =>

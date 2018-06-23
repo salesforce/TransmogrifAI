@@ -50,7 +50,7 @@ class RealNNVectorizer
   /**
    * Function used to convert input to output
    */
-  override def transformFn: (Seq[RealNN]) => OPVector = in => {
+  override def transformFn: Seq[RealNN] => OPVector = in => {
     val ins = in.map(_.value.get) // assumes a non nullable real (RealNN)
     Vectors.dense(ins.toArray).toOPVector
   }

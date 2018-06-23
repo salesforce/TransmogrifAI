@@ -36,7 +36,8 @@ import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataReaders
-import com.salesforce.op.stages.impl.classification.OpLogisticRegression
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
@@ -106,7 +107,7 @@ object OpTitanicSimple {
 
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
 
-    val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN(Double.NaN)).asPredictor
+    val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
 
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
 
@@ -129,7 +130,7 @@ object OpTitanicSimple {
     val estimatedCostOfTickets = familySize * fare
     // val pivotedSex = sex.map[PickList](v => v).pivot()
     val pivotedSex = sex.pivot()
-    val normedAge = age.zNormalize()
+    val normedAge = age.fillMissingWithMean().zNormalize()
     val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
 
     // Define a feature of type vector containing all the predictors you'd like to use
@@ -145,13 +146,15 @@ object OpTitanicSimple {
 
     // Define the model we want to use (here a simple logistic regression) and get the resulting output
     val (prediction, rawPrediction, prob) =
-      new OpLogisticRegression()
-        .setInput(survived, finalFeatures).getOutput
+      BinaryClassificationModelSelector.withTrainValidationSplit()
+        .setModelsToTry(LogisticRegression)
+        .setInput(survived, finalFeatures).getOutput()
 
     val evaluator = Evaluators.BinaryClassification()
       .setLabelCol(survived)
       .setRawPredictionCol(rawPrediction)
       .setPredictionCol(prediction)
+      .setProbabilityCol(prob)
 
     ////////////////////////////////////////////////////////////////////////////////
     // WORKFLOW

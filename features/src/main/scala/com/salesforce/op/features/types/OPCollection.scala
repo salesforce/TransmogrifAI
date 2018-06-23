@@ -33,6 +33,6 @@ package com.salesforce.op.features.types
 
 
 /**
- * A base class for all the collections (arrays, lists, sets, maps, vector etc)
+ * A base class for all the collections Feature Types (maps, lists, sets, vector etc.)
  */
 abstract class OPCollection extends FeatureType
