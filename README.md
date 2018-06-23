@@ -122,14 +122,12 @@ You can simply add OP as a regular dependency to your existing project. Example 
 repositories {
     mavenCentral()
     maven { url "https://jitpack.io" }
-    repositories {
-        maven {
-            url "s3://op-repo/releases"
-            credentials(AwsCredentials) {
-                // user: op-repo-reader
-                accessKey "AKIAJ6AZFFSFRJI3IKHQ"
-                secretKey "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"
-            }
+    maven {
+        url "s3://op-repo/releases"
+        credentials(AwsCredentials) {
+            // user: op-repo-reader
+            accessKey "AKIAJ6AZFFSFRJI3IKHQ"
+            secretKey "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"
         }
     }
 }
