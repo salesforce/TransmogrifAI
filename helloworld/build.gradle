@@ -14,15 +14,15 @@ plugins {
 repositories {
     mavenCentral()
     maven { url "https://jitpack.io" }
-    maven {
-       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
-       credentials {
-           // Generate github api token here - https://goo.gl/ANZ9oz
-           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
-           username = System.getenv("GITHUB_API_TOKEN")
-           password "" // leave the password empty
-       }
-       authentication { digest(BasicAuthentication) }
+    repositories {
+        maven {
+            url "s3://op-repo/releases"
+            credentials(AwsCredentials) {
+                // user: op-repo-reader
+                accessKey "AKIAJ6AZFFSFRJI3IKHQ"
+                secretKey "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"
+            }
+        }
     }
 }
 
@@ -50,7 +50,7 @@ ext {
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='3.3.1'
+    opVersion='3.3.3'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
 

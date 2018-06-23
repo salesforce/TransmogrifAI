@@ -120,22 +120,24 @@ You can simply add OP as a regular dependency to your existing project. Example 
 
 ```groovy
 repositories {
-    maven {
-       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
-       credentials {
-           // Generate github api token here - https://goo.gl/ANZ9oz
-           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
-           username = System.getenv("GITHUB_API_TOKEN") // use your token as a username
-           password "" // leave the password blank
-       }
-       authentication { digest(BasicAuthentication) }
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+    repositories {
+        maven {
+            url "s3://op-repo/releases"
+            credentials(AwsCredentials) {
+                // user: op-repo-reader
+                accessKey "AKIAJ6AZFFSFRJI3IKHQ"
+                secretKey "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"
+            }
+        }
     }
 }
 ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '8'
     sparkVersion = '2.2.1'
-    opVersion = '3.3.1'
+    opVersion = '3.3.3'
 }
 dependencies {
     // Scala
@@ -155,6 +157,7 @@ dependencies {
     compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
 
     // All your other depdendecies go below
+    // ...
 }
 ```
 
