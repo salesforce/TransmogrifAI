@@ -22,22 +22,17 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.github.fommil.netlib.BLAS
 import com.salesforce.op.evaluators.OpEvaluatorBase
-import org.apache.spark.ml.{Estimator, Model}
-import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.sql.types.StructType
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
-import org.apache.spark.mllib.util.MLUtils
-import org.apache.spark.sql.{Dataset, Row}
+import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import org.apache.spark.ml.{Estimator, Model}
+import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
-import org.apache.spark.ml.linalg.Vector
-
-import scala.collection.parallel.mutable.ParArray
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 
-private[impl] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
+private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 (
   val numFolds: Int = ValidatorParamDefaults.NumFolds,
   val seed: Long = ValidatorParamDefaults.Seed,
@@ -49,11 +44,11 @@ private[impl] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   private val blas = BLAS.getInstance()
 
   private def findBestModel(
-    folds: ParArray[(E, Array[Double], Array[ParamMap])]
+    folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
-    val metrics = folds.map(_._2).reduce(_ + _)
+    val metrics = folds.map(_.metrics).reduce(_ + _)
     blas.dscal(metrics.length, 1.0 / numFolds, metrics, 1)
-    val (est, _, grid) = folds.head
+    val ValidatedModel(est, _, _, grid) = folds.head
     log.info(s"Average cross-validation for $est metrics: {}", metrics.toSeq.mkString(","))
     val (bestMetric, bestIndex) =
       if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
@@ -64,111 +59,106 @@ private[impl] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   }
 
   // TODO use futures to parallelize https://github.com/apache/spark/commit/16c4c03c71394ab30c8edaf4418973e1a2c5ebfe
-  private[op] def validate(
+  private[op] override def validate[T](
     modelInfo: Seq[ModelInfo[E]],
-    dataset: Dataset[_],
+    dataset: Dataset[T],
     label: String,
-    features: String
-  ): BestModel[M] = {
+    features: String,
+    dag: Option[StagesDAG] = None,
+    splitter: Option[Splitter] = None,
+    stratifyCondition: Boolean = isClassification && stratify
+  )(implicit spark: SparkSession): BestEstimator[E] = {
 
-    // get param that stores the label column
-    val labelCol = evaluator.getParam(ValidatorParamDefaults.labelCol)
-    evaluator.set(labelCol, label)
-
-    val sparkSession = dataset.sparkSession
-    import sparkSession.implicits._
-    val rdd = dataset.as[LabelFeaturesKey].rdd.persist()
-
+    dataset.persist()
+    val schema = dataset.schema
 
     // creating k train/validation data
-    val splits: Array[(RDD[Row], RDD[Row])] = createTrainValidationSplits(rdd)
+    val splits: Array[(RDD[Row], RDD[Row])] = createTrainValidationSplits(
+      stratifyCondition = stratifyCondition,
+      dataset = dataset,
+      label = label,
+      splitter = splitter
+    )
 
+    val modelsWithGrids = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
 
-    val schema = dataset.schema
-    val newSchema = StructType(schema.dropRight(1)) // dropping key
-
-    val modelWithGrid = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
-
-    val fitSummary = splits.zipWithIndex.par.flatMap {
-      case ((training, validation), splitIndex) =>
-
-        log.info(s"Cross Validation $splitIndex with multiple sets of parameters.")
-        val trainingDataset = sparkSession.createDataFrame(training, newSchema).persist()
-        val validationDataset = sparkSession.createDataFrame(validation, newSchema).persist()
-
-        val summary = modelWithGrid.map {
-          case (estimator, paramGrids, name) =>
-            val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-            val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
-            estimator.set(pi1, label).set(pi2, features)
-
-            val numModels = paramGrids.length
-            val metrics = new Array[Double](paramGrids.length)
-
-            // multi-model training
-            val models = estimator.fit(trainingDataset, paramGrids).asInstanceOf[Seq[M]]
-            var i = 0
-            while (i < numModels) {
-              val metric = evaluator.evaluate(models(i).transform(validationDataset, paramGrids(i)))
-              log.debug(s"Got metric $metric for $name trained with ${paramGrids(i)}.")
-              metrics(i) = metric
-              i += 1
-            }
-            (estimator, metrics, paramGrids)
+    // TODO use futures to parallelize https://github.com/apache/spark/commit/16c4c03c71394ab30c8edaf4418973e1a2c5ebfe
+    val groupedSummary = suppressLoggingForFun() {
+      splits.zipWithIndex.flatMap {
+        case ((training, validation), splitIndex) => {
+          log.info(s"Cross Validation $splitIndex with multiple sets of parameters.")
+          val trainingDataset = spark.createDataFrame(training, schema)
+          val validationDataset = spark.createDataFrame(validation, schema)
+          val (newTrain, newTest) = dag.map(theDAG =>
+            // If there is a CV DAG, then run it
+            applyDAG(
+              dag = theDAG,
+              training = trainingDataset,
+              validation = validationDataset,
+              label = label,
+              features = features,
+              splitter = splitter
+            )
+          ).getOrElse(trainingDataset, validationDataset)
+          getSummary(modelsWithGrids = modelsWithGrids, label = label, features = features,
+            train = newTrain, test = newTest)
         }
-        trainingDataset.unpersist()
-        validationDataset.unpersist()
-        summary
+      }.groupBy(_.model).map{ case (_, folds) => findBestModel(folds) }.toArray
     }
-    rdd.unpersist()
+    dataset.unpersist()
 
-    val groupedSummary = fitSummary.groupBy(_._1).map { case (_, folds) => findBestModel(folds) }.toArray
-
-    val model =
-      if (evaluator.isLargerBetter) groupedSummary.maxBy(_.bestMetric)
-      else groupedSummary.minBy(_.bestMetric)
-
-    val bestModel = model.model.fit(dataset, model.bestGrid).asInstanceOf[M]
-    wrapBestModel(groupedSummary, bestModel, s"$numFolds folds")
+    val model = getValidatedModel(groupedSummary)
+    wrapBestEstimator(groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$numFolds folds")
   }
 
   // TODO : Implement our own kFold method for better performance in a separate PR
   /**
    * Creates Train Validation Splits For CV
-   * @param rdd
+   *
+   * @param stratifyCondition condition to do stratify cv
+   * @param dataset dataset to split
+   * @param label name of label in data
+   * @param splitter  used to estimate splitter params prior to cv
    * @return Array((TrainRDD, ValidationRDD), Index)
    */
-  private[op] override def createTrainValidationSplits(
-    rdd: RDD[(Double, Vector, String)]): Array[(RDD[Row], RDD[Row])] = {
+  private[op] override def createTrainValidationSplits[T](stratifyCondition: Boolean,
+    dataset: Dataset[T], label: String, splitter: Option[Splitter] = None): Array[(RDD[Row], RDD[Row])] = {
 
-    if (stratify && isClassification) {
-      log.info(s"Creating $numFolds stratified folds")
-      val classes = rdd.map(_._1).distinct().collect()
-      // Creates RDD grouped by classes (0, 1, 2, 3, ..., K)
-      val rddByClass = classes.map(label => rdd.filter(_._1 == label)
-        .map { case (label, features, key) => key -> Seq(Row(label, features)) }.reduceByKey(_ ++ _))
+    // get param that stores the label column
+    val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)
+    evaluator.set(labelCol, label)
 
-      // Cross Validation's Train/Validation data for each class
-      val foldsByClass = rddByClass.map { case rdd: RDD[(String, Seq[Row])] => {
-        MLUtils.kFold(rdd, numFolds, seed)
-          .map { case (rdd1, rdd2) => (rdd1.values.flatMap(identity), rdd2.values.flatMap(identity)) }
-      }
-      }.toSeq
-
-      if (foldsByClass.isEmpty) throw new Error("Train Validation Data Grouped by class is empty")
-      // Merging Train/Validation data one by one
-      foldsByClass.reduce[Array[(RDD[Row], RDD[Row])]] {
-        // cv1 and cv2 are arrays of train/validation data
-        case (cv1: Array[(RDD[Row], RDD[Row])], cv2: Array[(RDD[Row], RDD[Row])]) =>
-          (cv1 zip cv2).map { // zip the two arrays and merge the tuples one by one
-            case ((train1: RDD[Row], test1: RDD[Row]), (train2: RDD[Row], test2: RDD[Row])) =>
-              (train1.union(train2), test1.union(test2))
-          }
-      }
+    // creating k train/validation data
+    if (stratifyCondition) {
+      val rddsByClass = prepareStratification(
+        dataset = dataset,
+        message = s"Creating $numFolds stratified folds",
+        label = label,
+        splitter = splitter
+      )
+      stratifyKFolds(rddsByClass)
     } else {
-      val rddRow = rdd.map { case (label, features, key) => key -> Seq(Row(label, features)) }.reduceByKey(_ ++ _)
+      val rddRow = dataset.toDF().rdd
       MLUtils.kFold(rddRow, numFolds, seed)
-        .map { case (rdd1, rdd2) => (rdd1.values.flatMap(identity), rdd2.values.flatMap(identity)) }
+    }
+  }
+
+
+  private def stratifyKFolds(rddsByClass: Array[RDD[Row]]): Array[(RDD[Row], RDD[Row])] = {
+    // Cross Validation's Train/Validation data for each class
+    val foldsByClass = rddsByClass.map(rdd => MLUtils.kFold(rdd, numFolds, seed)).toSeq
+
+    if (foldsByClass.isEmpty) {
+      throw new RuntimeException("Dataset is too small for CV forlds selected some empty datasets are created")
+    }
+    // Merging Train/Validation data one by one
+    foldsByClass.reduce[Array[(RDD[Row], RDD[Row])]] {
+      // cv1 and cv2 are arrays of train/validation data
+      case (cv1: Array[(RDD[Row], RDD[Row])], cv2: Array[(RDD[Row], RDD[Row])]) =>
+        (cv1 zip cv2).map { // zip the two arrays and merge the tuples one by one
+          case ((train1: RDD[Row], test1: RDD[Row]), (train2: RDD[Row], test2: RDD[Row])) =>
+            (train1.union(train2), test1.union(test2))
+        }
     }
   }
 

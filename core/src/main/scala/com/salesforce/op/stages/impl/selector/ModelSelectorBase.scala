@@ -31,6 +31,7 @@
 
 package com.salesforce.op.stages.impl.selector
 
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.evaluators.{EvaluationMetrics, _}
@@ -39,15 +40,14 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, Transformer}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.MetadataBuilder
-import org.apache.spark.sql.{DataFrame, Dataset}
+import org.apache.spark.sql.types.{MetadataBuilder, StructType}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
 import scala.util.Try
@@ -191,6 +191,34 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
    */
   protected def getModelInfo: Seq[ModelInfo[E]]
 
+  /**
+   * Get the list of all the models and their parameters for comparison
+   * @return value
+   */
+  protected[op] def getUsedModels: Seq[ModelInfo[E]] = getModelInfo.filter(m => $(m.useModel))
+
+  /**
+   * Find best estimator with validation on a workflow level. Executed when workflow level Cross Validation is on
+   * (see [[com.salesforce.op.OpWorkflow.withWorkflowCV]])
+   *
+   * @param data                data to validate
+   * @param dag                 dag done inside the Cross-validation/Train-validation split
+   * @param persistEveryKStages frequency of persisting the DAG's stages
+   * @param spark               Spark Session
+   * @return Updated Model Selector with best model along with best paramMap
+   */
+  protected[op] def findBestEstimator(data: Dataset[_], dag: StagesDAG, persistEveryKStages: Int = 0)
+    (implicit spark: SparkSession): Unit = {
+
+    val theBestEstimator = validator.validate(modelInfo = getUsedModels, dataset = data,
+      label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
+      stratifyCondition = validator.isClassification
+    )
+
+    bestEstimator = Option(theBestEstimator)
+  }
+
+
   // Map (name of param, value of param) of output column names
   def outputsColNamesMap: Map[String, String] = {
     val defaultNames = getOutputsColNamesMap(in1, in2)
@@ -216,16 +244,15 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
    */
   final override def fit(dataset: Dataset[_]): SelectedModel = {
 
-    import dataset.sparkSession.implicits._
+    implicit val spark = dataset.sparkSession
+    import spark.implicits._
 
     val datasetWithID =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
-          .as[LabelFeaturesKey].persist()
       } else {
         dataset.select(in1.name, in2.name)
           .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
-          .as[LabelFeaturesKey].persist()
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
@@ -234,13 +261,19 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
       case None => new ModelData(datasetWithID, new MetadataBuilder())
     }
 
-
-    val bestModel = bestEstimator.map { case BestEstimator(name, estimator, meta) =>
-      new BestModel(name = name, model = estimator.fit(trainData).asInstanceOf[M], metadata = Option(meta))
-    }.getOrElse {
+    val BestEstimator(name, estimator, meta) = bestEstimator.getOrElse{
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
-      validator.validate(getModelInfo.filter(m => $(m.useModel)), trainData, in1.name, in2.name)
+      val best = validator
+        .validate(modelInfo = getUsedModels, dataset = trainData, label = in1.name, features = in2.name)
+      bestEstimator = Some(best)
+      best
     }
+
+    val bestModel = new BestModel(
+      name = name,
+      model = estimator.fit(trainData).asInstanceOf[M],
+      metadata = Option(meta)
+    )
     bestModel.metadata.foreach(meta => setMetadata(meta.build))
     val bestClassifier = bestModel.model.parent
     log.info(s"Selected model : ${bestClassifier.getClass.getSimpleName}")

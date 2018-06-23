@@ -31,17 +31,10 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
-/**
- * Case class of data used in model selectors for data prep and cross validation
- */
-case object SelectorData {
-  type LabelFeaturesKey = (Double, Vector, String)
-}
 
 /**
  * Case class for Training & test sets
@@ -49,8 +42,8 @@ case object SelectorData {
  * @param train      training set is persisted at construction
  * @param metadata   metadata built at construction
  */
-case class ModelData private(train: Dataset[_], metadata: Metadata) {
-  def this(train: Dataset[_], metadata: MetadataBuilder) =
+case class ModelData private(train: Dataset[Row], metadata: Metadata) {
+  def this(train: Dataset[Row], metadata: MetadataBuilder) =
     this(train.persist(), metadata.build())
 }
 
@@ -65,7 +58,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return (dataTrain, dataTest)
    */
-  def split(data: Dataset[_]): (Dataset[_], Dataset[_]) = {
+  def split[T](data: Dataset[T]): (Dataset[T], Dataset[T]) = {
     val fraction = 1.0 - getReserveTestFraction
     val Array(dataTrain, dataTest) = data.randomSplit(Array(fraction, 1.0 - fraction), seed = $(seed))
     dataTrain -> dataTest
@@ -78,7 +71,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[SelectorData.LabelFeaturesKey]): ModelData
+  def prepare(data: Dataset[Row]): ModelData
 
 }
 

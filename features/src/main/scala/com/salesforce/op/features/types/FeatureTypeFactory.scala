@@ -36,7 +36,7 @@ import org.apache.spark.ml.linalg.Vector
 import scala.reflect.runtime.universe._
 
 /**
- * Factory for creating feature type instances
+ * Factory for creating Feature Type instances
  *
  * @tparam T feature type
  */
@@ -55,7 +55,7 @@ sealed trait FeatureTypeFactory[T <: FeatureType] extends Serializable {
 }
 
 /**
- * Factory for creating feature type instances from primitive values
+ * Factory for creating Feature Type instances from primitive values
  */
 case object FeatureTypeFactory {
   /**

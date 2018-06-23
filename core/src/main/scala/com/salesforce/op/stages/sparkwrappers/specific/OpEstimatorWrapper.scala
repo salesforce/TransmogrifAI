@@ -41,7 +41,7 @@ import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Wraps a spark ML estimator.  This wrapper is meant for Estimators not already covered by more specific
- * wrappers such as: [[OpProbabilisticClassifierWrapper]] and [[OpPredictorWrapper]].
+ * wrappers such as: [[OpPredictorWrapper]].
  * Examples of estimators meant to be wrapped with OpEstimatorWrapper include MinMaxScaler, IDF, VectorIndexer,
  * CountVectorizer, QuantileDiscretizer, StandardScaler, PCA, MaxAbsScaler, Word2Vec, etc.
  * Their defining characteristic is that they output a Model which takes in one column as input and output

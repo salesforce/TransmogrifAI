@@ -29,56 +29,95 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-// scalastyle:off
 package com.salesforce.op.stages.sparkwrappers.specific
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.{FeatureType, OPVector}
-import com.salesforce.op.stages.sparkwrappers.generic.SwBinaryEstimator
+import com.salesforce.op.features.types.{FeatureType, OPVector, Prediction, RealNN}
+import com.salesforce.op.stages.{OpPipelineStage2, SparkStageParam}
+import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel, OpTransformer2}
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.ml.{PredictionModel, Predictor, SparkMLSharedParamConstants}
+import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Wraps a spark ML predictor.  Predictors represent supervised learning algorithms (regression and classification) in
- * spark ML that inherit from [[Predictor]], examples of which include:
- * [[org.apache.spark.ml.regression.RandomForestRegressor]],
- * [[org.apache.spark.ml.regression.GBTRegressor]], [[org.apache.spark.ml.classification.GBTClassifier]],
- * [[org.apache.spark.ml.regression.DecisionTreeRegressor]],
- * [[org.apache.spark.ml.classification.MultilayerPerceptronClassifier]],
+ * spark ML that inherit from [[Predictor]], supported models are:
+ * [[org.apache.spark.ml.classification.LogisticRegression]]
  * [[org.apache.spark.ml.regression.LinearRegression]],
- * and [[org.apache.spark.ml.regression.GeneralizedLinearRegression]].
+ * [[org.apache.spark.ml.classification.RandomForestClassifier]],
+ * [[org.apache.spark.ml.regression.RandomForestRegressor]],
+ * [[org.apache.spark.ml.classification.NaiveBayesModel]],
+ * [[org.apache.spark.ml.classification.GBTClassifier]],
+ * [[org.apache.spark.ml.regression.GBTRegressor]],
+ * [[org.apache.spark.ml.classification.DecisionTreeClassifier]]
+ * [[org.apache.spark.ml.regression.DecisionTreeRegressor]],
+ * [[org.apache.spark.ml.classification.LinearSVC]]
+ * [[org.apache.spark.ml.classification.MultilayerPerceptronClassifier]],
+ * [[org.apache.spark.ml.regression.GeneralizedLinearRegression]].
  * Their defining characteristic is that they output a model which takes in 2 columns as input (labels and features)
- * and output one column as result.
- * NOTE: Probabilistic classifiers contain additional output information, and so there is a specific wrapper
- * for that kind of classifier see: [[OpProbabilisticClassifierWrapper]]
+ * and output one to three column as result.
  *
  * @param predictor the predictor to wrap
  * @param uid       stage uid
- * @tparam I the type of the transformation input feature
- * @tparam O the type of the transformation output feature
- * @tparam E spark estimator to wrap
- * @tparam M spark model type returned by spark estimator wrapped
+ * @tparam E        spark estimator to wrap
+ * @tparam M        spark model returned
  */
-class OpPredictorWrapper[I <: FeatureType, O <: FeatureType, E <: Predictor[Vector, E, M],
-M <: PredictionModel[Vector, M]]
+class OpPredictorWrapper[E <: Predictor[Vector, E, M], M <: PredictionModel[Vector, M]]
 (
   val predictor: E,
-  uid: String = UID[OpPredictorWrapper[I, O, E, M]]
+  val uid: String = UID[OpPredictorWrapper[_, _]]
 )(
-  implicit tti1: TypeTag[I],
-  tto: TypeTag[O],
-  ttov: TypeTag[O#Value]
-) extends SwBinaryEstimator[I, OPVector, O, M, E](
-  inputParam1Name = SparkMLSharedParamConstants.LabelColName,
-  inputParam2Name = SparkMLSharedParamConstants.FeaturesColName,
-  outputParamName = SparkMLSharedParamConstants.PredictionColName,
-  operationName = predictor.getClass.getSimpleName,
-  // cloning below to prevent parameter changes to the underlying classifier outside the wrapper
-  sparkMlStageIn = Option(predictor).map(_.copy(ParamMap.empty)),
-  uid = uid
-) {
-  final protected def getSparkStage: E = getSparkMlStage().get
+  implicit val tti1: TypeTag[RealNN],
+  val tti2: TypeTag[OPVector],
+  val tto: TypeTag[Prediction],
+  val ttov: TypeTag[Prediction#Value]
+) extends Estimator[OpPredictorWrapperModel[M]] with OpPipelineStage2[RealNN, OPVector, Prediction]
+  with SparkWrapperParams[E] {
+
+  val operationName = predictor.getClass.getSimpleName
+  val inputParam1Name = SparkMLSharedParamConstants.LabelColName
+  val inputParam2Name = SparkMLSharedParamConstants.FeaturesColName
+  val outputParamName = SparkMLSharedParamConstants.PredictionColName
+  setDefault(sparkMlStage, Option(predictor))
+
+    /**
+   * Function that fits the binary model
+   */
+  override def fit(dataset: Dataset[_]): OpPredictorWrapperModel[M] = {
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
+    copyValues(predictor) // when params are shared with wrapping class this will pass them into the model
+
+    val p1 = predictor.getParam(inputParam1Name)
+    val p2 = predictor.getParam(inputParam2Name)
+    val po = predictor.getParam(outputParamName)
+    val model: M = predictor
+      .set(p1, in1.name)
+      .set(p2, in2.name)
+      .set(po, getOutputFeatureName)
+      .fit(dataset)
+
+    SparkModelConverter.toOP(model, uid)
+      .setParent(this)
+      .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
+      .setMetadata(getMetadata())
+      .setOutputFeatureName(getOutputFeatureName)
+  }
+}
+
+abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
+(
+  val operationName: String,
+  val uid: String,
+  val sparkModel: M
+)(
+  implicit val tti1: TypeTag[RealNN],
+  val tti2: TypeTag[OPVector],
+  val tto: TypeTag[Prediction],
+  val ttov: TypeTag[Prediction#Value]
+) extends Model[OpPredictorWrapperModel[M]] with OpTransformer2[RealNN, OPVector, Prediction]
+  with SparkWrapperParams[M] {
+  setDefault(sparkMlStage, Option(sparkModel))
 }

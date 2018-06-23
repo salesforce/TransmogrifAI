@@ -31,6 +31,13 @@
 
 package com.salesforce.op.features.types
 
+/**
+ * Real value representation
+ *
+ * A base class for all the real Feature Types
+ *
+ * @param value real
+ */
 class Real(val value: Option[Double]) extends OPNumeric[Double] {
   def this(value: Double) = this(Option(value))
   final def toDouble: Option[Double] = value
@@ -42,8 +49,16 @@ object Real {
   def empty: Real = FeatureTypeDefaults.Real
 }
 
-class RealNN private[op](v: Option[Double]) extends Real(
-    if (v == null || v.isEmpty) throw new NonNullableEmptyException(classOf[RealNN]) else v
+/**
+ * Real non nullable value representation
+ *
+ * This value can only be constructed from a concrete [[Double]] value,
+ * if empty value is passed the [[NonNullableEmptyException]] is thrown.
+ *
+ * @param value real
+ */
+class RealNN private[op](value: Option[Double]) extends Real(
+    if (value == null || value.isEmpty) throw new NonNullableEmptyException(classOf[RealNN]) else value
   ) with NonNullable {
   def this(value: Double) = this(Option(value))
 }
@@ -51,6 +66,11 @@ object RealNN {
   def apply(value: Double): RealNN = new RealNN(value)
 }
 
+/**
+ * Binary value representation
+ *
+ * @param value binary
+ */
 class Binary(val value: Option[Boolean]) extends OPNumeric[Boolean] with SingleResponse {
   def this(value: Boolean) = this(Option(value))
   final def toDouble: Option[Double] = value.map(if (_) 1.0 else 0.0)
@@ -61,6 +81,13 @@ object Binary {
   def empty: Binary = FeatureTypeDefaults.Binary
 }
 
+/**
+ * Integral value representation
+ *
+ * A base class for all the integral Feature Types
+ *
+ * @param value integral
+ */
 class Integral(val value: Option[Long]) extends OPNumeric[Long] {
   def this(value: Long) = this(Option(value))
   final def toDouble: Option[Double] = value.map(_.toDouble)
@@ -71,6 +98,11 @@ object Integral {
   def empty: Integral = FeatureTypeDefaults.Integral
 }
 
+/**
+ * Percentage value representation
+ *
+ * @param value percentage
+ */
 class Percent(value: Option[Double]) extends Real(value) {
   def this(value: Double) = this(Option(value))
 }
@@ -80,6 +112,11 @@ object Percent {
   def empty: Percent = FeatureTypeDefaults.Percent
 }
 
+/**
+ * Currency value representation
+ *
+ * @param value currency
+ */
 class Currency(value: Option[Double]) extends Real(value) {
   def this(value: Double) = this(Option(value))
 }
@@ -89,6 +126,11 @@ object Currency {
   def empty: Currency = FeatureTypeDefaults.Currency
 }
 
+/**
+ * Date value representation
+ *
+ * @param value date (assumed to be in ms since Epoch)
+ */
 class Date(value: Option[Long]) extends Integral(value) {
   def this(value: Long) = this(Option(value))
 }
@@ -98,6 +140,11 @@ object Date {
   def empty: Date = FeatureTypeDefaults.Date
 }
 
+/**
+ * Date & time value representation
+ *
+ * @param value date & time (assumed to be in ms since Epoch)
+ */
 class DateTime(value: Option[Long]) extends Date(value) {
   def this(value: Long) = this(Option(value))
 }

@@ -78,23 +78,24 @@ class DecisionTreeNumericMapBucketizer[N, I2 <: OPMap[N]]
       label -> filterKeys[N](map, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
     }.persist()
 
-    require(!ds.isEmpty, "Dataset is empty, buckets cannot be computed.")
+    val computedSplits: Array[(String, Splits)] = if (ds.isEmpty) {
+      log.info("Skip bucketizing empty numeric map '{}' feature", in2.name)
+      Array.empty[(String, Splits)]
+    } else {
+      // Collect all unique map keys and sort them
+      val uniqueKeys: Seq[String] =
+        ds.map { case (_, map) => map.keys.toSeq }
+          .reduce((l, r) => (l ++ r).distinct)
+          .distinct.sorted
 
-    // Collect all unique map keys and sort them
-    val uniqueKeys: Seq[String] =
-      ds.map { case (_, map) => map.keys.toSeq }
-        .reduce((l, r) => (l ++ r).distinct)
-        .distinct.sorted
-
-    // Compute splits for each collected key in parallel
-    val computedSplits: Array[(String, Splits)] =
+      // Compute splits for each collected key in parallel
       uniqueKeys.par.map { k =>
         val data: Dataset[(Double, Double)] =
           ds.filter(_._2.contains(k))
             .map { case (label, map) => label.get -> nev.toDouble(map(k)) }
         k -> computeSplits(data, featureName = s"${in2.name}[$k]")
       }.toArray
-
+    }
     ds.unpersist()
 
     val meta = makeMetadata(computedSplits)

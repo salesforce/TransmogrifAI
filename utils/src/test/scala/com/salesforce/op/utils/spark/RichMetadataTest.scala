@@ -33,6 +33,8 @@ package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestCommon
 import org.apache.spark.sql.types.{MetadataBuilder, StructField}
+import org.json4s.DefaultFormats
+import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
@@ -46,10 +48,12 @@ class RichMetadataTest extends FlatSpec with TestCommon {
   Spec[RichMetadata] should "create a metadata from a map" in {
     val expected = Map(
       "1" -> 1L, "2" -> 1.0, "3" -> true, "4" -> "1",
-      "5" -> Array(1L), "6" -> Array(1.0), "6" -> Array(true), "7" -> Array("1")
+      "5" -> Array(1L), "6" -> Array(1.0), "6" -> Array(true), "7" -> Array("1"),
+      "8" -> Seq(1L), "9" -> Seq(1.0), "10" -> Seq(true), "11" -> Seq("1")
     )
     val meta = expected.toMetadata
-    meta.underlyingMap.toSeq shouldBe expected.toSeq
+    implicit val formats = DefaultFormats
+    meta.json shouldBe Serialization.write(expected)
   }
 
   it should "throw an error on unsupported type in a map" in {

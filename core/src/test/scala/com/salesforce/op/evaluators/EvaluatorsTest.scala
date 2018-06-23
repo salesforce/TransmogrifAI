@@ -32,7 +32,8 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.OpLogisticRegression
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator, RegressionEvaluator}
 import org.apache.spark.ml.linalg.Vectors
@@ -80,7 +81,11 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   )
   val test_label = test_rawLabel.copy(isResponse = true)
 
-  val testEstimator = new OpLogisticRegression().setInput(label, features)
+  // TODO put back LR when evaluators work with prediction features
+  val testEstimator = BinaryClassificationModelSelector()
+    .setModelsToTry(LogisticRegression)
+    .setLogisticRegressionRegParam(0)
+    .setInput(label, features)
   val (pred, rawPred, prob) = testEstimator.getOutput()
   val model = testEstimator.fit(ds)
   val transformedData = model.setInput(test_label, test_features).transform(test_ds)

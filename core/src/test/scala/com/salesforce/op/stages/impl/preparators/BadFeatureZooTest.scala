@@ -31,7 +31,7 @@
 
 package com.salesforce.op.stages.impl.preparators
 
-import com.salesforce.op.OpWorkflow
+import com.salesforce.op.{OpWorkflow, UID}
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
@@ -52,6 +52,11 @@ import org.apache.spark.internal.Logging
 class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
 
   // loggingLevel(Level.INFO)
+
+  override def beforeAll: Unit = {
+    super.beforeAll
+    UID.reset()
+  }
 
   Spec[SanityChecker] should "correctly identify label leakage in PickList features using the Cramer's V criteria" +
     "when the label corresponds to a binary classification problem" in {

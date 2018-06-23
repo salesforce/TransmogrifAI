@@ -32,19 +32,23 @@
 package com.salesforce.op.stages.impl.insights
 
 import com.salesforce.op.FeatureHistory
-import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForest}
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
+import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
+import com.salesforce.op.stages.impl.regression.OpLinearRegression
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.classification.{LogisticRegressionModel, RandomForestClassificationModel}
+import org.apache.spark.ml.regression.LinearRegressionModel
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.StructType
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
-import com.salesforce.op.stages.impl.regression.OpLinearRegression
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.types.StructType
-import com.salesforce.op.utils.spark.RichDataset._
+
 
 @RunWith(classOf[JUnitRunner])
 class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
@@ -57,7 +61,11 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val dfWithMeta = addMetaData(df, "features", 40)
     val sparkModel = new OpLogisticRegression().setInput(l1r, f1).fit(df)
 
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
+    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
+      .asInstanceOf[LogisticRegressionModel]
+
+    // val model = sparkModel.getSparkMlStage().get
+    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -71,9 +79,11 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
     val l1r = l1.copy(isResponse = true)
     val dfWithMeta = addMetaData(df, "features", 40)
-    val sparkModel = new OpRandomForest().setInput(l1r, f1).fit(df)
+    val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
+    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
+      .asInstanceOf[RandomForestClassificationModel]
 
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
+    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1).setTopK(2)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 2)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -93,8 +103,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val l1r = l1.copy(isResponse = true)
     val dfWithMeta = addMetaData(df, "features", 40)
     val sparkModel = new OpLinearRegression().setInput(l1r, f1).fit(df)
+    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
+      .asInstanceOf[LinearRegressionModel]
 
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
+    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -155,7 +167,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
-    val model = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+    val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
+      .asInstanceOf[LogisticRegressionModel]
 
     val transformer = new RecordInsightsLOCO(model).setInput(featureVector)
 

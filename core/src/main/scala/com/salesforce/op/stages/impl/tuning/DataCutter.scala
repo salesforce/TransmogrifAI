@@ -33,11 +33,10 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning.SelectorData.LabelFeaturesKey
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import org.apache.spark.sql.{DataFrame, Dataset}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
 case object DataCutter {
@@ -81,15 +80,15 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * function to use to prepare the dataset for modeling
    * eg - do data balancing or dropping based on the labels
    *
-   * @param data
+   * @param data first column must be the label as a double
    * @return Training set test set
    */
-  def prepare(data: Dataset[LabelFeaturesKey]): ModelData = {
+  def prepare(data: Dataset[Row]): ModelData = {
     import data.sparkSession.implicits._
 
     val keep =
       if (!isSet(labelsToKeep) || !isSet(labelsToDrop)) {
-        val labels = data.map(r => r._1 -> 1L)
+        val labels = data.map(r => r.getDouble(0) -> 1L)
         val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
         val (resKeep, resDrop) = estimate(labelCounts)
         labelCounts.unpersist()
@@ -97,7 +96,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         resKeep
       } else getLabelsToKeep.toSet
 
-    val dataUse = data.filter(r => keep.contains(r._1))
+    val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
 
     val labelsMeta = new MetadataBuilder()
       .putDoubleArray(ModelSelectorBaseNames.LabelsKept, getLabelsToKeep)
@@ -127,7 +126,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val labelSet = labelsKeep.toSet
     val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0)).toSet
 
-    if (labelSet.size > 1) {
+    if (labelSet.nonEmpty) {
       log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: $labelsDropped")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +

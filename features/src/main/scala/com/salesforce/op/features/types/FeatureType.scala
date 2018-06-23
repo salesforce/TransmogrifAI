@@ -176,7 +176,6 @@ object SomeValue {
  */
 object FeatureType {
 
-
   /**
    * Returns feature type name
    *
@@ -225,7 +224,8 @@ object FeatureType {
    * @param t type tag
    * @return true if this type tag corresponds to one of the feature value types, false otherwise
    */
-  def isFeatureValueType(t: TypeTag[_]): Boolean = FeatureType.featureValueTypeTags.contains(t.tpe.dealias.toString)
+  def isFeatureValueType(t: TypeTag[_]): Boolean =
+    FeatureType.featureValueTypeTags.contains(ReflectionUtils.dealisedTypeName(t.tpe))
 
   /**
    * Feature type tag
@@ -351,7 +351,7 @@ object FeatureType {
       // Text
       typeTag[Option[String]]
     )
-    typeTags.map(tag => tag.tpe.dealias.toString -> tag).toMap
+    typeTags.map(tag => ReflectionUtils.dealisedTypeName(tag.tpe) -> tag).toMap
   }
 
 }

@@ -316,22 +316,37 @@ trait RichNumericFeature {
      * @param fillValue    value to pull in place of nulls
      * @param trackNulls   keep tract of when nulls occur by adding a second column to the vector with a null indicator
      * @param fillWithMean replace missing values with mean (as apposed to constant provided in fillValue)
-     * @return
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
+     * @param label        optional label column to be passed into autoBucketizer if present
+     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
+     *                     features if a label argument is passed
      */
     def vectorize
     (
       fillValue: Double,
       fillWithMean: Boolean,
       trackNulls: Boolean,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+      label: Option[FeatureLike[RealNN]] = None
     ): FeatureLike[OPVector] = {
-      val stage = new RealVectorizer[T]()
-        .setInput(f +: others)
-        .setTrackNulls(trackNulls)
+      val features = f +: others
+      val stage = new RealVectorizer[T]().setInput(features).setTrackNulls(trackNulls)
       if (fillWithMean) stage.setFillWithMean else stage.setFillWithConstant(fillValue)
-      stage.getOutput()
+      val filledValues = stage.getOutput()
+      label match {
+        case None =>
+          filledValues
+        case Some(lbl) =>
+          val bucketized = features.map(
+            _.autoBucketize(label = lbl, trackNulls = false, trackInvalid = trackInvalid, minInfoGain = minInfoGain)
+          )
+          new VectorsCombiner().setInput(filledValues +: bucketized).getOutput()
+      }
     }
-
   }
 
 
@@ -418,6 +433,10 @@ trait RichNumericFeature {
      * @param minVariance       Minimum amount of variance allowed for each feature and label
      * @param removeBadFeatures If set to true, this will automatically remove all the bad features
      *                          from the feature vector
+     * @param removeFeatureGroup      remove all features descended from a parent feature
+     * @param protectTextSharedHash   protect text shared hash from related null indicators and other hashes
+     * @param categoricalLabel  If true, treat label as categorical. If not set, check number of disticnt labels to
+     *                          decide whether a label should be treated categorical.
      * @return sanity checked feature vector
      */
     // scalastyle:off
@@ -434,6 +453,7 @@ trait RichNumericFeature {
       minVariance: Double = SanityChecker.MinVariance,
       removeBadFeatures: Boolean = SanityChecker.RemoveBadFeatures,
       removeFeatureGroup: Boolean = SanityChecker.RemoveFeatureGroup,
+      protectTextSharedHash: Boolean = SanityChecker.ProtectTextSharedHash,
       categoricalLabel: Option[Boolean] = None
     ): FeatureLike[OPVector] = {
       // scalastyle:on
@@ -449,6 +469,7 @@ trait RichNumericFeature {
         .setMinVariance(minVariance)
         .setRemoveBadFeatures(removeBadFeatures)
         .setRemoveFeatureGroup(removeFeatureGroup)
+        .setProtectTextSharedHash(protectTextSharedHash)
         .setInput(f, featureVector)
 
       categoricalLabel.foreach(checker.setCategoricalLabel)
@@ -578,18 +599,36 @@ trait RichNumericFeature {
      * @param fillValue    value to pull in place of nulls
      * @param trackNulls   keep tract of when nulls occur by adding a second column to the vector with a null indicator
      * @param fillWithMode replace missing values with mode (as apposed to constant provided in fillValue)
-     * @return
+     * @param trackInvalid option to keep track of invalid values,
+     *                     eg. NaN, -/+Inf or values that fall outside the buckets
+     * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
+     * @param label        optional label column to be passed into autoBucketizer if present
+     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
+     *                     features if a label argument is passed
      */
     def vectorize
     (
       fillValue: Long,
       fillWithMode: Boolean,
       trackNulls: Boolean,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      trackInvalid: Boolean = TransmogrifierDefaults.TrackInvalid,
+      minInfoGain: Double = TransmogrifierDefaults.MinInfoGain,
+      label: Option[FeatureLike[RealNN]] = None
     ): FeatureLike[OPVector] = {
-      val stage = new IntegralVectorizer().setInput(f +: others).setTrackNulls(trackNulls)
+      val features = f +: others
+      val stage = new IntegralVectorizer[T]().setInput(features).setTrackNulls(trackNulls)
       if (fillWithMode) stage.setFillWithMode else stage.setFillWithConstant(fillValue)
-      stage.getOutput()
+      val filledValues = stage.getOutput()
+      label match {
+        case None =>
+          filledValues
+        case Some(lbl) =>
+          val bucketized = features.map(
+            _.autoBucketize(label = lbl, trackNulls = false, trackInvalid = trackInvalid, minInfoGain = minInfoGain)
+          )
+          new VectorsCombiner().setInput(filledValues +: bucketized).getOutput()
+      }
     }
   }
 

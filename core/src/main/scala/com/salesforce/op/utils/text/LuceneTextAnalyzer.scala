@@ -32,13 +32,18 @@
 package com.salesforce.op.utils.text
 
 import java.io.Reader
+import java.nio.charset.StandardCharsets
 
 import com.salesforce.op.utils.text.Language._
+import org.apache.lucene.analysis._
 import org.apache.lucene.analysis.ar.ArabicAnalyzer
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer
+import org.apache.lucene.analysis.bn.BengaliAnalyzer
+import org.apache.lucene.analysis.br.BrazilianAnalyzer
 import org.apache.lucene.analysis.ca.CatalanAnalyzer
 import org.apache.lucene.analysis.charfilter.HTMLStripCharFilter
 import org.apache.lucene.analysis.cjk.CJKAnalyzer
+import org.apache.lucene.analysis.ckb.SoraniAnalyzer
 import org.apache.lucene.analysis.cz.CzechAnalyzer
 import org.apache.lucene.analysis.da.DanishAnalyzer
 import org.apache.lucene.analysis.de.GermanAnalyzer
@@ -63,12 +68,13 @@ import org.apache.lucene.analysis.no.NorwegianAnalyzer
 import org.apache.lucene.analysis.pt.PortugueseAnalyzer
 import org.apache.lucene.analysis.ro.RomanianAnalyzer
 import org.apache.lucene.analysis.ru.RussianAnalyzer
+import org.apache.lucene.analysis.snowball.SnowballFilter
 import org.apache.lucene.analysis.standard.StandardAnalyzer
 import org.apache.lucene.analysis.sv.SwedishAnalyzer
 import org.apache.lucene.analysis.th.ThaiAnalyzer
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute
 import org.apache.lucene.analysis.tr.TurkishAnalyzer
-import org.apache.lucene.analysis.{Analyzer, AnalyzerWrapper, TokenStream}
+import org.apache.lucene.util.IOUtils
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -118,21 +124,28 @@ class LuceneTextAnalyzer
  */
 object LuceneTextAnalyzer {
 
+  private val englishStopwords = WordlistLoader.getSnowballWordSet(
+    IOUtils.getDecodingReader(classOf[SnowballFilter], "english_stop.txt", StandardCharsets.UTF_8)
+  )
+
   /**
    * Default analyzer to use if a language specific one is not present
    */
-  val DefaultAnalyzer: Analyzer = new StandardAnalyzer()
+  val DefaultAnalyzer: Analyzer = new StandardAnalyzer(englishStopwords)
 
   // TODO we should add specific analyzers per each language if possible
   private val analyzers: Map[Language, Analyzer] = Map(
     Arabic -> new ArabicAnalyzer(),
-    Catalan -> new CatalanAnalyzer(),
     Bulgarian -> new BulgarianAnalyzer(),
+    Bengali -> new BengaliAnalyzer(),
+    Brazilian -> new BrazilianAnalyzer(),
+    Catalan -> new CatalanAnalyzer(),
+    Sorani -> new SoraniAnalyzer(),
     Czech -> new CzechAnalyzer(),
     Danish -> new DanishAnalyzer(),
     German -> new GermanAnalyzer(),
     Greek -> new GreekAnalyzer(),
-    English -> new EnglishAnalyzer(),
+    English -> new EnglishAnalyzer(englishStopwords),
     Spanish -> new SpanishAnalyzer(),
     Basque -> new BasqueAnalyzer(),
     Persian -> new PersianAnalyzer(),
@@ -145,7 +158,7 @@ object LuceneTextAnalyzer {
     Indonesian -> new IndonesianAnalyzer(),
     Italian -> new ItalianAnalyzer(),
     Japanese -> new JapaneseAnalyzer(),
-    Korean -> new CJKAnalyzer(),
+    Korean -> new CJKAnalyzer(englishStopwords),
     Lithuanian -> new LithuanianAnalyzer(),
     Latvian -> new LatvianAnalyzer(),
     Dutch -> new DutchAnalyzer(),
@@ -156,8 +169,8 @@ object LuceneTextAnalyzer {
     Swedish -> new SwedishAnalyzer(),
     Thai -> new ThaiAnalyzer(),
     Turkish -> new TurkishAnalyzer(),
-    SimplifiedChinese -> new CJKAnalyzer(),
-    TraditionalChinese -> new CJKAnalyzer()
+    SimplifiedChinese -> new CJKAnalyzer(englishStopwords),
+    TraditionalChinese -> new CJKAnalyzer(englishStopwords)
   )
 
   private val defaultAnalyzerHtmlStrip = stripHtml(DefaultAnalyzer)

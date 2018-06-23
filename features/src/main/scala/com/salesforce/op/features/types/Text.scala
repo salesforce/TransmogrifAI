@@ -40,7 +40,9 @@ import org.apache.commons.io.input.CharSequenceInputStream
 import org.apache.commons.validator.routines.UrlValidator
 
 /**
- * A base class for all the text feature types
+ * Text value representation
+ *
+ * A base class for all the text Feature Types
  *
  * @param value text value
  */
@@ -56,9 +58,22 @@ object Text {
   def empty: Text = FeatureTypeDefaults.Text
 }
 
+/**
+ * Email value representation
+ *
+ * @param value email value
+ */
 class Email(value: Option[String]) extends Text(value) {
   def this(value: String) = this(Option(value))
+  /**
+   * Extract email prefix
+   * @return if email is invalid or empty - None is returned; otherwise some value with prefix
+   */
   def prefix: Option[String] = Email.prefixOrDomain(this, isPrefix = true)
+  /**
+   * Extract email domain
+   * @return if email is invalid or empty - None is returned; otherwise some value with domain
+   */
   def domain: Option[String] = Email.prefixOrDomain(this, isPrefix = false)
 }
 object Email {
@@ -79,7 +94,11 @@ object Email {
       if (!m.matches()) None else if (isPrefix) Option(m.group(1)) else Option(m.group(2))
     )
 }
-
+/**
+ * Base64 encoded binary value representation
+ *
+ * @param value base64 encoded binary value
+ */
 class Base64(value: Option[String]) extends Text(value) {
   def this(value: String) = this(Option(value))
   /**
@@ -107,13 +126,17 @@ class Base64(value: Option[String]) extends Text(value) {
    */
   def asString: Option[String] = asBytes map (new String(_))
 }
-
 object Base64 {
   def apply(value: Option[String]): Base64 = new Base64(value)
   def apply(value: String): Base64 = new Base64(value)
   def empty: Base64 = FeatureTypeDefaults.Base64
 }
 
+/**
+ * Phone number value representation, i.e. '+1-650-113-111-2222'
+ *
+ * @param value phone number
+ */
 class Phone(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
 }
@@ -123,6 +146,11 @@ object Phone {
   def empty: Phone = FeatureTypeDefaults.Phone
 }
 
+/**
+ * Unique identifier value representation
+ *
+ * @param value unique identifier
+ */
 class ID(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
 }
@@ -132,6 +160,11 @@ object ID {
   def empty: ID = FeatureTypeDefaults.ID
 }
 
+/**
+ * URL value representation
+ *
+ * @param value url
+ */
 class URL(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
   /**
@@ -147,7 +180,7 @@ class URL(value: Option[String]) extends Text(value){
    */
   def isValid(protocols: Array[String]): Boolean = value.exists(new UrlValidator(protocols).isValid)
   /**
-   * Extracts url domain, i.e. salesforce.com, data.com etc.
+   * Extracts url domain, i.e. 'salesforce.com', 'data.com' etc.
    */
   def domain: Option[String] = value map (new java.net.URL(_).getHost)
   /**
@@ -161,6 +194,11 @@ object URL {
   def empty: URL = FeatureTypeDefaults.URL
 }
 
+/**
+ * Large text values (more than 4000 bytes)
+ *
+ * @param value large text value
+ */
 class TextArea(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
 }
@@ -170,6 +208,11 @@ object TextArea {
   def empty: TextArea = FeatureTypeDefaults.TextArea
 }
 
+/**
+ * A single text value that represents a single selection from a set of values
+ *
+ * @param value selected text
+ */
 class PickList(value: Option[String]) extends Text(value) with SingleResponse {
   def this(value: String) = this(Option(value))
 }
@@ -178,7 +221,11 @@ object PickList {
   def apply(value: String): PickList = new PickList(value)
   def empty: PickList = FeatureTypeDefaults.PickList
 }
-
+/**
+ * A single text value that represents a selection from a set of values or a user specified one
+ *
+ * @param value selected or user specified text
+ */
 class ComboBox(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
 }
@@ -188,6 +235,11 @@ object ComboBox {
   def empty: ComboBox = FeatureTypeDefaults.ComboBox
 }
 
+/**
+ * Country value representation, i.e. 'United States of America', 'France" etc.
+ *
+ * @param value country
+ */
 class Country(value: Option[String]) extends Text(value) with Location {
   def this(value: String) = this(Option(value))
 }
@@ -197,6 +249,11 @@ object Country {
   def empty: Country = FeatureTypeDefaults.Country
 }
 
+/**
+ * State value representation, i.e. 'CA', 'OR' etc.
+ *
+ * @param value state
+ */
 class State(value: Option[String]) extends Text(value) with Location {
   def this(value: String) = this(Option(value))
 }
@@ -206,6 +263,11 @@ object State {
   def empty: State = FeatureTypeDefaults.State
 }
 
+/**
+ * Postal code value representation, i.e. '92101', '72212-341' etc.
+ *
+ * @param value postal code
+ */
 class PostalCode(value: Option[String]) extends Text(value) with Location {
   def this(value: String) = this(Option(value))
 }
@@ -215,6 +277,11 @@ object PostalCode {
   def empty: PostalCode = FeatureTypeDefaults.PostalCode
 }
 
+/**
+ * City value representation, i.e. 'New York', 'Paris' etc.
+ *
+ * @param value city
+ */
 class City(value: Option[String]) extends Text(value) with Location {
   def this(value: String) = this(Option(value))
 }
@@ -224,6 +291,11 @@ object City {
   def empty: City = FeatureTypeDefaults.City
 }
 
+/**
+ * Street representation, i.e. '123 University Ave' etc.
+ *
+ * @param value street
+ */
 class Street(value: Option[String]) extends Text(value) with Location {
   def this(value: String) = this(Option(value))
 }

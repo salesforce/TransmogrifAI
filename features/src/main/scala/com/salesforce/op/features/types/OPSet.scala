@@ -35,10 +35,16 @@ import scala.reflect.ClassTag
 
 
 /**
- * A base class for all the set feature types
+ * A base class for all the set Feature Types
  */
 abstract class OPSet[A](implicit val cta: ClassTag[A]) extends OPCollection with MultiResponse {
   type Value <: scala.collection.Set[A]
   final def isEmpty: Boolean = value.isEmpty
+
+  /**
+   * Converts set to an array
+   *
+   * @return array of A
+   */
   final def toArray: Array[A] = value.toArray(cta)
 }

@@ -34,19 +34,17 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.TimePeriod._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.Transformer
 import org.joda.time.{DateTime => JDateTime}
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class DateToUnitCircleTransformerTest extends FlatSpec with TestSparkContext {
+class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateToUnitCircleTransformer[Date]] {
 
   val eps = 1E-4
   val sampleDateTimes = Seq[JDateTime](
@@ -56,13 +54,12 @@ class DateToUnitCircleTransformerTest extends FlatSpec with TestSparkContext {
     new JDateTime(2017, 4, 17, 18, 0, 0, 0),
     new JDateTime(1918, 2, 13, 3, 0, 0, 0)
   )
-  val expectedHourOfDayOutput = Array(
-    Array(1.0, 0.0),
-    Array(0.0, 1.0),
-    Array(-1.0, 0.0),
-    Array(0.0, -1.0),
-    Array(math.sqrt(2.0) / 2, math.sqrt(2.0) / 2)
-  ).map(Vectors.dense(_).toOPVector)
+
+  val (inputData, f1) = TestFeatureBuilder(sampleDateTimes.map(x => Date(x.getMillis)))
+
+  val transformer = new DateToUnitCircleTransformer().setInput(f1)
+
+  val expectedResult: Seq[OPVector] = transformData(sampleDateTimes, HourOfDay)
 
   def transformData[T <: TimePeriod](data: Seq[JDateTime], timePeriod: T): Array[OPVector] = {
     val dataTimeStamps: Seq[Date] = data.map(x => Date(x.getMillis()))
@@ -78,24 +75,13 @@ class DateToUnitCircleTransformerTest extends FlatSpec with TestSparkContext {
       .map(Vectors.dense(_).toOPVector)
   }
 
-  Spec[DateToUnitCircleTransformer[_]] should
-    "take an array of features as input and return a single vector feature" in {
-    val dataTimeStamps: Seq[Date] = sampleDateTimes.map(x => Date(x.getMillis()))
-    val (ds, f) = TestFeatureBuilder(dataTimeStamps)
-    val vectorizer = new DateToUnitCircleTransformer().setInput(f)
-    val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.getOutputFeatureName
-    vector.typeName shouldBe FeatureType.typeName[OPVector]
-    vector.isResponse shouldBe false
-  }
-
   it should "work with its shortcut" in {
     val dataTimeStamps: Seq[Date] = sampleDateTimes.map(x => Date(x.getMillis()))
     val (ds, dateFeature) = TestFeatureBuilder(dataTimeStamps)
     val output = dateFeature.toUnitCircle(TimePeriod.HourOfDay)
     val transformed = output.originStage.asInstanceOf[Transformer].transform(ds)
     val actual = transformed.collect(output)
-    all (actual.zip(expectedHourOfDayOutput).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "work with its DateTime shortcut" in {
@@ -104,7 +90,7 @@ class DateToUnitCircleTransformerTest extends FlatSpec with TestSparkContext {
     val output = dateTimeFeature.toUnitCircle(TimePeriod.HourOfDay)
     val transformed = output.originStage.asInstanceOf[Transformer].transform(ds)
     val actual = transformed.collect(output)
-    all (actual.zip(expectedHourOfDayOutput).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "store the proper meta data" in {
@@ -137,7 +123,7 @@ class DateToUnitCircleTransformerTest extends FlatSpec with TestSparkContext {
 
   it should "transform the data correctly when the timePeriod is HourOfDay" in {
     val actual = transformData(sampleDateTimes, HourOfDay)
-    all (actual.zip(expectedHourOfDayOutput).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be <  eps
+    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be <  eps
   }
 
   it should "transform the data correctly when the timePeriod is DayOfYear" in {

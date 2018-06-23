@@ -40,13 +40,15 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import com.salesforce.op.utils.stages.FitStagesUtil
+import org.apache.spark.ml.Estimator
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
 import org.json4s.jackson.JsonMethods.{pretty, render}
-
 import scala.collection.mutable.ArrayBuffer
+
 import scala.reflect.ClassTag
 import scala.util.Try
 
@@ -94,15 +96,22 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   /**
-   * Returns a dataframe containing all the columns generated up to the feature input
+   * Returns a dataframe containing all the columns generated up to and including the feature input
    *
    * @param feature input feature to compute up to
    * @throws IllegalArgumentException if a feature is not part of this workflow
-   * @return Dataframe containing columns corresponding to all of the features generated before the feature given
+   * @return Dataframe containing columns corresponding to all of the features generated up to the feature given
    */
   def computeDataUpTo(feature: OPFeature, persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages)
     (implicit spark: SparkSession): DataFrame = {
-    computeDataUpTo(stopStage = findOriginStageId(feature), fitted = true, persistEveryKStages = persistEveryKStages)
+    if (findOriginStageId(feature).isEmpty) {
+      log.warn("Could not find origin stage for feature in workflow!! Defaulting to generate raw features.")
+      generateRawData()
+    } else {
+      val fittedFeature = feature.copyWithNewStages(stages)
+      val dag = FitStagesUtil.computeDAG(Array(fittedFeature))
+      applyTransformationsDAG(generateRawData(), dag, persistEveryKStages)
+    }
   }
 
   /**
@@ -124,7 +133,6 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @throws IllegalArgumentException if a feature is not part of this workflow
    * @return Updated instance of feature
    */
-  // TODO change this method to give you raw features for use in stacked workflows
   def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
     val allFeatures = rawFeatures ++ blacklistedFeatures ++ stages.map(_.getOutput())
     features.map{f => allFeatures.find(_.sameOrigin(f))
@@ -390,9 +398,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     require(persistEveryKStages >= 1, s"persistEveryKStages value of $persistEveryKStages is invalid must be >= 1")
 
     // TODO: replace 'stages' with 'stagesDag'. (is a breaking change for serialization, but would simplify scoreFn)
-
     // Pre-compute transformations dag
-    val dag = DAG.compute(resultFeatures)
+    val dag = FitStagesUtil.computeDAG(resultFeatures)
 
     (path: Option[String]) => {
       // Generate the dataframe with raw features

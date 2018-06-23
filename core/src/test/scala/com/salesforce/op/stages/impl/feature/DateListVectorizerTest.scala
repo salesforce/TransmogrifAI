@@ -31,23 +31,21 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.DateListPivot._
 import com.salesforce.op.test.TestOpVectorColumnType.IndCol
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder}
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.joda.time.{DateTime, DateTimeConstants}
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class DateListVectorizerTest extends FlatSpec with TestSparkContext {
+class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectorizer[DateList]] {
 
   // Sunday July 12th 1998 at 22:45
   val defaultDate = new DateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
@@ -94,23 +92,15 @@ class DateListVectorizerTest extends FlatSpec with TestSparkContext {
   val testVectorizer = new DateListVectorizer[DateList]()
   val outputName = "vecDateList"
 
-  Spec[DateListVectorizer[_]] should "have output name set correctly" in {
-    testVectorizer.operationName shouldBe outputName
-  }
+  // OpTransformer base tests
+  val inputData = testDataCurrent
 
-  it should "throw an error if you try to get the output without setting the inputs" in {
-    intercept[java.util.NoSuchElementException](testVectorizer.getOutput())
-  }
+  val transformer = new DateListVectorizer[DateList]().setInput(clicks, opens, purchases)
 
-  it should "return a single output feature of the correct type" in {
-    val output = testVectorizer.setInput(clicks, opens, purchases).getOutput()
-    output shouldBe new Feature[OPVector](
-      name = testVectorizer.getOutputFeatureName,
-      originStage = testVectorizer,
-      isResponse = false,
-      parents = Array(clicks, opens, purchases)
-    )
-  }
+  val expectedResult = Seq(Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0, 1.0).toOPVector,
+    Vectors.dense(3.0, 0.0, 0.0, 0.0, 0.0, 0.0).toOPVector,
+    Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).toOPVector,
+    Vectors.dense(2.0, 0.0, 1.0, 0.0, -1.0, 0.0).toOPVector)
 
   it should "vectorize with SinceFirst" in {
     val testModelTimeSinceFirst = testVectorizer.setInput(clicks, opens, purchases).setPivot(SinceFirst)

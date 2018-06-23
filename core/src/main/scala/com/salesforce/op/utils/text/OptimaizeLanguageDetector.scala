@@ -31,10 +31,10 @@
 
 package com.salesforce.op.utils.text
 
+import com.optimaize.langdetect.LanguageDetectorBuilder
 import com.optimaize.langdetect.i18n.LdLocale
 import com.optimaize.langdetect.ngram.NgramExtractors
 import com.optimaize.langdetect.profiles.LanguageProfileReader
-import com.optimaize.langdetect.{LanguageDetectorBuilder, LanguageDetector => OLanguageDetector}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._

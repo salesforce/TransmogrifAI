@@ -1,4 +1,4 @@
 rootProject.name='optimus-prime'
 
-include 'utils', 'features', 'readers', 'core', 'testkit', 'cli', 'templates:simple', 'docs'
+include 'utils', 'features', 'readers', 'core', 'models', 'testkit', 'cli', 'templates:simple', 'docs'
 

@@ -209,7 +209,7 @@ case class ModelInsights
   }
   private def evaluationMetrics(metricsName: String): EvaluationMetrics = {
     val res = for {
-      metricsMap <- getMap[String, Double](selectedModelInfo, metricsName)
+      metricsMap <- getMap[String, Any](selectedModelInfo, metricsName)
       evalMetrics <- Try(toEvaluationMetrics(metricsMap))
     } yield evalMetrics
     res match {
@@ -226,7 +226,7 @@ case class ModelInsights
 
   private val MetricName = "\\((.*)\\)\\_(.*)".r
 
-  private def toEvaluationMetrics(metrics: Map[String, Double]): EvaluationMetrics = {
+  private def toEvaluationMetrics(metrics: Map[String, Any]): EvaluationMetrics = {
     import OpEvaluatorNames._
     val metricsType = metrics.keys.headOption match {
       case Some(MetricName(t, _)) if Set(binary, multi, regression).contains(t) => t

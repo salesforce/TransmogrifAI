@@ -54,8 +54,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
 
   val data = labels.zip(vectors).zip(labelsBiased)
   val dataSize = data.size
-  val randDF = sc.makeRDD(data.map { case ((l, v), b) => (l.toDouble.get, v.value, b.toString) }).toDS()
-  val biasDF = sc.makeRDD(data.map { case ((l, v), b) => (b.toDouble.get, v.value, l.toString) }).toDS()
+  val randDF = sc.makeRDD(data.map { case ((l, v), b) => (l.toDouble.get, v.value, b.toString) }).toDF()
+  val biasDF = sc.makeRDD(data.map { case ((l, v), b) => (b.toDouble.get, v.value, l.toString) }).toDF()
   val seed = 42L
 
   Spec[DataCutter] should "not filter out any data when the parameters are permissive" in {

@@ -118,7 +118,6 @@ trait EvaluationMetrics extends JsonLike {
    * @return metadata
    */
   def toMetadata: Metadata = this.toMap.toMetadata
-
 }
 
 
@@ -225,6 +224,10 @@ sealed abstract class ClassificationEvalMetric
  */
 object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
+  case object F1 extends ClassificationEvalMetric("f1", "f1")
+  case object Error extends ClassificationEvalMetric("accuracy", "error")
   case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
   case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under PR")
 }
@@ -238,7 +241,9 @@ object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
   case object F1 extends ClassificationEvalMetric("f1", "f1")
   case object Error extends ClassificationEvalMetric("accuracy", "error")
+  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
 }
+
 
 /**
  * Regression Metrics

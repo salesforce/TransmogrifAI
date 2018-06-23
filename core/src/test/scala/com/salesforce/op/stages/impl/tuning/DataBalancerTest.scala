@@ -52,12 +52,12 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
   // Generate positive observations following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val positiveData = {
     RandomRDDs.normalVectorRDD(sc, bigCount, 3, seed = seed)
-      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDS()
+      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
   }
   // Generate negative observations following a distribution ~ N((10.0, 10.0, 10.0), I_3)
   val negativeData = {
     RandomRDDs.normalVectorRDD(sc, smallCount, 3, seed = seed)
-      .map(v => (0.0, Vectors.dense(v.toArray.map(_ + 10.0)), "B")).toDS()
+      .map(v => (0.0, Vectors.dense(v.toArray.map(_ + 10.0)), "B")).toDF()
   }
 
   val data = positiveData.union(negativeData)
@@ -77,7 +77,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     val (downSample, upSample) = dataBalancer.getProportions(smallCount, bigCount, sampleFraction, maxTrainingSample)
     val reSampled = dataBalancer.rebalance(negativeData, upSample, positiveData, downSample, seed)
 
-    val Array(negData, posData) = Array(0.0, 1.0).map(label => reSampled.filter(_._1 == label).persist())
+    val Array(negData, posData) = Array(0.0, 1.0).map(label => reSampled.filter(_.getDouble(0) == label).persist())
     val negativeCount = negData.count()
     val positiveCount = posData.count()
 
@@ -107,8 +107,13 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getDownSampleFraction shouldBe downSample
     balancer.getIsPositiveSmall shouldBe false
 
+
     // Rerun balancer with set params
+    val metadata = balancer.metadataBuilder
     val ModelData(expected2, _) = balancer.prepare(data)
+    withClue("Data balancer should no update the metadata"){
+      balancer.metadataBuilder shouldBe metadata
+    }
     expected.collect() shouldBe expected2.collect()
   }
 
@@ -125,7 +130,11 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getAlreadyBalancedFraction shouldBe 1.0
 
     // Rerun balancer with set params
+    val metadata = balancer.metadataBuilder
     val ModelData(expected2, _) = balancer.prepare(data)
+    withClue("Data balancer should no update the metadata"){
+      balancer.metadataBuilder shouldBe metadata
+    }
     expected.collect() shouldBe expected2.collect()
 
   }
@@ -144,7 +153,11 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
 
     // Rerun balancer with set params
+    val metadata = balancer.metadataBuilder
     val ModelData(expected2, _) = balancer.prepare(data)
+    withClue("Data balancer should no update the metadata"){
+      balancer.metadataBuilder shouldBe metadata
+    }
     expected.collect() shouldBe expected2.collect()
 
   }

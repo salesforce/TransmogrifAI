@@ -262,9 +262,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
     insights.problemType shouldBe ProblemType.BinaryClassification
     insights.selectedModelTrainEvalMetrics shouldBe
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0)
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0,
+        Seq(0.0), Seq(0.0), Seq(0.0), Seq(1.0))
     insights.selectedModelTestEvalMetrics shouldBe Some(
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0)
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0,
+        Seq(0.0), Seq(0.5), Seq(1.0), Seq(1.0))
     )
   }
 

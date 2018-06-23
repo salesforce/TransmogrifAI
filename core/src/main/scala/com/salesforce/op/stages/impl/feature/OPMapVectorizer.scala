@@ -451,7 +451,7 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
         val keys = args.allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = args.shouldCleanKeys, shouldCleanValue = args.shouldCleanValues)
         val mapValues = cleaned.map { case (k, v) => v.toText }
-        mapValues.map(tokenize(_)._2).toSeq
+        mapValues.map(tokenize(_).tokens).toSeq
     }
     val allTokens = tokenSeq.flatMap(_.value).toTextList
 

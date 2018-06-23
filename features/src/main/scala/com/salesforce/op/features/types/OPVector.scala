@@ -31,9 +31,13 @@
 
 package com.salesforce.op.features.types
 
-import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.linalg._
 
-
+/**
+ * Vector representation
+ *
+ * @param value vector ([[SparseVector]] or [[DenseVector]])
+ */
 class OPVector(val value: Vector) extends OPCollection {
   type Value = Vector
   final def isEmpty: Boolean = value.size == 0

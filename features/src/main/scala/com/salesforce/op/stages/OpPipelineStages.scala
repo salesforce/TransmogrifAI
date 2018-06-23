@@ -32,9 +32,10 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features._
-import com.salesforce.op.features.types.{FeatureType, OPVector}
+import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataType._
+import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.util.{MLWritable, MLWriter}
 import org.apache.spark.ml.{PipelineStage, Transformer}
@@ -203,7 +204,7 @@ trait OpPipelineStage[O <: FeatureType] extends OpPipelineStageBase {
    * Should output feature be a response? Yes, if any of the input features are.
    * @return true if the the output feature should be a response
    */
-  protected def outputIsResponse: Boolean = getTransientFeatures().exists(_.isResponse)
+  def outputIsResponse: Boolean = getTransientFeatures().exists(_.isResponse)
 
 }
 
@@ -553,12 +554,28 @@ trait OpPipelineStageN[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
  * Trait to mix into transformers that indicates their transform functions can be combined into a single stage
  */
 private[op] trait OpTransformer {
-
   self: OpPipelineStage[_] with Transformer =>
 
   /**
-   * Creates a transform function to convert Row to a value
-   * @return a transform function to convert Row to a value
+   * Feature name (key) -> value lookup, e.g Row, Map etc.
    */
-  def transformRow: Row => Any
+  type KeyValue = String => Any
+
+  /**
+   * Creates a transform function to transform Row to a value
+   * @return a transform function to transform Row to a value
+   */
+  def transformRow: Row => Any = r => transformKeyValue(r.getAny)
+
+  /**
+   * Creates a transform function to transform Map to a value
+   * @return a transform function to transform Map to a value
+   */
+  def transformMap: Map[String, Any] => Any = m => transformKeyValue(m.apply)
+
+  /**
+   * Creates a transform function to transform any key/value to a value
+   * @return a transform function to transform any key/value to a value
+   */
+  def transformKeyValue: KeyValue => Any
 }

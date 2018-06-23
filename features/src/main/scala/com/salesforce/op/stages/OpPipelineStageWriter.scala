@@ -77,7 +77,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    */
   def writeToMap: Map[String, Any] = {
     // We produce stage metadata for all the Spark params
-    val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage, sc)
+    val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
     // Add isModel indicator
     val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
     // In case we stumbled upon a model instance, we also include it's ctor args
@@ -102,10 +102,10 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
       val anyValue = argValue match {
         // Special handling for Feature Type TypeTags
         case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
-          AnyValue(`type` = AnyValueTypes.TypeTag, value = t.tpe.dealias.toString)
+          AnyValue(`type` = AnyValueTypes.TypeTag, value = ReflectionUtils.dealisedTypeName(t.tpe))
         case t: TypeTag[_] =>
           throw new RuntimeException(
-            s"Unknown type tag '${t.tpe.dealias.toString}'. " +
+            s"Unknown type tag '${t.tpe.toString}'. " +
               "Only Feature and Feature Value type tags are supported for serialization."
           )
 

@@ -92,15 +92,17 @@ final class TextMapNullModel[T <: OPMap[String]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun {
+    with VectorizerDefaults with CleanTextMapFun with TextTokenizerParams {
 
   def transformFn: Seq[T] => OPVector = row => {
     row.zipWithIndex.flatMap {
       case (map, i) =>
         val keys = allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = cleanKeys, shouldCleanValue = cleanValues)
+        val tokenMap = cleaned.mapValues { v => v.toText }.mapValues(tokenize(_).tokens)
 
-        keys.map(k => if (cleaned.contains(k)) 0.0 else 1.0)
+        // Need to check if key is present, and also that our tokenizer will not remove the value
+        keys.map(k => if (cleaned.contains(k) && tokenMap(k).nonEmpty) 0.0 else 1.0)
     }.toOPVector
   }
 

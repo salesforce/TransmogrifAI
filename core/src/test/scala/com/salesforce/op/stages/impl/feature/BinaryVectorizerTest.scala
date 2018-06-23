@@ -33,19 +33,18 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, RootCol}
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
+class BinaryVectorizerTest extends OpTransformerSpec[OPVector, BinaryVectorizer] {
 
-  val (ds, f1, f2) = TestFeatureBuilder(
+  val (inputData, f1, f2) = TestFeatureBuilder(
     Seq[(Binary, Binary)](
       (Binary(false), Binary(false)),
       (Binary(false), Binary(true)),
@@ -59,17 +58,23 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
     )
   )
 
-  Spec[BinaryVectorizer] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new BinaryVectorizer().setInput(f1, f2)
-    val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.getOutputFeatureName
-    vector.typeName shouldBe FeatureType.typeName[OPVector]
-    vector.isResponse shouldBe false
-  }
+  val transformer = new BinaryVectorizer().setInput(f1, f2) // default settings: trackNulls = true, setFillValue = false
+
+  val expectedResult = Seq(
+    Array(0.0, 0.0, 0.0, 0.0),
+    Array(0.0, 0.0, 1.0, 0.0),
+    Array(1.0, 0.0, 0.0, 0.0),
+    Array(1.0, 0.0, 1.0, 0.0),
+    Array(0.0, 1.0, 0.0, 0.0),
+    Array(0.0, 1.0, 1.0, 0.0),
+    Array(0.0, 0.0, 0.0, 1.0),
+    Array(1.0, 0.0, 0.0, 1.0),
+    Array(0.0, 1.0, 0.0, 1.0)
+  ).map(Vectors.dense(_).toOPVector)
 
   it should "transform the data correctly [trackNulls=true,fillValue=false]" in {
     val vectorizer = new BinaryVectorizer().setInput(f1, f2).setTrackNulls(true).setFillValue(false)
-    val transformed = vectorizer.transform(ds)
+    val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
       Array(0.0, 0.0, 0.0, 0.0),
@@ -93,7 +98,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "transform the data correctly [trackNulls=true,fillValue=true]" in {
     val vectorizer = new BinaryVectorizer().setInput(f1, f2).setTrackNulls(true).setFillValue(true)
-    val transformed = vectorizer.transform(ds)
+    val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
       Array(0.0, 0.0, 0.0, 0.0),
@@ -117,7 +122,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "transform the data correctly [trackNulls=false,fillValue=false]" in {
     val vectorizer = new BinaryVectorizer().setInput(f1, f2).setTrackNulls(false).setFillValue(false)
-    val transformed = vectorizer.transform(ds)
+    val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
       Array(0.0, 0.0),
@@ -141,7 +146,7 @@ class BinaryVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "transform the data correctly [trackNulls=false,fillValue=true]" in {
     val vectorizer = new BinaryVectorizer().setInput(f1, f2).setTrackNulls(false).setFillValue(true)
-    val transformed = vectorizer.transform(ds)
+    val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val expected = Array(
       Array(0.0, 0.0),

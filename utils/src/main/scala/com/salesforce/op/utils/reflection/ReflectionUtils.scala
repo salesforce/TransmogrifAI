@@ -146,16 +146,34 @@ object ReflectionUtils {
   def reflectSetterMethod[T: ClassTag](
     instance: T,
     setterName: String,
+    inputs: Seq[Any],
     classLoader: ClassLoader = defaultClassLoader
-  ): Option[MethodMirror] = {
+  ): Any = {
+    reflectMethod(instance, s"set$setterName", classLoader).apply(inputs: _*)
+  }
+
+  /**
+   * Find setter methods for the provided method name
+   * @param instance     class to find method for
+   * @param methodName   name of method to find
+   * @param classLoader  class loader to use
+   * @tparam T  type of instance to copy
+   * @return    reflected method to set type
+   */
+  def reflectMethod[T: ClassTag](
+    instance: T,
+    methodName: String,
+    classLoader: ClassLoader = defaultClassLoader
+  ): MethodMirror = {
     val klazz = instance.getClass
     val (runtimeMirror, classMirror) = mirrors(klazz, classLoader)
     val classType = runtimeMirror.classSymbol(klazz).toType
     val tMembers = classType.members
-    val settrs = tMembers.collect { case m: MethodSymbol if m.isPublic &&
-      termNameStr(m.name).compareToIgnoreCase(s"set$setterName") == 0 => m }
+    val methods = tMembers.collect { case m: MethodSymbol if m.isMethod &&
+      termNameStr(m.name).compareToIgnoreCase(methodName) == 0 => m
+    }
     val instanceMirror = runtimeMirror.reflect(instance)
-    settrs.headOption.map(instanceMirror.reflectMethod(_))
+    instanceMirror.reflectMethod(methods.head)
   }
 
   /**
@@ -167,6 +185,26 @@ object ReflectionUtils {
    * @return class object
    */
   def classForName(name: String, classLoader: ClassLoader = defaultClassLoader): Class[_] = classLoader.loadClass(name)
+
+
+  /**
+   * Fully dealiased type name for [[Type]].
+   * This method performs a recursive dealising vs a regular type.dealias, which does on one level only.
+   *
+   * E.g: given a type of "Map[String,Double]" the result is
+   * "scala.collection.immutable.Map[java.lang.String,scala.Double]"
+   *
+   * @param t type to dealias
+   * @return fully dealised type name
+   */
+  def dealisedTypeName(t: Type): String = {
+    val dealised = t.dealias
+    if (dealised.typeArgs.isEmpty) dealised.typeSymbol.fullName
+    else {
+      dealised.typeConstructor.dealias.typeSymbol.fullName +
+        dealised.typeArgs.map(dealisedTypeName).mkString("[", ",", "]")
+    }
+  }
 
   /**
    * Create a TypeTag for Type

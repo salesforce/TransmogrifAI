@@ -31,26 +31,27 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
-import com.salesforce.op.features.OPFeature
+import com.salesforce.op.evaluators._
+import com.salesforce.op.features._
 import com.salesforce.op.features.types._
 import com.salesforce.op.filters.RawFeatureFilter
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.readers._
 import com.salesforce.op.stages.base.unary._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, Stage1BinaryClassificationModelSelector}
+import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
-import com.salesforce.op.stages.impl.tuning.DataBalancer
-import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.stages.impl.regression.{LossType, RegressionModelSelector, RegressionModelsToTry}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBaseNames, SelectedModel}
+import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.test.{Passenger, PassengerCSV, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.BooleanParam
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DoubleType, StringType}
 import org.apache.spark.sql.{Dataset, SparkSession}
-import org.joda.time.DateTime
+import org.joda.time.{DateTime, Duration}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -158,7 +159,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setInput(survivedNum, checked).getOutput()
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed, prob)
-      .withRawFeatureFilter(Option(dataReader), None, minFillRate = 0.7)
+      .withRawFeatureFilter(
+        trainingReader = Option(dataReader),
+        scoringReader = None,
+        minFillRate = 0.7,
+        protectedFeatures = Array(height, weight))
 
     val wfM = wf.train()
     val data = wfM.score()
@@ -183,7 +188,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "be able to compute a partial dataset in both workflow and workflow model" in {
     val fields =
-      List(KeyFieldName, height.name, weight.name, heightNormed.name, density.name, densityByHeightNormed.name)
+      List(KeyFieldName, height.name, weight.name, heightNormed.name, density.name,
+        densityByHeightNormed.name, whyNotNormed.name)
 
     val data = workflow.setReader(dataReader).computeDataUpTo(whyNotNormed)
     data.schema.fieldNames should contain theSameElementsAs fields
@@ -445,6 +451,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setRawPredictionCol(rawPred)
       .setLabelCol(survivedNum)
       .setPredictionCol(pred)
+      .setProbabilityCol(prob)
 
     val scores1 = fittedWorkflow.score(keepIntermediateFeatures = true)
     val (scores2, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator, keepIntermediateFeatures = true)
@@ -458,7 +465,12 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     scores1.schema.fields.map(_.metadata.toString()) should contain theSameElementsAs
       scores2.schema.fields.map(_.metadata.toString())
 
-    metrics shouldBe BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0)
+    val probs = scores2.collect(prob)
+    val thresholds = probs.map(_.value(1)).distinct.sorted.reverse
+
+    metrics shouldBe BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0,
+      thresholds.toSeq, Seq(1.0, 0.5, 0.25, 0.2, 1.0/6), Seq(1.0, 1.0, 1.0, 1.0, 1.0),
+      Seq(0.0, 0.2, 0.6, 0.8, 1.0))
   }
 
   it should "return an empty data set if passed empty data for scoring" in {
