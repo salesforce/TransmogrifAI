@@ -154,6 +154,9 @@ dependencies {
     // Octopus Prime
     compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
 
+    // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
+    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
+
     // All your other depdendecies go below
     // ...
 }
