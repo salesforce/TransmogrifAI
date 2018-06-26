@@ -208,7 +208,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     summary += selectedModelInfo(insights)
     summary += modelEvaluationMetrics(insights)
     summary ++= topKCorrelations(insights, topK)
-    summary += topKContributions(insights, topK)
+    summary ++= topKContributions(insights, topK)
     summary ++= topKCramersV(insights, topK)
     summary.mkString("\n")
   }
@@ -261,19 +261,15 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   private def modelEvaluationMetrics(insights: ModelInsights): String = {
-    def stringOf: PartialFunction[Any, String] = {
-      case s: Traversable[_] => s.map(_.toString).mkString("[",",","]")
-      case v: Any => v.toString
-    }
     val name = "Model Evaluation Metrics"
-    val trainEvaluationMetrics = insights.selectedModelTrainEvalMetrics
-    val testEvaluationMetrics = insights.selectedModelTestEvalMetrics
+    val trainEvalMetrics = insights.selectedModelTrainEvalMetrics
+    val testEvalMetrics = insights.selectedModelTestEvalMetrics
     val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
-    val trainMetrics = trainEvaluationMetrics.toMap.map { case (k, v) => k -> stringOf(v) }.toSeq.sortBy(_._1)
-    val table = testEvaluationMetrics match {
+    val trainMetrics = trainEvalMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
+    val table = testEvalMetrics match {
       case Some(testMetrics) =>
         val testMetricsMap = testMetrics.toMap
-        val rows = trainMetrics.map { case (k, v) => (k, stringOf(v), stringOf(testMetricsMap(k))) }
+        val rows = trainMetrics.map { case (k, v) => (k, v, testMetricsMap(k).toString) }
         Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows)
       case None =>
         Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetrics)
@@ -320,16 +316,13 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     if (topNegativeInsights.isEmpty) Seq(topPositive) else Seq(topPositive, topNegative)
   }
 
-  private def topKContributions(insights: ModelInsights, topK: Int): String = {
+  private def topKContributions(insights: ModelInsights, topK: Int): Option[String] = {
     val maxContribFeatures = insights.features
       .flatMap(f => f.derivedFeatures.map(d =>
         (f, d, d.contribution.reduceOption[Double](math.max).getOrElse(Double.MinValue))))
       .sortBy(v => -1 * math.abs(v._3))
     val rows = topKInsights(maxContribFeatures, topK)
-    val contributionCol = "Contribution Value"
-
-    Table(columns = Seq("Top Contributions", contributionCol), rows = rows)
-      .prettyString(columnAlignments = Map(contributionCol -> Right))
+    numericalTable(columns = Seq("Top Contributions", "Contribution Value"), rows)
   }
 
   private def topKCramersV(insights: ModelInsights, topK: Int): Option[String] = {
@@ -339,13 +332,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       group <- derived.derivedFeatureGroup
       cramersV <- derived.cramersV
     } yield group -> cramersV
-
     val rows = allCramersV.sortBy(-_._2).take(topK)
-    val cramersVCol = "CramersV"
-    if (rows.isEmpty) None
-    else Some(Table(columns = Seq("Top CramersV", cramersVCol), rows = rows)
-      .prettyString(columnAlignments = Map(cramersVCol -> Right)))
+    numericalTable(columns = Seq("Top CramersV", "CramersV"), rows)
   }
+
+  private def numericalTable(columns: Seq[String], rows: Seq[(String, Double)]): Option[String] =
+    if (rows.isEmpty) None else Some(Table(columns, rows).prettyString(columnAlignments = Map(columns.last -> Right)))
 
   /**
    * Save this model to a path
