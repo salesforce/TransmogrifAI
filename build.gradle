@@ -5,21 +5,25 @@ buildscript {
     }
     dependencies {
         classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
+        classpath 'com.amazonaws:aws-java-sdk-core:1.11.353'
     }
 }
 
 plugins {
     id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
     id 'org.scoverage' version '2.1.0'
-    id 'com.jfrog.artifactory' version '3.1.1'
     id 'net.minecrell.licenser' version '0.3'
-    id 'com.github.unafraid.gradle.git-repo-plugin' version '2.0.4'
     id 'com.github.jk1.dependency-license-report' version '0.5.0'
 }
 
-apply from: 'gradle/artifactory.gradle'
-apply from: 'gradle/version-properties.gradle'
+allprojects {
+    repositories {
+        mavenCentral()
+        maven { url 'https://jitpack.io' }
+    }
+}
 
+apply from: 'gradle/version-properties.gradle'
 
 def allProjs = allprojects - project(':templates').subprojects - project(':docs')
 def subProjs = subprojects - project(':templates').subprojects - project(':docs')
@@ -37,11 +41,9 @@ configure(allProjs) {
     apply plugin: 'maven'
     apply plugin: 'maven-publish'
     apply plugin: 'project-report'
-    apply plugin: 'com.jfrog.artifactory'
     apply plugin: 'com.commercehub.gradle.plugin.avro'
     apply plugin: 'net.minecrell.licenser'
     apply plugin: 'com.github.jk1.dependency-license-report'
-    apply plugin: 'com.github.unafraid.gradle.git-repo-plugin'
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
@@ -231,29 +233,6 @@ configure(allProjs) {
             println sourceSets.main.runtimeClasspath.asPath
         }
     }
-
-    //****************************************************************************************************
-    // Publish to Github repository as a maven repo:
-    //    ./gradlew publishToGithub -Dorg.ajoberstar.grgit.auth.ssh.private=~/.ssh/id_rsa
-    //
-    // Then repo can be used as a maven repository:
-    //    repositories {
-    //        maven {
-    //            url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
-    //            credentials {
-    //                username "<YOUR_PERSONAL_ACCESS_TOKEN" // Generate one here - https://goo.gl/ANZ9oz
-    //                password "" // leave the password empty
-    //            }
-    //            authentication { digest(BasicAuthentication) }
-    //        }
-    //    }
-    gitPublishConfig {
-        org = 'salesforce'
-        repo = 'op'
-        upstream = 'origin'
-        branch = 'mvn-repo'
-    }
-    //****************************************************************************************************
 }
 
 task wrapper(type: Wrapper) {
@@ -265,19 +244,25 @@ task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
     description 'Aggregates scoverage reports of all subprojects.'
 }
 
-artifactoryPublish {
-    doFirst {
-        println "Overriding repository based on project version (snapshot/release) version=$project.version"
-        clientConfig.publisher.repoKey = "libs-${project.version.endsWith('-SNAPSHOT') ? 'snapshot' : 'release'}-local"
-        println("Publishing to ${clientConfig.publisher.repoKey}")
-    }
-}
+import com.amazonaws.auth.*
+import com.amazonaws.auth.profile.*
 
 configure(subProjs) {
     apply from: "$rootProject.projectDir/gradle/tests.gradle"
     apply from: "$rootProject.projectDir/gradle/spark.gradle"
 
     jar.baseName = "$rootProject.name-$project.name"
+
+    def fetchAwsCredentials = {
+        String profile = "op-repo-admin"
+        try {
+            return new ProfileCredentialsProvider(profile).credentials
+        } catch (Exception e) {
+            logger.debug("Unable to retrieve AWS credentials from '$profile' profile, publishing to S3 will not be available.", e)
+            return new BasicAWSCredentials("unknown-key", "unknown-secret")
+        }
+    }
+    AWSCredentials awsCredentials = fetchAwsCredentials()
 
     publishing {
         publications {
@@ -289,7 +274,11 @@ configure(subProjs) {
         }
         repositories {
             maven {
-                url "file://${gitPublishConfig.home}/${gitPublishConfig.org}/${gitPublishConfig.repo}/releases"
+                url "s3://op-repo/releases"
+                credentials(AwsCredentials) {
+                    accessKey awsCredentials.AWSAccessKeyId
+                    secretKey awsCredentials.AWSSecretKey
+                }
             }
         }
     }
@@ -301,16 +290,6 @@ configure(subProjs) {
     sourcesJar.baseName = jar.baseName
 
     artifacts { archives sourcesJar }
-
-    artifactoryPublish.dependsOn(jar, sourcesJar)
-}
-
-// Skip publishing the root project
-artifactoryPublish.skip = true
-
-// Send the version number to TeamCity
-if (System.env.TEAMCITY_VERSION) {
-    println("##teamcity[setParameter name='env.OP_VERSION' value='$project.version']")
 }
 
 // run by Heroku to build docs
