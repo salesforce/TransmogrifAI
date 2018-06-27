@@ -255,6 +255,7 @@ configure(subProjs) {
     jar.baseName = "$rootProject.name-$project.name"
 
     def fetchAwsCredentials = {
+        // Note: 'op-repo-admin' profile must be set in ~/.aws/credentials
         String profile = "op-repo-admin"
         try {
             return new ProfileCredentialsProvider(profile).credentials
