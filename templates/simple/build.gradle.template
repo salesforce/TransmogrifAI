@@ -135,7 +135,8 @@ task repl(type: JavaExec) {
     args '-usejavacp'
 }
 
-task wrapper(type: Wrapper) {
+wrapper {
     gradleVersion = '4.8.1'
-    description "Sets the Gradle wrapper version."
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
 }

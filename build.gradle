@@ -38,7 +38,6 @@ configure(allProjs) {
     // apply plugin: 'findbugs'
     apply plugin: 'org.scoverage'
     apply plugin: 'scalaStyle'
-    apply plugin: 'maven'
     apply plugin: 'maven-publish'
     apply plugin: 'signing'
     apply plugin: 'project-report'
@@ -236,9 +235,10 @@ configure(allProjs) {
     }
 }
 
-task wrapper(type: Wrapper) {
-    description "Sets the Gradle wrapper version to $gradleVersion."
+wrapper {
     gradleVersion = '4.8.1'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
@@ -265,12 +265,31 @@ configure(subProjs) {
     }
     AWSCredentials awsCredentials = fetchAwsCredentials()
 
+    task scaladocJar(type: Jar, dependsOn: scaladoc) {
+        classifier = 'javadoc'
+        from scaladoc.destinationDir
+    }
+    scaladocJar.baseName = jar.baseName
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+    sourcesJar.baseName = jar.baseName
+
+    artifacts {
+        archives jar, sourcesJar, scaladocJar
+    }
+
     publishing {
         publications {
             mavenJava(MavenPublication) {
-                artifactId "${jar.baseName}_$scalaVersion"
                 from components.java
                 artifact sourcesJar { classifier 'sources' }
+                artifact scaladocJar { classifier 'javadoc' }
+                afterEvaluate {
+                    artifactId = "${jar.baseName}_$scalaVersion"
+                }
                 pom {
                     name = 'Octopus Prime'
                     description = 'AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning'
@@ -284,6 +303,7 @@ configure(subProjs) {
                         license {
                             name = 'BSD-3-Clause'
                             url = 'https://github.com/salesforce/op/blob/master/LICENSE.txt'
+                            distribution = 'repo'
                         }
                     }
                     developers {
@@ -311,7 +331,7 @@ configure(subProjs) {
             }
             // Disable Sonatype publication for now
             /* maven {
-                // Note: requires 'nexusUsername' and 'nexusPassword' be set in ~/.gradle/gradle.properties file
+                // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
                 url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
                 credentials {
                     username nexusUsername
@@ -321,16 +341,8 @@ configure(subProjs) {
         }
     }
 
-    task sourcesJar(type: Jar, dependsOn: classes) {
-        classifier = 'sources'
-        from sourceSets.main.allSource
-    }
-    sourcesJar.baseName = jar.baseName
-
-    artifacts { archives sourcesJar }
-
     signing {
-        // Note: requires 'signing.keyId' and 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
         // and https://gpgtools.org/ (gpg2 installed and configured)
         useGpgCmd()
         sign publishing.publications.mavenJava

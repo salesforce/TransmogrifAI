@@ -131,6 +131,12 @@ configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
+wrapper {
+    gradleVersion = '4.8.1'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
+}
+
 task runMain(type: JavaExec) {
     description 'run a main class, i.e.: runMain -Dmain=MyMainClass -Dargs="arg1 arg2 arg3"'
     main = System.getProperty("main")
@@ -153,9 +159,4 @@ task classpath {
         description 'Print project classpath.'
         println sourceSets.main.runtimeClasspath.asPath
     }
-}
-
-task wrapper(type: Wrapper) {
-    gradleVersion = '4.8.1'
-    description "Sets the Gradle wrapper version to $gradleVersion."
 }
