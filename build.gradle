@@ -40,6 +40,7 @@ configure(allProjs) {
     apply plugin: 'scalaStyle'
     apply plugin: 'maven'
     apply plugin: 'maven-publish'
+    apply plugin: 'signing'
     apply plugin: 'project-report'
     apply plugin: 'com.commercehub.gradle.plugin.avro'
     apply plugin: 'net.minecrell.licenser'
@@ -237,7 +238,7 @@ configure(allProjs) {
 
 task wrapper(type: Wrapper) {
     description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.7'
+    gradleVersion = '4.8.1'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
@@ -270,6 +271,34 @@ configure(subProjs) {
                 artifactId "${jar.baseName}_$scalaVersion"
                 from components.java
                 artifact sourcesJar { classifier 'sources' }
+                pom {
+                    name = 'Octopus Prime'
+                    description = 'AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning'
+                    url = 'https://github.com/salesforce/op'
+                    scm {
+                        connection = 'scm:git:https://github.com/salesforce/op.git'
+                        developerConnection = 'scm:git:https://github.com/salesforce/op.git'
+                        url = 'https://github.com/salesforce/op'
+                    }
+                    licenses {
+                        license {
+                            name = 'BSD-3-Clause'
+                            url = 'https://github.com/salesforce/op/blob/master/LICENSE.txt'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'tovbinm'
+                            name = 'Matthew Tovbin'
+                            email = 'tovbinm@gmail.com'
+                        }
+                        developer {
+                            id = 'leahmcguire'
+                            name = 'Leah McGuire'
+                            email = 'lmcguire@salesforce.com'
+                        }
+                    }
+                }
             }
         }
         repositories {
@@ -280,6 +309,14 @@ configure(subProjs) {
                     secretKey awsCredentials.AWSSecretKey
                 }
             }
+            // Disable Sonatype publication for now
+            /* maven {
+                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username nexusUsername
+                    password nexusPassword
+                }
+            } */
         }
     }
 
@@ -290,4 +327,9 @@ configure(subProjs) {
     sourcesJar.baseName = jar.baseName
 
     artifacts { archives sourcesJar }
+
+    signing {
+        useGpgCmd()
+        sign publishing.publications.mavenJava
+    }
 }

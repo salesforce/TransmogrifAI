@@ -1,4 +1,3 @@
-rootProject.name='optimus-prime'
+rootProject.name='octopus-prime'
 
 include 'utils', 'features', 'readers', 'core', 'models', 'testkit', 'cli', 'templates:simple', 'docs'
-

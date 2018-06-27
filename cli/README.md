@@ -1,13 +1,13 @@
-# Optimus Prime Command Line Interface (OP CLI)
+# Octopus Prime Command Line Interface (OP CLI)
 
 ## Installation
 
 1. add to your bash profile:
     ```bash
-    export OP_HOME="/path/to/optimus-prime/"
+    export OP_HOME="/path/to/octopus-prime/"
     alias op="java -cp $OP_HOME/cli/build/libs/\* com.salesforce.op.cli.CLI"
     ```
-2. run `./gradlew cli:shadowJar` in your optimus-prime project directory
+2. run `./gradlew cli:shadowJar` in your octopus-prime project directory
 3. now running `op` in terminal should run the most recently build shadow jar every time
 4. if you change the CLI, rerun `./gradlew cli:shadowJar`
 
