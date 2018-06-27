@@ -311,6 +311,7 @@ configure(subProjs) {
             }
             // Disable Sonatype publication for now
             /* maven {
+                // Note: requires 'nexusUsername' and 'nexusPassword' be set in ~/.gradle/gradle.properties file
                 url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
                 credentials {
                     username nexusUsername
@@ -329,6 +330,8 @@ configure(subProjs) {
     artifacts { archives sourcesJar }
 
     signing {
+        // Note: requires 'signing.keyId' and 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+        // and https://gpgtools.org/ (gpg2 installed and configured)
         useGpgCmd()
         sign publishing.publications.mavenJava
     }
