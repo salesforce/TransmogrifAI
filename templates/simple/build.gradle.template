@@ -14,14 +14,12 @@ repositories {
     mavenCentral()
     maven { url "https://jitpack.io" }
     maven {
-       url "https://raw.githubusercontent.com/salesforce/op/mvn-repo/releases"
-       credentials {
-           // Generate github api token here - https://goo.gl/ANZ9oz
-           // and then set it as an environment variable `export GITHUB_API_TOKEN=<MY_TOKEN>`
-           username = System.getenv("GITHUB_API_TOKEN")
-           password "" // leave the password empty
-       }
-       authentication { digest(BasicAuthentication) }
+        url "s3://op-repo/releases"
+        credentials(AwsCredentials) {
+            // user: op-repo-reader
+            accessKey "AKIAJ6AZFFSFRJI3IKHQ"
+            secretKey "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"
+        }
     }
 }
 
@@ -71,6 +69,9 @@ dependencies {
 
     // Optimus Prime
     compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+
+    // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
+    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
 
     // Test
     testCompile ("org.scalatest:scalatest_$scalaVersion:${scalatestVersion}")
@@ -135,6 +136,6 @@ task repl(type: JavaExec) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '4.5.1'
+    gradleVersion = '4.7'
     description "Sets the Gradle wrapper version."
 }
