@@ -29,8 +29,6 @@ apply plugin: 'java'
 apply plugin: 'scala'
 apply plugin: 'com.github.johnrengelman.shadow'
 apply plugin: 'scalaStyle'
-apply plugin: 'maven'
-apply plugin: 'maven-publish'
 apply plugin: 'com.commercehub.gradle.plugin.avro'
 
 apply from: 'gradle/tests.gradle'
