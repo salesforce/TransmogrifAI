@@ -136,6 +136,6 @@ task repl(type: JavaExec) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '4.7'
+    gradleVersion = '4.8.1'
     description "Sets the Gradle wrapper version."
 }
