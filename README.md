@@ -152,10 +152,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // Octopus Prime
-    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+    compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // All your other depdendecies go below
     // ...
@@ -170,4 +170,4 @@ See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programm
 
 ## License
 
-[BSD 3-clause](LICENSE.txt) © Salesforce.com, Inc.
+[BSD 3-Clause](LICENSE.txt) © Salesforce.com, Inc.

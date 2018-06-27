@@ -68,10 +68,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // Optimus Prime
-    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+    compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // Test
     testCompile ("org.scalatest:scalatest_$scalaVersion:${scalatestVersion}")
@@ -135,7 +135,8 @@ task repl(type: JavaExec) {
     args '-usejavacp'
 }
 
-task wrapper(type: Wrapper) {
-    gradleVersion = '4.7'
-    description "Sets the Gradle wrapper version."
+wrapper {
+    gradleVersion = '4.8.1'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
 }
