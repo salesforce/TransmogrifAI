@@ -45,7 +45,7 @@ object DataGeneration {
   import spark.implicits._
 
   val df = spark.read.format("com.databricks.spark.csv").option("inferSchema", "true").load("PassengerData.csv")
-  // /Users/lmcguire/Stuff/Projects/optimus-prime/test-data/resources/PassengerData.csv
+  // /full/path/to/test-data/resources/PassengerData.csv
 
 
   val names = Seq("passengerId", "age", "gender", "height", "weight",

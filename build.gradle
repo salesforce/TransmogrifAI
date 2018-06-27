@@ -38,8 +38,8 @@ configure(allProjs) {
     // apply plugin: 'findbugs'
     apply plugin: 'org.scoverage'
     apply plugin: 'scalaStyle'
-    apply plugin: 'maven'
     apply plugin: 'maven-publish'
+    apply plugin: 'signing'
     apply plugin: 'project-report'
     apply plugin: 'com.commercehub.gradle.plugin.avro'
     apply plugin: 'net.minecrell.licenser'
@@ -235,9 +235,10 @@ configure(allProjs) {
     }
 }
 
-task wrapper(type: Wrapper) {
-    description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.7'
+wrapper {
+    gradleVersion = '4.8.1'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
@@ -254,6 +255,7 @@ configure(subProjs) {
     jar.baseName = "$rootProject.name-$project.name"
 
     def fetchAwsCredentials = {
+        // Note: 'op-repo-admin' profile must be set in ~/.aws/credentials
         String profile = "op-repo-admin"
         try {
             return new ProfileCredentialsProvider(profile).credentials
@@ -264,12 +266,60 @@ configure(subProjs) {
     }
     AWSCredentials awsCredentials = fetchAwsCredentials()
 
+    task scaladocJar(type: Jar, dependsOn: scaladoc) {
+        classifier = 'javadoc'
+        from scaladoc.destinationDir
+    }
+    scaladocJar.baseName = jar.baseName
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+    sourcesJar.baseName = jar.baseName
+
+    artifacts {
+        archives jar, sourcesJar, scaladocJar
+    }
+
     publishing {
         publications {
             mavenJava(MavenPublication) {
-                artifactId "${jar.baseName}_$scalaVersion"
                 from components.java
                 artifact sourcesJar { classifier 'sources' }
+                artifact scaladocJar { classifier 'javadoc' }
+                afterEvaluate {
+                    artifactId = "${jar.baseName}_$scalaVersion"
+                }
+                pom {
+                    name = 'Octopus Prime'
+                    description = 'AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning'
+                    url = 'https://github.com/salesforce/op'
+                    scm {
+                        connection = 'scm:git:https://github.com/salesforce/op.git'
+                        developerConnection = 'scm:git:https://github.com/salesforce/op.git'
+                        url = 'https://github.com/salesforce/op'
+                    }
+                    licenses {
+                        license {
+                            name = 'BSD-3-Clause'
+                            url = 'https://github.com/salesforce/op/blob/master/LICENSE.txt'
+                            distribution = 'repo'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'tovbinm'
+                            name = 'Matthew Tovbin'
+                            email = 'tovbinm@gmail.com'
+                        }
+                        developer {
+                            id = 'leahmcguire'
+                            name = 'Leah McGuire'
+                            email = 'lmcguire@salesforce.com'
+                        }
+                    }
+                }
             }
         }
         repositories {
@@ -280,14 +330,22 @@ configure(subProjs) {
                     secretKey awsCredentials.AWSSecretKey
                 }
             }
+            // Disable Sonatype publication for now
+            /* maven {
+                // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
+                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username nexusUsername
+                    password nexusPassword
+                }
+            } */
         }
     }
 
-    task sourcesJar(type: Jar, dependsOn: classes) {
-        classifier = 'sources'
-        from sourceSets.main.allSource
+    signing {
+        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+        // and https://gpgtools.org/ (gpg2 installed and configured)
+        useGpgCmd()
+        sign publishing.publications.mavenJava
     }
-    sourcesJar.baseName = jar.baseName
-
-    artifacts { archives sourcesJar }
 }

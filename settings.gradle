@@ -1,4 +1,5 @@
-rootProject.name='optimus-prime'
+enableFeaturePreview('STABLE_PUBLISHING')
+
+rootProject.name='octopus-prime'
 
 include 'utils', 'features', 'readers', 'core', 'models', 'testkit', 'cli', 'templates:simple', 'docs'
-
