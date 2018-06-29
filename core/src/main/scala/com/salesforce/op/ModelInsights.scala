@@ -37,6 +37,7 @@ import com.salesforce.op.features.types.{OPVector, RealNN}
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{DecisionTree, LogisticRegression, NaiveBayes, RandomForest}
+import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.{DecisionTreeRegression, GBTRegression, LinearRegression, RandomForestRegression}
@@ -44,8 +45,9 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames._
 import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, SelectedModel}
 import com.salesforce.op.stages.{OPStage, OpPipelineStageParams, OpPipelineStageParamsNames}
 import com.salesforce.op.utils.json.JsonUtils
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.table.Table
 import enumeratum._
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
@@ -56,7 +58,9 @@ import org.json4s._
 import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization.{write, writePretty}
 import org.slf4j.LoggerFactory
+import com.salesforce.op.utils.table.Alignment._
 
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
@@ -189,6 +193,160 @@ case class ModelInsights
     implicit val formats = DefaultFormats
     if (pretty) writePretty(this) else write(this)
   }
+
+  /**
+   * High level model summary in a compact print friendly format containing:
+   * selected model info, model evaluation results and feature correlations/contributions/cramersV values.
+   *
+   * @param topK top K of feature correlations/contributions/cramersV values
+   * @return high level model summary in a compact print friendly format
+   */
+  def prettyPrint(topK: Int = 15): String = {
+    val res = new ArrayBuffer[String]()
+    res ++= prettyValidationResults
+    res += prettySelectedModelInfo
+    res += modelEvaluationMetrics
+    res ++= topKCorrelations(topK)
+    res ++= topKContributions(topK)
+    res ++= topKCramersV(topK)
+    res.mkString("\n")
+  }
+
+  private def prettyValidationResults: Seq[String] = {
+    val evalSummary = {
+      val vModelTypes = validatedModelTypes
+      "Evaluated %s model%s using %s and %s metric.".format(
+        vModelTypes.mkString(", "),
+        if (vModelTypes.size > 1) "s" else "",
+        validationType.humanFriendlyName, // TODO add number of folds or train/split ratio if possible
+        evaluationMetricType.humanFriendlyName
+      )
+    }
+    val modelEvalRes = for {
+      modelType <- validatedModelTypes
+      modelValidationResults = validationResults(modelType)
+      evalMetric = evaluationMetricType.humanFriendlyName
+    } yield {
+      val evalMetricValues = modelValidationResults.flatMap { case (_, metrics) =>
+        metrics.get(evalMetric).flatMap(v => Try(v.toDouble).toOption)
+      }
+      val minMetricValue = evalMetricValues.reduceOption[Double](math.min).getOrElse(Double.NaN)
+      val maxMetricValue = evalMetricValues.reduceOption[Double](math.max).getOrElse(Double.NaN)
+
+      "Evaluated %d %s model%s with %s metric between [%s, %s].".format(
+        modelValidationResults.size,
+        modelType,
+        if (modelValidationResults.size > 1) "s" else "",
+        evalMetric,
+        minMetricValue,
+        maxMetricValue
+      )
+    }
+    Seq(evalSummary, modelEvalRes.mkString("\n"))
+  }
+
+  private def prettySelectedModelInfo: String = {
+    val bestModelType = selectedModelType
+    val name = s"Selected Model - $bestModelType"
+    val validationResults = selectedModelValidationResults.toSeq ++ Seq(
+      "name" -> selectedModelName,
+      "uid" -> selectedModelUID,
+      "modelType" -> selectedModelType
+    )
+    val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults.sortBy(_._1))
+    table.prettyString()
+  }
+
+  private def modelEvaluationMetrics: String = {
+    val name = "Model Evaluation Metrics"
+    val trainEvalMetrics = selectedModelTrainEvalMetrics
+    val testEvalMetrics = selectedModelTestEvalMetrics
+    val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
+    val trainMetrics = trainEvalMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
+    val table = testEvalMetrics match {
+      case Some(testMetrics) =>
+        val testMetricsMap = testMetrics.toMap
+        val rows = trainMetrics.map { case (k, v) => (k, v, testMetricsMap(k).toString) }
+        Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows)
+      case None =>
+        Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetrics)
+    }
+    table.prettyString()
+  }
+
+  private def topKInsights(s: Seq[(FeatureInsights, Insights, Double)], topK: Int): Seq[(String, Double)] = {
+    s.foldLeft(Seq.empty[(String, Double)]) {
+      case (acc, (feature, derived, corr)) =>
+        val insightValue = derived.derivedFeatureGroup -> derived.derivedFeatureValue match {
+          case (Some(group), Some(OpVectorColumnMetadata.NullString)) => s"${feature.featureName}($group = null)"
+          case (Some(group), Some(TransmogrifierDefaults.OtherString)) => s"${feature.featureName}($group = other)"
+          case (Some(group), Some(value)) => s"${feature.featureName}($group = $value)"
+          case (Some(group), None) => s"${feature.featureName}(group = $group)" // should not happen
+          case (None, Some(value)) => s"${feature.featureName}(value = $value)" // should not happen
+          case (None, None) => feature.featureName
+        }
+        if (acc.exists(_._1 == insightValue)) acc else acc :+ (insightValue, corr)
+    } take topK
+  }
+
+  private def topKCorrelations(topK: Int): Seq[String] = {
+    val corrs = for {
+      (feature, derived) <- derivedNonExcludedFeatures
+    } yield (feature, derived, derived.corr.collect { case v if !v.isNaN => v })
+
+    val corrDsc = corrs.map { case (f, d, corr) => (f, d, corr.getOrElse(Double.MinValue)) }.sortBy(_._3).reverse
+    val corrAsc = corrs.map { case (f, d, corr) => (f, d, corr.getOrElse(Double.MaxValue)) }.sortBy(_._3)
+    val topPositiveCorrs = topKInsights(corrDsc, topK)
+    val topNegativeCorrs = topKInsights(corrAsc, topK).filterNot(topPositiveCorrs.contains)
+
+    val correlationCol = "Correlation Value"
+
+    lazy val topPositive = Table(
+      name = "Top Model Insights",
+      columns = Seq("Top Positive Correlations", correlationCol),
+      rows = topPositiveCorrs
+    ).prettyString(columnAlignments = Map(correlationCol -> Right))
+
+    lazy val topNegative = Table(
+      columns = Seq("Top Negative Correlations", correlationCol),
+      rows = topNegativeCorrs
+    ).prettyString(columnAlignments = Map(correlationCol -> Right))
+
+    if (topNegativeCorrs.isEmpty) Seq(topPositive) else Seq(topPositive, topNegative)
+  }
+
+  private def topKContributions(topK: Int): Option[String] = {
+    val contribs = for {
+      (feature, derived) <- derivedNonExcludedFeatures
+      contrib = math.abs(derived.contribution.reduceOption[Double](math.max).getOrElse(0.0))
+    } yield (feature, derived, contrib)
+
+    val contribDesc = contribs.sortBy(_._3).reverse
+    val rows = topKInsights(contribDesc, topK)
+    numericalTable(columns = Seq("Top Contributions", "Contribution Value"), rows)
+  }
+
+  private def topKCramersV(topK: Int): Option[String] = {
+    val cramersV = for {
+      (feature, derived) <- derivedNonExcludedFeatures
+      group <- derived.derivedFeatureGroup
+      cramersV <- derived.cramersV
+    } yield group -> cramersV
+
+    val topCramersV = cramersV.distinct.sortBy(_._2).reverse.take(topK)
+    numericalTable(columns = Seq("Top CramersV", "CramersV"), rows = topCramersV)
+  }
+
+  private def derivedNonExcludedFeatures: Seq[(FeatureInsights, Insights)] = {
+    for {
+      feature <- features
+      derived <- feature.derivedFeatures
+      if !derived.excluded.contains(true)
+    } yield feature -> derived
+  }
+
+  private def numericalTable(columns: Seq[String], rows: Seq[(String, Double)]): Option[String] =
+    if (rows.isEmpty) None else Some(Table(columns, rows).prettyString(columnAlignments = Map(columns.last -> Right)))
 
   private def modelType(modelName: String): Try[ModelsToTry] = Try {
     classificationModelType.orElse(regressionModelType).lift(modelName).getOrElse(

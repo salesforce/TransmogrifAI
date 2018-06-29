@@ -270,6 +270,17 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     )
   }
 
+  it should "pretty print" in {
+    val insights = workflowModel.modelInsights(prob)
+    val pretty = insights.prettyPrint()
+    pretty should include(s"Selected Model - $LogisticRegression")
+    pretty should include("| area under PR    | 0.0")
+    pretty should include("Model Evaluation Metrics")
+    pretty should include("Top Model Insights")
+    pretty should include("Top Positive Correlations")
+    pretty should include("Top Contributions")
+  }
+
   it should "correctly serialize and deserialize from json" in {
     val insights = workflowModel.modelInsights(prob)
     ModelInsights.fromJson(insights.toJson()) match {

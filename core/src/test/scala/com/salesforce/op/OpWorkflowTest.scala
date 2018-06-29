@@ -403,7 +403,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     prettySummary should include("| area under PR    | 0.25")
     prettySummary should include("Model Evaluation Metrics")
     prettySummary should include("Top Model Insights")
-    prettySummary should include("Top Model Insights")
     prettySummary should include("Top Positive Correlations")
     prettySummary should include("Top Contributions")
   }
