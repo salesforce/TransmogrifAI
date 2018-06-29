@@ -39,7 +39,6 @@ import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
-import org.apache.spark.ml.Estimator
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
@@ -170,7 +169,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   /**
-   * Pulls all summary metadata off of transformers
+   * Pulls all summary metadata of transformers and puts them in json
    *
    * @return json summary
    */
@@ -182,11 +181,27 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )
 
   /**
-   * Pulls all summary metadata off of transformers and puts them in a pretty json string
+   * Pulls all summary metadata of transformers and puts them into json string
    *
-   * @return string summary
+   * @return json string summary
    */
   def summary(): String = pretty(render(summaryJson()))
+
+  /**
+   * High level model summary in a compact print friendly format containing:
+   * selected model info, model evaluation results and feature correlations/contributions/cramersV values.
+   *
+   * @param insights model insights to compute the summary against
+   * @param topK top K of feature correlations/contributions/cramersV values to print
+   * @return high level model summary in a compact print friendly format
+   */
+  def summaryPretty(
+    insights: ModelInsights = modelInsights(
+      resultFeatures.find(f => f.isResponse && !f.isRaw).getOrElse(
+        throw new IllegalArgumentException("No response feature is defined to compute model insights"))
+    ),
+    topK: Int = 15
+  ): String = insights.prettyPrint(topK)
 
   /**
    * Save this model to a path

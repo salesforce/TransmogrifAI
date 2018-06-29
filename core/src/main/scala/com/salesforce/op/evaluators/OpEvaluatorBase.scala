@@ -195,21 +195,41 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
   with OpHasLabelCol[RealNN]
   with OpHasPredictionCol[RealNN]
 
+/**
+ * Eval metric
+ */
+trait EvalMetric extends Serializable {
+  /**
+   * Spark metric name
+   */
+  def sparkEntryName: String
 
+  /**
+   * Human friendly metric name
+   */
+  def humanFriendlyName: String
+}
 
-sealed abstract class ClassificationEvalMetric(val sparkEntryName: String) extends EnumEntry with Serializable
+/**
+ * Classification Metrics
+ */
+sealed abstract class ClassificationEvalMetric
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EnumEntry with EvalMetric
 
 /**
  * Binary Classification Metrics
  */
 object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("precision")
-  case object Recall extends ClassificationEvalMetric("recall")
-  case object F1 extends ClassificationEvalMetric("f1")
-  case object Error extends ClassificationEvalMetric("accuracy")
-  case object AuROC extends ClassificationEvalMetric("areaUnderROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
+  case object F1 extends ClassificationEvalMetric("f1", "f1")
+  case object Error extends ClassificationEvalMetric("accuracy", "error")
+  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
+  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under PR")
 }
 
 /**
@@ -217,33 +237,29 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
  */
 object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall")
-  case object F1 extends ClassificationEvalMetric("f1")
-  case object Error extends ClassificationEvalMetric("accuracy")
-  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
+  case object F1 extends ClassificationEvalMetric("f1", "f1")
+  case object Error extends ClassificationEvalMetric("accuracy", "error")
+  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
 }
 
 
 /**
- * Contains the names of metrics used in logging
+ * Regression Metrics
  */
-private[op] case object OpMetricsNames {
-  val rootMeanSquaredError = "root mean square error"
-  val meanSquaredError = "mean square error"
-  val meanAbsoluteError = "mean absolute error"
-  val r2 = "r2"
-  val auROC = "area under ROC"
-  val auPR = "area under PR"
-  val precision = "precision"
-  val recall = "recall"
-  val f1 = "f1"
-  val accuracy = "accuracy"
-  val error = "error"
-  val tp = "true positive"
-  val tn = "true negative"
-  val fp = "false positive"
-  val fn = "false negative"
+sealed abstract class RegressionEvalMetric
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EnumEntry with EvalMetric
+
+object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
+  val values: Seq[RegressionEvalMetric] = findValues
+  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")
+  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error")
+  case object R2 extends RegressionEvalMetric("r2", "r2")
+  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
 }
 
 /**
@@ -254,5 +270,3 @@ case object OpEvaluatorNames {
   val multi = "multiEval"
   val regression = "regEval"
 }
-
-

@@ -31,6 +31,7 @@
 
 package com.salesforce.op.stages.impl.classification
 
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.selector._
 import org.apache.spark.ml.classification._
@@ -43,7 +44,7 @@ import scala.reflect.ClassTag
 /**
  * Enumeration of possible classification models in Model Selector
  */
-sealed trait ClassificationModelsToTry extends EnumEntry with Serializable
+sealed trait ClassificationModelsToTry extends ModelsToTry
 
 object ClassificationModelsToTry extends Enum[ClassificationModelsToTry] {
   val values = findValues
