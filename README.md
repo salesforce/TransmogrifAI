@@ -1,9 +1,9 @@
-# Octopus Prime (aka Optimus Prime) [![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
+# TransmogrifAI [![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
 
-Octopus Prime is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) - is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
 
-Use Octopus Prime if you need a machine learning library to:
+Use TransmogrifAI if you need a machine learning library to:
 
 * Build production ready machine learning applications in hours, not months
 * Build machine learning models without getting a Ph.D. in machine learning
