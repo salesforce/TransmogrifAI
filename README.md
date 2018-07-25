@@ -9,13 +9,13 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-Octopus Prime is compatible with Spark 2.2.1 and Scala 2.11.
+TransmogrifAI is compatible with Spark 2.2.1 and Scala 2.11.
 
 [Skip to Quick Start and Documentation](https://github.com/salesforce/op#quick-start-and-documentation)
 
-## Predicting Titanic Survivors with Octopus Prime
+## Predicting Titanic Survivors with TransmogrifAI
 
-The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using Octopus Prime:
+The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using TransmogrifAI:
 
 ```scala
 import com.salesforce.op._
@@ -151,10 +151,10 @@ dependencies {
     compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
-    // Octopus Prime
+    // TransmogrifAI
     compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
-    // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
+    // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
     // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // All your other depdendecies go below
