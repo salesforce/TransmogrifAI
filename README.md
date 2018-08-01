@@ -115,8 +115,8 @@ Top model insights computed using CramersV:
 While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
 
 
-## Adding OP into your project
-You can simply add OP as a regular dependency to your existing project. Example for gradle below:
+## Adding TransmogrifAI into your project
+You can simply add TransmogrifAI as a regular dependency to your existing project. Example for gradle below:
 
 ```groovy
 repositories {
