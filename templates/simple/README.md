@@ -14,7 +14,7 @@ This is an TransmogrifAI project created with the 'simple' template.
 ## Structure
 
 The primary build file is in `build.gradle`.
-This file defines dependencies on Scala, Spark, and Optimus Prime, and also defines how the project will be built
+This file defines dependencies on Scala, Spark, and TransmogrifAI, and also defines how the project will be built
 and deployed.
 
 The primary sources for your project live in `src/main/scala`.
@@ -68,6 +68,6 @@ To evaluate your project, run
 
 ## Read More
 
-- [Optimus Prime](https://github.com/salesforce/TransmogrifAI)
+- [TransmogrifAI](https://github.com/salesforce/TransmogrifAI)
 - [Wiki](https://github.com/salesforce/TransmogrifAI/wiki)
 - [Hello World examples](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld)

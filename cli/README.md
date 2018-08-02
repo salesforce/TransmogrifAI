@@ -1,4 +1,4 @@
-# Octopus Prime Command Line Interface (OP CLI)
+# TransmogrifAI Command Line Interface (OP CLI)
 
 ## Installation
 
