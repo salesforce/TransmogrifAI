@@ -3,4 +3,4 @@ type=doc
 status=published
 ~~~~~~
 
-TransmogrifAI – a complete, type-safe solution to build production Machine Learning workflows with Spark.
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning.
