@@ -9,7 +9,7 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-TransmogrifAI is compatible with Spark 2.2.1 and Scala 2.11.
+TransmogrifAI is compatible with Spark 2.3.1 and Scala 2.11.
 
 [Skip to Quick Start and Documentation](https://github.com/salesforce/op#quick-start-and-documentation)
 
