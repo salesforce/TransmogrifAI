@@ -23,3 +23,5 @@ gradlew.bat
 
 .env
 
+derby.log
+metastore_db/
