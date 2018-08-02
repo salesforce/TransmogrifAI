@@ -301,18 +301,18 @@ configure(subProjs) {
                     artifactId = "${jar.baseName}_$scalaVersion"
                 }
                 pom {
-                    name = 'Octopus Prime'
+                    name = 'TransmogrifAI'
                     description = 'AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning'
-                    url = 'https://github.com/salesforce/op'
+                    url = 'https://github.com/salesforce/TransmogrifAI'
                     scm {
-                        connection = 'scm:git:https://github.com/salesforce/op.git'
-                        developerConnection = 'scm:git:https://github.com/salesforce/op.git'
-                        url = 'https://github.com/salesforce/op'
+                        connection = 'scm:git:https://github.com/salesforce/TransmogrifAI.git'
+                        developerConnection = 'scm:git:https://github.com/salesforce/TransmogrifAI.git'
+                        url = 'https://github.com/salesforce/TransmogrifAI'
                     }
                     licenses {
                         license {
                             name = 'BSD-3-Clause'
-                            url = 'https://github.com/salesforce/op/blob/master/LICENSE.txt'
+                            url = 'https://github.com/salesforce/TransmogrifAI/blob/master/LICENSE.txt'
                             distribution = 'repo'
                         }
                     }
