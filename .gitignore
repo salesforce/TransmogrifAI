@@ -25,3 +25,4 @@ gradlew.bat
 
 derby.log
 metastore_db/
+*.bak

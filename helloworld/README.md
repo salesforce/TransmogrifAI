@@ -1,4 +1,4 @@
-# Hello World project for Octopus Prime apps
+# Hello World project for TransmogrifAI apps
 
 There are four example workflows in this project:
 1) **(start here)** A minimal classifier based on the Titanic dataset `com.salesforce.hw.titanic.OpTitanicMini`
