@@ -11,7 +11,7 @@ Use TransmogrifAI if you need a machine learning library to:
 
 TransmogrifAI is compatible with Spark 2.3.1 and Scala 2.11.
 
-[Skip to Quick Start and Documentation](https://github.com/salesforce/op#quick-start-and-documentation)
+[Skip to Quick Start and Documentation](https://github.com/salesforce/TransmogrifAI#quick-start-and-documentation)
 
 ## Predicting Titanic Survivors with TransmogrifAI
 
@@ -112,7 +112,7 @@ Top model insights computed using CramersV:
 |-----------------------|:--------------------:|
 ```
 
-While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
+While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
 
 ## Adding TransmogrifAI into your project
@@ -164,7 +164,7 @@ dependencies {
 
 ## Quick Start and Documentation
 
-See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
+See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
 See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programming API (can also be viewed [locally](docs/README.md)).
 

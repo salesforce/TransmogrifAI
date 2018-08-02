@@ -1,6 +1,6 @@
 # Simple /* << APP_NAME */
 
-This is an Optimus Prime project created with the 'simple' template.
+This is an TransmogrifAI project created with the 'simple' template.
 
 ## Prerequisites
 
@@ -8,7 +8,7 @@ This is an Optimus Prime project created with the 'simple' template.
 - Scala ${scalaVersion}.${scalaVersionRevision}
 - Spark ${sparkVersion}
 - IntelliJ Idea 2017+ recommended
-- Optimus Prime ${opVersion}
+- OTransmogrifAI ${opVersion}
 
 
 ## Structure
@@ -68,6 +68,6 @@ To evaluate your project, run
 
 ## Read More
 
-- [Optimus Prime](https://github.com/salesforce/op)
-- [Wiki](https://github.com/salesforce/op/wiki)
-- [Hello World examples](https://github.com/salesforce/op/tree/master/helloworld)
+- [Optimus Prime](https://github.com/salesforce/TransmogrifAI)
+- [Wiki](https://github.com/salesforce/TransmogrifAI/wiki)
+- [Hello World examples](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld)
