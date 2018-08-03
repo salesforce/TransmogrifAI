@@ -109,7 +109,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     val expected = new SparseVector(sparseSize, Array(0, 1, sparseSize - 1), Array(-2.0, 2.0, 6.0))
 
     forAllConcurrentCheck[SparseVector](
-      numThreads = 10, numInstancesPerThread = 100000, atMost = 10.seconds,
+      numThreads = 10, numInvocationsPerThread = 100000, atMost = 10.seconds,
       table = Table[SparseVector]("sparseVectors", sparse),
       functionCheck = sparse => {
         val res = sparse + sparse

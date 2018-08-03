@@ -43,32 +43,42 @@ trait ConcurrentCheck {
 
   def forAllConcurrentCheck[T](
     numThreads: Int = 10,
-    numInstancesPerThread: Int = 50000,
+    numInvocationsPerThread: Int = 50000,
     atMost: Duration = 10.seconds,
+    warmUp: Boolean = true,
     table: TableFor1[T],
     functionCheck: T => Unit
   ): Unit = {
-
-    val started = System.currentTimeMillis()
-    forAll(table) { ft =>
-      def testOne() = {
-        var i = 0
-        while (i < numInstancesPerThread) {
-          functionCheck(ft)
-          i += 1
+    def doTest(t: TableFor1[T]): Unit = {
+      forAll(t) { ft =>
+        def testOne(): Unit = {
+          var i = 0
+          while (i < numInvocationsPerThread) {
+            functionCheck(ft)
+            i += 1
+          }
         }
+        val all = Future.sequence((0 until numThreads).map(_ => Future(testOne())))
+        val res = Await.result(all, atMost)
+        res.length shouldBe numThreads
       }
-
-      val all = Future.sequence((0 until numThreads).map(_ => Future(testOne())))
-      val res = Await.result(all, atMost)
-      res.length shouldBe numThreads
     }
-    val elapsed = System.currentTimeMillis() - started
+
+    def measure(f: => Unit): Long = {
+      val started = System.currentTimeMillis()
+      val _ = f
+      System.currentTimeMillis() - started
+    }
+
+    val warmUpElapsed = if (warmUp) Some(measure(doTest(table.take(1)))) else None
+    val elapsed = measure(doTest(table))
     println(
-      s"Tested with $numThreads concurrent threads. Elapsed: ${elapsed}ms. " +
-        s"Created ${numInstancesPerThread * numThreads} instances with average " +
-        (System.currentTimeMillis() - started) / (numInstancesPerThread * numThreads).toDouble +
-        "ms per instance creation."
+      s"Tested with $numThreads concurrent threads. " +
+        warmUpElapsed.map(v => s"Warm up: ${v}ms. ").getOrElse("") +
+        s"Actual: ${elapsed}ms. " +
+        s"Executed ${numInvocationsPerThread * numThreads} function invocations with average " +
+        elapsed / (numInvocationsPerThread * numThreads).toDouble +
+        "ms per function invocation."
     )
     elapsed should be <= atMost.toMillis
   }
