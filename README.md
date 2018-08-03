@@ -39,8 +39,7 @@ val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, 
 val featureVector = features.toSeq.transmogrify()
 
 // Automated feature selection
-val checkedFeatures = survived.sanityCheck(
-  featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
+val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
 
 // Automated model selection
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
