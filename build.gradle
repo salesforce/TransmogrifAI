@@ -198,6 +198,9 @@ configure(allProjs) {
                 '**/com/fasterxml/jackson/module/scala/**',
                 '**/templates/**', '**/resources/**'
     }
+    scoverage {
+        coverageOutputCobertura = false
+    }
 
     licenseReport {
         renderer = new com.github.jk1.license.render.MultiReportRenderer(
