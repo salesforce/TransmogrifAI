@@ -10,7 +10,7 @@ env:
 install:
   - true
 script: 
-  - ./gradlew --console verbose reportScoverage aggregateScoverage
+  - ./gradlew reportScoverage aggregateScoverage
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:
