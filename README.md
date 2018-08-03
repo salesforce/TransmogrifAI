@@ -36,7 +36,7 @@ val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).re
 val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
 
 // Automated feature engineering of predictors
-val featureVector = features.toSeq.autoTransform()
+val featureVector = features.toSeq.transmogrify()
 
 // Automated feature selection
 val checkedFeatures = survived.sanityCheck(
