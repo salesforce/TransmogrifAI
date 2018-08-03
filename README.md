@@ -1,4 +1,4 @@
-# TransmogrifAI [![Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.3.1-brightgreen.svg)](https://spark.apache.org/news/spark-2-3-1-released.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-red.svg)](https://github.com/salesforce/TransmogrifAI/blob/master/LICENSE)
+# TransmogrifAI [![Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2.1-brightgreen.svg)](https://spark.apache.org/news/spark-2-2-1-released.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-red.svg)](https://github.com/salesforce/TransmogrifAI/blob/master/LICENSE)
 
 TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
@@ -9,7 +9,7 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-TransmogrifAI is compatible with Spark 2.3.x and Scala 2.11.x.
+TransmogrifAI is compatible with Spark 2.2.x and Scala 2.11.x.
 
 [Skip to Quick Start and Documentation](https://github.com/salesforce/TransmogrifAI#quick-start-and-documentation)
 
