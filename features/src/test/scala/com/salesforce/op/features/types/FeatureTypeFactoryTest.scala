@@ -117,7 +117,7 @@ class FeatureTypeFactoryTest
   }
   property("create a feature type instance in a timely fashion") {
     forAllConcurrentCheck[FeatureTypeFactory[_ <: FeatureType]](
-      numThreads = 10, numInstancesPerThread = 50000, atMost = 10.seconds,
+      numThreads = 10, numInvocationsPerThread = 10000, atMost = 10.seconds,
       table = featureTypeFactories,
       functionCheck = ft => assertCreate(ft.newInstance(null))
     )

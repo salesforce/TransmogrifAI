@@ -7,7 +7,12 @@ before_install:
 env:
   global:
     - GRADLE_OPTS="-Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m"
-script: "./gradlew build"
+install:
+  - true
+script: 
+  - ./gradlew reportScoverage aggregateScoverage
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
   - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
