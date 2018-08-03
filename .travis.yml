@@ -8,8 +8,7 @@ env:
   global:
     - GRADLE_OPTS="-Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m"
 install:
-  - true
-script: "./gradlew reportScoverage aggregateScoverage"
+  - travis_wait 20 ./gradlew reportScoverage aggregateScoverage
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:
