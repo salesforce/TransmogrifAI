@@ -168,4 +168,4 @@ See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programm
 
 ## License
 
-[BSD 3-Clause](LICENSE.txt) © Salesforce.com, Inc.
+[BSD 3-Clause](LICENSE) © Salesforce.com, Inc.
