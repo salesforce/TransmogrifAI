@@ -25,7 +25,7 @@ jobs:
       - restore_cache:
           key: jars-{{ checksum "build.gradle" }}
 
-      - run: cat /dev/null | ./gradlew --no-daemon --build-cache reportScoverage
+      - run: cat /dev/null | ./gradlew reportScoverage
 
       - save_cache:
           paths:
