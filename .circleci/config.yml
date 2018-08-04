@@ -17,7 +17,7 @@ jobs:
     working_directory: ~/repo
 
     environment:
-      JAVA_OPTS: -Xmx3200m
+      GRADLE_OPTS: '-Dorg.gradle.jvmargs="-Xmx3000m -XX:+HeapDumpOnOutOfMemoryError"'
       TERM: dumb
     
     steps:
