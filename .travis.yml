@@ -10,7 +10,7 @@ env:
 install:
   - true
 script: 
-  - ./gradlew --daemon reportScoverage
+  - ./gradlew --daemon --build-cache reportScoverage
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:
