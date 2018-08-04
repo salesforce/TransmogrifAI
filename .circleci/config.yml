@@ -19,7 +19,8 @@ jobs:
     resource_class: medium
 
     environment:
-      GRADLE_OPTS: -Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m
+      # GRADLE_OPTS: -Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m
+      GRADLE_OPTS: -Xmx3g
       TERM: dumb
     
     steps:
