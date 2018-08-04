@@ -18,7 +18,8 @@ jobs:
 
     environment:
       # Customize the JVM maximum heap limit
-      JVM_OPTS: -Xmx3200m
+      # JVM_OPTS: -Xmx3200m
+      GRADLE_OPTS: -XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap -XshowSettings:vm -version
       TERM: dumb
     
     steps:
