@@ -24,7 +24,7 @@ jobs:
           command: ./gradlew reportScoverage -x core:reportScoverage
 
       - run:
-          name: Collect results
+          name: Collect test results
           command: |
             mkdir -p ~/junit/results.xml/
             mkdir -p ~/scoverage/
