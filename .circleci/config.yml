@@ -31,6 +31,9 @@ jobs:
           paths:
             - ~/.gradle
           key: jars-{{ checksum "build.gradle" }}
+      
+      - store_test_results:
+          path: ~/repo/*/build/test-results
         
       - run: bash <(curl -s https://codecov.io/bash)
 
