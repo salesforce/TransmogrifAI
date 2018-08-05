@@ -40,8 +40,10 @@ jobs:
           path: ~/junit/results.xml/
       - store_artifacts:
           path: ~/junit/
+          background: true
       - store_artifacts:
           path: ~/scoverage/
+          background: true
 
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
