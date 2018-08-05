@@ -8,10 +8,6 @@ jobs:
       TERM: dumb
     
     steps:
-      - run:
-          name: Install dependencies
-          command: npm install -g junit-merge || true
-      
       - checkout
       - restore_cache:
           keys:
@@ -30,14 +26,13 @@ jobs:
       - run:
           name: Save test results
           command: |
-            mkdir -p ~/junit/
-            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
-            junit-merge -d ~/junit/ -o ~/merged.xml || true
+            mkdir -p ~/junit/results.xml/
+            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/results.xml/ \;
           when: always
       - store_test_results:
-          path: ~/merged.xml
+          path: ~/junit/results.xml/
       - store_artifacts:
-          path: ~/merged.xml
+          path: ~/junit/
 
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
