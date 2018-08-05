@@ -1,9 +1,9 @@
 version: 2
 jobs:
   build:
-    # machine: true
-    docker:
-      - image: circleci/openjdk:8-jdk
+    machine: true
+    #docker:
+    #  - image: circleci/openjdk:8-jdk
 
     working_directory: ~/repo
 
@@ -17,25 +17,42 @@ jobs:
       - restore_cache:
           keys:
             - gradle-aws-plugin-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-            - gradle-aws-plugin-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}
-            - gradle-aws-plugin-{{ .Branch }}
 
-      - run: ./gradlew utils:reportScoverage
-      - run: ./gradlew features:reportScoverage
-      - run: ./gradlew readers:reportScoverage
-      - run: ./gradlew core:reportScoverage
-      - run: ./gradlew testkit:reportScoverage
-      - run: ./gradlew cli:reportScoverage
+      - run:
+          name: Java version
+          command: java -version
+      - run:
+          name: Build Utils
+          command: ./gradlew utils:reportScoverage
+      - run:
+          name: Build Features
+          command: ./gradlew features:reportScoverage
+      - run:
+          name: Build Readers
+          command: ./gradlew readers:reportScoverage
+      - run:
+          name: Build Core
+          command: ./gradlew core:reportScoverage
+      - run:
+          name: Build TestKit
+          command: ./gradlew testkit:reportScoverage
+      - run:
+          name: Build CLI
+          command: ./gradlew cli:reportScoverage
+
+      - run:
+          name: Collect test results
+          command: mkdir -p ~/test-results/ && find . -type f -regex ".*/build/test-results/testScoverage/.*xml" -exec cp {} ~/test-results/ \;
       
+      - store_test_results:
+          path: ~/test-results
+
       - save_cache:
           key: gradle-aws-plugin-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
             - ~/.gradle
             - ~/.m2
-      
-      - store_test_results:
-          path: ~/repo/*/build/test-results
-        
+
       - run: bash <(curl -s https://codecov.io/bash)
 
 workflows:
