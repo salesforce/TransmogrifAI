@@ -4,6 +4,9 @@ dist: trusty
 sudo: required
 before_install:
   - unset _JAVA_OPTIONS
+env:
+  global:
+    - GRADLE_OPTS="-Xmx1g"
 install:
   - true
 script: 
