@@ -28,14 +28,13 @@ jobs:
           command: |
             mkdir -p ~/junit/
             mkdir -p ~/junit.xml/
-            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit.xml/ \;
+            find . -type d -regex ".*/build/test-results/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit.xml/$f' \;
             find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
           when: always
       - store_test_results:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-          background: true
 
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
