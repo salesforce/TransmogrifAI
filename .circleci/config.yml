@@ -24,15 +24,20 @@ jobs:
           command: ./gradlew reportScoverage -x core:reportScoverage
 
       - run:
-          name: Save test results
+          name: Collect results
           command: |
             mkdir -p ~/junit/results.xml/
+            mkdir -p ~/scoverage/
             find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/results.xml/ \;
+            find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
+            find . -type d -regex ".*/build/reports/scoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/scoverage/$f' \;
           when: always
       - store_test_results:
           path: ~/junit/results.xml/
       - store_artifacts:
           path: ~/junit/
+      - store_artifacts:
+          path: ~/scoverage/
 
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
