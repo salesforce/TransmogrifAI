@@ -28,18 +28,13 @@ jobs:
           command: |
             mkdir -p ~/junit/
             mkdir -p ~/junit.xml/
-            mkdir -p ~/scoverage/
             find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit.xml/ \;
             find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
-            find . -type d -regex ".*/build/reports/scoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/scoverage/$f' \;
           when: always
       - store_test_results:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-          background: true
-      - store_artifacts:
-          path: ~/scoverage/
           background: true
 
       - save_cache:
