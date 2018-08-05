@@ -22,6 +22,9 @@ jobs:
       - run:
           name: Build everything else
           command: ./gradlew reportScoverage -x core:reportScoverage
+      - run:
+          name: Aggregate scoverage results
+          command: ./gradlew aggregateScoverage
 
       - run:
           name: Collect test results
@@ -31,6 +34,7 @@ jobs:
             find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/results.xml/ \;
             find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
             find . -type d -regex ".*/build/reports/scoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/scoverage/$f' \;
+            find . -type d -regex "./build/scoverage-aggregate" -exec bash -c 'cp -r {} ~/scoverage/aggregated' \;
           when: always
       - store_test_results:
           path: ~/junit/results.xml/
