@@ -17,6 +17,7 @@ jobs:
       - restore_cache:
           key: jars-{{ checksum "build.gradle" }}
 
+      - run: java -version
       - run: cat /dev/null | ./gradlew --no-daemon reportScoverage
 
       - save_cache:
