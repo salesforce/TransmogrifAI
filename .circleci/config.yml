@@ -9,7 +9,7 @@ jobs:
 
     environment:
       #_JAVA_OPTIONS: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
-      GRADLE_OPTS: -Xmx256m -XshowSettings:vm -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
+      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
       TERM: dumb
     
     steps:
@@ -22,24 +22,11 @@ jobs:
           name: Java version
           command: java -version
       - run:
-          name: Build Utils
-          command: ./gradlew utils:reportScoverage
-      - run:
-          name: Build Features
-          command: ./gradlew features:reportScoverage
-      - run:
-          name: Build Readers
-          command: ./gradlew readers:reportScoverage
-      - run:
           name: Build Core
           command: ./gradlew core:reportScoverage
       - run:
-          name: Build TestKit
-          command: ./gradlew testkit:reportScoverage
-      - run:
-          name: Build CLI
-          command: ./gradlew cli:reportScoverage
-
+          name: Build everything else
+          command: ./gradlew utils:reportScoverage features:reportScoverage readers:reportScoverage testkit:reportScoverage cli:reportScoverage -x core:reportScoverage
       - run:
           name: Collect test results
           command: mkdir -p ~/test-results/ && find . -type f -regex ".*/build/test-results/testScoverage/.*xml" -exec cp {} ~/test-results/ \;
@@ -53,7 +40,9 @@ jobs:
             - ~/.gradle
             - ~/.m2
 
-      - run: bash <(curl -s https://codecov.io/bash)
+      - run:
+          name: Report scoverage resuts to Codecov
+          command: bash <(curl -s https://codecov.io/bash)
 
 workflows:
   version: 2
