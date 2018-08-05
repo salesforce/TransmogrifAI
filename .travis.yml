@@ -6,7 +6,7 @@ before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS="-Xmx1g"
+    - GRADLE_OPTS="-Xmx512m"
 install:
   - true
 script: 
