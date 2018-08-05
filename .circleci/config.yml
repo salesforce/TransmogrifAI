@@ -16,7 +16,7 @@ jobs:
       - checkout
       - restore_cache:
           keys:
-            - gradle-aws-plugin-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
 
       - run:
           name: Java version
@@ -35,7 +35,7 @@ jobs:
           path: ~/test-results
 
       - save_cache:
-          key: gradle-aws-plugin-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
             - ~/.gradle
             - ~/.m2
