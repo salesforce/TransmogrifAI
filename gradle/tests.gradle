@@ -25,7 +25,7 @@ tasks.withType(Test) {
     }
     maxParallelForks = 1
     failFast = true
-    maxHeapSize = "1g"
+    maxHeapSize = "1500m"
 
     beforeSuite { suite ->
         if (suite.name.startsWith("Gradle Test Executor")) return
