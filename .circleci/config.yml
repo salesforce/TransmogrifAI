@@ -1,13 +1,14 @@
 version: 2
 jobs:
   build:
-    docker:
-      - image: circleci/openjdk:8-jdk
+    machine: true
+    #docker:
+    #  - image: circleci/openjdk:8-jdk
 
     working_directory: ~/repo
 
     environment:
-      _JAVA_OPTIONS: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
+      #_JAVA_OPTIONS: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
       GRADLE_OPTS: -Xmx256m
       TERM: dumb
     
