@@ -2,13 +2,8 @@ version: 2
 jobs:
   build:
     machine: true
-    #docker:
-    #  - image: circleci/openjdk:8-jdk
-
     working_directory: ~/repo
-
     environment:
-      #_JAVA_OPTIONS: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
       GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
       TERM: dumb
     
@@ -27,7 +22,7 @@ jobs:
       - run:
           name: Build everything else
           command: ./gradlew utils:reportScoverage features:reportScoverage readers:reportScoverage testkit:reportScoverage cli:reportScoverage -x core:reportScoverage
-    
+
       - run:
           name: Save test results
           command: |
