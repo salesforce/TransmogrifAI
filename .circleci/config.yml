@@ -17,7 +17,7 @@ jobs:
     working_directory: ~/repo
 
     environment:
-      GRADLE_OPTS: -Xmx1g
+      GRADLE_OPTS: -Xmx512m
       TERM: dumb
     
     steps:
