@@ -9,7 +9,7 @@ jobs:
 
     environment:
       #_JAVA_OPTIONS: "-XX:+UnlockExperimentalVMOptions -XX:+UseCGroupMemoryLimitForHeap"
-      GRADLE_OPTS: -Xmx256m
+      GRADLE_OPTS: -Xmx256m -XshowSettings:vm
       TERM: dumb
     
     steps:
