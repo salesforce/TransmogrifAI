@@ -27,12 +27,17 @@ jobs:
       - run:
           name: Build everything else
           command: ./gradlew utils:reportScoverage features:reportScoverage readers:reportScoverage testkit:reportScoverage cli:reportScoverage -x core:reportScoverage
+    
       - run:
-          name: Collect test results
-          command: mkdir -p ~/test-results/ && find . -type f -regex ".*/build/test-results/testScoverage/.*xml" -exec cp {} ~/test-results/ \;
-      
+          name: Save test results
+          command: |
+            mkdir -p ~/junit/
+            find . -type f -regex ".*/build/test-results/.*xml" -exec cp {} ~/junit/ \;
+          when: always
       - store_test_results:
-          path: ~/test-results
+          path: ~/junit
+      - store_artifacts:
+          path: ~/junit
 
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
