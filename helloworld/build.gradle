@@ -73,7 +73,7 @@ dependencies {
     compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
-    // Optimus Prime
+    // TransmogrifAI
     compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
