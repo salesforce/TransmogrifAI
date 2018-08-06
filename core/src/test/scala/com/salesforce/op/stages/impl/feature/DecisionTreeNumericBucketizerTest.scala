@@ -84,9 +84,9 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
   }
 
   trait UniformData {
-    val (min, max) = (0.0, 100.0)
-    val currencyData: Seq[Currency] =
-      RandomReal.uniform[Currency](minValue = min, maxValue = max).withProbabilityOfEmpty(0.1).limit(1000)
+    val (min, max) = (0, 100)
+    val scale = 10
+    val currencyData: Seq[Currency] = Array.range(min, max * scale).map(x => (x / scale).toCurrency)
     val labelData = currencyData.map(c => {
       c.value.map {
         case v if v < 15 => 0.0
