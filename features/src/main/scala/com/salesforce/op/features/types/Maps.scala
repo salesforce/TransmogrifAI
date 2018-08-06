@@ -30,7 +30,7 @@
 
 package com.salesforce.op.features.types
 
-import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 /**
  * Map of text values

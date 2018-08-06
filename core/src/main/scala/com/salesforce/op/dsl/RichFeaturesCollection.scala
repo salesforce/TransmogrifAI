@@ -31,7 +31,7 @@
 package com.salesforce.op.dsl
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{FeatureLike, OPFeature}
+import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.stages.impl.feature._
 
 
@@ -79,5 +79,20 @@ trait RichFeaturesCollection {
     def autoTransform(label: Option[FeatureLike[RealNN]] = None): FeatureLike[OPVector] = transmogrify(label = label)
 
   }
+
+  /**
+   * Enrichment functions for an array of arbitrary features
+   *
+   * @param features an array of arbitrary features
+   */
+  implicit class RichAnyFeaturesArray(features: Array[OPFeature]) extends RichAnyFeaturesCollection(features.toSeq)
+
+  /**
+   * Enrichment functions for an array of arbitrary features
+   *
+   * @param features an array of arbitrary features
+   */
+  implicit class RichAnyConcreteFeaturesArray(features: Array[Feature[_ <: FeatureType]])
+    extends RichAnyFeaturesCollection(features.toSeq)
 
 }

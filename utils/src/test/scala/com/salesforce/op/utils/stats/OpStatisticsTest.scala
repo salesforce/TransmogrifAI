@@ -30,16 +30,20 @@
 
 package com.salesforce.op.utils.stats
 
-import com.salesforce.op.test.TestCommon
-import org.apache.spark.mllib.linalg.DenseMatrix
+import com.salesforce.op.test.{TestCommon, TestSparkContext}
+import org.apache.spark.mllib.linalg.{DenseMatrix, Vector => OldVector}
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
+import org.scalatest.Inspectors._
 import org.scalatest.{FlatSpec, PropSpec}
+import org.apache.spark.mllib.random.RandomRDDs._
+import org.apache.spark.mllib.stat.Statistics
+import org.apache.spark.rdd.RDD
 
 @RunWith(classOf[JUnitRunner])
-class OpStatisticsTest extends FlatSpec with TestCommon {
+class OpStatisticsTest extends FlatSpec with TestCommon with TestSparkContext {
   val tol: Double = 0.001
 
   Spec(OpStatistics.getClass) should "correctly calculate Cramer's V for a 2x2 matrix" in {
@@ -185,6 +189,23 @@ class OpStatisticsTest extends FlatSpec with TestCommon {
       math.abs(f._1 - f._2) < tol shouldBe true
     })
   }
+
+  it should "calculate feature-label correlation arrays that agree with Spark's full correlation matrix" in {
+    // Do a one-off random vector generation since we're operating directly on an RDD instead of features
+    val numRows = 100L
+    val numCols = 100
+    val testRDD: RDD[OldVector] = normalVectorRDD(sc, numRows = numRows, numCols = numCols, numPartitions = 1)
+
+    // Default correlation type is Pearson
+    val sparkRes = Statistics.corr(testRDD).rowIter.map(_.apply(numCols - 1)).toArray
+    val colStats = Statistics.colStats(testRDD)
+    val opRes = OpStatistics.computeCorrelationsWithLabel(testRDD, colStats, numRows)
+
+    // Comparing double-precision numbers so use a small tolerance on relative error
+    val tol = 1e-12
+    forAll(sparkRes.zip(opRes)) { case (sp, op) => math.abs((sp - op)/sp) should be < tol }
+  }
+
 }
 
 @RunWith(classOf[JUnitRunner])

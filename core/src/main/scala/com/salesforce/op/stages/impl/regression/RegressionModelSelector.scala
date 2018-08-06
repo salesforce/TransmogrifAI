@@ -56,12 +56,14 @@ case object RegressionModelSelector {
   /**
    * Creates a new Regression Model Selector with a Cross Validation
    *
-   * @param dataSplitter      instance that will split the data into training set and test set
-   * @param numFolds          number of folds for cross validation (>= 2)
-   * @param validationMetric  metric name in evaluation: RMSE, R2 etc
+   * @param dataSplitter        instance that will split the data into training set and test set
+   * @param numFolds            number of folds for cross validation (>= 2)
+   * @param validationMetric    metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.Regression)
-   * @param seed              random seed
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
+   * @param seed                random seed
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Regression Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -69,24 +71,28 @@ case object RegressionModelSelector {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): RegressionModelSelector = {
+    val cv = new OpCrossValidation[RegressorModel, Regressor](
+      numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
+    )
     selector(
-      validator = new OpCrossValidation[RegressorModel, Regressor](numFolds, seed, validationMetric),
-      dataSplitter = dataSplitter,
-      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      cv, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
   }
 
   /**
    * Creates a new Regression Model Selector with a Train Validation Split
    *
-   * @param dataSplitter      instance that will split the data into training set and test set
-   * @param trainRatio        ratio between training set and validation set (>= 0 && <= 1)
-   * @param validationMetric  metric name in evaluation: RMSE, R2 etc
+   * @param dataSplitter        instance that will split the data into training set and test set
+   * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
+   * @param validationMetric    metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.Regression)
-   * @param seed              random seed
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
+   * @param seed                random seed
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Regression Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -94,16 +100,14 @@ case object RegressionModelSelector {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): RegressionModelSelector = {
+    val ts = new OpTrainValidationSplit[RegressorModel, Regressor](
+      trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
+    )
     selector(
-      validator = new OpTrainValidationSplit[RegressorModel, Regressor](
-        trainRatio,
-        seed,
-        validationMetric
-      ),
-      dataSplitter = dataSplitter,
-      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      ts, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
   }
 

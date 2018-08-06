@@ -34,18 +34,19 @@ import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
-import com.salesforce.op.stages.base.binary.BinaryModel
+import com.salesforce.op.stages.impl.feature._
+import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.FlatSpec
 
 case class SanityCheckDataTest
 (
@@ -68,7 +69,10 @@ case class TextRawData
 )
 
 @RunWith(classOf[JUnitRunner])
-class SanityCheckerTest extends FlatSpec with TestSparkContext {
+class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
+  BinaryEstimator[RealNN, OPVector, OPVector]] with TestSparkContext {
+
+  // loggingLevel(Level.INFO)
 
   private val textRawData = Seq(
     TextRawData("0", 1.0, Map("color" -> "red", "fruit" -> "berry", "beverage" -> "tea")),
@@ -138,6 +142,11 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
 
   val targetLabel = targetLabelNoResponse.copy(isResponse = true)
 
+  val inputData = testData
+  val estimator = new SanityChecker().setRemoveBadFeatures(false).setInput(targetLabel, featureVector)
+  val expectedResult = testData.select(featureVector.name).collect()
+    .map(_.getAs[Vector](0).toOPVector).toSeq
+
   Spec[SanityChecker] should "remove trouble features" in {
     val checked = targetLabel.sanityCheck(featureVector,
       maxCorrelation = 0.99, minVariance = 0.0, checkSample = 1.0, removeBadFeatures = true)
@@ -150,7 +159,8 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     validateEstimatorOutput(outputColName, model, featuresToDrop, targetLabel.name)
 
     val transformedData = model.transform(testData)
-    validateTransformerOutput(outputColName, transformedData, expectedCorrFeatNames,
+    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -175,7 +185,7 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
     checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
     checker.getOrDefault(checker.minCorrelation) shouldBe SanityChecker.MinCorrelation
-    checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson
+    checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
     checker.getOrDefault(checker.removeBadFeatures) shouldBe SanityChecker.RemoveBadFeatures
   }
 
@@ -200,7 +210,8 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       contain theSameElementsAs summary.names
     outputColumns.columns.length + summary.dropped.length shouldEqual testMetadata.columns.length
 
-    validateTransformerOutput(outputColName, transformedData, expectedCorrFeatNames,
+    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
       featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
@@ -218,7 +229,8 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
 
     val transformedData = model.transform(testData)
 
-    validateTransformerOutput(outputColName, transformedData, expectedCorrFeatNames,
+    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
+    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
       Seq(), expectedCorrFeatNamesIsNan)
   }
 
@@ -336,7 +348,6 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       .setMinVariance(1000)
       .setCheckSample(0.999999)
       .setRemoveBadFeatures(true)
-      .setLogLevel(Level.ERROR)
       .setInput(targetLabel, featureVector).getOutput().name
 
     the[RuntimeException] thrownBy {
@@ -373,7 +384,9 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     )
     val featuresWithNaNCorr = Seq("textMap_7")
 
-    validateTransformerOutput(checkedFeatures.name, transformed, featuresWithCorr, featuresToDrop, featuresWithNaNCorr)
+    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
   }
 
   it should "remove text hash features as groups" in {
@@ -412,7 +425,189 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
       "textMap_beverage_8", "textMap_beverage_9"
     )
 
-    validateTransformerOutput(checkedFeatures.name, transformed, featuresWithCorr, featuresToDrop, featuresWithNaNCorr)
+    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
+  }
+
+  it should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setInput(textMap).getOutput()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setCorrelationExclusion(CorrelationExclusion.HashedText)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, smartMapVectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq("textMap_7", "textMap_color_NullIndicatorValue_8")
+    val expectedFeatNames = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
+      "textMap_6", "textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
+      "textMap_beverage_NullIndicatorValue_10"
+    )
+    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
+      "textMap_beverage_NullIndicatorValue_10"
+    )
+    val featuresWithNaNCorr = Seq.empty[String]
+
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
+  }
+
+  it should "not calculate correlations on hashed text features if asked not to (using transmogrify)" in {
+    val vectorized = Seq(textMap).transmogrify()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setCorrelationExclusion(CorrelationExclusion.HashedText)
+      .setMinVariance(-0.1)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, vectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_512")
+    val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
+      Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
+        "textMap_beverage_NullIndicatorValue_514")
+    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
+      "textMap_beverage_NullIndicatorValue_514"
+    )
+    val featuresWithNaNCorr = Seq.empty[String]
+
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
+  }
+
+  it should "only calculate correlations between feature and the label if requested" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setInput(textMap).getOutput()
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setFeatureLabelCorrOnly(true)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, smartMapVectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
+    val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
+      "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
+      "textMap_beverage_NullIndicatorValue_10"
+    )
+    val featuresWithNaNCorr = Seq("textMap_7")
+
+    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
+  }
+
+  // TODO: Not sure if we should do this test since it may not fail if spark settings are changed
+  it should "fail (due to a Kyro buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
+    val numHashes = 5000
+
+    val vectorized = textMap.vectorize(
+      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
+      cleanText = false,
+      cleanKeys = TransmogrifierDefaults.CleanKeys,
+      others = Array.empty,
+      trackNulls = TransmogrifierDefaults.TrackNulls,
+      numHashes = numHashes
+    )
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(true)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setFeatureLabelCorrOnly(false)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, vectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    intercept[SparkException](new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData))
+  }
+
+  it should "not fail when calculating feature-label correlations on that same 5k element feature vector" in {
+    val numHashes = 5000
+
+    val vectorized = textMap.vectorize(
+      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
+      cleanText = false,
+      cleanKeys = TransmogrifierDefaults.CleanKeys,
+      others = Array.empty,
+      trackNulls = TransmogrifierDefaults.TrackNulls,
+      numHashes = numHashes
+    )
+
+    val checkedFeatures = new SanityChecker()
+      .setCheckSample(1.0)
+      .setRemoveBadFeatures(false)
+      .setRemoveFeatureGroup(true)
+      .setProtectTextSharedHash(true)
+      .setFeatureLabelCorrOnly(true)
+      .setMinVariance(-0.1)
+      .setMinCorrelation(0.0)
+      .setMaxCorrelation(0.8)
+      .setMaxCramersV(0.8)
+      .setInput(targetResponse, vectorized)
+      .getOutput()
+
+    checkedFeatures.originStage shouldBe a[SanityChecker]
+
+    val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
+
+    val featuresToDrop = Seq.empty[String]
+    val totalFeatures = (0 until numHashes).map(i => "textMap_" + i.toString) ++
+      Seq("textMap_color_NullIndicatorValue_" + numHashes.toString,
+        "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
+        "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+    val featuresWithCorr = Seq("textMap_8", "textMap_89", "textMap_294", "textMap_706", "textMap_971",
+      "textMap_1364", "textMap_1633", "textMap_2382", "textMap_2527", "textMap_3159", "textMap_3491",
+      "textMap_3804", "textMap_color_NullIndicatorValue_" + numHashes.toString,
+      "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
+      "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+    val featuresWithNaNCorr = totalFeatures.filterNot(featuresWithCorr.contains)
+
+
+    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
+    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
+      featuresToDrop, featuresWithNaNCorr)
   }
 
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
@@ -431,9 +626,14 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     summary.featuresStatistics.mean.last shouldBe 0.5 // this is mean on label column
   }
 
-  private def validateTransformerOutput(outputColName: String, transformedData: DataFrame,
-    expectedCorrFeatNames: Seq[String], expectedFeaturesToDrop: Seq[String],
-    expectedCorrFeatNamesIsNan: Seq[String]): Unit = {
+  private def validateTransformerOutput(
+    outputColName: String,
+    transformedData: DataFrame,
+    expectedFeatNames: Seq[String],
+    expectedCorrFeatNames: Seq[String],
+    expectedFeaturesToDrop: Seq[String],
+    expectedCorrFeatNamesIsNan: Seq[String]
+  ): Unit = {
     transformedData.select(outputColName).collect().foreach { case Row(features: Vector) =>
       features.toArray.length equals
         (expectedCorrFeatNames.length + expectedCorrFeatNamesIsNan.length - expectedFeaturesToDrop.length)
@@ -443,7 +643,7 @@ class SanityCheckerTest extends FlatSpec with TestSparkContext {
     val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
 
     summary.names.slice(0, summary.names.size - 1) should
-      contain theSameElementsAs expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
+      contain theSameElementsAs expectedFeatNames
     summary.correlationsWLabel.nanCorrs should contain theSameElementsAs expectedCorrFeatNamesIsNan
     summary.correlationsWLabel.featuresIn should contain theSameElementsAs expectedCorrFeatNames
     summary.dropped should contain theSameElementsAs expectedFeaturesToDrop

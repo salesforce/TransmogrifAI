@@ -33,9 +33,7 @@ package com.salesforce.op.evaluators
 import com.salesforce.op.UID
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.sql.Dataset
-import com.salesforce.op.features.types._
 import org.slf4j.LoggerFactory
-import enumeratum._
 
 /**
  *
@@ -61,10 +59,12 @@ private[op] class OpRegressionEvaluator
 
   override def evaluateAll(data: Dataset[_]): RegressionMetrics = {
 
-    val rmse = getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, data)
-    val mse = getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, data)
-    val r2 = getRegEvaluatorMetric(RegressionEvalMetrics.R2, data)
-    val mae = getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, data)
+    val dataUse = makeDataToUse(data, getLabelCol)
+
+    val rmse = getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataUse)
+    val mse = getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataUse)
+    val r2 = getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataUse)
+    val mae = getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataUse)
 
     val metrics = RegressionMetrics(
       RootMeanSquaredError = rmse, MeanSquaredError = mse, R2 = r2, MeanAbsoluteError = mae
@@ -75,12 +75,14 @@ private[op] class OpRegressionEvaluator
 
   }
 
-  final private[op] def getRegEvaluatorMetric(metricName: RegressionEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getRegEvaluatorMetric(metricName: RegressionEvalMetric, dataset: Dataset[_]): Double = {
+    val labelName = getLabelCol
+    val dataUse = makeDataToUse(dataset, labelName)
     new RegressionEvaluator()
-      .setLabelCol(getLabelCol)
+      .setLabelCol(labelName)
       .setPredictionCol(getPredictionCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataset)
+      .evaluate(dataUse)
   }
 }
 
@@ -100,13 +102,3 @@ case class RegressionMetrics
   R2: Double,
   MeanAbsoluteError: Double
 ) extends EvaluationMetrics
-
-/* Regression Metrics */
-sealed abstract class RegressionEvalMetric(val sparkEntryName: String) extends EnumEntry with Serializable
-object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
-  val values: Seq[RegressionEvalMetric] = findValues
-  case object RootMeanSquaredError extends RegressionEvalMetric("rmse")
-  case object MeanSquaredError extends RegressionEvalMetric("mse")
-  case object R2 extends RegressionEvalMetric("r2")
-  case object MeanAbsoluteError extends RegressionEvalMetric("mae")
-}

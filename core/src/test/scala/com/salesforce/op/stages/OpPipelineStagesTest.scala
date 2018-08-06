@@ -51,8 +51,11 @@ class OpPipelineStagesTest
 
   var stage: TestStage = _
 
+  var savePath: String = _
+
   override def beforeEach(): Unit = {
     stage = new TestStage
+    savePath = tempDir + "/" + this.getClass.getSimpleName + "-" + System.currentTimeMillis()
   }
 
   "TransientFeatureArrayParam" should "decode json properly" in {
@@ -127,7 +130,8 @@ class OpPipelineStagesTest
     val writer = new OpPipelineStageWriter(testOp)
     testOp.setInput(weight)
     val reader = new OpPipelineStageReader(testOp)
-    val stage = reader.loadFromJsonString(writer.writeToJsonString).asInstanceOf[UnaryLambdaTransformer[Real, Real]]
+    val stageJson = writer.writeToJsonString(savePath)
+    val stage = reader.loadFromJsonString(stageJson, savePath).asInstanceOf[UnaryLambdaTransformer[Real, Real]]
 
     val features = stage.get(stage.inputFeatures).get
     features should have length 1

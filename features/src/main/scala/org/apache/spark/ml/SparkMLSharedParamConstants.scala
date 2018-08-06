@@ -30,7 +30,6 @@
 
 package org.apache.spark.ml
 
-import com.salesforce.op.UID
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.param.shared.{HasLabelCol, _}
 
@@ -66,7 +65,7 @@ case object SparkMLSharedParamConstants
   // ********************************************************************************
   // just adding these below so I can have this object (static class) for constants
   override def copy(extra: ParamMap): SparkMLSharedParamConstants.type = copyValues(this, extra)
-  override val uid: String = UID(this.getClass)
+  override val uid: String = s"${getClass.getSimpleName.stripSuffix("$")}_shouldnotuse"
   // ********************************************************************************
 
   type InOutTransformer = Transformer with HasInputCol with HasOutputCol

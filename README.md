@@ -47,7 +47,7 @@ val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sam
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
-println("Model summary: " + model.summary())
+println("Model summary:\n" + model.summaryPretty())
 ```
 Model summary:
 
@@ -57,9 +57,9 @@ Evaluated 3 Logistic Regression models with AuPR between [0.6751930383321765, 0.
 Evaluated 16 Random Forest models with AuPR between [0.7781671467343991, 0.8104798040316159]
 
 Selected model Random Forest classifier with parameters:
-|-----------------------|:------------:|
+|-----------------------|--------------|
 | Model Param           |     Value    |
-|-----------------------|:------------:|
+|-----------------------|--------------|
 | modelType             | RandomForest |
 | featureSubsetStrategy |         auto |
 | impurity              |         gini |
@@ -69,12 +69,12 @@ Selected model Random Forest classifier with parameters:
 | minInstancesPerNode   |           10 |
 | numTrees              |           50 |
 | subsamplingRate       |          1.0 |
-|-----------------------|:------------:|
+|-----------------------|--------------|
 
 Model evaluation metrics:
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 | Metric Name | Hold Out Set Value |  Training Set Value |
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 | Precision   |               0.85 |   0.773851590106007 |
 | Recall      | 0.6538461538461539 |  0.6930379746835443 |
 | F1          | 0.7391304347826088 |  0.7312186978297163 |
@@ -85,31 +85,31 @@ Model evaluation metrics:
 | TN          |               44.0 |               438.0 |
 | FP          |                3.0 |                64.0 |
 | FN          |                9.0 |                97.0 |
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 
 Top model insights computed using correlation:
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | Top Positive Insights |      Correlation     |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex = "female"        |   0.5177801026737666 |
 | cabin = "OTHER"       |   0.3331391338844782 |
 | pClass = 1            |   0.3059642953159715 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | Top Negative Insights |      Correlation     |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex = "male"          |  -0.5100301587292186 |
 | pClass = 3            |  -0.5075774968534326 |
 | cabin = null          | -0.31463114463832633 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 
 Top model insights computed using CramersV:
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 |      Top Insights     |       CramersV       |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex                   |    0.525557139885501 |
 | embarked              |  0.31582347194683386 |
 | age                   |  0.21582347194683386 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 ```
 
 While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
@@ -133,9 +133,9 @@ repositories {
 }
 ext {
     scalaVersion = '2.11'
-    scalaVersionRevision = '8'
+    scalaVersionRevision = '12'
     sparkVersion = '2.2.1'
-    opVersion = '3.3.3'
+    opVersion = '0.3.4'
 }
 dependencies {
     // Scala

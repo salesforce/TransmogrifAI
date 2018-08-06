@@ -56,8 +56,9 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
    * @return workflow model
    */
   final override def load(path: String): OpWorkflowModel = {
-    Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString).flatMap(loadJson) match {
-      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow: ${error.getMessage}", error)
+    Try(sc.textFile(OpWorkflowModelReadWriteShared.jsonPath(path), 1).collect().mkString)
+      .flatMap(loadJson(_, path = path)) match {
+      case Failure(error) => throw new RuntimeException(s"Failed to load Workflow from path '$path'", error)
       case Success(wf) => wf
     }
   }
@@ -66,22 +67,24 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
    * Load a previously trained workflow model from json
    *
    * @param json json of the trained workflow model
+   * @param path to the trained workflow model
    * @return workflow model
    */
-  def loadJson(json: String): Try[OpWorkflowModel] = Try(parse(json)).flatMap(loadJson)
+  def loadJson(json: String, path: String): Try[OpWorkflowModel] = Try(parse(json)).flatMap(loadJson(_, path = path))
 
   /**
    * Load Workflow instance from json
    *
    * @param json json value
+   * @param path to the trained workflow model
    * @return workflow model instance
    */
-  def loadJson(json: JValue): Try[OpWorkflowModel] = {
+  def loadJson(json: JValue, path: String): Try[OpWorkflowModel] = {
     for {
       trainParams <- OpParams.fromString((json \ TrainParameters.entryName).extract[String])
       params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
-      (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json))
+      (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json, path))
       blacklist <- Try(resolveBlacklist(json))
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
@@ -102,8 +105,8 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     }
   }
 
-  private def resolveFeaturesAndStages(json: JValue): (Array[OPStage], Array[OPFeature]) = {
-    val stages = loadStages(json)
+  private def resolveFeaturesAndStages(json: JValue, path: String): (Array[OPStage], Array[OPFeature]) = {
+    val stages = loadStages(json, path)
     val stagesMap = stages.map(stage => stage.uid -> stage).toMap[String, OPStage]
     val featuresMap = resolveFeatures(json, stagesMap)
     resolveStages(stages, featuresMap)
@@ -114,13 +117,13 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     stages.toArray -> resultFeatures.toArray
   }
 
-  private def loadStages(json: JValue): Seq[OPStage] = {
+  private def loadStages(json: JValue, path: String): Seq[OPStage] = {
     val stagesJs = (json \ Stages.entryName).extract[JArray].arr
     val recoveredStages = stagesJs.map(j => {
       val stageUid = (j \ FieldNames.Uid.entryName).extract[String]
       val originalStage = workflow.stages.find(_.uid == stageUid)
       originalStage match {
-        case Some(os) => new OpPipelineStageReader(os).loadFromJson(j).asInstanceOf[OPStage]
+        case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
         case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
       }
     })

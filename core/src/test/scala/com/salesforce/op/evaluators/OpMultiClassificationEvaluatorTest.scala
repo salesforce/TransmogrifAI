@@ -53,7 +53,32 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   val defaultThresholds = (0 to 100).map(_ / 100.0).toArray
   val defaultTopNs = Array(1, 3)
 
-  Spec[OpMultiClassificationEvaluator] should "determine incorrect/correct counts from the thresholds" in {
+
+  val (dsMulti2, labelRawMulti2, predictionMulti2) =
+    TestFeatureBuilder[RealNN, Prediction](Seq.fill(numRows.toInt)(
+      (RealNN(1.0), Prediction(0.0, Vectors.dense(10.0, 5.0, 1.0, 0.0, 0.0), Vectors.dense(0.70, 0.25, 0.05, 0.0, 0.0)))
+    ))
+  val labelMulti2 = labelRawMulti2.copy(isResponse = true)
+
+  // Predictions should never be correct for top1 (since correct class has 2nd highest probability).
+  // For top3, it should be correct up to a threshold of 0.25
+  val expectedCorrects = Map(
+    1 -> Seq.fill(defaultThresholds.length)(0L),
+    3 -> (Seq.fill(26)(numRows) ++ Seq.fill(defaultThresholds.length - 26)(0L))
+  )
+  // For top1, prediction is incorrect up to a threshold of 0.7, and then no prediction
+  // For top3, prediction is incorrect in the threshold range (0.25, 0.7], then no prediction
+  val expectedIncorrects = Map(
+    1 -> (Seq.fill(71)(numRows) ++ Seq.fill(defaultThresholds.length - 71)(0L)),
+    3 -> (Seq.fill(26)(0L) ++ Seq.fill(71 - 26)(numRows) ++ Seq.fill(defaultThresholds.length - 71)(0L))
+  )
+  val expectedNoPredictons = Map(
+    1 -> (Seq.fill(71)(0L) ++ Seq.fill(defaultThresholds.length - 71)(numRows)),
+    3 -> (Seq.fill(26)(0L) ++ Seq.fill(71 - 26)(0L) ++ Seq.fill(defaultThresholds.length - 71)(numRows))
+  )
+
+  Spec[OpMultiClassificationEvaluator] should
+    "determine incorrect/correct counts from the thresholds with 3 inputs" in {
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti)
       .setPredictionCol(predMulti)
@@ -62,22 +87,21 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     val metricsMulti = evaluatorMulti.evaluateAll(dsMulti)
 
-    // Predictions should never be correct for top1 (since correct class has 2nd highest probability).
-    // For top3, it should be correct up to a threshold of 0.25
-    val expectedCorrects = Map(
-      1 -> Seq.fill(defaultThresholds.length)(0L),
-      3 -> (Seq.fill(26)(numRows) ++ Seq.fill(defaultThresholds.length - 26)(0L))
+    metricsMulti.ThresholdMetrics shouldEqual ThresholdMetrics(
+      topNs = defaultTopNs,
+      thresholds = defaultThresholds,
+      correctCounts = expectedCorrects,
+      incorrectCounts = expectedIncorrects,
+      noPredictionCounts = expectedNoPredictons
     )
-    // For top1, prediction is incorrect up to a threshold of 0.7, and then no prediction
-    // For top3, prediction is incorrect in the threshold range (0.25, 0.7], then no prediction
-    val expectedIncorrects = Map(
-      1 -> (Seq.fill(71)(numRows) ++ Seq.fill(defaultThresholds.length - 71)(0L)),
-      3 -> (Seq.fill(26)(0L) ++ Seq.fill(71 - 26)(numRows) ++ Seq.fill(defaultThresholds.length - 71)(0L))
-    )
-    val expectedNoPredictons = Map(
-      1 -> (Seq.fill(71)(0L) ++ Seq.fill(defaultThresholds.length - 71)(numRows)),
-      3 -> (Seq.fill(26)(0L) ++ Seq.fill(71 - 26)(0L) ++ Seq.fill(defaultThresholds.length - 71)(numRows))
-    )
+  }
+
+  it should "determine incorrect/correct counts from the thresholds with one prediciton input" in {
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+      .setLabelCol(labelMulti2)
+      .setFullPredictionCol(predictionMulti2)
+
+    val metricsMulti = evaluatorMulti.evaluateAll(dsMulti2)
 
     metricsMulti.ThresholdMetrics shouldEqual ThresholdMetrics(
       topNs = defaultTopNs,

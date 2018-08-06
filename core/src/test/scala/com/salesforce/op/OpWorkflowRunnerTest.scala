@@ -68,7 +68,6 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   private val features = Seq(height, weight, gender, description, age).transmogrify()
   private val survivedNum = survived.occurs()
 
-  // TODO put back LR when evaluators work with prediction features
   val (pred, raw, prob) = BinaryClassificationModelSelector.withTrainValidationSplit(None)
     .setModelsToTry(LogisticRegression)
     .setLogisticRegressionRegParam(0)

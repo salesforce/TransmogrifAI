@@ -36,6 +36,7 @@ import com.twitter.chill.avro.AvroSerializer
 import org.apache.avro.generic.GenericData
 import org.apache.avro.specific.SpecificRecordBase
 import org.apache.spark.serializer.KryoRegistrator
+import com.twitter.chill.algebird.AlgebirdRegistrar
 
 import scala.reflect._
 
@@ -66,6 +67,7 @@ class OpKryoRegistrator extends KryoRegistrator {
       classOf[GenericData.Array[_]],
       new GenericJavaCollectionSerializer(classOf[java.util.ArrayList[_]])
     )
+    new AlgebirdRegistrar().apply(kryo)
     registerCustomClasses(kryo)
   }
 

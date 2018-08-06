@@ -313,7 +313,8 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "force a shared hash space when requested" in {
     val vectorizer = new OPCollectionHashingVectorizer[RealMap].setInput(rm1, rm2)
-      .setNumFeatures(256).setForceSharedHashSpace(true).setPrependFeatureName(false).setHashWithIndex(true)
+      .setNumFeatures(256).setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setPrependFeatureName(false).setHashWithIndex(true)
     val hasher = vectorizer.hashingTF()
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(realMapData)
@@ -364,7 +365,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "preserve binarity (if requested), even in shared hash spaces" in {
     val vectorizer = new OPCollectionHashingVectorizer[TextList].setInput(textList1, textList2)
-      .setNumFeatures(256).setHashWithIndex(false).setForceSharedHashSpace(true)
+      .setNumFeatures(256).setHashWithIndex(false).setHashSpaceStrategy(HashSpaceStrategy.Shared)
       .setBinaryFreq(true).setPrependFeatureName(false)
     val hasher = vectorizer.hashingTF()
     val vector = vectorizer.getOutput()
@@ -394,8 +395,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "make the correct metadata with separate hash spaces" in {
     val vectorizer = new OPCollectionHashingVectorizer[MultiPickList].setInput(top, bot)
-      .setNumFeatures(10)
-      .setForceSharedHashSpace(false)
+      .setNumFeatures(10).setHashSpaceStrategy(HashSpaceStrategy.Separate)
     val feature = vectorizer.getOutput()
     val transformed = vectorizer.transform(catData)
     val meta = OpVectorMetadata(transformed.schema(feature.name))
@@ -409,8 +409,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "make the correct metadata with shared hash spaces" in {
     val vectorizer = new OPCollectionHashingVectorizer[MultiPickList].setInput(top, bot)
-      .setNumFeatures(10)
-      .setForceSharedHashSpace(true)
+      .setNumFeatures(10).setHashSpaceStrategy(HashSpaceStrategy.Shared)
     val feature = vectorizer.getOutput()
     val transformed = vectorizer.transform(catData)
     val meta = OpVectorMetadata(transformed.schema(feature.name))

@@ -113,6 +113,36 @@ object RichMetadata {
     }
 
     /**
+     * Equals method that will recursively check Metadata objects that contain Metadata values or values that are
+     * Array[Metadata]
+     *
+     * @param that Other metadata object to compare to
+     * @return
+     */
+    def deepEquals(that: Metadata): Boolean = {
+      val map1 = this.wrapped.underlyingMap
+      val map2 = that.wrapped.underlyingMap
+
+      if (map1.size == map2.size) {
+        map1.keysIterator.forall { key =>
+          map2.get(key) match {
+            case Some(otherValue) =>
+              val ourValue = map1(key)
+              (ourValue, otherValue) match {
+                // Note: Spark will treat any empty Array as an Array[Long], so == will not work here if it thinks
+                // one array is an empty Array[Long] and the other is an empty Array[Metadata]
+                case (v0: Array[_], v1: Array[_]) => v0.sameElements(v1)
+                case (v0: Metadata, v1: Metadata) => v0.deepEquals(v1)
+                case (v0, v1) => v0 == v1
+              }
+            case None => false
+          }
+        }
+      }
+      else false
+    }
+
+    /**
      * Add summary metadata to an existing metadata instance
      *
      * @param summary Metadata containing any summary information from estimator

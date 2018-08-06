@@ -30,17 +30,17 @@
 
 package com.salesforce.op.evaluators
 
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.RichMetadata._
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.evaluation.Evaluator
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.sql.types.Metadata
 
 
 /**
@@ -53,6 +53,18 @@ trait OpHasLabelCol[T <: FeatureType] extends Params {
   def setLabelCol(value: String): this.type = set(labelCol, value)
   def setLabelCol(value: FeatureLike[T]): this.type = setLabelCol(value.name)
   def getLabelCol: String = $(labelCol)
+}
+
+
+/**
+ * Trait for predictionCol which contains all output results param
+ */
+trait OpHasFullPredictionCol extends Params {
+  final val fullPredictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
+
+  def setFullPredictionCol(value: String): this.type = set(fullPredictionCol, value)
+  def setFullPredictionCol(value: FeatureLike[Prediction]): this.type = setFullPredictionCol(value.name)
+  final def getFullPredictionCol: String = $(fullPredictionCol)
 }
 
 /**
@@ -124,7 +136,10 @@ trait EvaluationMetrics extends JsonLike {
  * Base Interface for OpEvaluator to be used in Evaluator creation. Can be used for both OP and spark
  * eval (so with workflows and cross validation).
  */
-abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator {
+abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
+  with OpHasLabelCol[RealNN]
+  with OpHasPredictionCol[RealNN]
+  with OpHasFullPredictionCol {
   /**
    * Name of evaluator
    */
@@ -154,6 +169,14 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator {
    * @return metric
    */
   override def evaluate(dataset: Dataset[_]): Double = getDefaultMetric(evaluateAll(dataset))
+
+  /**
+   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * @param data input data
+   * @param labelColName name of the label column
+   * @return data formatted for use with the evaluator
+   */
+  protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_]
 }
 
 /**
@@ -161,10 +184,41 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator {
  */
 private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
   extends OpEvaluatorBase[T]
-    with OpHasLabelCol[RealNN]
     with OpHasRawPredictionCol[OPVector]
-    with OpHasProbabilityCol[OPVector]
-    with OpHasPredictionCol[RealNN]
+    with OpHasProbabilityCol[OPVector] {
+
+  /**
+   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * @param data input data
+   * @param labelColName name of the label column
+   * @return data formatted for use with the evaluator
+   */
+  protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
+    if (isSet(fullPredictionCol) &&
+      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
+      val fullPredictionColName = getFullPredictionCol
+      val (predictionColName, rawPredictionColName, probabilityColName) =
+        (s"${fullPredictionColName}_pred", s"${fullPredictionColName}_raw", s"${fullPredictionColName}_prob")
+
+      setPredictionCol(predictionColName)
+      setRawPredictionCol(rawPredictionColName)
+      setProbabilityCol(probabilityColName)
+
+      val flattenedData = data.select(labelColName, getFullPredictionCol).rdd.map{ r =>
+        val label = r.getDouble(0)
+        val predMap: Prediction = r.getMap[String, Double](1).toMap.toPrediction
+        val raw = Vectors.dense(predMap.rawPrediction)
+        val prob = Vectors.dense(predMap.probability)
+        val probUse = if (prob.size == 0) raw else prob // so can calculate threshold metrics for LinearSVC
+        (label, predMap.prediction, raw, probUse)
+      }
+
+      data.sqlContext.createDataFrame(flattenedData)
+        .toDF(labelColName, predictionColName, rawPredictionColName, probabilityColName)
+
+    } else data
+  }
+}
 
 /**
  * Base Interface for OpBinaryClassificationEvaluator
@@ -190,25 +244,65 @@ abstract class OpMultiClassificationEvaluatorBase[T <: EvaluationMetrics]
 abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 (
   override val uid: String
-) extends OpEvaluatorBase[T]
-  with OpHasLabelCol[RealNN]
-  with OpHasPredictionCol[RealNN]
+) extends OpEvaluatorBase[T] {
 
+  /**
+   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * @param data input data
+   * @param labelColName name of the label column
+   * @return data formatted for use with the evaluator
+   */
+  protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
+    if (isSet(fullPredictionCol) &&
+      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
+      val fullPredictionColName = getFullPredictionCol
+      val predictionColName = s"${fullPredictionColName}_pred"
+      setPredictionCol(predictionColName)
 
+      val flattenedData = data.select(labelColName, fullPredictionColName).rdd
+        .map(r => (r.getDouble(0), r.getMap[String, Double](1).toMap.toPrediction.prediction ))
 
-sealed abstract class ClassificationEvalMetric(val sparkEntryName: String) extends EnumEntry with Serializable
+      data.sqlContext.createDataFrame(flattenedData).toDF(labelColName, predictionColName)
+
+    } else data
+  }
+}
+
+/**
+ * Eval metric
+ */
+trait EvalMetric extends Serializable {
+  /**
+   * Spark metric name
+   */
+  def sparkEntryName: String
+
+  /**
+   * Human friendly metric name
+   */
+  def humanFriendlyName: String
+}
+
+/**
+ * Classification Metrics
+ */
+sealed abstract class ClassificationEvalMetric
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EnumEntry with EvalMetric
 
 /**
  * Binary Classification Metrics
  */
 object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("precision")
-  case object Recall extends ClassificationEvalMetric("recall")
-  case object F1 extends ClassificationEvalMetric("f1")
-  case object Error extends ClassificationEvalMetric("accuracy")
-  case object AuROC extends ClassificationEvalMetric("areaUnderROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
+  case object F1 extends ClassificationEvalMetric("f1", "f1")
+  case object Error extends ClassificationEvalMetric("accuracy", "error")
+  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
+  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under PR")
 }
 
 /**
@@ -216,33 +310,29 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
  */
 object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall")
-  case object F1 extends ClassificationEvalMetric("f1")
-  case object Error extends ClassificationEvalMetric("accuracy")
-  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
+  case object F1 extends ClassificationEvalMetric("f1", "f1")
+  case object Error extends ClassificationEvalMetric("accuracy", "error")
+  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
 }
 
 
 /**
- * Contains the names of metrics used in logging
+ * Regression Metrics
  */
-private[op] case object OpMetricsNames {
-  val rootMeanSquaredError = "root mean square error"
-  val meanSquaredError = "mean square error"
-  val meanAbsoluteError = "mean absolute error"
-  val r2 = "r2"
-  val auROC = "area under ROC"
-  val auPR = "area under PR"
-  val precision = "precision"
-  val recall = "recall"
-  val f1 = "f1"
-  val accuracy = "accuracy"
-  val error = "error"
-  val tp = "true positive"
-  val tn = "true negative"
-  val fp = "false positive"
-  val fn = "false negative"
+sealed abstract class RegressionEvalMetric
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EnumEntry with EvalMetric
+
+object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
+  val values: Seq[RegressionEvalMetric] = findValues
+  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")
+  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error")
+  case object R2 extends RegressionEvalMetric("r2", "r2")
+  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
 }
 
 /**
@@ -253,5 +343,3 @@ case object OpEvaluatorNames {
   val multi = "multiEval"
   val regression = "regEval"
 }
-
-

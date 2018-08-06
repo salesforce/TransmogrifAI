@@ -31,14 +31,15 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import OpPipelineStageReadWriteShared._
 import org.apache.spark.ml.SparkDefaultParamsReadWrite
 import org.apache.spark.ml.util.MLReader
-import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, render}
+import org.json4s.{Extraction, _}
 
 import scala.reflect.runtime.universe._
 import scala.util.{Failure, Success, Try}
@@ -59,24 +60,27 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
    */
   override def load(path: String): OpPipelineStageBase = {
     val metadataPath = new Path(path, "metadata").toString
-    loadFromJsonString(sc.textFile(metadataPath, 1).first())
+    loadFromJsonString(sc.textFile(metadataPath, 1).first(), path)
   }
 
   /**
    * Loads from the json serialized data
    *
    * @param json json
+   * @param path to the stored output
    * @return OpPipelineStageBase
    */
-  def loadFromJson(json: JValue): OpPipelineStageBase = loadFromJsonString(compact(render(json)))
+  def loadFromJson(json: JValue, path: String): OpPipelineStageBase =
+    loadFromJsonString(jsonStr = compact(render(json)), path = path)
 
   /**
    * Loads from the json serialized data
    *
    * @param jsonStr json string
+   * @param path to the stored output
    * @return OpPipelineStageBase
    */
-  def loadFromJsonString(jsonStr: String): OpPipelineStageBase = {
+  def loadFromJsonString(jsonStr: String, path: String): OpPipelineStageBase = {
     // Load stage json with it's params
     val metadata = SparkDefaultParamsReadWrite.parseMetadata(jsonStr)
     val (className, metadataJson) = metadata.className -> metadata.metadata
@@ -88,7 +92,17 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
 
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
-    SparkDefaultParamsReadWrite.getAndSetParams(stage, metadata)
+
+    // Update [[SparkWrapperParams]] with path so we can load the [[SparkStageParam]] instance
+    val updatedMetadata = stage match {
+      case _: SparkWrapperParams[_] =>
+        val updatedParams = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path)
+        metadata.copy(params = updatedParams)
+      case _ => metadata
+    }
+
+    // Set all stage params from the metadata
+    SparkDefaultParamsReadWrite.getAndSetParams(stage, updatedMetadata)
     val matchingFeatures = stage.getTransientFeatures().map{ f =>
       inputFeatures.find( i => i.uid == f.uid && i.isResponse == f.isResponse && i.typeName == f.typeName )
         .getOrElse( throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'") )
@@ -125,7 +139,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
           }
 
         // Spark wrapped stage is saved using [[SparkWrapperParams]] and loaded later using
-        // [[DefaultParamsReader]].getAndSetParams returning 'null' here
+        // [[SparkDefaultParamsReadWrite]].getAndSetParams returning 'null' here
         case AnyValueTypes.SparkWrappedStage => {
           null // yes, yes - this should be 'null'
         }

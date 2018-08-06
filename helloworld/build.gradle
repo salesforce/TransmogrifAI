@@ -42,11 +42,12 @@ mainClassName = "com.salesforce.dummy.DummyMain"
 
 ext {
     scalaVersion = '2.11'
-    scalaVersionRevision = '8'
+    scalaVersionRevision = '12'
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='3.3.3'
+    opVersion='0.3.4'
+    collectionsVersion = '3.2.2'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
 
@@ -58,6 +59,8 @@ configurations {
 
 //noinspection GroovyAssignabilityCheck
 dependencies {
+    // Scala
+    zinc 'com.typesafe.zinc:zinc:0.3.15'
     scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
     scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
     compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
@@ -80,6 +83,21 @@ dependencies {
     testCompile "org.scalatest:scalatest_$scalaVersion:$scalatestVersion"
     testCompile "junit:junit:${junitVersion}"
 }
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy {
+        force "commons-collections:commons-collections:$collectionsVersion",
+                "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
+                "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+    }
+}
+configurations.zinc {
+    resolutionStrategy {
+        force 'org.scala-lang:scala-library:2.10.6', 'org.scala-lang:scala-reflect:2.10.6'
+    }
+}
+
 
 tasks.withType(ScalaCompile) {
     configure(scalaCompileOptions.forkOptions) {
@@ -125,14 +143,10 @@ sourceSets {
     }
 }
 
-configurations.all {
-    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
-}
-
 wrapper {
-    gradleVersion = '4.8.1'
+    gradleVersion = '4.9'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
+    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
 }
 
 task runMain(type: JavaExec) {

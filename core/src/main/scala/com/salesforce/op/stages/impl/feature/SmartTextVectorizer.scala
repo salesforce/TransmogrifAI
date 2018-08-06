@@ -71,7 +71,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     numFeatures = $(numFeatures),
     numInputs = inN.length,
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = getForceSharedHashSpace,
     binaryFreq = $(binaryFreq),
     hashAlgorithm = getHashAlgorithm,
     hashSpaceStrategy = getHashSpaceStrategy

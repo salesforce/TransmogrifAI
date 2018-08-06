@@ -32,21 +32,46 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.base.binary.BinaryModel
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
+
 @RunWith(classOf[JUnitRunner])
-class DecisionTreeNumericMapBucketizerTest extends FlatSpec with TestSparkContext {
-  import DecisionTreeNumericBucketizerTestHelper._
+class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
+  BinaryModel[RealNN, RealMap, OPVector], DecisionTreeNumericMapBucketizer[Double, RealMap]]
+  with DecisionTreeNumericBucketizerAsserts
+{
   import OPMapVectorizerTestHelper._
+
+  val (inputData, estimator) = {
+    val numericData = Seq(
+      Map("a" -> 1.0),
+      Map("a" -> 18.0),
+      Map("b" -> 0.0),
+      Map("a" -> -1.23, "b" -> 1.0),
+      Map("a" -> -1.23, "b" -> 1.0, "c" -> 117.0)
+    ).map(_.toRealMap)
+    val labelData = Seq(1.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN)
+    val (inputData, numeric, label) = TestFeatureBuilder[RealMap, RealNN](numericData zip labelData)
+
+    inputData -> new DecisionTreeNumericMapBucketizer[Double, RealMap]().setInput(label, numeric)
+  }
+
+  val expectedResult = Seq(
+    Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(2, 3, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(0, 4), Array(1.0, 1.0))
+  ).map(_.toOPVector)
 
   trait NormalData {
     val total = 1000
@@ -93,8 +118,7 @@ class DecisionTreeNumericMapBucketizerTest extends FlatSpec with TestSparkContex
     )
   )
 
-  Spec[DecisionTreeNumericMapBucketizer[_, _]] should "produce output that is never a response, " +
-    "except the case where both inputs are" in new NormalData {
+  it should "produce output that is never a response, except the case where both inputs are" in new NormalData {
     Seq(
       label.copy(isResponse = false) -> realMapFeature.copy(isResponse = false),
       label.copy(isResponse = true) -> realMapFeature.copy(isResponse = false),

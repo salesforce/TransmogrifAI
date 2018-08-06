@@ -195,13 +195,13 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
 
   def setNumFeatures(v: Int): this.type = set(numFeatures, v)
 
-  final val forceSharedHashSpace = new BooleanParam(
-    parent = this, name = "forceSharedHashSpace",
-    doc = s"if true, then force the hash space to be shared among all included features"
+  final val hashSpaceStrategy: Param[String] = new Param[String](this, "hashSpaceStrategy",
+    "Strategy to determine whether to use shared or separate hash space for input text features",
+    (value: String) => HashSpaceStrategy.withNameInsensitiveOption(value).isDefined
   )
-  setDefault(forceSharedHashSpace, false)
-
-  def setForceSharedHashSpace(v: Boolean): this.type = set(forceSharedHashSpace, v)
+  setDefault(hashSpaceStrategy, TransmogrifierDefaults.HashSpaceStrategy.entryName)
+  def setHashSpaceStrategy(v: HashSpaceStrategy): this.type = set(hashSpaceStrategy, v.entryName)
+  def getHashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.withNameInsensitive($(hashSpaceStrategy))
 
   def getFillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = Seq.empty
 
@@ -210,7 +210,7 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
       args = args.copy(shouldCleanValues = $(cleanText)),
       shouldPrependFeatureName = $(prependFeatureName),
       numFeatures = $(numFeatures),
-      forceSharedHash = $(forceSharedHashSpace),
+      hashSpaceStrategy = getHashSpaceStrategy,
       operationName = operationName,
       uid = uid
     )
@@ -422,7 +422,7 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
   args: OPMapVectorizerModelArgs,
   val shouldPrependFeatureName: Boolean,
   val numFeatures: Int,
-  val forceSharedHash: Boolean,
+  val hashSpaceStrategy: HashSpaceStrategy,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
@@ -436,9 +436,9 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
     numFeatures = numFeatures,
     numInputs = 1, // All tokens are combined into a single TextList before hashing
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = forceSharedHash,
     binaryFreq = TransmogrifierDefaults.BinaryFreq,
-    hashAlgorithm = TransmogrifierDefaults.HashAlgorithm
+    hashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+    hashSpaceStrategy = hashSpaceStrategy
   )
 
   def convertFn: Map[String, String] => Map[String, Double] = _.map { case (k, v) => k -> 1.0 }

@@ -109,6 +109,7 @@ trait RichTextFeature {
      *                             failed to make a good enough prediction.
      * @param autoDetectThreshold  Language detection threshold. If none of the detected languages have
      *                             confidence greater than the threshold then defaultLanguage is used.
+     * @param hashSpaceStrategy    strategy to determine whether to use shared hash space for all included features
      * @param minTokenLength       minimum token length, >= 1.
      * @param trackNulls           indicates whether or not to track null values in a separate column.
      *                             Since features may be combined into a shared hash space here, the null value
@@ -117,7 +118,6 @@ trait RichTextFeature {
      * @param numHashes            number of features (hashes) to generate
      * @param hashWithIndex        include indices when hashing a feature that has them (OPLists or OPVectors)
      * @param prependFeatureName   if true, prepends a input feature name to each token of that feature
-     * @param forceSharedHashSpace force the hash space to be shared among all included features
      * @param hashAlgorithm        hash algorithm to use
      * @param binaryFreq           if true, term frequency vector will be binary such that non-zero term
      *                             counts will be set to 1.0
@@ -135,7 +135,7 @@ trait RichTextFeature {
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      forceSharedHashSpace: Boolean = TransmogrifierDefaults.ForceSharedHashSpace,
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
@@ -157,7 +157,7 @@ trait RichTextFeature {
         .setNumFeatures(numHashes)
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
-        .setForceSharedHashSpace(forceSharedHashSpace)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
         .getOutput()
@@ -189,7 +189,6 @@ trait RichTextFeature {
      * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
-     * @param forceSharedHashSpace      force the hash space to be shared among all included features
      * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
@@ -214,7 +213,6 @@ trait RichTextFeature {
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      forceSharedHashSpace: Boolean = false,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
@@ -237,7 +235,6 @@ trait RichTextFeature {
         .setNumFeatures(numHashes)
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
-        .setForceSharedHashSpace(forceSharedHashSpace)
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
