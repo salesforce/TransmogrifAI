@@ -38,6 +38,7 @@ import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification._
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
+import org.apache.log4j.{Level, LogManager}
 
 /**
  * A minimal Titanic Survival example with Octopus Prime
@@ -61,6 +62,7 @@ object OpTitanicMini {
   )
 
   def main(args: Array[String]): Unit = {
+    LogManager.getLogger("com.salesforce.op").setLevel(Level.ERROR)
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
     import spark.implicits._
 
@@ -79,7 +81,7 @@ object OpTitanicMini {
     val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
     val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
-    println(s"Model summary:${model.summary()}")
+    println("Model summary:" + model.summaryPretty())
   }
 
 }
