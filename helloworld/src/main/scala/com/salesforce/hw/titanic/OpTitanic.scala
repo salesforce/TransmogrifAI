@@ -42,7 +42,7 @@ import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.utils.kryo.OpKryoRegistrator
 
 /**
- * Octopus Prime example classification app using the Titanic dataset
+ * TransmogrifAI example classification app using the Titanic dataset
  */
 object OpTitanic extends OpAppWithRunner with TitanicFeatures {
 
