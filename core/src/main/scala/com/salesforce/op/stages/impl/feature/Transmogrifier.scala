@@ -62,7 +62,6 @@ private[op] trait TransmogrifierDefaults {
   val BinaryFillValue: Boolean = false
   val HashWithIndex: Boolean = false
   val PrependFeatureName: Boolean = true
-  val ForceSharedHashSpace: Boolean = true
   val HashSpaceStrategy: HashSpaceStrategy = com.salesforce.op.stages.impl.feature.HashSpaceStrategy.Auto
   val CleanText: Boolean = true
   val CleanKeys: Boolean = false
@@ -87,7 +86,7 @@ private[op] case object Transmogrifier {
    *
    * @param features input features
    * @param defaults transmogrifier defaults (allows params injection)
-   * @param label optional label feature to be passed into stages that require the label column
+   * @param label    optional label feature to be passed into stages that require the label column
    * @return vectorized features grouped by type
    */
   def transmogrify(
@@ -282,11 +281,13 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
           f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            hashSpaceStrategy = defaults.HashSpaceStrategy,
             autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
             toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
           f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            hashSpaceStrategy = defaults.HashSpaceStrategy,
             autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
             toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[URL] =>
@@ -327,11 +328,8 @@ private[op] case object Transmogrifier {
    * @param thisStageName this stage name
    * @return map from feature name to feature history
    */
-  def inputFeaturesToHistory(tf: Array[TransientFeature], thisStageName: String): Map[String, FeatureHistory] = {
-    tf.map { f =>
-      f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages :+ thisStageName)
-    }.toMap
-  }
+  def inputFeaturesToHistory(tf: Array[TransientFeature], thisStageName: String): Map[String, FeatureHistory] =
+    tf.map(f => f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages :+ thisStageName)).toMap
 
 }
 

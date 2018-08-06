@@ -22,6 +22,7 @@ gradlew.bat
 *.der
 
 .env
+.gradletasknamecache
 
 derby.log
 metastore_db/

@@ -4,10 +4,10 @@
 
 1. add to your bash profile:
     ```bash
-    export OP_HOME="/path/to/octopus-prime/"
+    export OP_HOME="/path/to/TransmogrifAI/"
     alias op="java -cp $OP_HOME/cli/build/libs/\* com.salesforce.op.cli.CLI"
     ```
-2. run `./gradlew cli:shadowJar` in your octopus-prime project directory
+2. run `./gradlew cli:shadowJar` in your TransmogrifAI project directory
 3. now running `op` in terminal should run the most recently build shadow jar every time
 4. if you change the CLI, rerun `./gradlew cli:shadowJar`
 

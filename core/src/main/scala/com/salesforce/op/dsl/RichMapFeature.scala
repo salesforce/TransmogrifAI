@@ -34,7 +34,9 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{BinaryMap, _}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
+import com.salesforce.op.features.types._
 import com.salesforce.op.utils.text.Language
+import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
 
@@ -191,7 +193,7 @@ trait RichMapFeature {
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
      * @param numHashes                size of hash space
-     * @param forceSharedHash          use a shared space for hashes
+     * @param hashSpaceStrategy        strategy to determine whether to use shared hash space for all included features
      *
      * @return an OPVector feature
      */
@@ -204,7 +206,7 @@ trait RichMapFeature {
       others: Array[FeatureLike[TextMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
-      forceSharedHash: Boolean = TransmogrifierDefaults.ForceSharedHashSpace
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
       val hashedFeatures = new TextMapHashingVectorizer[TextMap]()
         .setInput(f +: others)
@@ -215,7 +217,7 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
-        .setForceSharedHashSpace(forceSharedHash)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .getOutput()
 
       /**
@@ -250,7 +252,6 @@ trait RichMapFeature {
      * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
-     * @param forceSharedHashSpace      force the hash space to be shared among all included features
      * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
@@ -275,7 +276,6 @@ trait RichMapFeature {
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      forceSharedHashSpace: Boolean = false,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
@@ -298,7 +298,6 @@ trait RichMapFeature {
         .setNumFeatures(numHashes)
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
-        .setForceSharedHashSpace(forceSharedHashSpace)
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
@@ -324,7 +323,7 @@ trait RichMapFeature {
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
      * @param numHashes                size of hash space
-     * @param forceSharedHash          use a shared space for hashes
+     * @param hashSpaceStrategy        strategy to determine whether to use shared hash space for all included features
      *
      * @return an OPVector feature
      */
@@ -337,7 +336,7 @@ trait RichMapFeature {
       others: Array[FeatureLike[TextAreaMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
-      forceSharedHash: Boolean = TransmogrifierDefaults.ForceSharedHashSpace
+      hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
       val hashedFeatures = new TextMapHashingVectorizer[TextAreaMap]()
         .setInput(f +: others)
@@ -348,7 +347,7 @@ trait RichMapFeature {
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(false) // Null tracking does nothing here and is done from outside the vectorizer, below
         .setNumFeatures(numHashes)
-        .setForceSharedHashSpace(forceSharedHash)
+        .setHashSpaceStrategy(hashSpaceStrategy)
         .getOutput()
 
       /* Note: Text is tokenized into a TextList, and then null tracking is applied. For maps, we do null
@@ -382,7 +381,6 @@ trait RichMapFeature {
      * @param prependFeatureName        if true, prepends a input feature name to each token of that feature
      * @param autoDetectThreshold       Language detection threshold. If none of the detected languages have
      *                                  confidence greater than the threshold then defaultLanguage is used.
-     * @param forceSharedHashSpace      force the hash space to be shared among all included features
      * @param hashSpaceStrategy         strategy to determine whether to use shared hash space for all included features
      * @param defaultLanguage           default language to assume in case autoDetectLanguage is disabled or
      *                                  failed to make a good enough prediction.
@@ -407,7 +405,6 @@ trait RichMapFeature {
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
       autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      forceSharedHashSpace: Boolean = false,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
@@ -430,7 +427,6 @@ trait RichMapFeature {
         .setNumFeatures(numHashes)
         .setHashWithIndex(hashWithIndex)
         .setPrependFeatureName(prependFeatureName)
-        .setForceSharedHashSpace(forceSharedHashSpace)
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
@@ -961,6 +957,26 @@ trait RichMapFeature {
         whiteListKeys = whiteListKeys, blackListKeys = blackListKeys,
         others = domains.tail, trackNulls = trackNulls
       )
+    }
+
+    /**
+     * Enrichment functions for Prediction Features
+     *
+     * @param f FeatureLike of URLMap
+     */
+    implicit class RichPredicitionFeature(val f: FeatureLike[Prediction]) {
+
+      /**
+       * Takes single output feature from model of type Prediction and flattens it into 3 features
+       * @return prediction, rawPrediction, probability
+       */
+      def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
+        (f.map[RealNN](_.prediction.toRealNN),
+          f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
+            f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
+        )
+      }
+
     }
 
   }

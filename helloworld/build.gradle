@@ -130,9 +130,9 @@ configurations.all {
 }
 
 wrapper {
-    gradleVersion = '4.8.1'
+    gradleVersion = '4.9'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
+    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
 }
 
 task runMain(type: JavaExec) {

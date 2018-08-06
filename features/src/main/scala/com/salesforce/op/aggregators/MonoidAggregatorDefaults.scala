@@ -85,6 +85,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[PostalCodeMap] => UnionConcatPostalCodeMap
       case wt if wt =:= weakTypeOf[StreetMap] => UnionConcatStreetMap
       case wt if wt =:= weakTypeOf[GeolocationMap] => UnionGeolocationMidpointMap
+      case wt if wt =:= weakTypeOf[Prediction] => UnionMeanPredicition
 
       // Numerics
       case wt if wt =:= weakTypeOf[Binary] => LogicalOr // TODO: reconsider using Xor since this is natural op on Z/2

@@ -43,7 +43,7 @@ trait ConcurrentCheck {
 
   def forAllConcurrentCheck[T](
     numThreads: Int = 10,
-    numInvocationsPerThread: Int = 50000,
+    numInvocationsPerThread: Int = 10000,
     atMost: Duration = 10.seconds,
     warmUp: Boolean = true,
     table: TableFor1[T],

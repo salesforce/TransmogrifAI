@@ -258,7 +258,7 @@ class RawFeatureFilter[T]
    */
   // TODO return distribution information to attach to features that are kept
   def generateFilteredRaw(rawFeatures: Array[OPFeature], parameters: OpParams)
-    (implicit spark: SparkSession): (DataFrame, Array[OPFeature]) = {
+    (implicit spark: SparkSession): FilteredRawData = {
 
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
@@ -309,6 +309,19 @@ class RawFeatureFilter[T]
     trainData.unpersist()
     scoreData.map(_.unpersist())
 
-    cleanedData -> featuresToDrop
+    FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop)
   }
 }
+
+/**
+ * case class for the RFF filtered data and features to drop
+ * @param cleanedData RFF cleaned data
+ * @param featuresToDrop raw features dropped by RFF
+ * @param mapKeysToDrop keys in map features dropped by RFF
+ */
+case class FilteredRawData
+(
+  cleanedData: DataFrame,
+  featuresToDrop: Array[OPFeature],
+  mapKeysToDrop: Map[String, Set[String]]
+)

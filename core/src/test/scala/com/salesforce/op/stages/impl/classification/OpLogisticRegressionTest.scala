@@ -70,7 +70,6 @@ class OpLogisticRegressionTest extends OpEstimatorSpec[Prediction, OpPredictorWr
     Prediction(0.0, Array(20.9, -20.9), Array(1.0, 0.0))
   )
 
-
   it should "allow the user to set the desired spark parameters" in {
     estimator
       .setRegParam(0.1)

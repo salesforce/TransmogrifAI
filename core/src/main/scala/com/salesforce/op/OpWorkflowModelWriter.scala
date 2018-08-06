@@ -97,12 +97,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    */
   private def stagesJArray(path: String): JArray = {
     val stages: Seq[OpPipelineStageBase] = model.stages
-    val stagesJson: Seq[JObject] = stages.map {
-      // Set save path for all Spark wrapped stages
-      case s: SparkWrapperParams[_] => s.setSavePath(path)
-      case s => s
-    }.map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson)
-
+    val stagesJson: Seq[JObject] = stages.map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
     JArray(stagesJson.toList)
   }
 

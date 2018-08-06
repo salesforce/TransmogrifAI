@@ -32,18 +32,20 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
-  lazy val (data, f1, f2) = TestFeatureBuilder("text1", "text2",
+class SmartTextVectorizerTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], SmartTextVectorizer[Text]] {
+
+  lazy val (inputData, f1, f2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
       ("hello world".toText, "Hello world!".toText),
       ("hello world".toText, "What's up".toText),
@@ -52,21 +54,21 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
       (Text.empty, Text.empty)
     )
   )
+  val estimator = new SmartTextVectorizer()
+    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+    .setTopK(2).setPrependFeatureName(false)
+    .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+    .setInput(f1, f2)
 
-  Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
+  val expectedResult = Seq(
+    Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
+    Vectors.sparse(9, Array(1, 6), Array(1.0, 1.0)),
+    Vectors.sparse(9, Array(0, 6), Array(1.0, 2.0)),
+    Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
+  ).map(_.toOPVector)
 
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-    val r2 = TextStats(Map("hello" -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-
-    TextStats.semiGroup(2).plus(l1, r1) shouldBe expected1
-    TextStats.semiGroup(2).plus(l2, r2) shouldBe expected2
-  }
-
-  Spec[SmartTextVectorizer[_]] should "detect one categorical and one non-categorical text feature" in {
+  it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
@@ -78,10 +80,10 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
 
     val transformed = new OpWorkflow()
-      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(data)
+      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
 
-    val (smart, expected) = result.map{ case (smartVector, categoricalVector, textVector, nullVector) =>
+    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
       smartVector -> combined
     }.unzip
@@ -97,7 +99,7 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
     val categoricalVectorized =
       new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized, categoricalVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized, categoricalVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized)
 
     val (smart, expected) = result.unzip
@@ -116,10 +118,11 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
       .setNumFeatures(4).setPrependFeatureName(false).setInput(f1Tokenized, f2Tokenized).getOutput()
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(f1Tokenized, f2Tokenized).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(data)
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
 
-    val (smart, expected) = result.map{ case (smartVector, textVector, nullVector) =>
+    val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
       smartVector -> combined
     }.unzip
@@ -135,11 +138,11 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
 
     val shortcutVectorized = f1.smartVectorize(
       maxCategoricalCardinality = 2, numHashes = 4, minSupport = 1, topK = 2,
-      autoDetectLanguage = false, minTokenLength = 1, toLowercase = false, forceSharedHashSpace = true,
-      others = Array(f2)
+      autoDetectLanguage = false, minTokenLength = 1, toLowercase = false,
+      hashSpaceStrategy = HashSpaceStrategy.Shared, others = Array(f2)
     )
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
 
     val (regular, shortcut) = result.unzip
@@ -148,7 +151,7 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "fail with an assertion error" in {
-    val emptyDF = data.filter(data("text1") === "").toDF()
+    val emptyDF = inputData.filter(inputData("text1") === "").toDF()
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
@@ -165,12 +168,12 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 9
-    meta.columns.foreach{ col =>
+    meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
         col.indicatorGroup shouldBe Option(f1.name)
@@ -198,12 +201,12 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
       .setMaxCardinality(4).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 8
-    meta.columns.foreach{ col =>
+    meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
         col.indicatorGroup shouldBe Option(f1.name)
@@ -235,12 +238,12 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
       .setMaxCardinality(1).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 10
-    meta.columns.foreach{ col =>
+    meta.columns.foreach { col =>
       if (col.index < 4) {
         col.parentFeatureName shouldBe Seq(f1.name)
         col.indicatorGroup shouldBe None
@@ -257,6 +260,19 @@ class SmartTextVectorizerTest extends FlatSpec with TestSparkContext {
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
+  }
+
+  Spec[TextStats] should "aggregate correctly" in {
+    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
+    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
+    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
+
+    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+    val r2 = TextStats(Map("hello" -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+
+    TextStats.semiGroup(2).plus(l1, r1) shouldBe expected1
+    TextStats.semiGroup(2).plus(l2, r2) shouldBe expected2
   }
 
 }

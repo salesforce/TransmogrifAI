@@ -30,12 +30,13 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features._
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType._
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestOpVectorMetadataBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichStructType._
-import com.salesforce.op.{OpWorkflow, _}
+import com.salesforce.op._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -43,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
 
-  val inputFeatures = Seq(heightNoWindow, weight, gender)
+  val inputFeatures = Array[OPFeature](heightNoWindow, weight, gender)
 
   Spec(Transmogrifier.getClass) should "return a single output feature of type vector with the correct name" in {
     val feature = inputFeatures.transmogrify()
@@ -60,7 +61,7 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly transform the data and store the feature names in metadata" in {
-    val feature = inputFeatures.transmogrify()
+    val feature = inputFeatures.toSeq.transmogrify()
     val model = new OpWorkflow().setResultFeatures(feature).setReader(dataReader).train()
     val transformed = model.score(keepRawFeatures = true, keepIntermediateFeatures = true)
     val hist = feature.parents.flatMap{ f =>

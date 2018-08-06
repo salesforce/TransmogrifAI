@@ -83,7 +83,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     numFeatures = $(numFeatures),
     numInputs = inN.length,
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = getForceSharedHashSpace,
     binaryFreq = $(binaryFreq),
     hashAlgorithm = getHashAlgorithm,
     hashSpaceStrategy = getHashSpaceStrategy

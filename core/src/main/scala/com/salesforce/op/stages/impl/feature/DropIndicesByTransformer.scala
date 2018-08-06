@@ -58,17 +58,17 @@ class DropIndicesByTransformer
     case _ =>
   }
 
-  private lazy val vectorMetadata = OpVectorMetadata(getInputSchema()(in1.name))
-  private lazy val columnMetadataToKeep = vectorMetadata.columns.collect { case cm if !matchFn(cm) => cm }
-  private lazy val indicesToKeep = columnMetadataToKeep.map { case cm => cm.index }
+  @transient private lazy val vectorMetadata = OpVectorMetadata(getInputSchema()(in1.name))
+  @transient private lazy val columnMetadataToKeep = vectorMetadata.columns.collect { case cm if !matchFn(cm) => cm }
+  @transient private lazy val indicesToKeep = columnMetadataToKeep.map(_.index)
 
-  override def transformFn: OPVector => OPVector = (v: OPVector) => {
-    val vals = new Array[Double](indicesToKeep.length)
+  override def transformFn: OPVector => OPVector = v => {
+    val values = new Array[Double](indicesToKeep.length)
     v.value.foreachActive((i, v) => {
       val k = indicesToKeep.indexOf(i)
-      if (k >= 0) vals(k) = v
+      if (k >= 0) values(k) = v
     })
-    Vectors.dense(vals).compressed.toOPVector
+    Vectors.dense(values).compressed.toOPVector
   }
 
   override def onGetMetadata(): Unit = {

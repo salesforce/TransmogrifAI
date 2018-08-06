@@ -71,6 +71,7 @@ case object UnionMeanPercentMap extends UnionMeanDoubleMap[PercentMap] with Perc
   override def prepare(input: Event[PercentMap]): Map[String, (Double, Int)] =
     input.value.value.map { case (k, p) => k -> (prepareFn(p), 1) }
 }
+case object UnionMeanPredicition extends UnionMeanDoubleMap[Prediction]
 
 case object UnionGeolocationMidpointMap
   extends MonoidAggregator[Event[GeolocationMap], Map[String, Array[Double]], GeolocationMap]
