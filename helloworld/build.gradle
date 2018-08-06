@@ -42,11 +42,12 @@ mainClassName = "com.salesforce.dummy.DummyMain"
 
 ext {
     scalaVersion = '2.11'
-    scalaVersionRevision = '8'
+    scalaVersionRevision = '12'
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='3.3.3'
+    opVersion='3.4.0'
+    collectionsVersion = '3.2.2'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
 
@@ -58,6 +59,8 @@ configurations {
 
 //noinspection GroovyAssignabilityCheck
 dependencies {
+    // Scala
+    zinc 'com.typesafe.zinc:zinc:0.3.15'
     scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
     scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
     compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
@@ -80,6 +83,21 @@ dependencies {
     testCompile "org.scalatest:scalatest_$scalaVersion:$scalatestVersion"
     testCompile "junit:junit:${junitVersion}"
 }
+
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+    resolutionStrategy {
+        force "commons-collections:commons-collections:$collectionsVersion",
+                "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
+                "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+    }
+}
+configurations.zinc {
+    resolutionStrategy {
+        force 'org.scala-lang:scala-library:2.10.6', 'org.scala-lang:scala-reflect:2.10.6'
+    }
+}
+
 
 tasks.withType(ScalaCompile) {
     configure(scalaCompileOptions.forkOptions) {
@@ -123,10 +141,6 @@ sourceSets {
             srcDir 'build/generated-main-avro-java'
         }
     }
-}
-
-configurations.all {
-    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 
 wrapper {
