@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.regression
@@ -57,12 +56,14 @@ case object RegressionModelSelector {
   /**
    * Creates a new Regression Model Selector with a Cross Validation
    *
-   * @param dataSplitter      instance that will split the data into training set and test set
-   * @param numFolds          number of folds for cross validation (>= 2)
-   * @param validationMetric  metric name in evaluation: RMSE, R2 etc
+   * @param dataSplitter        instance that will split the data into training set and test set
+   * @param numFolds            number of folds for cross validation (>= 2)
+   * @param validationMetric    metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.Regression)
-   * @param seed              random seed
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
+   * @param seed                random seed
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Regression Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -70,24 +71,28 @@ case object RegressionModelSelector {
     numFolds: Int = ValidatorParamDefaults.NumFolds,
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): RegressionModelSelector = {
+    val cv = new OpCrossValidation[RegressorModel, Regressor](
+      numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
+    )
     selector(
-      validator = new OpCrossValidation[RegressorModel, Regressor](numFolds, seed, validationMetric),
-      dataSplitter = dataSplitter,
-      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      cv, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
   }
 
   /**
    * Creates a new Regression Model Selector with a Train Validation Split
    *
-   * @param dataSplitter      instance that will split the data into training set and test set
-   * @param trainRatio        ratio between training set and validation set (>= 0 && <= 1)
-   * @param validationMetric  metric name in evaluation: RMSE, R2 etc
+   * @param dataSplitter        instance that will split the data into training set and test set
+   * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
+   * @param validationMetric    metric name in evaluation: RMSE, R2 etc
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.Regression)
-   * @param seed              random seed
+   *                            and default evaluator is added to this list (here Evaluators.Regression)
+   * @param seed                random seed
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Regression Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -95,16 +100,14 @@ case object RegressionModelSelector {
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
-    seed: Long = ValidatorParamDefaults.Seed
+    seed: Long = ValidatorParamDefaults.Seed,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): RegressionModelSelector = {
+    val ts = new OpTrainValidationSplit[RegressorModel, Regressor](
+      trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
+    )
     selector(
-      validator = new OpTrainValidationSplit[RegressorModel, Regressor](
-        trainRatio,
-        seed,
-        validationMetric
-      ),
-      dataSplitter = dataSplitter,
-      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      ts, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
     )
   }
 

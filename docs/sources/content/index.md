@@ -1,8 +1,6 @@
-title=Octopus Prime
+title=TransmogrifAI
 type=doc
 status=published
 ~~~~~~
 
-Octopus Prime – an AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning.
-
-https://github.com/salesforce/op
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning.

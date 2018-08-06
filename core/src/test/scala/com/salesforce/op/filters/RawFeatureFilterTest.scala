@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.filters
@@ -149,15 +148,19 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survPred, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.0, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val (df, toDrop) = filter.generateFilteredRaw(features, params)
-    toDrop.isEmpty shouldBe true
-    df.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.isEmpty shouldBe true
+    filteredRawData.mapKeysToDrop.isEmpty shouldBe true
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
 
     val filter1 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val (df1, toDrop1) = filter1.generateFilteredRaw(features, params)
-    toDrop1 should contain theSameElementsAs Array(survPred)
-    df1.schema.fields.exists(_.name == survPred.name) shouldBe false
-    df1.collect(stringMap).foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    val filteredRawData1 = filter1.generateFilteredRaw(features, params)
+    filteredRawData1.featuresToDrop should contain theSameElementsAs Array(survPred)
+    filteredRawData1.mapKeysToDrop should contain theSameElementsAs Map("numericMap" -> Set("Male"),
+      "booleanMap" -> Set("Male"), "stringMap" -> Set("Male"))
+    filteredRawData1.cleanedData.schema.fields.exists(_.name == survPred.name) shouldBe false
+    filteredRawData1.cleanedData.collect(stringMap).
+      foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
   }
 
   it should "not drop response features" in {
@@ -165,10 +168,11 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val (df, toDrop) = filter.generateFilteredRaw(features, params)
-    toDrop.isEmpty shouldBe true
-    df.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
-    df.collect(stringMap).foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.isEmpty shouldBe true
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
+    filteredRawData.cleanedData.collect(stringMap)
+      .foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
   }
 
 
@@ -177,16 +181,16 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1, 2, 0.2, 0.9)
-    val (df, toDrop) = filter.generateFilteredRaw(features, params)
-    toDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
-    df.schema.fields.map(_.name) should contain theSameElementsAs
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Array(DataFrameFieldNames.KeyFieldName, survived.name)
 
     val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1, 2, 0.2, 0.9,
       protectedFeatures = Set(age.name, gender.name))
-    val (df2, toDrop2) = filter2.generateFilteredRaw(features, params)
-    toDrop2.toSet shouldEqual Set(height, weight, description, boarded)
-    df2.schema.fields.map(_.name) should contain theSameElementsAs
+    val filteredRawData2 = filter2.generateFilteredRaw(features, params)
+    filteredRawData2.featuresToDrop.toSet shouldEqual Set(height, weight, description, boarded)
+    filteredRawData2.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Array(DataFrameFieldNames.KeyFieldName, survived.name, age.name, gender.name)
   }
 
@@ -205,39 +209,46 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       maxCorrelation = 1.0,
       jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name))
 
-    val (df, toDrop) = filter.generateFilteredRaw(features, params)
-    toDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
-    df.schema.fields.map(_.name) should contain theSameElementsAs
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.9" in {
     val expectedDropped = Seq(boarded, weight, gender)
     val expectedMapKeys = Seq("Female", "Male")
-    nullLabelCorrelationTest(0.9, expectedDropped, expectedMapKeys)
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.9, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.6" in {
     val expectedDropped = Seq(boarded, weight, gender, age)
     val expectedMapKeys = Seq("Female", "Male")
-    nullLabelCorrelationTest(0.6, expectedDropped, expectedMapKeys)
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.6, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.4" in {
     val expectedDropped = Seq(boarded, weight, gender, age, description)
     val expectedMapKeys = Seq("Male")
-    nullLabelCorrelationTest(0.4, expectedDropped, expectedMapKeys)
+    val expectedDroppedMapKeys = Map("booleanMap" -> Set("Female"), "stringMap" -> Set("Female"),
+      "numericMap" -> Set("Female"))
+    nullLabelCorrelationTest(0.4, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.3" in {
     val expectedDropped = Seq(boarded, weight, gender, age, description, booleanMap, numericMap, stringMap)
-    nullLabelCorrelationTest(0.3, expectedDropped, Seq())
+    // all the maps dropped
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.3, expectedDropped, Seq(), expectedDroppedMapKeys)
   }
 
   private def nullLabelCorrelationTest(
     maxCorrelation: Double,
     expectedDropped: Seq[OPFeature],
-    expectedMapKeys: Seq[String]
+    expectedMapKeys: Seq[String],
+    expectedDroppedMapKeys: Map[String, Set[String]]
   ): Unit = {
     def getFilter(maxCorrelation: Double): RawFeatureFilter[Passenger] = new RawFeatureFilter(
       trainingReader = dataReader,
@@ -252,9 +263,10 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    val (df, dropped) = getFilter(maxCorrelation).generateFilteredRaw(features, params)
+    val FilteredRawData(df, dropped, droppedKeyValue) = getFilter(maxCorrelation).generateFilteredRaw(features, params)
 
     dropped should contain theSameElementsAs expectedDropped.toSeq
+    droppedKeyValue should contain theSameElementsAs expectedDroppedMapKeys
     df.schema.fields.map(_.name) should contain theSameElementsAs
       DataFrameFieldNames.KeyFieldName +: features.diff(dropped).map(_.name)
     if (expectedMapKeys.nonEmpty) {

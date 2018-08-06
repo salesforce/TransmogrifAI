@@ -11,9 +11,10 @@ buildscript {
 
 plugins {
     id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
-    id 'org.scoverage' version '2.1.0'
-    id 'net.minecrell.licenser' version '0.3'
+    id 'org.scoverage' version '2.3.0'
+    id 'net.minecrell.licenser' version '0.4.1'
     id 'com.github.jk1.dependency-license-report' version '0.5.0'
+    id 'com.github.johnrengelman.shadow' version '2.0.4'
 }
 
 allprojects {
@@ -38,12 +39,13 @@ configure(allProjs) {
     // apply plugin: 'findbugs'
     apply plugin: 'org.scoverage'
     apply plugin: 'scalaStyle'
-    apply plugin: 'maven'
     apply plugin: 'maven-publish'
+    apply plugin: 'signing'
     apply plugin: 'project-report'
     apply plugin: 'com.commercehub.gradle.plugin.avro'
     apply plugin: 'net.minecrell.licenser'
     apply plugin: 'com.github.jk1.dependency-license-report'
+    apply plugin: 'com.github.johnrengelman.shadow'
 
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
@@ -54,7 +56,7 @@ configure(allProjs) {
 
     ext {
         scalaVersion = '2.11'
-        scalaVersionRevision = '8'
+        scalaVersionRevision = '12'
         scalaTestVersion = '3.0.5'
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.11'
@@ -86,6 +88,7 @@ configure(allProjs) {
         pegdownVersion = '1.4.2'
         commonsValidatorVersion = '1.6'
         commonsIOVersion = '2.6'
+        scoveragePluginVersion = '1.3.1'
 
         mainClassName = 'com.salesforce.Main'
     }
@@ -96,8 +99,10 @@ configure(allProjs) {
     }
 
     dependencies {
-        scoverage "org.scoverage:scalac-scoverage-plugin_$scalaVersion:1.1.0"
-        scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:1.1.0"
+        // Scala
+        zinc 'com.typesafe.zinc:zinc:0.3.15'
+        scoverage "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
+        scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
         scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
         scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
         compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
@@ -114,6 +119,8 @@ configure(allProjs) {
         compileOnly "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
         testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
         compileOnly "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
+        testCompile "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
+        testCompile "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
         testCompile "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
         testCompile ("com.holdenkarau:spark-testing-base_$scalaVersion:$sparkTestingBaseVersion") { transitive = false }
         testCompile "junit:junit:$junitVersion"
@@ -121,7 +128,16 @@ configure(allProjs) {
     }
 
     configurations.all {
-        resolutionStrategy.force "commons-collections:commons-collections:$collectionsVersion"
+        resolutionStrategy {
+            force "commons-collections:commons-collections:$collectionsVersion",
+                    "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
+                    "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+        }
+    }
+    configurations.zinc {
+        resolutionStrategy {
+            force 'org.scala-lang:scala-library:2.10.6', 'org.scala-lang:scala-reflect:2.10.6'
+        }
     }
 
     tasks.withType(ScalaCompile) {
@@ -178,7 +194,7 @@ configure(allProjs) {
     }
 
     license {
-        header = rootProject.file('LICENSE.txt')
+        header = rootProject.file('LICENSE')
         ignoreFailures = true
         include '**/*.java', '**/*.scala'
         exclude '**/org/apache/spark/ml/SparkDefaultParamsReadWrite.scala',
@@ -192,6 +208,9 @@ configure(allProjs) {
                 '**/com/fasterxml/jackson/module/scala/**',
                 '**/templates/**', '**/resources/**'
     }
+    scoverage {
+        coverageOutputCobertura = false
+    }
 
     licenseReport {
         renderer = new com.github.jk1.license.render.MultiReportRenderer(
@@ -199,6 +218,13 @@ configure(allProjs) {
                 new com.github.jk1.license.render.InventoryHtmlReportRenderer()
         )
     }
+
+    shadowJar {
+        zip64 = true
+        exclude 'META-INF/maven/**'
+        baseName = jar.baseName
+    }
+    shadowJar.dependsOn(createVersionProperties)
 
     /* findbugs {
         toolVersion = '3.0.1'
@@ -235,9 +261,10 @@ configure(allProjs) {
     }
 }
 
-task wrapper(type: Wrapper) {
-    description "Sets the Gradle wrapper version to $gradleVersion."
-    gradleVersion = '4.7'
+wrapper {
+    gradleVersion = '4.9'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
@@ -254,6 +281,7 @@ configure(subProjs) {
     jar.baseName = "$rootProject.name-$project.name"
 
     def fetchAwsCredentials = {
+        // Note: 'op-repo-admin' profile must be set in ~/.aws/credentials
         String profile = "op-repo-admin"
         try {
             return new ProfileCredentialsProvider(profile).credentials
@@ -264,12 +292,60 @@ configure(subProjs) {
     }
     AWSCredentials awsCredentials = fetchAwsCredentials()
 
+    task scaladocJar(type: Jar, dependsOn: scaladoc) {
+        classifier = 'javadoc'
+        from scaladoc.destinationDir
+    }
+    scaladocJar.baseName = jar.baseName
+
+    task sourcesJar(type: Jar, dependsOn: classes) {
+        classifier = 'sources'
+        from sourceSets.main.allSource
+    }
+    sourcesJar.baseName = jar.baseName
+
+    artifacts {
+        archives jar, sourcesJar, scaladocJar
+    }
+
     publishing {
         publications {
             mavenJava(MavenPublication) {
-                artifactId "${jar.baseName}_$scalaVersion"
                 from components.java
                 artifact sourcesJar { classifier 'sources' }
+                artifact scaladocJar { classifier 'javadoc' }
+                afterEvaluate {
+                    artifactId = "${jar.baseName}_$scalaVersion"
+                }
+                pom {
+                    name = 'TransmogrifAI'
+                    description = 'AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning'
+                    url = 'https://github.com/salesforce/TransmogrifAI'
+                    scm {
+                        connection = 'scm:git:https://github.com/salesforce/TransmogrifAI.git'
+                        developerConnection = 'scm:git:https://github.com/salesforce/TransmogrifAI.git'
+                        url = 'https://github.com/salesforce/TransmogrifAI'
+                    }
+                    licenses {
+                        license {
+                            name = 'BSD-3-Clause'
+                            url = 'https://github.com/salesforce/TransmogrifAI/blob/master/LICENSE'
+                            distribution = 'repo'
+                        }
+                    }
+                    developers {
+                        developer {
+                            id = 'tovbinm'
+                            name = 'Matthew Tovbin'
+                            email = 'tovbinm@gmail.com'
+                        }
+                        developer {
+                            id = 'leahmcguire'
+                            name = 'Leah McGuire'
+                            email = 'lmcguire@salesforce.com'
+                        }
+                    }
+                }
             }
         }
         repositories {
@@ -280,16 +356,24 @@ configure(subProjs) {
                     secretKey awsCredentials.AWSSecretKey
                 }
             }
+            // Disable Sonatype publication for now
+            /* maven {
+                // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
+                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+                credentials {
+                    username nexusUsername
+                    password nexusPassword
+                }
+            } */
         }
     }
 
-    task sourcesJar(type: Jar, dependsOn: classes) {
-        classifier = 'sources'
-        from sourceSets.main.allSource
+    signing {
+        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+        // and https://gpgtools.org/ (gpg2 installed and configured)
+        useGpgCmd()
+        sign publishing.publications.mavenJava
     }
-    sourcesJar.baseName = jar.baseName
-
-    artifacts { archives sourcesJar }
 }
 
 // run by Heroku to build docs

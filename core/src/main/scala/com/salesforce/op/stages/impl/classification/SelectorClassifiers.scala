@@ -5,32 +5,32 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.classification
 
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.selector._
 import org.apache.spark.ml.classification._
@@ -43,7 +43,7 @@ import scala.reflect.ClassTag
 /**
  * Enumeration of possible classification models in Model Selector
  */
-sealed trait ClassificationModelsToTry extends EnumEntry with Serializable
+sealed trait ClassificationModelsToTry extends ModelsToTry
 
 object ClassificationModelsToTry extends Enum[ClassificationModelsToTry] {
   val values = findValues
@@ -267,10 +267,10 @@ private[op] trait SelectorClassifiers // TODO add GBT to binary when upgrade to 
 
 
   final protected def getModelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
-    ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
-    ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
-    ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
-    ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
+    new ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
+    new ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
+    new ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
+    new ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
   )
 
 }

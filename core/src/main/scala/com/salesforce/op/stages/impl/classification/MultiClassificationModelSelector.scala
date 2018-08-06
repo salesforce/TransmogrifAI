@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.classification
@@ -54,14 +53,16 @@ case object MultiClassificationModelSelector {
   /**
    * Creates a new Multi Classification Model Selector with a Cross Validation
    *
-   * @param splitter         instance that will split the data
-   * @param numFolds         number of folds for cross validation (>= 2)
-   * @param validationMetric metric name in evaluation: Accuracy, Precision, Recall or F1
+   * @param splitter            instance that will split the data
+   * @param numFolds            number of folds for cross validation (>= 2)
+   * @param validationMetric    metric name in evaluation: Accuracy, Precision, Recall or F1
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
-   * @param seed             random seed
-   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
-   *                         impact the runtime.
+   *                            and default evaluator is added to this list (here OpMultiClassificationEvaluator)
+   * @param seed                random seed
+   * @param stratify            whether or not stratify cross validation. Caution : setting that param to true might
+   *                            impact the runtime
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return MultiClassification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -70,26 +71,30 @@ case object MultiClassificationModelSelector {
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    stratify: Boolean = ValidatorParamDefaults.Stratify
+    stratify: Boolean = ValidatorParamDefaults.Stratify,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): MultiClassificationModelSelector = {
+    val cv = new OpCrossValidation[ProbClassifierModel, ProbClassifier](
+      numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
+    )
     selector(
-      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
-      splitter = splitter,
-      trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
+      cv, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
     )
   }
 
   /**
    * Creates a new Multi Classification Model Selector with a Train Validation Split
    *
-   * @param splitter         instance that will split the data
-   * @param trainRatio       ratio between training set and validation set (>= 0 && <= 1)
-   * @param validationMetric metric name in evaluation: AuROC or AuPR
+   * @param splitter            instance that will split the data
+   * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
+   * @param validationMetric    metric name in evaluation: AuROC or AuPR
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here OpMultiClassificationEvaluator)
-   * @param seed             random seed
-   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
-   *                         impact the runtime.
+   *                            and default evaluator is added to this list (here OpMultiClassificationEvaluator)
+   * @param seed                random seed
+   * @param stratify            whether or not stratify train validation split.
+   *                            Caution : setting that param to true might impact the runtime
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return MultiClassification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -98,17 +103,14 @@ case object MultiClassificationModelSelector {
     validationMetric: OpMultiClassificationEvaluatorBase[_] = Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    stratify: Boolean = ValidatorParamDefaults.Stratify
+    stratify: Boolean = ValidatorParamDefaults.Stratify,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): MultiClassificationModelSelector = {
+    val ts = new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
+      trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
+    )
     selector(
-      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
-        trainRatio,
-        seed,
-        validationMetric,
-        stratify
-      ),
-      splitter = splitter,
-      trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
+      ts, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
     )
   }
 

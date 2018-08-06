@@ -5,40 +5,41 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, BinaryClassificationMetrics}
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.{FeatureTypeDefaults, PickList, Real, RealNN}
+import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, NaiveBayes}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
 import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.junit.runner.RunWith
@@ -54,15 +55,25 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
   private val descrVec = description.vectorize(10, false, 1, true)
   private val features = Seq(density, age, generVec, weight, descrVec).transmogrify()
+  private val featuresWithMaps = Seq(density, age, generVec, weight, descrVec, numericMap).transmogrify()
   private val label = survived.occurs()
-  private val checked = label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false,
-    checkSample = 1.0)
+  private val checked =
+    label.sanityCheck(features, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
+  private val checkedWithMaps =
+    label.sanityCheck(featuresWithMaps, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
 
   val (pred, rawPred, prob) = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = None)
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)))
     .setModelsToTry(LogisticRegression)
     .setLogisticRegressionRegParam(0.01, 0.1)
     .setInput(label, checked)
+    .getOutput()
+
+  val (predWithMaps, rawPredWithMaps, probWithMaps) = BinaryClassificationModelSelector
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)))
+    .setModelsToTry(LogisticRegression)
+    .setLogisticRegressionRegParam(0.01, 0.1)
+    .setInput(label, checkedWithMaps)
     .getOutput()
 
   val predLin = RegressionModelSelector
@@ -119,7 +130,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(6.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -142,8 +153,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "find the sanity checker metadata even if the model has been serialized" in {
-    val json = OpWorkflowModelWriter.toJson(workflowModel, "tmp")
-    val loadedModel = new OpWorkflowModelReader(workflow).loadJson(json)
+    val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
+    val json = OpWorkflowModelWriter.toJson(workflowModel, path)
+    val loadedModel = new OpWorkflowModelReader(workflow).loadJson(json, path)
     val insights = loadedModel.get.modelInsights(checked)
     val ageInsights = insights.features.filter(_.featureName == age.name).head
     val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
@@ -170,7 +182,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(6.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -237,6 +249,48 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
   }
 
+  it should "return best model information" in {
+    val insights = workflowModel.modelInsights(prob)
+    insights.selectedModelUID should startWith("logreg_")
+    insights.selectedModelName should startWith("logreg_")
+    insights.selectedModelType shouldBe LogisticRegression
+    val bestModelValidationResults = insights.selectedModelValidationResults
+    bestModelValidationResults.size shouldBe 15
+    bestModelValidationResults.get(BinaryClassEvalMetrics.AuPR.humanFriendlyName) shouldBe Some("0.0")
+    val validationResults = insights.validationResults
+    validationResults.size shouldBe 2
+    validationResults.get(insights.selectedModelName) shouldBe Some(bestModelValidationResults)
+    insights.validationResults(LogisticRegression) shouldBe validationResults
+    insights.validationResults(NaiveBayes) shouldBe Map.empty
+  }
+
+  it should "return test/train evaluation metrics" in {
+    val insights = workflowModel.modelInsights(prob)
+    insights.evaluationMetricType shouldBe BinaryClassEvalMetrics.AuPR
+    insights.validationType shouldBe ValidationType.CrossValidation
+    insights.validatedModelTypes shouldBe Set(LogisticRegression)
+
+    insights.problemType shouldBe ProblemType.BinaryClassification
+    insights.selectedModelTrainEvalMetrics shouldBe
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0,
+        Seq(0.0), Seq(0.0), Seq(0.0), Seq(1.0))
+    insights.selectedModelTestEvalMetrics shouldBe Some(
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0,
+        Seq(0.0), Seq(0.5), Seq(1.0), Seq(1.0))
+    )
+  }
+
+  it should "pretty print" in {
+    val insights = workflowModel.modelInsights(prob)
+    val pretty = insights.prettyPrint()
+    pretty should include(s"Selected Model - $LogisticRegression")
+    pretty should include("| area under PR    | 0.0")
+    pretty should include("Model Evaluation Metrics")
+    pretty should include("Top Model Insights")
+    pretty should include("Top Positive Correlations")
+    pretty should include("Top Contributions")
+  }
+
   it should "correctly serialize and deserialize from json" in {
     val insights = workflowModel.modelInsights(prob)
     ModelInsights.fromJson(insights.toJson()) match {
@@ -251,16 +305,27 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "have feature insights for features that are removed by the raw feature filter" in {
+
     val model = new OpWorkflow()
-      .setResultFeatures(predLin, prob)
+      .setResultFeatures(probWithMaps)
       .setParameters(params)
-      .withRawFeatureFilter(Option(simpleReader), Option(dataReader), 50, 0.2, 0.3, 2, 0.5)
+      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
+        maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,
+        maxJSDivergence = 1.0, maxCorrelation = 0.4)
       .train()
-    val insights = model.modelInsights(pred)
-    model.blacklistedFeatures should contain theSameElementsAs Array(height)
-    val heightIn = insights.features.find(_.featureName == height.name).get
+    val insights = model.modelInsights(predWithMaps)
+    model.blacklistedFeatures should contain theSameElementsAs Array(age, description, genderPL, weight)
+    val heightIn = insights.features.find(_.featureName == age.name).get
     heightIn.derivedFeatures.size shouldBe 1
     heightIn.derivedFeatures.head.excluded shouldBe Some(true)
+
+    model.blacklistedMapKeys should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
+    val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
+    mapDerivedIn.size shouldBe 3
+    droppedMapDerivedIn.size shouldBe 1
+    droppedMapDerivedIn.head.excluded shouldBe Some(true)
+    droppedMapDerivedIn.head.derivedFeatureGroup shouldBe Some("Female")
   }
 
   val labelName = "l"
@@ -331,7 +396,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
-      Option(meta), Option(summary), None, Array(f1, f0), Array.empty
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]]
     )
     featureInsights.size shouldBe 2
 

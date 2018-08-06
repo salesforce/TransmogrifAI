@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.feature
@@ -83,9 +82,9 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
     numFeatures = $(numFeatures),
     numInputs = inN.length,
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = $(forceSharedHashSpace),
     binaryFreq = $(binaryFreq),
-    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm))
+    hashAlgorithm = HashAlgorithm.withNameInsensitive($(hashAlgorithm)),
+    hashSpaceStrategy = getHashSpaceStrategy
   )
 
   override def transformFn: Seq[T] => OPVector = in => hash[T](in, getTransientFeatures(), makeHashingParams())
@@ -97,16 +96,6 @@ class OPCollectionHashingVectorizer[T <: OPCollection](uid: String = UID[OPColle
     val meta = makeVectorMetadata(getTransientFeatures(), makeHashingParams(), getOutputFeatureName)
     setMetadata(meta.toMetadata)
   }
-}
-
-sealed trait HashSpaceStrategy extends EnumEntry with Serializable
-
-object HashSpaceStrategy extends Enum[HashSpaceStrategy] {
-  val values: Seq[HashSpaceStrategy] = findValues
-
-  case object Shared extends HashSpaceStrategy
-  case object Separate extends HashSpaceStrategy
-  case object Auto extends HashSpaceStrategy
 }
 
 private[op] trait HashingVectorizerParams extends Params {
@@ -126,16 +115,6 @@ private[op] trait HashingVectorizerParams extends Params {
     doc = s"if true, include indices when hashing a feature that has them (OPLists or OPVectors)"
   )
   def setHashWithIndex(v: Boolean): this.type = set(hashWithIndex, v)
-
-  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
-  final val forceSharedHashSpace = new BooleanParam(
-    parent = this, name = "forceSharedHashSpace",
-    doc = s"if true, then force the hash space to be shared among all included features"
-  )
-  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
-  def setForceSharedHashSpace(v: Boolean): this.type = set(forceSharedHashSpace, v)
-  @deprecated("Functionality replaced by hashSpaceStrategy", "3.3.0")
-  def getForceSharedHashSpace: Boolean = $(forceSharedHashSpace)
 
   final val hashSpaceStrategy: Param[String] = new Param[String](this, "hashSpaceStrategy",
     "Strategy to determine whether to use shared or separate hash space for input text features",
@@ -166,7 +145,6 @@ private[op] trait HashingVectorizerParams extends Params {
   setDefault(
     numFeatures -> TransmogrifierDefaults.DefaultNumOfFeatures,
     hashWithIndex -> TransmogrifierDefaults.HashWithIndex,
-    forceSharedHashSpace -> false,
     prependFeatureName -> TransmogrifierDefaults.PrependFeatureName,
     hashAlgorithm -> TransmogrifierDefaults.HashAlgorithm.toString.toLowerCase,
     binaryFreq -> TransmogrifierDefaults.BinaryFreq,
@@ -183,7 +161,6 @@ private[op] trait HashingVectorizerParams extends Params {
  * @param numFeatures          number of features (hashes) to generate
  * @param numInputs            number of inputs
  * @param maxNumOfFeatures     max number of features (hashes)
- * @param forceSharedHashSpace if true, then force the hash space to be shared among all included features
  * @param binaryFreq           if true, term frequency vector will be binary such that non-zero term counts
  *                             will be set to 1.0
  * @param hashAlgorithm        hash algorithm to use
@@ -196,10 +173,9 @@ case class HashingFunctionParams
   numFeatures: Int,
   numInputs: Int,
   maxNumOfFeatures: Int,
-  forceSharedHashSpace: Boolean,
   binaryFreq: Boolean,
   hashAlgorithm: HashAlgorithm,
-  hashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.Auto
+  hashSpaceStrategy: HashSpaceStrategy
 )
 
 /**
@@ -216,11 +192,10 @@ private[op] trait HashingFun {
   protected def isSharedHashSpace(p: HashingFunctionParams, numFeatures: Option[Int] = None): Boolean = {
     val numHashes = p.numFeatures
     val numOfFeatures = numFeatures.getOrElse(p.numInputs)
-    import HashSpaceStrategy._
     p.hashSpaceStrategy match {
-      case s if p.forceSharedHashSpace || s.equals(Shared) => true
-      case Separate => false
-      case Auto => (numHashes * numOfFeatures) > p.maxNumOfFeatures
+      case HashSpaceStrategy.Shared => true
+      case HashSpaceStrategy.Separate => false
+      case HashSpaceStrategy.Auto => (numHashes * numOfFeatures) > p.maxNumOfFeatures
     }
   }
 

@@ -22,14 +22,20 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.github.fommil.netlib.BLAS
 import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import org.apache.spark.util.SparkThreadUtils
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
 
 
 private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
@@ -37,7 +43,8 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   val numFolds: Int = ValidatorParamDefaults.NumFolds,
   val seed: Long = ValidatorParamDefaults.Seed,
   val evaluator: OpEvaluatorBase[_],
-  val stratify: Boolean = ValidatorParamDefaults.Stratify
+  val stratify: Boolean = ValidatorParamDefaults.Stratify,
+  val parallelism: Int = ValidatorParamDefaults.Parallelism
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorBaseNames.CrossValResults
@@ -58,9 +65,8 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     ValidatedModel(est, bestIndex, metrics, grid)
   }
 
-  // TODO use futures to parallelize https://github.com/apache/spark/commit/16c4c03c71394ab30c8edaf4418973e1a2c5ebfe
   private[op] override def validate[T](
-    modelInfo: Seq[ModelInfo[E]],
+    modelInfo: Seq[(E, Array[ParamMap])],
     dataset: Dataset[T],
     label: String,
     features: String,
@@ -74,44 +80,50 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 
     // creating k train/validation data
     val splits: Array[(RDD[Row], RDD[Row])] = createTrainValidationSplits(
-      stratifyCondition = stratifyCondition,
-      dataset = dataset,
-      label = label,
-      splitter = splitter
+      stratifyCondition = stratifyCondition, dataset = dataset, label = label, splitter = splitter
     )
 
-    val modelsWithGrids = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
+    // Prepare copies of the DAG for each CV split so we can parallelize it safely
+    val splitsWithDags =
+      splits.zipWithIndex.map { case (data, splitIndex) =>
+        val dagCopy = dag.map(_.map { layer =>
+          layer.map { case (stage, depth) => (stage.copy(ParamMap.empty): OPStage) -> depth }: Layer
+        })
+        (data, splitIndex, dagCopy)
+      }
 
-    // TODO use futures to parallelize https://github.com/apache/spark/commit/16c4c03c71394ab30c8edaf4418973e1a2c5ebfe
-    val groupedSummary = suppressLoggingForFun() {
-      splits.zipWithIndex.flatMap {
-        case ((training, validation), splitIndex) => {
-          log.info(s"Cross Validation $splitIndex with multiple sets of parameters.")
-          val trainingDataset = spark.createDataFrame(training, schema)
-          val validationDataset = spark.createDataFrame(validation, schema)
-          val (newTrain, newTest) = dag.map(theDAG =>
+    // Evaluate all models in parallel
+    implicit val ec: ExecutionContext = makeExecutionContext()
+    val modelSummariesFuts = splitsWithDags.map { case ((trainingRDD, validationRDD), splitIndex, theDAG) =>
+      log.info(s"Cross Validation $splitIndex with multiple sets of parameters.")
+      Future {
+        suppressLoggingForFun() {
+          val training = spark.createDataFrame(trainingRDD, schema)
+          val validation = spark.createDataFrame(validationRDD, schema)
+          val (newTrain, newTest) = theDAG.map((d: StagesDAG) =>
             // If there is a CV DAG, then run it
             applyDAG(
-              dag = theDAG,
-              training = trainingDataset,
-              validation = validationDataset,
-              label = label,
-              features = features,
-              splitter = splitter
+              dag = d, training = training, validation = validation,
+              label = label, features = features, splitter = splitter
             )
-          ).getOrElse(trainingDataset, validationDataset)
-          getSummary(modelsWithGrids = modelsWithGrids, label = label, features = features,
-            train = newTrain, test = newTest)
+          ).getOrElse(training -> validation)
+          getSummary(modelInfo = modelInfo, label = label, features = features, train = newTrain, test = newTest)
         }
-      }.groupBy(_.model).map{ case (_, folds) => findBestModel(folds) }.toArray
+      }
     }
-    dataset.unpersist()
+    // Await for all the evaluations to complete
+    val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), Duration.Inf)
 
+    // Find the best model & return it
+    val groupedSummary = modelSummaries.flatten.groupBy(_.model).map { case (_, folds) => findBestModel(folds) }.toArray
     val model = getValidatedModel(groupedSummary)
-    wrapBestEstimator(groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$numFolds folds")
+    val bestEstimator = wrapBestEstimator(
+      groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$numFolds folds"
+    )
+    dataset.unpersist()
+    bestEstimator
   }
 
-  // TODO : Implement our own kFold method for better performance in a separate PR
   /**
    * Creates Train Validation Splits For CV
    *
@@ -123,6 +135,8 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
    */
   private[op] override def createTrainValidationSplits[T](stratifyCondition: Boolean,
     dataset: Dataset[T], label: String, splitter: Option[Splitter] = None): Array[(RDD[Row], RDD[Row])] = {
+
+    // TODO : Implement our own kFold method for better performance in a separate PR
 
     // get param that stores the label column
     val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)

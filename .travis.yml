@@ -6,15 +6,22 @@ before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS="-Xms512m -Xmx4g -XX:MaxMetaspaceSize=256m"
-script: "./gradlew build"
+    - GRADLE_OPTS="-Xmx256m"
+install:
+  - true
+script: 
+  - ./gradlew --no-daemon reportScoverage
+after_success:
+  - bash <(curl -s https://codecov.io/bash)
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
   - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
 cache:
   directories:
-    - "$HOME/.gradle/caches/"
-    - "$HOME/.gradle/wrapper/"
+    - $HOME/.gradle/caches/
+    - $HOME/.gradle/wrapper/
 notifications:
   slack:
     secure: d42STNN75J5WK5awJVCWVAaESqnGum4sIwqwt3VvCZJNYx/GztVD6ZTyLjqKJdx0ZLNx+4SAtWxVI+GMGzQitq+sN7hHfzLbfDk4bAllkYTYp/gnIeWSXJZEdZT0PjI9njYmQM6W9CxxGnHZ1W/hClMavsxGk7F+euN52eLTIGPv6Z3KQzaFpCy9Q9WVwhG4B40cAxk8yU12s3jnXuL2f2RfBgRxGfbX+241MnC51/2jm/CwOnOaVAqo05MRvEK3JWglthmmUF9m8HdK7biXPY9Cx+WgZpYELHJrlrH+cMJBiGlOpI2Lfbq9ZorzK0ASGeC9zK2y1ckTj0z0mA8mpEO8JwCIhCSEyGsqCTmEagqLo7JWc3rjokio1Zzl9wcTOJ0e+B5+9nqIn78Ju3waL2rQbeHi0lk1f2KrKU23UJHYfBKKiXN4T1/sx75ZCKndgl0Bl8DlfhpzeN+0RyS/nH2JuVBOXdDgq4Y3CkXXWq/Vevb5y41SNiaL/o5QKZSmMq03LSa2OYhJJqz6/Z/CxxXAxaa8COE0iHf+uMIePgJfLiAB2B8tpzQ44dRrsUX6eBcdWEVYApOUtHR+1PlEPyuab8wTphQE2Y4Nr8GfxPcKTBcV7luOz3dPo6wyORtR2v9JVrUUd3f9OAHerA/LXhqdV5sQwynB18hcvncuqFk=
+  on_success: change
+  on_failure: always

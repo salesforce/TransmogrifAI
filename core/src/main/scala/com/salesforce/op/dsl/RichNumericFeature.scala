@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.dsl
@@ -36,7 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.stages.impl.preparators.{CorrelationType, SanityChecker}
+import com.salesforce.op.stages.impl.preparators.{CorrelationType, CorrelationExclusion, SanityChecker}
 import com.salesforce.op.stages.impl.regression.IsotonicRegressionCalibrator
 import com.salesforce.op.utils.tuples.RichTuple._
 import com.salesforce.op.utils.numeric.Number
@@ -435,6 +434,17 @@ trait RichNumericFeature {
      *                          from the feature vector
      * @param removeFeatureGroup      remove all features descended from a parent feature
      * @param protectTextSharedHash   protect text shared hash from related null indicators and other hashes
+     * @param maxRuleConfidence       Maximum allowed confidence of association rules in categorical variables.
+     *                                A categorical variable will be removed if there is a choice where the maximum
+     *                                confidence is above this threshold, and the support for that choice is above the
+     *                                min rule support parameter, defined below.
+     * @param minRequiredRuleSupport  Categoricals can be removed if an association rule is found between one of the
+     *                                choices and a categorical label where the confidence of that rule is above
+     *                                maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
+     * @param featureLabelCorrOnly    If true, then only calculate correlations between features and label instead of
+     *                                the entire correlation matrix which includes all feature-feature correlations
+     * @param correlationExclusion    Setting for what categories of feature vector columns to exclude from the
+     *                                correlation calculation (eg. hashed text features)
      * @param categoricalLabel  If true, treat label as categorical. If not set, check number of disticnt labels to
      *                          decide whether a label should be treated categorical.
      * @return sanity checked feature vector
@@ -449,11 +459,15 @@ trait RichNumericFeature {
       maxCorrelation: Double = SanityChecker.MaxCorrelation,
       minCorrelation: Double = SanityChecker.MinCorrelation,
       maxCramersV: Double = SanityChecker.MaxCramersV,
-      correlationType: CorrelationType = SanityChecker.CorrelationType,
+      correlationType: CorrelationType = SanityChecker.CorrelationTypeDefault,
       minVariance: Double = SanityChecker.MinVariance,
       removeBadFeatures: Boolean = SanityChecker.RemoveBadFeatures,
       removeFeatureGroup: Boolean = SanityChecker.RemoveFeatureGroup,
       protectTextSharedHash: Boolean = SanityChecker.ProtectTextSharedHash,
+      maxRuleConfidence: Double = SanityChecker.MaxRuleConfidence,
+      minRequiredRuleSupport: Double = SanityChecker.MinRequiredRuleSupport,
+      featureLabelCorrOnly: Boolean = SanityChecker.FeatureLabelCorrOnly,
+      correlationExclusion: CorrelationExclusion = SanityChecker.CorrelationExclusionDefault,
       categoricalLabel: Option[Boolean] = None
     ): FeatureLike[OPVector] = {
       // scalastyle:on
@@ -470,6 +484,10 @@ trait RichNumericFeature {
         .setRemoveBadFeatures(removeBadFeatures)
         .setRemoveFeatureGroup(removeFeatureGroup)
         .setProtectTextSharedHash(protectTextSharedHash)
+        .setMaxRuleConfidence(maxRuleConfidence)
+        .setMinRequiredRuleSupport(minRequiredRuleSupport)
+        .setFeatureLabelCorrOnly(featureLabelCorrOnly)
+        .setCorrelationExclusion(correlationExclusion)
         .setInput(f, featureVector)
 
       categoricalLabel.foreach(checker.setCategoricalLabel)

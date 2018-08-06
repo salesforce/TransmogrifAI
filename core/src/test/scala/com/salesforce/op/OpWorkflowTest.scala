@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op
@@ -41,17 +40,16 @@ import com.salesforce.op.stages.base.unary._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.regression.{LossType, RegressionModelSelector, RegressionModelsToTry}
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBaseNames, SelectedModel}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.test.{Passenger, PassengerCSV, PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.BooleanParam
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DoubleType, StringType}
 import org.apache.spark.sql.{Dataset, SparkSession}
-import org.joda.time.{DateTime, Duration}
+import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -391,12 +389,21 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val summary = fittedWorkflow.summary()
     log.info(summary)
-    summary.contains(classOf[SanityChecker].getSimpleName) shouldBe true
-    summary.contains("logreg") shouldBe true
-    summary.contains(""""regParam" : "0.1"""") shouldBe true
-    summary.contains(""""regParam" : "0.01"""") shouldBe true
-    summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
-    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
+    summary should include(classOf[SanityChecker].getSimpleName)
+    summary should include("logreg")
+    summary should include(""""regParam" : "0.1"""")
+    summary should include(""""regParam" : "0.01"""")
+    summary should include(ModelSelectorBaseNames.HoldOutEval)
+    summary should include(ModelSelectorBaseNames.TrainingEval)
+
+    val prettySummary = fittedWorkflow.summaryPretty()
+    log.info(prettySummary)
+    prettySummary should include(s"Selected Model - $LogisticRegression")
+    prettySummary should include("| area under PR    | 0.25")
+    prettySummary should include("Model Evaluation Metrics")
+    prettySummary should include("Top Model Insights")
+    prettySummary should include("Top Positive Correlations")
+    prettySummary should include("Top Contributions")
   }
 
   it should "be able to refit a workflow with calibrated probability" in {

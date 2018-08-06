@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.feature
@@ -196,13 +195,13 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
 
   def setNumFeatures(v: Int): this.type = set(numFeatures, v)
 
-  final val forceSharedHashSpace = new BooleanParam(
-    parent = this, name = "forceSharedHashSpace",
-    doc = s"if true, then force the hash space to be shared among all included features"
+  final val hashSpaceStrategy: Param[String] = new Param[String](this, "hashSpaceStrategy",
+    "Strategy to determine whether to use shared or separate hash space for input text features",
+    (value: String) => HashSpaceStrategy.withNameInsensitiveOption(value).isDefined
   )
-  setDefault(forceSharedHashSpace, false)
-
-  def setForceSharedHashSpace(v: Boolean): this.type = set(forceSharedHashSpace, v)
+  setDefault(hashSpaceStrategy, TransmogrifierDefaults.HashSpaceStrategy.entryName)
+  def setHashSpaceStrategy(v: HashSpaceStrategy): this.type = set(hashSpaceStrategy, v.entryName)
+  def getHashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.withNameInsensitive($(hashSpaceStrategy))
 
   def getFillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = Seq.empty
 
@@ -211,7 +210,7 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
       args = args.copy(shouldCleanValues = $(cleanText)),
       shouldPrependFeatureName = $(prependFeatureName),
       numFeatures = $(numFeatures),
-      forceSharedHash = $(forceSharedHashSpace),
+      hashSpaceStrategy = getHashSpaceStrategy,
       operationName = operationName,
       uid = uid
     )
@@ -423,7 +422,7 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
   args: OPMapVectorizerModelArgs,
   val shouldPrependFeatureName: Boolean,
   val numFeatures: Int,
-  val forceSharedHash: Boolean,
+  val hashSpaceStrategy: HashSpaceStrategy,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
@@ -437,9 +436,9 @@ final class TextMapHashingVectorizerModel[T <: OPMap[String]] private[op]
     numFeatures = numFeatures,
     numInputs = 1, // All tokens are combined into a single TextList before hashing
     maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    forceSharedHashSpace = forceSharedHash,
     binaryFreq = TransmogrifierDefaults.BinaryFreq,
-    hashAlgorithm = TransmogrifierDefaults.HashAlgorithm
+    hashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+    hashSpaceStrategy = hashSpaceStrategy
   )
 
   def convertFn: Map[String, String] => Map[String, Double] = _.map { case (k, v) => k -> 1.0 }

@@ -6,7 +6,7 @@ buildscript {
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
         classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.8.0'
-      //classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.8.2'
+      //classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
     }
 }
 
@@ -42,8 +42,9 @@ ext {
     scalaVersionRevision = '$scalaVersionRevision'
     junitVersion = '$junitVersion'
     sparkVersion = '$sparkVersion'
-    scalatestVersion = '$scalatestVersion'
+    scalaTestVersion = '$scalaTestVersion'
     opVersion = '$opVersion'
+    collectionsVersion = '$collectionsVersion'
 
     mainClassName = 'com.salesforce.app.Simple' /* << MAIN_CLASS */
 }
@@ -55,6 +56,7 @@ configurations {
 
 dependencies {
     // Scala
+    zinc 'com.typesafe.zinc:zinc:0.3.15'
     scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
     scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
     compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
@@ -68,13 +70,13 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // Optimus Prime
-    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+    compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // Test
-    testCompile ("org.scalatest:scalatest_$scalaVersion:${scalatestVersion}")
+    testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
     testCompile "junit:junit:$junitVersion"
 
     // Avro
@@ -86,6 +88,20 @@ dependencies {
     // Spark Avro
     compile ("com.databricks:spark-avro_$scalaVersion:$sparkAvroVersion") { exclude group: "org.apache.avro", module: "avro" }
 
+}
+
+configurations.all {
+    resolutionStrategy {
+        cacheChangingModulesFor 0, 'seconds'
+        force "commons-collections:commons-collections:$collectionsVersion",
+                "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
+                "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+    }
+}
+configurations.zinc {
+    resolutionStrategy {
+        force 'org.scala-lang:scala-library:2.10.6', 'org.scala-lang:scala-reflect:2.10.6'
+    }
 }
 
 tasks.withType(ScalaCompile) {
@@ -125,8 +141,6 @@ sourceSets {
     }
 }
 
-configurations.all { resolutionStrategy.cacheChangingModulesFor 0, 'seconds' }
-
 task repl(type: JavaExec) {
     description 'Start Scala repl.'
     main = "scala.tools.nsc.MainGenericRunner"
@@ -135,7 +149,8 @@ task repl(type: JavaExec) {
     args '-usejavacp'
 }
 
-task wrapper(type: Wrapper) {
-    gradleVersion = '4.7'
-    description "Sets the Gradle wrapper version."
+wrapper {
+    gradleVersion = '4.9'
+    distributionType = Wrapper.DistributionType.BIN
+    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
 }

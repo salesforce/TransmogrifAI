@@ -5,50 +5,66 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.base.binary.BinaryModel
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal}
 import com.salesforce.op.utils.numeric.Number
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
+import org.scalatest.Matchers
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
+class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
+  BinaryModel[RealNN, Real, OPVector], DecisionTreeNumericBucketizer[Double, Real]]
+  with DecisionTreeNumericBucketizerAsserts
+{
+  val (inputData, estimator) = {
+    val numericData = Seq(1.0.toReal, 18.0.toReal, Real.empty, (-1.23).toReal, 0.0.toReal)
+    val labelData = Seq(1.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN)
+    val (inputData, numeric, label) = TestFeatureBuilder[Real, RealNN](numericData zip labelData)
 
-  import DecisionTreeNumericBucketizerTestHelper._
+    inputData -> new DecisionTreeNumericBucketizer[Double, Real]().setInput(label, numeric)
+  }
+
+  val expectedResult = Seq(
+    Vectors.sparse(3, Array(1), Array(1.0)),
+    Vectors.sparse(3, Array(1), Array(1.0)),
+    Vectors.sparse(3, Array(2), Array(1.0)),
+    Vectors.sparse(3, Array(0), Array(1.0)),
+    Vectors.sparse(3, Array(1), Array(1.0))
+  ).map(_.toOPVector)
 
   trait NormalData {
     val numericData: Seq[Real] = RandomReal.normal[Real]().withProbabilityOfEmpty(0.2).limit(1000)
@@ -60,9 +76,7 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
 
   trait EmptyData {
     val (_, numeric, label) = TestFeatureBuilder[Real, RealNN](Seq[Real]() zip Seq[RealNN]())
-    val nulls = Seq[(java.lang.Double, java.lang.Double)](
-      (0.0: java.lang.Double) -> (null: java.lang.Double)
-    )
+    val nulls = Seq[(java.lang.Double, java.lang.Double)]((0.0: java.lang.Double) -> (null: java.lang.Double))
     import spark.implicits._
     val nullsDS = spark.createDataset(nulls).toDF(label.name, numeric.name)
     val emptyDS = spark.createDataset(Seq[(java.lang.Double, java.lang.Double)]()).toDF(label.name, numeric.name)
@@ -85,8 +99,7 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
     val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
   }
 
-  Spec[DecisionTreeNumericBucketizer[_, _]] should "produce output that is never a response, " +
-    "except the case where both inputs are" in new NormalData {
+  it should "produce output that is never a response, except the case where both inputs are" in new NormalData {
     Seq(
       label.copy(isResponse = false) -> numeric.copy(isResponse = false),
       label.copy(isResponse = true) -> numeric.copy(isResponse = false),
@@ -99,15 +112,6 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
     ).foreach(inputs =>
       new DecisionTreeNumericBucketizer[Double, Real]().setInput(inputs).getOutput().isResponse shouldBe true
     )
-  }
-
-  it should "serialize correctly" in new NormalData {
-    val bucketizer = new DecisionTreeNumericBucketizer[Double, Real]().setInput(label, numeric).setTrackNulls(false)
-    val workflow = new OpWorkflow()
-    val model = workflow.setInputDataset(ds).setResultFeatures(bucketizer.getOutput()).train()
-    model.save(modelLocation)
-    val loaded = workflow.loadModel(modelLocation)
-    loaded.stages.map(_.uid) should contain (bucketizer.uid)
   }
 
   it should "not find any splits on random data" in new NormalData {
@@ -211,7 +215,8 @@ class DecisionTreeNumericBucketizerTest extends FlatSpec with TestSparkContext {
 
 }
 
-object DecisionTreeNumericBucketizerTestHelper extends Matchers {
+trait DecisionTreeNumericBucketizerAsserts {
+  self: Matchers =>
 
   def assertSplits(splits: Array[Double], expectedSplits: Array[Double], expectedTolerance: Double): Unit = {
     withClue(

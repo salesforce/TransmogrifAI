@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op
@@ -39,8 +38,8 @@ import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
-import org.apache.spark.ml.Estimator
 import org.apache.spark.sql.types.Metadata
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.json4s.JValue
 import org.json4s.JsonAST.{JField, JObject}
@@ -77,6 +76,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
 
   protected[op] def setBlacklist(features: Array[OPFeature]): this.type = {
     blacklistedFeatures = features
+    this
+  }
+
+  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): this.type = {
+    blacklistedMapKeys = mapKeys
     this
   }
 
@@ -165,12 +169,13 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       case Some(_) =>
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
-        ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams, blacklistedFeatures)
+        ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams,
+          blacklistedFeatures, blacklistedMapKeys)
     }
   }
 
   /**
-   * Pulls all summary metadata off of transformers
+   * Extracts all summary metadata from transformers in JSON format
    *
    * @return json summary
    */
@@ -182,11 +187,27 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )
 
   /**
-   * Pulls all summary metadata off of transformers and puts them in a pretty json string
+   * Extracts all summary metadata from transformers in JSON format
    *
-   * @return string summary
+   * @return json string summary
    */
   def summary(): String = pretty(render(summaryJson()))
+
+  /**
+   * Generated high level model summary in a compact print friendly format containing:
+   * selected model info, model evaluation results and feature correlations/contributions/cramersV values.
+   *
+   * @param insights model insights to compute the summary against
+   * @param topK top K of feature correlations/contributions/cramersV values to print
+   * @return high level model summary in a compact print friendly format
+   */
+  def summaryPretty(
+    insights: ModelInsights = modelInsights(
+      resultFeatures.find(f => f.isResponse && !f.isRaw).getOrElse(
+        throw new IllegalArgumentException("No response feature is defined to compute model insights"))
+    ),
+    topK: Int = 15
+  ): String = insights.prettyPrint(topK)
 
   /**
    * Save this model to a path
@@ -371,14 +392,17 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
 
     // Pick which features to return (always force the key and result features to be included)
     val featuresToKeep: Array[String] = (keepRawFeatures, keepIntermediateFeatures) match {
-      case (true, true) => Array.empty
+      case (true, true) => Array.empty[String] // keep everything (no `data.select` needed)
       case (true, false) => (rawFeatures ++ resultFeatures).map(_.name) :+ KeyFieldName
       case (false, true) => stages.map(_.getOutputFeatureName) :+ KeyFieldName
       case (false, false) => resultFeatures.map(_.name) :+ KeyFieldName
     }
-    val scores = featuresToKeep.distinct.toList.sorted match {
-      case head :: tail => transformedData.select(head, tail: _*)
-      case _ => transformedData
+    val scores = featuresToKeep.distinct match {
+      case Array() => transformedData // keep everything (no `data.select` needed)
+      case keep =>
+        // keep the order of the columns the same when selecting, so the data wont be reshuffled
+        val columns = transformedData.columns.filter(keep.contains).map(column)
+        transformedData.select(columns: _*)
     }
     if (log.isTraceEnabled) {
       log.trace("Scores dataframe schema:\n{}", scores.schema.treeString)

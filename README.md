@@ -1,21 +1,23 @@
-# Octopus Prime (aka Optimus Prime) [![Build Status](https://travis-ci.com/salesforce/op.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/op)
+# TransmogrifAI
 
-Octopus Prime is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
+[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE)
+
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
 
-Use Octopus Prime if you need a machine learning library to:
+Use TransmogrifAI if you need a machine learning library to:
 
 * Build production ready machine learning applications in hours, not months
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-Octopus Prime is compatible with Spark 2.2.1 and Scala 2.11.
+TransmogrifAI is compatible with Spark 2.2.x and Scala 2.11.x.
 
-[Skip to Quick Start and Documentation](https://github.com/salesforce/op#quick-start-and-documentation)
+[Skip to Quick Start and Documentation](https://github.com/salesforce/TransmogrifAI#quick-start-and-documentation)
 
-## Predicting Titanic Survivors with Octopus Prime
+## Predicting Titanic Survivors with TransmogrifAI
 
-The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using Octopus Prime:
+The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using TransmogrifAI:
 
 ```scala
 import com.salesforce.op._
@@ -36,18 +38,16 @@ val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).re
 val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
 
 // Automated feature engineering of predictors
-val featureVector = features.toSeq.autoTransform()
+val featureVector = features.toSeq.transmogrify()
 
 // Automated feature selection
-val checkedFeatures = survived.sanityCheck(
-  featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
+val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
 
 // Automated model selection
-val (pred, raw, prob) = BinaryClassificationModelSelector()
-  .setInput(survived, checkedFeatures).getOutput()
+val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
-println(s"Model summary: \n${model.summary()}")
+println("Model summary:\n" + model.summaryPretty())
 ```
 Model summary:
 
@@ -57,9 +57,9 @@ Evaluated 3 Logistic Regression models with AuPR between [0.6751930383321765, 0.
 Evaluated 16 Random Forest models with AuPR between [0.7781671467343991, 0.8104798040316159]
 
 Selected model Random Forest classifier with parameters:
-|-----------------------|:------------:|
+|-----------------------|--------------|
 | Model Param           |     Value    |
-|-----------------------|:------------:|
+|-----------------------|--------------|
 | modelType             | RandomForest |
 | featureSubsetStrategy |         auto |
 | impurity              |         gini |
@@ -69,12 +69,12 @@ Selected model Random Forest classifier with parameters:
 | minInstancesPerNode   |           10 |
 | numTrees              |           50 |
 | subsamplingRate       |          1.0 |
-|-----------------------|:------------:|
+|-----------------------|--------------|
 
 Model evaluation metrics:
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 | Metric Name | Hold Out Set Value |  Training Set Value |
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 | Precision   |               0.85 |   0.773851590106007 |
 | Recall      | 0.6538461538461539 |  0.6930379746835443 |
 | F1          | 0.7391304347826088 |  0.7312186978297163 |
@@ -85,38 +85,38 @@ Model evaluation metrics:
 | TN          |               44.0 |               438.0 |
 | FP          |                3.0 |                64.0 |
 | FN          |                9.0 |                97.0 |
-|-------------|:------------------:|:-------------------:|
+|-------------|--------------------|---------------------|
 
 Top model insights computed using correlation:
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | Top Positive Insights |      Correlation     |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex = "female"        |   0.5177801026737666 |
 | cabin = "OTHER"       |   0.3331391338844782 |
 | pClass = 1            |   0.3059642953159715 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | Top Negative Insights |      Correlation     |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex = "male"          |  -0.5100301587292186 |
 | pClass = 3            |  -0.5075774968534326 |
 | cabin = null          | -0.31463114463832633 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 
 Top model insights computed using CramersV:
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 |      Top Insights     |       CramersV       |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 | sex                   |    0.525557139885501 |
 | embarked              |  0.31582347194683386 |
 | age                   |  0.21582347194683386 |
-|-----------------------|:--------------------:|
+|-----------------------|----------------------|
 ```
 
-While this may seem a bit too magical, for those who want more control, Octopus Prime also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
+While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
 
-## Adding OP into your project
-You can simply add OP as a regular dependency to your existing project. Example for gradle below:
+## Adding TransmogrifAI into your project
+You can simply add TransmogrifAI as a regular dependency to your existing project. Example for gradle below:
 
 ```groovy
 repositories {
@@ -133,9 +133,9 @@ repositories {
 }
 ext {
     scalaVersion = '2.11'
-    scalaVersionRevision = '8'
+    scalaVersionRevision = '12'
     sparkVersion = '2.2.1'
-    opVersion = '3.3.3'
+    opVersion = '0.3.4'
 }
 dependencies {
     // Scala
@@ -151,11 +151,11 @@ dependencies {
     compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
-    // Octopus Prime
-    compile "com.salesforce:optimus-prime-core_$scalaVersion:$opVersion"
+    // TransmogrifAI
+    compile "com.salesforce.op:octopus-prime-core_$scalaVersion:$opVersion"
 
-    // Pretrained models used in Octopus Prime, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:optimus-prime-models_$scalaVersion:$opVersion"
+    // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
+    // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // All your other depdendecies go below
     // ...
@@ -164,10 +164,10 @@ dependencies {
 
 ## Quick Start and Documentation
 
-See [Wiki](https://github.com/salesforce/op/wiki) for full documentation, getting started, examples and other information.
+See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
 See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programming API (can also be viewed [locally](docs/README.md)).
 
 ## License
 
-[BSD 3-clause](LICENSE.txt) © Salesforce.com, Inc.
+[BSD 3-Clause](LICENSE) © Salesforce.com, Inc.

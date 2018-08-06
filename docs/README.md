@@ -1,9 +1,9 @@
-# Optimus Prime Docs
+# TransmogrifAI Docs
 
-- `git clone https://github.com/salesforce/op.git` - clone Optimus Prime repo
-- `cd ./op` - go to cloned directory
+- `git clone https://github.com/salesforce/TransmogrifAI.git` - clone TransmogrifAI repo
+- `cd ./TransmogrifAI` - go to cloned directory
 - `./gradlew docs:buildDocs` - build documentation files
-- `./gradlew docs:serve` - run a web server to serve the docs. Ctrl-C to stop.
+- `./gradlew docs:serve` - run a web server to serve the docs (Ctrl-C to stop).
 - `open http://localhost:3000` or visit http://localhost:3000 in your browser
 
 You can also run `./gradlew docs:buildDocs --continuous` in one terminal to automatically rebuild the docs when

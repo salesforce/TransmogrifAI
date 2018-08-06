@@ -1,6 +1,6 @@
 # Simple /* << APP_NAME */
 
-This is an Optimus Prime project created with the 'simple' template.
+This is an TransmogrifAI project created with the 'simple' template.
 
 ## Prerequisites
 
@@ -8,13 +8,13 @@ This is an Optimus Prime project created with the 'simple' template.
 - Scala ${scalaVersion}.${scalaVersionRevision}
 - Spark ${sparkVersion}
 - IntelliJ Idea 2017+ recommended
-- Optimus Prime ${opVersion}
+- OTransmogrifAI ${opVersion}
 
 
 ## Structure
 
 The primary build file is in `build.gradle`.
-This file defines dependencies on Scala, Spark, and Optimus Prime, and also defines how the project will be built
+This file defines dependencies on Scala, Spark, and TransmogrifAI, and also defines how the project will be built
 and deployed.
 
 The primary sources for your project live in `src/main/scala`.
@@ -68,6 +68,6 @@ To evaluate your project, run
 
 ## Read More
 
-- [Optimus Prime](https://github.com/salesforce/op)
-- [Wiki](https://github.com/salesforce/op/wiki)
-- [Hello World examples](https://github.com/salesforce/op/tree/master/helloworld)
+- [TransmogrifAI](https://github.com/salesforce/TransmogrifAI)
+- [Wiki](https://github.com/salesforce/TransmogrifAI/wiki)
+- [Hello World examples](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld)

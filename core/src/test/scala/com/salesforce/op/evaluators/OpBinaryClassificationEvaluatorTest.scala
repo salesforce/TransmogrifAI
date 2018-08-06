@@ -5,28 +5,27 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.evaluators
@@ -102,17 +101,28 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   )
   val one_label = one_rawLabel.copy(isResponse = true)
 
-  // TODO put back LR when evaluators work with prediction features
-  val testEstimator = BinaryClassificationModelSelector()
+  // with multiple outputs
+  val testEstimator = BinaryClassificationModelSelector.withTrainValidationSplit(splitter = None, trainRatio = 0.5)
     .setModelsToTry(LogisticRegression)
     .setLogisticRegressionRegParam(0)
     .setInput(label, features)
   val (pred, rawPred, prob) = testEstimator.getOutput()
+  val model = testEstimator.fit(ds)
+
   val testEvaluator = new OpBinaryClassificationEvaluator().setLabelCol(label)
     .setPredictionCol(pred)
     .setRawPredictionCol(rawPred)
     .setProbabilityCol(prob)
-  val model = testEstimator.fit(ds)
+
+  // with single predicition putput
+  val testEstimator2 = new OpLogisticRegression().setInput(label, features)
+  val prediction = testEstimator2.getOutput()
+  val model2 = testEstimator2.fit(ds)
+
+  val testEvaluator2 = new OpBinaryClassificationEvaluator().setLabelCol(label)
+    .setFullPredictionCol(prediction)
+
+  // comparisons
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator()
   val sparkMulticlassEvaluator = new MulticlassClassificationEvaluator()
   Spec[OpBinaryClassificationEvaluator] should "copy" in {
@@ -120,16 +130,12 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     testEvaluatorCopy.uid shouldBe testEvaluator.uid
   }
 
-  it should "evaluate the metrics" in {
+  it should "evaluate the metrics with three inputs" in {
     val transformedData = model.setInput(test_label, test_features).transform(test_ds)
     val metrics = testEvaluator.evaluateAll(transformedData)
 
     sparkBinaryEvaluator.setLabelCol(label.name).setRawPredictionCol(rawPred.name)
     sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(pred.name)
-
-    // TODO: These are no longer the same since we now use probabilities as thresholds, and Spark uses rawPredictions
-    // metrics.AuROC shouldBe sparkBinaryEvaluator.setMetricName(AuROC.sparkEntryName).evaluate(transformedData)
-    // metrics.AuPR shouldBe sparkBinaryEvaluator.setMetricName(AuPR.sparkEntryName).evaluate(transformedData)
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       transformedData.select(pred.name, test_label.name).rdd
@@ -140,12 +146,30 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     fp.toDouble shouldBe metrics.FP
     fn.toDouble shouldBe metrics.FN
 
+    precision shouldBe metrics.Precision
+    recall shouldBe metrics.Recall
+    f1 shouldBe metrics.F1
+    1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(transformedData) shouldBe metrics.Error
+  }
+
+  it should "evaluate the metrics with one prediction input" in {
+    val transformedData = model2.setInput(test_label, test_features).transform(test_ds)
+    val metrics = testEvaluator2.evaluateAll(transformedData)
+
+    val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
+      transformedData.select(prediction.name, test_label.name).rdd
+        .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
+    )
+
+    tp.toDouble shouldBe metrics.TP
+    tn.toDouble shouldBe metrics.TN
+    fp.toDouble shouldBe metrics.FP
+    fn.toDouble shouldBe metrics.FN
+
     metrics.Precision shouldBe precision
     metrics.Recall shouldBe recall
     metrics.F1 shouldBe f1
-    metrics.Error shouldBe 1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(transformedData)
   }
-
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
     val transformedDataZero = model.setInput(zero_label, zero_features).transform(zero_ds)

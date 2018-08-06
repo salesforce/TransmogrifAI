@@ -1,6 +1,6 @@
-title=Octopus Prime
+title=TransmogrifAI
 type=doc
 status=published
 ~~~~~~
 
-[Wiki](https://github.com/salesforce/op/wiki)
+[Wiki](https://github.com/salesforce/TransmogrifAI/wiki)

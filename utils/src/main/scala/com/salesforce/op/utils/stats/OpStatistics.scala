@@ -5,34 +5,36 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.utils.stats
 
-import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, SparseMatrix}
-import org.apache.spark.mllib.stat.Statistics
+import org.apache.spark.mllib.linalg.{SparseMatrix, DenseMatrix, Matrix, Vector => OldVector}
+import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
+import org.apache.spark.rdd.RDD
+import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
 
 object OpStatistics {
 
@@ -55,6 +57,43 @@ object OpStatistics {
     arr.colIter.zipWithIndex.map {
       case (vec, idx) => idx.toString -> vec.toArray
     }.toMap
+  }
+
+  /**
+   * Assumes that we have already computed a MultivariateStatisticsSummary on the RDD, so we can use that info here.
+   * This defines an RDD aggregation that calculates all the correlations with the label. Data is assumed to be laid
+   * out in an RDD[org.apache.spark.mllib.linalg.Vector] where the label is the last element.
+   *
+   * @param featuresAndLabel Input RDD consisting of a single array containing the feature vector with the label as
+   *                         the last element
+   * @return  Array of correlations of each feature vector element with the label
+   */
+  def computeCorrelationsWithLabel(
+    featuresAndLabel: RDD[OldVector],
+    colStats: MultivariateStatisticalSummary,
+    numOfRows: Long
+  ): Array[Double] = {
+    require(numOfRows > 1, s"computeCorrelationsWithLabel called on matrix with only $numOfRows rows." +
+      "  Cannot compute the covariance of a matrix with <= 1 row.")
+    val means = colStats.mean.toArray
+    val variances = colStats.variance.toArray
+    val stdDevs = colStats.variance.toArray.map(math.sqrt)
+    val numOfCols = means.size
+
+    // TODO: Look into compensated summation algorithm for use when nRows is large and we need to worry about roundoff
+
+    // First compute the covariance of each feature column with the label column
+    val covariancesWithLabel = featuresAndLabel.treeAggregate(zeroValue = new Array[Double](numOfCols))(
+      seqOp = (agg, el) => agg +
+        (0 until numOfCols).map(i => (el(i) - means(i)) * (el(numOfCols - 1) - means.last)).toArray,
+      combOp = (x1, x2) => x1 + x2
+    )
+
+    val correlationsWithLabel = (0 until numOfCols).map(i =>
+      covariancesWithLabel(i)/(stdDevs(i) * stdDevs.last * (numOfRows - 1))
+    ).toArray
+
+    correlationsWithLabel
   }
 
   /**

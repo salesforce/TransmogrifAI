@@ -1,4 +1,4 @@
-# Hello World project for Octopus Prime apps
+# Hello World project for TransmogrifAI apps
 
 There are four example workflows in this project:
 1) **(start here)** A minimal classifier based on the Titanic dataset `com.salesforce.hw.titanic.OpTitanicMini`
@@ -12,7 +12,7 @@ In addition, there are two examples of more complex kinds of data preparation th
 
 Each project can be either be run with the gradle task, `sparkSubmit` (**recommended**) or with the standard `spark-submit` command. We show examples of running the Titanic case with both gradle and spark-submit for completeness, but the rest of the instructions are for gradle only since that is the recommended submission method (it defines many other useful spark parameters). You should not mix submission methods (eg. don't train with the gradle task and score with spark-submit), as you may get class serialization errors.
 
-Note: make sure you have all the [Prerequisites](https://github.com/salesforce/op/wiki/Bootstrap-Your-First-Project#prerequisites).
+Note: make sure you have all the [Prerequisites](https://github.com/salesforce/TransmogrifAI/wiki/Bootstrap-Your-First-Project#prerequisites).
 
 ### Titanic Mini
 

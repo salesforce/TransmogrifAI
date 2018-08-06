@@ -5,33 +5,35 @@
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice,
- * this list of conditions and the following disclaimer.
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
  *
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- * this list of conditions and the following disclaimer in the documentation
- * and/or other materials provided with the distribution.
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
  *
- * 3. Neither the name of Salesforce.com nor the names of its contributors may
- * be used to endorse or promote products derived from this software without
- * specific prior written permission.
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 package com.salesforce.op.evaluators
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
+import com.salesforce.op.features.types.Prediction
+import com.salesforce.op.utils.json.JsonLike
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
@@ -39,8 +41,12 @@ import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.{DoubleArrayParam, IntArrayParam}
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
+
+import scala.collection.mutable
 
 /**
  * Instance to evaluate Multi Classification metrics
@@ -83,7 +89,12 @@ private[op] class OpMultiClassificationEvaluator
   def setThresholds(v: Array[Double]): this.type = set(thresholds, v)
 
   override def evaluateAll(data: Dataset[_]): MultiClassificationMetrics = {
-    val (labelColName, predictionColName, rawPredictionColName, probabilityColName) = (getLabelCol, getPredictionCol,
+
+    val labelColName = getLabelCol
+
+    val dataUse = makeDataToUse(data, labelColName)
+
+    val (predictionColName, rawPredictionColName, probabilityColName) = (getPredictionCol,
       getRawPredictionCol, getProbabilityCol)
 
     log.debug(
@@ -91,31 +102,40 @@ private[op] class OpMultiClassificationEvaluator
       labelColName, rawPredictionColName, predictionColName, probabilityColName
     )
 
-    import data.sparkSession.implicits._
-    val rdd = data.select(predictionColName, labelColName).as[(Double, Double)].rdd
+    import dataUse.sparkSession.implicits._
+    val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
+    if (rdd.isEmpty()) {
+      log.error("The dataset is empty")
+      MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
+        ThresholdMetrics(Seq.empty, Seq.empty, Map.empty, Map.empty, Map.empty)
+      )
+    } else {
 
-    val multiclassMetrics = new MulticlassMetrics(rdd)
-    val error = 1.0 - multiclassMetrics.accuracy
-    val precision = multiclassMetrics.weightedPrecision
-    val recall = multiclassMetrics.weightedRecall
-    val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
+      val multiclassMetrics = new MulticlassMetrics(rdd)
+      val error = 1.0 - multiclassMetrics.accuracy
+      val precision = multiclassMetrics.weightedPrecision
+      val recall = multiclassMetrics.weightedRecall
+      val f1 = if (precision + recall == 0.0) 0.0 else 2 * precision * recall / (precision + recall)
 
-    val thresholdMetrics = calculateThresholdMetrics(
-      data = data.select(probabilityColName, labelColName).rdd.map(r => (r.getAs[Vector](0).toArray, r.getDouble(1))),
-      topNs = $(topNs),
-      thresholds = $(thresholds)
-    )
+      val thresholdMetrics = calculateThresholdMetrics(
+        data = dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map{
+          case Row(prob: Vector, label: Double) => (prob.toArray, label)
+        },
+        topNs = $(topNs),
+        thresholds = $(thresholds)
+      )
 
-    val metrics = MultiClassificationMetrics(
-      Precision = precision,
-      Recall = recall,
-      F1 = f1,
-      Error = error,
-      ThresholdMetrics = thresholdMetrics
-    )
+      val metrics = MultiClassificationMetrics(
+        Precision = precision,
+        Recall = recall,
+        F1 = f1,
+        Error = error,
+        ThresholdMetrics = thresholdMetrics
+      )
 
-    log.info("Evaluated metrics: {}", metrics.toString)
-    metrics
+      log.info("Evaluated metrics: {}", metrics.toString)
+      metrics
+    }
   }
 
 
@@ -226,12 +246,14 @@ private[op] class OpMultiClassificationEvaluator
   }
 
 
-  final private[op] def getMultiEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getMultiEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+    val labelName = getLabelCol
+    val dataUse = makeDataToUse(dataset, labelName)
     new MulticlassClassificationEvaluator()
-      .setLabelCol(getLabelCol)
+      .setLabelCol(labelName)
       .setPredictionCol(getPredictionCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataset)
+      .evaluate(dataUse)
   }
 
 }
@@ -274,9 +296,14 @@ case class MultiClassificationMetrics
  */
 case class ThresholdMetrics
 (
+  @JsonDeserialize(contentAs = classOf[java.lang.Integer])
   topNs: Seq[Int],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   thresholds: Seq[Double],
+  @JsonDeserialize(keyAs = classOf[java.lang.Integer])
   correctCounts: Map[Int, Seq[Long]],
+  @JsonDeserialize(keyAs = classOf[java.lang.Integer])
   incorrectCounts: Map[Int, Seq[Long]],
+  @JsonDeserialize(keyAs = classOf[java.lang.Integer])
   noPredictionCounts: Map[Int, Seq[Long]]
 ) extends EvaluationMetrics

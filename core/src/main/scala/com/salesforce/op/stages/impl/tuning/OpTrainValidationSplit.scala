@@ -21,12 +21,14 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.OpEvaluatorBase
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
+import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
 import com.salesforce.op.utils.stages.FitStagesUtil._
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
+
+import scala.concurrent.ExecutionContext
 
 
 private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
@@ -34,13 +36,14 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
   val trainRatio: Double = ValidatorParamDefaults.TrainRatio,
   val seed: Long = ValidatorParamDefaults.Seed,
   val evaluator: OpEvaluatorBase[_],
-  val stratify: Boolean = ValidatorParamDefaults.Stratify
+  val stratify: Boolean = ValidatorParamDefaults.Stratify,
+  val parallelism: Int = ValidatorParamDefaults.Parallelism
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorBaseNames.TrainValSplitResults
 
   private[op] override def validate[T](
-    modelInfo: Seq[ModelInfo[E]],
+    modelInfo: Seq[(E, Array[ParamMap])],
     dataset: Dataset[T],
     label: String,
     features: String,
@@ -73,18 +76,12 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
         splitter = splitter
       )).getOrElse(trainingDataset, validationDataset)
     }
-    // multi-model training
-    val modelsWithGrids = modelInfo.map(m => (m.sparkEstimator, m.grid.build(), m.modelName))
-
-    val groupedSummary = getSummary(
-      modelsWithGrids = modelsWithGrids, label = label, features = features,
-      train = newTrain, test = newTest
-    )
-
+    implicit val ec: ExecutionContext = makeExecutionContext()
+    val modelSummaries = getSummary(modelInfo, label = label, features = features, train = newTrain, test = newTest)
     dataset.unpersist()
 
-    val model = getValidatedModel(groupedSummary)
-    wrapBestEstimator(groupedSummary, model.model.copy(model.bestGrid).asInstanceOf[E], s"$trainRatio training split")
+    val model = getValidatedModel(modelSummaries)
+    wrapBestEstimator(modelSummaries, model.model.copy(model.bestGrid).asInstanceOf[E], s"$trainRatio training split")
   }
 
   /**
