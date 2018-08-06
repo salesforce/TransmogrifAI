@@ -8,7 +8,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="/">Octopus Prime</a>
+          <a class="navbar-brand" href="/">TransmogrifAI</a>
         </div>
         <div class="navbar-collapse collapse">
           <ul class="nav navbar-nav">

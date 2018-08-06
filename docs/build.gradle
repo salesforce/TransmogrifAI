@@ -26,7 +26,7 @@ dependencies {
 task allScaladoc(type: ScalaDoc) {
     group 'Documentation'
     description 'Generates Scaladoc for the main source code of all subprojects.'
-    title 'Octopus Prime'
+    title 'TransmogrifAI'
     source rootProject.subProjs.collect { it.sourceSets.main.allJava + it.sourceSets.main.allScala }
     classpath = files(rootProject.subProjs.collect { it.sourceSets.main.compileClasspath })
     destinationDir = file("build/site/scaladoc")
@@ -34,13 +34,13 @@ task allScaladoc(type: ScalaDoc) {
 
 task buildDocs(dependsOn: [bake, allScaladoc]) {
     group 'Documentation'
-    description = "Build Optimus Prime documentation"
+    description = "Build TransmogrifAI documentation"
 }
 
 task serve(type: JavaExec) {
     def port = 3000
     def host = 'localhost'
-    description = "Serve the Octopus Prime documentation on http://$host:$port"
+    description = "Serve the TransmogrifAI documentation on http://$host:$port"
     classpath = configurations.webServer
     main = 'fi.iki.elonen.SimpleWebServer'
 
