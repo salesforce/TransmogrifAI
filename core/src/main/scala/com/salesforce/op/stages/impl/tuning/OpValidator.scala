@@ -30,18 +30,28 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.utils.stages.FitStagesUtil._
-import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
+import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureLike}
+import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
+import com.salesforce.op.readers.DataFrameFieldNames
+import com.salesforce.op.stages.OpPipelineStage2
+import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
+import com.salesforce.op.utils.stages.FitStagesUtil
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.monotonically_increasing_id
-import org.apache.spark.sql.types.{MetadataBuilder, StructType}
+import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Row, SparkSession, functions}
+import org.apache.spark.util.SparkThreadUtils
 import org.slf4j.{Logger, LoggerFactory}
+
+import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.runtime.universe._
 
 
 /**
@@ -98,8 +108,6 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
 
   @transient protected lazy val log: Logger = LoggerFactory.getLogger(this.getClass)
 
-  type ModelWithGrids = Seq[(E, Array[ParamMap], String)]
-
   def seed: Long
 
   def evaluator: OpEvaluatorBase[_]
@@ -107,6 +115,8 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
   def validationName: String
 
   def stratify: Boolean
+
+  def parallelism: Int
 
   private[op] final def isClassification = evaluator match {
     case _: OpBinaryClassificationEvaluatorBase[_] => true
@@ -129,7 +139,7 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
    * @return
    */
   private[op] def validate[T](
-    modelInfo: Seq[ModelInfo[E]],
+    modelInfo: Seq[(E, Array[ParamMap])],
     dataset: Dataset[T],
     label: String,
     features: String,
@@ -241,7 +251,6 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
     features: String,
     splitter: Option[Splitter]
   )(implicit sparkSession: SparkSession): (Dataset[Row], Dataset[Row]) = {
-    import sparkSession.implicits._
 
     val FittedDAG(newTrain, newTest, _) = FitStagesUtil.fitAndTransformDAG(
       dag = dag,
@@ -276,44 +285,58 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
     result
   }
 
-  protected def getValidatedModel(groupedSummary: Array[ValidatedModel[E]]): ValidatedModel[E] = {
-    if (evaluator.isLargerBetter) groupedSummary.maxBy(_.bestMetric) else groupedSummary.minBy(_.bestMetric)
-  }
-
   protected def getSummary[T](
-    modelsWithGrids: ModelWithGrids, label: String, features: String, train: Dataset[T], test: Dataset[T]
-  ): Array[ValidatedModel[E]] = {
+    modelInfo: Seq[(E, Array[ParamMap])], label: String, features: String, train: Dataset[T], test: Dataset[T]
+  )(implicit ec: ExecutionContext): Array[ValidatedModel[E]] = {
     train.persist()
     test.persist()
-    val summary = modelsWithGrids.par.map {
-      case (estimator, paramGrids, name) =>
-        val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-        val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
-        estimator.set(pi1, label).set(pi2, features)
-
-        val numModels = paramGrids.length
-        val metrics = new Array[Double](paramGrids.length)
-
+    val summaryFuts = modelInfo.map { case (estimator, params) =>
+      val name = estimator.getClass.getSimpleName
+      estimator match {
+        case e: OpPipelineStage2[RealNN, OPVector, Prediction]@unchecked =>
+          val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked, _)) =
+            FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
+              nonNullable = Set(features, DataFrameFieldNames.KeyFieldName))
+          e.setInput(labelFeat, featuresFeat)
+          evaluator.setFullPredictionCol(e.getOutput())
+        case _ => // otherwise it is a spark estimator
+          val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
+          val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
+          estimator.set(pi1, label).set(pi2, features)
+      }
+      Future {
+        val numModels = params.length
+        val metrics = new Array[Double](params.length)
         log.info(s"Train split with multiple sets of parameters.")
-        val models = estimator.fit(train, paramGrids).asInstanceOf[Seq[M]]
-        var i = 0
-        while (i < numModels) {
-          val metric = evaluator.evaluate(models(i).transform(test, paramGrids(i)))
-          log.info(s"Got metric $metric for model $name trained with ${paramGrids(i)}.")
+        val models = estimator.fit(train, params).asInstanceOf[Seq[M]]
+        for {i <- 0 until numModels} {
+          val metric = evaluator.evaluate(models(i).transform(test, params(i)))
+          log.info(s"Got metric $metric for model $name trained with ${params(i)}.")
           metrics(i) = metric
-          i += 1
         }
         val (bestMetric, bestIndex) =
           if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
           else metrics.zipWithIndex.minBy(_._1)
-        log.info(s"Best set of parameters:\n${paramGrids(bestIndex)} for $name")
-        log.info(s"Best train validation split metric: $bestMetric.")
 
-        ValidatedModel(estimator, bestIndex, metrics, paramGrids)
-    }.toArray
+        log.info(s"Best set of parameters:\n${params(bestIndex)} for $name")
+        log.info(s"Best train validation split metric: $bestMetric.")
+        ValidatedModel(estimator, bestIndex, metrics, params)
+      }
+    }
+    val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryFuts), Duration.Inf).toArray
     train.unpersist()
     test.unpersist()
     summary
+  }
+
+  protected def getValidatedModel(modelSummaries: Array[ValidatedModel[E]]): ValidatedModel[E] = {
+    if (evaluator.isLargerBetter) modelSummaries.maxBy(_.bestMetric) else modelSummaries.minBy(_.bestMetric)
+  }
+
+  protected def makeExecutionContext(numOfThreads: Int = parallelism): ExecutionContext = {
+    if (numOfThreads <= 1) SparkThreadUtils.utils.sameThread
+    else ExecutionContext.fromExecutorService(
+      SparkThreadUtils.utils.newDaemonCachedThreadPool(s"${this.getClass.getSimpleName}-thread-pool", numOfThreads))
   }
 
 }
@@ -324,5 +347,6 @@ object ValidatorParamDefaults {
   val NumFolds = 3
   val TrainRatio = 0.75
   val Stratify = false
+  val Parallelism = 8
 }
 

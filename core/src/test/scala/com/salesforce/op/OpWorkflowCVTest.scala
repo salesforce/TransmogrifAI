@@ -34,6 +34,7 @@ import com.salesforce.app.schema.PassengerDataAll
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
+import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.readers._
 import com.salesforce.op.stages.base.binary.BinaryTransformer
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
@@ -49,6 +50,7 @@ import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.utils.spark.RichRow._
 import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
@@ -72,7 +74,6 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val survivedNum = survived.occurs()
   }
 
-
   Spec[OpWorkflow] should
     "return a binary classification model that runs cv at the workflow level" in new PassenserCSVforCV {
     val fv = Seq(age, sex, fair, pClass, cabin).transmogrify()
@@ -95,7 +96,9 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val data1 = model1.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
     val (pred2, _, prob2) = new BinaryClassificationModelSelector(
-      validator = new OpCrossValidation(evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L),
+      validator = new OpCrossValidation(
+        evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L, parallelism = 4
+      ),
       splitter = Option(DataBalancer(sampleFraction = 0.01, reserveTestFraction = 0.2, seed = 0L)),
       evaluators = Seq(new OpBinaryClassificationEvaluator)
     ).setModelsToTry(LogisticRegression, RandomForest)
@@ -110,12 +113,12 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
-    compare(data1, data2, pred1, pred2)
+    compare(data1, data2, pred1, pred2, Some(prob1), Some(prob2))
 
     val summary = model1.summary()
-    summary.contains(classOf[SanityChecker].getSimpleName) shouldBe true
-    summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
-    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
+    summary should include (classOf[SanityChecker].getSimpleName)
+    summary should include (ModelSelectorBaseNames.HoldOutEval)
+    summary should include (ModelSelectorBaseNames.TrainingEval)
   }
 
   it should "return a multi classification model that runs ts at the workflow level" in new PassenserCSVforCV {
@@ -141,7 +144,9 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 
 
     val (pred2, _, prob2) = new MultiClassificationModelSelector(
-      validator = new OpTrainValidationSplit(evaluator = Evaluators.MultiClassification.error()),
+      validator = new OpTrainValidationSplit(
+        evaluator = Evaluators.MultiClassification.error(), parallelism = 4
+      ),
       splitter = Option(DataCutter(reserveTestFraction = 0.2, seed = 0L)),
       evaluators = Seq(new OpMultiClassificationEvaluator())
     ).setModelsToTry(LogisticRegression, DecisionTree)
@@ -157,14 +162,13 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
-    compare(data1, data2, pred1, pred2)
+    compare(data1, data2, pred1, pred2, Some(prob1), Some(prob2))
 
     val summary = model1.summary()
     log.info(summary)
-    summary.contains(classOf[SanityChecker].getSimpleName) shouldBe true
-    summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
-    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
-
+    summary should include (classOf[SanityChecker].getSimpleName)
+    summary should include (ModelSelectorBaseNames.HoldOutEval)
+    summary should include (ModelSelectorBaseNames.TrainingEval)
   }
 
   it should "return a regression model that runs cv at the workflow level" in new PassenserCSVforCV {
@@ -187,7 +191,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val data1 = model1.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
     val pred2 = new RegressionModelSelector(
-      validator = new OpCrossValidation(evaluator = Evaluators.Regression.r2()),
+      validator = new OpCrossValidation(evaluator = Evaluators.Regression.r2(), parallelism = 4),
       dataSplitter = None,
       evaluators = Seq(new OpRegressionEvaluator())
     ).setModelsToTry(RegressionModelsToTry.LinearRegression, RegressionModelsToTry.RandomForestRegression)
@@ -201,12 +205,12 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
-    compare(data1, data2, pred1, pred2)
+    compare(data1, data2, pred1, pred2, None, None)
 
     val summary = model1.summary()
     log.info(summary)
-    summary.contains(classOf[SanityChecker].getSimpleName) shouldBe true
-    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
+    summary should include (classOf[SanityChecker].getSimpleName)
+    summary should include (ModelSelectorBaseNames.TrainingEval)
   }
 
   it should "return a regression model that runs ts at the workflow level" in new PassenserCSVforCV {
@@ -229,7 +233,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val data1 = model1.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
     val pred2 = new RegressionModelSelector(
-      validator = new OpTrainValidationSplit(evaluator = Evaluators.Regression.r2()),
+      validator = new OpTrainValidationSplit(evaluator = Evaluators.Regression.r2(), parallelism = 4),
       dataSplitter = Option(DataSplitter(seed = 0L)),
       evaluators = Seq(new OpRegressionEvaluator())
     ).setModelsToTry(RegressionModelsToTry.LinearRegression, RegressionModelsToTry.GBTRegression)
@@ -243,24 +247,24 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = false)
 
-    compare(data1, data2, pred1, pred2)
+    compare(data1, data2, pred1, pred2, None, None)
 
     val summary = model1.summary()
     log.info(summary)
-    summary.contains(classOf[SanityChecker].getSimpleName) shouldBe true
-    summary.contains(ModelSelectorBaseNames.HoldOutEval) shouldBe true
-    summary.contains(ModelSelectorBaseNames.TrainingEval) shouldBe true
+    summary should include (classOf[SanityChecker].getSimpleName)
+    summary should include (ModelSelectorBaseNames.HoldOutEval)
+    summary should include (ModelSelectorBaseNames.TrainingEval)
   }
 
   it should "avoid adding label leakage when feature engineering would introduce it" in new PassenserCSVforCV {
-
     val fairLeaker = fair.autoBucketize(survivedNum, trackNulls = false)
     val ageLeaker = age.autoBucketize(survivedNum, trackNulls = false)
-    val fv = Seq(age, sex, ageLeaker, fairLeaker, pClass, cabin)
-      .transmogrify()
+    val fv = Seq(age, sex, ageLeaker, fairLeaker, pClass, cabin).transmogrify()
 
     val (pred1, _, _) = new BinaryClassificationModelSelector(
-      validator = new OpCrossValidation(evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L),
+      validator = new OpCrossValidation(
+        evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L, parallelism = 4
+      ),
       splitter = Option(DataBalancer(sampleFraction = 0.01, reserveTestFraction = 0.2, seed = 0L)),
       evaluators = Seq(new OpBinaryClassificationEvaluator)
     ).setModelsToTry(LogisticRegression)
@@ -274,7 +278,9 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val data1 = model1.score(keepRawFeatures = false, keepIntermediateFeatures = true)
 
     val (pred2, _, _) = new BinaryClassificationModelSelector(
-      validator = new OpCrossValidation(evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L),
+      validator = new OpCrossValidation(
+        evaluator = Evaluators.BinaryClassification.auPR(), numFolds = 2, seed = 0L, parallelism = 8
+      ),
       splitter = Option(DataBalancer(sampleFraction = 0.01, reserveTestFraction = 0.2, seed = 0L)),
       evaluators = Seq(new OpBinaryClassificationEvaluator)
     ).setModelsToTry(LogisticRegression)
@@ -287,27 +293,38 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = true)
 
+    val summary1 = model1.summary()
+    log.info("model1.summary: \n{}", summary1)
+    val summary2 = model2.summary()
+    log.info("model2.summary: \n{}", summary2)
+
     // CV
-    model1.summary().contains(""""area under PR" : "0.802""") shouldBe true
-    model1.summary().contains(""""area under PR" : "0.81""") shouldBe false
-    model2.summary().contains(""""area under PR" : "0.81""") shouldBe true
+    summary1 should include ("area under PR\" : \"0.802")
+    summary1 should not include ("area under PR\" : \"0.81")
+    summary2 should include ("area under PR\" : \"0.81")
   }
 
-  def compare(data1: DataFrame, data2: DataFrame, f1: FeatureLike[_], f2: FeatureLike[_]): Unit = {
-
-    val winner1 = f1.originStage.asInstanceOf[ModelSelectorBase[_, _]].bestEstimator.get
-    val winner2 = f2.originStage.asInstanceOf[ModelSelectorBase[_, _]].bestEstimator.get
+  def compare(
+    data1: DataFrame,
+    data2: DataFrame,
+    pred1: FeatureLike[RealNN],
+    pred2: FeatureLike[RealNN],
+    prob1: Option[FeatureLike[OPVector]],
+    prob2: Option[FeatureLike[OPVector]]
+  ): Unit = {
+    val winner1 = pred1.originStage.asInstanceOf[ModelSelectorBase[_, _]].bestEstimator.get
+    val winner2 = pred2.originStage.asInstanceOf[ModelSelectorBase[_, _]].bestEstimator.get
     winner1.estimator.getClass shouldEqual winner2.estimator.getClass
     winner1.estimator.asInstanceOf[PipelineStage].extractParamMap.toSeq.sortBy(_.param.name).map(_.value) should
       contain theSameElementsAs
       winner2.estimator.asInstanceOf[PipelineStage].extractParamMap.toSeq.sortBy(_.param.name).map(_.value)
 
-    val d1s = data1.collect().sortBy(_.getAs[String]("key"))
-    val d2s = data2.collect().sortBy(_.getAs[String]("key"))
-    d1s.zip(d2s).foreach{
+    val d1s = data1.select(pred1.name, prob1.map(_.name).toSeq :+ KeyFieldName: _*).sort(KeyFieldName).collect()
+    val d2s = data2.select(pred2.name, prob2.map(_.name).toSeq :+ KeyFieldName: _*).sort(KeyFieldName).collect()
+    d1s.zip(d2s).foreach {
       case (r1, r2) =>
-        math.abs(r1.getDouble(0) - r2.getDouble(0)) < 0.5 shouldBe true
-        if (r1.size > 2) math.abs(r1.getAs[Vector](1)(0) - r2.getAs[Vector](1)(0) ) < 0.5 shouldBe true
+        math.abs(r1.getDouble(0) - r2.getDouble(0)) should be < 0.5
+        if (r1.size > 2) math.abs(r1.getAs[Vector](1)(0) - r2.getAs[Vector](1)(0)) should be < 0.5
     }
   }
 

@@ -35,7 +35,6 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.AllowLabelAsInput
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.impl.preparators.CorrelationType.Pearson
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stats.OpStatistics
@@ -45,12 +44,14 @@ import enumeratum._
 import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, Vector => OldVector, Vectors => OldVectors}
+import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, DenseVector => OldDenseVector, SparseVector => OldSparseVector, Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.runtime.universe._
 import scala.math.min
 import scala.util.Try
 
@@ -121,12 +122,12 @@ trait SanityCheckerParams extends Params {
   def setMinCorrelation(value: Double): this.type = set(minCorrelation, value)
   def getMinCorrelation: Double = $(minCorrelation)
 
-  final val correlationType = new Param[CorrelationType](
+  final val correlationType = new Param[String](
     parent = this, name = "correlationType",
     doc = "Which coefficient to use for computing correlation"
   )
-  def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value)
-  def getCorrelationType: CorrelationType = $(correlationType)
+  def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value.entryName)
+  def getCorrelationType: CorrelationType = CorrelationType.withNameInsensitive($(correlationType))
 
   final val minVariance = new DoubleParam(
     parent = this, name = "minVariance",
@@ -189,6 +190,21 @@ trait SanityCheckerParams extends Params {
   def setMinRequiredRuleSupport(value: Double): this.type = set(minRequiredRuleSupport, value)
   def getMinRequiredRuleSupport: Double = $(minRequiredRuleSupport)
 
+  final val featureLabelCorrOnly = new BooleanParam(
+    parent = this, name = "featureLabelCorrOnly",
+    doc = "If true, then only calculate the correlations between the features and the label. Otherwise, calculate " +
+      "the entire correlation matrix, which includes all feature-feature correlations."
+  )
+  def setFeatureLabelCorrOnly(value: Boolean): this.type = set(featureLabelCorrOnly, value)
+  def getFeatureLabelCorrOnly: Boolean = $(featureLabelCorrOnly)
+
+  final val correlationExclusion: Param[String] = new Param[String](this, "correlationExclusion",
+    "Setting for what categories of feature vector columns to exclude from the correlation calculation",
+    (value: String) => CorrelationExclusion.withNameInsensitiveOption(value).isDefined
+  )
+  def setCorrelationExclusion(v: CorrelationExclusion): this.type = set(correlationExclusion, v.entryName)
+  def getCorrelationExclusion: CorrelationExclusion = CorrelationExclusion.withNameInsensitive($(correlationExclusion))
+
   setDefault(
     checkSample -> SanityChecker.CheckSample,
     sampleSeed -> SanityChecker.SampleSeed,
@@ -201,9 +217,11 @@ trait SanityCheckerParams extends Params {
     removeBadFeatures -> SanityChecker.RemoveBadFeatures,
     removeFeatureGroup -> SanityChecker.RemoveFeatureGroup,
     protectTextSharedHash -> SanityChecker.ProtectTextSharedHash,
-    correlationType -> SanityChecker.CorrelationType,
+    correlationType -> SanityChecker.CorrelationTypeDefault.entryName,
     maxRuleConfidence -> SanityChecker.MaxRuleConfidence,
-    minRequiredRuleSupport -> SanityChecker.MinRequiredRuleSupport
+    minRequiredRuleSupport -> SanityChecker.MinRequiredRuleSupport,
+    featureLabelCorrOnly -> SanityChecker.FeatureLabelCorrOnly,
+    correlationExclusion -> SanityChecker.CorrelationExclusionDefault.entryName
   )
 }
 
@@ -225,10 +243,24 @@ class SanityChecker(uid: String = UID[SanityChecker])
     CheckIsResponseValues(in1, in2)
   }
 
+  /**
+   * Builds an Array of ColumnStatistics objects containing all the data we calculate for each column (eg. mean,
+   * max, variance, correlation, cramer's V, etc.)
+   *
+   * @param metaCols          Sequence of OpVectorColumnMetadata to use for grouping features
+   * @param labelColumnIndex  Index of the column corresponding to the label
+   * @param corrsWithLabel    Array containing correlations between each feature vector element and the label
+   * @param corrIndices       Indices that we actually compute correlations for (eg. can ignore hashed text features)
+   * @param statsSummary      Multivariate statistics previously computed by Spark
+   * @param categoricalStats  Array of CategoricalGroupStats for each group of feature vector indices corresponding
+   *                          to a categorical feature
+   * @return
+   */
   private def makeColumnStatistics(
     metaCols: Seq[OpVectorColumnMetadata],
     labelColumnIndex: Int,
-    corrMatrix: Matrix,
+    corrsWithLabel: Array[Double],
+    corrIndices: Array[Int],
     statsSummary: MultivariateStatisticalSummary,
     categoricalStats: Array[CategoricalGroupStats]
   ): Array[ColumnStatistics] = {
@@ -240,6 +272,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val variances = statsSummary.variance
     val cramersVMap = categoricalStats.flatMap(f => f.categoricalFeatures.map(c => c -> f.cramersV))
       .toMap[String, Double]
+    val numCorrIndices = corrIndices.length
 
     // build map from indicator group name to any null indicator it may have
     val nullGroups = for {
@@ -259,7 +292,13 @@ class SanityChecker(uid: String = UID[SanityChecker])
     }
 
     def corrParentMap(fn: OpVectorColumnMetadata => Seq[String]) =
-      maxByParent(metaCols.flatMap(c => fn(c).map(_ -> corrMatrix(c.index, labelColumnIndex))))
+      maxByParent(metaCols.flatMap(c =>
+        // Need to map feature indices to indices in correlation matrix, since we might skip hashed text indices
+        corrIndices.indexOf(c.index) match {
+          case -1 => Seq.empty[(String, Double)]
+          case i => fn(c).map(_ -> corrsWithLabel(i))
+        }
+      ))
 
     def cramersVParentMap(fn: OpVectorColumnMetadata => Seq[String]) = {
       val parentMap = metaCols.flatMap{ c => fn(c).map(c.makeColName() -> _) }.toMap
@@ -305,7 +344,11 @@ class SanityChecker(uid: String = UID[SanityChecker])
           min = mins(i),
           max = maxs(i),
           variance = variances(i),
-          corrLabel = Option(corrMatrix(i, labelColumnIndex)),
+          // Label index is always the last index, which depends on how many indices we calculate correlations for
+          corrLabel = corrIndices.indexOf(i) match {
+            case -1 => None
+            case ind => Option(corrsWithLabel(ind))
+          },
           cramersV = cramersVMap.get(name),
           parentCorr = getParentValue(col, corrParent, corrParentNoKeys),
           parentCramersV = getParentValue(col, cramersVParent, cramersVParentNoKeys),
@@ -376,6 +419,16 @@ class SanityChecker(uid: String = UID[SanityChecker])
     }
   }
 
+  /**
+   * Calculates an Array of CategoricalGroupStats objects, each one corresponding to a single categorical feature.
+   *
+   * @param sampleSize    Number of data points
+   * @param featureSize   Length of the feature vector
+   * @param columnMeta    Sequence of OpVectorColumnMetadata, mainly for determining which feature vector indices
+   *                      correspond to categorical features
+   * @param data          RDD of data in the form of (label, featureVector)
+   * @return              Array of CategoricalGroupStats objects, one per categorical feature
+   */
   private def categoricalTests(
     sampleSize: Long,
     featureSize: Int,
@@ -542,8 +595,49 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val vectorMetaColumns = vectorMeta.columns
     val featureNames = vectorMetaColumns.map(_.makeColName())
 
-    logInfo(s"Calculating ${corrType.sparkName} correlations")
-    val covariance = Statistics.corr(vectorRows, corrType.sparkName)
+    val (corrIndices, vectorRowsForCorr) = if ($(correlationExclusion) == CorrelationExclusion.HashedText.entryName) {
+      val hashedIndices = vectorMetaColumns
+        .filter(f =>
+          // Indices are determined to be hashed if they come from Text/TextArea types (or their maps) and don't have
+          // an indicator group or indicator value (indicating that they are not pivoted out by the SmartTextVectorizer
+          // TODO: Find a better way to do this with the feature history
+          f.indicatorGroup.isEmpty && f.indicatorValue.isEmpty &&
+            f.parentFeatureType.exists { t =>
+              val tt = FeatureType.featureTypeTag(t)
+              tt.tpe =:= typeTag[Text].tpe || tt.tpe =:= typeTag[TextArea].tpe ||
+                tt.tpe =:= typeTag[TextMap].tpe || tt.tpe =:= typeTag[TextAreaMap].tpe
+            }
+        )
+        .map(f => f.index)
+      val localCorrIndices = (0 until featureSize + 1).diff(hashedIndices).toArray
+
+      logInfo(s"Ignoring correlations for hashed text features - out of $featureSize feature vector elements, using " +
+        s"${localCorrIndices.length} elements in the correlation matrix calculation")
+
+      // Exclude feature vector entries coming from hashed text features if requested
+      val localVectorRowsForCorr = vectorRows.map {
+        case (v: OldDenseVector) =>
+          val res = localCorrIndices.map(v.apply)
+          OldVectors.dense(res)
+        case (v: OldSparseVector) => {
+          val res = new ArrayBuffer[(Int, Double)]()
+          v.foreachActive((i, v) => if (localCorrIndices.contains(i)) res += localCorrIndices.indexOf(i) -> v)
+          OldVectors.sparse(localCorrIndices.length, res).compressed
+        }
+      }
+      (localCorrIndices, localVectorRowsForCorr)
+    }
+    // Make sure to include the label, correlation matrix has dimensions (featureSize + 1, featureSize + 1)
+    else ((0 until featureSize + 1).toArray, vectorRows)
+    val numCorrIndices = corrIndices.length
+
+    // TODO: We are still calculating the full correlation matrix when featureLabelCorrOnly is false, but are not
+    // TODO: storing it anywhere. If we want access to the inter-feature correlations then need to refactor this a bit.
+    val corrsWithLabel = if ($(featureLabelCorrOnly)) {
+      OpStatistics.computeCorrelationsWithLabel(vectorRowsForCorr, colStats, count)
+    }
+    else Statistics.corr(vectorRowsForCorr, getCorrelationType.sparkName).rowIter
+      .map(_.apply(numCorrIndices - 1)).toArray
 
     // Only calculate this if the label is categorical, so ignore if user has flagged label as not categorical
     val categoricalStats =
@@ -558,7 +652,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val stats = makeColumnStatistics(
       vectorMetaColumns,
       labelColumnIndex = featureSize, // label column goes at end of vector
-      covariance, colStats, categoricalStats
+      corrsWithLabel,
+      corrIndices,
+      colStats,
+      categoricalStats
     )
     stats.foreach { stat => logInfo(stat.toString) }
 
@@ -577,7 +674,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
       dropped = toDropFeatures.map(_.name),
       colStats = colStats,
       names = featureNames :+ in1.name,
-      correlationType = corrType,
+      correlationType = CorrelationType.withNameInsensitive(corrType),
       sample = sampleFraction
     )
     setMetadata(outputMeta.toMetadata.withSummaryMetadata(summary.toMetadata()))
@@ -620,7 +717,6 @@ final class SanityCheckerModel private[op]
       NewVectors.dense(vals).compressed.toOPVector
     }
   }
-
 }
 
 object SanityChecker {
@@ -634,13 +730,17 @@ object SanityChecker {
   val RemoveBadFeatures = false
   val RemoveFeatureGroup = true
   val ProtectTextSharedHash = false
-  val CorrelationType = Pearson
+  val CorrelationTypeDefault = CorrelationType.Pearson
   // These settings will make the maxRuleConfidence check off by default
   val MaxRuleConfidence = 1.0
   val MinRequiredRuleSupport = 1.0
+  val FeatureLabelCorrOnly = false
+  val CorrelationExclusionDefault = CorrelationExclusion.NoExclusion
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
 }
+
+
 
 /**
  * Holds information related to the statistics of a column in the feature vector.
@@ -779,3 +879,22 @@ object CorrelationType extends Enum[CorrelationType] {
   case object Spearman extends CorrelationType("spearman")
 }
 
+/**
+ * Categories of feature vector columns to exclude from the feature-label correlation matrix (or just array of
+ * feature-label correlations) calculated inSanityChecker.
+ */
+sealed trait CorrelationExclusion extends EnumEntry with Serializable
+
+object CorrelationExclusion extends Enum[CorrelationExclusion] {
+  val values: Seq[CorrelationExclusion] = findValues
+
+  /**
+   * Don't exclude any feature vector columns from the correlation calculation
+   */
+  case object NoExclusion extends CorrelationExclusion
+
+  /**
+   * Exclude columns coming from hashed text features
+   */
+  case object HashedText extends CorrelationExclusion
+}

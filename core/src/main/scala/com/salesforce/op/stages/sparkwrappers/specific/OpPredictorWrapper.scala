@@ -31,9 +31,9 @@
 package com.salesforce.op.stages.sparkwrappers.specific
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.{FeatureType, OPVector, Prediction, RealNN}
-import com.salesforce.op.stages.{OpPipelineStage2, SparkStageParam}
-import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel, OpTransformer2}
+import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
+import com.salesforce.op.stages.OpPipelineStage2
+import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml._
 import org.apache.spark.ml.linalg.Vector

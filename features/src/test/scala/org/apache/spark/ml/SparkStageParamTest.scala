@@ -32,19 +32,19 @@ package org.apache.spark.ml
 
 import com.salesforce.op.stages.SparkStageParam
 import com.salesforce.op.test.TestSparkContext
-import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.feature.StandardScaler
 import org.joda.time.DateTime
-import org.json4s.DefaultFormats
-import org.json4s.jackson.JsonMethods.parse
+import org.json4s.JsonDSL._
+import org.json4s._
+import org.json4s.jackson.JsonMethods.{parse, _}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{BeforeAndAfterEach, FlatSpec, Matchers}
+import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 
 
 @RunWith(classOf[JUnitRunner])
 class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndAfterEach {
-  implicit val formats = DefaultFormats
+  import SparkStageParam._
 
   var savePath: String = _
   var param: SparkStageParam[StandardScaler] = _
@@ -54,40 +54,45 @@ class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndA
     super.beforeEach()
     savePath = tempDir + "/op-stage-param-test-" + DateTime.now().getMillis
     param = new SparkStageParam[StandardScaler](parent = "test" , name = "test", doc = "none")
-
     // by setting both to be the same, we guarantee that at least one isn't the default value
-    stage = new StandardScaler().setWithMean(false).setWithStd(false)
+    stage = new StandardScaler().setWithMean(true).setWithStd(false)
   }
 
   // easier if test both at the same time
-  "Param" should "encode and decode properly when is set" in {
+  Spec[SparkStageParam[_]] should "encode and decode properly when is set" in {
     param.savePath = Option(savePath)
     val jsonOut = param.jsonEncode(Option(stage))
+    val parsed = parse(jsonOut).asInstanceOf[JObject]
+    val updated = parsed ~ ("path" -> savePath) // inject path for decoding
 
-    // reparse to get encoding value
-    val parsed = parse(jsonOut)
-    (parsed \ "path").extract[String] shouldBe new Path(savePath, stage.uid).toString
-    (parsed \ "className").extract[String] shouldBe stage.getClass.getName
+    updated shouldBe JObject(
+      "className" -> JString(stage.getClass.getName),
+      "uid" -> JString(stage.uid),
+      "path" -> JString(savePath)
+    )
+    val updatedJson = compact(updated)
 
-    val stageRecovered = param.jsonDecode(jsonOut).get
-    stageRecovered shouldBe a[StandardScaler]
-    stageRecovered.getWithMean shouldBe stage.getWithMean
-    stageRecovered.getWithStd shouldBe stage.getWithStd
+    param.jsonDecode(updatedJson) match {
+      case None => fail("Failed to recover the stage")
+      case Some(stageRecovered) =>
+        stageRecovered shouldBe a[StandardScaler]
+        stageRecovered.uid shouldBe stage.uid
+        stageRecovered.getWithMean shouldBe stage.getWithMean
+        stageRecovered.getWithStd shouldBe stage.getWithStd
+    }
   }
 
   it should "except out when path is empty" in {
-    intercept[RuntimeException](param.jsonEncode(Option(stage)))
+    intercept[RuntimeException](param.jsonEncode(Option(stage))).getMessage shouldBe
+      s"Path must be set before Spark stage '${stage.uid}' can be saved"
   }
 
   it should "have empty path if stage is empty" in {
     param.savePath = Option(savePath)
     val jsonOut = param.jsonEncode(None)
-
     val parsed = parse(jsonOut)
-    (parsed \ "path").extract[String] shouldBe SparkStageParam.NoPath
-    (parsed \ "className").extract[String].isEmpty shouldBe true
 
-    val stageOpt = param.jsonDecode(jsonOut)
-    stageOpt.isDefined shouldBe false
+    parsed shouldBe JObject("className" -> JString(NoClass), "uid" -> JString(NoUID))
+    param.jsonDecode(jsonOut) shouldBe None
   }
 }

@@ -58,14 +58,14 @@ EstimatorType <: Estimator[ModelType] with OpPipelineStage[O] : ClassTag]
   extends OpPipelineStageSpec[O, EstimatorType] {
 
   /**
-   * Estimator instance to be tested
-   */
-  val estimator: EstimatorType
-
-  /**
    * Input Dataset to fit & transform
    */
   val inputData: Dataset[_]
+
+  /**
+   * Estimator instance to be tested
+   */
+  val estimator: EstimatorType
 
   /**
    * Expected result of the transformer applied on the Input Dataset

@@ -22,7 +22,6 @@ package org.apache.spark.ml
 
 import com.salesforce.op.stages.OpPipelineStageBase
 import org.apache.spark.ml.param.ParamPair
-import org.apache.spark.ml.util.DefaultParamsReader.{Metadata, loadMetadata}
 import org.apache.spark.ml.util.{DefaultParamsReader, DefaultParamsWriter}
 import org.json4s.JsonDSL._
 import org.json4s._
@@ -34,12 +33,14 @@ import org.json4s.jackson.JsonMethods._
  */
 case object SparkDefaultParamsReadWrite {
 
+  type Metadata = DefaultParamsReader.Metadata
+
   /**
    * Helper for [[OpPipelineStageWriter]] which extracts the JSON to save.
    * This is useful for ensemble models which need to save metadata for many sub-models.
    *
    * Note: this method was taken from DefaultParamsWriter.getMetadataToSave,
-   * but modified to avoid requiring Spark session
+   * but modified to avoid requiring Spark session instead use `org.apache.spark.SPARK_VERSION`
    *
    * @see [[OpPipelineStageWriter]] for details on what this includes.
    */
@@ -77,7 +78,7 @@ case object SparkDefaultParamsReadWrite {
    * @param expectedClassName  If non empty, this is checked against the loaded metadata.
    * @throws IllegalArgumentException if expectedClassName is specified and does not match metadata
    */
-  def parseMetadata(jsonStr: String): DefaultParamsReader.Metadata =
+  def parseMetadata(jsonStr: String): Metadata =
     DefaultParamsReader.parseMetadata(jsonStr)
 
   /**
@@ -85,7 +86,7 @@ case object SparkDefaultParamsReadWrite {
    * This works if all Params implement [[org.apache.spark.ml.param.Param.jsonDecode()]].
    * TODO: Move to [[Metadata]] method
    */
-  def getAndSetParams(stage: OpPipelineStageBase, metadata: DefaultParamsReader.Metadata): Unit =
+  def getAndSetParams(stage: OpPipelineStageBase, metadata: Metadata): Unit =
     DefaultParamsReader.getAndSetParams(stage, metadata)
 
 }

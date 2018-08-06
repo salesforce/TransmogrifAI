@@ -38,6 +38,7 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
+import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
@@ -69,6 +70,8 @@ case object ModelSelectorBaseNames {
   val idColName = "rowId"
   val LabelsKept = "labelsKept"
   val LabelsDropped = "labelsDropped"
+
+  type ModelType = Model[_ <: Model[_]] with OpTransformer2[RealNN, OPVector, Prediction]
 }
 
 /**
@@ -81,7 +84,8 @@ private[op] trait HasEval {
   protected[op] def outputsColNamesMap: Map[String, String]
   protected[op] def labelColName: String
 
-  protected[op] def predictionColName: String = outputsColNamesMap(StageParamNames.outputParam1Name)
+  protected[op] def fullPredictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParamName)
+  protected[op] def predictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam1Name)
   protected[op] def rawPredictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam2Name)
   protected[op] def probabilityColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam3Name)
 
@@ -97,12 +101,16 @@ private[op] trait HasEval {
     data.persist()
     val metricsMap = evaluators.map {
       case evaluator: OpClassificationEvaluatorBase[_] =>
-        evaluator.setLabelCol(labelColName).setPredictionCol(predictionColName)
-        rawPredictionColName.map(evaluator.setRawPredictionCol)
-        probabilityColName.map(evaluator.setProbabilityCol)
+        evaluator.setLabelCol(labelColName)
+        fullPredictionColName.foreach(evaluator.setFullPredictionCol)
+        predictionColName.foreach(evaluator.setPredictionCol)
+        rawPredictionColName.foreach(evaluator.setRawPredictionCol)
+        probabilityColName.foreach(evaluator.setProbabilityCol)
         evaluator.name -> evaluator.evaluateAll(data)
       case evaluator: OpRegressionEvaluatorBase[_] =>
-        evaluator.setLabelCol(labelColName).setPredictionCol(predictionColName)
+        evaluator.setLabelCol(labelColName)
+        fullPredictionColName.foreach(evaluator.setFullPredictionCol)
+        predictionColName.foreach(evaluator.setPredictionCol)
         evaluator.name -> evaluator.evaluateAll(data)
       case evaluator => throw new RuntimeException(s"Evaluator $evaluator is not supported")
     }.toMap
@@ -194,7 +202,8 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
    * Get the list of all the models and their parameters for comparison
    * @return value
    */
-  protected[op] def getUsedModels: Seq[ModelInfo[E]] = getModelInfo.filter(m => $(m.useModel))
+  protected[op] def getUsedModels: Seq[(E, Array[ParamMap])] = getModelInfo
+    .collect{ case m if $(m.useModel) => m.estimator -> m.grid }
 
   /**
    * Find best estimator with validation on a workflow level. Executed when workflow level Cross Validation is on

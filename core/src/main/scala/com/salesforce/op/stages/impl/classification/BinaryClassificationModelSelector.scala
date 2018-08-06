@@ -55,14 +55,16 @@ case object BinaryClassificationModelSelector {
   /**
    * Creates a new Binary Classification Model Selector with a Cross Validation
    *
-   * @param splitter         instance that will balance and split the data
-   * @param numFolds         number of folds for cross validation (>= 2)
-   * @param validationMetric metric name in evaluation: AuROC or AuPR
+   * @param splitter            instance that will balance and split the data
+   * @param numFolds            number of folds for cross validation (>= 2)
+   * @param validationMetric    metric name in evaluation: AuROC or AuPR
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
-   * @param seed             random seed
-   * @param stratify         whether or not stratify cross validation. Caution : setting that param to true might
-   *                         impact the runtime.
+   *                            and default evaluator is added to this list (here Evaluators.BinaryClassification)
+   * @param seed                random seed
+   * @param stratify            whether or not stratify cross validation. Caution : setting that param to true might
+   *                            impact the runtime
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Classification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -71,26 +73,30 @@ case object BinaryClassificationModelSelector {
     validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    stratify: Boolean = ValidatorParamDefaults.Stratify
+    stratify: Boolean = ValidatorParamDefaults.Stratify,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): BinaryClassificationModelSelector = {
+    val cv = new OpCrossValidation[ProbClassifierModel, ProbClassifier](
+      numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
+    )
     selector(
-      new OpCrossValidation[ProbClassifierModel, ProbClassifier](numFolds, seed, validationMetric, stratify),
-      splitter = splitter,
-      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
+      cv, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
   }
 
   /**
    * Creates a new Binary Classification Model Selector with a Train Validation Split
    *
-   * @param splitter         instance that will balance and split the data
-   * @param trainRatio       ratio between training set and validation set (>= 0 && <= 1)
-   * @param validationMetric metric name in evaluation: AuROC or AuPR
+   * @param splitter            instance that will balance and split the data
+   * @param trainRatio          ratio between training set and validation set (>= 0 && <= 1)
+   * @param validationMetric    metric name in evaluation: AuROC or AuPR
    * @param trainTestEvaluators List of evaluators applied on training + holdout data for evaluation. Default is empty
-   *                          and default evaluator is added to this list (here Evaluators.BinaryClassification)
-   * @param seed             random seed
-   * @param stratify         whether or not stratify train validation split. Caution : setting that param to true might
-   *                         impact the runtime.
+   *                            and default evaluator is added to this list (here Evaluators.BinaryClassification)
+   * @param seed                random seed
+   * @param stratify            whether or not stratify train validation split.
+   *                            Caution : setting that param to true might impact the runtime
+   * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
+   *                            so that the jobs can be run concurrently
    * @return Classification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -99,15 +105,16 @@ case object BinaryClassificationModelSelector {
     validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    stratify: Boolean = ValidatorParamDefaults.Stratify
+    stratify: Boolean = ValidatorParamDefaults.Stratify,
+    parallelism: Int = ValidatorParamDefaults.Parallelism
   ): BinaryClassificationModelSelector = {
+    val ts = new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
+      trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
+    )
     selector(
-      new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](trainRatio, seed, validationMetric, stratify),
-      splitter = splitter,
-      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
+      ts, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
     )
   }
-
 
   private def selector(
     validator: OpValidator[ProbClassifierModel, ProbClassifier],

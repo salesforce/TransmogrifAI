@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.classification
 
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.ProbClassifier
 import com.salesforce.op.stages.impl.selector._
 import org.apache.spark.ml.classification._
@@ -42,7 +43,7 @@ import scala.reflect.ClassTag
 /**
  * Enumeration of possible classification models in Model Selector
  */
-sealed trait ClassificationModelsToTry extends EnumEntry with Serializable
+sealed trait ClassificationModelsToTry extends ModelsToTry
 
 object ClassificationModelsToTry extends Enum[ClassificationModelsToTry] {
   val values = findValues
@@ -266,10 +267,10 @@ private[op] trait SelectorClassifiers // TODO add GBT to binary when upgrade to 
 
 
   final protected def getModelInfo: Seq[ModelInfo[ProbClassifier]] = Seq(
-    ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
-    ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
-    ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
-    ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
+    new ModelInfo(sparkLR.asInstanceOf[ProbClassifier], lRGrid, useLR),
+    new ModelInfo(sparkRF.asInstanceOf[ProbClassifier], rFGrid, useRF),
+    new ModelInfo(sparkDT.asInstanceOf[ProbClassifier], dTGrid, useDT),
+    new ModelInfo(sparkNB.asInstanceOf[ProbClassifier], nBGrid, useNB)
   )
 
 }

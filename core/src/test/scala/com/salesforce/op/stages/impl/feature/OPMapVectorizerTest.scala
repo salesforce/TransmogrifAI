@@ -350,6 +350,10 @@ object OPMapVectorizerTestHelper extends Matchers {
       // Also need to set ReferenceDate to prevent it from being locally different that the one used everywhere else
       override val ReferenceDate = TransmogrifierDefaults.ReferenceDate
       override val PrependFeatureName: Boolean = false
+
+      // Map vectorizers can only do shared hash space currently, so need to add this as well
+      override val HashSpaceStrategy: HashSpaceStrategy =
+        com.salesforce.op.stages.impl.feature.HashSpaceStrategy.Shared
     }
 
     val featureVector = Transmogrifier.transmogrify(Seq(rawF1, rawF2, rawF3))(TransmogrifierTestDefaults).combine()

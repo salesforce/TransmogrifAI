@@ -40,29 +40,35 @@ import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 @RunWith(classOf[JUnitRunner])
 class SparkWrapperParamsTest extends FlatSpec with BeforeAndAfterEach with TestCommon {
 
-  var swEstimator: SwUnaryEstimator[Real, Real, StandardScalerModel, StandardScaler] = _
-
-  override protected def beforeEach(): Unit = {
-    swEstimator = new SwUnaryEstimator[Real, Real, StandardScalerModel, StandardScaler](
-      inputParamName = "foo",
-      outputParamName = "foo2",
-      operationName = "foo3",
-      sparkMlStageIn = None
+  private def estimator(sparkMlStageIn: Option[StandardScaler] = None) = {
+    new SwUnaryEstimator[Real, Real, StandardScalerModel, StandardScaler](
+      inputParamName = "in", outputParamName = "out",
+      operationName = "test-op", sparkMlStageIn = sparkMlStageIn
     )
   }
 
-  val path = "test"
-
-  Spec[SparkWrapperParams[_]] should "when setting path, it should also set path to the stage param" in {
-    swEstimator.setSavePath(path)
-
-    swEstimator.getSavePath() shouldBe path
-    swEstimator.getStageSavePath().get shouldBe swEstimator.getSavePath()
+  Spec[SparkWrapperParams[_]] should "have proper default values for path and stage" in {
+    val stage = estimator()
+    stage.getStageSavePath() shouldBe None
+    stage.getSparkMlStage() shouldBe None
   }
-
-  it should "have proper default values for path and stage" in {
-    swEstimator.getSavePath() shouldBe ""
-    swEstimator.getSparkMlStage() shouldBe None
+  it should "when setting path, it should also set path to the stage param" in {
+    val stage = estimator()
+    stage.setStageSavePath("/test/path")
+    stage.getStageSavePath() shouldBe Some("/test/path")
+  }
+  it should "allow set/get spark params on a wrapped stage" in {
+    val sparkStage = new StandardScaler()
+    val stage = estimator(sparkMlStageIn = Some(sparkStage))
+    stage.getSparkMlStage() shouldBe Some(sparkStage)
+    for {
+      sparkStage <- stage.getSparkMlStage()
+      withMean = sparkStage.getOrDefault(sparkStage.withMean)
+    } {
+      withMean shouldBe false
+      sparkStage.set[Boolean](sparkStage.withMean, true)
+      sparkStage.get(sparkStage.withMean) shouldBe Some(true)
+    }
   }
 
 }

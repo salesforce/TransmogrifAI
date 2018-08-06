@@ -34,13 +34,16 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.Estimator
 import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.sql.types.Metadata
 import org.scalatest._
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
 import scala.util.Failure
+import scala.collection.mutable
 
 
 /**
@@ -100,12 +103,8 @@ StageType <: OpPipelineStage[O] : ClassTag]
    * @return read stage
    */
   protected def writeAndRead(stage: StageType, savePath: String = stageSavePath): OpPipelineStageBase = {
-    val savable = stage match {
-      case s: SparkWrapperParams[_] => s.setSavePath(savePath)
-      case s => s
-    }
-    val json = new OpPipelineStageWriter(savable).overwrite().writeToJsonString
-    new OpPipelineStageReader(savable).loadFromJsonString(json)
+    val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
+    new OpPipelineStageReader(stage).loadFromJsonString(json, savePath)
   }
 
   /**
@@ -179,8 +178,7 @@ trait OpPipelineStageAsserts extends AppendedClues {
       stage.getInputSchema() shouldBe expected.getInputSchema()
     }
     clue("Metadata values don't match:") {
-      stage.getMetadata() shouldBe expected.getMetadata()
+      stage.getMetadata().deepEquals(expected.getMetadata()) shouldBe true
     }
   }
-
 }

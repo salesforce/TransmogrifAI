@@ -56,7 +56,7 @@ configure(allProjs) {
 
     ext {
         scalaVersion = '2.11'
-        scalaVersionRevision = '8'
+        scalaVersionRevision = '12'
         scalaTestVersion = '3.0.5'
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.11'
@@ -100,6 +100,7 @@ configure(allProjs) {
 
     dependencies {
         // Scala
+        zinc 'com.typesafe.zinc:zinc:0.3.15'
         scoverage "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
         scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
         scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
@@ -127,7 +128,16 @@ configure(allProjs) {
     }
 
     configurations.all {
-        resolutionStrategy.force "commons-collections:commons-collections:$collectionsVersion"
+        resolutionStrategy {
+            force "commons-collections:commons-collections:$collectionsVersion",
+                    "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision",
+                    "org.scala-lang:scala-reflect:$scalaVersion.$scalaVersionRevision"
+        }
+    }
+    configurations.zinc {
+        resolutionStrategy {
+            force 'org.scala-lang:scala-library:2.10.6', 'org.scala-lang:scala-reflect:2.10.6'
+        }
     }
 
     tasks.withType(ScalaCompile) {
@@ -252,9 +262,9 @@ configure(allProjs) {
 }
 
 wrapper {
-    gradleVersion = '4.8.1'
+    gradleVersion = '4.9'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'af334d994b5e69e439ab55b5d2b7d086da5ea6763d78054f49f147b06370ed71'
+    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {

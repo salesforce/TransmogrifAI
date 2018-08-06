@@ -47,6 +47,8 @@ object StreamingReaders {
    */
   object Simple {
 
+    private[readers] def defaultPathFiler(p: Path) = Seq(".", "_").forall(!p.getName.startsWith(_))
+
     /**
      * Creates [[FileStreamingAvroReader]]
      *
@@ -56,7 +58,7 @@ object StreamingReaders {
      */
     def avro[T <: GenericRecord : ClassTag : WeakTypeTag](
       key: T => String = ReaderKey.randomKey _,
-      filter: Path => Boolean = (p: Path) => !p.getName.startsWith("."),
+      filter: Path => Boolean = defaultPathFiler,
       newFilesOnly: Boolean = false
     ): FileStreamingAvroReader[T] = new FileStreamingAvroReader[T](key, filter, newFilesOnly)
 

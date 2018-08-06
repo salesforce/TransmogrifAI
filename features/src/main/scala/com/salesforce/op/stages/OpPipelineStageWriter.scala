@@ -34,6 +34,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
 import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
@@ -52,7 +53,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
   override protected def saveImpl(path: String): Unit = {
     val metadataPath = new Path(path, "metadata").toString
-    sc.parallelize(Seq(writeToJsonString), 1).saveAsTextFile(metadataPath)
+    sc.parallelize(Seq(writeToJsonString(path)), 1).saveAsTextFile(metadataPath)
   }
 
   /**
@@ -60,21 +61,27 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    *
    * @return stage metadata json string
    */
-  def writeToJsonString: String = compact(writeToJson)
+  def writeToJsonString(path: String): String = compact(writeToJson(path))
 
   /**
    * Stage metadata json
    *
    * @return stage metadata json
    */
-  def writeToJson: JObject = jsonSerialize(writeToMap).asInstanceOf[JObject]
+  def writeToJson(path: String): JObject = jsonSerialize(writeToMap(path)).asInstanceOf[JObject]
 
   /**
    * Stage metadata map
    *
    * @return stage metadata map
    */
-  def writeToMap: Map[String, Any] = {
+  def writeToMap(path: String): Map[String, Any] = {
+    // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]]
+    // so they can save
+    stage match {
+      case s: SparkWrapperParams[_] => s.setStageSavePath(path)
+      case s => s
+    }
     // We produce stage metadata for all the Spark params
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
     // Add isModel indicator
@@ -88,7 +95,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
   /**
    * Extract model ctor args values keyed by their names, so we can reconstruct the model instance when loading.
-   * See [[OpPipelineStageReader]].
+   * See [[OpPipelineStageReader]].OpPipelineStageReader
    *
    * @return model ctor args values by their names
    */
@@ -109,10 +116,8 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
           )
 
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
-        case v: Option[_] if v.exists(_.isInstanceOf[PipelineStage]) =>
-          AnyValue(AnyValueTypes.SparkWrappedStage, v.get.asInstanceOf[PipelineStage].uid)
-        case v: PipelineStage =>
-          AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
+        case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
+        case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
 
         // Everything else goes as is and is handled by json4s
         case v =>

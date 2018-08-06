@@ -70,6 +70,8 @@ private[op] trait OpWorkflowCore {
   // features that have been blacklisted from use in dag
   private[op] var blacklistedFeatures: Array[OPFeature] = Array[OPFeature]()
 
+  private[op] var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
+
   // stages of the workflow
   private[op] var stages: Array[OPStage] = Array[OPStage]()
 
@@ -164,9 +166,16 @@ private[op] trait OpWorkflowCore {
   /**
    * Get the list of raw features which have been blacklisted
    *
-   * @return result features for workflow
+   * @return blacklisted features
    */
   final def getBlacklist(): Array[OPFeature] = blacklistedFeatures
+
+  /**
+   * Get the list of Map Keys which have been blacklisted
+   *
+   * @return blacklisted map keys
+   */
+  final def getBlacklistMapKeys(): Map[String, Set[String]] = blacklistedMapKeys
 
   /**
    * Get the parameter settings passed into the workflow

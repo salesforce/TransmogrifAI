@@ -30,8 +30,11 @@
 
 package com.salesforce.op.utils.stats
 
-import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, SparseMatrix}
-import org.apache.spark.mllib.stat.Statistics
+import org.apache.spark.mllib.linalg.{SparseMatrix, DenseMatrix, Matrix, Vector => OldVector}
+import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
+import org.apache.spark.rdd.RDD
+import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
 
 object OpStatistics {
 
@@ -54,6 +57,43 @@ object OpStatistics {
     arr.colIter.zipWithIndex.map {
       case (vec, idx) => idx.toString -> vec.toArray
     }.toMap
+  }
+
+  /**
+   * Assumes that we have already computed a MultivariateStatisticsSummary on the RDD, so we can use that info here.
+   * This defines an RDD aggregation that calculates all the correlations with the label. Data is assumed to be laid
+   * out in an RDD[org.apache.spark.mllib.linalg.Vector] where the label is the last element.
+   *
+   * @param featuresAndLabel Input RDD consisting of a single array containing the feature vector with the label as
+   *                         the last element
+   * @return  Array of correlations of each feature vector element with the label
+   */
+  def computeCorrelationsWithLabel(
+    featuresAndLabel: RDD[OldVector],
+    colStats: MultivariateStatisticalSummary,
+    numOfRows: Long
+  ): Array[Double] = {
+    require(numOfRows > 1, s"computeCorrelationsWithLabel called on matrix with only $numOfRows rows." +
+      "  Cannot compute the covariance of a matrix with <= 1 row.")
+    val means = colStats.mean.toArray
+    val variances = colStats.variance.toArray
+    val stdDevs = colStats.variance.toArray.map(math.sqrt)
+    val numOfCols = means.size
+
+    // TODO: Look into compensated summation algorithm for use when nRows is large and we need to worry about roundoff
+
+    // First compute the covariance of each feature column with the label column
+    val covariancesWithLabel = featuresAndLabel.treeAggregate(zeroValue = new Array[Double](numOfCols))(
+      seqOp = (agg, el) => agg +
+        (0 until numOfCols).map(i => (el(i) - means(i)) * (el(numOfCols - 1) - means.last)).toArray,
+      combOp = (x1, x2) => x1 + x2
+    )
+
+    val correlationsWithLabel = (0 until numOfCols).map(i =>
+      covariancesWithLabel(i)/(stdDevs(i) * stdDevs.last * (numOfRows - 1))
+    ).toArray
+
+    correlationsWithLabel
   }
 
   /**

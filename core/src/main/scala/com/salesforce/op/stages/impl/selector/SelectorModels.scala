@@ -33,13 +33,16 @@ package com.salesforce.op.stages.impl.selector
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.regression.LossType
 import org.apache.spark.ml.Estimator
-import org.apache.spark.ml.param.{BooleanParam, Param, Params}
+import org.apache.spark.ml.param.{BooleanParam, Param, ParamMap, Params}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 
 import scala.reflect.ClassTag
 
-case class ModelInfo[E <: Estimator[_]](sparkEstimator: E, grid: ParamGridBuilder, useModel: BooleanParam) {
-  def modelName: String = sparkEstimator.getClass.getSimpleName
+case class ModelInfo[E <: Estimator[_]](estimator: E, grid: Array[ParamMap], useModel: BooleanParam) {
+  def this(estimator: E, gridBuilder: ParamGridBuilder, useModel: BooleanParam) =
+    this(estimator, gridBuilder.build(), useModel)
+
+  def modelName: String = estimator.getClass.getSimpleName
 }
 
 /**
@@ -50,6 +53,7 @@ private[op] object StageParamNames {
   val inputParam1Name = "labelCol"
   val inputParam2Name = "featuresCol"
 
+  val outputParamName = "outputFeatureName"
   val outputParam1Name = "predictionCol"
   val outputParam2Name = "rawPredictionCol"
   val outputParam3Name = "probabilityCol"

@@ -147,6 +147,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     }
   }
 
+
+  protected[op] def setBlacklistMapKeys(mapKeys: Map[String, Set[String]]): Unit = {
+    blacklistedMapKeys = mapKeys
+  }
+
   /**
    * Set parameters from stage params map unless param is set in code.
    * Note: Will NOT override parameter values that have been
@@ -222,9 +227,10 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
             " reader do not match! The RawFeatureFilter training reader will be used to generate the data for training")
         }
         checkReadersAndFeatures()
-        val (dataframe, blacklist) = rf.generateFilteredRaw(rawFeatures, parameters)
-        setBlacklist(blacklist)
-        dataframe
+        val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
+        setBlacklist(filteredRawData.featuresToDrop)
+        setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
+        filteredRawData.cleanedData
     }
   }
 
@@ -333,6 +339,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setFeatures(newResultFeatures)
         .setParameters(getParameters())
         .setBlacklist(getBlacklist())
+        .setBlacklistMapKeys(getBlacklistMapKeys())
 
     reader.map(model.setReader).getOrElse(model)
   }

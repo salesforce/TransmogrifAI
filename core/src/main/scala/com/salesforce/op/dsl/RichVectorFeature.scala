@@ -136,13 +136,8 @@ trait RichVectorFeature {
      *                columns (cases that evaluate to true will be dropped)
      * @return new Vector with columns removed by function
      */
-    def dropIndicesBy
-    (
-      matchFn: OpVectorColumnMetadata => Boolean
-    ): FeatureLike[OPVector] = {
-      new DropIndicesByTransformer(matchFn = matchFn)
-        .setInput(f)
-        .getOutput()
+    def dropIndicesBy(matchFn: OpVectorColumnMetadata => Boolean): FeatureLike[OPVector] = {
+      new DropIndicesByTransformer(matchFn = matchFn).setInput(f).getOutput()
     }
   }
 

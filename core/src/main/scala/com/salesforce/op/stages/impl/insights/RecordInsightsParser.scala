@@ -33,13 +33,8 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.features.types.TextMap
 import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.OpVectorColumnHistory
-import org.json4s.{DefaultFormats, ShortTypeHints}
+import org.json4s.{DefaultFormats, _}
 import org.json4s.jackson.JsonMethods.parse
-import org.json4s.jackson.Serialization
-import org.json4s._
-import org.json4s.jackson.JsonMethods._
-import org.json4s.jackson.Serialization
-import org.json4s.jackson.Serialization.{write => jwrite}
 
 /**
  * Converts record insights format Map[String, String] to and from underlying case classes to give

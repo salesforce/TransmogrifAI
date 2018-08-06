@@ -30,14 +30,14 @@
 
 package com.salesforce.op.evaluators
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.evaluation.MulticlassMetrics
-import org.apache.spark.mllib.evaluation.{BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
+import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
 
 /**
@@ -64,16 +64,19 @@ private[op] class OpBinaryClassificationEvaluator
   def getDefaultMetric: BinaryClassificationMetrics => Double = _.AuROC
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationMetrics = {
-    val (labelColName, rawPredictionColName, predictionColName, probabilityColName) =
-      (getLabelCol, getRawPredictionCol, getPredictionCol, getProbabilityCol)
 
+    val labelColName = getLabelCol
+    val dataUse = makeDataToUse(data, labelColName)
+
+    val (rawPredictionColName, predictionColName, probabilityColName) =
+      (getRawPredictionCol, getPredictionCol, getProbabilityCol)
     log.debug(
       "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
       labelColName, rawPredictionColName, predictionColName, probabilityColName
     )
 
-    import data.sparkSession.implicits._
-    val rdd = data.select(predictionColName, labelColName).as[(Double, Double)].rdd
+    import dataUse.sparkSession.implicits._
+    val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
     if (rdd.isEmpty()) {
       log.error("The dataset is empty")
@@ -88,7 +91,7 @@ private[op] class OpBinaryClassificationEvaluator
         (confusionMatrix(0, 0), confusionMatrix(1, 0), confusionMatrix(0, 1), confusionMatrix(1, 1))
       } else {
         // if labels and predictions of data are only one class, cannot compute confusion matrix
-        val size = data.count().toDouble
+        val size = dataUse.count().toDouble
         if (labels.head == 0.0) (size, 0.0, 0.0, 0.0) else (0.0, 0.0, 0.0, size)
       }
 
@@ -98,7 +101,7 @@ private[op] class OpBinaryClassificationEvaluator
       val error = if (tp + fp + tn + fn == 0.0) 0.0 else (fp + fn) / (tp + fp + tn + fn)
 
       val scoreAndLabels =
-        data.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map {
+        dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map {
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
@@ -120,19 +123,23 @@ private[op] class OpBinaryClassificationEvaluator
   }
 
   final protected def getBinaryEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+    val labelColName = getLabelCol
+    val dataUse = makeDataToUse(dataset, labelColName)
     new BinaryClassificationEvaluator()
-      .setLabelCol(getLabelCol)
+      .setLabelCol(labelColName)
       .setRawPredictionCol(getRawPredictionCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataset)
+      .evaluate(dataUse)
   }
 
   final protected def getMultiEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+    val labelColName = getLabelCol
+    val dataUse = makeDataToUse(dataset, labelColName)
     new MulticlassClassificationEvaluator()
-      .setLabelCol(getLabelCol)
+      .setLabelCol(labelColName)
       .setPredictionCol(getPredictionCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataset)
+      .evaluate(dataUse)
   }
 }
 
@@ -163,8 +170,16 @@ case class BinaryClassificationMetrics
   TN: Double,
   FP: Double,
   FN: Double,
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   thresholds: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   precisionByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   recallByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   falsePositiveRateByThreshold: Seq[Double]
-) extends EvaluationMetrics
+) extends EvaluationMetrics {
+
+  def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
+  def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
+}
