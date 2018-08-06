@@ -41,7 +41,7 @@ import org.apache.spark.sql.SparkSession
 import org.apache.log4j.{Level, LogManager}
 
 /**
- * A minimal Titanic Survival example with Octopus Prime
+ * A minimal Titanic Survival example with TransmogrifAI
  */
 object OpTitanicMini {
 
