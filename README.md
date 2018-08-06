@@ -47,7 +47,7 @@ val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sam
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
-println("Model summary: " + model.summary())
+println("Model summary:" + model.summaryPretty())
 ```
 Model summary:
 
@@ -135,7 +135,7 @@ ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '12'
     sparkVersion = '2.2.1'
-    opVersion = '3.4.0'
+    opVersion = '0.3.4'
 }
 dependencies {
     // Scala
