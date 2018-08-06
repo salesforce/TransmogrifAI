@@ -76,7 +76,7 @@ dependencies {
     // compile "com.salesforce.op:octopus-prime-models_$scalaVersion:$opVersion"
 
     // Test
-    testCompile "org.scalatest:scalatest_$scalaVersion:${scalatestVersion}"
+    testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
     testCompile "junit:junit:$junitVersion"
 
     // Avro
