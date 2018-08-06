@@ -47,7 +47,7 @@ val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sam
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
-println("Model summary:" + model.summaryPretty())
+println("Model summary:\n" + model.summaryPretty())
 ```
 Model summary:
 
