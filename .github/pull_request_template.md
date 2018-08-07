@@ -1,9 +1,3 @@
----
-name: Pull request
-about: Create a pull request with your contribution
-
----
-
 **Related issues**
 Refer to issue(s) addressed in this pull request from [Issues](https://github.com/salesforce/TransmogrifAI/issues) page.
 
