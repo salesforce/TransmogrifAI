@@ -168,7 +168,7 @@ configure(allProjs) {
         source = "src/main/scala"
         testSource = "src/test/scala"
     }
-    compileScala.dependsOn(scalaStyle)
+    // compileScala.dependsOn(scalaStyle)
 
     avro {
         createSetters = true
