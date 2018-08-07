@@ -88,7 +88,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
+    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {
@@ -107,7 +107,8 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
+    println(balancer.get.summary)
+    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {

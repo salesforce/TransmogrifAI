@@ -32,19 +32,20 @@ package com.salesforce.op.stages.impl.tuning
 
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.{Dataset, Row}
+import com.salesforce.op.stages.impl.MetadataLike
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+
 
 
 /**
  * Case class for Training & test sets
  *
  * @param train      training set is persisted at construction
- * @param metadata   metadata built at construction
+ * @param summary    summary for building metadata
  */
-case class ModelData private(train: Dataset[Row], metadata: Metadata) {
-  def this(train: Dataset[Row], metadata: MetadataBuilder) =
-    this(train.persist(), metadata.build())
-}
+case class ModelData(train: Dataset[Row], summary: Option[SplitterSummary])
 
 /**
  * Abstract class that will carry on the creation of training set + test set
@@ -112,3 +113,26 @@ object SplitterParamsDefault {
   val MaxLabelCategoriesDefault = 100
   val MinLabelFractionDefault = 0.0
 }
+
+trait SplitterSummary extends MetadataLike
+
+private[op] object SplitterSummary {
+  val ClassName: String = "className"
+  def fromMap(map: Map[String, Any]): SplitterSummary = {
+    map(ClassName) match {
+      case s if s == classOf[DataSplitterSummary].getCanonicalName => DataSplitterSummary()
+      case s if s == classOf[DataBalancerSummary].getCanonicalName => DataBalancerSummary(
+        positiveLabels = map(ModelSelectorBaseNames.Positive).asInstanceOf[Long],
+        negativeLabels = map(ModelSelectorBaseNames.Negative).asInstanceOf[Long],
+        desiredFraction = map(ModelSelectorBaseNames.Desired).asInstanceOf[Double],
+        upSamplingFraction = map(ModelSelectorBaseNames.UpSample).asInstanceOf[Double],
+        downSamplingFraction = map(ModelSelectorBaseNames.DownSample).asInstanceOf[Double]
+      )
+      case s if s == classOf[DataCutterSummary].getCanonicalName => DataCutterSummary(
+        labelsKept = map(ModelSelectorBaseNames.LabelsKept).asInstanceOf[Array[Double]],
+        labelsDropped = map(ModelSelectorBaseNames.LabelsDropped).asInstanceOf[Array[Double]]
+      )
+    }
+  }
+}
+

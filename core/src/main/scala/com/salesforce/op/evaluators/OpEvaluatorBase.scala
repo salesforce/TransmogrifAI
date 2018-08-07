@@ -42,6 +42,8 @@ import org.apache.spark.ml.param._
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.types.Metadata
 
+import scala.util.Try
+
 
 /**
  * Trait for labelCol param
@@ -123,7 +125,6 @@ trait EvaluationMetrics extends JsonLike {
    * @return a map from metric name to metric value
    */
   def toMap: Map[String, Any] = JsonUtils.toMap(JsonUtils.toJsonTree(this))
-
   /**
    * Convert metrics into metadata for saving
    * @return metadata
@@ -131,6 +132,46 @@ trait EvaluationMetrics extends JsonLike {
   def toMetadata: Metadata = this.toMap.toMetadata
 }
 
+private[op] object EvaluationMetrics {
+
+  /**
+   * Decode metric values from JSON string
+   *
+   * @param json encoded metrics
+   */
+  def fromJson(className: String, json: String): EvaluationMetrics = {
+    def error(c: Class[_]) = throw new IllegalArgumentException(
+      s"Could not extract metrics of type $c from ${json.mkString(",")}"
+    )
+    className match {
+      case n if n == classOf[MultiMetrics].getSimpleName =>
+        JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
+          val asMetrics = d.flatMap{ case (_, values) => values.map{
+            case (nm: String, mp: Map[String, Any]@unchecked) =>
+              val valsJson = JsonUtils.toJsonString(mp) // gross but it works TODO try to find a better way
+              nm match {
+                case OpEvaluatorNames.Binary.humanFriendlyName =>
+                  nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
+                case OpEvaluatorNames.Multi.humanFriendlyName =>
+                  nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
+                case OpEvaluatorNames.Regression.humanFriendlyName =>
+                  nm -> JsonUtils.fromString[RegressionMetrics](valsJson).get
+                case _ => nm -> JsonUtils.fromString[SingleMetric](valsJson).get
+              }}
+          }
+          MultiMetrics(asMetrics)
+        }.getOrElse(error(classOf[MultiMetrics]))
+      case n if n == classOf[BinaryClassificationMetrics].getSimpleName =>
+        JsonUtils.fromString[BinaryClassificationMetrics](json).getOrElse(error(classOf[BinaryClassificationMetrics]))
+      case n if n == classOf[MultiClassificationMetrics].getSimpleName =>
+        JsonUtils.fromString[MultiClassificationMetrics](json).getOrElse(error(classOf[MultiClassificationMetrics]))
+      case n if n == classOf[RegressionMetrics].getSimpleName =>
+        JsonUtils.fromString[RegressionMetrics](json).getOrElse(error(classOf[RegressionMetrics]))
+      case n if n == classOf[SingleMetric].getSimpleName =>
+        JsonUtils.fromString[SingleMetric](json).getOrElse(error(classOf[SingleMetric]))
+    }
+  }
+}
 
 /**
  * Base Interface for OpEvaluator to be used in Evaluator creation. Can be used for both OP and spark
@@ -143,7 +184,7 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   /**
    * Name of evaluator
    */
-  val name: String = "Eval"
+  val name: EvalMetric
 
   /**
    * Evaluate function that returns a class or value with the calculated metric value(s).
@@ -271,7 +312,7 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 /**
  * Eval metric
  */
-trait EvalMetric extends Serializable {
+trait EvalMetric extends EnumEntry with Serializable {
   /**
    * Spark metric name
    */
@@ -281,6 +322,18 @@ trait EvalMetric extends Serializable {
    * Human friendly metric name
    */
   def humanFriendlyName: String
+
+}
+
+object EvalMetric {
+
+  def withNameInsensitive(name: String): EvalMetric = {
+    BinaryClassEvalMetrics.withNameInsensitiveOption(name)
+      .orElse(MultiClassEvalMetrics.withNameInsensitiveOption(name))
+      .orElse(RegressionEvalMetrics.withNameInsensitiveOption(name))
+      .orElse(OpEvaluatorNames.withNameInsensitiveOption(name))
+      .getOrElse(OpEvaluatorNames.Custom(name, name))
+  }
 }
 
 /**
@@ -290,7 +343,7 @@ sealed abstract class ClassificationEvalMetric
 (
   val sparkEntryName: String,
   val humanFriendlyName: String
-) extends EnumEntry with EvalMetric
+) extends EvalMetric
 
 /**
  * Binary Classification Metrics
@@ -302,7 +355,11 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object F1 extends ClassificationEvalMetric("f1", "f1")
   case object Error extends ClassificationEvalMetric("accuracy", "error")
   case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under PR")
+  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under precision-recall")
+  case object TP extends ClassificationEvalMetric("TP", "true positive")
+  case object TN extends ClassificationEvalMetric("TN", "true negative")
+  case object FP extends ClassificationEvalMetric("FP", "false positive")
+  case object FN extends ClassificationEvalMetric("FN", "false negative")
 }
 
 /**
@@ -325,7 +382,7 @@ sealed abstract class RegressionEvalMetric
 (
   val sparkEntryName: String,
   val humanFriendlyName: String
-) extends EnumEntry with EvalMetric
+) extends EvalMetric
 
 object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   val values: Seq[RegressionEvalMetric] = findValues
@@ -335,11 +392,34 @@ object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
 }
 
+
+/**
+ * GeneralMetrics
+ */
+sealed abstract class OpEvaluatorNames
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EvalMetric
+
 /**
  * Contains evaluator names used in logging
  */
-case object OpEvaluatorNames {
-  val binary = "binEval"
-  val multi = "multiEval"
-  val regression = "regEval"
+object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
+  val values: Seq[OpEvaluatorNames] = findValues
+
+  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metics")
+
+  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metics")
+
+  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metics")
+
+  case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
+    override def entryName: String = name.toLowerCase
+  }
+
+  override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
+
+  override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
+    .getOrElse(Custom(name, name))
 }

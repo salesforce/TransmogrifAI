@@ -30,9 +30,7 @@
 
 package com.salesforce.op.stages.impl.selector
 
-import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.UID
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.evaluators.{EvaluationMetrics, _}
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
@@ -42,15 +40,16 @@ import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.stages.RichParamMap._
+import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, Transformer}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{MetadataBuilder, StructType}
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 
 case object ModelSelectorBaseNames {
@@ -106,12 +105,12 @@ private[op] trait HasEval {
         predictionColName.foreach(evaluator.setPredictionCol)
         rawPredictionColName.foreach(evaluator.setRawPredictionCol)
         probabilityColName.foreach(evaluator.setProbabilityCol)
-        evaluator.name -> evaluator.evaluateAll(data)
+        evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
       case evaluator: OpRegressionEvaluatorBase[_] =>
         evaluator.setLabelCol(labelColName)
         fullPredictionColName.foreach(evaluator.setFullPredictionCol)
         predictionColName.foreach(evaluator.setPredictionCol)
-        evaluator.name -> evaluator.evaluateAll(data)
+        evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
       case evaluator => throw new RuntimeException(s"Evaluator $evaluator is not supported")
     }.toMap
     data.unpersist()
@@ -136,9 +135,9 @@ private[op] trait HasTestEval extends HasEval {
   private[op] def evaluateModel(data: Dataset[_]): DataFrame = {
     val scored = transform(data)
     val metrics = evaluate(scored)
-    val builder = new MetadataBuilder().withMetadata(getMetadata().getSummaryMetadata())
-    builder.putMetadata(ModelSelectorBaseNames.HoldOutEval, metrics.toMetadata)
-    setMetadata(builder.build().toSummaryMetadata())
+    val metadata = ModelSelectorSummary.fromMetadata(getMetadata().getSummaryMetadata())
+      .copy(holdoutEvaluation = Option(metrics))
+    setMetadata(metadata.toMetadata().toSummaryMetadata())
     scored
   }
 }
@@ -253,7 +252,6 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
   final override def fit(dataset: Dataset[_]): SelectedModel = {
 
     implicit val spark = dataset.sparkSession
-    import spark.implicits._
 
     val datasetWithID =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
@@ -266,10 +264,10 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
 
     val ModelData(trainData, met) = splitter match {
       case Some(spltr) => spltr.prepare(datasetWithID)
-      case None => new ModelData(datasetWithID, new MetadataBuilder())
+      case None => new ModelData(datasetWithID, None)
     }
 
-    val BestEstimator(name, estimator, meta) = bestEstimator.getOrElse{
+    val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse{
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
         .validate(modelInfo = getUsedModels, dataset = trainData, label = in1.name, features = in2.name)
@@ -277,38 +275,38 @@ private[op] abstract class ModelSelectorBase[M <: Model[_], E <: Estimator[_]]
       best
     }
 
-    val bestModel = new BestModel(
-      name = name,
-      model = estimator.fit(trainData).asInstanceOf[M],
-      metadata = Option(meta)
-    )
-    bestModel.metadata.foreach(meta => setMetadata(meta.build))
-    val bestClassifier = bestModel.model.parent
-    log.info(s"Selected model : ${bestClassifier.getClass.getSimpleName}")
-    log.info(s"With parameters : ${bestClassifier.extractParamMap()}")
+    val bestModel = estimator.fit(trainData).asInstanceOf[M]
+    val bestEst = bestModel.parent
+    log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
+    log.info(s"With parameters : ${bestEst.extractParamMap()}")
 
     // set input and output params
-    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.model.set(bestModel.model.getParam(pname), pvalue) }
+    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
-    val builder = new MetadataBuilder().withMetadata(getMetadata()) // get cross val metrics
-    builder.putString(ModelSelectorBaseNames.BestModelUid, bestModel.model.uid) // log bestModel uid (ie model type)
-    builder.putString(ModelSelectorBaseNames.BestModelName, bestModel.name) // log bestModel name
-    splitter.collect {
-      case _: DataBalancer => builder.putMetadata(ModelSelectorBaseNames.ResampleValues, met)
-      case _: DataCutter => builder.putMetadata(ModelSelectorBaseNames.CuttValues, met)
-    }
+    // get eval results for metadata
+    val trainingEval = evaluate(bestModel.transform(trainData))
 
+    val metadataSummary = ModelSelectorSummary(
+      validationType = ValidationType.fromValidator(validator),
+      validationParameters = validator.getParams(),
+      dataPrepParameters = splitter.map(_.extractParamMap().getAsMap()).getOrElse(Map()),
+      dataPrepResults = met,
+      evaluationMetric = validator.evaluator.name,
+      problemType = ProblemType.fromEvalMetrics(trainingEval),
+      bestModelUID = estimator.uid,
+      bestModelName = name,
+      bestModelType = estimator.getClass.getSimpleName,
+      validationResults = summary,
+      trainEvaluation = trainingEval,
+      holdoutEvaluation = None
+    )
 
-    // add eval results to metadata
-    val transformed = bestModel.model.transform(trainData)
-    builder.putMetadata(ModelSelectorBaseNames.TrainingEval, evaluate(transformed).toMetadata)
-    val allMetadata = builder.build().toSummaryMetadata()
-    setMetadata(allMetadata)
+    setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
-    new SelectedModel(bestModel.model.asInstanceOf[Model[_ <: Model[_]]], outputsColNamesMap, uid)
+    new SelectedModel(bestModel.asInstanceOf[Model[_ <: Model[_]]], outputsColNamesMap, uid)
       .setParent(this)
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
-      .setMetadata(allMetadata)
+      .setMetadata(getMetadata())
       .setEvaluators(evaluators)
   }
 
