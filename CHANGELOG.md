@@ -1,7 +1,6 @@
 # Changelog
 
 ## 0.3.4
-
 Performance improvements:
 - Added featureLabelCorrOnly parameter in SanityChecker to only compute correlations between features and label (defaults to false)
 - Added ignoreHashCorrelations parameter in SanityChecker that ignores correlations from hashed text features (defaults to false)
@@ -84,11 +83,9 @@ Dependency upgrades:
 40. Adding autoBucketize to transmogrify for numerics & numeric maps + pass in optional label #159 
 41. Autobucketizing for numeric maps should not fail if map is empty, instead we generate empty column for empty numeric map #231 
 
-### Migration Guide
-
+Migration guide:
 1. OpLogisticRegression() is in progress (evaluator needs updates)
     may use BinaryClassificationModelSelector() instead
-    
 2. Need to add .setProbabilityCol($probCol) to evaluator in workflow definition to make sure that the evaluator will get the correct probability column to do the calculation
 
 
