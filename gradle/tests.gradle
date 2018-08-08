@@ -24,8 +24,8 @@ tasks.withType(Test) {
         showStandardStreams true
     }
     maxParallelForks = 1
-    failFast = true
     maxHeapSize = "1500m"
+    failFast = System.getenv('IS_CI') != null
 
     beforeSuite { suite ->
         if (suite.name.startsWith("Gradle Test Executor")) return
