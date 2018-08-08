@@ -46,7 +46,7 @@ import scala.util.{Success, Try}
 
 
 /**
- * Optimus Prime Base Pipeline Stage allowing to specify arbitrary Input and Output Feature types
+ * TransmogrifAI Base Pipeline Stage allowing to specify arbitrary Input and Output Feature types
  *
  * Internally the stage operates and serializes the TransientFeature. However to maintain usability
  * for users, the getters will return FeatureLike objects. It is important that during development
@@ -169,7 +169,7 @@ trait OpPipelineStageBase extends OpPipelineStageParams with MLWritable {
 
 
 /**
- * Optimus Prime Base Pipeline Stage allowing to specify Input Feature types and a single Output Feature type
+ * TransmogrifAI Base Pipeline Stage allowing to specify Input Feature types and a single Output Feature type
  *
  * @tparam O output feature type
  */

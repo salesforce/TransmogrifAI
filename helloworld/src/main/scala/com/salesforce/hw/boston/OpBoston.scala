@@ -41,7 +41,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 /**
- * Optimus Prime Regression example on the Boston Dataset
+ * TransmogrifAI Regression example on the Boston Dataset
  */
 object OpBoston extends OpAppWithRunner with BostonFeatures {
 
