@@ -65,19 +65,19 @@ trait OpCli {
 object CommandParser extends scopt.OptionParser[CliParameters]("op") with OpCli {
   private[cli] var AUTO_ENABLED = true // for testing, temporary
 
-  head("op: Optimus Prime CLI")
+  head("op: TransmogrifAI CLI")
 
   help("help")
 
   note("")
 
   val knownOptions = List(arg[String]("name")
-    .text("Name for the Optimus Prime project (should be in CamelCase) [required]")
+    .text("Name for the TransmogrifAI project (should be in CamelCase) [required]")
     .validate(camelCase)
     .action((appName, cfg) => cfg.copy(projName = appName)),
 
   opt[File]("input")
-    .text("Input file for the Optimus Prime project [required]")
+    .text("Input file for the TransmogrifAI project [required]")
     .validate(fileExists)
     .required
     .action((inputFile, cfg) => cfg.copy(inputFile = Option(inputFile))),
@@ -119,7 +119,7 @@ object CommandParser extends scopt.OptionParser[CliParameters]("op") with OpCli 
 
   cmd("gen")
     .action((_, cfg) => cfg.copy(command = "gen"))
-    .text("Generate a new Optimus Prime project")
+    .text("Generate a new TransmogrifAI project")
     .children(cliOptions.toArray: _*)
 
 }

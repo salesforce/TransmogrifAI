@@ -45,7 +45,7 @@ import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Success, Try}
 
 /**
- * MLWriter class used to write Optimus Prime stages to disk
+ * MLWriter class used to write TransmogrifAI stages to disk
  *
  * @param stage a stage to save
  */
