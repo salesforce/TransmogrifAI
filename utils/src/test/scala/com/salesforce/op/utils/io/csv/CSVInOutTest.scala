@@ -39,26 +39,26 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class CSVInOutTest extends FlatSpec with TestSparkContext {
-  private val csvReader = new CSVInOut(CSVOptions())
+  private val csvReader = new CSVInOut(CSVOptions(header = true))
   private val f1 = resourceFile(name = "test_sample.csv")
 
-  "CSVInOut" should "throw AnalysisException for bad file paths" in {
-    var error = intercept[AnalysisException] {
-      csvReader.readDataFrame("/bad/file/path/read/dataframe")
-    }
-    error.getMessage().contains("Path does not exist: file:/bad/file/path/read/dataframe") shouldBe true
+  Spec[CSVInOut] should "throw error for bad file paths" in {
+    var error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))
+    error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/dataframe;")
 
-    error = intercept[AnalysisException] {
-      csvReader.readRDD("/bad/file/path/read/rdd")
-    }
-    error.getMessage().contains("Path does not exist: file:/bad/file/path/read/rdd") shouldBe true
+    error = intercept[AnalysisException](csvReader.readRDD("/bad/file/path/read/rdd"))
+    error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/rdd;")
   }
 
-  it should "read a CSV file to DataFrame/RDD" in {
-    csvReader.readDataFrame(f1.getAbsolutePath) shouldBe a[DataFrame]
-    csvReader.readDataFrame(f1.getAbsolutePath).count shouldBe 2
+  it should "read a CSV file to DataFrame" in {
+    val res = csvReader.readDataFrame(f1.getAbsolutePath)
+    res shouldBe a[DataFrame]
+    res.count shouldBe 100
+  }
 
-    csvReader.readRDD(f1.getAbsolutePath) shouldBe a[RDD[Seq[String]]]
-    csvReader.readRDD(f1.getAbsolutePath).count shouldBe 2
+  it should "read a CSV file to RDD" in {
+    val res = csvReader.readRDD(f1.getAbsolutePath)
+    res   shouldBe a[RDD[Seq[String]]]
+    res.count shouldBe 100
   }
 }
