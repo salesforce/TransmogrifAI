@@ -30,16 +30,16 @@
 
 package com.salesforce.op.stages.impl.classification
 
-import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
-import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
-import org.apache.spark.ml.Model
-import org.apache.spark.sql.Dataset
+import com.salesforce.op.stages.impl.ModelsToTry
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.StageOperationName
+import com.salesforce.op.stages.impl.selector.ModelSelector
+import com.salesforce.op.stages.impl.tuning._
+import enumeratum.Enum
+import org.apache.spark.ml.param.ParamMap
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{EstimatorType, ModelType}
+import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
 /**
@@ -47,10 +47,62 @@ import com.salesforce.op.stages.impl.selector.StageOperationName
  */
 case object BinaryClassificationModelSelector {
 
+  private val modelNames: Seq[BinaryClassificationModelsToTry] = Seq(OpLogisticRegression, OpRandomForestClassifier,
+    OpGBTClassifier, OpLinearSVC) // OpNaiveBayes and OpDecisionTreeClassifier off by default
+
+  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    val lr = new OpLogisticRegression()
+    val lrParams = new ParamGridBuilder()
+
+    val rf = new OpRandomForestClassifier()
+    val rfParams = new ParamGridBuilder()
+
+    val gbt = new OpGBTClassifier()
+    val gbtParams = new ParamGridBuilder()
+
+    val svc = new OpLinearSVC()
+    val svcParams = new ParamGridBuilder()
+
+    val nb = new OpRandomForestClassifier()
+    val nbParams = new ParamGridBuilder()
+
+    val dt = new OpRandomForestClassifier()
+    val dtParams = new ParamGridBuilder()
+
+    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams)
+      .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+  }
+
+//  // Random forest defaults
+//  .setRandomForestMaxDepth(MaxDepth: _*)
+//    .setRandomForestImpurity(ImpurityClass)
+//    .setRandomForestMaxBins(MaxBin)
+//    .setRandomForestMinInfoGain(MinInfoGain: _*)
+//    .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
+//    .setRandomForestNumTrees(MaxTrees)
+//    .setRandomForestSubsamplingRate(SubsampleRate)
+//    // Logistic regression defaults
+//    .setLogisticRegressionElasticNetParam(ElasticNet)
+//    .setLogisticRegressionFitIntercept(FitIntercept)
+//    .setLogisticRegressionMaxIter(MaxIterLin)
+//    .setLogisticRegressionRegParam(Regularization: _*)
+//    .setLogisticRegressionStandardization(Standardized)
+//    .setLogisticRegressionTol(Tol)
+//    // NB defaults
+//    .setNaiveBayesModelType(NbModel)
+//    .setNaiveBayesSmoothing(NbSmoothing)
+//    // DT defaults
+//    .setDecisionTreeImpurity(ImpurityClass)
+//    .setDecisionTreeMaxBins(MaxBin)
+//    .setDecisionTreeMaxDepth(MaxDepth: _*)
+//    .setDecisionTreeMinInfoGain(MinInfoGain: _*)
+//    .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+//
+
   /**
    * Creates a new Binary Classification Model Selector with a Cross Validation
    */
-  def apply(): BinaryClassificationModelSelector = withCrossValidation()
+  def apply(): ModelSelector[ModelType, EstimatorType] = withCrossValidation()
 
   /**
    * Creates a new Binary Classification Model Selector with a Cross Validation
@@ -74,13 +126,16 @@ case object BinaryClassificationModelSelector {
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): BinaryClassificationModelSelector = {
-    val cv = new OpCrossValidation[ProbClassifierModel, ProbClassifier](
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
-      cv, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
+      cv, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
@@ -106,90 +161,50 @@ case object BinaryClassificationModelSelector {
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): BinaryClassificationModelSelector = {
-    val ts = new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
-      ts, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators
+      ts, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
   private def selector(
-    validator: OpValidator[ProbClassifierModel, ProbClassifier],
+    validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[Splitter],
-    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]]
-  ): BinaryClassificationModelSelector = {
-    new BinaryClassificationModelSelector(
+    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry],
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val modelStrings = modelTypesToUse.map(_.entryName)
+    val modelsToUse = if (modelsAndParameters == defaultModelsAndParams) {
+      modelsAndParameters.filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+    } else modelsAndParameters
+    new ModelSelector(
       validator = validator,
       splitter = splitter,
+      models = modelsToUse,
       evaluators = trainTestEvaluators
-    ) // models on by default
-      .setModelsToTry(RandomForest, LogisticRegression)
-      // Random forest defaults
-      .setRandomForestMaxDepth(MaxDepth: _*)
-      .setRandomForestImpurity(ImpurityClass)
-      .setRandomForestMaxBins(MaxBin)
-      .setRandomForestMinInfoGain(MinInfoGain: _*)
-      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setRandomForestNumTrees(MaxTrees)
-      .setRandomForestSubsamplingRate(SubsampleRate)
-      // Logistic regression defaults
-      .setLogisticRegressionElasticNetParam(ElasticNet)
-      .setLogisticRegressionFitIntercept(FitIntercept)
-      .setLogisticRegressionMaxIter(MaxIterLin)
-      .setLogisticRegressionRegParam(Regularization: _*)
-      .setLogisticRegressionStandardization(Standardized)
-      .setLogisticRegressionTol(Tol)
-      // NB defaults
-      .setNaiveBayesModelType(NbModel)
-      .setNaiveBayesSmoothing(NbSmoothing)
-      // DT defaults
-      .setDecisionTreeImpurity(ImpurityClass)
-      .setDecisionTreeMaxBins(MaxBin)
-      .setDecisionTreeMaxDepth(MaxDepth: _*)
-      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
-      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+    )
   }
 }
 
 /**
- * Binary Classification Model Selector
- *
- * @param validator Cross Validation or Train Validation Split
- * @param splitter  instance that will balance and/or split the data
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- * @param uid
+ * Enumeration of possible classification models in Model Selector
  */
-private[op] class BinaryClassificationModelSelector
-(
-  override val validator: OpValidator[ProbClassifierModel, ProbClassifier],
-  override val splitter: Option[Splitter],
-  override val evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-  override val uid: String = UID[BinaryClassificationModelSelector]
-) extends ClassificationModelSelector(validator, splitter, evaluators, uid) with StageOperationName {
+sealed trait BinaryClassificationModelsToTry extends ModelsToTry
 
-  override private[classification] val stage1uid: String = UID[Stage1BinaryClassificationModelSelector]
-
-  lazy val stage1 = new Stage1BinaryClassificationModelSelector(validator = validator, splitter = splitter,
-    evaluators = evaluators, uid = stage1uid, stage2uid = stage2uid, stage3uid = stage3uid)
+object BinaryClassificationModelsToTry extends Enum[BinaryClassificationModelsToTry] {
+  val values = findValues
+  case object OpLogisticRegression extends BinaryClassificationModelsToTry
+  case object OpRandomForestClassifier extends BinaryClassificationModelsToTry
+  case object OpGBTClassifier extends BinaryClassificationModelsToTry
+  case object OpLinearSVC extends BinaryClassificationModelsToTry // TODO need to ensure that eval works with this
+  case object OpDecisionTreeClassifier extends BinaryClassificationModelsToTry
+  case object OpNaiveBayes extends BinaryClassificationModelsToTry
 }
-
-/**
- * Stage 1 of BinaryClassificationModelSelector
- *
- * @param validator Cross Validation or Train Validation Split
- * @param splitter  instance that will balance and split the data
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- * @param uid
- */
-private[op] class Stage1BinaryClassificationModelSelector
-(
-  validator: OpValidator[ProbClassifierModel, ProbClassifier],
-  splitter: Option[Splitter],
-  evaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-  uid: String = UID[Stage1BinaryClassificationModelSelector],
-  stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
-  stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
-) extends Stage1ClassificationModelSelector(validator, splitter, evaluators, uid, stage2uid, stage3uid)

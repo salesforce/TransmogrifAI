@@ -30,17 +30,14 @@
 
 package com.salesforce.op.stages.impl.regression
 
-import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.TransientFeature
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
-import com.salesforce.op.stages.impl.regression.RegressorType._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames}
+import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.stages.makeOutputName
-
-import scala.util.Try
+import enumeratum.Enum
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{ModelType, EstimatorType}
 
 
 /**
@@ -51,7 +48,7 @@ case object RegressionModelSelector {
   /**
    * Creates a new Regression Model Selector with a Cross Validation
    */
-  def apply(): RegressionModelSelector = withCrossValidation()
+  def apply(): ModelSelector[ModelType, EstimatorType] = withCrossValidation()
 
   /**
    * Creates a new Regression Model Selector with a Cross Validation
@@ -73,8 +70,8 @@ case object RegressionModelSelector {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): RegressionModelSelector = {
-    val cv = new OpCrossValidation[RegressorModel, Regressor](
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(
@@ -102,8 +99,8 @@ case object RegressionModelSelector {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): RegressionModelSelector = {
-    val ts = new OpTrainValidationSplit[RegressorModel, Regressor](
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(
@@ -112,9 +109,10 @@ case object RegressionModelSelector {
   }
 
   private def selector(
-    validator: OpValidator[RegressorModel, Regressor],
+    validator: OpValidator[ModelType, EstimatorType],
     dataSplitter: Option[DataSplitter],
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]): RegressionModelSelector = {
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]
+  ): ModelSelector[ModelType, EstimatorType] = {
     new RegressionModelSelector(
       validator = validator,
       dataSplitter = dataSplitter,
@@ -158,25 +156,15 @@ case object RegressionModelSelector {
 }
 
 /**
- * Model Selector that selects best regression model
- *
- * @param validator         validator used for the model selector
- * @param uid
- * @param dataSplitter      instance that will split the data into training set and test set
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- *
+ * Enumeration of possible regression models in Model Selector
  */
-private[op] class RegressionModelSelector
-(
-  validator: OpValidator[RegressorModel, Regressor],
-  val dataSplitter: Option[DataSplitter],
-  evaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
-  uid: String = UID[RegressionModelSelector]
-) extends ModelSelectorBase[RegressorModel, Regressor](validator = validator, splitter = dataSplitter,
-  evaluators = evaluators, uid = uid)
-  with SelectorRegressors {
+sealed trait RegressionModelsToTry extends ModelsToTry
 
-  final override protected def getOutputsColNamesMap(f1: TransientFeature, f2: TransientFeature): Map[String, String] =
-    Map(StageParamNames.outputParam1Name -> makeOutputName(outputFeatureUid, Seq(f1, f2)))
-
+object RegressionModelsToTry extends Enum[RegressionModelsToTry] {
+  val values = findValues
+  case object LinearRegression extends RegressionModelsToTry
+  case object DecisionTreeRegression extends RegressionModelsToTry
+  case object RandomForestRegression extends RegressionModelsToTry
+  case object GBTRegression extends RegressionModelsToTry
+  case object GeneralizedLinearRegression extends RegressionModelsToTry
 }

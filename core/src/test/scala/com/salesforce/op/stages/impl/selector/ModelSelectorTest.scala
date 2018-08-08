@@ -34,8 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
-import com.salesforce.op.stages.OpPipelineStage2
-import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel, OpTransformer2}
+import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpLogisticRegressionModel, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpRandomForestRegressor}
@@ -48,7 +47,6 @@ import org.apache.spark.ml.classification.{LogisticRegression => SparkLR}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
-import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
@@ -193,8 +191,7 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
       .addGrid(lr.regParam, Array(100.0))
       .addGrid(lr.elasticNetParam, Array(0, 0.5)).build()
 
-    val validatorCV = new OpCrossValidation[Model[_] with OpTransformer2[RealNN, OPVector, Prediction],
-      Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]](
+    val validatorCV = new OpCrossValidation[ModelSelectorBaseNames.ModelType, ModelSelectorBaseNames.EstimatorType](
       numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(),
       stratify = false, parallelism = 1)
 

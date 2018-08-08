@@ -30,14 +30,14 @@
 
 package com.salesforce.op.stages.impl.classification
 
-import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, RandomForest}
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
+import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.StageOperationName
+import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
+import enumeratum.Enum
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{ModelType, EstimatorType}
 
 
 /**
@@ -48,7 +48,7 @@ case object MultiClassificationModelSelector {
   /**
    * Creates a new Multi Classification Model Selector with a Cross Validation
    */
-  def apply(): MultiClassificationModelSelector = withCrossValidation()
+  def apply(): ModelSelector[ModelType, EstimatorType] = withCrossValidation()
 
   /**
    * Creates a new Multi Classification Model Selector with a Cross Validation
@@ -73,8 +73,8 @@ case object MultiClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): MultiClassificationModelSelector = {
-    val cv = new OpCrossValidation[ProbClassifierModel, ProbClassifier](
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
@@ -105,8 +105,8 @@ case object MultiClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): MultiClassificationModelSelector = {
-    val ts = new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
@@ -115,10 +115,10 @@ case object MultiClassificationModelSelector {
   }
 
   private def selector(
-    validator: OpValidator[ProbClassifierModel, ProbClassifier],
+    validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[DataCutter],
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]]
-  ): MultiClassificationModelSelector = {
+  ): ModelSelector[ModelType, EstimatorType] = {
     new MultiClassificationModelSelector(
       validator = validator,
       splitter = splitter,
@@ -151,47 +151,15 @@ case object MultiClassificationModelSelector {
       .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
   }
 }
-
-
 /**
- * Multi Classification Model Selector
- *
- * @param validator Cross Validation or Train Validation Split
- * @param splitter  instance that will split the data
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- * @param uid
+ * Enumeration of possible classification models in Model Selector
  */
-private[op] class MultiClassificationModelSelector
-(
-  override val validator: OpValidator[ProbClassifierModel, ProbClassifier],
-  override val splitter: Option[DataCutter],
-  override val evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-  override val uid: String = UID[MultiClassificationModelSelector]
-) extends ClassificationModelSelector(validator, splitter, evaluators, uid) with StageOperationName {
+sealed trait MultiClassClassificationModelsToTry extends ModelsToTry
 
-  override private[classification] val stage1uid: String = UID[Stage1MultiClassificationModelSelector]
-
-  lazy val stage1 = new Stage1MultiClassificationModelSelector(validator = validator,
-    splitter = splitter.asInstanceOf[Option[DataCutter]], evaluators = evaluators,
-    uid = stage1uid, stage2uid = stage2uid, stage3uid = stage3uid)
+object MultiClassClassificationModelsToTry extends Enum[MultiClassClassificationModelsToTry] {
+  val values = findValues
+  case object LogisticRegression extends MultiClassClassificationModelsToTry
+  case object RandomForest extends MultiClassClassificationModelsToTry
+  case object DecisionTree extends MultiClassClassificationModelsToTry
+  case object NaiveBayes extends MultiClassClassificationModelsToTry
 }
-
-
-
-/**
- * Stage 1 of MultiClassificationModelSelector
- *
- * @param validator Cross Validation or Train Validation Split
- * @param splitter  instance that will split the data
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- * @param uid
- */
-private[op] class Stage1MultiClassificationModelSelector
-(
-  validator: OpValidator[ProbClassifierModel, ProbClassifier],
-  splitter: Option[DataCutter],
-  evaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-  uid: String = UID[Stage1MultiClassificationModelSelector],
-  stage2uid: String = UID[SwTernaryTransformer[_, _, _, _, _]],
-  stage3uid: String = UID[SwQuaternaryTransformer[_, _, _, _, _, _]]
-) extends Stage1ClassificationModelSelector(validator, splitter, evaluators, uid, stage2uid, stage3uid)
