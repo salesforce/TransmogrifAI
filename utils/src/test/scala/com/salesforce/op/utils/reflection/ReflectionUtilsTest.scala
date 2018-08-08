@@ -213,7 +213,7 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   it should "reflected method should be fast to execute" in {
     val myClass = new TestClassVar()
     val method = ReflectionUtils.reflectMethod(myClass, "getValue")
-    val max = 100000
+    val max = 50000
     def measure(fun: => Int): Long = {
       val start = System.currentTimeMillis()
       (0 until max).foreach(_ => fun shouldBe 2)
