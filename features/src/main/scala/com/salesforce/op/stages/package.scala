@@ -54,9 +54,9 @@ package object stages {
   private[stages] def makeOutputName(
     featureUid: String, inputs: Seq[TransientFeature], numberOperations: Int = 1
   ): String = {
-    val origins = inputs.flatMap(_.originFeatures).distinct.sorted.mkString("-").replaceAll("[^A-Za-z-]+", "")
+    val origins = inputs.flatMap(_.originFeatures).distinct.sorted.mkString("_").replaceAll("[^A-Za-z_]+", "")
     val stages = inputs.flatMap(_.stages).distinct.length + numberOperations
-    s"${origins}_$stages-stagesApplied_$featureUid"
+    s"${origins}_${stages}_stagesApplied_$featureUid"
   }
 
   /**

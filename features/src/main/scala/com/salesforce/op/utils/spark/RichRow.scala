@@ -116,6 +116,27 @@ object RichRow {
     def getFeatureType[T <: FeatureType](f: TransientFeature)(implicit conv: FeatureTypeSparkConverter[T]): T =
       conv.fromSpark(getAny(f.name))
 
+    /**
+     * Converts row to a [[collection.mutable.Map]]
+     *
+     * @return a [[collection.mutable.Map]] with row contents
+     */
+    def toMutableMap: collection.mutable.Map[String, Any] = {
+      val res = collection.mutable.Map.empty[String, Any]
+      val fields = row.schema.fields
+      for {i <- 0 until row.size} {
+        res += fields(i).name -> row(i)
+      }
+      res
+    }
+
+    /**
+     * Converts row to a [[collection.immutable.Map]]
+     *
+     * @return a [[collection.immutable.Map]] with row contents
+     */
+    def toMap: Map[String, Any] = toMutableMap.toMap
+
   }
 
 }

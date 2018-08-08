@@ -1,0 +1,13 @@
+dependencies {
+    compile project(':core')
+    testCompile project(':testkit')
+
+    // PFA serialization for Spark
+    // TODO: replace with official Aardpfark release when ready
+    compile "com.github.relateiq:aardpfark:0.1.0-SNAPSHOT"
+
+    // Hadrian PFA runtime for PFA
+    // TODO: replace with official Hadrian release when ready
+    compileOnly "com.github.opendatagroup:hadrian:v0.8.5"
+    testRuntime "com.github.opendatagroup:hadrian:v0.8.5"
+}
