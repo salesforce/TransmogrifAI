@@ -36,7 +36,7 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.impl.selector.{ModelSelectorBaseNames, StageParamNames, _}
-import com.salesforce.op.utils.stages.RichParamMap._
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.log4j.{Level, LogManager}

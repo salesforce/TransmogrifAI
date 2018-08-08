@@ -40,7 +40,7 @@ import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.stages.RichParamMap._
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model}

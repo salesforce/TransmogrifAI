@@ -28,7 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.stages
+package com.salesforce.op.utils.spark
 
 import com.salesforce.op.features.TransientFeature
 import org.apache.spark.ml.PipelineStage
