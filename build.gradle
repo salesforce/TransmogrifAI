@@ -21,6 +21,9 @@ allprojects {
     repositories {
         mavenCentral()
         maven { url 'https://jitpack.io' }
+        // Needed for XGboost
+        // TODO: remove this repo once XGBoost is published into Maven Central or similar
+        maven { url 'https://raw.githubusercontent.com/CodingCat/xgboost/maven-repo/' }
     }
 }
 
