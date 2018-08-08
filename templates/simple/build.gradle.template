@@ -1,7 +1,7 @@
 buildscript {
     repositories {
-        maven { url "https://plugins.gradle.org/m2/" }
         mavenCentral()
+        maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
@@ -70,10 +70,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // TransmogrifAI
-    compile "com.salesforce.op:transmogrifai-core_$scalaVersion:$opVersion"
+    compile "com.salesforce:transmogrifai-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce.op:transmogrifai-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce:transmogrifai-models_$scalaVersion:$opVersion"
 
     // Test
     testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
