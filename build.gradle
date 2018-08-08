@@ -78,7 +78,7 @@ configure(allProjs) {
         googleLibPhoneNumberVersion = '8.8.5'
         googleGeoCoderVersion = '2.82'
         googleCarrierVersion = '1.72'
-        chillAvroVersion = '0.8.4'
+        chillVersion = '0.8.4'
         reflectionsVersion = '0.9.11'
         collectionsVersion = '3.2.2'
         optimaizeLangDetectorVersion = '0.7.1'
