@@ -1,3 +1,8 @@
+repositories {
+    // Needed for XGboost
+    maven { url 'https://raw.githubusercontent.com/CodingCat/xgboost/maven-repo/' }
+}
+
 dependencies {
     compile project(':readers')
     testRuntime project(':models')
