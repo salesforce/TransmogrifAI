@@ -30,18 +30,16 @@
 
 package com.salesforce.op.filters
 
-import scala.math.round
-
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test.TestSparkContext
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.linalg.{Matrix, Vector}
+import com.twitter.algebird.Tuple2Semigroup
 import org.apache.spark.mllib.stat.Statistics
-import org.apache.spark.rdd.RDD
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.filters.Summary._
 
 @RunWith(classOf[JUnitRunner])
 class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
@@ -65,6 +63,7 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
     responses = Map(responseKey2 -> Right(Seq(-0.5))),
     predictors = Map(predictorKey2A -> Left(Seq("iv"))))
   val allPreparedFeatures = Seq(preparedFeatures1, preparedFeatures2, preparedFeatures3)
+  implicit val sgTuple2 = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
   val (allResponseSummaries, allPredictorSummaries) = allPreparedFeatures.map(_.summaries).reduce(_ + _)
 
   val allResponseKeys1 = Array(responseKey1, responseKey2)

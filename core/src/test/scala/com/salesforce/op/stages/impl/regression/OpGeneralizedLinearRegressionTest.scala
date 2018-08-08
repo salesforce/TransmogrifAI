@@ -44,6 +44,8 @@ class OpGeneralizedLinearRegressionTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[GeneralizedLinearRegressionModel],
   OpPredictorWrapper[GeneralizedLinearRegression, GeneralizedLinearRegressionModel]] with PredictionEquality {
 
+  override def specName: String = classOf[OpGeneralizedLinearRegression].getSimpleName
+
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](
       (10.0.toRealNN, Vectors.dense(1.0, 4.3, 1.3).toOPVector),

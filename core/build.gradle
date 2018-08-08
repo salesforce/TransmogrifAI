@@ -22,4 +22,7 @@ dependencies {
 
     // Scopt
     compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
+
+    // XGBoost
+    compile "ml.dmlc:xgboost4j-spark:0.80-SNAPSHOT"
 }

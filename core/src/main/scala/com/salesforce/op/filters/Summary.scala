@@ -45,7 +45,7 @@ private[op] case object Summary {
   val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity)
 
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
-    override def zero = empty
+    override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = Summary(math.min(l.min, r.min), math.max(l.max, r.max))
   }
 
