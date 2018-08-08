@@ -169,6 +169,7 @@ private[op] object EvaluationMetrics {
         JsonUtils.fromString[RegressionMetrics](json).getOrElse(error(classOf[RegressionMetrics]))
       case n if n == classOf[SingleMetric].getSimpleName =>
         JsonUtils.fromString[SingleMetric](json).getOrElse(error(classOf[SingleMetric]))
+      case n => throw new IllegalArgumentException(s"Could not extract metrics of type $n from ${json.mkString(",")}")
     }
   }
 }
