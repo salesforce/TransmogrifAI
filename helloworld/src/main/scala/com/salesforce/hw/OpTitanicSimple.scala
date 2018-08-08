@@ -74,7 +74,7 @@ case class Passenger
 )
 
 /**
- * A simplified Optimus Prime example classification app using the Titanic dataset
+ * A simplified TransmogrifAI example classification app using the Titanic dataset
  */
 object OpTitanicSimple {
 
