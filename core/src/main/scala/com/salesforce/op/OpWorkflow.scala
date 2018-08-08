@@ -49,7 +49,7 @@ import scala.util.{Failure, Success, Try}
 
 
 /**
- * Workflow for Optimus Prime. Takes the final features that the user wants to generate as inputs and
+ * Workflow for TransmogrifAI. Takes the final features that the user wants to generate as inputs and
  * constructs the full DAG needed to generate them from those features lineage. Then fits any estimators in the
  * pipeline dag to create a sequence of transformations that are saved in a workflow model.
  *

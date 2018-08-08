@@ -41,7 +41,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 /**
- * Optimus Prime MultiClass Classification example on the Iris Dataset
+ * TransmogrifAI MultiClass Classification example on the Iris Dataset
  */
 object OpIris extends OpAppWithRunner with IrisFeatures {
 

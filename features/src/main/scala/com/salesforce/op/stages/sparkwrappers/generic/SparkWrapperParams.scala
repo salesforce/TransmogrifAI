@@ -56,7 +56,7 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   )
 
   final val sparkMlStage = new SparkStageParam[S](
-    parent = this, name = "sparkMlStage", doc = "the spark stage that is being wrapped for optimus prime"
+    parent = this, name = "sparkMlStage", doc = "the spark stage that is being wrapped for TransmogrifAI"
   )
 
   setDefault(sparkMlStage, None)

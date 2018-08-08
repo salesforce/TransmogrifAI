@@ -135,7 +135,7 @@ trait InputParams extends Params {
 }
 
 /**
- * Parameters shared across all Optimus Prime base stages
+ * Parameters shared across all TransmogrifAI base stages
  */
 trait OpPipelineStageParams extends InputParams {
 
