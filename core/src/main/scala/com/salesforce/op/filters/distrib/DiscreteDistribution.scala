@@ -28,20 +28,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.filters.distrib
 
 import com.salesforce.op.features.types.FeatureType
 
-trait ContinuousDistribution[T <: FeatureType] extends Distribution[T] {
+trait DiscreteDistribution[T <: FeatureType] extends Distribution[T] {
 
-  def density(x: Double): Double
+  def values: Set[Double]
 
-  final def jsDivergence(dist: ContinuousDistribution[T], n: Int): Double = {
+  def mass(x: Double): Double
+
+  final def jsDivergence(dist: DiscreteDistribution[T]): Double = {
     val f: Distribution[T] => Double => Double = _ match {
-      case d: ContinuousDistribution[_] => d.asInstanceOf[ContinuousDistribution[T]].density(_)
+      case d: DiscreteDistribution[_] => d.asInstanceOf[DiscreteDistribution[T]].mass(_)
       case _ => throw new RuntimeException("Attempting to compare incompatible distributions")
     }
-
-    jsFunc(dist, f)(mcSample(dist, n))
+    jsFunc(dist, f)(values.intersect(dist.values))
   }
 }

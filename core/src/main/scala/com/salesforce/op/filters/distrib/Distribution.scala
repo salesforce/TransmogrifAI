@@ -28,7 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.filters.distrib
 
 import com.salesforce.op.features.types.FeatureType
 
@@ -62,7 +62,7 @@ trait Distribution[T <: FeatureType] {
   def minimum: Double
 
   /**
-   * Evaluates CDF at input point for the associated R.V. distribution
+   * Evaluates CDF at input point for the associated distribution
    *
    * @param x input value
    */
