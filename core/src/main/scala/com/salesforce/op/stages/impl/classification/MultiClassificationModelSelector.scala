@@ -169,7 +169,7 @@ private[op] class MultiClassificationModelSelector
   override val uid: String = UID[MultiClassificationModelSelector]
 ) extends ClassificationModelSelector(validator, splitter, evaluators, uid) with StageOperationName {
 
-  override private[classification] val stage1uid: String = UID[Stage1BinaryClassificationModelSelector]
+  override private[classification] val stage1uid: String = UID[Stage1MultiClassificationModelSelector]
 
   lazy val stage1 = new Stage1MultiClassificationModelSelector(validator = validator,
     splitter = splitter.asInstanceOf[Option[DataCutter]], evaluators = evaluators,
