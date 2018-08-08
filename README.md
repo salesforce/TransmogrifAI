@@ -152,10 +152,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // TransmogrifAI
-    compile "com.salesforce.op:transmogrifai-core_$scalaVersion:$opVersion"
+    compile "com.salesforce:transmogrifai-core_$scalaVersion:$opVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce.op:transmogrifai-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce:transmogrifai-models_$scalaVersion:$opVersion"
 
     // All your other depdendecies go below
     // ...
