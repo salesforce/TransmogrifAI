@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorBaseNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.test.TestSparkContext
@@ -291,18 +291,19 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     log.info(model.getMetadata().toString)
 
     // Evaluation from train data should be there
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+      .holdoutEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
@@ -336,18 +337,18 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     log.info(model.getMetadata().toString)
 
     // evaluation metrics from test set should be in metadata
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
@@ -453,23 +454,23 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     assert(testEstimator.evaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
 
     // checking trainingEval & holdOutEval metrics
-    val metaData = model.getMetadata().getSummaryMetadata()
-    val trainMetaData = metaData.getMetadata(ModelSelectorBaseNames.TrainingEval)
-    val holdOutMetaData = metaData.getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val trainMetaData = metaData.trainEvaluation
+    val holdOutMetaData = metaData.holdoutEvaluation.get
 
     testEstimator.evaluators.foreach {
       case evaluator: OpBinaryClassificationEvaluator => {
         BinaryClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
-            metadata => assert(metadata.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-              s"Metric ${metric.entryName} is not present in metadata: " + metadata.json)
+            metadata => assert(metadata.toJson(false).contains(s"${metric.entryName}"),
+              s"Metric ${metric.entryName} is not present in metadata: " + metadata)
           )
         )
       }
       case evaluator: OpBinaryClassificationEvaluatorBase[_] => {
         Seq(trainMetaData, holdOutMetaData).foreach(metadata =>
-          assert(metadata.contains(s"(${evaluator.name})_${evaluator.name}"),
-            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata.json)
+          assert(metadata.toJson(false).contains(s"${evaluator.name.humanFriendlyName}"),
+            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata)
         )
       }
     }
@@ -480,19 +481,19 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val myParam = 42
     val myMetaName = "myMeta"
     val myMetaValue = 348954389534875.432423
-    val myMetadata = new MetadataBuilder().putDouble(myMetaName, myMetaValue)
+    val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
+      Map.empty)
     val myEstimatorName = "myEstimator"
     val myEstimator = new SparkLR().setMaxIter(myParam)
 
-    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, myMetadata)
+    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, Seq(myMetadata))
     modelSelector.stage1.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
     fitted.getParams.get(myEstimator.maxIter).get shouldBe myParam
 
-    val meta = fitted.stage1.getMetadata().getMetadata("summary")
-    meta.getDouble(myMetaName) shouldBe myMetaValue
-    meta.getString("bestModelName") shouldBe myEstimatorName
+    val meta = ModelSelectorSummary.fromMetadata(fitted.stage1.getMetadata().getSummaryMetadata())
+    meta.validationResults.head shouldBe myMetadata
   }
 
 }

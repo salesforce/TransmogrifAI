@@ -56,7 +56,8 @@ class RichMetadataTest extends FlatSpec with TestCommon {
   }
 
   it should "throw an error on unsupported type in a map" in {
-    the[RuntimeException] thrownBy Map("a" -> Map("b" -> 1)).toMetadata
+    the[RuntimeException] thrownBy Map("a" -> TestClass("test")).toMetadata
   }
 
 }
+case class TestClass(name: String)
