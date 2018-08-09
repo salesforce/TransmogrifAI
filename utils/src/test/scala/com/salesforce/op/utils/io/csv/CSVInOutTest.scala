@@ -30,6 +30,8 @@
 
 package com.salesforce.op.utils.io.csv
 
+import java.io.File
+
 import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{AnalysisException, DataFrame}
@@ -37,10 +39,15 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.language.postfixOps
+
 @RunWith(classOf[JUnitRunner])
 class CSVInOutTest extends FlatSpec with TestSparkContext {
+  private val testDataDirPath: String = {
+    Some(new File("test-data")) filter (_.isDirectory) getOrElse new File("../test-data") getPath
+  }
   private val csvReader = new CSVInOut(CSVOptions(header = true))
-  private val f1 = resourceFile(name = "test_sample.csv")
+  private val csvFile = s"$testDataDirPath/PassengerDataAllWithHeader.csv"
 
   Spec[CSVInOut] should "throw error for bad file paths" in {
     var error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))
@@ -51,14 +58,14 @@ class CSVInOutTest extends FlatSpec with TestSparkContext {
   }
 
   it should "read a CSV file to DataFrame" in {
-    val res = csvReader.readDataFrame(f1.getAbsolutePath)
+    val res = csvReader.readDataFrame(csvFile)
     res shouldBe a[DataFrame]
-    res.count shouldBe 100
+    res.count shouldBe 891
   }
 
   it should "read a CSV file to RDD" in {
-    val res = csvReader.readRDD(f1.getAbsolutePath)
-    res   shouldBe a[RDD[Seq[String]]]
-    res.count shouldBe 100
+    val res = csvReader.readRDD(csvFile)
+    res shouldBe a[RDD[Seq[String]]]
+    res.count shouldBe 891
   }
 }
