@@ -167,7 +167,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary = model1.summary()
     log.info(summary)
     summary should include (classOf[SanityChecker].getSimpleName)
-    summary should include (""""HoldoutEvaluation" : [ "MultiMetrics"""")
+    summary should include (""""HoldoutEvaluation" : [ "com.salesforce.op.evaluators.MultiMetrics"""")
     summary should include ("TrainEvaluation")
   }
 
