@@ -49,11 +49,13 @@ class CSVInOutTest extends FlatSpec with TestSparkContext {
   private val csvReader = new CSVInOut(CSVOptions(header = true))
   private val csvFile = s"$testDataDirPath/PassengerDataAllWithHeader.csv"
 
-  Spec[CSVInOut] should "throw error for bad file paths" in {
-    var error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))
+  Spec[CSVInOut] should "throw error for bad file paths with DataFrame" in {
+    val error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))
     error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/dataframe;")
-
-    error = intercept[AnalysisException](csvReader.readRDD("/bad/file/path/read/rdd"))
+  }
+  
+  it should "throw error for bad file paths with RDD" in {
+    val error = intercept[AnalysisException](csvReader.readRDD("/bad/file/path/read/rdd"))
     error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/rdd;")
   }
 
