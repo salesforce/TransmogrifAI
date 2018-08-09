@@ -204,7 +204,7 @@ object BinaryClassificationModelsToTry extends Enum[BinaryClassificationModelsTo
   case object OpLogisticRegression extends BinaryClassificationModelsToTry
   case object OpRandomForestClassifier extends BinaryClassificationModelsToTry
   case object OpGBTClassifier extends BinaryClassificationModelsToTry
-  case object OpLinearSVC extends BinaryClassificationModelsToTry // TODO need to ensure that eval works with this
+  case object OpLinearSVC extends BinaryClassificationModelsToTry
   case object OpDecisionTreeClassifier extends BinaryClassificationModelsToTry
   case object OpNaiveBayes extends BinaryClassificationModelsToTry
 }
