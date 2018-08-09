@@ -132,48 +132,6 @@ trait EvaluationMetrics extends JsonLike {
   def toMetadata: Metadata = this.toMap.toMetadata
 }
 
-private[op] object EvaluationMetrics {
-
-  /**
-   * Decode metric values from JSON string
-   *
-   * @param json encoded metrics
-   */
-  def fromJson(className: String, json: String): EvaluationMetrics = {
-    def error(c: Class[_]) = throw new IllegalArgumentException(
-      s"Could not extract metrics of type $c from ${json.mkString(",")}"
-    )
-    className match {
-      case n if n == classOf[MultiMetrics].getSimpleName =>
-        JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
-          val asMetrics = d.flatMap{ case (_, values) => values.map{
-            case (nm: String, mp: Map[String, Any]@unchecked) =>
-              val valsJson = JsonUtils.toJsonString(mp) // gross but it works TODO try to find a better way
-              nm match {
-                case OpEvaluatorNames.Binary.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.Multi.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.Regression.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[RegressionMetrics](valsJson).get
-                case _ => nm -> JsonUtils.fromString[SingleMetric](valsJson).get
-              }}
-          }
-          MultiMetrics(asMetrics)
-        }.getOrElse(error(classOf[MultiMetrics]))
-      case n if n == classOf[BinaryClassificationMetrics].getSimpleName =>
-        JsonUtils.fromString[BinaryClassificationMetrics](json).getOrElse(error(classOf[BinaryClassificationMetrics]))
-      case n if n == classOf[MultiClassificationMetrics].getSimpleName =>
-        JsonUtils.fromString[MultiClassificationMetrics](json).getOrElse(error(classOf[MultiClassificationMetrics]))
-      case n if n == classOf[RegressionMetrics].getSimpleName =>
-        JsonUtils.fromString[RegressionMetrics](json).getOrElse(error(classOf[RegressionMetrics]))
-      case n if n == classOf[SingleMetric].getSimpleName =>
-        JsonUtils.fromString[SingleMetric](json).getOrElse(error(classOf[SingleMetric]))
-      case n => throw new IllegalArgumentException(s"Could not extract metrics of type $n from ${json.mkString(",")}")
-    }
-  }
-}
-
 /**
  * Base Interface for OpEvaluator to be used in Evaluator creation. Can be used for both OP and spark
  * eval (so with workflows and cross validation).
@@ -326,6 +284,9 @@ trait EvalMetric extends EnumEntry with Serializable {
 
 }
 
+/**
+ * Eval metric companion object
+ */
 object EvalMetric {
 
   def withNameInsensitive(name: String): EvalMetric = {
@@ -385,6 +346,9 @@ sealed abstract class RegressionEvalMetric
   val humanFriendlyName: String
 ) extends EvalMetric
 
+/**
+ * Regression Metrics
+ */
 object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   val values: Seq[RegressionEvalMetric] = findValues
   case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")

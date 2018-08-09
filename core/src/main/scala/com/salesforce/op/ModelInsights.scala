@@ -82,7 +82,7 @@ case class ModelInsights
    * @return json string
    */
   def toJson(pretty: Boolean = true): String = {
-    implicit val formats = ModelInsights.SerFormats
+    implicit val formats = ModelInsights.SerializationFormats
     if (pretty) writePretty(this) else write(this)
   }
 
@@ -362,23 +362,24 @@ case class Insights
 case object ModelInsights {
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  val SerFormats: Formats = Serialization.formats(FullTypeHints(List(
-    classOf[Continuous], classOf[Discrete],
-    classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
-    classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics], classOf[ThresholdMetrics],
-    classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
-  ))) +
-    EnumEntrySerializer.json4s[ValidationType](ValidationType) +
-    EnumEntrySerializer.json4s[ProblemType](ProblemType) +
-    new SpecialDoubleSerializer +
-    new CustomSerializer[EvalMetric](_ =>
-        ( {
-          case JString(s) => EvalMetric.withNameInsensitive(s)
-        }, {
-          case x: EvalMetric => JString(x.entryName)
-        }
-        )
+  val SerializationFormats: Formats = {
+    val typeHints = FullTypeHints(List(
+      classOf[Continuous], classOf[Discrete],
+      classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
+      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics], classOf[ThresholdMetrics],
+      classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
+    ))
+    val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>
+      ( { case JString(s) => EvalMetric.withNameInsensitive(s) },
+        { case x: EvalMetric => JString(x.entryName) }
       )
+    )
+    Serialization.formats(typeHints) +
+      EnumEntrySerializer.json4s[ValidationType](ValidationType) +
+      EnumEntrySerializer.json4s[ProblemType](ProblemType) +
+      new SpecialDoubleSerializer +
+      evalMetricsSerializer
+  }
 
   /**
    * Read ModelInsights from a json
@@ -387,7 +388,7 @@ case object ModelInsights {
    * @return Try[ModelInsights]
    */
   def fromJson(json: String): Try[ModelInsights] = {
-    implicit val formats: Formats = SerFormats
+    implicit val formats: Formats = SerializationFormats
     Try { read[ModelInsights](json) }
   }
 

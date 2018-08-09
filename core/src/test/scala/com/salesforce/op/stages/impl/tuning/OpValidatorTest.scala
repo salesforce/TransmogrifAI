@@ -45,7 +45,8 @@ import org.apache.spark.sql.types.MetadataBuilder
 import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
-class OpValidatorTest extends FlatSpec with TestSparkContext {
+class
+OpValidatorTest extends FlatSpec with TestSparkContext {
   // Random Data
   val count = 1000
   val sizeOfVector = 2
@@ -107,7 +108,6 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    println(balancer.get.summary)
     balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 

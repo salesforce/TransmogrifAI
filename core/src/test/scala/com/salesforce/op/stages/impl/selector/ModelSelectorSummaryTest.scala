@@ -107,7 +107,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     decoded.bestModelName shouldEqual summary.bestModelName
     decoded.bestModelType shouldEqual summary.bestModelType
     decoded.validationResults shouldEqual summary.validationResults
-    decoded.trainEvaluation.toJson() shouldEqual summary.trainEvaluation.toJson()
+    decoded.trainEvaluation shouldEqual summary.trainEvaluation
     decoded.holdoutEvaluation shouldEqual summary.holdoutEvaluation
   }
 
