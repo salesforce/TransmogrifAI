@@ -65,7 +65,7 @@ class CSVInOutTest extends FlatSpec with TestSparkContext {
 
   it should "read a CSV file to RDD" in {
     val res = csvReader.readRDD(csvFile)
-    res shouldBe a[RDD[Seq[String]]]
+    res shouldBe a[RDD[_]]
     res.count shouldBe 891
   }
 }
