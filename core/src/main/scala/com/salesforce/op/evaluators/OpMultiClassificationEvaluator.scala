@@ -58,7 +58,7 @@ import scala.collection.mutable
  */
 private[op] class OpMultiClassificationEvaluator
 (
-  override val name: String = OpEvaluatorNames.multi,
+  override val name: EvalMetric = OpEvaluatorNames.Multi,
   override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpMultiClassificationEvaluator]
 ) extends OpMultiClassificationEvaluatorBase[MultiClassificationMetrics](uid) {
@@ -306,3 +306,4 @@ case class ThresholdMetrics
   @JsonDeserialize(keyAs = classOf[java.lang.Integer])
   noPredictionCounts: Map[Int, Seq[Long]]
 ) extends EvaluationMetrics
+

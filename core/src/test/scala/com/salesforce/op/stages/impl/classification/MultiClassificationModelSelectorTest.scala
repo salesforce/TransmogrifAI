@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorBaseNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.test.TestSparkContext
@@ -281,18 +281,18 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     log.info(model.getMetadata().prettyJson)
 
     // evaluation metrics from test set should be in metadata
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.multi})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.multi})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData2.holdoutEvaluation.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData2.holdoutEvaluation)
     )
 
     val transformedData = model.transform(data)
@@ -371,23 +371,23 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     assert(testEstimator.evaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
 
     // checking trainingEval & holdOutEval metrics
-    val metaData = model.getMetadata().getSummaryMetadata()
-    val trainMetaData = metaData.getMetadata(ModelSelectorBaseNames.TrainingEval)
-    val holdOutMetaData = metaData.getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val trainMetaData = metaData.trainEvaluation.toJson(false)
+    val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
 
     testEstimator.evaluators.foreach {
       case evaluator: OpMultiClassificationEvaluator => {
         MultiClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
-            metadata => assert(metadata.contains(s"(${OpEvaluatorNames.multi})_${metric.entryName}"),
-              s"Metric ${metric.entryName} is not present in metadata: " + metadata.json)
+            metadata => assert(metadata.contains(s"${metric.entryName}"),
+              s"Metric ${metric.entryName} is not present in metadata: " + metadata)
           )
         )
       }
       case evaluator: OpMultiClassificationEvaluatorBase[_] => {
         Seq(trainMetaData, holdOutMetaData).foreach(
-          metadata => assert(metadata.contains(s"(${evaluator.name})_${evaluator.name}"),
-            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata.json)
+          metadata => assert(metadata.contains(s"${evaluator.name.humanFriendlyName}"),
+            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata)
         )
       }
     }
@@ -397,19 +397,19 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val modelSelector: MultiClassificationModelSelector = MultiClassificationModelSelector().setInput(label, features)
     val myParam = "entropy"
     val myMetaName = "myMeta"
-    val myMetaValue = "This is a string metadata"
-    val myMetadata = new MetadataBuilder().putString(myMetaName, myMetaValue)
+    val myMetaValue = 0.5
+    val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
+      Map.empty)
     val myEstimatorName = "myEstimatorIsAwesome"
     val myEstimator = new DecisionTreeClassifier().setImpurity(myParam)
 
-    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, myMetadata)
+    val bestEstimator = new BestEstimator[ProbClassifier](myEstimatorName, myEstimator, Seq(myMetadata))
     modelSelector.stage1.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
     fitted.getParams.get(myEstimator.impurity).get shouldBe myParam
 
-    val meta = fitted.stage1.getMetadata().getMetadata("summary")
-    meta.getString(myMetaName) shouldBe myMetaValue
-    meta.getString("bestModelName") shouldBe myEstimatorName
+    val meta = ModelSelectorSummary.fromMetadata(fitted.stage1.getMetadata().getSummaryMetadata())
+    meta.validationResults.head shouldBe myMetadata
   }
 }

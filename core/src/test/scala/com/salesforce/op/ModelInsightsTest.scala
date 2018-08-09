@@ -30,19 +30,21 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, BinaryClassificationMetrics}
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.features.types.{PickList, Prediction, Real, RealNN}
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, NaiveBayes}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.RegressionModelSelector
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
 import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.junit.runner.RunWith
+import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
@@ -50,6 +52,22 @@ import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
+
+  implicit val doubleEquality = new Equality[Double] {
+    def areEqual(a: Double, b: Any): Boolean = b match {
+      case s: Double => (a.isNaN && s.isNaN) || (a == b)
+      case _ => false
+    }
+  }
+
+  implicit val doubleOptEquality = new Equality[Option[Double]] {
+    def areEqual(a: Option[Double], b: Any): Boolean = b match {
+      case None => a.isEmpty
+      case s: Option[Double] => (a.exists(_.isNaN) && s.exists(_.isNaN)) ||
+        (a.nonEmpty && a.toSeq.zip(s.toSeq).forall{ case (n, m) => n == m })
+      case _ => false
+    }
+  }
 
   private val density = weight / height
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
@@ -199,7 +217,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       f.variance.nonEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
     }
-    insights.selectedModelInfo.contains("crossValidationResults") shouldBe true
+    insights.selectedModelInfo.get.validationType shouldBe CrossValidation
     insights.trainingParams shouldEqual params
     insights.stageInfo.keys.size shouldEqual 13
   }
@@ -230,7 +248,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       f.variance.isEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
     }
-    insights.selectedModelInfo.contains("trainValidationSplitResults") shouldBe true
+    insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
     insights.trainingParams shouldEqual params
     insights.stageInfo.keys.size shouldEqual 10
   }
@@ -249,42 +267,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
   }
 
-  it should "return best model information" in {
-    val insights = workflowModel.modelInsights(prob)
-    insights.selectedModelUID should startWith("logreg_")
-    insights.selectedModelName should startWith("logreg_")
-    insights.selectedModelType shouldBe LogisticRegression
-    val bestModelValidationResults = insights.selectedModelValidationResults
-    bestModelValidationResults.size shouldBe 15
-    bestModelValidationResults.get(BinaryClassEvalMetrics.AuPR.humanFriendlyName) shouldBe Some("0.0")
-    val validationResults = insights.validationResults
-    validationResults.size shouldBe 2
-    validationResults.get(insights.selectedModelName) shouldBe Some(bestModelValidationResults)
-    insights.validationResults(LogisticRegression) shouldBe validationResults
-    insights.validationResults(NaiveBayes) shouldBe Map.empty
-  }
-
-  it should "return test/train evaluation metrics" in {
-    val insights = workflowModel.modelInsights(prob)
-    insights.evaluationMetricType shouldBe BinaryClassEvalMetrics.AuPR
-    insights.validationType shouldBe ValidationType.CrossValidation
-    insights.validatedModelTypes shouldBe Set(LogisticRegression)
-
-    insights.problemType shouldBe ProblemType.BinaryClassification
-    insights.selectedModelTrainEvalMetrics shouldBe
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0,
-        Seq(0.0), Seq(0.0), Seq(0.0), Seq(1.0))
-    insights.selectedModelTestEvalMetrics shouldBe Some(
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.5, 0.75, 0.5, 0.0, 1.0, 0.0, 1.0,
-        Seq(0.0), Seq(0.5), Seq(1.0), Seq(1.0))
-    )
-  }
-
   it should "pretty print" in {
     val insights = workflowModel.modelInsights(prob)
     val pretty = insights.prettyPrint()
     pretty should include(s"Selected Model - $LogisticRegression")
-    pretty should include("| area under PR    | 0.0")
+    pretty should include("area under precision-recall | 0.0")
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
     pretty should include("Top Positive Correlations")
@@ -296,9 +283,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
       case Success(deser) =>
-        insights.label.labelName shouldEqual deser.label.labelName
-        insights.features.length shouldEqual deser.features.length
-        insights.selectedModelInfo.keys shouldEqual deser.selectedModelInfo.keys
+        insights.label shouldEqual deser.label
+        insights.features.zip(deser.features).foreach{
+          case (i, o) =>
+            i.featureName shouldEqual o.featureName
+            i.featureType shouldEqual o.featureType
+            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+        }
+        insights.selectedModelInfo shouldEqual deser.selectedModelInfo
         insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
         insights.stageInfo.keys shouldEqual deser.stageInfo.keys
     }
