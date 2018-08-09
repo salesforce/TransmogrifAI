@@ -107,7 +107,6 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    println(balancer.get.summary)
     balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 

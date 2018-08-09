@@ -36,6 +36,11 @@ import com.salesforce.op.stages.impl.MetadataLike
 import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.sql.types.Metadata
+
+import scala.util.Try
+
 
 
 
@@ -118,7 +123,9 @@ trait SplitterSummary extends MetadataLike
 
 private[op] object SplitterSummary {
   val ClassName: String = "className"
-  def fromMap(map: Map[String, Any]): SplitterSummary = {
+
+  def fromMetadata(metadata: Metadata): Try[SplitterSummary] = Try {
+    val map = metadata.wrapped.underlyingMap
     map(ClassName) match {
       case s if s == classOf[DataSplitterSummary].getCanonicalName => DataSplitterSummary()
       case s if s == classOf[DataBalancerSummary].getCanonicalName => DataBalancerSummary(

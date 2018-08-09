@@ -49,7 +49,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
  * @param wtt         feature's value type tag
  * @tparam O feature value type
  */
-private[op] case class Feature[O <: FeatureType]
+case class Feature[O <: FeatureType] private[op]
 (
   name: String,
   isResponse: Boolean,

@@ -38,7 +38,6 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.{DataFrame, Dataset}
 
-
 case object ModelSelectorBase {
   val TrainValSplitResults = "trainValidationSplitResults"
   val CrossValResults = "crossValidationResults"
@@ -129,3 +128,4 @@ private[op] trait HasTestEval extends HasEval {
     scored
   }
 }
+

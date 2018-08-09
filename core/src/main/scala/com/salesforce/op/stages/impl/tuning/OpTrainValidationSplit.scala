@@ -45,6 +45,9 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
   override def getParams(): Map[String, Any] = Map("trainRatio" -> trainRatio, "seed" -> seed,
     "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
 
+  override def getParams(): Map[String, Any] = Map("trainRatio" -> trainRatio, "seed" -> seed,
+    "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
+
   private[op] override def validate[T](
     modelInfo: Seq[(E, Array[ParamMap])],
     dataset: Dataset[T],

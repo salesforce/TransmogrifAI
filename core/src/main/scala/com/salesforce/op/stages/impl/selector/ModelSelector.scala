@@ -40,7 +40,7 @@ import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.stages.RichParamMap._
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model}
@@ -81,7 +81,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
-) extends Estimator[SelectedBestModel]
+) extends Estimator[SelectedModel]
   with OpPipelineStage2[RealNN, OPVector, Prediction] with HasEval {
 
   override protected def onSetInput(): Unit = {
@@ -129,7 +129,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
    * @param dataset
    * @return best model
    */
-  final override def fit(dataset: Dataset[_]): SelectedBestModel = {
+  final override def fit(dataset: Dataset[_]): SelectedModel = {
 
     implicit val spark = dataset.sparkSession
 
@@ -183,7 +183,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
-    new SelectedBestModel(
+    new SelectedModel(
       bestModel.asInstanceOf[ModelSelectorBase.ModelType],
       outputsColNamesMap,
       uid,
@@ -209,7 +209,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
  * @param tto type tag for Prediction
  * @param ttov type tag for Prediction internal map
  */
-final class SelectedBestModel private[op]
+final class SelectedModel private[op]
 (
   val modelStageIn: ModelSelectorBase.ModelType,
   val outputsColNamesMap: Map[String, String],
@@ -220,7 +220,7 @@ final class SelectedBestModel private[op]
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
-) extends Model[SelectedBestModel] with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval {
+) extends Model[SelectedModel] with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval {
 
   override def transformFn: (RealNN, OPVector) => Prediction = modelStageIn.transformFn
 

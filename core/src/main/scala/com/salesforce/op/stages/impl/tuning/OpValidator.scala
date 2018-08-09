@@ -33,10 +33,9 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
-import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames, _}
-import com.salesforce.op.utils.stages.RichParamMap._
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.log4j.{Level, LogManager}
