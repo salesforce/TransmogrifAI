@@ -53,7 +53,7 @@ import org.slf4j.LoggerFactory
 
 private[op] class OpBinaryClassificationEvaluator
 (
-  override val name: String = OpEvaluatorNames.binary,
+  override val name: EvalMetric = OpEvaluatorNames.Binary,
   override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpBinaryClassificationEvaluator],
   val numBins: Int = 100
@@ -179,7 +179,6 @@ case class BinaryClassificationMetrics
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   falsePositiveRateByThreshold: Seq[Double]
 ) extends EvaluationMetrics {
-
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
   def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
 }

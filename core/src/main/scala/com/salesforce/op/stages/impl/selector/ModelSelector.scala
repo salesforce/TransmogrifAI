@@ -40,11 +40,11 @@ import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
@@ -144,10 +144,10 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     val ModelData(trainData, met) = splitter match {
       case Some(spltr) => spltr.prepare(datasetWithID)
-      case None => new ModelData(datasetWithID, new MetadataBuilder())
+      case None => ModelData(datasetWithID, None)
     }
 
-    val BestEstimator(name, estimator, meta) = bestEstimator.getOrElse{
+    val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse{
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
         .validate(modelInfo = modelsUse, dataset = trainData, label = in1.name, features = in2.name)
@@ -155,42 +155,43 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       best
     }
 
-    val bestModel = new BestModel(
-      name = name,
-      model = estimator.fit(trainData).asInstanceOf[M],
-      metadata = Option(meta)
-    )
-    bestModel.metadata.foreach(meta => setMetadata(meta.build))
-    val bestEst = bestModel.model.parent
+    val bestModel = estimator.fit(trainData).asInstanceOf[M]
+    val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
     log.info(s"With parameters : ${bestEst.extractParamMap()}")
 
     // set input and output params
-    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.model.set(bestModel.model.getParam(pname), pvalue) }
+    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
-    val builder = new MetadataBuilder().withMetadata(getMetadata()) // get cross val metrics
-    builder.putString(ModelSelectorBaseNames.BestModelUid, bestModel.model.uid) // log bestModel uid (ie model type)
-    builder.putString(ModelSelectorBaseNames.BestModelName, bestModel.name) // log bestModel name
-    splitter.collect {
-      case _: DataBalancer => builder.putMetadata(ModelSelectorBaseNames.ResampleValues, met)
-      case _: DataCutter => builder.putMetadata(ModelSelectorBaseNames.CuttValues, met)
-    }
+    // get eval results for metadata
+    val trainingEval = evaluate(bestModel.transform(trainData))
 
-    // add eval results to metadata
-    val transformed = bestModel.model.transform(trainData)
-    builder.putMetadata(ModelSelectorBaseNames.TrainingEval, evaluate(transformed).toMetadata)
-    val allMetadata = builder.build().toSummaryMetadata()
-    setMetadata(allMetadata)
+    val metadataSummary = ModelSelectorSummary(
+      validationType = ValidationType.fromValidator(validator),
+      validationParameters = validator.getParams(),
+      dataPrepParameters = splitter.map(_.extractParamMap().getAsMap()).getOrElse(Map()),
+      dataPrepResults = met,
+      evaluationMetric = validator.evaluator.name,
+      problemType = ProblemType.fromEvalMetrics(trainingEval),
+      bestModelUID = estimator.uid,
+      bestModelName = name,
+      bestModelType = estimator.getClass.getSimpleName,
+      validationResults = summary,
+      trainEvaluation = trainingEval,
+      holdoutEvaluation = None
+    )
+
+    setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
     new SelectedBestModel(
-      bestModel.model.asInstanceOf[ModelSelectorBaseNames.ModelType],
+      bestModel.asInstanceOf[ModelSelectorBaseNames.ModelType],
       outputsColNamesMap,
       uid,
       operationName
     )
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setParent(this)
-      .setMetadata(allMetadata)
+      .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
   }

@@ -36,7 +36,7 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType._
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning.BestEstimator
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
@@ -228,17 +228,17 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val pred = model.getOutput()
 
     // evaluation metrics from train set should be in metadata
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
     RegressionEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from train set should be in metadata
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
     RegressionEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
@@ -355,24 +355,24 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
 
     // checking trainingEval & holdOutEval metrics
     model.evaluateModel(data)
-    val metaData = model.getMetadata().getSummaryMetadata()
-    val trainMetaData = metaData.getMetadata(ModelSelectorBaseNames.TrainingEval)
-    val holdOutMetaData = metaData.getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val trainMetaData = metaData.trainEvaluation
+    val holdOutMetaData = metaData.holdoutEvaluation.get
 
     testEstimator.evaluators.foreach {
       case evaluator: OpRegressionEvaluator => {
         RegressionEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
-            metadata => assert(metadata.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
-              s"Metric ${metric.entryName} is not present in metadata: " + metadata.json)
+            metadata => assert(metadata.toJson(false).contains(s"${metric.entryName}"),
+              s"Metric ${metric.entryName} is not present in metadata: " + metadata)
           )
         )
       }
       case evaluator: OpRegressionEvaluatorBase[_] => {
         Seq(trainMetaData, holdOutMetaData).foreach(
           metadata =>
-            assert(metadata.contains(s"(${evaluator.name})_${evaluator.name}"),
-              s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata.json)
+            assert(metadata.toJson(false).contains(s"${evaluator.name.humanFriendlyName}"),
+              s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata)
         )
       }
     }
@@ -384,14 +384,14 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val myEstimatorName = "myEstimatorIsAwesome"
     val myEstimator = new GBTRegressor().setCacheNodeIds(myParam)
 
-    val bestEstimator = new BestEstimator[Regressor](myEstimatorName, myEstimator.asInstanceOf[Regressor])
+    val bestEstimator = new BestEstimator[Regressor](myEstimatorName, myEstimator.asInstanceOf[Regressor], Seq.empty)
     modelSelector.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
     fitted.getSparkMlStage().get.extractParamMap().get(myEstimator.cacheNodeIds).get shouldBe myParam
 
-    val meta = fitted.getMetadata().getMetadata("summary")
-    meta.getString("bestModelName") shouldBe myEstimatorName
+    val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
+    meta.bestModelName shouldBe myEstimatorName
   }
 
   private def assertScores(scores: Array[RealNN], labels: Array[RealNN]) = {
