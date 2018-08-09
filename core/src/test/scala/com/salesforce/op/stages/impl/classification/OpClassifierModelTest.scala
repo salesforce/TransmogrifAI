@@ -65,7 +65,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-
   Spec[OpLogisticRegressionModel] should "produce the same values as the spark version" in {
     val spk = new LogisticRegression()
       .setFamily("multinomial")
