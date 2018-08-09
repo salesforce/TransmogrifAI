@@ -34,16 +34,76 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.ModelSelector
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{ModelType, EstimatorType}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase.{EstimatorType, ModelType}
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
 /**
  * A factory for Regression Model Selector
  */
 case object RegressionModelSelector {
+
+  private val modelNames: Seq[RegressionModelsToTry] = Seq(OpLinearRegression, OpRandomForestRegressor,
+    OpGBTRegressor, OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
+
+  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+
+    val lr = new OpLinearRegression()
+    val lrParams = new ParamGridBuilder()
+      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(lr.solver, DefaultSelectorParams.RegSolver)
+      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+      .addGrid(lr.tol, DefaultSelectorParams.Tol)
+
+    val rf = new OpRandomForestRegressor()
+    val rfParams = new ParamGridBuilder()
+      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(rf.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+
+    val gbt = new OpGBTRegressor()
+    val gbtParams = new ParamGridBuilder()
+      .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
+      .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(gbt.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
+      .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
+
+    val dt = new OpDecisionTreeRegressor()
+    val dtParams = new ParamGridBuilder()
+      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(dt.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+
+    val glr = new OpGeneralizedLinearRegression()
+    val glrParams = new ParamGridBuilder()
+      .addGrid(glr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(glr.family, DefaultSelectorParams.DistFamily)
+      .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(glr.tol, DefaultSelectorParams.Tol)
+
+    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, dt -> dtParams, glr -> glrParams)
+      .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+  }
+
 
   /**
    * Creates a new Regression Model Selector with a Cross Validation
@@ -69,13 +129,16 @@ case object RegressionModelSelector {
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(
-      cv, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      cv, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
@@ -98,59 +161,36 @@ case object RegressionModelSelector {
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(
-      ts, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
+      ts, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
   private def selector(
     validator: OpValidator[ModelType, EstimatorType],
-    dataSplitter: Option[DataSplitter],
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]
+    splitter: Option[DataSplitter],
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
+    modelTypesToUse: Seq[RegressionModelsToTry],
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
   ): ModelSelector[ModelType, EstimatorType] = {
-    new RegressionModelSelector(
+    val modelStrings = modelTypesToUse.map(_.entryName)
+    val modelsToUse = if (modelsAndParameters == defaultModelsAndParams) {
+      modelsAndParameters.filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+    } else modelsAndParameters
+    new ModelSelector(
       validator = validator,
-      dataSplitter = dataSplitter,
+      splitter = splitter,
+      models = modelsToUse,
       evaluators = trainTestEvaluators
-    ) // models on by default
-      .setModelsToTry(RandomForestRegression, LinearRegression, GBTRegression)
-      // Random forest defaults
-      .setRandomForestMaxDepth(MaxDepth: _*)
-      .setRandomForestImpurity(ImpurityReg)
-      .setRandomForestMaxBins(MaxBin)
-      .setRandomForestMinInfoGain(MinInfoGain: _*)
-      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setRandomForestNumTrees(MaxTrees)
-      .setRandomForestSubsamplingRate(SubsampleRate)
-      // Linear regression defaults
-      .setLinearRegressionElasticNetParam(ElasticNet)
-      .setLinearRegressionFitIntercept(FitIntercept)
-      .setLinearRegressionMaxIter(MaxIterLin)
-      .setLinearRegressionRegParam(Regularization: _*)
-      .setLinearRegressionSolver(RegSolver)
-      .setLinearRegressionStandardization(Standardized)
-      .setLinearRegressionTol(Tol)
-      // GBT defaults
-      .setGradientBoostedTreeLossType(TreeLossType)
-      .setGradientBoostedTreeMaxBins(MaxBin)
-      .setGradientBoostedTreeMaxDepth(MaxDepth: _*)
-      .setGradientBoostedTreeMinInfoGain(MinInfoGain: _*)
-      .setGradientBoostedTreeMaxIter(MaxIterTree)
-      .setGradientBoostedTreeMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setGradientBoostedTreeStepSize(StepSize)
-      .setGradientBoostedTreeImpurity(ImpurityReg)
-      .setGradientBoostedTreeSubsamplingRate(SubsampleRate)
-      // DT defaults
-      .setDecisionTreeImpurity(ImpurityReg)
-      .setDecisionTreeMaxBins(MaxBin)
-      .setDecisionTreeMaxDepth(MaxDepth: _*)
-      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
-      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+    )
   }
 
 }
@@ -162,9 +202,9 @@ sealed trait RegressionModelsToTry extends ModelsToTry
 
 object RegressionModelsToTry extends Enum[RegressionModelsToTry] {
   val values = findValues
-  case object LinearRegression extends RegressionModelsToTry
-  case object DecisionTreeRegression extends RegressionModelsToTry
-  case object RandomForestRegression extends RegressionModelsToTry
-  case object GBTRegression extends RegressionModelsToTry
-  case object GeneralizedLinearRegression extends RegressionModelsToTry
+  case object OpLinearRegression extends RegressionModelsToTry
+  case object OpDecisionTreeRegressor extends RegressionModelsToTry
+  case object OpRandomForestRegressor extends RegressionModelsToTry
+  case object OpGBTRegressor extends RegressionModelsToTry
+  case object OpGeneralizedLinearRegression extends RegressionModelsToTry
 }

@@ -36,7 +36,7 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
 import com.salesforce.op.stages.impl.regression.RegressorType._
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBaseNames, ModelSelectorSummary}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorBase, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning.BestEstimator
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._

@@ -41,7 +41,7 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.regression.{LossType, RegressionModelSelector, RegressionModelsToTry}
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, ModelSelectorBase}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import org.apache.spark.ml.PipelineStage

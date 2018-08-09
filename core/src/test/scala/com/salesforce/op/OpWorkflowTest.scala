@@ -40,7 +40,7 @@ import com.salesforce.op.stages.base.unary._
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._

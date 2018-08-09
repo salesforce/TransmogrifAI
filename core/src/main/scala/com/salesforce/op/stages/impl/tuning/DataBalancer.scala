@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
@@ -445,11 +445,11 @@ case class DataBalancerSummary
   override def toMetadata(): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
-      .putLong(ModelSelectorBaseNames.Positive, positiveLabels)
-      .putLong(ModelSelectorBaseNames.Negative, negativeLabels)
-      .putDouble(ModelSelectorBaseNames.Desired, desiredFraction)
-      .putDouble(ModelSelectorBaseNames.UpSample, upSamplingFraction)
-      .putDouble(ModelSelectorBaseNames.DownSample, downSamplingFraction)
+      .putLong(ModelSelectorBase.Positive, positiveLabels)
+      .putLong(ModelSelectorBase.Negative, negativeLabels)
+      .putDouble(ModelSelectorBase.Desired, desiredFraction)
+      .putDouble(ModelSelectorBase.UpSample, upSamplingFraction)
+      .putDouble(ModelSelectorBase.DownSample, downSamplingFraction)
       .build()
   }
 }

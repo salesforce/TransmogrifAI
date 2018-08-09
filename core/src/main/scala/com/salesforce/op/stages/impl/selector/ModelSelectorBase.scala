@@ -39,7 +39,7 @@ import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.{DataFrame, Dataset}
 
 
-case object ModelSelectorBaseNames {
+case object ModelSelectorBase {
   val TrainValSplitResults = "trainValidationSplitResults"
   val CrossValResults = "crossValidationResults"
   val TrainingEval = "trainingSetEvaluationResults"

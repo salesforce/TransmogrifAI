@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
-import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorBaseNames, ModelSelectorSummary}
+import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorBase, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
 import com.salesforce.op.test.TestSparkContext
@@ -249,7 +249,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val testFraction = 0.2
 
     val (train, test) = DataSplitter(reserveTestFraction = testFraction)
-      .split(data.withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+      .split(data.withColumn(ModelSelectorBase.idColName, monotonically_increasing_id())
         .as[(Double, Vector, Double)])
 
     val trainCount = train.count()

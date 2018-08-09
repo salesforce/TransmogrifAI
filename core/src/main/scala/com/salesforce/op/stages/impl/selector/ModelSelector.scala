@@ -138,7 +138,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
       } else {
         dataset.select(in1.name, in2.name)
-          .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+          .withColumn(ModelSelectorBase.idColName, monotonically_increasing_id())
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
@@ -184,7 +184,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
     new SelectedBestModel(
-      bestModel.asInstanceOf[ModelSelectorBaseNames.ModelType],
+      bestModel.asInstanceOf[ModelSelectorBase.ModelType],
       outputsColNamesMap,
       uid,
       operationName
@@ -211,7 +211,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
  */
 final class SelectedBestModel private[op]
 (
-  val modelStageIn: ModelSelectorBaseNames.ModelType,
+  val modelStageIn: ModelSelectorBase.ModelType,
   val outputsColNamesMap: Map[String, String],
   val uid: String,
   val operationName: String

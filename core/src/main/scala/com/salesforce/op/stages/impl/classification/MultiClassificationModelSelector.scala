@@ -32,18 +32,59 @@ package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
-import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.ModelSelector
+import com.salesforce.op.stages.impl.classification.MultiClassClassificationModelsToTry._
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import enumeratum.Enum
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{ModelType, EstimatorType}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase.{EstimatorType, ModelType}
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
 /**
  * A factory for Multi Classification Model Selector
  */
 case object MultiClassificationModelSelector {
+
+  private val modelNames: Seq[MultiClassClassificationModelsToTry] = Seq(OpLogisticRegression, OpRandomForestClassifier,
+    OpNaiveBayes) // OpDecisionTreeClassifier off by default
+
+  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    val lr = new OpLogisticRegression()
+    val lrParams = new ParamGridBuilder()
+      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+      .addGrid(lr.tol, DefaultSelectorParams.Tol)
+
+    val rf = new OpRandomForestClassifier()
+    val rfParams = new ParamGridBuilder()
+      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(rf.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+
+    val nb = new OpNaiveBayes()
+    val nbParams = new ParamGridBuilder()
+      .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
+      .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
+
+    val dt = new OpDecisionTreeClassifier()
+    val dtParams = new ParamGridBuilder()
+      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(dt.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+
+    Seq(lr -> lrParams, rf -> rfParams, nb -> nbParams, dt -> dtParams)
+      .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+  }
 
   /**
    * Creates a new Multi Classification Model Selector with a Cross Validation
@@ -72,13 +113,16 @@ case object MultiClassificationModelSelector {
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
-      cv, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
+      cv, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
@@ -104,51 +148,36 @@ case object MultiClassificationModelSelector {
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(
-      ts, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators
+      ts, splitter = splitter, trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
     )
   }
 
   private def selector(
     validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[DataCutter],
-    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]]
+    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
+    modelTypesToUse: Seq[MultiClassClassificationModelsToTry],
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
   ): ModelSelector[ModelType, EstimatorType] = {
-    new MultiClassificationModelSelector(
+    val modelStrings = modelTypesToUse.map(_.entryName)
+    val modelsToUse = if (modelsAndParameters == defaultModelsAndParams) {
+      modelsAndParameters.filter { case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+    } else modelsAndParameters
+    new ModelSelector(
       validator = validator,
       splitter = splitter,
+      models = modelsToUse,
       evaluators = trainTestEvaluators
-    ) // models on by default
-      .setModelsToTry(RandomForest, LogisticRegression)
-      // Random forest defaults
-      .setRandomForestMaxDepth(MaxDepth: _*)
-      .setRandomForestImpurity(ImpurityClass)
-      .setRandomForestMaxBins(MaxBin)
-      .setRandomForestMinInfoGain(MinInfoGain: _*)
-      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setRandomForestNumTrees(MaxTrees)
-      .setRandomForestSubsamplingRate(SubsampleRate)
-      // Logistic regression defaults
-      .setLogisticRegressionElasticNetParam(ElasticNet)
-      .setLogisticRegressionFitIntercept(FitIntercept)
-      .setLogisticRegressionMaxIter(MaxIterLin)
-      .setLogisticRegressionRegParam(Regularization: _*)
-      .setLogisticRegressionStandardization(Standardized)
-      .setLogisticRegressionTol(Tol)
-      // NB defaults
-      .setNaiveBayesModelType(NbModel)
-      .setNaiveBayesSmoothing(NbSmoothing)
-      // DT defaults
-      .setDecisionTreeImpurity(ImpurityClass)
-      .setDecisionTreeMaxBins(MaxBin)
-      .setDecisionTreeMaxDepth(MaxDepth: _*)
-      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
-      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+    )
   }
 }
 /**
@@ -158,8 +187,8 @@ sealed trait MultiClassClassificationModelsToTry extends ModelsToTry
 
 object MultiClassClassificationModelsToTry extends Enum[MultiClassClassificationModelsToTry] {
   val values = findValues
-  case object LogisticRegression extends MultiClassClassificationModelsToTry
-  case object RandomForest extends MultiClassClassificationModelsToTry
-  case object DecisionTree extends MultiClassClassificationModelsToTry
-  case object NaiveBayes extends MultiClassClassificationModelsToTry
+  case object OpLogisticRegression extends MultiClassClassificationModelsToTry
+  case object OpRandomForestClassifier extends MultiClassClassificationModelsToTry
+  case object OpDecisionTreeClassifier extends MultiClassClassificationModelsToTry
+  case object OpNaiveBayes extends MultiClassClassificationModelsToTry
 }

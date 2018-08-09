@@ -33,12 +33,11 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
-import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.ModelSelector
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames.{EstimatorType, ModelType}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase.{EstimatorType, ModelType}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
@@ -53,51 +52,59 @@ case object BinaryClassificationModelSelector {
   private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
+      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+      .addGrid(lr.tol, DefaultSelectorParams.Tol)
 
     val rf = new OpRandomForestClassifier()
     val rfParams = new ParamGridBuilder()
+      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(rf.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
 
     val gbt = new OpGBTClassifier()
     val gbtParams = new ParamGridBuilder()
+      .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
+      .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(gbt.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
+      .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
 
     val svc = new OpLinearSVC()
     val svcParams = new ParamGridBuilder()
+      .addGrid(svc.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(svc.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(svc.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(svc.tol, DefaultSelectorParams.Tol)
+      .addGrid(svc.standardization, DefaultSelectorParams.Standardized)
 
-    val nb = new OpRandomForestClassifier()
+    val nb = new OpNaiveBayes()
     val nbParams = new ParamGridBuilder()
+      .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
+      .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
 
-    val dt = new OpRandomForestClassifier()
+    val dt = new OpDecisionTreeClassifier()
     val dtParams = new ParamGridBuilder()
+      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(dt.impurity, DefaultSelectorParams.ImpurityClass)
+      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
 
     Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams)
       .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
   }
-
-//  // Random forest defaults
-//  .setRandomForestMaxDepth(MaxDepth: _*)
-//    .setRandomForestImpurity(ImpurityClass)
-//    .setRandomForestMaxBins(MaxBin)
-//    .setRandomForestMinInfoGain(MinInfoGain: _*)
-//    .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
-//    .setRandomForestNumTrees(MaxTrees)
-//    .setRandomForestSubsamplingRate(SubsampleRate)
-//    // Logistic regression defaults
-//    .setLogisticRegressionElasticNetParam(ElasticNet)
-//    .setLogisticRegressionFitIntercept(FitIntercept)
-//    .setLogisticRegressionMaxIter(MaxIterLin)
-//    .setLogisticRegressionRegParam(Regularization: _*)
-//    .setLogisticRegressionStandardization(Standardized)
-//    .setLogisticRegressionTol(Tol)
-//    // NB defaults
-//    .setNaiveBayesModelType(NbModel)
-//    .setNaiveBayesSmoothing(NbSmoothing)
-//    // DT defaults
-//    .setDecisionTreeImpurity(ImpurityClass)
-//    .setDecisionTreeMaxBins(MaxBin)
-//    .setDecisionTreeMaxDepth(MaxDepth: _*)
-//    .setDecisionTreeMinInfoGain(MinInfoGain: _*)
-//    .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
-//
 
   /**
    * Creates a new Binary Classification Model Selector with a Cross Validation

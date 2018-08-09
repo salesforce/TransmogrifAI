@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
@@ -195,8 +195,8 @@ case class DataCutterSummary
   override def toMetadata(): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
-      .putDoubleArray(ModelSelectorBaseNames.LabelsKept, labelsKept)
-      .putDoubleArray(ModelSelectorBaseNames.LabelsDropped, labelsDropped)
+      .putDoubleArray(ModelSelectorBase.LabelsKept, labelsKept)
+      .putDoubleArray(ModelSelectorBase.LabelsDropped, labelsDropped)
       .build()
   }
 }
