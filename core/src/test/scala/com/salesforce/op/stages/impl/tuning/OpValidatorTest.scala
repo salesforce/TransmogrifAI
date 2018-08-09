@@ -45,8 +45,7 @@ import org.apache.spark.sql.types.MetadataBuilder
 import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
-class
-OpValidatorTest extends FlatSpec with TestSparkContext {
+class OpValidatorTest extends FlatSpec with TestSparkContext {
   // Random Data
   val count = 1000
   val sizeOfVector = 2
