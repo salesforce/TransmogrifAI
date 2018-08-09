@@ -25,4 +25,6 @@ dependencies {
 
     // XGBoost
     compile "ml.dmlc:xgboost4j-spark:0.80-SNAPSHOT"
+    // Akka slfj4 logging (version matches XGBoost dependency)
+    testCompile "com.typesafe.akka:akka-slf4j_$scalaVersion:2.3.11"
 }

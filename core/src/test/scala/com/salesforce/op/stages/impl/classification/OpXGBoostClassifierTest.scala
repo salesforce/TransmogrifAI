@@ -34,8 +34,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import ml.dmlc.xgboost4j.scala.spark.{TrackerConf, XGBoost, XGBoostClassificationModel, XGBoostClassifier}
-import org.apache.log4j.{Level, Logger}
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostQuietLogging, XGBoostClassificationModel, XGBoostClassifier}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -43,7 +42,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpXGBoostClassifierTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[XGBoostClassificationModel],
-  OpPredictorWrapper[XGBoostClassifier, XGBoostClassificationModel]] with PredictionEquality {
+  OpPredictorWrapper[XGBoostClassifier, XGBoostClassificationModel]]
+  with PredictionEquality with OpXGBoostQuietLogging {
 
   override def specName: String = classOf[OpXGBoostClassifier].getSimpleName
 
@@ -61,7 +61,6 @@ class OpXGBoostClassifierTest extends OpEstimatorSpec[Prediction, OpPredictorWra
   val (inputData, label, features) = TestFeatureBuilder("label", "features", rawData)
 
   val estimator = new OpXGBoostClassifier().setInput(label.copy(isResponse = true), features)
-  estimator.setTrackerConf(TrackerConf(0, "scala"))
   estimator.setSilent(1)
 
   val expectedResult = Seq(

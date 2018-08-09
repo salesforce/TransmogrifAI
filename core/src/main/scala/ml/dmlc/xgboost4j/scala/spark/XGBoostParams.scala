@@ -30,7 +30,21 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
+import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
+import org.apache.log4j.{Level, Logger}
 
-trait OpXGBoostClassifierParams extends XGBoostClassifierParams
 
-trait OpXGBoostRegressorParams extends XGBoostRegressorParams
+trait OpXGBoostClassifierParams extends XGBoostClassifierParams with OpXGBoostGeneralParamsDefaults
+
+trait OpXGBoostRegressorParams extends XGBoostRegressorParams with OpXGBoostGeneralParamsDefaults
+
+trait OpXGBoostGeneralParamsDefaults {
+  self: GeneralParams =>
+  setDefault(trackerConf -> TrackerConf(0L, "scala"))
+}
+
+trait OpXGBoostQuietLogging {
+  Logger.getLogger("akka").setLevel(Level.WARN)
+  Logger.getLogger("XGBoostSpark").setLevel(Level.WARN)
+  Logger.getLogger(classOf[XGBoostRegressor]).setLevel(Level.WARN)
+}

@@ -34,14 +34,16 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import com.salesforce.op.test._
-import ml.dmlc.xgboost4j.scala.spark.{TrackerConf, XGBoostRegressionModel, XGBoostRegressor}
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostQuietLogging, XGBoostRegressionModel, XGBoostRegressor}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+
 @RunWith(classOf[JUnitRunner])
 class OpXGBoostRegressorTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[XGBoostRegressionModel],
-  OpPredictorWrapper[XGBoostRegressor, XGBoostRegressionModel]] with PredictionEquality {
+  OpPredictorWrapper[XGBoostRegressor, XGBoostRegressionModel]]
+  with PredictionEquality with OpXGBoostQuietLogging {
 
   override def specName: String = classOf[OpXGBoostRegressor].getSimpleName
 
@@ -56,7 +58,6 @@ class OpXGBoostRegressorTest extends OpEstimatorSpec[Prediction, OpPredictorWrap
   val (inputData, label, features) = TestFeatureBuilder("label", "features", rawData)
 
   val estimator = new OpXGBoostRegressor().setInput(label.copy(isResponse = true), features)
-  estimator.setTrackerConf(TrackerConf(0, "scala"))
   estimator.setSilent(1)
 
   val expectedResult = Seq(
