@@ -40,11 +40,15 @@ trait OpXGBoostRegressorParams extends XGBoostRegressorParams with OpXGBoostGene
 
 trait OpXGBoostGeneralParamsDefaults {
   self: GeneralParams =>
-  setDefault(trackerConf -> TrackerConf(0L, "scala"))
+  setDefault(trackerConf -> OpXGBoost.DefaultTrackerConf)
 }
 
 trait OpXGBoostQuietLogging {
   Logger.getLogger("akka").setLevel(Level.WARN)
   Logger.getLogger("XGBoostSpark").setLevel(Level.WARN)
   Logger.getLogger(classOf[XGBoostRegressor]).setLevel(Level.WARN)
+}
+
+case object OpXGBoost {
+  val DefaultTrackerConf = TrackerConf(workerConnectionTimeout = 0L, "scala")
 }

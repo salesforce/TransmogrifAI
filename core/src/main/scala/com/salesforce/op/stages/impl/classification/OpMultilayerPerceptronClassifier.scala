@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
 import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import org.apache.spark.ml.classification.{MultilayerPerceptronClassificationModel, MultilayerPerceptronClassifier, OpMultilayerPerceptronClassifierParams}
 import org.apache.spark.ml.linalg.Vector
@@ -128,7 +128,6 @@ class OpMultilayerPerceptronClassifier(uid: String = UID[OpMultilayerPerceptronC
  * @param uid           uid to give stage
  * @param operationName unique name of the operation this stage performs
  */
-// TODO in next release of spark this will be probablistic classifier
 class OpMultilayerPerceptronClassificationModel
 (
   sparkModel: MultilayerPerceptronClassificationModel,
@@ -139,9 +138,12 @@ class OpMultilayerPerceptronClassificationModel
   tti2: TypeTag[OPVector],
   tto: TypeTag[Prediction],
   ttov: TypeTag[Prediction#Value]
-) extends OpPredictionModel[MultilayerPerceptronClassificationModel](
+) extends OpProbabilisticClassifierModel[MultilayerPerceptronClassificationModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
-  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
+  @transient lazy val predictRawMirror = reflectMethod(getSparkMlStage().get, "predictRaw")
+  @transient lazy val raw2probabilityMirror = reflectMethod(getSparkMlStage().get, "raw2probability")
+  @transient lazy val probability2predictionMirror =
+    reflectMethod(getSparkMlStage().get, "probability2prediction")
 }
 

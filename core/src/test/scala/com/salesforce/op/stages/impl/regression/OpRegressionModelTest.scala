@@ -34,6 +34,7 @@ import com.salesforce.op.features.types.{Prediction, RealNN}
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter.toOP
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoost, OpXGBoostQuietLogging, XGBoostRegressor}
 import org.apache.spark.ml.regression._
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -41,7 +42,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class OpRegressionModelTest extends FlatSpec with TestSparkContext {
+class OpRegressionModelTest extends FlatSpec with TestSparkContext with OpXGBoostQuietLogging {
 
   private val label = RandomIntegral.integrals(0, 2).limit(1000)
     .map{ v => RealNN(v.value.map(_.toDouble).getOrElse(0.0)) }
@@ -58,7 +59,6 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -70,7 +70,6 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -81,7 +80,6 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -92,7 +90,6 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -103,7 +100,17 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
+  }
 
+  Spec[OpXGBoostRegressionModel] should "produce the same values as the spark version" in {
+    val reg = new XGBoostRegressor()
+    reg.set(reg.trackerConf, OpXGBoost.DefaultTrackerConf)
+      .setFeaturesCol(featureV.name)
+      .setLabelCol(labelF.name)
+    val spk = reg.fit(rawDF)
+
+    val op = toOP(spk, spk.uid).setInput(labelF, featureV)
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 

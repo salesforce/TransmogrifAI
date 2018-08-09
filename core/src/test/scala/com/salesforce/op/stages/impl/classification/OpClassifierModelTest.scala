@@ -34,6 +34,7 @@ import com.salesforce.op.features.types.{Prediction, RealNN}
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoost, OpXGBoostQuietLogging, XGBoostClassifier}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.DataFrame
@@ -43,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpClassifierModelTest extends FlatSpec with TestSparkContext {
+class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoostQuietLogging {
 
   private val label = RandomIntegral.integrals(0, 2).limit(1000)
     .map{ v => RealNN(v.value.map(_.toDouble).getOrElse(0.0)) }
@@ -129,6 +130,16 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .setFeaturesCol(featureV.name)
       .setLabelCol(labelF.name)
       .fit(rawDF)
+    val op = toOP(spk, spk.uid).setInput(labelF, featureV)
+    compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 2)
+  }
+
+  Spec[OpXGBoostClassifier] should "produce the same values as the spark version" in {
+    val cl = new XGBoostClassifier()
+    cl.set(cl.trackerConf, OpXGBoost.DefaultTrackerConf)
+      .setFeaturesCol(featureV.name)
+      .setLabelCol(labelF.name)
+    val spk = cl.fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
     compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 2)
   }
