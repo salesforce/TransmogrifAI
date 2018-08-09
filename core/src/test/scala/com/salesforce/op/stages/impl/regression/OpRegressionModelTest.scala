@@ -62,7 +62,6 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext with OpXGBoos
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-
   Spec[OpLinearRegressionModel] should "produce the same values as the spark version" in {
     val spk = new LinearRegression()
       .setFeaturesCol(featureV.name)
@@ -115,6 +114,8 @@ class OpRegressionModelTest extends FlatSpec with TestSparkContext with OpXGBoos
   }
 
   def compareOutputs(df1: DataFrame, df2: DataFrame): Unit = {
+    df1.show()
+    df2.show()
     val sorted1 = df1.collect().sortBy(_.getAs[Double](2))
     val sorted2 = df2.collect().sortBy(_.getAs[Map[String, Double]](2)(Prediction.Keys.PredictionName))
     sorted1.zip(sorted2).foreach{ case (r1, r2) =>
