@@ -50,6 +50,9 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   val validationName: String = ModelSelectorBaseNames.CrossValResults
   private val blas = BLAS.getInstance()
 
+  override def getParams(): Map[String, Any] = Map("numFolds" -> numFolds, "seed" -> seed,
+    "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
+
   private def findBestModel(
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {

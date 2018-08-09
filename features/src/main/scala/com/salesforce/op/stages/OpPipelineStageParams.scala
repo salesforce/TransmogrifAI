@@ -186,4 +186,5 @@ trait OpPipelineStageParams extends InputParams {
 object OpPipelineStageParamsNames {
   val OutputMetadata: String = "outputMetadata"
   val InputSchema: String = "inputSchema"
+  val InputFeatures: String = "inputFeatures"
 }
