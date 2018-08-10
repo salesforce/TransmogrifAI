@@ -63,7 +63,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   implicit val doubleOptEquality = new Equality[Option[Double]] {
     def areEqual(a: Option[Double], b: Any): Boolean = b match {
       case None => a.isEmpty
-      case s: Option[Double] => (a.exists(_.isNaN) && s.exists(_.isNaN)) ||
+      case s: Option[Double]@unchecked => (a.exists(_.isNaN) && s.exists(_.isNaN)) ||
         (a.nonEmpty && a.toSeq.zip(s.toSeq).forall{ case (n, m) => n == m })
       case _ => false
     }

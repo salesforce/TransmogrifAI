@@ -39,6 +39,7 @@ import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
+import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
@@ -53,7 +54,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
   private val data = label.zip(fv)
 
   private val (rawDF, labelF, featureV) = TestFeatureBuilder("label", "features", data)
-
 
   Spec[OpDecisionTreeClassificationModel] should "produce the same values as the spark version" in {
     val spk = new DecisionTreeClassifier()
@@ -134,17 +134,30 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
       .setLabelCol(labelF.name)
     val spk = cl.fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
+
+    // ******************************************************
+    // TODO: equality tolerance once XGBoost rounding bug in XGBoostClassifier.transform(probabilityUDF) is fixed
+    implicit val doubleEquality = new Equality[Double] {
+      def areEqual(a: Double, b: Any): Boolean = b match {
+        case s: Double => (a.isNaN && s.isNaN) || math.abs(a - s) < 0.0000001
+        case _ => false
+      }
+    }
+    implicit val doubleArrayEquality = new Equality[Array[Double]] {
+      def areEqual(a: Array[Double], b: Any): Boolean = b match {
+        case s: Array[_] if a.length == s.length => a.zip(s).forall(v => doubleEquality.areEqual(v._1, v._2))
+        case _ => false
+      }
+    }
+    // ******************************************************
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-  def compareOutputs(df1: DataFrame, df2: DataFrame): Unit = {
-
+  def compareOutputs(df1: DataFrame, df2: DataFrame)(implicit arrayEquality: Equality[Array[Double]]): Unit = {
     def keysStartsWith(name: String, value: Map[String, Double]): Array[Double] = {
       val names = value.keys.filter(_.startsWith(name)).toArray.sorted
       names.map(value)
     }
-    df1.show()
-    df2.show()
     val sorted1 = df1.collect().sortBy(_.getAs[Double](4))
     val sorted2 = df2.collect().sortBy(_.getAs[Map[String, Double]](2)(Prediction.Keys.PredictionName))
     sorted1.zip(sorted2).foreach{ case (r1, r2) =>
@@ -154,6 +167,7 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
       r1.getAs[Vector](2).toArray shouldEqual keysStartsWith(Prediction.Keys.RawPredictionName, map)
     }
   }
+
 
   def compareOutputsPred(df1: DataFrame, df2: DataFrame, predIndex: Int): Unit = {
     val sorted1 = df1.collect().sortBy(_.getAs[Double](predIndex))

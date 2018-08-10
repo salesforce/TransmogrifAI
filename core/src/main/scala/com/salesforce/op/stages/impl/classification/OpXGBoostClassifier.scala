@@ -33,12 +33,13 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
-import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
 import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
-import ml.dmlc.xgboost4j.scala.{EvalTrait, ObjectiveTrait}
-import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostClassifierParams, TrackerConf, XGBoostClassificationModel, XGBoostClassifier}
+import ml.dmlc.xgboost4j.scala.spark._
+import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait}
+import org.apache.spark.ml.linalg.Vectors
 
-import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe._
 
 /**
  * Wrapper around XGBoost classifier [[XGBoostClassifier]]
@@ -159,8 +160,37 @@ class OpXGBoostClassificationModel
   tti2: TypeTag[OPVector],
   tto: TypeTag[Prediction],
   ttov: TypeTag[Prediction#Value]
-) extends OpPredictionModel[XGBoostClassificationModel](
+) extends OpProbabilisticClassifierModel[XGBoostClassificationModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
 ) {
-  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
+  import OpXGBoost._
+
+  protected def predictRawMirror: MethodMirror = throw new NotImplementedError()
+  protected def raw2probabilityMirror: MethodMirror = throw new NotImplementedError()
+  @transient lazy val probability2predictionMirror =
+    reflectMethod(getSparkMlStage().get, "probability2prediction")
+
+  @transient lazy val model: XGBoostClassificationModel = getSparkMlStage().get
+  @transient lazy val booster: Booster = model.nativeBooster
+
+  override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
+    //    val appName = dataset.sparkSession.sparkContext.appName
+//    val cacheInfo = {
+//      if (model.getUseExternalMemory) {
+//        s"$appName-${TaskContext.get().stageId()}-dtest_cache-${TaskContext.getPartitionId()}"
+//      } else {
+//        null
+//      }
+//    }
+    booster.getFeatureScore()
+    val cacheInfo = null
+    val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGBLabeledPoint), model.getMissing)
+    val dm = new DMatrix(dataIter = data, cacheInfo = cacheInfo)
+    val treeLimit: Int = 0 // TODO: instead use model.getTreeLimit once available
+    val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
+    val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
+    val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
+    val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
+    Prediction(prediction = prediction, rawPrediction = rawPred, probability = probability)
+  }
 }

@@ -30,8 +30,14 @@
 
 package ml.dmlc.xgboost4j.scala.spark
 
+import ml.dmlc.xgboost4j.LabeledPoint
+import ml.dmlc.xgboost4j.scala.spark.DataUtils.MLVectorToXGBLabeledPoint
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
 import org.apache.log4j.{Level, Logger}
+import org.apache.spark.ml.linalg.Vector
+
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 
 trait OpXGBoostClassifierParams extends XGBoostClassifierParams with OpXGBoostGeneralParamsDefaults
@@ -51,4 +57,27 @@ trait OpXGBoostQuietLogging {
 
 case object OpXGBoost {
   val DefaultTrackerConf = TrackerConf(workerConnectionTimeout = 0L, "scala")
+
+  implicit class RichMLVectorToXGBLabeledPoint(val v: Vector) extends AnyVal {
+    def asXGBLabeledPoint: LabeledPoint = MLVectorToXGBLabeledPoint(v).asXGB
+  }
+
+  /**
+   * Copied from [[ml.dmlc.xgboost4j.scala.spark.XGBoost.removeMissingValues]] private method
+   */
+  def removeMissingValues(xgbLabelPoints: Iterator[LabeledPoint], missing: Float): Iterator[LabeledPoint] = {
+    if (!missing.isNaN) {
+      xgbLabelPoints.map { labeledPoint =>
+        val indices = new ArrayBuffer[Int]()
+        val values = new ArrayBuffer[Float]()
+        for ((value, i) <- labeledPoint.values.zipWithIndex if value != missing) {
+          indices += (if (labeledPoint.indices == null) i else labeledPoint.indices(i))
+          values += value
+        }
+        labeledPoint.copy(indices = indices.toArray, values = values.toArray)
+      }
+    } else {
+      xgbLabelPoints
+    }
+  }
 }
