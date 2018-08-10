@@ -170,22 +170,12 @@ class OpXGBoostClassificationModel
   @transient lazy val probability2predictionMirror =
     reflectMethod(getSparkMlStage().get, "probability2prediction")
 
-  @transient lazy val model: XGBoostClassificationModel = getSparkMlStage().get
-  @transient lazy val booster: Booster = model.nativeBooster
+  private lazy val model = getSparkMlStage().get
+  private lazy val  booster = model.nativeBooster
 
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    //    val appName = dataset.sparkSession.sparkContext.appName
-//    val cacheInfo = {
-//      if (model.getUseExternalMemory) {
-//        s"$appName-${TaskContext.get().stageId()}-dtest_cache-${TaskContext.getPartitionId()}"
-//      } else {
-//        null
-//      }
-//    }
-    booster.getFeatureScore()
-    val cacheInfo = null
-    val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGBLabeledPoint), model.getMissing)
-    val dm = new DMatrix(dataIter = data, cacheInfo = cacheInfo)
+    val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
+    val dm = new DMatrix(dataIter = data)
     val treeLimit: Int = 0 // TODO: instead use model.getTreeLimit once available
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)

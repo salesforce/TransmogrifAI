@@ -191,8 +191,8 @@ class OpGeneralizedLinearRegressionModel
    */
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
     val offset = 0.0
-    val raw = predictLink.apply(features.value, offset).asInstanceOf[Double]
-    val pred = predict.apply(features.value, offset).asInstanceOf[Double]
+    val raw = predictLink(features.value, offset).asInstanceOf[Double]
+    val pred = predict(features.value, offset).asInstanceOf[Double]
     Prediction(prediction = pred, rawPrediction = raw)
   }
 }

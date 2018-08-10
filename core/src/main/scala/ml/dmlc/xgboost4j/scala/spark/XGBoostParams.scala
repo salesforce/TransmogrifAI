@@ -34,9 +34,8 @@ import ml.dmlc.xgboost4j.LabeledPoint
 import ml.dmlc.xgboost4j.scala.spark.DataUtils.MLVectorToXGBLabeledPoint
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
 
-import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -59,7 +58,18 @@ case object OpXGBoost {
   val DefaultTrackerConf = TrackerConf(workerConnectionTimeout = 0L, "scala")
 
   implicit class RichMLVectorToXGBLabeledPoint(val v: Vector) extends AnyVal {
-    def asXGBLabeledPoint: LabeledPoint = MLVectorToXGBLabeledPoint(v).asXGB
+    /**
+     * Converts a [[Vector]] to a data point with a dummy label.
+     *
+     * This is needed for constructing a [[ml.dmlc.xgboost4j.scala.DMatrix]]
+     * for prediction.
+     */
+    def asXGB: LabeledPoint = v match {
+      case v: DenseVector =>
+        LabeledPoint(0.0f, null, v.values.map(_.toFloat))
+      case v: SparseVector =>
+        LabeledPoint(0.0f, v.indices, v.values.map(_.toFloat))
+    }
   }
 
   /**
@@ -70,7 +80,7 @@ case object OpXGBoost {
       xgbLabelPoints.map { labeledPoint =>
         val indices = new ArrayBuffer[Int]()
         val values = new ArrayBuffer[Float]()
-        for ((value, i) <- labeledPoint.values.zipWithIndex if value != missing) {
+        for {(value, i) <- labeledPoint.values.zipWithIndex if value != missing} {
           indices += (if (labeledPoint.indices == null) i else labeledPoint.indices(i))
           values += value
         }
