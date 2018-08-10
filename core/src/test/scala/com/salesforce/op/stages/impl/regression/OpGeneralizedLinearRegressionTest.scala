@@ -72,14 +72,14 @@ class OpGeneralizedLinearRegressionTest extends OpEstimatorSpec[Prediction,
       .setRegParam(0.1)
       .setFitIntercept(true)
       .setTol(1E-4)
-      .setSolver("normal")
+      .setSolver("irls")
     estimator.fit(inputData)
 
     estimator.predictor.getMaxIter shouldBe 10
     estimator.predictor.getRegParam shouldBe 0.1
     estimator.predictor.getFitIntercept shouldBe true
     estimator.predictor.getTol shouldBe 1E-4
-    estimator.predictor.getSolver shouldBe "normal"
+    estimator.predictor.getSolver shouldBe "irls"
 
   }
 }
