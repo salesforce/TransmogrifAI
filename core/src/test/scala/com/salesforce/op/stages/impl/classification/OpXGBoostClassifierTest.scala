@@ -64,14 +64,14 @@ class OpXGBoostClassifierTest extends OpEstimatorSpec[Prediction, OpPredictorWra
   estimator.setSilent(1)
 
   val expectedResult = Seq(
-    Prediction(1.0),
-    Prediction(0.0),
-    Prediction(0.0),
-    Prediction(1.0),
-    Prediction(1.0),
-    Prediction(0.0),
-    Prediction(1.0),
-    Prediction(0.0)
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284))
   )
 
   it should "allow the user to set the desired spark parameters" in {

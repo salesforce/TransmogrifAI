@@ -31,7 +31,6 @@
 package ml.dmlc.xgboost4j.scala.spark
 
 import ml.dmlc.xgboost4j.LabeledPoint
-import ml.dmlc.xgboost4j.scala.spark.DataUtils.MLVectorToXGBLabeledPoint
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
 import org.apache.log4j.{Level, Logger}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}

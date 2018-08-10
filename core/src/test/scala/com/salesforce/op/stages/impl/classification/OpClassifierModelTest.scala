@@ -136,7 +136,7 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
 
     // ******************************************************
-    // TODO: equality tolerance once XGBoost rounding bug in XGBoostClassifier.transform(probabilityUDF) is fixed
+    // TODO: remove equality tolerance once XGBoost rounding bug in XGBoostClassifier.transform(probabilityUDF) is fixed
     implicit val doubleEquality = new Equality[Double] {
       def areEqual(a: Double, b: Any): Boolean = b match {
         case s: Double => (a.isNaN && s.isNaN) || math.abs(a - s) < 0.0000001

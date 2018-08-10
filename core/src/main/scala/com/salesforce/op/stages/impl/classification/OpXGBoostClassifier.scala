@@ -36,7 +36,7 @@ import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpProbabilisticClassifierModel}
 import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import ml.dmlc.xgboost4j.scala.spark._
-import ml.dmlc.xgboost4j.scala.{Booster, DMatrix, EvalTrait, ObjectiveTrait}
+import ml.dmlc.xgboost4j.scala.{DMatrix, EvalTrait, ObjectiveTrait}
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
@@ -176,7 +176,8 @@ class OpXGBoostClassificationModel
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
     val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
     val dm = new DMatrix(dataIter = data)
-    val treeLimit: Int = 0 // TODO: instead use model.getTreeLimit once available
+    val treeLimit = 0 // TODO: instead use model.getTreeLimit once available
+    // TODO: can we avoid two booster.predict calls here?
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
     val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
