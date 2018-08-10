@@ -81,9 +81,6 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     scaled shouldEqual Array(0.0, 33.0, 66.0, 99.0, 99.0).map(_.toString)
   }
 
-  // Array("-Infinity", "0.25329310557439133", "0.7231742029971469", "0.9908988967772393", "Infinity") did not contain the same elements as ArraySeq("-Infinity", "0.7231742029971469", "0.9908988967772393", "Infinity")
-
-
   it should "return a maximum calibrated score of 99" in {
     val data = (0 until 1000).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
     val (scoresDF, f1, f2): (DataFrame, Feature[Integral], Feature[RealNN]) = TestFeatureBuilder(data)
