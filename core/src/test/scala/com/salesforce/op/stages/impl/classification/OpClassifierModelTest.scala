@@ -168,7 +168,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
     }
   }
 
-
   def compareOutputsPred(df1: DataFrame, df2: DataFrame, predIndex: Int): Unit = {
     val sorted1 = df1.collect().sortBy(_.getAs[Double](predIndex))
     val sorted2 = df2.collect().sortBy(_.getAs[Map[String, Double]](2)(Prediction.Keys.PredictionName))

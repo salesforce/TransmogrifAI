@@ -337,6 +337,13 @@ class Prediction private[op](value: Map[String, Double]) extends RealMap(value) 
     val probKeys = keysStartsWith(ProbabilityName)
     if (probKeys.nonEmpty) probKeys.map(value) else Array(value(PredictionName))
   }
+
+  override def toString: String = {
+    val rawPred = rawPrediction.mkString("Array(", ",", ")")
+    val prob = probability.mkString("Array(", ",", ")")
+    s"${getClass.getSimpleName}(prediction = $prediction, rawPrediction = $rawPred, probability = $prob)"
+  }
+
 }
 object Prediction {
   object Keys {

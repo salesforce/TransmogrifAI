@@ -72,12 +72,9 @@ class OpNaiveBayesTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperMod
     Prediction(0.0, Array(-4.54, -6.32), Array(0.85, 0.14))
   )
 
-
   it should "allow the user to set the desired spark parameters" in {
-    estimator
-      .setSmoothing(2)
+    estimator.setSmoothing(2)
     estimator.fit(inputData)
-
     estimator.predictor.getSmoothing shouldBe 2
   }
 }

@@ -73,7 +73,6 @@ class OpDecisionTreeClassifierTest extends OpEstimatorSpec[Prediction,
     Prediction(0.0, Array(4.0, 0.0), Array(1.0, 0.0))
   )
 
-
   it should "allow the user to set the desired spark parameters" in {
     estimator
       .setMaxDepth(6)
