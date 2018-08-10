@@ -94,7 +94,7 @@ object AvroInOut {
       case ex: Exception => throw new IllegalArgumentException(s"Bad path $firstPath: ${ex.getMessage}")
     }
     val found = paths.filter(p => fs.exists(new Path(p)))
-    if (found.isEmpty) throw new IllegalArgumentException("No valid directory found in the list of paths <<$path>>")
+    if (found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in the list of paths <<$path>>")
     found.mkString(",")
   }
 
