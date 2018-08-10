@@ -76,6 +76,14 @@ class PredictionTest extends FlatSpec with TestCommon {
     Prediction(1.0, Array(2.0, 3.0), Array.empty[Double]).score shouldBe Array(1.0)
     Prediction(1.0, Array.empty[Double], Array(2.0, 3.0)).score shouldBe Array(2.0, 3.0)
   }
+  it should "have a nice .toString method implementation" in {
+    Prediction(4.0).toString shouldBe
+      "Prediction(prediction = 4.0, rawPrediction = Array(), probability = Array())"
+    Prediction(1.0, Array(2.0, 3.0), Array.empty[Double]).toString shouldBe
+      "Prediction(prediction = 1.0, rawPrediction = Array(2.0, 3.0), probability = Array())"
+    Prediction(1.0, Array.empty[Double], Array(2.0, 3.0)).toString shouldBe
+      "Prediction(prediction = 1.0, rawPrediction = Array(), probability = Array(2.0, 3.0))"
+  }
 
   private def assertPredictionError(f: => Unit) =
     intercept[NonNullableEmptyException](f).getMessage shouldBe

@@ -339,8 +339,8 @@ class Prediction private[op](value: Map[String, Double]) extends RealMap(value) 
   }
 
   override def toString: String = {
-    val rawPred = rawPrediction.mkString("Array(", ",", ")")
-    val prob = probability.mkString("Array(", ",", ")")
+    val rawPred = rawPrediction.mkString("Array(", ", ", ")")
+    val prob = probability.mkString("Array(", ", ", ")")
     s"${getClass.getSimpleName}(prediction = $prediction, rawPrediction = $rawPred, probability = $prob)"
   }
 
