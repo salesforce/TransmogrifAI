@@ -114,7 +114,7 @@ object TextAreaMap {
  *
  * @param value map of picklist values
  */
-class PickListMap(value: Map[String, String]) extends TextMap(value)
+class PickListMap(value: Map[String, String]) extends TextMap(value) with SingleResponse
 object PickListMap {
   def apply(value: Map[String, String]): PickListMap = new PickListMap(value)
   def empty: PickListMap = FeatureTypeDefaults.PickListMap
@@ -136,7 +136,7 @@ object ComboBoxMap {
  *
  * @param value map of binary values
  */
-class BinaryMap(val value: Map[String, Boolean]) extends OPMap[Boolean] with NumericMap {
+class BinaryMap(val value: Map[String, Boolean]) extends OPMap[Boolean] with NumericMap with SingleResponse {
   def toDoubleMap: Map[String, Double] = value
 }
 object BinaryMap {
@@ -219,7 +219,7 @@ object DateTimeMap {
  *
  * @param value map of multi picklist values
  */
-class MultiPickListMap(val value: Map[String, Set[String]]) extends OPMap[Set[String]]
+class MultiPickListMap(val value: Map[String, Set[String]]) extends OPMap[Set[String]] with MultiResponse
 object MultiPickListMap {
   def apply(value: Map[String, Set[String]]): MultiPickListMap = new MultiPickListMap(value)
   def empty: MultiPickListMap = FeatureTypeDefaults.MultiPickListMap
