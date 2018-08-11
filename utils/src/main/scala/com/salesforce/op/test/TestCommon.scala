@@ -37,6 +37,7 @@ import org.scalatest._
 
 import scala.collection.JavaConverters._
 import scala.io.Source
+import scala.language.postfixOps
 import scala.reflect.{ClassTag, _}
 
 /**
@@ -64,6 +65,23 @@ trait TestCommon extends Matchers with Assertions {
     def apply[T: ClassTag]: String = apply(classTag[T].runtimeClass)
     def apply[T1: ClassTag, T2: ClassTag]: String = apply[T2] + "[" + apply[T1] + "]"
     def apply(klazz: Class[_]): String = klazz.getSimpleName.stripSuffix("$")
+  }
+
+  /**
+   * Test data directory
+   * @return directory path
+   */
+  def testDataDir: String = {
+    Some(new File("test-data")) filter (_.isDirectory) getOrElse new File("../test-data") getPath
+  }
+
+  /**
+   * Load a file as string
+   * @param path absolute or relative path of a file
+   * @return the whole content of resource file as a string
+   */
+  def loadFile(path: String): String = {
+    Source.fromFile(path).mkString
   }
 
   /**
