@@ -43,44 +43,43 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class AvroInOutTest extends FlatSpec with TestSparkContext {
+  super.beforeAll()
+
   val avroSchemaPath = s"$testDataDir/PassengerDataAll.avsc"
   val avroFilePath = s"$testDataDir/PassengerDataAll.avro"
   val avroFileRecordCount = 891
-  val avroTemp = "/tmp/avro"
+  val avroTemp: String = tempDir + "/avro-inout-test"
   val hdfs: FileSystem = FileSystem.get(spark.sparkContext.hadoopConfiguration)
 
-  // Cleanup any old temp files
-  hdfs.delete(new Path(avroTemp), true)
-
-  Spec[AvroInOut.type] should "readPathSeq to an RDD for a valid path" in {
+  Spec(AvroInOut.getClass) should "creates RDD from an avro file" in {
     val res = readPathSeq(avroFilePath, withCount = true, deepCopy = true, persist = false)
     res shouldBe a[RDD[_]]
     res.count shouldBe avroFileRecordCount
   }
 
-  it should "readPathSeq to an RDD for a valid path sequence" in {
+  it should "creates RDD from a sequence of avro files" in {
     val res = readPathSeq(s"$avroFilePath,$avroFilePath")
     res.count shouldBe avroFileRecordCount*2
   }
 
-  it should "readPathSeq to an RDD for a mix of valid and invalid paths" in {
+  it should "create RDD from a mixed sequence of valid and invalid avro files" in {
     val res = readPathSeq(s"badfile/path1,$avroFilePath,badfile/path2,$avroFilePath,badfile/path3")
     res.count shouldBe avroFileRecordCount*2
   }
 
-  it should "readPathSeq and throw an error if valid paths are not found" in {
+  it should "throw an error if passed in avro files are invalid" in {
     val error = intercept[IllegalArgumentException](readPathSeq("badfile/path1,badfile/path2"))
     error.getMessage shouldBe "No valid directory found in the list of paths <<badfile/path1,badfile/path2>>"
   }
 
-  it should "read Some(RDD) for a valid path " in {
+  it should "creates Some(RDD) from an avro file" in {
     val res = read(avroFilePath)
     res.size shouldBe 1
     res.get shouldBe an[RDD[_]]
     res.get.count shouldBe avroFileRecordCount
   }
 
-  it should "read None for an invalid path" in {
+  it should "create None from an invalid avro file" in {
     val res = read("badfile/path")
     res shouldBe None
   }
@@ -93,7 +92,9 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
     error.getMessage shouldBe s"File $avroTemp does not exist"
 
     AvroWriter(avroData).writeAvro(avroTemp, avroSchema)
-    hdfs.listStatus(new Path(avroTemp)).take(1) should not be empty
+    val hdfsFiles = hdfs.listStatus(new Path(avroTemp)) filter (x => x.getPath.getName.contains("part"))
+    val res = readPathSeq((for (x <- hdfsFiles) yield avroTemp + "/" + x.getPath.getName).mkString(","))
+    res.count shouldBe avroFileRecordCount
   }
 
   it should "checkPathsExist" in {
