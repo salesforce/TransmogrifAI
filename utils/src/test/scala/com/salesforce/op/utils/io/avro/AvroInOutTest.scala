@@ -93,7 +93,7 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
 
     AvroWriter(avroData).writeAvro(avroTemp, avroSchema)
     val hdfsFiles = hdfs.listStatus(new Path(avroTemp)) filter (x => x.getPath.getName.contains("part"))
-    val res = readPathSeq((for (x <- hdfsFiles) yield avroTemp + "/" + x.getPath.getName).mkString(","))
+    val res = readPathSeq((for { x <- hdfsFiles } yield avroTemp + "/" + x.getPath.getName).mkString(","))
     res.count shouldBe avroFileRecordCount
   }
 
