@@ -54,8 +54,8 @@ import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.{Failure, Success, Try}
 
 /**
- * A class for running an Optimus Prime Workflow.
- * Provides methods to train, score, evaluate and computeUpTo for Optimus Prime Workflow.
+ * A class for running an TransmogrifAI Workflow.
+ * Provides methods to train, score, evaluate and computeUpTo for TransmogrifAI Workflow.
  *
  * @param workflow             the workflow that you want to run (Note: the workflow should have the resultFeatures set)
  * @param trainingReader       reader to use to load up data for training

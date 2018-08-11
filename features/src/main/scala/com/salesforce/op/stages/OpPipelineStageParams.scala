@@ -135,7 +135,7 @@ trait InputParams extends Params {
 }
 
 /**
- * Parameters shared across all Optimus Prime base stages
+ * Parameters shared across all TransmogrifAI base stages
  */
 trait OpPipelineStageParams extends InputParams {
 
@@ -186,4 +186,5 @@ trait OpPipelineStageParams extends InputParams {
 object OpPipelineStageParamsNames {
   val OutputMetadata: String = "outputMetadata"
   val InputSchema: String = "inputSchema"
+  val InputFeatures: String = "inputFeatures"
 }

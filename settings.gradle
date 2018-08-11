@@ -1,5 +1,5 @@
 enableFeaturePreview('STABLE_PUBLISHING')
 
-rootProject.name='octopus-prime'
+rootProject.name='transmogrifai'
 
 include 'utils', 'features', 'readers', 'core', 'models', 'testkit', 'cli', 'templates:simple', 'docs'

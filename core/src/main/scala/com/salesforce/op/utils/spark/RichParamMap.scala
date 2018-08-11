@@ -28,61 +28,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.tuning
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.UID
-import org.apache.spark.ml.param._
-import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import com.salesforce.op.features.TransientFeature
+import org.apache.spark.ml.PipelineStage
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.sql.types.StructType
 
-case object DataSplitter {
-
-  /**
-   * Creates instance that will split data into training and test set
-   *
-   * @param seed                set for the random split
-   * @param reserveTestFraction fraction of the data used for test
-   * @return data splitter
-   */
-  def apply(
-    seed: Long = SplitterParamsDefault.seedDefault,
-    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault
-  ): DataSplitter = {
-    new DataSplitter()
-      .setSeed(seed)
-      .setReserveTestFraction(reserveTestFraction)
-  }
-}
-
-/**
- * Instance that will split the data into training and holdout for regressions
- *
- * @param uid
- */
-class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
+object RichParamMap {
 
   /**
-   * Function to use to prepare the dataset for modeling
-   * eg - do data balancing or dropping based on the labels
+   * Enrichment functions for ParamMap
    *
-   * @param data
-   * @return Training set test set
+   * @param params Metadata
    */
-  def prepare(data: Dataset[Row]): ModelData =
-    new ModelData(data, Option(DataSplitterSummary()))
+  implicit class RichParamMap(val params: ParamMap) extends AnyVal {
 
-  override def copy(extra: ParamMap): DataSplitter = {
-    val copy = new DataSplitter(uid)
-    copyValues(copy, extra)
+    /**
+     * Extract param names and values from param map
+     * @return map of names to values
+     */
+    def getAsMap(): Map[String, Any] =
+      params.toSeq.map(pp => pp.param.name -> pp.value).toMap.map{
+        case (k, v: Array[_]) =>
+          if (v.headOption.exists(_.isInstanceOf[TransientFeature])) {
+            k -> v.map(_.asInstanceOf[TransientFeature].toJsonString())
+          } else k -> v
+        case (k, v: StructType) => k -> v.toString()
+        case (k, v: PipelineStage) => k -> v.getClass.getName
+        case (k, v: Option[_]) =>
+          if (v.exists(_.isInstanceOf[PipelineStage])) {
+            k -> v.getClass.getName
+          } else k -> v
+        case (k, v) => k -> v
+      }
+
   }
-}
 
-/**
- * Empty class because no summary information for a datasplitter
- */
-case class DataSplitterSummary() extends SplitterSummary {
-  override def toMetadata(): Metadata = new MetadataBuilder()
-    .putString(SplitterSummary.ClassName, this.getClass.getName)
-    .build()
 }
-
