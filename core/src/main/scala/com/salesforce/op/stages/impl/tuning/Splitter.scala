@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.tuning
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.{Dataset, Row}
 import com.salesforce.op.stages.impl.MetadataLike
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -129,15 +129,15 @@ private[op] object SplitterSummary {
     map(ClassName) match {
       case s if s == classOf[DataSplitterSummary].getCanonicalName => DataSplitterSummary()
       case s if s == classOf[DataBalancerSummary].getCanonicalName => DataBalancerSummary(
-        positiveLabels = map(ModelSelectorBase.Positive).asInstanceOf[Long],
-        negativeLabels = map(ModelSelectorBase.Negative).asInstanceOf[Long],
-        desiredFraction = map(ModelSelectorBase.Desired).asInstanceOf[Double],
-        upSamplingFraction = map(ModelSelectorBase.UpSample).asInstanceOf[Double],
-        downSamplingFraction = map(ModelSelectorBase.DownSample).asInstanceOf[Double]
+        positiveLabels = map(ModelSelectorNames.Positive).asInstanceOf[Long],
+        negativeLabels = map(ModelSelectorNames.Negative).asInstanceOf[Long],
+        desiredFraction = map(ModelSelectorNames.Desired).asInstanceOf[Double],
+        upSamplingFraction = map(ModelSelectorNames.UpSample).asInstanceOf[Double],
+        downSamplingFraction = map(ModelSelectorNames.DownSample).asInstanceOf[Double]
       )
       case s if s == classOf[DataCutterSummary].getCanonicalName => DataCutterSummary(
-        labelsKept = map(ModelSelectorBase.LabelsKept).asInstanceOf[Array[Double]],
-        labelsDropped = map(ModelSelectorBase.LabelsDropped).asInstanceOf[Array[Double]]
+        labelsKept = map(ModelSelectorNames.LabelsKept).asInstanceOf[Array[Double]],
+        labelsDropped = map(ModelSelectorNames.LabelsDropped).asInstanceOf[Array[Double]]
       )
     }
   }

@@ -120,7 +120,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   lazy val labelColName: String = in1.name
 
   override protected[op] def outputsColNamesMap: Map[String, String] =
-    Map(StageParamNames.outputParamName -> getOutputFeatureName)
+    Map(ModelSelectorNames.outputParamName -> getOutputFeatureName)
 
   /**
    * Splits the data into training test and test set, balances the training set and selects the best model
@@ -138,7 +138,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
       } else {
         dataset.select(in1.name, in2.name)
-          .withColumn(ModelSelectorBase.idColName, monotonically_increasing_id())
+          .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
@@ -184,7 +184,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
     new SelectedModel(
-      bestModel.asInstanceOf[ModelSelectorBase.ModelType],
+      bestModel.asInstanceOf[ModelSelectorNames.ModelType],
       outputsColNamesMap,
       uid,
       operationName
@@ -211,7 +211,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
  */
 final class SelectedModel private[op]
 (
-  val modelStageIn: ModelSelectorBase.ModelType,
+  val modelStageIn: ModelSelectorNames.ModelType,
   val outputsColNamesMap: Map[String, String],
   val uid: String,
   val operationName: String

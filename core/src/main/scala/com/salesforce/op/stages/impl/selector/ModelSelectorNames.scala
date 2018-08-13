@@ -38,7 +38,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.{DataFrame, Dataset}
 
-case object ModelSelectorBase {
+case object ModelSelectorNames {
   val TrainValSplitResults = "trainValidationSplitResults"
   val CrossValResults = "crossValidationResults"
   val TrainingEval = "trainingSetEvaluationResults"
@@ -58,6 +58,11 @@ case object ModelSelectorBase {
 
   type ModelType = Model[_ <: Model[_]] with OpTransformer2[RealNN, OPVector, Prediction]
   type EstimatorType = Estimator[_ <: Model[_]] with OpPipelineStage2[RealNN, OPVector, Prediction]
+
+  // Stage param names
+  val inputParam1Name = "labelCol"
+  val inputParam2Name = "featuresCol"
+  val outputParamName = "outputFeatureName"
 }
 
 /**
@@ -70,11 +75,7 @@ private[op] trait HasEval {
   protected[op] def outputsColNamesMap: Map[String, String]
   protected[op] def labelColName: String
 
-  protected[op] def fullPredictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParamName)
-  protected[op] def predictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam1Name)
-  protected[op] def rawPredictionColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam2Name)
-  protected[op] def probabilityColName: Option[String] = outputsColNamesMap.get(StageParamNames.outputParam3Name)
-
+  protected[op] def fullPredictionColName: Option[String] = outputsColNamesMap.get(ModelSelectorNames.outputParamName)
   /**
    * Function that evaluates the selected model on the test set
    *
@@ -85,20 +86,10 @@ private[op] trait HasEval {
     data: Dataset[_]
   ): EvaluationMetrics = {
     data.persist()
-    val metricsMap = evaluators.map {
-      case evaluator: OpClassificationEvaluatorBase[_] =>
-        evaluator.setLabelCol(labelColName)
-        fullPredictionColName.foreach(evaluator.setFullPredictionCol)
-        predictionColName.foreach(evaluator.setPredictionCol)
-        rawPredictionColName.foreach(evaluator.setRawPredictionCol)
-        probabilityColName.foreach(evaluator.setProbabilityCol)
-        evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
-      case evaluator: OpRegressionEvaluatorBase[_] =>
-        evaluator.setLabelCol(labelColName)
-        fullPredictionColName.foreach(evaluator.setFullPredictionCol)
-        predictionColName.foreach(evaluator.setPredictionCol)
-        evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
-      case evaluator => throw new RuntimeException(s"Evaluator $evaluator is not supported")
+    val metricsMap = evaluators.map { evaluator =>
+      evaluator.setLabelCol(labelColName)
+      fullPredictionColName.foreach(evaluator.setFullPredictionCol)
+      evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
     }.toMap
     data.unpersist()
     MultiMetrics(metricsMap)
@@ -128,4 +119,3 @@ private[op] trait HasTestEval extends HasEval {
     scored
   }
 }
-

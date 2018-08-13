@@ -31,18 +31,19 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.{PickList, Prediction, Real, RealNN}
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.{LogisticRegression, NaiveBayes}
+import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.RegressionModelSelector
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.PassengerSparkFixtureTest
-import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import org.scalactic.Equality
 import org.scalatest.FlatSpec
@@ -63,8 +64,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   implicit val doubleOptEquality = new Equality[Option[Double]] {
     def areEqual(a: Option[Double], b: Any): Boolean = b match {
       case None => a.isEmpty
-      case s: Option[Double] => (a.exists(_.isNaN) && s.exists(_.isNaN)) ||
-        (a.nonEmpty && a.toSeq.zip(s.toSeq).forall{ case (n, m) => n == m })
+      case Some(s: Double) => (a.exists(_.isNaN) && s.isNaN) ||
+        (a.nonEmpty && a.contains(s))
       case _ => false
     }
   }
@@ -80,29 +81,32 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   private val checkedWithMaps =
     label.sanityCheck(featuresWithMaps, removeBadFeatures = true, removeFeatureGroup = false, checkSample = 1.0)
 
-  val (pred, rawPred, prob) = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)))
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0.01, 0.1)
+  val lr = new OpLogisticRegression()
+  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
+  val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+
+
+  val pred = BinaryClassificationModelSelector
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+      modelsAndParameters = models)
     .setInput(label, checked)
     .getOutput()
 
-  val (predWithMaps, rawPredWithMaps, probWithMaps) = BinaryClassificationModelSelector
-    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)))
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0.01, 0.1)
+  val predWithMaps = BinaryClassificationModelSelector
+    .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+      modelsAndParameters = models)
     .setInput(label, checkedWithMaps)
     .getOutput()
 
   val predLin = RegressionModelSelector
-    .withTrainValidationSplit(seed = 42, dataSplitter = None)
-    .setModelsToTry(LinearRegression)
+    .withTrainValidationSplit(seed = 42, dataSplitter = None, modelsAndParameters = Seq(new OpLinearRegression() ->
+      new ParamGridBuilder().build()).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
     .setInput(label, features)
     .getOutput()
 
   val params = new OpParams()
 
-  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, prob).setParameters(params).setReader(dataReader)
+  lazy val workflow = new OpWorkflow().setResultFeatures(predLin).setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
 
@@ -192,7 +196,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "return feature insights with selector info and label info and model info" in {
-    val insights = workflowModel.modelInsights(prob)
+    val insights = workflowModel.modelInsights(pred)
     val ageInsights = insights.features.filter(_.featureName == age.name).head
     val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
     insights.label.labelName shouldBe Some(label.name)
@@ -268,9 +272,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "pretty print" in {
-    val insights = workflowModel.modelInsights(prob)
+    val insights = workflowModel.modelInsights(pred)
     val pretty = insights.prettyPrint()
-    pretty should include(s"Selected Model - $LogisticRegression")
+    pretty should include(s"Selected Model - ${BinaryClassificationModelsToTry.OpLogisticRegression}")
     pretty should include("area under precision-recall | 0.0")
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
@@ -279,7 +283,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly serialize and deserialize from json" in {
-    val insights = workflowModel.modelInsights(prob)
+    val insights = workflowModel.modelInsights(pred)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
       case Success(deser) =>
@@ -299,7 +303,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "have feature insights for features that are removed by the raw feature filter" in {
 
     val model = new OpWorkflow()
-      .setResultFeatures(probWithMaps)
+      .setResultFeatures(predWithMaps)
       .setParameters(params)
       .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
         maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,

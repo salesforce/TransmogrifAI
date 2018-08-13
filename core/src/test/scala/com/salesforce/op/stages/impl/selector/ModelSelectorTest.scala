@@ -191,7 +191,7 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
       .addGrid(lr.regParam, Array(100.0))
       .addGrid(lr.elasticNetParam, Array(0, 0.5)).build()
 
-    val validatorCV = new OpCrossValidation[ModelSelectorBase.ModelType, ModelSelectorBase.EstimatorType](
+    val validatorCV = new OpCrossValidation[ModelSelectorNames.ModelType, ModelSelectorNames.EstimatorType](
       numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(),
       stratify = false, parallelism = 1)
 

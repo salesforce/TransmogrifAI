@@ -34,7 +34,7 @@ import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEval
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.OpPipelineStage2
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames, _}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorNames, _}
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil._
@@ -248,10 +248,10 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       indexOfLastEstimator = Some(-1)
     )
     val selectTrain = newTrain.select(label, features)
-      .withColumn(ModelSelectorBase.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val selectTest = newTest.select(label, features)
-      .withColumn(ModelSelectorBase.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val (balancedTrain, balancedTest) = splitter.map(s => (
       s.prepare(selectTrain).train,
@@ -284,12 +284,12 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
         case e: OpPipelineStage2[RealNN, OPVector, Prediction]@unchecked =>
           val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked, _)) =
             FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
-              nonNullable = Set(features, ModelSelectorBase.idColName))
+              nonNullable = Set(features, ModelSelectorNames.idColName))
           e.setInput(labelFeat, featuresFeat)
           evaluator.setFullPredictionCol(e.getOutput())
         case _ => // otherwise it is a spark estimator
-          val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-          val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
+          val pi1 = estimator.getParam(ModelSelectorNames.inputParam1Name)
+          val pi2 = estimator.getParam(ModelSelectorNames.inputParam2Name)
           estimator.set(pi1, label).set(pi2, features)
       }
       Future {

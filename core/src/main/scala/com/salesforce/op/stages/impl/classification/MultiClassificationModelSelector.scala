@@ -32,11 +32,11 @@ package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
-import com.salesforce.op.stages.impl.classification.MultiClassClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase.{EstimatorType, ModelType}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 
@@ -46,8 +46,8 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object MultiClassificationModelSelector {
 
-  private val modelNames: Seq[MultiClassClassificationModelsToTry] = Seq(OpLogisticRegression, OpRandomForestClassifier,
-    OpNaiveBayes) // OpDecisionTreeClassifier off by default
+  private val modelNames: Seq[_ <: MultiClassClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
+    MTT.OpRandomForestClassifier, MTT.OpNaiveBayes) // OpDecisionTreeClassifier off by default
 
   private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
@@ -58,6 +58,7 @@ case object MultiClassificationModelSelector {
       .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
       .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
       .addGrid(lr.tol, DefaultSelectorParams.Tol)
+      .build()
 
     val rf = new OpRandomForestClassifier()
     val rfParams = new ParamGridBuilder()
@@ -68,11 +69,13 @@ case object MultiClassificationModelSelector {
       .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
       .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
       .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .build()
 
     val nb = new OpNaiveBayes()
     val nbParams = new ParamGridBuilder()
       .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
       .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
+      .build()
 
     val dt = new OpDecisionTreeClassifier()
     val dtParams = new ParamGridBuilder()
@@ -81,9 +84,9 @@ case object MultiClassificationModelSelector {
       .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
       .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
       .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .build()
 
     Seq(lr -> lrParams, rf -> rfParams, nb -> nbParams, dt -> dtParams)
-      .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
   }
 
   /**
@@ -114,7 +117,7 @@ case object MultiClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[_ <: MultiClassClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
@@ -149,7 +152,7 @@ case object MultiClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[_ <: MultiClassClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
@@ -165,7 +168,7 @@ case object MultiClassificationModelSelector {
     validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[DataCutter],
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[MultiClassClassificationModelsToTry],
+    modelTypesToUse: Seq[_ <: MultiClassClassificationModelsToTry],
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)

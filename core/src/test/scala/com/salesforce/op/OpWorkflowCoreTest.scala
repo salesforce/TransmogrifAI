@@ -37,7 +37,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.feature.{OpLDA, OpScalarStandardScaler}
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
+import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomReal, RandomVector}
 import org.apache.spark.ml.{Estimator, Model}
@@ -49,7 +49,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   // Types
-  type MS = ModelSelectorBase[_ <: Model[_], _ <: Estimator[_]]
+  type MS = ModelSelector[_ <: Model[_], _ <: Estimator[_]]
 
   // Random Data
   val count = 1000
@@ -87,12 +87,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
 
   it should "cut simple DAG containing modelSelector only" in {
     val ms = BinaryClassificationModelSelector()
-    val (pred, _, _) = ms.setInput(label, features).getOutput()
+    val pred = ms.setInput(label, features).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array.empty[Layer],
         during = Array.empty[Layer],
         after = Array.empty[Layer]
@@ -104,12 +104,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     val ldaFeatures = lda.setInput(features).getOutput()
     val checkedFeatures = sanityChecker.setInput(label, ldaFeatures).getOutput()
     val ms = BinaryClassificationModelSelector()
-    val (pred, _, _) = ms.setInput(label, checkedFeatures).getOutput()
+    val pred = ms.setInput(label, checkedFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array(Array((lda, 2))),
         during = Array(Array((sanityChecker, 1))),
         after = Array.empty[Layer]
@@ -121,14 +121,15 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     val ldaFeatures = lda.setInput(features).getOutput()
     val checkedFeatures = sanityChecker.setInput(label, ldaFeatures).getOutput()
     val ms = BinaryClassificationModelSelector()
-    val (pred, _, _) = ms.setInput(label, checkedFeatures).getOutput()
+    val pred = ms.setInput(label, checkedFeatures).getOutput()
+    val predValue = pred.map[RealNN](_.prediction.toRealNN)
     val zNormalize = new OpScalarStandardScaler()
-    val realPred = zNormalize.setInput(pred).getOutput()
+    val realPred = zNormalize.setInput(predValue).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(realPred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 1)),
+        modelSelector = Option((ms, 1)),
         before = Array(Array((lda, 3))),
         during = Array(Array((sanityChecker, 2))),
         after = Array(Array((zNormalize, 0)))
@@ -139,12 +140,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   it should "cut DAG with no nonCVTS stage" in {
     val checkedFeatures = sanityChecker.setInput(label, features).getOutput()
     val ms = BinaryClassificationModelSelector()
-    val (pred, _, _) = ms.setInput(label, checkedFeatures).getOutput()
+    val pred = ms.setInput(label, checkedFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array.empty[Layer],
         during = Array(Array((sanityChecker, 1))),
         after = Array.empty[Layer]
@@ -155,12 +156,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   it should "cut DAG with no cVTS stage before ModelSelector" in {
     val ms = BinaryClassificationModelSelector()
     val ldaFeatures = lda.setInput(features).getOutput()
-    val (pred, _, _) = ms.setInput(label, ldaFeatures).getOutput()
+    val pred = ms.setInput(label, ldaFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array(Array((lda, 1))),
         during = Array.empty[Layer],
         after = Array.empty[Layer]
@@ -186,8 +187,8 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   it should "throw an error when there is more than one ModelSelector in parallel" in {
     val ms1 = BinaryClassificationModelSelector()
     val ms2 = BinaryClassificationModelSelector()
-    val (pred1, _, _) = ms1.setInput(label, features).getOutput()
-    val (pred2, _, _) = ms2.setInput(label2, features).getOutput()
+    val pred1 = ms1.setInput(label, features).getOutput()
+    val pred2 = ms2.setInput(label2, features).getOutput()
 
     val error = intercept[IllegalArgumentException](cutDAG(wf.setResultFeatures(pred1, pred2)))
     error.getMessage
@@ -197,8 +198,9 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
   it should "throw an error when there is more than one ModelSelector in sequence" in {
     val ms1 = BinaryClassificationModelSelector()
     val ms2 = BinaryClassificationModelSelector()
-    val (pred1, _, _) = ms1.setInput(label, features).getOutput()
-    val (pred2, _, _) = ms2.setInput(pred1, features).getOutput()
+    val pred1 = ms1.setInput(label, features).getOutput()
+    val predLabel = pred1.map[RealNN](_.prediction.toRealNN)
+    val pred2 = ms2.setInput(predLabel, features).getOutput()
 
     val error = intercept[IllegalArgumentException](cutDAG(wf.setResultFeatures(pred1, pred2)))
     error.getMessage
@@ -210,13 +212,13 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     val logReg = new OpLogisticRegression()
     val ldaFeatures = lda.setInput(features).getOutput()
     val checkedFeatures = sanityChecker.setInput(label2, ldaFeatures).getOutput()
-    val (pred, _, _) = ms.setInput(label, features).getOutput()
+    val pred = ms.setInput(label, features).getOutput()
     val predLogReg = logReg.setInput(label2, checkedFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred, predLogReg)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array(Array((lda, 2)), Array((sanityChecker, 1)), Array((logReg, 0))),
         during = Array.empty[Layer],
         after = Array.empty[Layer]
@@ -230,12 +232,12 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     val transformedLabel: FeatureLike[RealNN] = zNormalize.setInput(label).getOutput()
     val checkedFeatures = sanityChecker.setInput(transformedLabel, ldaFeatures).getOutput()
     val ms = BinaryClassificationModelSelector()
-    val (pred, _, _) = ms.setInput(transformedLabel, checkedFeatures).getOutput()
+    val pred = ms.setInput(transformedLabel, checkedFeatures).getOutput()
 
     assert(
       res = cutDAG(wf.setResultFeatures(pred)),
       expected = CutDAG(
-        modelSelector = Option((ms.stage1, 0)),
+        modelSelector = Option((ms, 0)),
         before = Array(Array((lda, 2), (zNormalize, 2))),
         during = Array(Array((sanityChecker, 1))),
         after = Array.empty[Layer]

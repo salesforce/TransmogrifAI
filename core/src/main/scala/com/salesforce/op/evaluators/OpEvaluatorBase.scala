@@ -76,9 +76,9 @@ trait OpHasPredictionCol[T <: FeatureType] extends Params {
   final val predictionCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
   setDefault(predictionCol, "prediction")
 
-  def setPredictionCol(value: String): this.type = set(predictionCol, value)
-  def setPredictionCol(value: FeatureLike[T]): this.type = setPredictionCol(value.name)
-  final def getPredictionCol: String = $(predictionCol)
+  protected def setPredictionCol(value: String): this.type = set(predictionCol, value)
+  protected def setPredictionCol(value: FeatureLike[T]): this.type = setPredictionCol(value.name)
+  protected final def getPredictionCol: String = $(predictionCol)
 }
 
 /**
@@ -92,9 +92,9 @@ trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
   )
   setDefault(rawPredictionCol, "rawPrediction")
 
-  def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
-  def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
-  final def getRawPredictionCol: String = $(rawPredictionCol)
+  protected def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
+  protected def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
+  protected final def getRawPredictionCol: String = $(rawPredictionCol)
 }
 
 /**
@@ -110,9 +110,9 @@ trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   )
   setDefault(probabilityCol, "probability")
 
-  def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
-  def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
-  final def getProbabilityCol: String = $(probabilityCol)
+  protected def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
+  protected def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
+  protected final def getProbabilityCol: String = $(probabilityCol)
 }
 
 

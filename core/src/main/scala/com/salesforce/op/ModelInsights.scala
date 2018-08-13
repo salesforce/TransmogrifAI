@@ -436,7 +436,7 @@ case object ModelInsights {
         // first try out to get vector metadata from sanity checker
         .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
         // fall back to model selector stage metadata
-        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelectorBase[_, _]])))
+        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelector[_, _]])))
         // finally try to get it from the last vector stage
         .orElse(
         stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption

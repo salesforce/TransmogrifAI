@@ -31,9 +31,9 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator, RegressionEvaluator}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
@@ -80,21 +80,22 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   )
   val test_label = test_rawLabel.copy(isResponse = true)
 
-  // TODO put back LR when evaluators work with prediction features
-  val testEstimator = BinaryClassificationModelSelector()
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0)
+  val testEstimator = new OpLogisticRegression()
     .setInput(label, features)
-  val (pred, rawPred, prob) = testEstimator.getOutput()
+  val pred = testEstimator.getOutput()
   val model = testEstimator.fit(ds)
   val transformedData = model.setInput(test_label, test_features).transform(test_ds)
+  val rawPred = pred.map[OPVector](p => Vectors.dense(p.rawPrediction).toOPVector)
+  val transformedData2 = rawPred.originStage.asInstanceOf[Transformer].transform(transformedData)
+  val predValue = pred.map[RealNN](_.prediction.toRealNN)
+  val transformedData3 = predValue.originStage.asInstanceOf[Transformer].transform(transformedData2)
 
 
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator().setLabelCol(test_label.name)
     .setRawPredictionCol(rawPred.name)
 
   val opBinaryMetrics = new OpBinaryClassificationEvaluator().setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob).evaluateAll(transformedData)
+    .setFullPredictionCol(pred).evaluateAll(transformedData)
 
   val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(test_label.name)
     .setPredictionCol(pred.name)
@@ -145,23 +146,21 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   }
 
   def evaluateBinaryMetric(binEval: OpBinaryClassificationEvaluator): Double = binEval.setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob)
-    .evaluate(transformedData)
+    .setFullPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkBinaryMetric(metricName: String): Double = sparkBinaryEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
+    .evaluate(transformedData3)
 
   def evaluateMultiMetric(multiEval: OpMultiClassificationEvaluator): Double = multiEval.setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob)
-    .evaluate(transformedData)
+    .setFullPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkMultiMetric(metricName: String): Double = sparkMultiEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
+    .evaluate(transformedData3)
 
-  def evaluateRegMetric(regEval: OpRegressionEvaluator): Double = regEval.setLabelCol(test_label).setPredictionCol(pred)
-    .evaluate(transformedData)
+  def evaluateRegMetric(regEval: OpRegressionEvaluator): Double = regEval.setLabelCol(test_label)
+    .setFullPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkRegMetric(metricName: String): Double = sparkRegressionEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
+    .evaluate(transformedData3)
 }
 

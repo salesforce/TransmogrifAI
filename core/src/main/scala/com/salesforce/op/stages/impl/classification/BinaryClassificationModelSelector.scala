@@ -32,12 +32,12 @@ package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
-import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.stages.impl.tuning.{DataSplitter, Splitter, _}
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase.{EstimatorType, ModelType}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
@@ -46,8 +46,9 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object BinaryClassificationModelSelector {
 
-  private val modelNames: Seq[BinaryClassificationModelsToTry] = Seq(OpLogisticRegression, OpRandomForestClassifier,
-    OpGBTClassifier, OpLinearSVC) // OpNaiveBayes and OpDecisionTreeClassifier off by default
+  private val modelNames: Seq[_ <: BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
+    MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
+  // OpNaiveBayes and OpDecisionTreeClassifier off by default
 
   private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
@@ -58,6 +59,7 @@ case object BinaryClassificationModelSelector {
       .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
       .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
       .addGrid(lr.tol, DefaultSelectorParams.Tol)
+      .build()
 
     val rf = new OpRandomForestClassifier()
     val rfParams = new ParamGridBuilder()
@@ -68,6 +70,7 @@ case object BinaryClassificationModelSelector {
       .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
       .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
       .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .build()
 
     val gbt = new OpGBTClassifier()
     val gbtParams = new ParamGridBuilder()
@@ -80,6 +83,7 @@ case object BinaryClassificationModelSelector {
       .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
       .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
       .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
+      .build()
 
     val svc = new OpLinearSVC()
     val svcParams = new ParamGridBuilder()
@@ -88,11 +92,13 @@ case object BinaryClassificationModelSelector {
       .addGrid(svc.fitIntercept, DefaultSelectorParams.FitIntercept)
       .addGrid(svc.tol, DefaultSelectorParams.Tol)
       .addGrid(svc.standardization, DefaultSelectorParams.Standardized)
+      .build()
 
     val nb = new OpNaiveBayes()
     val nbParams = new ParamGridBuilder()
       .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
       .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
+      .build()
 
     val dt = new OpDecisionTreeClassifier()
     val dtParams = new ParamGridBuilder()
@@ -101,9 +107,9 @@ case object BinaryClassificationModelSelector {
       .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
       .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
       .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .build()
 
     Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams)
-      .asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
   }
 
   /**
@@ -134,7 +140,7 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
@@ -169,7 +175,7 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
@@ -185,7 +191,7 @@ case object BinaryClassificationModelSelector {
     validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry],
+    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry],
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)

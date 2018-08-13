@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
 import org.apache.spark.sql.Dataset

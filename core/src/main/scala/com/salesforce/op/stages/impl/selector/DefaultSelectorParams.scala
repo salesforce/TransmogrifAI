@@ -31,9 +31,6 @@
 package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.stages.impl.classification.Impurity._
-import com.salesforce.op.stages.impl.classification.ModelType.Multinomial
-import com.salesforce.op.stages.impl.regression.LossType.Squared
-import com.salesforce.op.stages.impl.regression.Solver.Auto
 
 object DefaultSelectorParams {
 
