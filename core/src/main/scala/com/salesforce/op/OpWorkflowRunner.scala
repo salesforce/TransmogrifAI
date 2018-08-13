@@ -31,6 +31,7 @@
 package com.salesforce.op
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.github.fommil.netlib.{BLAS, LAPACK}
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
@@ -234,7 +235,7 @@ class OpWorkflowRunner
       "The streamingScore method requires an streaming score reader to be specified")
 
     // Prepare write path
-    def writePath(timeInMs: Long) = Some(s"${params.writeLocation.get.stripSuffix("/")}/$timeInMs")
+    def writePath(timeInMs: Long) = Some(Paths.get(params.writeLocation.get, timeInMs.toString).toString)
 
     // Load the model to score with and prepare the scoring function
     val workflowModel = workflow.loadModel(params.modelLocation.get).setParameters(params)

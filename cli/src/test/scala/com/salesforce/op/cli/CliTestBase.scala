@@ -31,6 +31,7 @@
 package com.salesforce.op.cli
 
 import java.io.{ByteArrayOutputStream, File, StringReader}
+import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType
 import com.salesforce.op.test.TestCommon
@@ -108,17 +109,17 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
 
   val expectedSourceFiles = "Features.scala" :: s"$ProjectName.scala"::Nil
 
-  val projectDir = new File(ProjectName.toLowerCase)
+  val projectDir = ProjectName.toLowerCase
 
   def checkAvroFile(source: File): Unit = {
-    val avroFile = new File(projectDir, s"src/main/avro/${source.getName}")
+    val avroFile = Paths.get(projectDir, "src", "main", "avro", source.getName).toFile
     avroFile should exist
     Source.fromFile(avroFile).getLines.mkString("\n") shouldBe
       Source.fromFile(source).getLines.mkString("\n")
   }
 
   def checkScalaFiles(shouldNotContain: String): Unit = {
-    val srcDir = new File(projectDir, "src/main/scala/com/salesforce/app")
+    val srcDir = Paths.get(projectDir, "src", "main", "scala", "com", "salesforce", "app").toFile
     srcDir should exist
 
     for {
@@ -136,7 +137,7 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
 
   def findFile(relPath: String): String = {
     Option(new File(relPath)) filter (_.exists) orElse
-    Option(new File(new File(".."), relPath)) filter (_.exists) getOrElse {
+    Option(Paths.get("fake-rel-path").relativize(Paths.get(relPath)).toFile) filter (_.exists) getOrElse {
       throw new UnsupportedOperationException(
         s"Could not find file $relPath, current is ${new File(".").getAbsolutePath}")
     } getAbsolutePath
