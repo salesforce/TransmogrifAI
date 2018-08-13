@@ -70,7 +70,7 @@ class CSVToAvroTest extends FlatSpec with TestSparkContext {
   }
 
   it should "throw an error for bad data" in {
-    val invalidDataRDD = csvReader.readRDD(s"$resourceDir/PassengerDataBadData.csv")
+    val invalidDataRDD = csvReader.readRDD(s"$resourceDir/PassengerDataContentTypeMisMatch.csv")
     val error = intercept[SparkException](CSVToAvro.toAvro(invalidDataRDD, avroSchema).count())
     error.getCause.getMessage shouldBe "Boolean column not actually a boolean. Invalid value: 'fail'"
   }
