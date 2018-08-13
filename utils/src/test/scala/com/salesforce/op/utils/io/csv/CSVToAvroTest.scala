@@ -31,7 +31,6 @@
 package com.salesforce.op.utils.io.csv
 
 import com.salesforce.op.test.{Passenger, TestSparkContext}
-import org.apache.avro.generic.GenericRecord
 import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
 import org.junit.runner.RunWith
@@ -40,46 +39,38 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class CSVToAvroTest extends FlatSpec with TestSparkContext {
-  val avroSchemaPath: String = s"$testDataDir/PassengerDataAllV2.avsc"
-  val avroSchema: String = loadFile(avroSchemaPath)
-  val csvFile: String = s"$testDataDir/PassengerDataAllV2.csv"
+  val avroSchema: String = loadFile(s"$resourceDir/PassengerSchemaModifiedDataTypes.avsc")
   val csvReader: CSVInOut = new CSVInOut(CSVOptions(header = true))
-  val csvRDD: RDD[Seq[String]] = csvReader.readRDD(csvFile)
-  val csvFileRecordCount: Long = csvRDD.count
+  lazy val csvRDD: RDD[Seq[String]] = csvReader.readRDD(s"$resourceDir/PassengerDataModifiedDataTypes.csv")
+  lazy val csvFileRecordCount: Long = csvRDD.count
 
   Spec(CSVToAvro.getClass) should "convert RDD[Seq[String]] to RDD[GenericRecord]" in {
     val res = CSVToAvro.toAvro(csvRDD, avroSchema)
-    assert(res.isInstanceOf[RDD[GenericRecord]])
+    res shouldBe a[RDD[_]]
     res.count shouldBe csvFileRecordCount
   }
 
   it should "convert RDD[Seq[String]] to RDD[T]" in {
     val res = CSVToAvro.toAvroTyped[Passenger](csvRDD, avroSchema)
-    assert(res.isInstanceOf[RDD[Passenger]])
+    res shouldBe a[RDD[_]]
     res.count shouldBe csvFileRecordCount
   }
 
   it should "throw an error for nested schema" in {
-    val invalidAvroSchemaPath = s"$testDataDir/InvalidPassengerDataAll.avsc"
-    val invalidAvroSchema: String = loadFile(invalidAvroSchemaPath)
+    val invalidAvroSchema = loadFile(s"$resourceDir/PassengerSchemaNestedTypeCSV.avsc")
     val exceptionMsg = "CSV should be a flat file and not have nested records (unsupported column(Sex schemaType=ENUM)"
-
     val error = intercept[SparkException](CSVToAvro.toAvro(csvRDD, invalidAvroSchema).count())
     error.getCause.getMessage shouldBe exceptionMsg
   }
 
   it should "throw an error for mis-matching schema fields" in {
-    val invalidAvroSchemaPath = s"$testDataDir/InvalidPassengerDataAllV2.avsc"
-    val invalidAvroSchema: String = loadFile(invalidAvroSchemaPath)
-
+    val invalidAvroSchema = loadFile(s"$resourceDir/PassengerSchemaInvalidField.avsc")
     val error = intercept[SparkException](CSVToAvro.toAvro(csvRDD, invalidAvroSchema).count())
     error.getCause.getMessage shouldBe "Mismatch number of fields in csv record and avro schema"
   }
 
   it should "throw an error for bad data" in {
-    val invalidCsvFile = s"$testDataDir/InvalidPassengerDataAll.csv"
-    val invalidDataRDD = csvReader.readRDD(invalidCsvFile)
-
+    val invalidDataRDD = csvReader.readRDD(s"$resourceDir/PassengerDataBadData.csv")
     val error = intercept[SparkException](CSVToAvro.toAvro(invalidDataRDD, avroSchema).count())
     error.getCause.getMessage shouldBe "Boolean column not actually a boolean. Invalid value: 'fail'"
   }

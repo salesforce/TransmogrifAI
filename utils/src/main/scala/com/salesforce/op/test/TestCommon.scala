@@ -44,6 +44,12 @@ import scala.reflect.{ClassTag, _}
  * Trait with test commons such as Spec and Resource functions
  */
 trait TestCommon extends Matchers with Assertions {
+  private val _resourceDir = "src/test/resources"
+
+  /**
+   * Returns the resource directory path
+   */
+  protected def resourceDir = _resourceDir
 
   /**
    * Set logging level for
@@ -91,7 +97,7 @@ trait TestCommon extends Matchers with Assertions {
    * @param name   resource name
    * @return resource file
    */
-  def resourceFile(parent: String = "src/test/resources", name: String): File = {
+  def resourceFile(parent: String = resourceDir, name: String): File = {
     val file = new File(parent, name)
     if (!file.canRead) throw new IllegalStateException(s"File $file unreadable")
     file
@@ -106,7 +112,7 @@ trait TestCommon extends Matchers with Assertions {
    * @return resource file
    */
   @deprecated("Use loadResource", "3.2.3")
-  def resourceString(parent: String = "src/test/resources", noSpaces: Boolean = true, name: String): String = {
+  def resourceString(parent: String = resourceDir, noSpaces: Boolean = true, name: String): String = {
     val file = resourceFile(parent = parent, name = name)
     val contents = Source.fromFile(file, "UTF-8").mkString
     if (noSpaces) contents.replaceAll("\\s", "") else contents

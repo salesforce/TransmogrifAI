@@ -89,10 +89,4 @@ class RichGenericRecordTest extends FlatSpec
     val error = intercept[IllegalArgumentException](firstRow.getValue[Short]("invalidField"))
     error.getMessage shouldBe "requirement failed: invalidField is not found in Avro schema!"
   }
-
-  it should "convert GenericRecord to RichGenericRecord" in {
-    val res = RichGenericRecord(firstRow)
-    assert(res.isInstanceOf[RichGenericRecord])
-    res.getValue[Int]("passengerId") shouldBe Some(1)
-  }
 }
