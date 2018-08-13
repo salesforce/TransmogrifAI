@@ -171,11 +171,17 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val (ds, rawBinary, rawCurrency, rawER, label) =
       TestFeatureBuilder("binary", "currency", "expectedRevenue", "label", rawData)
 
+    // Spark changed their split algorithm in 2.3.0 to use the mean, so adjust our expected value here
+    // https://issues.apache.org/jira/browse/SPARK-16957
+    val splitValue = expectedRevenueData
+      .filter(x => x.nonEmpty && x.value.get > 0.0)
+      .map(_.value.get).min / 2.0
+
     val out = rawER.autoBucketize(label.copy(isResponse = true), trackNulls = true, trackInvalid = true)
     assertBucketizer(
       bucketizer = out.originStage.asInstanceOf[DecisionTreeNumericBucketizer[_, _ <: OPNumeric[_]]],
       data = ds, shouldSplit = true, trackNulls = true, trackInvalid = true,
-      expectedSplits = Array(Double.NegativeInfinity, 0.0, Double.PositiveInfinity),
+      expectedSplits = Array(Double.NegativeInfinity, splitValue, Double.PositiveInfinity),
       expectedTolerance = 0.15
     )
   }
