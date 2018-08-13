@@ -69,7 +69,7 @@ class CSVToAvroTest extends FlatSpec with TestSparkContext {
   }
 
   it should "throw an error for mis-matching schema fields" in {
-    val invalidAvroSchemaPath = s"$testDataDir/InvalidPassengerDataAll2.avsc"
+    val invalidAvroSchemaPath = s"$testDataDir/InvalidPassengerDataAllV2.avsc"
     val invalidAvroSchema: String = loadFile(invalidAvroSchemaPath)
 
     val error = intercept[SparkException](CSVToAvro.toAvro(csvRDD, invalidAvroSchema).count())
