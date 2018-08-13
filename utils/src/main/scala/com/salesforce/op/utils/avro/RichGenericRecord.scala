@@ -31,10 +31,6 @@
 package com.salesforce.op.utils.avro
 
 import org.apache.avro.generic.GenericRecord
-import scala.collection.JavaConverters._
-
-
-import scala.util.Try
 
 object RichGenericRecord {
 
@@ -55,7 +51,7 @@ object RichGenericRecord {
     def getValue[T](fieldName: String): Option[T] = {
       // Check that field exists in schema
       require(Option(r.getSchema.getField(fieldName)).isDefined,
-        s"${fieldName} is not found in Avro schema!")
+        s"$fieldName is not found in Avro schema!")
 
       val field = Option(r.get(fieldName))
       (field map {
