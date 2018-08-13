@@ -44,12 +44,11 @@ import scala.reflect.{ClassTag, _}
  * Trait with test commons such as Spec and Resource functions
  */
 trait TestCommon extends Matchers with Assertions {
-  private val _resourceDir = "src/test/resources"
 
   /**
    * Returns the resource directory path
    */
-  protected def resourceDir = _resourceDir
+  protected def resourceDir: String = "src/test/resources"
 
   /**
    * Set logging level for
