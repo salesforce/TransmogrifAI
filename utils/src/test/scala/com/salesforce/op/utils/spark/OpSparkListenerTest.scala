@@ -48,7 +48,6 @@ class OpSparkListenerTest extends FlatSpec with TestSparkContext {
     appMetrics.runType shouldBe "testRun"
     appMetrics.customTagName shouldBe Some("tag")
     appMetrics.customTagValue shouldBe Some("tagValue")
-    appMetrics.appDurationPretty shouldBe "0s"
   }
 
   it should "capture app stage metrics" in {
