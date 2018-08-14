@@ -53,7 +53,6 @@ object DefaultSelectorParams {
   val RegSolver = Array("auto") // regression solver spark default auto
   val FitIntercept = Array(true) // fit intercept spark default true
   val NbSmoothing = Array(1.0) // spark default 1.0
-  val NbModel = Array("mutlinomial") // spark default multinomial
   val DistFamily = Array("gaussian", "binomial", "poisson", "gamma") // generalized linear model link family
 
 }

@@ -35,12 +35,12 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-import com.salesforce.op.stages.impl.CompareParamGrid
+import com.salesforce.op.stages.impl.{CompareParamGrid, PredictionEquality}
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpLogisticRegressionModel, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpRandomForestRegressor}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.classification.{LogisticRegression => SparkLR}
@@ -55,7 +55,8 @@ import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
-class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, ModelSelector[_, _]]
+  with PredictionEquality with CompareParamGrid {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -99,8 +100,41 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
     .addGrid(rfR.numTrees, Array(2, 4))
     .addGrid(rfR.minInfoGain, Array(100.0, 10.0)).build()
 
+  val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
+    Seq[(RealNN, OPVector)](
+      1.0.toRealNN -> Vectors.dense(12.0, 4.3, 1.3).toOPVector,
+      0.0.toRealNN -> Vectors.dense(0.0, 0.3, 0.1).toOPVector,
+      0.0.toRealNN -> Vectors.dense(1.0, 3.9, 4.3).toOPVector,
+      1.0.toRealNN -> Vectors.dense(10.0, 1.3, 0.9).toOPVector,
+      1.0.toRealNN -> Vectors.dense(15.0, 4.7, 1.3).toOPVector,
+      0.0.toRealNN -> Vectors.dense(0.5, 0.9, 10.1).toOPVector,
+      1.0.toRealNN -> Vectors.dense(11.5, 2.3, 1.3).toOPVector,
+      0.0.toRealNN -> Vectors.dense(0.1, 3.3, 0.1).toOPVector
+    )
+  )
 
-  Spec[ModelSelector[_, _]] should "fit and predict classifiers" in {
+  val feature1 = rawFeature1.copy(isResponse = true)
+
+  val estimator = new ModelSelector(
+    validator = new OpCrossValidation[OpPredictorWrapperModel[_], OpPredictorWrapper[_, _]](
+      numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(), stratify = false, parallelism = 1),
+    splitter = Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
+    models = Seq(lr -> Array.empty[ParamMap]),
+    evaluators = Seq(new OpBinaryClassificationEvaluator)
+  ).setInput(feature1, feature2)
+
+  val expectedResult = Seq(
+    Prediction(1.0, Array(-20.88, 20.88), Array(0.0, 1.0)),
+    Prediction(0.0, Array(16.70, -16.7), Array(1.0, 0.0)),
+    Prediction(0.0, Array(22.2, -22.2), Array(1.0, 0.0)),
+    Prediction(1.0, Array(-18.35, 18.35), Array(0.0, 1.0)),
+    Prediction(1.0, Array(-31.46, 31.46), Array(0.0, 1.0)),
+    Prediction(0.0, Array(24.67, -24.67), Array(1.0, 0.0)),
+    Prediction(1.0, Array(-22.07, 22.07), Array(0.0, 1.0)),
+    Prediction(0.0, Array(20.9, -20.9), Array(1.0, 0.0))
+  )
+
+  it should "fit and predict classifiers" in {
 
     val validatorCV = new OpCrossValidation[OpPredictorWrapperModel[_], OpPredictorWrapper[_, _]](
       numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(), stratify = false, parallelism = 1
@@ -226,7 +260,6 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
     justScores.size shouldEqual data.count()
 
   }
-
 }
 
 class TestEstimator extends BinaryEstimator[RealNN, OPVector, Prediction]("test", UID[TestEstimator]) {

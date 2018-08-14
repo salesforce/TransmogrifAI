@@ -106,7 +106,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   val params = new OpParams()
 
-  lazy val workflow = new OpWorkflow().setResultFeatures(predLin).setParameters(params).setReader(dataReader)
+  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
 
@@ -143,7 +143,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.stageInfo.keys.size shouldEqual 8
   }
 
-  it should "return feature insights with selector info and label info even when models are found" in {
+  it should "return feature insights with selector info and label info even when no models are found" in {
     val insights = workflowModel.modelInsights(checked)
     val ageInsights = insights.features.filter(_.featureName == age.name).head
     val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
@@ -223,7 +223,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.get.validationType shouldBe CrossValidation
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 13
+    insights.stageInfo.keys.size shouldEqual 11
   }
 
   it should "return feature insights with label info and model info even when no sanity checker is found" in {

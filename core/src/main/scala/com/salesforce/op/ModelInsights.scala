@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapperModel}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -416,7 +417,10 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val models = stages.collect { case s: SelectedModel => s } // TODO support other model types?
+    val models = stages.collect{
+      case s: SelectedModel => s
+      case s: OpPredictorWrapperModel[_] => s
+    } // TODO support other model types?
     val model = models.lastOption
     log.info(
       s"Found ${models.length} models will " +
@@ -495,7 +499,7 @@ case object ModelInsights {
   private[op] def getFeatureInsights(
     vectorInfo: Option[OpVectorMetadata],
     summary: Option[SanityCheckerSummary],
-    model: Option[SelectedModel],
+    model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]]
@@ -602,24 +606,29 @@ case object ModelInsights {
     }
   }
 
-  private[op] def getModelContributions(model: Option[SelectedModel]): Seq[Seq[Double]] = {
+  private[op] def getModelContributions(model: Option[Model[_]]): Seq[Seq[Double]] = {
     model.map {
-      _.modelStageIn match { // TODO add new models
-        case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-        case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: GradientBoostedTreesModel => Seq.empty[Seq[Double]]
-        case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: SelectedModel => getModelContributions(m.getSparkMlStage())
+      case m: OpPredictorWrapperModel[_] => m.getSparkMlStage() match { // TODO add additional models
+        case Some(m: LogisticRegressionModel) => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
+        case Some(m: RandomForestClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: NaiveBayesModel) => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
+        case Some(m: DecisionTreeClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: LinearRegressionModel) => Seq(m.coefficients.toArray.toSeq)
+        case Some(m: DecisionTreeRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: RandomForestRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
         case _ => Seq.empty[Seq[Double]]
       }
+      case _ => Seq.empty[Seq[Double]]
     }.getOrElse(Seq.empty[Seq[Double]])
   }
 
-  private def getModelInfo(model: Option[SelectedModel]): Option[ModelSelectorSummary] = {
-    model.map(m => ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata()))
+  private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
+    model match {
+      case Some(m: SelectedModel) => Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata()))
+        .toOption
+      case _ => None
+    }
   }
 
   private def getStageInfo(stages: Array[OPStage]): Map[String, Any] = {

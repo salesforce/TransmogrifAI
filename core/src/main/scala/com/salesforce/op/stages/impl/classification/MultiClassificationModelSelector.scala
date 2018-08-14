@@ -73,7 +73,6 @@ case object MultiClassificationModelSelector {
 
     val nb = new OpNaiveBayes()
     val nbParams = new ParamGridBuilder()
-      .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
       .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
       .build()
 

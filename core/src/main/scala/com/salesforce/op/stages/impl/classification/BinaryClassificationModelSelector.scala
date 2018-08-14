@@ -74,7 +74,6 @@ case object BinaryClassificationModelSelector {
 
     val gbt = new OpGBTClassifier()
     val gbtParams = new ParamGridBuilder()
-      .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
       .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
       .addGrid(gbt.impurity, DefaultSelectorParams.ImpurityClass)
       .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
@@ -96,7 +95,6 @@ case object BinaryClassificationModelSelector {
 
     val nb = new OpNaiveBayes()
     val nbParams = new ParamGridBuilder()
-      .addGrid(nb.modelType, DefaultSelectorParams.NbModel)
       .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
       .build()
 

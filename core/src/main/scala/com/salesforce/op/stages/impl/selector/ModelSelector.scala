@@ -38,6 +38,8 @@ import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichParamMap._
@@ -48,6 +50,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
+import scala.util.Try
 
 
 /**
@@ -220,9 +223,12 @@ final class SelectedModel private[op]
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
-) extends Model[SelectedModel] with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval {
+) extends Model[SelectedModel] with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval
+  with SparkWrapperParams[ModelSelectorNames.ModelType] {
 
-  override def transformFn: (RealNN, OPVector) => Prediction = modelStageIn.transformFn
+  setDefault(sparkMlStage, Option(modelStageIn))
+
+  override def transformFn: (RealNN, OPVector) => Prediction = getSparkMlStage().get.transformFn
 
   lazy val labelColName: String = in1.name
 
