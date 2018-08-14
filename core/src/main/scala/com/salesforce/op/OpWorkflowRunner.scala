@@ -348,7 +348,6 @@ class OpWorkflowRunner
         val m = super.metrics
         log.info("Total run time: {}", m.appDurationPretty)
         OpWorkflowRunner.this.onApplicationEnd(m)
-        spark.sparkContext.removeSparkListener(this)
       }
     }
   }
