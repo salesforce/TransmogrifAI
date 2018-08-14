@@ -30,16 +30,16 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.tuning.DataSplitter
+import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
+import com.salesforce.op.stages.impl.tuning.{DataSplitter, SplitterSummary}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -294,7 +294,24 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
         }
-        insights.selectedModelInfo shouldEqual deser.selectedModelInfo
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
+          case (o, i) =>
+            o.validationType shouldEqual i.validationType
+            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
+            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
+            o.dataPrepResults shouldEqual i.dataPrepResults
+            o.evaluationMetric shouldEqual i.evaluationMetric
+            o.problemType shouldEqual i.problemType
+            o.bestModelUID shouldEqual i.bestModelUID
+            o.bestModelName shouldEqual i.bestModelName
+            o.bestModelType shouldEqual i.bestModelType
+            o.validationResults.zip(i.validationResults).foreach{
+              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
+                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
+            }
+            o.trainEvaluation shouldEqual i.trainEvaluation
+            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
+        }
         insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
         insights.stageInfo.keys shouldEqual deser.stageInfo.keys
     }

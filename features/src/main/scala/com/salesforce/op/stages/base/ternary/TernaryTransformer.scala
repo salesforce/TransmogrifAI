@@ -83,7 +83,7 @@ trait OpTransformer3[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O 
     dataset.select(col("*"), functionUDF(col(in1.name), col(in2.name), col(in3.name)).as(getOutputFeatureName, meta))
   }
 
-  private val transform3Fn = FeatureSparkTypes.transform3[I1, I2, I3, O](transformFn)
+  private lazy val transform3Fn = FeatureSparkTypes.transform3[I1, I2, I3, O](transformFn)
   override def transformKeyValue: KeyValue => Any = {
     val (in1name, in2name, in3name) = (in1.name, in2.name, in3.name)
     (kv: KeyValue) => transform3Fn(kv(in1name), kv(in2name), kv(in3name))

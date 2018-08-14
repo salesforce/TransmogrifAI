@@ -44,8 +44,9 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.param._
-import org.apache.spark.ml.{Estimator, Model}
+import org.apache.spark.ml.{Estimator, Model, PipelineStage, PredictionModel}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Dataset, SparkSession}
 
@@ -187,7 +188,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
 
     new SelectedModel(
-      bestModel.asInstanceOf[ModelSelectorNames.ModelType],
+      bestModel.asInstanceOf[ModelType],
       outputsColNamesMap,
       uid,
       operationName
@@ -214,7 +215,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
  */
 final class SelectedModel private[op]
 (
-  val modelStageIn: ModelSelectorNames.ModelType,
+  val modelStageIn: ModelType,
   val outputsColNamesMap: Map[String, String],
   val uid: String,
   val operationName: String
@@ -223,12 +224,22 @@ final class SelectedModel private[op]
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
-) extends Model[SelectedModel] with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval
-  with SparkWrapperParams[ModelSelectorNames.ModelType] {
+) extends Model[SelectedModel] with SparkWrapperParams[Model[_]]
+  with OpTransformer2[RealNN, OPVector, Prediction] with HasTestEval {
 
-  setDefault(sparkMlStage, Option(modelStageIn))
+  modelStageIn match {
+    case m: OpPredictorWrapperModel[_] => setDefault(sparkMlStage, m.getSparkMlStage())
+    case m => setDefault(sparkMlStage, Option(m))
+  }
 
-  override def transformFn: (RealNN, OPVector) => Prediction = getSparkMlStage().get.transformFn
+  lazy val recoveredStage: ModelType = getSparkMlStage() match {
+    case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
+    case Some(m: ModelType@unchecked) => m
+    case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
+      s" type ${m.getClass.getName}")
+  }
+
+  override def transformFn: (RealNN, OPVector) => Prediction = recoveredStage.transformFn
 
   lazy val labelColName: String = in1.name
 

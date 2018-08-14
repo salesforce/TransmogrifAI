@@ -63,10 +63,10 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   val label = rawLabel.copy(isResponse = true)
 
   val lr = new OpLogisticRegression()
-  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0))
+  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()
 
   val testEstimator = RegressionModelSelector.withTrainValidationSplit(dataSplitter = None, trainRatio = 0.5,
-    modelsAndParameters = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
+    modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
 
   val prediction = testEstimator.getOutput()

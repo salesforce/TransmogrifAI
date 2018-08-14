@@ -142,7 +142,8 @@ object Evaluators {
         override def getDefaultMetric: SingleMetric => Double = _.value
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           val metric = evaluateFn(ds)
           SingleMetric(name.humanFriendlyName, metric)
@@ -225,7 +226,8 @@ object Evaluators {
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           try {
             val metric = evaluateFn(ds)
@@ -318,7 +320,8 @@ object Evaluators {
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getPredictionCol).as[(Double, Double)]
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getPredictionCol).as[(Double, Double)]
           val metric = evaluateFn(ds)
           SingleMetric(name.humanFriendlyName, metric)
         }

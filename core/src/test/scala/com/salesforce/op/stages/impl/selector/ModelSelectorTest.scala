@@ -34,13 +34,14 @@ import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
+import com.salesforce.op.stages.{OpPipelineStageReader, OpPipelineStageWriter}
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-import com.salesforce.op.stages.impl.{CompareParamGrid, PredictionEquality}
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpLogisticRegressionModel, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpRandomForestRegressor}
 import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.stages.impl.{CompareParamGrid, PredictionEquality}
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.classification.{LogisticRegression => SparkLR}
@@ -50,7 +51,6 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
@@ -221,10 +221,6 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     val test = new TestEstimator()
     val testParams = Array(new ParamMap())
 
-    val lrParams2 = new ParamGridBuilder()
-      .addGrid(lr.regParam, Array(100.0))
-      .addGrid(lr.elasticNetParam, Array(0, 0.5)).build()
-
     val validatorCV = new OpCrossValidation[ModelSelectorNames.ModelType, ModelSelectorNames.EstimatorType](
       numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(),
       stratify = false, parallelism = 1)
@@ -232,11 +228,12 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     val testEstimator = new ModelSelector(
       validator = validatorCV,
       splitter = Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
-      models = Seq(lr -> lrParams2, test -> testParams),
+      models = Seq(test -> testParams),
       evaluators = Seq(new OpBinaryClassificationEvaluator)
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
+    model.modelStageIn.isInstanceOf[TestModel] shouldBe true
 
     log.info(model.getMetadata().toString)
     // Evaluation from train data should be there
@@ -254,7 +251,12 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
-    val transformedData = model.transform(data)
+    // TODO extend spark wrapper serialization to use reflection on our model classes for deserializtion
+    // val json = new OpPipelineStageWriter(model).overwrite().writeToJsonString(stageSavePath)
+    // val loaded = new OpPipelineStageReader(model).loadFromJsonString(json, stageSavePath)
+    // assert(loaded, model)
+
+    val transformedData = model.asInstanceOf[SelectedModel].transform(data)
     val pred = model.getOutput()
     val justScores = transformedData.collect(pred)
     justScores.size shouldEqual data.count()

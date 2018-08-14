@@ -81,7 +81,7 @@ trait OpTransformerN[I <: FeatureType, O <: FeatureType]
     dataset.select(col("*"), functionUDF(struct(columns: _*)).as(getOutputFeatureName, meta))
   }
 
-  private val transformNFn = FeatureSparkTypes.transformN[I, O](transformFn)
+  private lazy val transformNFn = FeatureSparkTypes.transformN[I, O](transformFn)
   override def transformKeyValue: KeyValue => Any = {
     val inNames = inN.map(_.name)
     (kv: KeyValue) => transformNFn(inNames.map(name => kv(name)))

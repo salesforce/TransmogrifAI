@@ -104,11 +104,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val one_label = one_rawLabel.copy(isResponse = true)
 
   val lr = new OpLogisticRegression()
-  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0))
+  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()
 
   // with multiple outputs
   val testEstimator = BinaryClassificationModelSelector.withTrainValidationSplit(splitter = None, trainRatio = 0.5,
-    modelsAndParameters = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
+    modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
   val pred = testEstimator.getOutput()
   val model = testEstimator.fit(ds)

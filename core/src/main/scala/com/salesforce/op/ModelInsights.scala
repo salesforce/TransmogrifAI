@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapperModel}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -608,8 +609,7 @@ case object ModelInsights {
 
   private[op] def getModelContributions(model: Option[Model[_]]): Seq[Seq[Double]] = {
     model.map {
-      case m: SelectedModel => getModelContributions(m.getSparkMlStage())
-      case m: OpPredictorWrapperModel[_] => m.getSparkMlStage() match { // TODO add additional models
+      case m: SparkWrapperParams[_] => m.getSparkMlStage() match { // TODO add additional models
         case Some(m: LogisticRegressionModel) => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
         case Some(m: RandomForestClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
         case Some(m: NaiveBayesModel) => m.theta.rowIter.toSeq.map(_.toArray.toSeq)

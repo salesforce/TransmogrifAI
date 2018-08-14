@@ -42,6 +42,7 @@ import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -117,7 +118,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
 
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
-    val modelSelector = RegressionModelSelector()
+    val modelSelector = RegressionModelSelector.withCrossValidation(seed = seed)
     val (train, test) = modelSelector.setInput(label, features)
       .splitter.get.setReserveTestFraction(0.2).split(data.as[(Double, Vector)])
 
@@ -153,7 +154,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
-    metaData.validationResults.length shouldEqual 20
+    metaData.validationResults.length shouldEqual 56
 
     // evaluation metrics from train set should be in metadata
     val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
@@ -269,13 +270,14 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val modelSelector = RegressionModelSelector().setInput(label, features)
     val myParam = true
     val myEstimatorName = "myEstimatorIsAwesome"
-    val myEstimator = new OpGBTRegressor().setCacheNodeIds(myParam)
+    val myEstimator = new OpGBTRegressor().setCacheNodeIds(myParam).setInput(label, features)
 
     val bestEstimator = new BestEstimator(myEstimatorName, myEstimator.asInstanceOf[EstimatorType], Seq.empty)
     modelSelector.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
-    fitted.modelStageIn.extractParamMap().get(myEstimator.cacheNodeIds).get shouldBe myParam
+    fitted.modelStageIn.parent.extractParamMap().toSeq
+      .collect{ case p: ParamPair[_] if p.param.name == "cacheNodeIds" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.bestModelName shouldBe myEstimatorName
