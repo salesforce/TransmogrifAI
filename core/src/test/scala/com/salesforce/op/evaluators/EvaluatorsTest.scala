@@ -98,10 +98,10 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     .setFullPredictionCol(pred).evaluateAll(transformedData)
 
   val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(test_label.name)
-    .setPredictionCol(pred.name)
+    .setPredictionCol(predValue.name)
 
   val sparkRegressionEvaluator = new RegressionEvaluator().setLabelCol(test_label.name)
-    .setPredictionCol(pred.name)
+    .setPredictionCol(predValue.name)
 
 
   "Evaluators" should "have a binary classification factory" in {

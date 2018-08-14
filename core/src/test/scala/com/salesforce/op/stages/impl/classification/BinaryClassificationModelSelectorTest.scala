@@ -34,17 +34,16 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => BMT}
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => BMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.{LogisticRegressionModel, LogisticRegression => SparkLR}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Encoders
@@ -84,9 +83,9 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
   val lr = new OpLogisticRegression()
   val lrParams = new ParamGridBuilder()
-    .addGrid(lr.elasticNetParam, Array(0.0))
+    .addGrid(lr.elasticNetParam, Array(1.0))
     .addGrid(lr.maxIter, Array(10))
-    .addGrid(lr.regParam, Array(1000.0, 0.1))
+    .addGrid(lr.regParam, Array(1000000.0, 0.0))
     .build()
 
   val rf = new OpRandomForestClassifier()
@@ -94,6 +93,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     .addGrid(rf.maxDepth, Array(0))
     .addGrid(rf.minInstancesPerNode, Array(1))
     .addGrid(rf.numTrees, Array(10))
+    .addGrid(rf.minInfoGain, Array(10000.0))
     .build()
 
   val models = Seq(lr -> lrParams, rf -> rfParams)
@@ -136,7 +136,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .withCrossValidation(
           Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
           numFolds = 4,
-          validationMetric = Evaluators.BinaryClassification.precision(),
+          validationMetric = Evaluators.BinaryClassification.error(),
           seed = 42L
         )
         .setInput(label, features)
@@ -150,8 +150,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
-
-    metaData.validationResults.length shouldEqual 20
+    metaData.validationResults.length shouldEqual 48
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
@@ -165,7 +164,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val transformedData = model.transform(data)
     val pred = model.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores shouldEqual data.collect(label)
+    justScores shouldEqual data.collect(label).map(_.v.get)
   }
 
   it should "fit and predict even if there is no balancing" in {
@@ -175,7 +174,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         .withCrossValidation(
           Option(DataSplitter(reserveTestFraction = 0.2)),
           numFolds = 4,
-          validationMetric = Evaluators.BinaryClassification.recall(),
+          validationMetric = Evaluators.BinaryClassification.auPR(),
           seed = 10L,
           modelsAndParameters = models
         )
@@ -186,10 +185,9 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     log.info(model.getMetadata().toString)
 
     val sparkStage = model.modelStageIn
-    sparkStage.isInstanceOf[LogisticRegressionModel] shouldBe true
-    sparkStage.extractParamMap()(sparkStage.getParam("maxIter")) shouldBe 10
-    sparkStage.extractParamMap()(sparkStage.getParam("regParam")) shouldBe 0.1
-
+    sparkStage.isInstanceOf[OpLogisticRegressionModel] shouldBe true
+    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("maxIter")) shouldBe 10
+    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("regParam")) shouldBe 0.0
 
     // evaluation metrics from test set should be in metadata
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
@@ -209,7 +207,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val transformedData = model.transform(data)
     val pred = model.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores shouldEqual data.collect(label)
+    justScores shouldEqual data.collect(label).map(_.v.get)
   }
 
   it should "fit and predict with a train validation split, " +
@@ -234,7 +232,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val transformedData = model.transform(data)
     val pred = testEstimator.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores shouldEqual data.collect(label)
+    justScores shouldEqual data.collect(label).map(_.v.get)
   }
 
   it should "fit and predict with a train validation split, even if there is no split and balancing" in {
@@ -242,7 +240,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val testEstimator =
       BinaryClassificationModelSelector
         .withTrainValidationSplit(None,
-          trainRatio = 0.8, validationMetric = Evaluators.BinaryClassification.auROC(), seed = 10L,
+          trainRatio = 0.8, validationMetric = Evaluators.BinaryClassification.precision(), seed = 10L,
           modelsAndParameters = models)
         .setInput(label, features)
 
@@ -254,7 +252,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val pred = testEstimator.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
 
-    justScores shouldEqual transformedData.collect(label)
+    justScores shouldEqual transformedData.collect(label).map(_.v.get)
   }
 
   it should "fit and predict with a cross validation and compute correct metrics from evaluators" in {
@@ -314,13 +312,14 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
       Map.empty)
     val myEstimatorName = "myEstimator"
-    val myEstimator = new OpLogisticRegression().setMaxIter(myParam)
+    val myEstimator = new OpLogisticRegression().setMaxIter(myParam).setInput(label, features)
 
     val bestEstimator = new BestEstimator(myEstimatorName, myEstimator.asInstanceOf[EstimatorType], Seq(myMetadata))
     modelSelector.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
-    fitted.modelStageIn.get(myEstimator.maxIter).get shouldBe myParam
+    fitted.modelStageIn.parent.extractParamMap().toSeq
+      .collect{ case p: ParamPair[_] if p.param.name == "maxIter" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.validationResults.head shouldBe myMetadata

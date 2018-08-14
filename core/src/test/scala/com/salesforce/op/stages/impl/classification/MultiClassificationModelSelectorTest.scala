@@ -42,9 +42,8 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.sql.Encoders
@@ -159,7 +158,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
     )
 
-    metaData.validationResults.length shouldEqual 20
+    metaData.validationResults.length shouldEqual 26
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
@@ -172,7 +171,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val transformedData = model.transform(data)
     val pred = model.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores shouldEqual transformedData.collect(label)
+    justScores shouldEqual transformedData.collect(label).map(_.v.get)
   }
 
   it should "fit and predict with a train validation split, even if there is no split + custom evaluator" in {
@@ -192,9 +191,9 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val model = testEstimator.fit(data)
 
     val sparkStage = model.modelStageIn
-    sparkStage.isInstanceOf[LogisticRegressionModel] shouldBe true
-    sparkStage.extractParamMap()(sparkStage.getParam("maxIter")) shouldBe 10
-    sparkStage.extractParamMap()(sparkStage.getParam("regParam")) shouldBe 0.1
+    sparkStage.isInstanceOf[OpLogisticRegressionModel] shouldBe true
+    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("maxIter")) shouldBe 10
+    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("regParam")) shouldBe 0.1
 
     val transformedData = model.transform(data)
     val pred = testEstimator.getOutput()
@@ -261,13 +260,14 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
       Map.empty)
     val myEstimatorName = "myEstimatorIsAwesome"
-    val myEstimator = new OpDecisionTreeClassifier().setImpurity(myParam)
+    val myEstimator = new OpDecisionTreeClassifier().setImpurity(myParam).setInput(label, features)
 
     val bestEstimator = new BestEstimator(myEstimatorName, myEstimator.asInstanceOf[EstimatorType], Seq(myMetadata))
     modelSelector.bestEstimator = Option(bestEstimator)
     val fitted = modelSelector.fit(data)
 
-    fitted.modelStageIn.get(myEstimator.impurity).get shouldBe myParam
+    fitted.modelStageIn.parent.extractParamMap().toSeq
+      .collect{ case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.validationResults.head shouldBe myMetadata

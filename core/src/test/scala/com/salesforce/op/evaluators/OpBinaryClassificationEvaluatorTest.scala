@@ -106,7 +106,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val lr = new OpLogisticRegression()
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()
 
-  // with multiple outputs
   val testEstimator = BinaryClassificationModelSelector.withTrainValidationSplit(splitter = None, trainRatio = 0.5,
     modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
@@ -127,10 +126,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   // comparisons
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator()
   val sparkMulticlassEvaluator = new MulticlassClassificationEvaluator()
-  Spec[OpBinaryClassificationEvaluator] should "copy" in {
-    val testEvaluatorCopy = testEvaluator.copy(ParamMap())
-    testEvaluatorCopy.uid shouldBe testEvaluator.uid
-  }
 
   val rawPred = pred.map[OPVector](p => Vectors.dense(p.rawPrediction).toOPVector)
   val predValue = pred.map[RealNN](_.prediction.toRealNN)
@@ -140,7 +135,12 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val flattenedData2 = predValue.originStage.asInstanceOf[Transformer].transform(flattenedData1)
 
   sparkBinaryEvaluator.setLabelCol(label.name).setRawPredictionCol(rawPred.name)
-  sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(pred.name)
+  sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(predValue.name)
+
+  Spec[OpBinaryClassificationEvaluator] should "copy" in {
+    val testEvaluatorCopy = testEvaluator.copy(ParamMap())
+    testEvaluatorCopy.uid shouldBe testEvaluator.uid
+  }
 
 
   it should "evaluate the metrics with three inputs" in {
@@ -162,10 +162,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   }
 
   it should "evaluate the metrics with one prediction input" in {
-    val metrics = testEvaluator2.evaluateAll(transformedData)
+    val transformedData2 = model2.setInput(test_label, test_features).transform(test_ds)
+    val metrics = testEvaluator2.evaluateAll(transformedData2)
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
-      transformedData.select(prediction.name, test_label.name).rdd
+      transformedData2.select(prediction.name, test_label.name).rdd
         .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
     )
 
@@ -180,8 +181,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
-    val transformedDataZero = model.setInput(zero_label, zero_features).transform(zero_ds)
-    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).evaluateAll(transformedDataZero)
+    model.setInput(zero_label, zero_features)
+    val transformedDataZero = model.transform(zero_ds)
+    val outPred = model.getOutput()
+    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).setFullPredictionCol(outPred)
+      .evaluateAll(transformedDataZero)
 
     metricsZero.TN shouldBe 1.0
     metricsZero.TP shouldBe 0.0

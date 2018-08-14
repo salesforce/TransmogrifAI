@@ -80,7 +80,7 @@ trait OpTransformer1[I <: FeatureType, O <: FeatureType]
   }
 
   private lazy val transform1Fn = FeatureSparkTypes.transform1[I, O](transformFn)
-  override def transformKeyValue: KeyValue => Any = {
+  override lazy val transformKeyValue: KeyValue => Any = {
     val inName = in1.name
     (kv: KeyValue) => transform1Fn(kv(inName))
   }

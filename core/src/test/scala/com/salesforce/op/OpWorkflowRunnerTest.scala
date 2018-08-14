@@ -152,7 +152,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
     res.asInstanceOf[ScoreResult].metrics.isDefined shouldBe true
 
     val scores = loadAvro(scoresLocation.toString)
-    scores.sort(KeyFieldName, pred.name).collect(pred) shouldBe Seq(0, 1, 1, 0, 0, 1, 0, 1).map(_.toRealNN)
+    scores.collect(pred).map(_.prediction).sorted shouldBe Seq(0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0)
   }
 
   it should "streaming score a dataset with a trained model" in {
@@ -175,7 +175,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
     scoresDirs.length shouldBe 1
 
     val scores = loadAvro(scoresDirs.head.toString)
-    scores.sort(KeyFieldName, pred.name).collect(pred) shouldBe Seq(0, 1, 1, 0, 0, 1, 0, 1).map(_.toRealNN)
+    scores.collect(pred).map(_.prediction).sorted shouldBe Seq(0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0)
   }
 
   it should "evaluate a dataset with a trained model" in {

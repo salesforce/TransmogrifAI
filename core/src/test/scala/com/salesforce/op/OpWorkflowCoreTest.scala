@@ -129,10 +129,10 @@ class OpWorkflowCoreTest extends FlatSpec with TestSparkContext {
     assert(
       res = cutDAG(wf.setResultFeatures(realPred)),
       expected = CutDAG(
-        modelSelector = Option((ms, 1)),
-        before = Array(Array((lda, 3))),
-        during = Array(Array((sanityChecker, 2))),
-        after = Array(Array((zNormalize, 0)))
+        modelSelector = Option((ms, 2)),
+        before = Array(Array((lda, 4))),
+        during = Array(Array((sanityChecker, 3))),
+        after = Array(Array((predValue.originStage, 1)), Array((zNormalize, 0)))
       )
     )
   }

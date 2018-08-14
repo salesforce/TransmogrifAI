@@ -81,7 +81,8 @@ object Evaluators {
         name = MultiClassEvalMetrics.Precision, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
-          new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          new MulticlassMetrics(dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
         }
       }
 
@@ -93,7 +94,8 @@ object Evaluators {
         name = MultiClassEvalMetrics.Recall, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
-          new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          new MulticlassMetrics(dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
         }
       }
 
@@ -104,8 +106,9 @@ object Evaluators {
       new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.F1, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
+          val dataUse = makeDataToUse(dataset, getLabelCol)
           new MulticlassMetrics(
-            dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).fMeasure(1.0)
+            dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).fMeasure(1.0)
         }
       }
 

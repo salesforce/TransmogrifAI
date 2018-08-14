@@ -80,6 +80,7 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
     the[IllegalArgumentException] thrownBy {
       logLoss.setLabelCol(labelEmpty).setFullPredictionCol(predEmpty).evaluate(dsEmpty)
     } should have message
-      s"Metric ${logLoss.name} failed on empty dataset with (${labelEmpty.name}, ${predEmpty.name})"
+      s"Metric ${logLoss.name} failed on empty dataset with (${labelEmpty.name}, ${predEmpty.name}_raw," +
+        s" ${predEmpty.name}_prob, ${predEmpty.name}_pred)"
   }
 }

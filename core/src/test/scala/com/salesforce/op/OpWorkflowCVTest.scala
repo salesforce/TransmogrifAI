@@ -41,7 +41,7 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.regression._
 import com.salesforce.op.stages.impl.selector.ModelSelector
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import org.apache.spark.ml.PipelineStage
@@ -84,12 +84,14 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.elasticNetParam, Array(0.01, 0.5))
       .addGrid(lr.regParam, Array(10000.0))
+      .build()
 
     val rf = new OpRandomForestClassifier()
     val rfParams = new ParamGridBuilder()
       .addGrid(rf.numTrees, Array(10))
+      .build()
 
-    val models = Seq(lr -> lrParams, rf -> rfParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+    val models = Seq(lr -> lrParams, rf -> rfParams)
 
     val pred1 = BinaryClassificationModelSelector.withCrossValidation(
       splitter = Option(DataBalancer(sampleFraction = 0.01, reserveTestFraction = 0.2, seed = 0L)),
@@ -139,13 +141,15 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.1))
+      .build()
 
     val dt = new OpDecisionTreeClassifier()
     val dtParams = new ParamGridBuilder()
       .addGrid(dt.maxDepth, Array(5, 10))
       .addGrid(dt.minInfoGain, Array(100000.0))
+      .build()
 
-    val models = Seq(lr -> lrParams, dt -> dtParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+    val models = Seq(lr -> lrParams, dt -> dtParams)
 
     val pred1 = MultiClassificationModelSelector.withTrainValidationSplit(
       splitter = Option(DataCutter(reserveTestFraction = 0.2, seed = 0L)),
@@ -193,12 +197,14 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lr = new OpLinearRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.01))
+      .build()
 
     val rf = new OpRandomForestRegressor()
     val rfParams = new ParamGridBuilder()
       .addGrid(rf.minInfoGain, Array(100000.0))
+      .build()
 
-    val models = Seq(lr -> lrParams, rf -> rfParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+    val models = Seq(lr -> lrParams, rf -> rfParams)
 
     MultiClassificationModelSelector.withTrainValidationSplit(
       splitter = Option(DataCutter(reserveTestFraction = 0.2, seed = 0L)),
@@ -250,12 +256,14 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lr = new OpLinearRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(10000.0))
+      .build()
 
     val gbt = new OpGBTRegressor()
     val gbtParams = new ParamGridBuilder()
       .addGrid(gbt.maxDepth, Array(5))
+      .build()
 
-    val models = Seq(lr -> lrParams, gbt -> gbtParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+    val models = Seq(lr -> lrParams, gbt -> gbtParams)
 
     val pred1 = RegressionModelSelector.withTrainValidationSplit(
       dataSplitter = Option(DataSplitter(seed = 0L)),
@@ -300,7 +308,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lr = new OpLinearRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.0, 0.001, 0.1))
-    val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
+      .build()
+    val models = Seq(lr -> lrParams)
 
     val pred1 = BinaryClassificationModelSelector.withCrossValidation(
       splitter = Option(DataBalancer(sampleFraction = 0.01, reserveTestFraction = 0.2, seed = 0L)),
@@ -354,10 +363,11 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val winner1 = pred1.originStage.asInstanceOf[ModelSelector[_, _]].bestEstimator.get
     val winner2 = pred2.originStage.asInstanceOf[ModelSelector[_, _]].bestEstimator.get
     winner1.estimator.getClass shouldEqual winner2.estimator.getClass
-    winner1.estimator.asInstanceOf[PipelineStage].extractParamMap.toSeq.sortBy(_.param.name).map(_.value) should
-      contain theSameElementsAs
-      winner2.estimator.asInstanceOf[PipelineStage].extractParamMap.toSeq.sortBy(_.param.name).map(_.value)
-
+    val params1 = winner1.estimator.asInstanceOf[PipelineStage].extractParamMap.getAsMap()
+    val params2 = winner2.estimator.asInstanceOf[PipelineStage].extractParamMap.getAsMap()
+    params1.keySet.union(params2.keySet).foreach{k =>
+      if (!Seq("outputFeatureName", "inputFeatures").contains(k)) params1(k) shouldEqual params2(k)
+    }
     val d1s = data1.select(pred1.name, KeyFieldName).sort(KeyFieldName).collect()
     val d2s = data2.select(pred2.name, KeyFieldName).sort(KeyFieldName).collect()
     d1s.zip(d2s).foreach {

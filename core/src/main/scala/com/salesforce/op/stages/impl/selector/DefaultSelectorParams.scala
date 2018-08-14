@@ -38,7 +38,7 @@ object DefaultSelectorParams {
   val MaxBin = Array(32) // bins for cont variables in trees - 32 is spark default
   val MinInstancesPerNode = Array(10, 100) // spark default 1
   val MinInfoGain = Array(0.001, 0.01, 0.1) // spark default 0
-  val Regularization = Array(0.001, 0.01, 0.05, 0.1, 0.2) // spark default 0
+  val Regularization = Array(0.001, 0.01, 0.1, 0.2) // spark default 0
   val MaxIterLin = Array(50) // spark default is 100
   val MaxIterTree = Array(20) // spark default is 20
   val SubsampleRate = Array(1.0) // sample of data used for tree fits spark default 1.0

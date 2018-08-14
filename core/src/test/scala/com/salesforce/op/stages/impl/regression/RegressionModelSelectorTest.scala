@@ -154,7 +154,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
-    metaData.validationResults.length shouldEqual 56
+    metaData.validationResults.length shouldEqual 52
 
     // evaluation metrics from train set should be in metadata
     val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation

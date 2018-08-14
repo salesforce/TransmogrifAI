@@ -83,7 +83,7 @@ trait OpTransformer2[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
   }
 
   private lazy val transform2Fn = FeatureSparkTypes.transform2[I1, I2, O](transformFn)
-  override def transformKeyValue: KeyValue => Any = {
+  override lazy val transformKeyValue: KeyValue => Any = {
     val (in1name, in2name) = (in1.name, in2.name)
     (kv: KeyValue) => transform2Fn(kv(in1name), kv(in2name))
   }

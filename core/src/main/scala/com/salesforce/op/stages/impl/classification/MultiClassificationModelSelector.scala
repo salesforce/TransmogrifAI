@@ -47,7 +47,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 case object MultiClassificationModelSelector {
 
   private val modelNames: Seq[_ <: MultiClassClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
-    MTT.OpRandomForestClassifier, MTT.OpNaiveBayes) // OpDecisionTreeClassifier off by default
+    MTT.OpRandomForestClassifier) // OpDecisionTreeClassifier and OpNaiveBayes off by default
 
   private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
