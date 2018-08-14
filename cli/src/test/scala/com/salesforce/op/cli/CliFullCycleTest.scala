@@ -108,7 +108,7 @@ class CliFullCycleTest extends CliTestBase {
     cmdSh.write(cmdStr)
     cmdSh.close()
 
-    val proc = Process("sh" :: "cmd" :: Nil, projectDir.getAbsoluteFile)
+    val proc = Process("sh" :: "cmd" :: Nil, new File(projectDir).getAbsoluteFile)
     val logger = ProcessLogger(s => log.info(s), s => log.error(s))
     val code = proc !< logger
 

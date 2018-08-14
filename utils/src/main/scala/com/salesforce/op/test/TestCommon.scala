@@ -31,6 +31,7 @@
 package com.salesforce.op.test
 
 import java.io.File
+import java.nio.file.Paths
 
 import org.apache.log4j.{Level, LogManager, Logger}
 import org.scalatest._
@@ -77,7 +78,9 @@ trait TestCommon extends Matchers with Assertions {
    * @return directory path
    */
   def testDataDir: String = {
-    Some(new File("test-data")) filter (_.isDirectory) getOrElse new File("../test-data") getPath
+    Some(new File("test-data"))
+      .collect{ case d if d.isDirectory => d.getPath}
+      .getOrElse(Paths.get("test-data-sibling").relativize(Paths.get("test-data")).toString)
   }
 
   /**
