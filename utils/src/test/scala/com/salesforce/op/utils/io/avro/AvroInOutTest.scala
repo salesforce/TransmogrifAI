@@ -31,6 +31,7 @@
 package com.salesforce.op.utils.io.avro
 
 import java.io.{File, FileNotFoundException, FileWriter}
+import java.nio.file.Paths
 
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.io.avro.AvroInOut._
@@ -96,14 +97,15 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
   }
 
   it should "checkPathsExist" in {
-    val f1 = new File("/tmp/avroinouttest")
+    val tmpDir = Paths.get(File.separator, "tmp").toFile
+    val f1 = new File(tmpDir, "avroinouttest")
     f1.delete()
     val w = new FileWriter(f1)
     w.write("just checking")
     w.close()
-    val f2 = new File("/tmp/thisfilecannotexist")
+    val f2 = new File(tmpDir, "thisfilecannotexist")
     f2.delete()
-    val f3 = new File("/tmp/this file cannot exist")
+    val f3 = new File(tmpDir, "this file cannot exist")
     f3.delete()
     assume(f1.exists && !f2.exists && !f3.exists)
 
