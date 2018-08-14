@@ -30,7 +30,7 @@
 
 package com.salesforce.op.test
 
-import java.io.File
+import java.nio.file.Paths
 
 import com.salesforce.op.aggregators.CutOffTime
 import com.salesforce.op.readers._
@@ -42,13 +42,10 @@ import scala.language.postfixOps
 trait PassengerSparkFixtureTest extends TestSparkContext with PassengerFeaturesTest {
   self: Suite =>
 
-  def testDataPath: String = {
-    Some(new File("test-data")) filter (_.isDirectory) getOrElse new File("../test-data") getPath
-  }
-  def passengerAvroPath: String = s"$testDataPath/PassengerData.avro"
-  def passengerCsvPath: String = s"$testDataPath/PassengerData.csv"
-  def passengerCsvWithHeaderPath: String = s"$testDataPath/PassengerDataWithHeader.csv"
-  def passengerProfileCsvPath: String = s"$testDataPath/PassengerProfileData.csv"
+  def passengerAvroPath: String = Paths.get(testDataDir, "PassengerData.avro").toString
+  def passengerCsvPath: String = Paths.get(testDataDir, "PassengerData.csv").toString
+  def passengerCsvWithHeaderPath: String = Paths.get(testDataDir, "PassengerDataWithHeader.csv").toString
+  def passengerProfileCsvPath: String = Paths.get(testDataDir, "PassengerProfileData.csv").toString
 
   lazy val simpleReader: AvroReader[Passenger] =
     DataReaders.Simple.avro[Passenger](
