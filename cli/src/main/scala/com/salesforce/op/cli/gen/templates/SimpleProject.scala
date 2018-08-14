@@ -31,8 +31,9 @@
 package com.salesforce.op.cli.gen.templates
 
 import java.io.File
+import java.nio.file.Paths
 
-import com.salesforce.op.cli.{AvroSchemaFromFile, GeneratorConfig}
+import com.salesforce.op.cli.GeneratorConfig
 import com.salesforce.op.cli.gen.FileGenerator.Substitutions
 import com.salesforce.op.cli.gen._
 
@@ -77,10 +78,11 @@ case class SimpleProject(ops: Ops) extends ProjectGenerator {
 
     val mainClass = s"'com.salesforce.app.${conf.projName}'"
 
-    val modelLocation = new File(conf.projectDirectory, "build/spark/model")
-    val scoreLocation = new File(conf.projectDirectory, "build/spark/scores")
-    val evalLocation = new File(conf.projectDirectory, "build/spark/eval")
-    val metricsLocation = new File(conf.projectDirectory, "build/spark/metrics")
+    val projectBuildRoot = Paths.get(conf.projectDirectory.toString, "build", "spark").toString
+    val modelLocation = Paths.get(projectBuildRoot, "model").toFile
+    val scoreLocation = Paths.get(projectBuildRoot, "scores").toFile
+    val evalLocation = Paths.get(projectBuildRoot, "eval").toFile
+    val metricsLocation = Paths.get(projectBuildRoot, "metrics").toFile
 
     val readerChoice = schema.theReader
 

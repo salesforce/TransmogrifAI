@@ -30,6 +30,8 @@
 
 package com.salesforce.op
 
+import java.nio.file.Paths
+
 import com.salesforce.app.schema.PassengerDataAll
 import com.salesforce.op.evaluators.{OpMultiClassificationEvaluator, _}
 import com.salesforce.op.features._
@@ -41,12 +43,11 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.regression._
 import com.salesforce.op.stages.impl.selector.ModelSelector
-import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.utils.spark.RichParamMap._
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -61,7 +62,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 
   trait PassenserCSVforCV {
     val simplePassengerForCV = DataReaders.Simple.csv[PassengerDataAll](
-      path = Some(s"$testDataPath/PassengerDataAll.csv"),
+      path = Some(Paths.get(testDataDir, "PassengerDataAll.csv").toString),
       schema = PassengerDataAll.getClassSchema.toString,
       key = _.getPassengerId.toString
     )

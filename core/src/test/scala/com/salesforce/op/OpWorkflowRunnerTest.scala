@@ -31,11 +31,11 @@
 package com.salesforce.op
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestSparkStreamingContext}
 import com.salesforce.op.utils.spark.AppMetrics
@@ -58,7 +58,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  val thisDir = new File("resources/tmp/OpWorkflowRunnerTest/").getCanonicalFile
+  val thisDir = Paths.get("resources", "tmp", "OpWorkflowRunnerTest").toFile.getCanonicalFile
 
   override def beforeAll: Unit = try deleteRecursively(thisDir) finally super.beforeAll
   override def afterAll: Unit = try deleteRecursively(thisDir) finally super.afterAll
@@ -127,8 +127,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "train a workflow and write the trained model" in {
-    lazy val modelLocation = new File(thisDir + "/op-runner-test-model")
-    lazy val modelMetricsLocation = new File(thisDir + "/op-runner-test-metrics/train")
+    lazy val modelLocation = new File(thisDir, "op-runner-test-model")
+    lazy val modelMetricsLocation = Paths.get(thisDir.toString, "op-runner-test-metrics", "train").toFile
 
     val runConfig = testConfig.copy(
       runType = Train,
@@ -140,8 +140,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "score a dataset with a trained model" in {
-    val scoresLocation = new File(thisDir + "/op-runner-test-write/score")
-    val scoringMetricsLocation = new File(thisDir + "/op-runner-test-metrics/score")
+    val scoresLocation = Paths.get(thisDir.toString, "op-runner-test-write", "score").toFile
+    val scoringMetricsLocation = Paths.get(thisDir.toString, "op-runner-test-metrics", "score").toFile
 
     val runConfig = testConfig.copy(
       runType = Score,
@@ -156,13 +156,13 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "streaming score a dataset with a trained model" in {
-    val readLocation = new File(thisDir + "/op-runner-test-read/streaming-score")
-    val scoresLocation = new File(thisDir + "/op-runner-test-write/streaming-score")
+    val readLocation = Paths.get(thisDir.toString, "op-runner-test-read", "streaming-score").toFile
+    val scoresLocation = Paths.get(thisDir.toString, "op-runner-test-write", "streaming-score").toFile
 
     // Prepare streaming input data
     FileUtils.forceMkdir(readLocation)
     val passengerAvroFile = new File(passengerAvroPath).getCanonicalFile
-    FileUtils.copyFile(passengerAvroFile, new File(readLocation + "/" + passengerAvroFile.getName), false)
+    FileUtils.copyFile(passengerAvroFile, new File(readLocation, passengerAvroFile.getName), false)
 
     val runConfig = testConfig.copy(
       runType = StreamingScore,
@@ -179,7 +179,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "evaluate a dataset with a trained model" in {
-    val metricsLocation = new File(thisDir + "/op-runner-test-metrics/eval")
+    val metricsLocation = Paths.get(thisDir.toString, "op-runner-test-metrics", "eval").toFile
 
     val runConfig = testConfig.copy(
       runType = Evaluate,
@@ -190,7 +190,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "compute features upto with a workflow" in {
-    lazy val featuresLocation = new File(thisDir + "/op-runner-test-write/features")
+    lazy val featuresLocation = Paths.get(thisDir.toString, "op-runner-test-write", "features").toFile
 
     val runConfig = testConfig.copy(
       runType = Features,
