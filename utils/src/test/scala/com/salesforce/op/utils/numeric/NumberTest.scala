@@ -37,16 +37,21 @@ import org.scalatest.{Matchers, PropSpec}
 
 @RunWith(classOf[JUnitRunner])
 class NumberTest extends PropSpec with PropertyChecks with Matchers {
-  val tests = Table(
-    "TestNumbers",
-    0.0,
-    Double.MaxValue,
-    Double.NegativeInfinity,
-    Double.NaN
+
+  val specials = Table("specials",
+    Double.MinValue, Double.MaxValue,
+    Double.MinPositiveValue, Double.NaN,
+    Double.PositiveInfinity, Double.NegativeInfinity
   )
 
   property("validate numbers") {
-    forAll(tests) { d =>
+    forAll { d: Double =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
+    }
+  }
+
+  property("validate special numbers") {
+    forAll(specials) { d =>
       Number.isValid(d) should not be (d.isInfinity || d.isNaN)
     }
   }
