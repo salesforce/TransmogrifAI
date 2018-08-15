@@ -30,7 +30,9 @@
 
 package com.salesforce.op.stages
 
+import com.salesforce.op.utils.json.JsonLike
 import enumeratum.EnumEntry
+import org.apache.spark.sql.types.Metadata
 
 package object impl {
 
@@ -39,4 +41,7 @@ package object impl {
    */
   trait ModelsToTry extends EnumEntry with Serializable
 
+  trait MetadataLike {
+    def toMetadata(): Metadata
+  }
 }

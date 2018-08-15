@@ -46,7 +46,7 @@ ext {
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    opVersion='0.3.4'
+    transmogrifaiVersion ='0.3.4'
     collectionsVersion = '3.2.2'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
@@ -74,10 +74,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // TransmogrifAI
-    compile "com.salesforce:transmogrifai-core_$scalaVersion:$opVersion"
+    compile "com.salesforce.transmogrifai:transmogrifai-core_$scalaVersion:$transmogrifaiVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:transmogrifai-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce.transmogrifai:transmogrifai-models_$scalaVersion:$transmogrifaiVersion"
 
     // Test
     testCompile "org.scalatest:scalatest_$scalaVersion:$scalatestVersion"

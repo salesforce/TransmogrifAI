@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.UID
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
 case object DataSplitter {
 
@@ -69,10 +69,20 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @return Training set test set
    */
   def prepare(data: Dataset[Row]): ModelData =
-    new ModelData(data, new MetadataBuilder())
+    new ModelData(data, Option(DataSplitterSummary()))
 
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)
     copyValues(copy, extra)
   }
 }
+
+/**
+ * Empty class because no summary information for a datasplitter
+ */
+case class DataSplitterSummary() extends SplitterSummary {
+  override def toMetadata(): Metadata = new MetadataBuilder()
+    .putString(SplitterSummary.ClassName, this.getClass.getName)
+    .build()
+}
+

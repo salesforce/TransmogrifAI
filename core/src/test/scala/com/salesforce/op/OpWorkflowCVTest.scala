@@ -30,6 +30,8 @@
 
 package com.salesforce.op
 
+import java.nio.file.Paths
+
 import com.salesforce.app.schema.PassengerDataAll
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
@@ -41,7 +43,7 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
 import com.salesforce.op.stages.impl.regression.{LossType, RegressionModelSelector, RegressionModelsToTry}
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBase
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import org.apache.spark.ml.PipelineStage
@@ -50,7 +52,6 @@ import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.utils.spark.RichRow._
 import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
@@ -60,7 +61,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 
   trait PassenserCSVforCV {
     val simplePassengerForCV = DataReaders.Simple.csv[PassengerDataAll](
-      path = Some(s"$testDataPath/PassengerDataAll.csv"),
+      path = Some(Paths.get(testDataDir, "PassengerDataAll.csv").toString),
       schema = PassengerDataAll.getClassSchema.toString,
       key = _.getPassengerId.toString
     )
@@ -117,8 +118,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val summary = model1.summary()
     summary should include (classOf[SanityChecker].getSimpleName)
-    summary should include (ModelSelectorBaseNames.HoldOutEval)
-    summary should include (ModelSelectorBaseNames.TrainingEval)
+    summary should include (""""HoldoutEvaluation" : [ "com.salesforce.op.evaluators.MultiMetrics"""")
+    summary should include ("TrainEvaluation")
   }
 
   it should "return a multi classification model that runs ts at the workflow level" in new PassenserCSVforCV {
@@ -167,8 +168,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary = model1.summary()
     log.info(summary)
     summary should include (classOf[SanityChecker].getSimpleName)
-    summary should include (ModelSelectorBaseNames.HoldOutEval)
-    summary should include (ModelSelectorBaseNames.TrainingEval)
+    summary should include (""""HoldoutEvaluation" : [ "com.salesforce.op.evaluators.MultiMetrics"""")
+    summary should include ("TrainEvaluation")
   }
 
   it should "return a regression model that runs cv at the workflow level" in new PassenserCSVforCV {
@@ -210,7 +211,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary = model1.summary()
     log.info(summary)
     summary should include (classOf[SanityChecker].getSimpleName)
-    summary should include (ModelSelectorBaseNames.TrainingEval)
+    summary should include ("TrainEvaluation")
   }
 
   it should "return a regression model that runs ts at the workflow level" in new PassenserCSVforCV {
@@ -252,8 +253,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary = model1.summary()
     log.info(summary)
     summary should include (classOf[SanityChecker].getSimpleName)
-    summary should include (ModelSelectorBaseNames.HoldOutEval)
-    summary should include (ModelSelectorBaseNames.TrainingEval)
+    summary should include (""""HoldoutEvaluation" : [ "com.salesforce.op.evaluators.MultiMetrics"""")
+    summary should include ("TrainEvaluation")
   }
 
   it should "avoid adding label leakage when feature engineering would introduce it" in new PassenserCSVforCV {
@@ -293,15 +294,15 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val model2 = wf2.setReader(simplePassengerForCV).train()
     val data2 = model2.score(keepRawFeatures = false, keepIntermediateFeatures = true)
 
-    val summary1 = model1.summary()
+    val summary1 = model1.modelInsights(pred1)
     log.info("model1.summary: \n{}", summary1)
-    val summary2 = model2.summary()
+    val summary2 = model2.modelInsights(pred2)
     log.info("model2.summary: \n{}", summary2)
 
-    // CV
-    summary1 should include ("area under PR\" : \"0.802")
-    summary1 should not include ("area under PR\" : \"0.81")
-    summary2 should include ("area under PR\" : \"0.81")
+    summary1.selectedModelInfo.get.validationResults
+      .forall(_.metricValues.asInstanceOf[SingleMetric].value < 0.81) shouldBe true
+    summary2.selectedModelInfo.get.validationResults
+      .forall(_.metricValues.asInstanceOf[SingleMetric].value < 0.81) shouldBe false
   }
 
   def compare(
@@ -333,6 +334,6 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 class Leaker(uid: String = UID[BinaryTransformer[_, _, _]]) extends
   BinaryTransformer[Real, RealNN, RealNN](operationName = "makeLeaker", uid = uid) {
   override def transformFn: (Real, RealNN) => RealNN =
-  (f: Real, l: RealNN) => if (l.v.exists(_ > 0)) 1.0.toRealNN else 0.0.toRealNN
+    (f: Real, l: RealNN) => if (l.v.exists(_ > 0)) 1.0.toRealNN else 0.0.toRealNN
   override def outputIsResponse: Boolean = false
 }

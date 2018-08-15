@@ -108,10 +108,10 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
 
 
     // Rerun balancer with set params
-    val metadata = balancer.metadataBuilder
+    val metadata = balancer.summary
     val ModelData(expected2, _) = balancer.prepare(data)
     withClue("Data balancer should no update the metadata"){
-      balancer.metadataBuilder shouldBe metadata
+      balancer.summary shouldBe metadata
     }
     expected.collect() shouldBe expected2.collect()
   }
@@ -129,10 +129,10 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getAlreadyBalancedFraction shouldBe 1.0
 
     // Rerun balancer with set params
-    val metadata = balancer.metadataBuilder
+    val metadata = balancer.summary
     val ModelData(expected2, _) = balancer.prepare(data)
     withClue("Data balancer should no update the metadata"){
-      balancer.metadataBuilder shouldBe metadata
+      balancer.summary shouldBe metadata
     }
     expected.collect() shouldBe expected2.collect()
 
@@ -152,10 +152,10 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
 
     // Rerun balancer with set params
-    val metadata = balancer.metadataBuilder
+    val metadata = balancer.summary
     val ModelData(expected2, _) = balancer.prepare(data)
     withClue("Data balancer should no update the metadata"){
-      balancer.metadataBuilder shouldBe metadata
+      balancer.summary shouldBe metadata
     }
     expected.collect() shouldBe expected2.collect()
 

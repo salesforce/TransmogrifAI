@@ -38,7 +38,6 @@ import com.salesforce.op.stages.OpPipelineStage2
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel, OpTransformer2}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpLogisticRegressionModel, OpRandomForestClassifier}
-import com.salesforce.op.stages.impl.feature.JaccardSimilarity
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpRandomForestRegressor}
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
@@ -51,7 +50,6 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.mllib.random.RandomRDDs._
-import org.apache.spark.network.util.TransportFrameDecoder.Interceptor
 import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -125,18 +123,18 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
 
     log.info(model.getMetadata().toString)
     // Evaluation from train data should be there
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).trainEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
@@ -166,18 +164,18 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
 
     log.info(model.getMetadata().toString)
     // Evaluation from train data should be there
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).trainEvaluation
     RegressionEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
     RegressionEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.regression})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
@@ -211,18 +209,18 @@ class ModelSelectorTest extends FlatSpec with TestSparkContext with CompareParam
 
     log.info(model.getMetadata().toString)
     // Evaluation from train data should be there
-    val metaData = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.TrainingEval)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).trainEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaData.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
-    val metaDataHoldOut = model.getMetadata().getSummaryMetadata().getMetadata(ModelSelectorBaseNames.HoldOutEval)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
     BinaryClassEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.contains(s"(${OpEvaluatorNames.binary})_${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.json)
+      assert(metaDataHoldOut.get.toJson(true).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
 
     val transformedData = model.transform(data)
