@@ -4,3 +4,5 @@ destination: _site
 
 jekyll_auth:
   ssl: true
+  whitelist:
+    - scaladoc?
