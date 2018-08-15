@@ -30,22 +30,23 @@
 
 package com.salesforce.op.utils.spark
 
-import language.postfixOps
 import java.io.File
 
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.test.SparkMatchers._
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
-import org.apache.spark.ml.linalg.Vectors
 import org.slf4j.LoggerFactory
+
+import scala.language.postfixOps
 
 
 @RunWith(classOf[JUnitRunner])
@@ -53,12 +54,12 @@ class RichDatasetTest extends FlatSpec with TestSparkContext {
 
   // TODO: fix implicit scope conflicts with 'org.apache.spark.sql.functions._'
   import com.salesforce.op.utils.spark.RichDataType._
-  import com.salesforce.op.utils.spark.RichMetadata._
   import com.salesforce.op.utils.spark.RichDataset._
+  import com.salesforce.op.utils.spark.RichMetadata._
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  lazy val savedPath = new File(tempDir + "/richDS-" + DateTime.now().getMillis)
+  lazy val savedPath = new File(tempDir, "richDS-" + DateTime.now().getMillis)
 
   private val data =
     Seq[(Integral, Real, Text, Binary, Real)](
