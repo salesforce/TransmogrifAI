@@ -31,15 +31,17 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.utils.date.DateTimeUtils
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpSparkListenerTest extends FlatSpec with TestSparkContext {
+  val start = DateTimeUtils.now().getMillis
   val listener = new OpSparkListener(sc.appName, sc.applicationId, "testRun", Some("tag"), Some("tagValue"), true, true)
   sc.addSparkListener(listener)
-  spark.read.csv(s"$testDataDir/PassengerDataAll.csv")
+  val _ = spark.read.csv(s"$testDataDir/PassengerDataAll.csv").count()
 
   Spec[OpSparkListener] should "capture app metrics" in {
     val appMetrics: AppMetrics = listener.metrics
@@ -48,14 +50,19 @@ class OpSparkListenerTest extends FlatSpec with TestSparkContext {
     appMetrics.runType shouldBe "testRun"
     appMetrics.customTagName shouldBe Some("tag")
     appMetrics.customTagValue shouldBe Some("tagValue")
+    appMetrics.appStartTime should be >= start
+    appMetrics.appEndTime should be >= appMetrics.appStartTime
+    appMetrics.appDuration shouldBe (appMetrics.appEndTime - appMetrics.appStartTime)
+    appMetrics.appDurationPretty.isEmpty shouldBe false
   }
 
   it should "capture app stage metrics" in {
     val stageMetrics = listener.metrics.stageMetrics
-    stageMetrics.size shouldBe 1
-    stageMetrics.head.name startsWith "csv at OpSparkListenerTest.scala"
-    stageMetrics.head.stageId shouldBe 0
-    stageMetrics.head.numTasks shouldBe 1
-    stageMetrics.head.status shouldBe "succeeded"
+    stageMetrics.size should be > 0
+    val firstStage = stageMetrics.head
+    firstStage.name should startWith("csv at OpSparkListenerTest.scala")
+    firstStage.stageId shouldBe 0
+    firstStage.numTasks shouldBe 1
+    firstStage.status shouldBe "succeeded"
   }
 }
