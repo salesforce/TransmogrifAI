@@ -198,7 +198,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
     )
-\
+
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)
     val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
