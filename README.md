@@ -135,7 +135,7 @@ ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '12'
     sparkVersion = '2.2.1'
-    opVersion = '0.3.4'
+    transmogrifaiVersion = '0.3.4'
 }
 dependencies {
     // Scala
@@ -152,10 +152,10 @@ dependencies {
     testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
     // TransmogrifAI
-    compile "com.salesforce:transmogrifai-core_$scalaVersion:$opVersion"
+    compile "com.salesforce.transmogrifai:transmogrifai-core_$scalaVersion:$transmogrifaiVersion"
 
     // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:transmogrifai-models_$scalaVersion:$opVersion"
+    // compile "com.salesforce.transmogrifai:transmogrifai-models_$scalaVersion:$transmogrifaiVersion"
 
     // All your other depdendecies go below
     // ...
