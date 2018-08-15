@@ -207,20 +207,12 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val models = Seq(lr -> lrParams, rf -> rfParams)
 
-    MultiClassificationModelSelector.withTrainValidationSplit(
-      splitter = Option(DataCutter(reserveTestFraction = 0.2, seed = 0L)),
-      validationMetric = Evaluators.MultiClassification.error(),
-      trainTestEvaluators = Seq(new OpMultiClassificationEvaluator()),
-      seed = 10L,
-      modelsAndParameters = models
-    ).setInput(survivedNum, checked)
-      .getOutput()
-
     val pred1 = RegressionModelSelector.withCrossValidation(
       dataSplitter = None,
       validationMetric = Evaluators.Regression.r2(),
       trainTestEvaluators = Seq(new OpRegressionEvaluator()),
-      parallelism = 4
+      parallelism = 4,
+      modelsAndParameters = models
     ).setInput(survivedNum, checked)
       .getOutput()
 
@@ -233,7 +225,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       dataSplitter = None,
       validationMetric = Evaluators.Regression.r2(),
       trainTestEvaluators = Seq(new OpRegressionEvaluator()),
-      parallelism = 4
+      parallelism = 4,
+      modelsAndParameters = models
     ).setInput(survivedNum, checked)
       .getOutput()
 
@@ -270,7 +263,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       dataSplitter = Option(DataSplitter(seed = 0L)),
       validationMetric = Evaluators.Regression.r2(),
       trainTestEvaluators = Seq(new OpRegressionEvaluator()),
-      parallelism = 4
+      parallelism = 4,
+      modelsAndParameters = models
     ).setInput(survivedNum, checked)
       .getOutput()
 
@@ -283,7 +277,8 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       dataSplitter = Option(DataSplitter(seed = 0L)),
       validationMetric = Evaluators.Regression.r2(),
       trainTestEvaluators = Seq(new OpRegressionEvaluator()),
-      parallelism = 4
+      parallelism = 4,
+      modelsAndParameters = models
     ).setInput(survivedNum, checked)
       .getOutput()
 
@@ -306,7 +301,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val ageLeaker = age.autoBucketize(survivedNum, trackNulls = false)
     val fv = Seq(age, sex, ageLeaker, fairLeaker, pClass, cabin).transmogrify()
 
-    val lr = new OpLinearRegression()
+    val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.0, 0.001, 0.1))
       .build()

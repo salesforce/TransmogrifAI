@@ -47,6 +47,6 @@ trait RegressionTemplate {
 
   val evaluator =
     Evaluators.Regression()
-      .setLabelCol(label).setPredictionCol(pred)
+      .setLabelCol(label).setFullPredictionCol(pred)
   // END
 }
