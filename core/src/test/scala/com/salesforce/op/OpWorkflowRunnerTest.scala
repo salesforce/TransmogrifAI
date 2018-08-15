@@ -36,34 +36,30 @@ import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestSparkStreamingContext}
 import com.salesforce.op.utils.spark.AppMetrics
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.commons.io.FileUtils
 import org.junit.runner.RunWith
 import org.scalactic.source
-import org.scalatest.AsyncFlatSpec
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
-import org.apache.log4j.Level
 
 import scala.collection.JavaConverters._
-import scala.concurrent.Promise
+import scala.concurrent.{Future, Promise}
 import scala.reflect.ClassTag
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowRunnerTest extends AsyncFlatSpec
-  with PassengerSparkFixtureTest with TestSparkStreamingContext {
+class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest with TestSparkStreamingContext {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  val thisDir = new File("resources/tmp/OpWorkflowRunnerTest/").getCanonicalFile
-
-  override def beforeAll: Unit = try deleteRecursively(thisDir) finally super.beforeAll
-  override def afterAll: Unit = try deleteRecursively(thisDir) finally super.afterAll
+  lazy val testDir = tempDir + "/op-runner-test"
+  lazy val modelLocation = new File( testDir + "/model")
 
   private val features = Seq(height, weight, gender, description, age).transmogrify()
   private val survivedNum = survived.occurs()
@@ -73,9 +69,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
     .setLogisticRegressionRegParam(0)
     .setInput(survivedNum, features).getOutput()
   private val workflow = new OpWorkflow().setResultFeatures(pred, raw, survivedNum).setReader(dataReader)
-  private val evaluator =
-    Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred).setRawPredictionCol(raw)
-      .setProbabilityCol(prob)
+  private val evaluator = Evaluators.BinaryClassification()
+    .setLabelCol(survivedNum).setPredictionCol(pred).setRawPredictionCol(raw).setProbabilityCol(prob)
 
   val metricsPromise = Promise[AppMetrics]()
 
@@ -92,7 +87,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
 
   val invalidParamsLocation = Some(resourceFile(name = "RunnerParamsInvalid.json").getPath)
   val paramsLocation = Some(resourceFile(name = "RunnerParams.json").getPath)
-  val testConfig = OpWorkflowRunnerConfig(paramLocation = paramsLocation)
+  def testConfig: OpWorkflowRunnerConfig = OpWorkflowRunnerConfig(paramLocation = paramsLocation)
+    .copy(modelLocation = Some(modelLocation.toString))
 
   Spec[OpWorkflowRunner] should "correctly determine if the command line options are valid for each run type" in {
     assertConf(OpWorkflowRunnerConfig(Train, modelLocation = Some("Test")))
@@ -133,12 +129,10 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "train a workflow and write the trained model" in {
-    lazy val modelLocation = new File(thisDir + "/op-runner-test-model")
-    lazy val modelMetricsLocation = new File(thisDir + "/op-runner-test-metrics/train")
+    val modelMetricsLocation = new File(testDir + "/train-metrics")
 
     val runConfig = testConfig.copy(
       runType = Train,
-      modelLocation = Some(modelLocation.toString),
       metricsLocation = Some(modelMetricsLocation.toString)
     )
     val res = doRun[TrainResult](runConfig, modelLocation, modelMetricsLocation)
@@ -146,8 +140,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "score a dataset with a trained model" in {
-    val scoresLocation = new File(thisDir + "/op-runner-test-write/score")
-    val scoringMetricsLocation = new File(thisDir + "/op-runner-test-metrics/score")
+    val scoresLocation = new File(testDir + "/score")
+    val scoringMetricsLocation = new File(testDir + "/score-metrics")
 
     val runConfig = testConfig.copy(
       runType = Score,
@@ -162,8 +156,8 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "streaming score a dataset with a trained model" in {
-    val readLocation = new File(thisDir + "/op-runner-test-read/streaming-score")
-    val scoresLocation = new File(thisDir + "/op-runner-test-write/streaming-score")
+    val readLocation = new File(testDir + "/streaming-score-in")
+    val scoresLocation = new File(testDir + "/streaming-score-out")
 
     // Prepare streaming input data
     FileUtils.forceMkdir(readLocation)
@@ -185,18 +179,20 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "evaluate a dataset with a trained model" in {
-    val metricsLocation = new File(thisDir + "/op-runner-test-metrics/eval")
+    val scoresLocation = new File(testDir + "/eval-score")
+    val metricsLocation = new File(testDir + "/eval-metrics")
 
     val runConfig = testConfig.copy(
       runType = Evaluate,
+      writeLocation = Some(scoresLocation.toString),
       metricsLocation = Some(metricsLocation.toString)
     )
-    val res = doRun[EvaluateResult](runConfig, metricsLocation)
+    val res = doRun[EvaluateResult](runConfig, metricsLocation, scoresLocation)
     res.metrics shouldBe a[BinaryClassificationMetrics]
   }
 
   it should "compute features upto with a workflow" in {
-    lazy val featuresLocation = new File(thisDir + "/op-runner-test-write/features")
+    lazy val featuresLocation = new File(testDir + "/features")
 
     val runConfig = testConfig.copy(
       runType = Features,
@@ -207,7 +203,6 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   }
 
   it should "collect and report metrics on application end" in {
-    spark.stop()
     metricsPromise.future.map { metrics =>
       metrics.appId.isEmpty shouldBe false
       OpWorkflowRunType.withNameInsensitiveOption(metrics.runType).isDefined shouldBe true
@@ -217,6 +212,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
       metrics.appDuration should be >= 0L
       metrics.stageMetrics.length should be > 0
     }
+    Future(spark.stop()).map(_ => true shouldBe true)
   }
 
   private def assertConf(c: OpWorkflowRunnerConfig)(implicit pos: source.Position) = {

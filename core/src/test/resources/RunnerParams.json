@@ -19,9 +19,9 @@
       "partitions": 1
     }
   },
-  "modelLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-model",
-  "writeLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-write",
-  "metricsLocation": "resources/tmp/OpWorkflowRunnerTest/op-runner-test-metrics",
+  "modelLocation": "",
+  "writeLocation": "",
+  "metricsLocation": "",
   "customParams" : {},
   "customTagName": "myTag",
   "collectStageMetrics": true,
