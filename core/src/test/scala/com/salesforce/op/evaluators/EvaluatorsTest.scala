@@ -95,7 +95,7 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     .setRawPredictionCol(rawPred.name)
 
   val opBinaryMetrics = new OpBinaryClassificationEvaluator().setLabelCol(test_label)
-    .setFullPredictionCol(pred).evaluateAll(transformedData)
+    .setPredictionCol(pred).evaluateAll(transformedData)
 
   val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(test_label.name)
     .setPredictionCol(predValue.name)
@@ -146,19 +146,19 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   }
 
   def evaluateBinaryMetric(binEval: OpBinaryClassificationEvaluator): Double = binEval.setLabelCol(test_label)
-    .setFullPredictionCol(pred).evaluate(transformedData3)
+    .setPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkBinaryMetric(metricName: String): Double = sparkBinaryEvaluator.setMetricName(metricName)
     .evaluate(transformedData3)
 
   def evaluateMultiMetric(multiEval: OpMultiClassificationEvaluator): Double = multiEval.setLabelCol(test_label)
-    .setFullPredictionCol(pred).evaluate(transformedData3)
+    .setPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkMultiMetric(metricName: String): Double = sparkMultiEvaluator.setMetricName(metricName)
     .evaluate(transformedData3)
 
   def evaluateRegMetric(regEval: OpRegressionEvaluator): Double = regEval.setLabelCol(test_label)
-    .setFullPredictionCol(pred).evaluate(transformedData3)
+    .setPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkRegMetric(metricName: String): Double = sparkRegressionEvaluator.setMetricName(metricName)
     .evaluate(transformedData3)

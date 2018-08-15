@@ -82,7 +82,8 @@ object Evaluators {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
-          new MulticlassMetrics(dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
+          new MulticlassMetrics(dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .precision(1.0)
         }
       }
 
@@ -95,7 +96,8 @@ object Evaluators {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
-          new MulticlassMetrics(dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
+          new MulticlassMetrics(dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .recall(1.0)
         }
       }
 
@@ -108,7 +110,8 @@ object Evaluators {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
           new MulticlassMetrics(
-            dataUse.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).fMeasure(1.0)
+            dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .fMeasure(1.0)
         }
       }
 
@@ -146,7 +149,7 @@ object Evaluators {
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
-          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionValueCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           val metric = evaluateFn(ds)
           SingleMetric(name.humanFriendlyName, metric)
@@ -230,7 +233,7 @@ object Evaluators {
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
-          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionValueCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           try {
             val metric = evaluateFn(ds)
@@ -238,7 +241,8 @@ object Evaluators {
           } catch {
             case iae: IllegalArgumentException =>
               val size = dataset.count
-              val desc = s"dataset with ($getLabelCol, $getRawPredictionCol, $getProbabilityCol, $getPredictionCol)"
+              val desc = s"dataset with ($getLabelCol, $getRawPredictionCol," +
+                s" $getProbabilityCol, $getPredictionValueCol)"
               val msg = if (size == 0) s"empty $desc" else s"$desc of $size rows"
               throw new IllegalArgumentException(s"Metric $name failed on $msg", iae)
           }
@@ -324,7 +328,7 @@ object Evaluators {
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
-          val ds = dataUse.select(getLabelCol, getPredictionCol).as[(Double, Double)]
+          val ds = dataUse.select(getLabelCol, getPredictionValueCol).as[(Double, Double)]
           val metric = evaluateFn(ds)
           SingleMetric(name.humanFriendlyName, metric)
         }

@@ -113,7 +113,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val model = testEstimator.fit(ds)
 
   val testEvaluator = new OpBinaryClassificationEvaluator().setLabelCol(label)
-    .setFullPredictionCol(pred)
+    .setPredictionCol(pred)
 
   // with single predicition putput
   val testEstimator2 = new OpLogisticRegression().setInput(label, features)
@@ -121,7 +121,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val model2 = testEstimator2.fit(ds)
 
   val testEvaluator2 = new OpBinaryClassificationEvaluator().setLabelCol(label)
-    .setFullPredictionCol(prediction)
+    .setPredictionCol(prediction)
 
   // comparisons
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator()
@@ -184,7 +184,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     model.setInput(zero_label, zero_features)
     val transformedDataZero = model.transform(zero_ds)
     val outPred = model.getOutput()
-    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).setFullPredictionCol(outPred)
+    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).setPredictionCol(outPred)
       .evaluateAll(transformedDataZero)
 
     metricsZero.TN shouldBe 1.0

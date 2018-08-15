@@ -75,7 +75,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     "determine incorrect/correct counts from the thresholds with one prediciton input" in {
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti)
-      .setFullPredictionCol(predictionMulti)
+      .setPredictionCol(predictionMulti)
 
     val metricsMulti = evaluatorMulti.evaluateAll(dsMulti)
 
@@ -94,7 +94,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti)
-      .setFullPredictionCol(predictionMulti)
+      .setPredictionCol(predictionMulti)
       .setThresholds(thresholds)
       .setTopNs(topNs)
 

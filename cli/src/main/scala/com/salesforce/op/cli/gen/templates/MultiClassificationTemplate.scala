@@ -48,6 +48,6 @@ trait MultiClassificationTemplate {
 
   val evaluator =
     Evaluators.MultiClassification()
-      .setLabelCol(label).setFullPredictionCol(pred)
+      .setLabelCol(label).setPredictionCol(pred)
   // END
 }

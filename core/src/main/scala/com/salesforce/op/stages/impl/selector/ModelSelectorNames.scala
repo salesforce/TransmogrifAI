@@ -88,7 +88,7 @@ private[op] trait HasEval {
     data.persist()
     val metricsMap = evaluators.map { evaluator =>
       evaluator.setLabelCol(labelColName)
-      fullPredictionColName.foreach(evaluator.setFullPredictionCol)
+      fullPredictionColName.foreach(evaluator.setPredictionCol)
       evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
     }.toMap
     data.unpersist()

@@ -48,6 +48,6 @@ trait BinaryClassificationTemplate {
 
   val evaluator =
     Evaluators.BinaryClassification()
-      .setLabelCol(label).setFullPredictionCol(pred)
+      .setLabelCol(label).setPredictionCol(pred)
   // END
 }

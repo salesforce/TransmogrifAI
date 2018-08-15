@@ -70,12 +70,12 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
     .setInput(label, features)
 
   val prediction = testEstimator.getOutput()
-  val testEvaluator = new OpRegressionEvaluator().setLabelCol(label).setFullPredictionCol(prediction)
+  val testEvaluator = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction)
 
   val testEstimator2 = new OpLinearRegression().setInput(label, features)
 
   val prediction2 = testEstimator2.getOutput()
-  val testEvaluator2 = new OpRegressionEvaluator().setLabelCol(label).setFullPredictionCol(prediction2)
+  val testEvaluator2 = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction2)
 
 
   Spec[OpRegressionEvaluator] should "copy" in {

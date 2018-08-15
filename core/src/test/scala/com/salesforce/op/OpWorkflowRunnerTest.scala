@@ -69,7 +69,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec
   val pred = new OpLogisticRegression().setRegParam(0)
     .setInput(survivedNum, features).getOutput()
   private val workflow = new OpWorkflow().setResultFeatures(pred, survivedNum).setReader(dataReader)
-  private val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setFullPredictionCol(pred)
+  private val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred)
 
   val metricsPromise = Promise[AppMetrics]()
 

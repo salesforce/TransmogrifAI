@@ -61,28 +61,28 @@ trait OpHasLabelCol[T <: FeatureType] extends Params {
 /**
  * Trait for predictionCol which contains all output results param
  */
-trait OpHasFullPredictionCol extends Params {
-  final val fullPredictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
+trait OpHasPredictionCol extends Params {
+  final val predictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
 
-  def setFullPredictionCol(value: String): this.type = set(fullPredictionCol, value)
-  def setFullPredictionCol(value: FeatureLike[Prediction]): this.type = setFullPredictionCol(value.name)
-  final def getFullPredictionCol: String = $(fullPredictionCol)
+  def setPredictionCol(value: String): this.type = set(predictionCol, value)
+  def setPredictionCol(value: FeatureLike[Prediction]): this.type = setPredictionCol(value.name)
+  final def getPredictionCol: String = $(predictionCol)
 }
 
 /**
- * Trait for predictionCol param
+ * Trait for internal flattened predictionCol param
  */
-trait OpHasPredictionCol[T <: FeatureType] extends Params {
-  final val predictionCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
-  setDefault(predictionCol, "prediction")
+trait OpHasPredictionValueCol[T <: FeatureType] extends Params {
+  final val predictionValueCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
+  setDefault(predictionValueCol, "prediction")
 
-  protected def setPredictionCol(value: String): this.type = set(predictionCol, value)
-  protected def setPredictionCol(value: FeatureLike[T]): this.type = setPredictionCol(value.name)
-  protected final def getPredictionCol: String = $(predictionCol)
+  protected def setPredictionValueCol(value: String): this.type = set(predictionValueCol, value)
+  protected def setPredictionValueCol(value: FeatureLike[T]): this.type = setPredictionValueCol(value.name)
+  protected final def getPredictionValueCol: String = $(predictionValueCol)
 }
 
 /**
- * Trait for rawPredictionColParam
+ * Trait for internal flattened rawPredictionColParam
  */
 trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
   final val rawPredictionCol: Param[String] = new Param[String](
@@ -98,7 +98,7 @@ trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
 }
 
 /**
- * Trait for probabilityCol Param
+ * Trait for internal flattened probabilityCol Param
  */
 trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   final val probabilityCol: Param[String] = new Param[String](
@@ -138,8 +138,8 @@ trait EvaluationMetrics extends JsonLike {
  */
 abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   with OpHasLabelCol[RealNN]
-  with OpHasPredictionCol[RealNN]
-  with OpHasFullPredictionCol {
+  with OpHasPredictionValueCol[RealNN]
+  with OpHasPredictionCol {
   /**
    * Name of evaluator
    */
@@ -194,17 +194,17 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.schema.fieldNames.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val (predictionColName, rawPredictionColName, probabilityColName) =
         (s"${fullPredictionColName}_pred", s"${fullPredictionColName}_raw", s"${fullPredictionColName}_prob")
 
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
       setRawPredictionCol(rawPredictionColName)
       setProbabilityCol(probabilityColName)
 
-      val flattenedData = data.select(labelColName, getFullPredictionCol).rdd.map{ r =>
+      val flattenedData = data.select(labelColName, getPredictionCol).rdd.map{ r =>
         val label = r.getDouble(0)
         val predMap: Prediction = r.getMap[String, Double](1).toMap.toPrediction
         val raw = Vectors.dense(predMap.rawPrediction)
@@ -253,11 +253,11 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.schema.fieldNames.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val predictionColName = s"${fullPredictionColName}_pred"
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
 
       val flattenedData = data.select(labelColName, fullPredictionColName).rdd
         .map(r => (r.getDouble(0), r.getMap[String, Double](1).toMap.toPrediction.prediction ))

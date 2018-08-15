@@ -204,7 +204,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val transformedData = model.transform(data)
     val justScores = transformedData.collect(pred)
 
-   justScores.length shouldEqual transformedData.count()
+    justScores.length shouldEqual transformedData.count()
   }
 
   it should "fit and predict with a train validation split even if there is no split between training and test" in {

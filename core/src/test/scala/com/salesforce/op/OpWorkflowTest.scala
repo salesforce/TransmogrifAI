@@ -412,7 +412,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val calibrated = probability.toPercentile()
     val newWorkflow = new OpWorkflow().setResultFeatures(pred, calibrated).setReader(dataReader)
     val fittedWorkflow = newWorkflow.train()
-    val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setFullPredictionCol(pred)
+    val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred)
 
     val scores1 = fittedWorkflow.score(keepIntermediateFeatures = true)
     val (scores2, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator, keepIntermediateFeatures = true)

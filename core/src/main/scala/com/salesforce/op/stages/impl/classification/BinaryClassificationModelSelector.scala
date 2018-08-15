@@ -46,7 +46,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object BinaryClassificationModelSelector {
 
-  private[op] val modelNames: Seq[_ <: BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
+  private[op] val modelNames: Seq[BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
     MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
   // OpNaiveBayes and OpDecisionTreeClassifier off by default
 
@@ -128,6 +128,13 @@ case object BinaryClassificationModelSelector {
    *                            impact the runtime
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
+   * @param modelTypesToUse     list of model types to run grid search on must from supported types in
+   *                            BinaryClassificationModelsToTry (OpLogisticRegression, OpRandomForestClassifier,
+   *                            OpGBTClassifier, OpLinearSVC, OpDecisionTreeClassifier, OpNaiveBayes)
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyper parameters to
+   *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
+   *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
+   *                            prediction (Prediction)
    * @return Classification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -138,16 +145,15 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
-    selector(
-      cv, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
-    )
+    selector(cv, splitter = splitter,
+      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
 
   /**
@@ -163,6 +169,13 @@ case object BinaryClassificationModelSelector {
    *                            Caution : setting that param to true might impact the runtime
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
+   * @param modelTypesToUse     list of model types to run grid search on must from supported types in
+   *                            BinaryClassificationModelsToTry (OpLogisticRegression, OpRandomForestClassifier,
+   *                            OpGBTClassifier, OpLinearSVC, OpDecisionTreeClassifier, OpNaiveBayes)
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyper parameters to
+   *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
+   *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
+   *                            prediction (Prediction)
    * @return Classification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -173,29 +186,29 @@ case object BinaryClassificationModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
-    selector(
-      ts, splitter = splitter, trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters
-    )
+    selector(ts, splitter = splitter,
+      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
 
   private def selector(
     validator: OpValidator[ModelType, EstimatorType],
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[_ <: BinaryClassificationModelsToTry],
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry],
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)
-    val modelsToUse = if (modelsAndParameters == defaultModelsAndParams) {
-      modelsAndParameters.filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-    } else modelsAndParameters
+    val modelsToUse =
+      if (modelTypesToUse != modelNames) modelsAndParameters
+        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+      else modelsAndParameters
     new ModelSelector(
       validator = validator,
       splitter = splitter,

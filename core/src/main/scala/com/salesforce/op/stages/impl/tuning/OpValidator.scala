@@ -286,7 +286,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
             FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
               nonNullable = Set(features, ModelSelectorNames.idColName))
           e.setInput(labelFeat, featuresFeat)
-          evaluator.setFullPredictionCol(e.getOutput())
+          evaluator.setPredictionCol(e.getOutput())
         case _ => // otherwise it is a spark estimator
           val pi1 = estimator.getParam(ModelSelectorNames.inputParam1Name)
           val pi2 = estimator.getParam(ModelSelectorNames.inputParam2Name)

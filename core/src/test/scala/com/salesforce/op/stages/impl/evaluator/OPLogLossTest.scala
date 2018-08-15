@@ -69,7 +69,7 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
   val logLoss = LogLoss.mulitLogLoss
 
   Spec(LogLoss.getClass) should "compute logarithmic loss metric" in {
-    val metric = logLoss.setLabelCol(label).setFullPredictionCol(pred)
+    val metric = logLoss.setLabelCol(label).setPredictionCol(pred)
       .evaluate(ds)
     metric shouldBe expected
 
@@ -78,7 +78,7 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
   it should "throw an error when the dataset is empty" in {
 
     the[IllegalArgumentException] thrownBy {
-      logLoss.setLabelCol(labelEmpty).setFullPredictionCol(predEmpty).evaluate(dsEmpty)
+      logLoss.setLabelCol(labelEmpty).setPredictionCol(predEmpty).evaluate(dsEmpty)
     } should have message
       s"Metric ${logLoss.name} failed on empty dataset with (${labelEmpty.name}, ${predEmpty.name}_raw," +
         s" ${predEmpty.name}_prob, ${predEmpty.name}_pred)"
