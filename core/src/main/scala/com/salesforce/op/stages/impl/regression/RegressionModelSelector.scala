@@ -195,7 +195,7 @@ case object RegressionModelSelector {
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)
     val modelsToUse =
-      if (modelTypesToUse != modelNames) modelsAndParameters
+      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
         .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
       else modelsAndParameters
     new ModelSelector(
