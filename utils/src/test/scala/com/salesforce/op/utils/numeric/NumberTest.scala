@@ -28,31 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.features.types
+package com.salesforce.op.utils.numeric
 
-/**
- * A base class for all the map Feature Types
- *
- * @tparam A item type
- */
-abstract class OPMap[A] extends OPCollection {
-  type Element = A
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
-  override type Value = Map[String, A]
+@RunWith(classOf[JUnitRunner])
+class NumberTest extends PropSpec with PropertyChecks with Matchers {
 
-  final def isEmpty: Boolean = value.isEmpty
-}
+  val specials = Table("specials",
+    Double.MinValue, Double.MaxValue,
+    Double.MinPositiveValue, Double.NaN,
+    Double.PositiveInfinity, Double.NegativeInfinity
+  )
 
-/**
- * Numeric Map mixin
- */
-trait NumericMap {
-  self: OPMap[_] =>
+  property("validate numbers") {
+    forAll { d: Double =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
+    }
+  }
 
-  /**
-   * Convert map of numeric values to map of [[Double]] values
-   *
-   * @return map of [[Double]] values
-   */
-  def toDoubleMap: Map[String, Double]
+  property("validate special numbers") {
+    forAll(specials) { d =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
+    }
+  }
 }

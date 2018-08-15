@@ -28,31 +28,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.features.types
+package com.salesforce.op.utils.spark
 
-/**
- * A base class for all the map Feature Types
- *
- * @tparam A item type
- */
-abstract class OPMap[A] extends OPCollection {
-  type Element = A
+import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.utils.date.DateTimeUtils
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-  override type Value = Map[String, A]
+@RunWith(classOf[JUnitRunner])
+class OpSparkListenerTest extends FlatSpec with TestSparkContext {
+  val start = DateTimeUtils.now().getMillis
+  val listener = new OpSparkListener(sc.appName, sc.applicationId, "testRun", Some("tag"), Some("tagValue"), true, true)
+  sc.addSparkListener(listener)
+  val _ = spark.read.csv(s"$testDataDir/PassengerDataAll.csv").count()
 
-  final def isEmpty: Boolean = value.isEmpty
-}
+  Spec[OpSparkListener] should "capture app metrics" in {
+    val appMetrics: AppMetrics = listener.metrics
+    appMetrics.appName shouldBe sc.appName
+    appMetrics.appId shouldBe sc.applicationId
+    appMetrics.runType shouldBe "testRun"
+    appMetrics.customTagName shouldBe Some("tag")
+    appMetrics.customTagValue shouldBe Some("tagValue")
+    appMetrics.appStartTime should be >= start
+    appMetrics.appEndTime should be >= appMetrics.appStartTime
+    appMetrics.appDuration shouldBe (appMetrics.appEndTime - appMetrics.appStartTime)
+    appMetrics.appDurationPretty.isEmpty shouldBe false
+  }
 
-/**
- * Numeric Map mixin
- */
-trait NumericMap {
-  self: OPMap[_] =>
-
-  /**
-   * Convert map of numeric values to map of [[Double]] values
-   *
-   * @return map of [[Double]] values
-   */
-  def toDoubleMap: Map[String, Double]
+  it should "capture app stage metrics" in {
+    val stageMetrics = listener.metrics.stageMetrics
+    stageMetrics.size should be > 0
+    val firstStage = stageMetrics.head
+    firstStage.name should startWith("csv at OpSparkListenerTest.scala")
+    firstStage.stageId shouldBe 0
+    firstStage.numTasks shouldBe 1
+    firstStage.status shouldBe "succeeded"
+  }
 }

@@ -30,7 +30,7 @@
 
 package com.salesforce.op.features.types
 
-import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.ml.linalg.Vector
 
 /**
  * Map of text values
@@ -48,7 +48,7 @@ object TextMap {
  *
  * @param value map of email values
  */
-class EmailMap(val value: Map[String, String]) extends OPMap[String]
+class EmailMap(value: Map[String, String]) extends TextMap(value)
 object EmailMap {
   def apply(value: Map[String, String]): EmailMap = new EmailMap(value)
   def empty: EmailMap = FeatureTypeDefaults.EmailMap
@@ -59,7 +59,7 @@ object EmailMap {
  *
  * @param value map of base64 binary encoded values
  */
-class Base64Map(val value: Map[String, String]) extends OPMap[String]
+class Base64Map(value: Map[String, String]) extends TextMap(value)
 object Base64Map {
   def apply(value: Map[String, String]): Base64Map = new Base64Map(value)
   def empty: Base64Map = FeatureTypeDefaults.Base64Map
@@ -70,7 +70,7 @@ object Base64Map {
  *
  * @param value map of phone values
  */
-class PhoneMap(val value: Map[String, String]) extends OPMap[String]
+class PhoneMap(value: Map[String, String]) extends TextMap(value)
 object PhoneMap {
   def apply(value: Map[String, String]): PhoneMap = new PhoneMap(value)
   def empty: PhoneMap = FeatureTypeDefaults.PhoneMap
@@ -81,7 +81,7 @@ object PhoneMap {
  *
  * @param value map of ID values
  */
-class IDMap(val value: Map[String, String]) extends OPMap[String]
+class IDMap(value: Map[String, String]) extends TextMap(value)
 object IDMap {
   def apply(value: Map[String, String]): IDMap = new IDMap(value)
   def empty: IDMap = FeatureTypeDefaults.IDMap
@@ -92,7 +92,7 @@ object IDMap {
  *
  * @param value map of URL values
  */
-class URLMap(val value: Map[String, String]) extends OPMap[String]
+class URLMap(value: Map[String, String]) extends TextMap(value)
 object URLMap {
   def apply(value: Map[String, String]): URLMap = new URLMap(value)
   def empty: URLMap = FeatureTypeDefaults.URLMap
@@ -103,7 +103,7 @@ object URLMap {
  *
  * @param value map of text area values
  */
-class TextAreaMap(val value: Map[String, String]) extends OPMap[String]
+class TextAreaMap(value: Map[String, String]) extends TextMap(value)
 object TextAreaMap {
   def apply(value: Map[String, String]): TextAreaMap = new TextAreaMap(value)
   def empty: TextAreaMap = FeatureTypeDefaults.TextAreaMap
@@ -114,7 +114,7 @@ object TextAreaMap {
  *
  * @param value map of picklist values
  */
-class PickListMap(val value: Map[String, String]) extends OPMap[String]
+class PickListMap(value: Map[String, String]) extends TextMap(value) with SingleResponse
 object PickListMap {
   def apply(value: Map[String, String]): PickListMap = new PickListMap(value)
   def empty: PickListMap = FeatureTypeDefaults.PickListMap
@@ -125,7 +125,7 @@ object PickListMap {
  *
  * @param value map of combobox values
  */
-class ComboBoxMap(val value: Map[String, String]) extends OPMap[String]
+class ComboBoxMap(value: Map[String, String]) extends TextMap(value)
 object ComboBoxMap {
   def apply(value: Map[String, String]): ComboBoxMap = new ComboBoxMap(value)
   def empty: ComboBoxMap = FeatureTypeDefaults.ComboBoxMap
@@ -136,7 +136,9 @@ object ComboBoxMap {
  *
  * @param value map of binary values
  */
-class BinaryMap(val value: Map[String, Boolean]) extends OPMap[Boolean]
+class BinaryMap(val value: Map[String, Boolean]) extends OPMap[Boolean] with NumericMap with SingleResponse {
+  def toDoubleMap: Map[String, Double] = value
+}
 object BinaryMap {
   def apply(value: Map[String, Boolean]): BinaryMap = new BinaryMap(value)
   def empty: BinaryMap = FeatureTypeDefaults.BinaryMap
@@ -147,7 +149,9 @@ object BinaryMap {
  *
  * @param value map of integral values
  */
-class IntegralMap(val value: Map[String, Long]) extends OPMap[Long]
+class IntegralMap(val value: Map[String, Long]) extends OPMap[Long] with NumericMap {
+  def toDoubleMap: Map[String, Double] = value
+}
 object IntegralMap {
   def apply(value: Map[String, Long]): IntegralMap = new IntegralMap(value)
   def empty: IntegralMap = FeatureTypeDefaults.IntegralMap
@@ -158,7 +162,9 @@ object IntegralMap {
  *
  * @param value map of real values
  */
-class RealMap(val value: Map[String, Double]) extends OPMap[Double]
+class RealMap(val value: Map[String, Double]) extends OPMap[Double] with NumericMap {
+  def toDoubleMap: Map[String, Double] = value
+}
 object RealMap {
   def apply(value: Map[String, Double]): RealMap = new RealMap(value)
   def empty: RealMap = FeatureTypeDefaults.RealMap
@@ -169,7 +175,7 @@ object RealMap {
  *
  * @param value map of percent values
  */
-class PercentMap(val value: Map[String, Double]) extends OPMap[Double]
+class PercentMap(value: Map[String, Double]) extends RealMap(value)
 object PercentMap {
   def apply(value: Map[String, Double]): PercentMap = new PercentMap(value)
   def empty: PercentMap = FeatureTypeDefaults.PercentMap
@@ -180,7 +186,7 @@ object PercentMap {
  *
  * @param value map of currency values
  */
-class CurrencyMap(val value: Map[String, Double]) extends OPMap[Double]
+class CurrencyMap(value: Map[String, Double]) extends RealMap(value)
 object CurrencyMap {
   def apply(value: Map[String, Double]): CurrencyMap = new CurrencyMap(value)
   def empty: CurrencyMap = FeatureTypeDefaults.CurrencyMap
@@ -191,7 +197,7 @@ object CurrencyMap {
  *
  * @param value map of date values
  */
-class DateMap(val value: Map[String, Long]) extends OPMap[Long]
+class DateMap(value: Map[String, Long]) extends IntegralMap(value)
 object DateMap {
   def apply(value: Map[String, Long]): DateMap = new DateMap(value)
   def empty: DateMap = FeatureTypeDefaults.DateMap
@@ -202,7 +208,7 @@ object DateMap {
  *
  * @param value map of date & time values
  */
-class DateTimeMap(val value: Map[String, Long]) extends OPMap[Long]
+class DateTimeMap(value: Map[String, Long]) extends DateMap(value)
 object DateTimeMap {
   def apply(value: Map[String, Long]): DateTimeMap = new DateTimeMap(value)
   def empty: DateTimeMap = FeatureTypeDefaults.DateTimeMap
@@ -213,7 +219,7 @@ object DateTimeMap {
  *
  * @param value map of multi picklist values
  */
-class MultiPickListMap(val value: Map[String, Set[String]]) extends OPMap[Set[String]]
+class MultiPickListMap(val value: Map[String, Set[String]]) extends OPMap[Set[String]] with MultiResponse
 object MultiPickListMap {
   def apply(value: Map[String, Set[String]]): MultiPickListMap = new MultiPickListMap(value)
   def empty: MultiPickListMap = FeatureTypeDefaults.MultiPickListMap
@@ -224,7 +230,7 @@ object MultiPickListMap {
  *
  * @param value map of country values
  */
-class CountryMap(val value: Map[String, String]) extends OPMap[String] with Location
+class CountryMap(value: Map[String, String]) extends TextMap(value) with Location
 object CountryMap {
   def apply(value: Map[String, String]): CountryMap = new CountryMap(value)
   def empty: CountryMap = FeatureTypeDefaults.CountryMap
@@ -235,7 +241,7 @@ object CountryMap {
  *
  * @param value map of state values
  */
-class StateMap(val value: Map[String, String]) extends OPMap[String] with Location
+class StateMap(value: Map[String, String]) extends TextMap(value) with Location
 object StateMap {
   def apply(value: Map[String, String]): StateMap = new StateMap(value)
   def empty: StateMap = FeatureTypeDefaults.StateMap
@@ -246,7 +252,7 @@ object StateMap {
  *
  * @param value map of city values
  */
-class CityMap(val value: Map[String, String]) extends OPMap[String] with Location
+class CityMap(value: Map[String, String]) extends TextMap(value) with Location
 object CityMap {
   def apply(value: Map[String, String]): CityMap = new CityMap(value)
   def empty: CityMap = FeatureTypeDefaults.CityMap
@@ -257,7 +263,7 @@ object CityMap {
  *
  * @param value map of postal code values
  */
-class PostalCodeMap(val value: Map[String, String]) extends OPMap[String] with Location
+class PostalCodeMap(value: Map[String, String]) extends TextMap(value) with Location
 object PostalCodeMap {
   def apply(value: Map[String, String]): PostalCodeMap = new PostalCodeMap(value)
   def empty: PostalCodeMap = FeatureTypeDefaults.PostalCodeMap
@@ -268,7 +274,7 @@ object PostalCodeMap {
  *
  * @param value map of street values
  */
-class StreetMap(val value: Map[String, String]) extends OPMap[String] with Location
+class StreetMap(value: Map[String, String]) extends TextMap(value) with Location
 object StreetMap {
   def apply(value: Map[String, String]): StreetMap = new StreetMap(value)
   def empty: StreetMap = FeatureTypeDefaults.StreetMap
