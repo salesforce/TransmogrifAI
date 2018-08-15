@@ -40,7 +40,7 @@ class NumberTest extends PropSpec with PropertyChecks with Matchers {
 
   val specials = Table("specials",
     Double.MinValue, Double.MaxValue,
-    Double.MinPositiveValue, Double.MinPositiveValue, Double.NaN,
+    Double.MinPositiveValue, Double.NaN,
     Double.PositiveInfinity, Double.NegativeInfinity
   )
 
