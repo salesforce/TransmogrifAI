@@ -49,6 +49,10 @@ class TextUtilsTest extends FlatSpec with TestCommon {
     TextUtils.concat("Left", "", ",") shouldBe "Left"
   }
 
+  it should "concat empty strings" in {
+    TextUtils.concat("", "", ",") shouldBe ""
+  }
+
   it should "clean a string with special chars" in {
     TextUtils.cleanString("A string wit#h %bad pun&ctuation mark<=>s") shouldBe "AStringWitHBadPunCtuationMarkS"
   }

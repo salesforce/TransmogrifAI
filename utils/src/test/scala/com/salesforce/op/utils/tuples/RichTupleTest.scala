@@ -43,8 +43,8 @@ class RichTupleTest extends FlatSpec with TestCommon {
     res.get shouldBe 3
   }
 
-  it should "not support mapping for more than 2 arguments" in {
-    assertDoesNotCompile("(Some(1), Some(2), Some(3)).map((x, y) => x + y)")
+  it should "not map empty tuples" in {
+    assertDoesNotCompile("(None, None).map((x, y) => x + y)")
   }
 
   it should "map the function with no effect for left param alone" in {

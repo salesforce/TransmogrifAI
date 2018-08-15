@@ -30,18 +30,24 @@
 
 package com.salesforce.op.utils.numeric
 
-import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.PropertyChecks
+import org.scalatest.{Matchers, PropSpec}
 
 @RunWith(classOf[JUnitRunner])
-class NumberTest extends FlatSpec with TestCommon {
-  Spec(Number.getClass) should "return true for a valid number" in {
-    Number.isValid(20) shouldBe true
-  }
+class NumberTest extends PropSpec with PropertyChecks with Matchers {
+  val tests = Table(
+    "TestNumbers",
+    0.0,
+    Double.MaxValue,
+    Double.NegativeInfinity,
+    Double.NaN
+  )
 
-  it should "return false for NaN or Infinity" in {
-    Number.isValid(Double.NegativeInfinity) shouldBe false
+  property("validate numbers") {
+    forAll(tests) { d =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
+    }
   }
 }
