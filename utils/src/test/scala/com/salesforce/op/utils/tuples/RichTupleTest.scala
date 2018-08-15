@@ -43,8 +43,9 @@ class RichTupleTest extends FlatSpec with TestCommon {
     res.get shouldBe 3
   }
 
-  it should "not map empty tuples" in {
-    assertDoesNotCompile("(None, None).map((x, y) => x + y)")
+  it should "map on empty tuples" in {
+    val none: (Option[String], Option[String]) = None -> None
+    none.map((x, y) => x + y) shouldBe None
   }
 
   it should "map the function with no effect for left param alone" in {
