@@ -375,3 +375,6 @@ configure(subProjs) {
         sign publishing.publications.mavenJava
     }
 }
+
+// run by Heroku to build docs
+task stage(dependsOn: ':docs:buildDocs')
