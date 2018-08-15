@@ -42,6 +42,9 @@ class PredictionTest extends FlatSpec with TestCommon {
 
   Spec[Prediction] should "extend FeatureType" in {
     Prediction(1.0) shouldBe a[FeatureType]
+    Prediction(1.0) shouldBe a[OPMap[_]]
+    Prediction(1.0) shouldBe a[NumericMap]
+    Prediction(1.0) shouldBe a[RealMap]
   }
   it should "error if prediction is missing" in {
     intercept[NonNullableEmptyException](new Prediction(null))
