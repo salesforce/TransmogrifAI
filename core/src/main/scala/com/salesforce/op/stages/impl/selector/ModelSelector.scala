@@ -232,7 +232,7 @@ final class SelectedModel private[op]
     case m => setDefault(sparkMlStage, Option(m))
   }
 
-  lazy val recoveredStage: ModelType = getSparkMlStage() match {
+  @transient private lazy val recoveredStage: ModelType = getSparkMlStage() match {
     case Some(m: PredictionModel[_, _]) => SparkModelConverter.toOPUnchecked(m).asInstanceOf[ModelType]
     case Some(m: ModelType@unchecked) => m
     case m => throw new IllegalArgumentException(s"SparkMlStage in SelectedModel ($m) is of unsupported" +
