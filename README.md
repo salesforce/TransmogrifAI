@@ -34,13 +34,13 @@ import spark.implicits._
 // Read Titanic data as a DataFrame
 val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).readDataset().toDF()
 
-// Extract response and predictor variables
-val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
+// Extract response and predictor Features
+val (survived, predictors) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
 
-// Automated feature engineering of predictors
-val featureVector = features.toSeq.transmogrify()
+// Automated feature engineering
+val featureVector = predictors.toSeq.transmogrify()
 
-// Automated feature selection
+// Automated feature validation and selection
 val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
 
 // Automated model selection
