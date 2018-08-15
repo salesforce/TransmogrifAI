@@ -46,7 +46,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object RegressionModelSelector {
 
-  private val modelNames: Seq[_ <: RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
+  private[op] val modelNames: Seq[_ <: RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
     MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
 
   private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {

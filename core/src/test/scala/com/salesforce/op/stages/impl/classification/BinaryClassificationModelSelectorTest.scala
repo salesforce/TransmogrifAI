@@ -42,6 +42,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -129,7 +130,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
     trainCount + testCount shouldBe totalCount
   }
 
-  it should "fit and predict all models on by default" in {
+  ignore should "fit and predict all models on by default" in {
 
     val testEstimator =
       BinaryClassificationModelSelector
@@ -151,6 +152,46 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
     metaData.validationResults.length shouldEqual 48
+
+    // evaluation metrics from test set should be in metadata after eval run
+    model.evaluateModel(data)
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+      .holdoutEvaluation
+    BinaryClassEvalMetrics.values.foreach(metric =>
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+
+    val transformedData = model.transform(data)
+    val pred = model.getOutput()
+    val justScores = transformedData.collect(pred).map(_.prediction)
+    justScores shouldEqual data.collect(label).map(_.v.get)
+  }
+
+  it should "fit and predict for default models" in {
+
+    val modelToTry = BinaryClassificationModelSelector.modelNames(scala.util.Random.nextInt(4))
+
+    val testEstimator =
+      BinaryClassificationModelSelector
+        .withCrossValidation(
+          Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
+          numFolds = 4,
+          validationMetric = Evaluators.BinaryClassification.error(),
+          seed = 42,
+          modelTypesToUse = Seq(modelToTry)
+        )
+        .setInput(label, features)
+
+    val model = testEstimator.fit(data)
+    log.info(model.getMetadata().toString)
+
+    // Evaluation from train data should be there
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    BinaryClassEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
 
     // evaluation metrics from test set should be in metadata after eval run
     model.evaluateModel(data)

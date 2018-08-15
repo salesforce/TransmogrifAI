@@ -46,7 +46,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object BinaryClassificationModelSelector {
 
-  private val modelNames: Seq[_ <: BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
+  private[op] val modelNames: Seq[_ <: BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
     MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
   // OpNaiveBayes and OpDecisionTreeClassifier off by default
 
