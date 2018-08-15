@@ -41,5 +41,18 @@ abstract class OPMap[A] extends OPCollection {
   override type Value = Map[String, A]
 
   final def isEmpty: Boolean = value.isEmpty
+}
 
+/**
+ * Numeric Map mixin
+ */
+trait NumericMap {
+  self: OPMap[_] =>
+
+  /**
+   * Convert map of numeric values to map of [[Double]] values
+   *
+   * @return map of [[Double]] values
+   */
+  def toDoubleMap: Map[String, Double]
 }
