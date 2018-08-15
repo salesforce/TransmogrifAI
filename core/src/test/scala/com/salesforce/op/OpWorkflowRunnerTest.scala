@@ -31,7 +31,6 @@
 package com.salesforce.op
 
 import java.io.File
-import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
@@ -45,7 +44,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.commons.io.FileUtils
 import org.junit.runner.RunWith
 import org.scalactic.source
-import org.scalatest.FlatSpec
+import org.scalatest.AsyncFlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
@@ -55,7 +54,7 @@ import scala.reflect.ClassTag
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest with TestSparkStreamingContext {
+class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest with TestSparkStreamingContext {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -204,7 +203,10 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest with 
   }
 
   it should "collect and report metrics on application end" in {
-    metricsPromise.future.map { metrics =>
+    for {
+      _ <- Future(spark.stop()) // stop spark to make sure metrics promise completes
+      metrics <- metricsPromise.future
+    } yield {
       metrics.appId.isEmpty shouldBe false
       OpWorkflowRunType.withNameInsensitiveOption(metrics.runType).isDefined shouldBe true
       metrics.appName shouldBe "op-test"
@@ -213,7 +215,6 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest with 
       metrics.appDuration should be >= 0L
       metrics.stageMetrics.length should be > 0
     }
-    Future(spark.stop()).map(_ => true shouldBe true)
   }
 
   private def assertConf(c: OpWorkflowRunnerConfig)(implicit pos: source.Position) = {
