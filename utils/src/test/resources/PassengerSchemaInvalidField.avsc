@@ -1,0 +1,46 @@
+{
+  "type" : "record",
+  "name" : "Passenger",
+  "namespace" : "com.salesforce.app.schema",
+  "fields" : [ {
+    "name" : "PassengerId",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Survived",
+    "type" : "boolean",
+    "default": false
+  }, {
+    "name" : "Pclass",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Name",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Sex",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Age",
+    "type" : [ "double", "null" ]
+  }, {
+    "name" : "SibSp",
+    "type" : [ "int", "null" ]
+  }, {
+    "name" : "Parch",
+    "type" : [ "long", "null" ]
+  }, {
+    "name" : "Ticket",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Fare",
+    "type" : [ "float", "null" ]
+  }, {
+    "name" : "Cabin",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "Embarked",
+    "type" : [ "string", "null" ]
+  }, {
+    "name" : "FailTest",
+    "type" : [ "string", "null" ]
+  } ]
+}

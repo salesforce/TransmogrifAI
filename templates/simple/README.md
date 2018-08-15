@@ -8,7 +8,7 @@ This is an TransmogrifAI project created with the 'simple' template.
 - Scala ${scalaVersion}.${scalaVersionRevision}
 - Spark ${sparkVersion}
 - IntelliJ Idea 2017+ recommended
-- OTransmogrifAI ${opVersion}
+- TransmogrifAI ${transmogrifaiVersion}
 
 
 ## Structure

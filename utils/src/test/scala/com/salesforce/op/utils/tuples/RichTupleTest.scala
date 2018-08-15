@@ -28,41 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.spark
+package com.salesforce.op.utils.tuples
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.RDDGenerator
-import com.salesforce.op.test.TestSparkContext
-import org.apache.hadoop.io.compress.DefaultCodec
-import org.apache.hadoop.mapred.JobConf
-import org.joda.time.DateTime
+import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
-import org.scalacheck.Arbitrary
-import org.scalatest.PropSpec
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
-
+import com.salesforce.op.utils.tuples.RichTuple._
 
 @RunWith(classOf[JUnitRunner])
-class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
-  import com.salesforce.op.utils.spark.RichRDD._
-
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
-
-  property("save as a text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
-  }
-  property("save as a compressed text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
+class RichTupleTest extends FlatSpec with TestCommon {
+  Spec(RichTuple.getClass) should "map a function to provided elements in tuples" in {
+    val res = (Some(1), Some(2)).map((x, y) => x + y)
+    res.get shouldBe 3
   }
 
+  it should "map on empty tuples" in {
+    val none: (Option[String], Option[String]) = None -> None
+    none.map((x, y) => x + y) shouldBe None
+  }
+
+  it should "map the function with no effect for left param alone" in {
+    val res = (Some(1), None).map((x, y) => x + y)
+    res shouldBe Some(1)
+  }
+
+  it should "map the function with no effect for right param alone" in {
+    val res = (None, Some(1)).map((x, y) => x + y)
+    res shouldBe Some(1)
+  }
 }

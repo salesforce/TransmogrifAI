@@ -31,6 +31,7 @@
 package com.salesforce.op
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
@@ -162,7 +163,7 @@ class OpWorkflowRunnerTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Prepare streaming input data
     FileUtils.forceMkdir(readLocation)
     val passengerAvroFile = new File(passengerAvroPath).getCanonicalFile
-    FileUtils.copyFile(passengerAvroFile, new File(readLocation + "/" + passengerAvroFile.getName), false)
+    FileUtils.copyFile(passengerAvroFile, new File(readLocation, passengerAvroFile.getName), false)
 
     val runConfig = testConfig.copy(
       runType = StreamingScore,

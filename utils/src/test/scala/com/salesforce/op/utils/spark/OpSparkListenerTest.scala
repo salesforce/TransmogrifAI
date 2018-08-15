@@ -30,39 +30,39 @@
 
 package com.salesforce.op.utils.spark
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.RDDGenerator
 import com.salesforce.op.test.TestSparkContext
-import org.apache.hadoop.io.compress.DefaultCodec
-import org.apache.hadoop.mapred.JobConf
-import org.joda.time.DateTime
+import com.salesforce.op.utils.date.DateTimeUtils
 import org.junit.runner.RunWith
-import org.scalacheck.Arbitrary
-import org.scalatest.PropSpec
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
-
 
 @RunWith(classOf[JUnitRunner])
-class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
-  import com.salesforce.op.utils.spark.RichRDD._
+class OpSparkListenerTest extends FlatSpec with TestSparkContext {
+  val start = DateTimeUtils.now().getMillis
+  val listener = new OpSparkListener(sc.appName, sc.applicationId, "testRun", Some("tag"), Some("tagValue"), true, true)
+  sc.addSparkListener(listener)
+  val _ = spark.read.csv(s"$testDataDir/PassengerDataAll.csv").count()
 
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
-
-  property("save as a text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
+  Spec[OpSparkListener] should "capture app metrics" in {
+    val appMetrics: AppMetrics = listener.metrics
+    appMetrics.appName shouldBe sc.appName
+    appMetrics.appId shouldBe sc.applicationId
+    appMetrics.runType shouldBe "testRun"
+    appMetrics.customTagName shouldBe Some("tag")
+    appMetrics.customTagValue shouldBe Some("tagValue")
+    appMetrics.appStartTime should be >= start
+    appMetrics.appEndTime should be >= appMetrics.appStartTime
+    appMetrics.appDuration shouldBe (appMetrics.appEndTime - appMetrics.appStartTime)
+    appMetrics.appDurationPretty.isEmpty shouldBe false
   }
-  property("save as a compressed text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
-  }
 
+  it should "capture app stage metrics" in {
+    val stageMetrics = listener.metrics.stageMetrics
+    stageMetrics.size should be > 0
+    val firstStage = stageMetrics.head
+    firstStage.name should startWith("csv at OpSparkListenerTest.scala")
+    firstStage.stageId shouldBe 0
+    firstStage.numTasks shouldBe 1
+    firstStage.status shouldBe "succeeded"
+  }
 }

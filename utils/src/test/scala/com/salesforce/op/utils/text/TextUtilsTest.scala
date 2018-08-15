@@ -28,41 +28,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.spark
+package com.salesforce.op.utils.text
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.RDDGenerator
-import com.salesforce.op.test.TestSparkContext
-import org.apache.hadoop.io.compress.DefaultCodec
-import org.apache.hadoop.mapred.JobConf
-import org.joda.time.DateTime
+import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
-import org.scalacheck.Arbitrary
-import org.scalatest.PropSpec
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
-
 
 @RunWith(classOf[JUnitRunner])
-class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
-  import com.salesforce.op.utils.spark.RichRDD._
-
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
-
-  property("save as a text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
-  }
-  property("save as a compressed text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
+class TextUtilsTest extends FlatSpec with TestCommon {
+  Spec(TextUtils.getClass) should "concat strings" in {
+    TextUtils.concat("Left", "Right", ",") shouldBe "Left,Right"
   }
 
+  it should "concat with no effect for right half alone" in {
+    TextUtils.concat("", "Right", ",") shouldBe "Right"
+  }
+
+  it should "concat with no effect for left half alone" in {
+    TextUtils.concat("Left", "", ",") shouldBe "Left"
+  }
+
+  it should "concat empty strings" in {
+    TextUtils.concat("", "", ",") shouldBe ""
+  }
+
+  it should "clean a string with special chars" in {
+    TextUtils.cleanString("A string wit#h %bad pun&ctuation mark<=>s") shouldBe "AStringWitHBadPunCtuationMarkS"
+  }
+
+  it should "clean an Option(string) with special chars" in {
+    val testString: Option[String] = Some("A string wit#h %bad pun&ctuation mark<=>s")
+    TextUtils.cleanOptString(testString) shouldBe Some("AStringWitHBadPunCtuationMarkS")
+  }
 }

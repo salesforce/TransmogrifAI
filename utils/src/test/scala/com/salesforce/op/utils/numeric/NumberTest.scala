@@ -28,41 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.spark
+package com.salesforce.op.utils.numeric
 
-import java.io.File
-
-import com.holdenkarau.spark.testing.RDDGenerator
-import com.salesforce.op.test.TestSparkContext
-import org.apache.hadoop.io.compress.DefaultCodec
-import org.apache.hadoop.mapred.JobConf
-import org.joda.time.DateTime
 import org.junit.runner.RunWith
-import org.scalacheck.Arbitrary
-import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
-
+import org.scalatest.{Matchers, PropSpec}
 
 @RunWith(classOf[JUnitRunner])
-class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
-  import com.salesforce.op.utils.spark.RichRDD._
+class NumberTest extends PropSpec with PropertyChecks with Matchers {
 
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
+  val specials = Table("specials",
+    Double.MinValue, Double.MaxValue,
+    Double.MinPositiveValue, Double.NaN,
+    Double.PositiveInfinity, Double.NegativeInfinity
+  )
 
-  property("save as a text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
-    }
-  }
-  property("save as a compressed text file") {
-    forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
-      rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
-      spark.read.textFile(out).count() shouldBe rdd.count()
+  property("validate numbers") {
+    forAll { d: Double =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
     }
   }
 
+  property("validate special numbers") {
+    forAll(specials) { d =>
+      Number.isValid(d) should not be (d.isInfinity || d.isNaN)
+    }
+  }
 }
