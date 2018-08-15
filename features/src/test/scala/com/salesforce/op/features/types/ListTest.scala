@@ -48,10 +48,10 @@ class ListTest extends FlatSpec with TestCommon {
     myTextList shouldBe a[OPList[_]]
   }
   it should "compare values correctly" in {
-    new TextList(List("Hello", "Bye")).equals(new TextList(List("Hello", "Bye"))) shouldBe true
-    new TextList(List("Bye", "Hello")).equals(new TextList(List("Hello", "Bye"))) shouldBe false
-    FeatureTypeDefaults.TextList.equals(new TextList(List("Hello", "Bye"))) shouldBe false
-    FeatureTypeDefaults.TextList.equals(TextList(List.empty[String])) shouldBe true
+    new TextList(List("Hello", "Bye")) shouldBe new TextList(List("Hello", "Bye"))
+    new TextList(List("Bye", "Hello")) should not be new TextList(List("Hello", "Bye"))
+    FeatureTypeDefaults.TextList should not be new TextList(List("Hello", "Bye"))
+    FeatureTypeDefaults.TextList shouldBe TextList(List.empty[String])
 
     List("Goodbye", "world").toTextList shouldBe a[TextList]
   }
@@ -64,10 +64,10 @@ class ListTest extends FlatSpec with TestCommon {
     myDateList shouldBe a[OPList[_]]
   }
   it should "compare values correctly" in {
-    new DateList(List(456L, 13L)).equals(new DateList(List(456L, 13L))) shouldBe true
-    new DateList(List(13L, 456L)).equals(new DateList(List(456L, 13L))) shouldBe false
-    FeatureTypeDefaults.DateList.equals(new DateList(List(456L, 13L))) shouldBe false
-    FeatureTypeDefaults.DateList.equals(DateList(List.empty[Long])) shouldBe true
+    new DateList(List(456L, 13L)) shouldBe new DateList(List(456L, 13L))
+    new DateList(List(13L, 456L)) should not be new DateList(List(456L, 13L))
+    FeatureTypeDefaults.DateList should not be new DateList(List(456L, 13L))
+    FeatureTypeDefaults.DateList shouldBe new DateList(List.empty[Long])
 
     List(44829L, 389093L).toDateList shouldBe a[DateList]
   }
@@ -78,12 +78,13 @@ class ListTest extends FlatSpec with TestCommon {
     myDateTimeList shouldBe a[FeatureType]
     myDateTimeList shouldBe a[OPCollection]
     myDateTimeList shouldBe a[OPList[_]]
+    myDateTimeList shouldBe a[DateList]
   }
   it should "compare values correctly" in {
-    new DateTimeList(List(456L, 13L)).equals(new DateTimeList(List(456L, 13L))) shouldBe true
-    new DateTimeList(List(13L, 456L)).equals(new DateTimeList(List(456L, 13L))) shouldBe false
-    FeatureTypeDefaults.DateTimeList.equals(new DateTimeList(List(456L, 13L))) shouldBe false
-    FeatureTypeDefaults.DateTimeList.equals(DateTimeList(List.empty[Long])) shouldBe true
+    new DateTimeList(List(456L, 13L)) shouldBe new DateTimeList(List(456L, 13L))
+    new DateTimeList(List(13L, 456L)) should not be new DateTimeList(List(456L, 13L))
+    FeatureTypeDefaults.DateTimeList should not be new DateTimeList(List(456L, 13L))
+    FeatureTypeDefaults.DateTimeList shouldBe DateTimeList(List.empty[Long])
 
     List(12237834L, 4890489839L).toDateTimeList shouldBe a[DateTimeList]
   }
