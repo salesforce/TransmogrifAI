@@ -1,6 +1,6 @@
 # TransmogrifAI
 
-[![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg)](https://bintray.com/salesforce/maven/TransmogrifAI/_latestVersion) [![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE)
+[![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg)](https://bintray.com/salesforce/maven/TransmogrifAI/_latestVersion) [![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE) [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
@@ -11,9 +11,7 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-TransmogrifAI is compatible with Spark 2.2.x and Scala 2.11.x.
-
-[Skip to Quick Start and Documentation](https://github.com/salesforce/TransmogrifAI#quick-start-and-documentation)
+Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
 ## Predicting Titanic Survivors with TransmogrifAI
 
@@ -118,49 +116,59 @@ While this may seem a bit too magical, for those who want more control, Transmog
 
 
 ## Adding TransmogrifAI into your project
-You can simply add TransmogrifAI as a regular dependency to your existing project. Example for gradle below:
+You can simply add TransmogrifAI as a regular dependency to an existing project.
 
+For Gradle in `build.gradle` add:
 ```groovy
 repositories {
     mavenCentral()
     maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
-ext {
-    scalaVersion = '2.11'
-    scalaVersionRevision = '12'
-    sparkVersion = '2.2.1'
-    transmogrifaiVersion = '0.3.4'
-}
 dependencies {
-    // Scala
-    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
-    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+    // TransmogrifAI core dependency
+    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.3.4'
 
-    // Spark
-    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-
-    // TransmogrifAI
-    compile "com.salesforce.transmogrifai:transmogrifai-core_$scalaVersion:$transmogrifaiVersion"
-
-    // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce.transmogrifai:transmogrifai-models_$scalaVersion:$transmogrifaiVersion"
-
-    // All your other depdendecies go below
-    // ...
+    // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
+    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.3.4'
 }
 ```
+
+For SBT in `build.sbt` add:
+```scala
+scalaVersion := "2.11.12"
+
+resolvers += Resolver.bintrayRepo("salesforce", "maven")
+
+// TransmogrifAI core dependency
+libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.3.4"
+
+// TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
+// libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.3.4"
+```
+
+Then import TransmogrifAI into your code:
+```scala
+// TransmogrifAI functionality: feature types, feature builders, feature dsl, readers, aggregators etc.
+import com.salesforce.op._
+import com.salesforce.op.aggregators._
+import com.salesforce.op.features._
+import com.salesforce.op.features.types._
+import com.salesforce.op.readers._
+
+// Spark enrichments (optional)
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichRDD._
+import com.salesforce.op.utils.spark.RichRow._
+import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichStructType._
+```
+
 
 ## Quick Start and Documentation
 
 See the [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
-See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programming API (can also be viewed [locally](docs/README.md)).
+See [Scaladoc](https://docs.transmogrif.ai) for the programming API (can also be viewed [locally](docs/README.md)).
 
 ## License
 
