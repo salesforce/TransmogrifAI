@@ -242,6 +242,7 @@ trait RichMapFeature {
      * @param minTokenLength            minimum token length, >= 1.
      * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
+     * @param cleanKeys                 clean map keys before pivoting
      * @param trackNulls                indicates whether or not to track null values in a separate column.
      * @param topK                      number of most common elements to be used as categorical pivots
      * @param minSupport                minimum number of occurences an element must have to appear in pivot
@@ -267,6 +268,7 @@ trait RichMapFeature {
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       topK: Int = TransmogrifierDefaults.TopK,
@@ -285,6 +287,7 @@ trait RichMapFeature {
       new SmartTextMapVectorizer[TextMap]()
         .setInput(f +: others)
         .setMaxCardinality(maxCategoricalCardinality)
+        .setCleanKeys(cleanKeys)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
         .setAutoDetectLanguage(autoDetectLanguage)
@@ -370,6 +373,7 @@ trait RichMapFeature {
      * @param autoDetectLanguage        indicates whether to attempt language detection
      * @param minTokenLength            minimum token length, >= 1.
      * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
+     * @param cleanKeys                 clean map keys before pivoting
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param trackNulls                indicates whether or not to track null values in a separate column.
      * @param topK                      number of most common elements to be used as categorical pivots
@@ -397,6 +401,7 @@ trait RichMapFeature {
       minTokenLength: Int,
       toLowercase: Boolean,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
@@ -414,6 +419,7 @@ trait RichMapFeature {
       new SmartTextMapVectorizer[TextAreaMap]()
         .setInput(f +: others)
         .setMaxCardinality(maxCategoricalCardinality)
+        .setCleanKeys(cleanKeys)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
         .setAutoDetectLanguage(autoDetectLanguage)

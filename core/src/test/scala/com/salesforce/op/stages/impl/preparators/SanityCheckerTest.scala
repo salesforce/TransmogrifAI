@@ -466,8 +466,13 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  it should "not calculate correlations on hashed text features if asked not to (using transmogrify)" in {
-    val vectorized = Seq(textMap).transmogrify()
+  it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
+
+    val vectorized = textMap.vectorize(trackNulls = TransmogrifierDefaults.TrackNulls,
+      numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
+      hashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
+      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
+      cleanText = TransmogrifierDefaults.CleanText)
 
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)

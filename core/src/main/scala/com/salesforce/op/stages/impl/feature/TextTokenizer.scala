@@ -139,6 +139,7 @@ object TextTokenizer {
   val MinTokenLength = 1
   val ToLowercase = true
   val StripHtml = false
+  val MaxCategoricalCardinality = 30
 
   /**
    * Language wise sentence tokenization
