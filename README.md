@@ -146,6 +146,23 @@ libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" %
 // libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.3.4"
 ```
 
+Lastly import TransmogrifAI into your code:
+```scala
+// TransmogrifAI functionality: feature types, feature builders, feature dsl, readers, aggregators etc.
+import com.salesforce.op._
+import com.salesforce.op.aggregators._
+import com.salesforce.op.features._
+import com.salesforce.op.features.types._
+import com.salesforce.op.readers._
+
+// Spark enrichments (optional)
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichRDD._
+import com.salesforce.op.utils.spark.RichRow._
+import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichStructType._
+```
+
 
 ## Quick Start and Documentation
 
