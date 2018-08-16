@@ -75,6 +75,7 @@ private[op] trait TransmogrifierDefaults {
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
+  val MaxCategoricalCardinality = 30
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -184,7 +185,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g)
           // Explicitly set cleanText to false here in order to match behavior of Text vectorization
-          f.smartVectorize(maxCategoricalCardinality = TextTokenizer.MaxCategoricalCardinality,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
             minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
             prependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
@@ -192,7 +193,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[TextMap] =>
           val (f, other) = castAs[TextMap](g)
           // Explicitly set cleanText to false here in order to match behavior of Text vectorization
-          f.smartVectorize(maxCategoricalCardinality = TextTokenizer.MaxCategoricalCardinality,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
             minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
             prependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
@@ -286,14 +287,14 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
-          f.smartVectorize(maxCategoricalCardinality = TextTokenizer.MaxCategoricalCardinality,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
             minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
             prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
-          f.smartVectorize(maxCategoricalCardinality = TextTokenizer.MaxCategoricalCardinality,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
             minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
