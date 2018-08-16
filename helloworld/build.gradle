@@ -13,8 +13,7 @@ plugins {
 }
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io" }
-    maven { url "https://salesforce.bintray.com/maven" }
+    maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
 
 apply plugin: 'application'

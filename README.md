@@ -123,8 +123,7 @@ You can simply add TransmogrifAI as a regular dependency to your existing projec
 ```groovy
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io" }
-    maven { url "https://salesforce.bintray.com/maven" }
+    maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
 ext {
     scalaVersion = '2.11'
