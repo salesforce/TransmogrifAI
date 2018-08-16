@@ -146,7 +146,7 @@ libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" %
 // libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.3.4"
 ```
 
-Lastly import TransmogrifAI into your code:
+Then import TransmogrifAI into your code:
 ```scala
 // TransmogrifAI functionality: feature types, feature builders, feature dsl, readers, aggregators etc.
 import com.salesforce.op._
