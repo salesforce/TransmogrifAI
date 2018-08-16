@@ -11,7 +11,7 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-[Skip to Quick Start and Documentation.](#quick-start-and-documentation)
+Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
 ## Predicting Titanic Survivors with TransmogrifAI
 
