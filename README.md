@@ -118,40 +118,37 @@ While this may seem a bit too magical, for those who want more control, Transmog
 
 
 ## Adding TransmogrifAI into your project
-You can simply add TransmogrifAI as a regular dependency to your existing project. Example for gradle below:
+You can simply add TransmogrifAI as a regular dependency to your existing project:
+
+For Gradle in `build.gradle` add:
 
 ```groovy
 repositories {
     mavenCentral()
     maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
-ext {
-    scalaVersion = '2.11'
-    scalaVersionRevision = '12'
-    sparkVersion = '2.2.1'
-    transmogrifaiVersion = '0.3.4'
-}
 dependencies {
-    // Scala
-    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
-    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-
-    // Spark
-    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-
     // TransmogrifAI core dependency
-    compile "com.salesforce.transmogrifai:transmogrifai-core_$scalaVersion:$transmogrifaiVersion"
+    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.3.4'
 
     // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce.transmogrifai:transmogrifai-models_$scalaVersion:$transmogrifaiVersion"
+    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.3.4'
 }
 ```
+
+With SBT in `build.sbt` add:
+```scala
+scalaVersion := "2.11.12"
+
+resolvers += Resolver.bintrayRepo("salesforce", "maven")
+
+// TransmogrifAI core dependency
+libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.3.4"
+
+// TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
+// libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.3.4"
+```
+
 
 ## Quick Start and Documentation
 
