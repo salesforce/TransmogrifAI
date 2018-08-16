@@ -5,7 +5,6 @@ buildscript {
     }
     dependencies {
         classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
-        classpath 'com.amazonaws:aws-java-sdk-core:1.11.353'
     }
 }
 
@@ -20,7 +19,7 @@ plugins {
 allprojects {
     repositories {
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        maven { url "https://dl.bintray.com/salesforce/maven" }
     }
 }
 
@@ -271,26 +270,11 @@ task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
     description 'Aggregates scoverage reports of all subprojects.'
 }
 
-import com.amazonaws.auth.*
-import com.amazonaws.auth.profile.*
-
 configure(subProjs) {
     apply from: "$rootProject.projectDir/gradle/tests.gradle"
     apply from: "$rootProject.projectDir/gradle/spark.gradle"
 
     jar.baseName = "$rootProject.name-$project.name"
-
-    def fetchAwsCredentials = {
-        // Note: 'op-repo-admin' profile must be set in ~/.aws/credentials
-        String profile = "op-repo-admin"
-        try {
-            return new ProfileCredentialsProvider(profile).credentials
-        } catch (Exception e) {
-            logger.debug("Unable to retrieve AWS credentials from '$profile' profile, publishing to S3 will not be available.", e)
-            return new BasicAWSCredentials("unknown-key", "unknown-secret")
-        }
-    }
-    AWSCredentials awsCredentials = fetchAwsCredentials()
 
     task scaladocJar(type: Jar, dependsOn: scaladoc) {
         classifier = 'javadoc'
@@ -349,22 +333,24 @@ configure(subProjs) {
             }
         }
         repositories {
-            maven {
-                url "s3://op-repo/releases"
-                credentials(AwsCredentials) {
-                    accessKey awsCredentials.AWSAccessKeyId
-                    secretKey awsCredentials.AWSSecretKey
-                }
-            }
             // Disable Sonatype publication for now
-            /* maven {
-                // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
-                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-                credentials {
-                    username nexusUsername
-                    password nexusPassword
-                }
-            } */
+            // maven {
+            //     // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
+            //     url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            //     credentials {
+            //         username nexusUsername
+            //         password nexusPassword
+            //     }
+            // }
+            // Disable Bintray publication for now
+            // maven {
+            //     // Note: requires 'bintrayUsername' and 'bintrayPassword' to be set in ~/.gradle/gradle.properties file
+            //     url "https://api.bintray.com/maven/salesforce/maven/TransmogrifAI/;publish=1"
+            //     credentials {
+            //         username bintrayUsername
+            //         password bintrayPassword
+            //     }
+            // }
         }
     }
 

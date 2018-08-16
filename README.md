@@ -1,6 +1,6 @@
 # TransmogrifAI
 
-[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE)
+[![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg)](https://bintray.com/salesforce/maven/TransmogrifAI/_latestVersion) [![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE)
 
 TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
@@ -121,15 +121,7 @@ You can simply add TransmogrifAI as a regular dependency to your existing projec
 ```groovy
 repositories {
     mavenCentral()
-    maven { url "https://jitpack.io" }
-    maven {
-        url "s3://op-repo/releases"
-        credentials(AwsCredentials) {
-            // user: op-repo-reader
-            accessKey "AKIAJ6AZFFSFRJI3IKHQ"
-            secretKey "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"
-        }
-    }
+    maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
 ext {
     scalaVersion = '2.11'
