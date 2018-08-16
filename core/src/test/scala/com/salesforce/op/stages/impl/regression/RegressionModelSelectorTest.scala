@@ -126,8 +126,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     val testCount = test.count()
     val totalCount = rawData.length
 
-    assert(math.abs(testCount - 0.2 * totalCount) <= 3)
-    assert(math.abs(trainCount - 0.8 * totalCount) <= 3)
+    assert(math.abs(testCount - 0.2 * totalCount) <= 10)
+    assert(math.abs(trainCount - 0.8 * totalCount) <= 10)
 
     trainCount + testCount shouldBe totalCount
   }
