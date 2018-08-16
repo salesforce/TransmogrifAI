@@ -116,10 +116,9 @@ While this may seem a bit too magical, for those who want more control, Transmog
 
 
 ## Adding TransmogrifAI into your project
-You can simply add TransmogrifAI as a regular dependency to your existing project:
+You can simply add TransmogrifAI as a regular dependency to an existing project.
 
 For Gradle in `build.gradle` add:
-
 ```groovy
 repositories {
     mavenCentral()
@@ -134,7 +133,7 @@ dependencies {
 }
 ```
 
-With SBT in `build.sbt` add:
+For SBT in `build.sbt` add:
 ```scala
 scalaVersion := "2.11.12"
 
