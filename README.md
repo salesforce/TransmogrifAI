@@ -38,13 +38,15 @@ val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).re
 val (survived, predictors) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
 
 // Automated feature engineering
-val featureVector = predictors.toSeq.transmogrify()
+val featureVector = predictors.transmogrify()
 
 // Automated feature validation and selection
 val checkedFeatures = survived.sanityCheck(featureVector, removeBadFeatures = true)
 
 // Automated model selection
 val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
+
+// Setting up a TransmogrifAI workflow and training the model
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
 println("Model summary:\n" + model.summaryPretty())
