@@ -33,11 +33,8 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import org.apache.spark.annotation.Since
 import org.apache.spark.ml.attribute.{Attribute, NominalAttribute}
-import org.apache.spark.ml.feature.IndexToString
-import org.apache.spark.ml.param.{Param, StringArrayParam}
+import org.apache.spark.ml.param.StringArrayParam
 
 /**
  * A transformer that maps a feature of indices back to a new feature of corresponding text values.

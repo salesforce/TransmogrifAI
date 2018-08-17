@@ -49,7 +49,7 @@ import scala.reflect.runtime.universe.TypeTag
 /**
  * Convert a sequence of text map features into a vector by detecting categoricals that are disguised as text.
  * A categorical will be represented as a vector consisting of occurrences of top K most common values of that feature
- * plus occurences of non top k values and a null indicator (if enabled).
+ * plus occurrences of non top k values and a null indicator (if enabled).
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
  *

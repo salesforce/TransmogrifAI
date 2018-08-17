@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
-import com.salesforce.op.evaluators.{EvaluationMetrics, OpClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
+import com.salesforce.op.evaluators.{EvaluationMetrics, OpClassificationEvaluatorBase, OpEvaluatorBase}
 import com.salesforce.op.features.{FeatureLike, TransientFeature}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._

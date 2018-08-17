@@ -128,7 +128,7 @@ class OpMultilayerPerceptronClassifier(uid: String = UID[OpMultilayerPerceptronC
  * @param uid           uid to give stage
  * @param operationName unique name of the operation this stage performs
  */
-// TODO in next release of spark this will be probablistic classifier
+// TODO in next release of spark this will be a probabilistic classifier
 class OpMultilayerPerceptronClassificationModel
 (
   sparkModel: MultilayerPerceptronClassificationModel,
