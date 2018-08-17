@@ -234,7 +234,7 @@ class RichDatasetTest extends FlatSpec with TestSparkContext {
     in(ds) noneOf "f2" should ((x: Double) => x > 3.5)
   }
 
-  it should "only compare types and ignore nullability" in {
+  Spec(com.salesforce.op.utils.spark.RichDataType.getClass) should "only compare types and ignore nullability" in {
     val arrayNullType = StructType(Array(field(f1, ArrayType(StringType, containsNull = false))))
     val arrayNonNullableType = StructType(Array(field(f1, ArrayType(StringType, containsNull = true))))
     arrayNullType.equalsIgnoreNullability(arrayNonNullableType) shouldBe true
