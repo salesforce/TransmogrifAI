@@ -33,8 +33,6 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
-import com.salesforce.op.utils.spark.OpVectorColumnMetadata
-import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.BooleanParam
 
