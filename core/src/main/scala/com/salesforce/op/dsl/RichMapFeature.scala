@@ -244,7 +244,7 @@ trait RichMapFeature {
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param trackNulls                indicates whether or not to track null values in a separate column.
      * @param topK                      number of most common elements to be used as categorical pivots
-     * @param minSupport                minimum number of occurences an element must have to appear in pivot
+     * @param minSupport                minimum number of occurrences an element must have to appear in pivot
      * @param unseenName                name to give indexes which do not have a label name associated with them
      * @param hashWithIndex             include indices when hashing a feature that has them (OPLists or OPVectors)
      * @param binaryFreq                if true, term frequency vector will be binary such that non-zero term
@@ -373,7 +373,7 @@ trait RichMapFeature {
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param trackNulls                indicates whether or not to track null values in a separate column.
      * @param topK                      number of most common elements to be used as categorical pivots
-     * @param minSupport                minimum number of occurences an element must have to appear in pivot
+     * @param minSupport                minimum number of occurrences an element must have to appear in pivot
      * @param unseenName                name to give indexes which do not have a label name associated with them
      * @param hashWithIndex             include indices when hashing a feature that has them (OPLists or OPVectors)
      * @param binaryFreq                if true, term frequency vector will be binary such that non-zero term

@@ -3,7 +3,7 @@
     <%include "menu.gsp"%>
 
     <div class="page-header">
-        <h1>Documenation</h1>
+        <h1>Documentation</h1>
     </div>
     <ul>
         <% docs.each {doc ->%>

@@ -151,7 +151,7 @@ class OpVectorMetadata private
       case _ => false
     }
 
-  // have to override to support overriden .equals
+  // have to override to support overridden .equals
   override def hashCode(): Int = 37 * columns.toSeq.hashCode()
 
   override def toString: String =

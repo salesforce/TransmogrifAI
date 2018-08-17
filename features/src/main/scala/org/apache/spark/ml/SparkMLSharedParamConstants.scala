@@ -52,7 +52,7 @@ case object SparkMLSharedParamConstants
   // response variable
   val PredictionColName = predictionCol.name
 
-  // these are the names for input/ouput for estimators/transformers that transform a single column to another
+  // these are the names for input/output for estimators/transformers that transform a single column to another
   // single columns
   val InputColName = inputCol.name
   val OutputColName = outputCol.name

@@ -43,7 +43,7 @@
  *
  * By default (unless you add any new arguments,) spark-submit task will work exactly the same
  * as before, uploading your local spark libs / project libs every time. This is just a precaution
- * to maintain backwards compatability.
+ * to maintain backwards compatibility.
  */
 
 task copyLog4jToSparkNoInstall(type: Copy) {
