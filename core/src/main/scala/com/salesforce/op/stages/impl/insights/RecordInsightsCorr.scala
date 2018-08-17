@@ -37,7 +37,7 @@ import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorMetadata}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.mllib.linalg.{Vectors => OldVectors}
-import org.apache.spark.ml.linalg.{DenseVector, Matrix, SparseVector, Vector}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
 import org.apache.spark.ml.param.{IntParam, Param}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import com.twitter.algebird.Operators._

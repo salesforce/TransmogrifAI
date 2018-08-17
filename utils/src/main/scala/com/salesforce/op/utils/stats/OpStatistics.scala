@@ -30,7 +30,7 @@
 
 package com.salesforce.op.utils.stats
 
-import org.apache.spark.mllib.linalg.{SparseMatrix, DenseMatrix, Matrix, Vector => OldVector}
+import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, SparseMatrix, Vector => OldVector}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
 import com.twitter.algebird.Monoid._
