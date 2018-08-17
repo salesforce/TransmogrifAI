@@ -28,31 +28,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.features.types
+package com.salesforce.op.utils.text
 
-/**
- * A base class for all the map Feature Types
- *
- * @tparam A item type
- */
-abstract class OPMap[A] extends OPCollection {
-  type Element = A
+import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-  override type Value = Map[String, A]
+@RunWith(classOf[JUnitRunner])
+class TextUtilsTest extends FlatSpec with TestCommon {
+  Spec(TextUtils.getClass) should "concat strings" in {
+    TextUtils.concat("Left", "Right", ",") shouldBe "Left,Right"
+  }
 
-  final def isEmpty: Boolean = value.isEmpty
-}
+  it should "concat with no effect for right half alone" in {
+    TextUtils.concat("", "Right", ",") shouldBe "Right"
+  }
 
-/**
- * Numeric Map mixin
- */
-trait NumericMap {
-  self: OPMap[_] =>
+  it should "concat with no effect for left half alone" in {
+    TextUtils.concat("Left", "", ",") shouldBe "Left"
+  }
 
-  /**
-   * Convert map of numeric values to map of [[Double]] values
-   *
-   * @return map of [[Double]] values
-   */
-  def toDoubleMap: Map[String, Double]
+  it should "concat empty strings" in {
+    TextUtils.concat("", "", ",") shouldBe ""
+  }
+
+  it should "clean a string with special chars" in {
+    TextUtils.cleanString("A string wit#h %bad pun&ctuation mark<=>s") shouldBe "AStringWitHBadPunCtuationMarkS"
+  }
+
+  it should "clean an Option(string) with special chars" in {
+    val testString: Option[String] = Some("A string wit#h %bad pun&ctuation mark<=>s")
+    TextUtils.cleanOptString(testString) shouldBe Some("AStringWitHBadPunCtuationMarkS")
+  }
 }

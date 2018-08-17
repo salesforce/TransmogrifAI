@@ -28,31 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.features.types
+package com.salesforce.op.utils.tuples
 
-/**
- * A base class for all the map Feature Types
- *
- * @tparam A item type
- */
-abstract class OPMap[A] extends OPCollection {
-  type Element = A
+import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.utils.tuples.RichTuple._
 
-  override type Value = Map[String, A]
+@RunWith(classOf[JUnitRunner])
+class RichTupleTest extends FlatSpec with TestCommon {
+  Spec(RichTuple.getClass) should "map a function to provided elements in tuples" in {
+    val res = (Some(1), Some(2)).map((x, y) => x + y)
+    res.get shouldBe 3
+  }
 
-  final def isEmpty: Boolean = value.isEmpty
-}
+  it should "map on empty tuples" in {
+    val none: (Option[String], Option[String]) = None -> None
+    none.map((x, y) => x + y) shouldBe None
+  }
 
-/**
- * Numeric Map mixin
- */
-trait NumericMap {
-  self: OPMap[_] =>
+  it should "map the function with no effect for left param alone" in {
+    val res = (Some(1), None).map((x, y) => x + y)
+    res shouldBe Some(1)
+  }
 
-  /**
-   * Convert map of numeric values to map of [[Double]] values
-   *
-   * @return map of [[Double]] values
-   */
-  def toDoubleMap: Map[String, Double]
+  it should "map the function with no effect for right param alone" in {
+    val res = (None, Some(1)).map((x, y) => x + y)
+    res shouldBe Some(1)
+  }
 }

@@ -89,7 +89,7 @@ task copyTemplates(type: Copy) {
             sparkAvroVersion: sparkAvroVersion,
             hadoopVersion: hadoopVersion,
             collectionsVersion: collectionsVersion,
-            opVersion: version,
+            transmogrifaiVersion: version,
             buildNumber: (int)(Math.random() * 1000),
             date: new Date()
     ])

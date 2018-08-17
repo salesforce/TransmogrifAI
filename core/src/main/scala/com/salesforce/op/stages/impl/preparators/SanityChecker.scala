@@ -44,7 +44,7 @@ import enumeratum._
 import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.mllib.linalg.{DenseMatrix, Matrix, DenseVector => OldDenseVector, SparseVector => OldSparseVector, Vector => OldVector, Vectors => OldVectors}
+import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector => OldDenseVector, SparseVector => OldSparseVector, Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset

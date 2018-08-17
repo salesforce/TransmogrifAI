@@ -75,7 +75,7 @@ package object stages {
   }
 
   /**
-   * Replace feature names for multistage spark wrappers (gross-ness) that have had the output name overriden
+   * Replace feature names for multistage spark wrappers (gross-ness) that have had the output name overridden
    *
    * @param newName          override name
    * @param oldName          default name
