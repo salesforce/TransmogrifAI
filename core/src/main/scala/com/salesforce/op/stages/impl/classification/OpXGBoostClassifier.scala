@@ -171,12 +171,12 @@ class OpXGBoostClassificationModel
     reflectMethod(getSparkMlStage().get, "probability2prediction")
 
   private lazy val model = getSparkMlStage().get
-  private lazy val  booster = model.nativeBooster
+  private lazy val booster = model.nativeBooster
+  private lazy val treeLimit = model.getTreeLimit.toInt
 
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
     val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
     val dm = new DMatrix(dataIter = data)
-    val treeLimit = 0 // TODO: instead use model.getTreeLimit once available
     // TODO: can we avoid two booster.predict calls here?
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)

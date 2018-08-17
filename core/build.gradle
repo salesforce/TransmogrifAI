@@ -24,7 +24,7 @@ dependencies {
     compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
 
     // XGBoost
-    compile "ml.dmlc:xgboost4j-spark:0.80-SNAPSHOT"
+    compile "ml.dmlc:xgboost4j-spark:$xgboostVersion"
     // Akka slfj4 logging (version matches XGBoost dependency)
     testCompile "com.typesafe.akka:akka-slf4j_$scalaVersion:2.3.11"
 }
