@@ -522,7 +522,7 @@ trait PivotParams extends TextParams {
 
 trait MinSupportParam extends Params {
   final val minSupport = new IntParam(
-    parent = this, name = "minSupport", doc = "minimum number of occurences an element must have to appear in pivot",
+    parent = this, name = "minSupport", doc = "minimum number of occurrences an element must have to appear in pivot",
     isValid = ParamValidators.gtEq(0L)
   )
   setDefault(minSupport, TransmogrifierDefaults.MinSupport)
