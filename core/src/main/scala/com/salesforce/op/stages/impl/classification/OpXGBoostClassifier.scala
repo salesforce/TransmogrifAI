@@ -175,7 +175,7 @@ class OpXGBoostClassificationModel
   private lazy val treeLimit = model.getTreeLimit.toInt
 
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    val data = OpXGBoost.removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
+    val data = removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
     val dm = new DMatrix(dataIter = data)
     // TODO: can we avoid two booster.predict calls here?
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)

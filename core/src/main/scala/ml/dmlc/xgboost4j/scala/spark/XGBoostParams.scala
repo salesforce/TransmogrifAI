@@ -72,21 +72,8 @@ case object OpXGBoost {
   }
 
   /**
-   * Copied from [[ml.dmlc.xgboost4j.scala.spark.XGBoost.removeMissingValues]] private method
+   * Hack to access [[ml.dmlc.xgboost4j.scala.spark.XGBoost.removeMissingValues]] private method
    */
-  def removeMissingValues(xgbLabelPoints: Iterator[LabeledPoint], missing: Float): Iterator[LabeledPoint] = {
-    if (!missing.isNaN) {
-      xgbLabelPoints.map { labeledPoint =>
-        val indices = new ArrayBuffer[Int]()
-        val values = new ArrayBuffer[Float]()
-        for {(value, i) <- labeledPoint.values.zipWithIndex if value != missing} {
-          indices += (if (labeledPoint.indices == null) i else labeledPoint.indices(i))
-          values += value
-        }
-        labeledPoint.copy(indices = indices.toArray, values = values.toArray)
-      }
-    } else {
-      xgbLabelPoints
-    }
-  }
+  def removeMissingValues(xgbLabelPoints: Iterator[LabeledPoint], missing: Float): Iterator[LabeledPoint] =
+    XGBoost.removeMissingValues(xgbLabelPoints, missing)
 }
