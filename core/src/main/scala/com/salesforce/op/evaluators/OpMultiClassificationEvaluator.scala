@@ -45,8 +45,6 @@ import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
-
 /**
  * Instance to evaluate Multi Classification metrics
  * The metrics are  Precision, Recall, F1 and Error Rate
