@@ -36,8 +36,6 @@ import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.sql.Dataset
 
-import scala.util.Try
-
 /**
  * Just a handy factory for evaluators
  */

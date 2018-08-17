@@ -35,9 +35,7 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
-import com.salesforce.op.stages.impl.feature.HashSpaceStrategy.findValues
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.feature.HashingTF
