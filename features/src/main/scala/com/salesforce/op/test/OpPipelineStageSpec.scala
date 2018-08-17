@@ -33,17 +33,14 @@ package com.salesforce.op.test
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages._
-import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.Estimator
 import org.apache.spark.ml.param.ParamMap
-import org.apache.spark.sql.types.Metadata
 import org.scalatest._
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
 import scala.util.Failure
-import scala.collection.mutable
 
 
 /**

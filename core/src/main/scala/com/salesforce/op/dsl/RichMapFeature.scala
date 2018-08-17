@@ -34,7 +34,6 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{BinaryMap, _}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.features.types._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.ml.linalg.Vectors
 
