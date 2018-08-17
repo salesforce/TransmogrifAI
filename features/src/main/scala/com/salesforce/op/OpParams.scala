@@ -34,7 +34,6 @@ import java.io.File
 
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
 
-import scala.concurrent.duration.Duration
 import scala.util.Try
 
 

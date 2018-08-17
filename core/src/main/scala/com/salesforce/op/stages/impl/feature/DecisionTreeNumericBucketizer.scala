@@ -38,7 +38,7 @@ import com.salesforce.op.stages.impl.classification.Impurity
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.classification.DecisionTreeClassifier
-import org.apache.spark.ml.linalg.{Vector, Vectors}
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.tree.RichNode._
 import org.apache.spark.sql.Dataset

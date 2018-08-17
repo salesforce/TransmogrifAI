@@ -40,8 +40,6 @@ import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamName
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.makeOutputName
 
-import scala.util.Try
-
 
 /**
  * A factory for Regression Model Selector
