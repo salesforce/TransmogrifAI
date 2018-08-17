@@ -445,7 +445,7 @@ trait RichNumericFeature {
      *                                the entire correlation matrix which includes all feature-feature correlations
      * @param correlationExclusion    Setting for what categories of feature vector columns to exclude from the
      *                                correlation calculation (eg. hashed text features)
-     * @param categoricalLabel  If true, treat label as categorical. If not set, check number of disticnt labels to
+     * @param categoricalLabel  If true, treat label as categorical. If not set, check number of distinct labels to
      *                          decide whether a label should be treated categorical.
      * @return sanity checked feature vector
      */

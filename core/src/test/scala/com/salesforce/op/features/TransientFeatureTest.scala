@@ -50,7 +50,7 @@ class TransientFeatureTest extends FlatSpec with PassengerFeaturesTest with Test
   implicit val formats = DefaultFormats
   val tf = TransientFeature(height)
 
-  Spec[TransientFeature] should "return feature after contruction with a feature" in {
+  Spec[TransientFeature] should "return feature after construction with a feature" in {
     compare(tf, height)
     tf.getFeature() shouldBe height
   }

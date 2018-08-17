@@ -230,7 +230,7 @@ case class CategoricalGroupStats
  * @param mutualInfos          Values of MI for each feature (should be the same for everything coming from the same
  *                             contingency matrix)
  * @param counts               Counts of occurrence for categoricals (n x m array of arrays where n = number of labels
- *                             and m = number of features + 1 with last element being occurance count of labels
+ *                             and m = number of features + 1 with last element being occurrence count of labels
  */
 @deprecated("Functionality replaced by Array[CategoricalGroupStats]", "3.3.0")
 case class CategoricalStats

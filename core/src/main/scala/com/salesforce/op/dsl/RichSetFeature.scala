@@ -55,7 +55,7 @@ trait RichSetFeature {
      *
      * @param others     other features to include in the pivot
      * @param topK       keep topK values
-     * @param minSupport min occurances to keep a value
+     * @param minSupport min occurrences to keep a value
      * @param cleanText  if true ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep a count of nulls
      * @return
@@ -84,7 +84,7 @@ trait RichSetFeature {
      *
      * @param others    other features to include in the pivot
      * @param topK      keep topK values
-     * @param minSupport min occurances to keep a value
+     * @param minSupport min occurrences to keep a value
      * @param cleanText  if true ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep a count of nulls
      * @return
