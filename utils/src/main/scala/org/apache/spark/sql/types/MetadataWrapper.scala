@@ -34,7 +34,6 @@ import org.json4s.JValue
 import org.json4s.jackson.JsonMethods.{pretty, render}
 
 import scala.reflect.ClassTag
-import scala.util.Try
 
 /**
  * Metadata wrapper allows access to private members of metadata

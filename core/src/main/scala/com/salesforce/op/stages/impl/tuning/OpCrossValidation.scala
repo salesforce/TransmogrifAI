@@ -23,7 +23,7 @@ package com.salesforce.op.stages.impl.tuning
 import com.github.fommil.netlib.BLAS
 import com.salesforce.op.evaluators.OpEvaluatorBase
 import com.salesforce.op.stages.OPStage
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._

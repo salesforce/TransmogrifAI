@@ -21,7 +21,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.OpEvaluatorBase
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}

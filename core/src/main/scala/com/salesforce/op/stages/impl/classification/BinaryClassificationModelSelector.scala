@@ -36,8 +36,6 @@ import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType._
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.{SwQuaternaryTransformer, SwTernaryTransformer}
-import org.apache.spark.ml.Model
-import org.apache.spark.sql.Dataset
 import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
 import com.salesforce.op.stages.impl.selector.StageOperationName
 
