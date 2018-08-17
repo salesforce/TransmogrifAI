@@ -44,6 +44,15 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
     classOf[com.salesforce.op.test.PassengerCSV]
   )
 
+  val sparkLogAppender: MemoryAppender = {
+    val sparkAppender = new MemoryAppender()
+    sparkAppender.setName("spark-appender")
+    sparkAppender.setThreshold(Level.INFO)
+    sparkAppender.setLayout(new org.apache.log4j.PatternLayout)
+    Logger.getRootLogger.addAppender(sparkAppender)
+    sparkAppender
+  }
+
   lazy val conf: SparkConf = {
     val conf = new SparkConf()
     conf
