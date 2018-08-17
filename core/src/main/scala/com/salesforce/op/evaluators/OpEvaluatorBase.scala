@@ -171,7 +171,7 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   override def evaluate(dataset: Dataset[_]): Double = getDefaultMetric(evaluateAll(dataset))
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
@@ -188,7 +188,7 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
     with OpHasProbabilityCol[OPVector] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
@@ -247,7 +247,7 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 ) extends OpEvaluatorBase[T] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator

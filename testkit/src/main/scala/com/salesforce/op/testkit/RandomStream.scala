@@ -256,7 +256,7 @@ object RandomStream {
   /**
    * a generator of random integers between two given numbers (in
    *
-   * @param from minimium number to produce (inclusive)
+   * @param from minimum number to produce (inclusive)
    * @param to   max number to produce (exclusive)
    * @return
    */
