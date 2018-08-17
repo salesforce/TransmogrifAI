@@ -32,14 +32,26 @@ package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.date.DateTimeUtils
-import org.apache.log4j.Level
+import org.apache.log4j._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.TableDrivenPropertyChecks
 
+import scala.collection.mutable.ArrayBuffer
+
 @RunWith(classOf[JUnitRunner])
 class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with TestSparkContext {
+  val sparkLogAppender: MemoryAppender = {
+    val sparkAppender = new MemoryAppender()
+    sparkAppender.setName("spark-appender")
+    sparkAppender.setThreshold(Level.INFO)
+    sparkAppender.setLayout(new org.apache.log4j.PatternLayout)
+    LogManager.getLogger("com.salesforce.op.utils.spark.OpSparkListener").setLevel(Level.INFO)
+    Logger.getRootLogger.addAppender(sparkAppender)
+    sparkAppender
+  }
+
   val start = DateTimeUtils.now().getMillis
   val listener = new OpSparkListener(sc.appName, sc.applicationId, "testRun", Some("tag"), Some("tagValue"), true, true)
   sc.addSparkListener(listener)
@@ -72,6 +84,7 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
   it should "log messages for listener initialization, stage completion, app completion" in {
     val firstStage = listener.metrics.stageMetrics.head
     val logPrefix = listener.logPrefix
+    val logs = sparkLogAppender.logs
     val messages = Table("Spark Log Messages",
       "Instantiated spark listener: com.salesforce.op.utils.spark.OpSparkListener. Log Prefix %s".format(logPrefix),
       "%s,APP_TIME_MS:%s".format(logPrefix, listener.metrics.appEndTime - listener.metrics.appStartTime),
@@ -81,7 +94,39 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     )
 
     forAll(messages) { m =>
-      sparkLogAppender.logExists(Level.INFO, m) shouldBe true
+      logs.map(x => x.getMessage.toString).contains(m) shouldBe true
     }
   }
+}
+
+/**
+ * Class to enable in memory logging for tests
+ */
+class MemoryAppender extends AppenderSkeleton {
+  private val logRecords = new ArrayBuffer[spi.LoggingEvent]
+
+  override def requiresLayout: Boolean = true
+
+  /**
+   * Clear out the logRecords in log collection
+   * @return Unit
+   */
+  override def close(): Unit = {
+    logRecords.clear
+  }
+
+  /**
+   * Add a log to the log collection
+   * @param event The log event
+   * @return Unit
+   */
+  override def append(event: spi.LoggingEvent): Unit = {
+    logRecords.append(event)
+  }
+
+  /**
+   * Log event collection
+   * @return A collection of log events
+   */
+  def logs: ArrayBuffer[spi.LoggingEvent] = logRecords
 }
