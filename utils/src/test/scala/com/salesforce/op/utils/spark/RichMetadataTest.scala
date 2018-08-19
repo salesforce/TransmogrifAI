@@ -31,12 +31,12 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestCommon
-import org.apache.spark.sql.types.{MetadataBuilder, StructField}
+import org.apache.spark.sql.types.MetadataWrapper
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
+import org.scalatest.FlatSpec
 
 
 @RunWith(classOf[JUnitRunner])
@@ -44,20 +44,62 @@ class RichMetadataTest extends FlatSpec with TestCommon {
 
   import com.salesforce.op.utils.spark.RichMetadata._
 
+  private val map1 = Map(
+    "1" -> 1L, "2" -> 1.0, "3" -> true, "4" -> "1",
+    "5" -> Array(1L), "6" -> Array(1.0), "6" -> Array(x = true), "7" -> Array("1"),
+    "8" -> Seq(1L), "9" -> Seq(1.0), "10" -> Seq(true), "11" -> Seq("1")
+  )
+
+  private val map2 = Map(
+    "1" -> 1L, "2" -> 1.0, "3" -> false, "4" -> "2",
+    "5" -> Array(1L, 2L), "6" -> Array(x = true), "7" -> Array("1"), "8" -> Seq(1L), "9" -> Seq(1.0),
+    "10" -> Seq(true), "12" -> "12"
+  )
+
+  private val meta1 = map1.toMetadata
+
+  implicit val formats: DefaultFormats = DefaultFormats
+
   Spec[RichMetadata] should "create a metadata from a map" in {
-    val expected = Map(
-      "1" -> 1L, "2" -> 1.0, "3" -> true, "4" -> "1",
-      "5" -> Array(1L), "6" -> Array(1.0), "6" -> Array(true), "7" -> Array("1"),
-      "8" -> Seq(1L), "9" -> Seq(1.0), "10" -> Seq(true), "11" -> Seq("1")
-    )
-    val meta = expected.toMetadata
-    implicit val formats = DefaultFormats
-    meta.json shouldBe Serialization.write(expected)
+    meta1.json shouldBe Serialization.write(map1)
   }
 
   it should "throw an error on unsupported type in a map" in {
     the[RuntimeException] thrownBy Map("a" -> TestClass("test")).toMetadata
   }
 
+  it should "create a MetaDataWrapper with non empty map from a metadata " in {
+    val wrap = meta1.wrapped
+
+    wrap shouldBe a[MetadataWrapper]
+    meta1.isEmpty shouldBe false
+  }
+
+  it should "deep merge metadata correctly" in {
+    val mergedMap = Map(
+      "1" -> 2L, "2" -> 2.0, "3" -> true, "4" -> "12",
+      "5" -> Array(1L, 1L, 2L), "6" -> Array(true, true), "7" -> Array("1", "1"),
+      "8" -> Seq(1L, 1L), "9" -> Seq(1.0, 1.0), "10" -> Seq(true, true), "11" -> Seq("1"), "12" -> "12"
+    )
+
+    val mergedMetadata = meta1.deepMerge(map2.toMetadata)
+    mergedMetadata.json shouldBe Serialization.write(mergedMap)
+
+  }
+
+  it should "throw an error on incompatible value types in deep merge" in {
+    the[RuntimeException] thrownBy meta1.deepMerge(Map("1" -> "test").toMetadata)
+  }
+
+  it should "be false on different maps when compared using deep equals " in {
+    meta1.deepEquals(map2.toMetadata) shouldBe false
+  }
+
+  it should "turn a metadata into summary metadata by putting it behind the summary key" in {
+    val summaryMeta = meta1.toSummaryMetadata()
+    summaryMeta.containsSummaryMetadata shouldBe true
+  }
+
 }
+
 case class TestClass(name: String)
