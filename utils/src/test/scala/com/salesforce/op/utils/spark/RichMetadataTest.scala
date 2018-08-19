@@ -58,7 +58,7 @@ class RichMetadataTest extends FlatSpec with TestCommon {
 
   private val meta1 = map1.toMetadata
 
-  implicit val formats: DefaultFormats.type = DefaultFormats
+  implicit val formats: DefaultFormats = DefaultFormats
 
   Spec[RichMetadata] should "create a metadata from a map" in {
     meta1.json shouldBe Serialization.write(map1)
