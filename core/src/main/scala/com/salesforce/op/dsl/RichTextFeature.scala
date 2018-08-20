@@ -134,12 +134,12 @@ trait RichTextFeature {
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
-      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
+      autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
-      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
+      defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
-      languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
-      analyzer: TextAnalyzer = TextTokenizer.Analyzer,
+      languageDetector: LanguageDetector = TransmogrifierDefaults.LanguageDetector,
+      analyzer: TextAnalyzer = TransmogrifierDefaults.Analyzer,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -212,9 +212,9 @@ trait RichTextFeature {
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
-      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
+      autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
-      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
+      defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
@@ -312,16 +312,16 @@ trait RichTextFeature {
      * @return tokenized feature
      */
     def tokenize(
-      autoDetectLanguage: Boolean = TextTokenizer.AutoDetectLanguage,
-      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
-      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
-      minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase,
-      stripHtml: Boolean = TextTokenizer.StripHtml
+      autoDetectLanguage: Boolean = TransmogrifierDefaults.AutoDetectLanguage,
+      autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
+      defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
+      minTokenLength: Int = TransmogrifierDefaults.MinTokenLength,
+      toLowercase: Boolean = TransmogrifierDefaults.ToLowercase,
+      stripHtml: Boolean = TransmogrifierDefaults.StripHtml
     ): FeatureLike[TextList] =
       tokenize(
-        languageDetector = TextTokenizer.LanguageDetector,
-        analyzer = if (stripHtml) TextTokenizer.AnalyzerHtmlStrip else TextTokenizer.Analyzer,
+        languageDetector = TransmogrifierDefaults.LanguageDetector,
+        analyzer = if (stripHtml) TransmogrifierDefaults.AnalyzerHtmlStrip else TransmogrifierDefaults.Analyzer,
         autoDetectLanguage = autoDetectLanguage,
         autoDetectThreshold = autoDetectThreshold,
         defaultLanguage = defaultLanguage,
@@ -344,8 +344,8 @@ trait RichTextFeature {
     (
       pattern: String,
       group: Int = -1,
-      minTokenLength: Int = TextTokenizer.MinTokenLength,
-      toLowercase: Boolean = TextTokenizer.ToLowercase
+      minTokenLength: Int = TransmogrifierDefaults.MinTokenLength,
+      toLowercase: Boolean = TransmogrifierDefaults.ToLowercase
     ): FeatureLike[TextList] = {
       require(Try(Pattern.compile(pattern)).isSuccess, s"Invalid regex pattern: $pattern")
 
@@ -358,7 +358,7 @@ trait RichTextFeature {
         }
       })
       tokenize(
-        languageDetector = TextTokenizer.LanguageDetector,
+        languageDetector = TransmogrifierDefaults.LanguageDetector,
         analyzer = analyzer,
         autoDetectLanguage = false,
         autoDetectThreshold = 1.0,

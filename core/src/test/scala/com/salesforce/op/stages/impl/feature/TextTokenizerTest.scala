@@ -145,21 +145,21 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
   it should "strip html tags and tokenize text correctly [English]" in new English {
     assertTextTokenizer(
       input = english, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+      tokenizer = new TextTokenizer[Text](analyzer = TransmogrifierDefaults.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.English)
     )
   }
   it should "strip html tags and tokenize text correctly [Japanese]" in new Japanese {
     assertTextTokenizer(
       input = japanese, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+      tokenizer = new TextTokenizer[Text](analyzer = TransmogrifierDefaults.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.Japanese)
     )
   }
   it should "strip html tags and tokenize text correctly [French]" in new French {
     assertTextTokenizer(
       input = french, expected = expectedHtml,
-      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+      tokenizer = new TextTokenizer[Text](analyzer = TransmogrifierDefaults.AnalyzerHtmlStrip)
         .setDefaultLanguage(Language.French)
     )
   }
