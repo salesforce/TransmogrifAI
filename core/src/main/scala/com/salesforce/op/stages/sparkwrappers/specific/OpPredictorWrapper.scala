@@ -116,7 +116,7 @@ abstract class OpPredictorWrapperModel[M <: PredictionModel[Vector, M]]
   val tti2: TypeTag[OPVector],
   val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
-) extends Model[OpPredictorWrapperModel[M]] with OpTransformer2[RealNN, OPVector, Prediction]
-  with SparkWrapperParams[M] {
+) extends Model[OpPredictorWrapperModel[M]] with SparkWrapperParams[M]
+  with OpTransformer2[RealNN, OPVector, Prediction] {
   setDefault(sparkMlStage, Option(sparkModel))
 }

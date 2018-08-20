@@ -35,7 +35,8 @@ import com.salesforce.op.filters.RawFeatureFilter
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
+import com.salesforce.op.stages.impl.selector.ModelSelector
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -357,7 +358,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     (implicit spark: SparkSession): Array[OPStage] = {
 
     // TODO may want to make workflow take an optional reserve fraction
-    val splitters = stagesToFit.collect { case s: ModelSelectorBase[_, _] => s.splitter }.flatten
+    val splitters = stagesToFit.collect { case s: ModelSelector[_, _] => s.splitter }.flatten
     val splitter = splitters.reduceOption { (a, b) =>
       if (a.getReserveTestFraction > b.getReserveTestFraction) a else b
     }

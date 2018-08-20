@@ -35,9 +35,7 @@ import java.io.File
 import com.salesforce.op.OpWorkflowRunType._
 import com.salesforce.op.evaluators.{BinaryClassificationMetrics, Evaluators}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestSparkStreamingContext}
 import com.salesforce.op.utils.spark.AppMetrics
 import com.salesforce.op.utils.spark.RichDataset._
@@ -64,13 +62,10 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
   private val features = Seq(height, weight, gender, description, age).transmogrify()
   private val survivedNum = survived.occurs()
 
-  val (pred, raw, prob) = BinaryClassificationModelSelector.withTrainValidationSplit(None)
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0)
+  val pred = new OpLogisticRegression().setRegParam(0)
     .setInput(survivedNum, features).getOutput()
-  private val workflow = new OpWorkflow().setResultFeatures(pred, raw, survivedNum).setReader(dataReader)
-  private val evaluator = Evaluators.BinaryClassification()
-    .setLabelCol(survivedNum).setPredictionCol(pred).setRawPredictionCol(raw).setProbabilityCol(prob)
+  private val workflow = new OpWorkflow().setResultFeatures(pred, survivedNum).setReader(dataReader)
+  private val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred)
 
   val metricsPromise = Promise[AppMetrics]()
 
@@ -152,7 +147,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
     res.asInstanceOf[ScoreResult].metrics.isDefined shouldBe true
 
     val scores = loadAvro(scoresLocation.toString)
-    scores.sort(KeyFieldName, pred.name).collect(pred) shouldBe Seq(0, 1, 1, 0, 0, 1, 0, 1).map(_.toRealNN)
+    scores.collect(pred).map(_.prediction).sorted shouldBe Seq(0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0)
   }
 
   it should "streaming score a dataset with a trained model" in {
@@ -175,7 +170,7 @@ class OpWorkflowRunnerTest extends AsyncFlatSpec with PassengerSparkFixtureTest 
     scoresDirs.length shouldBe 1
 
     val scores = loadAvro(scoresDirs.head.toString)
-    scores.sort(KeyFieldName, pred.name).collect(pred) shouldBe Seq(0, 1, 1, 0, 0, 1, 0, 1).map(_.toRealNN)
+    scores.collect(pred).map(_.prediction).sorted shouldBe Seq(0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0)
   }
 
   it should "evaluate a dataset with a trained model" in {
