@@ -32,8 +32,6 @@ package com.salesforce.op.evaluators
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.Prediction
-import com.salesforce.op.utils.json.JsonLike
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
@@ -45,8 +43,6 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
-
-import scala.collection.mutable
 
 /**
  * Instance to evaluate Multi Classification metrics

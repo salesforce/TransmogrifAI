@@ -33,11 +33,11 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => MTT}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning.{DataSplitter, Splitter, _}
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 
 

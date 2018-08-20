@@ -39,8 +39,8 @@ import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
-import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapperModel}
-import com.salesforce.op.utils.json.EnumEntrySerializer
+import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
+import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
@@ -48,11 +48,9 @@ import com.salesforce.op.utils.table.Table
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
-import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization._
-import com.salesforce.op.utils.json.SpecialDoubleSerializer
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
