@@ -32,7 +32,7 @@ package com.salesforce.op.filters
 
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.{TextTokenizer, TransmogrifierDefaults}
+import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.mllib.feature.HashingTF
@@ -182,5 +182,5 @@ private[filters] object PreparedFeatures {
    * @param s input string
    * @return array of string tokens
    */
-  private def tokenize(s: String) = TransmogrifierDefaults.Analyzer.analyze(s, Language.Unknown)
+  private def tokenize(s: String) = TextTokenizer.Analyzer.analyze(s, Language.Unknown)
 }

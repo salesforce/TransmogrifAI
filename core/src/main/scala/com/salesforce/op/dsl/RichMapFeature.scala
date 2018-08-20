@@ -276,9 +276,9 @@ trait RichMapFeature {
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
-      autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
+      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
-      defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
+      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[TextMap]] = Array.empty
     ): FeatureLike[OPVector] = {
@@ -408,9 +408,9 @@ trait RichMapFeature {
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
-      autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
+      autoDetectThreshold: Double = TextTokenizer.AutoDetectThreshold,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
-      defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
+      defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty
     ): FeatureLike[OPVector] = {

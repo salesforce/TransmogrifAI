@@ -88,17 +88,17 @@ trait TextTokenizerParams extends LanguageDetectionParams {
   def getToLowercase: Boolean = $(toLowercase)
 
   setDefault(
-    minTokenLength -> TransmogrifierDefaults.MinTokenLength,
-    toLowercase -> TransmogrifierDefaults.ToLowercase,
-    autoDetectLanguage -> TransmogrifierDefaults.AutoDetectLanguage,
-    autoDetectThreshold -> TransmogrifierDefaults.AutoDetectThreshold,
-    defaultLanguage -> TransmogrifierDefaults.DefaultLanguage.entryName
+    minTokenLength -> TextTokenizer.MinTokenLength,
+    toLowercase -> TextTokenizer.ToLowercase,
+    autoDetectLanguage -> TextTokenizer.AutoDetectLanguage,
+    autoDetectThreshold -> TextTokenizer.AutoDetectThreshold,
+    defaultLanguage -> TextTokenizer.DefaultLanguage.entryName
   )
 
   def tokenize(
     text: Text,
-    languageDetector: LanguageDetector = TransmogrifierDefaults.LanguageDetector,
-    analyzer: TextAnalyzer = TransmogrifierDefaults.Analyzer
+    languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
+    analyzer: TextAnalyzer = TextTokenizer.Analyzer
   ): TextTokenizerResult = TextTokenizer.tokenize(
     text = text,
     languageDetector = languageDetector,
@@ -121,8 +121,8 @@ trait TextTokenizerParams extends LanguageDetectionParams {
  */
 class TextTokenizer[T <: Text]
 (
-  val languageDetector: LanguageDetector = TransmogrifierDefaults.LanguageDetector,
-  val analyzer: TextAnalyzer = TransmogrifierDefaults.Analyzer,
+  val languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
+  val analyzer: TextAnalyzer = TextTokenizer.Analyzer,
   uid: String = UID[TextTokenizer[_]]
 )(implicit tti: TypeTag[T])
   extends UnaryTransformer[T, TextList](operationName = "textToken", uid = uid) with TextTokenizerParams {
@@ -130,6 +130,15 @@ class TextTokenizer[T <: Text]
 }
 
 object TextTokenizer {
+  val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
+  val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
+  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneTextAnalyzer(LuceneTextAnalyzer.withHtmlStripping)
+  val AutoDetectLanguage = false
+  val AutoDetectThreshold = 0.99
+  val DefaultLanguage: Language = Language.Unknown
+  val MinTokenLength = 1
+  val ToLowercase = true
+  val StripHtml = false
 
   /**
    * Language wise sentence tokenization
@@ -147,14 +156,14 @@ object TextTokenizer {
    */
   def tokenize(
     text: Text,
-    languageDetector: LanguageDetector = TransmogrifierDefaults.LanguageDetector,
-    analyzer: TextAnalyzer = TransmogrifierDefaults.Analyzer,
+    languageDetector: LanguageDetector = LanguageDetector,
+    analyzer: TextAnalyzer = Analyzer,
     sentenceSplitter: Option[SentenceSplitter] = None,
-    autoDetectLanguage: Boolean = TransmogrifierDefaults.AutoDetectLanguage,
-    defaultLanguage: Language = TransmogrifierDefaults.DefaultLanguage,
-    autoDetectThreshold: Double = TransmogrifierDefaults.AutoDetectThreshold,
-    toLowercase: Boolean = TransmogrifierDefaults.ToLowercase,
-    minTokenLength: Int = TransmogrifierDefaults.MinTokenLength
+    autoDetectLanguage: Boolean = AutoDetectLanguage,
+    defaultLanguage: Language = DefaultLanguage,
+    autoDetectThreshold: Double = AutoDetectThreshold,
+    toLowercase: Boolean = ToLowercase,
+    minTokenLength: Int = MinTokenLength
   ): TextTokenizerResult = {
     text match {
       case SomeValue(Some(txt)) =>

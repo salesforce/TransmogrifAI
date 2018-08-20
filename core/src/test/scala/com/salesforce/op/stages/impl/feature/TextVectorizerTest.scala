@@ -53,9 +53,9 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
 
   "TextVectorizer" should "work correctly out of the box" in {
     val vectorized = f1.vectorize(numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
-      autoDetectLanguage = TransmogrifierDefaults.AutoDetectLanguage,
-      minTokenLength = TransmogrifierDefaults.MinTokenLength,
-      toLowercase = TransmogrifierDefaults.ToLowercase
+      autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+      minTokenLength = TextTokenizer.MinTokenLength,
+      toLowercase = TextTokenizer.ToLowercase
     )
     vectorized.originStage shouldBe a[VectorsCombiner]
     vectorized.parents.head.originStage shouldBe a[OPCollectionHashingVectorizer[_]]
@@ -77,9 +77,9 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
 
   it should "allow forcing hashing into a shared hash space" in {
     val vectorized = f1.vectorize(numHashes = TransmogrifierDefaults.DefaultNumOfFeatures,
-      autoDetectLanguage = TransmogrifierDefaults.AutoDetectLanguage,
-      minTokenLength = TransmogrifierDefaults.MinTokenLength,
-      toLowercase = TransmogrifierDefaults.ToLowercase,
+      autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+      minTokenLength = TextTokenizer.MinTokenLength,
+      toLowercase = TextTokenizer.ToLowercase,
       binaryFreq = true,
       others = Array(f2))
     val hasher = vectorized.parents.head.originStage.asInstanceOf[OPCollectionHashingVectorizer[_]].hashingTF()
