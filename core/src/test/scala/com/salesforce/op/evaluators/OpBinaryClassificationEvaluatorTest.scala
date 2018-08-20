@@ -32,18 +32,20 @@ package com.salesforce.op.evaluators
 
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.evaluation._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -101,18 +103,17 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   )
   val one_label = one_rawLabel.copy(isResponse = true)
 
-  // with multiple outputs
-  val testEstimator = BinaryClassificationModelSelector.withTrainValidationSplit(splitter = None, trainRatio = 0.5)
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0)
+  val lr = new OpLogisticRegression()
+  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()
+
+  val testEstimator = BinaryClassificationModelSelector.withTrainValidationSplit(splitter = None, trainRatio = 0.5,
+    modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
-  val (pred, rawPred, prob) = testEstimator.getOutput()
+  val pred = testEstimator.getOutput()
   val model = testEstimator.fit(ds)
 
   val testEvaluator = new OpBinaryClassificationEvaluator().setLabelCol(label)
     .setPredictionCol(pred)
-    .setRawPredictionCol(rawPred)
-    .setProbabilityCol(prob)
 
   // with single predicition putput
   val testEstimator2 = new OpLogisticRegression().setInput(label, features)
@@ -120,25 +121,33 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   val model2 = testEstimator2.fit(ds)
 
   val testEvaluator2 = new OpBinaryClassificationEvaluator().setLabelCol(label)
-    .setFullPredictionCol(prediction)
+    .setPredictionCol(prediction)
 
   // comparisons
   val sparkBinaryEvaluator = new BinaryClassificationEvaluator()
   val sparkMulticlassEvaluator = new MulticlassClassificationEvaluator()
+
+  val rawPred = pred.map[OPVector](p => Vectors.dense(p.rawPrediction).toOPVector)
+  val predValue = pred.map[RealNN](_.prediction.toRealNN)
+
+  val transformedData = model.setInput(test_label, test_features).transform(test_ds)
+  val flattenedData1 = rawPred.originStage.asInstanceOf[Transformer].transform(transformedData)
+  val flattenedData2 = predValue.originStage.asInstanceOf[Transformer].transform(flattenedData1)
+
+  sparkBinaryEvaluator.setLabelCol(label.name).setRawPredictionCol(rawPred.name)
+  sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(predValue.name)
+
   Spec[OpBinaryClassificationEvaluator] should "copy" in {
     val testEvaluatorCopy = testEvaluator.copy(ParamMap())
     testEvaluatorCopy.uid shouldBe testEvaluator.uid
   }
 
+
   it should "evaluate the metrics with three inputs" in {
-    val transformedData = model.setInput(test_label, test_features).transform(test_ds)
     val metrics = testEvaluator.evaluateAll(transformedData)
 
-    sparkBinaryEvaluator.setLabelCol(label.name).setRawPredictionCol(rawPred.name)
-    sparkMulticlassEvaluator.setLabelCol(label.name).setPredictionCol(pred.name)
-
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
-      transformedData.select(pred.name, test_label.name).rdd
+      flattenedData2.select(predValue.name, test_label.name).rdd
     )
 
     tp.toDouble shouldBe metrics.TP
@@ -149,15 +158,15 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     precision shouldBe metrics.Precision
     recall shouldBe metrics.Recall
     f1 shouldBe metrics.F1
-    1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(transformedData) shouldBe metrics.Error
+    1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
   }
 
   it should "evaluate the metrics with one prediction input" in {
-    val transformedData = model2.setInput(test_label, test_features).transform(test_ds)
-    val metrics = testEvaluator2.evaluateAll(transformedData)
+    val transformedData2 = model2.setInput(test_label, test_features).transform(test_ds)
+    val metrics = testEvaluator2.evaluateAll(transformedData2)
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
-      transformedData.select(prediction.name, test_label.name).rdd
+      transformedData2.select(prediction.name, test_label.name).rdd
         .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
     )
 
@@ -172,11 +181,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
-    val transformedDataZero = model.setInput(zero_label, zero_features).transform(zero_ds)
-
-    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).evaluateAll(transformedDataZero)
-
-    sparkMulticlassEvaluator.setLabelCol(zero_label.name).setPredictionCol(pred.name)
+    model.setInput(zero_label, zero_features)
+    val transformedDataZero = model.transform(zero_ds)
+    val outPred = model.getOutput()
+    val metricsZero = testEvaluator.setLabelCol(zero_rawLabel).setPredictionCol(outPred)
+      .evaluateAll(transformedDataZero)
 
     metricsZero.TN shouldBe 1.0
     metricsZero.TP shouldBe 0.0
@@ -193,8 +202,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     val transformedDataOne = model.setInput(one_label, one_features).transform(one_ds)
 
     val metricsOne = testEvaluator.setLabelCol(one_label).evaluateAll(transformedDataOne)
-
-    sparkMulticlassEvaluator.setLabelCol(one_label.name).setPredictionCol(pred.name)
 
     metricsOne.TN shouldBe 0.0
     metricsOne.TP shouldBe 1.0

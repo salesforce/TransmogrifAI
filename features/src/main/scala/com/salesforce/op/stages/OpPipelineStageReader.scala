@@ -89,7 +89,6 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     // In case we stumbled upon model we instantiate it using the class name + ctor args
     // otherwise we simply use the provided stage instance.
     val stage = if (isModel) loadModel(className, metadataJson) else originalStage
-
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
 
