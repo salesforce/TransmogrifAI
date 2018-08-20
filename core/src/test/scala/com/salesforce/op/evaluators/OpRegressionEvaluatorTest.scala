@@ -31,11 +31,13 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.LinearRegression
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -60,9 +62,11 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
 
   val label = rawLabel.copy(isResponse = true)
 
-  val testEstimator = RegressionModelSelector.withTrainValidationSplit(dataSplitter = None, trainRatio = 0.5)
-    .setModelsToTry(LinearRegression)
-    .setLinearRegressionRegParam(0)
+  val lr = new OpLogisticRegression()
+  val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.0)).build()
+
+  val testEstimator = RegressionModelSelector.withTrainValidationSplit(dataSplitter = None, trainRatio = 0.5,
+    modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
 
   val prediction = testEstimator.getOutput()
@@ -71,7 +75,7 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   val testEstimator2 = new OpLinearRegression().setInput(label, features)
 
   val prediction2 = testEstimator2.getOutput()
-  val testEvaluator2 = new OpRegressionEvaluator().setLabelCol(label).setFullPredictionCol(prediction2)
+  val testEvaluator2 = new OpRegressionEvaluator().setLabelCol(label).setPredictionCol(prediction2)
 
 
   Spec[OpRegressionEvaluator] should "copy" in {
@@ -79,7 +83,7 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
     testEvaluatorCopy.uid shouldBe testEvaluator.uid
   }
 
-  it should "evaluate the metrics when there are 3 outputs from the model" in {
+  it should "evaluate the metrics from a model selector" in {
     val model = testEstimator.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
     val metrics = testEvaluator.evaluateAll(transformedData).toMetadata
@@ -90,7 +94,7 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
     assert(metrics.getDouble(RegressionEvalMetrics.MeanAbsoluteError.toString) <= 1E-12, "mae should be close to 0")
   }
 
-  it should "evaluate the metrics when there is a prediction output from the model" in {
+  it should "evaluate the metrics from a single model" in {
     val model = testEstimator2.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
     val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata

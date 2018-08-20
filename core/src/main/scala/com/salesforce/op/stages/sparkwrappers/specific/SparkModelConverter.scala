@@ -66,7 +66,7 @@ object SparkModelConverter {
    * @return Op Binary Model which will produce the same values put into a Prediction return feature
    */
   // TODO remove when loco and model selector are updated
-  def toOPUnchecked[T <: Model[_]](model: T): OpTransformer2[RealNN, OPVector, Prediction] =
+  def toOPUnchecked(model: Model[_]): OpTransformer2[RealNN, OPVector, Prediction] =
     toOPUnchecked(model, model.uid)
 
   /**
@@ -77,8 +77,8 @@ object SparkModelConverter {
    * @return Op Binary Model which will produce the same values put into a Prediction return feature
    */
   // TODO remove when loco and model selector are updated
-  def toOPUnchecked[T <: Model[_]](
-    model: T,
+  def toOPUnchecked(
+    model: Model[_],
     uid: String
   ): OpTransformer2[RealNN, OPVector, Prediction] = {
     model match {
