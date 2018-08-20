@@ -62,7 +62,7 @@ trait OpHasLabelCol[T <: FeatureType] extends Params {
  * Trait for predictionCol which contains all output results param
  */
 trait OpHasPredictionCol extends Params {
-  final val predictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
+  final val predictionCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
 
   def setPredictionCol(value: String): this.type = set(predictionCol, value)
   def setPredictionCol(value: FeatureLike[Prediction]): this.type = setPredictionCol(value.name)
@@ -73,7 +73,7 @@ trait OpHasPredictionCol extends Params {
  * Trait for internal flattened predictionCol param
  */
 trait OpHasPredictionValueCol[T <: FeatureType] extends Params {
-  final val predictionValueCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
+  final val predictionValueCol: Param[String] = new Param[String](this, "predictionValueCol", "prediction column name")
   setDefault(predictionValueCol, "prediction")
 
   protected def setPredictionValueCol(value: String): this.type = set(predictionValueCol, value)
@@ -86,9 +86,7 @@ trait OpHasPredictionValueCol[T <: FeatureType] extends Params {
  */
 trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
   final val rawPredictionCol: Param[String] = new Param[String](
-    this,
-    "rawPredictionCol",
-    "raw prediction (a.k.a. confidence) column name"
+    this, "rawPredictionCol", "raw prediction (a.k.a. confidence) column name"
   )
   setDefault(rawPredictionCol, "rawPrediction")
 
@@ -102,8 +100,7 @@ trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
  */
 trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   final val probabilityCol: Param[String] = new Param[String](
-    this,
-    "probabilityCol",
+    this, "probabilityCol",
     "Column name for predicted class conditional probabilities." +
       " Note: Not all models output well-calibrated probability estimates!" +
       " These probabilities should be treated as confidences, not precise probabilities"
