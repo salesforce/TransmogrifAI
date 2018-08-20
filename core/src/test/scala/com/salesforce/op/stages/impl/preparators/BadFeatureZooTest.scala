@@ -432,7 +432,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     "corresponding parent features" in {
     // First set up the raw features:
     val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.4).take(1000).toList
-    val textData: Seq[Text] = RandomText.pickLists(domain = List("alpha", "beta", "gamma", "delta"))
+    val textData: Seq[Text] = RandomText.strings(1, 10)
       .withProbabilityOfEmpty(0.4).take(1000).toList
     val realData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 1.0)
       .withProbabilityOfEmpty(0.5).limit(1000)
@@ -470,8 +470,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     retrieved.dropped.count(_.startsWith("text")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures + 1
 
     // Now do the same thing with the map data
-    val textMapData: Seq[TextMap] = RandomMap.of[Text, TextMap](RandomText.textFromDomain(domain =
-      List("alpha", "beta", "gamma", "delta")), 0, 3).take(1000).toList
+    val textMapData: Seq[TextMap] = RandomMap.of[Text, TextMap](RandomText.strings(1, 10), 0, 3).take(1000).toList
 
     val generatedData2: Seq[(City, Real, TextMap)] =
       cityData.zip(realData).zip(textMapData).map {
@@ -499,7 +498,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val summary2 = transformed2.schema(checkedFeatures2.name).metadata
     val retrieved2 = SanityCheckerSummary.fromMetadata(summary2.getSummaryMetadata())
 
-    retrieved2.dropped.count(_.startsWith("textmap")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures + 1
+    retrieved2.dropped.count(_.startsWith("textmap_k1")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures + 1
   }
 
   it should "correctly identify label leakage due to correlations in hashed text features and throw away" +
@@ -540,8 +539,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val summary = transformed.schema(checkedFeatures.name).metadata
     val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
 
-    // Check that all of the hashed text columns (and the null indicator column itself) are thrown away
-    retrieved.dropped.count(_.startsWith("text")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures + 1
+    // Check that all of the pivoted text columns are thrown away
+    retrieved.dropped.count(_.startsWith("text")) shouldBe 6
 
     // Now do the same thing with the map data (can only do with one
     val textMapData: Seq[TextMap] = RandomMap.of[Text, TextMap](RandomText.textFromDomain(domain =
@@ -573,9 +572,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val summary2 = transformed2.schema(checkedFeatures2.name).metadata
     val retrieved2 = SanityCheckerSummary.fromMetadata(summary2.getSummaryMetadata())
 
-    // Drop the whole hash space but not the null indicator column (it has an indicator group, so does not get
-    // picked up by the same check on parentCorr in SanityChecker)
-    retrieved2.dropped.count(_.startsWith("textmap")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures
+    // Check that all of the pivoted text columns are thrown away
+    retrieved2.dropped.count(_.startsWith("textmap")) shouldBe 6
   }
 
   it should "correctly identify label leakage from binned numerics" in {
