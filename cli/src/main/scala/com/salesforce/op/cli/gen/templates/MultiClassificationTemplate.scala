@@ -42,12 +42,12 @@ trait MultiClassificationTemplate {
   val label: Feature[RealNN]
   val checkedFeatures: Feature[OPVector]
   // BEGIN
-  val (pred, raw, prob) = MultiClassificationModelSelector()
+  val pred = MultiClassificationModelSelector()
     .setInput(label, checkedFeatures)
     .getOutput()
 
   val evaluator =
     Evaluators.MultiClassification()
-      .setLabelCol(label).setPredictionCol(pred).setRawPredictionCol(raw)
+      .setLabelCol(label).setPredictionCol(pred)
   // END
 }

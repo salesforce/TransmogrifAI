@@ -31,7 +31,8 @@
 package com.salesforce.op.utils.stages
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.stages.impl.selector.{HasTestEval, ModelSelectorBase}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
+import com.salesforce.op.stages.impl.selector.{HasTestEval, ModelSelector, ModelSelectorNames}
 import com.salesforce.op.stages.{OPStage, OpTransformer}
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.spark.ml.{Estimator, Model, Transformer}
@@ -62,7 +63,7 @@ private[op] case object FitStagesUtil {
   /**
    * Model Selector type
    */
-  type MS = ModelSelectorBase[_ <: Model[_], _ <: Estimator[_]]
+  type MS = ModelSelector[_ <: ModelType, _ <: EstimatorType]
 
   /**
    * Fitted DAG together with it's trainding & test data

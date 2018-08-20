@@ -90,7 +90,7 @@ private[op] class OpMultiClassificationEvaluator
 
     val dataUse = makeDataToUse(data, labelColName)
 
-    val (predictionColName, rawPredictionColName, probabilityColName) = (getPredictionCol,
+    val (predictionColName, rawPredictionColName, probabilityColName) = (getPredictionValueCol,
       getRawPredictionCol, getProbabilityCol)
 
     log.debug(
@@ -247,7 +247,7 @@ private[op] class OpMultiClassificationEvaluator
     val dataUse = makeDataToUse(dataset, labelName)
     new MulticlassClassificationEvaluator()
       .setLabelCol(labelName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
       .evaluate(dataUse)
   }
