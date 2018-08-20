@@ -45,7 +45,7 @@ class FeatureHistoryTest extends FlatSpec with TestCommon {
   val stage1 = "stage1"
   val stage2 = "stage2"
 
-  Spec(FeatureHistory.getClass) should "convert a feature history to metadata" in {
+  Spec[FeatureHistory] should "convert a feature history to metadata" in {
     val featureHistory = FeatureHistory(originFeatures = Seq(feature1, feature2), stages = Seq(stage1, stage2))
 
     val featureHistoryMetadata = featureHistory.toMetadata
@@ -57,7 +57,7 @@ class FeatureHistoryTest extends FlatSpec with TestCommon {
     featureHistoryMetadata.getStringArray(StagesKey) shouldBe Array(stage1, stage2)
   }
 
-  it should "merge two featurehistory" in {
+  it should "merge two instances" in {
     val featureHistory1 = FeatureHistory(originFeatures = Seq(feature1), stages = Seq(stage1))
     val featureHistory2 = FeatureHistory(originFeatures = Seq(feature2), stages = Seq(stage2))
 
@@ -70,7 +70,7 @@ class FeatureHistoryTest extends FlatSpec with TestCommon {
     val featureHistory1 = FeatureHistory(originFeatures = Seq(feature1), stages = Seq(stage1))
     val featureHistory2 = FeatureHistory(originFeatures = Seq(feature2), stages = Seq(stage2))
 
-    val map = Map[String, FeatureHistory](("1" -> featureHistory1), ("2" -> featureHistory2))
+    val map = Map(("1" -> featureHistory1), ("2" -> featureHistory2))
     val featureHistoryMetadata = FeatureHistory.toMetadata(map)
 
     featureHistoryMetadata.contains("1") shouldBe true
