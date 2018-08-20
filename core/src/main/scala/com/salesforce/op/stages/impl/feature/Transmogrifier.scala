@@ -194,19 +194,17 @@ private[op] case object Transmogrifier {
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g)
-          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             numHashes = DefaultNumOfFeatures, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+            prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[TextMap] =>
           val (f, other) = castAs[TextMap](g)
-          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             numHashes = DefaultNumOfFeatures, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+            prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[URLMap] =>
           val (f, other) = castAs[URLMap](g)

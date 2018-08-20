@@ -539,7 +539,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val summary = transformed.schema(checkedFeatures.name).metadata
     val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
 
-    // Check that all of the hashed text columns (and the null indicator column itself) are thrown away
+    // Check that all of the pivoted text columns are thrown away
     retrieved.dropped.count(_.startsWith("text")) shouldBe 6
 
     // Now do the same thing with the map data (can only do with one
@@ -572,8 +572,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val summary2 = transformed2.schema(checkedFeatures2.name).metadata
     val retrieved2 = SanityCheckerSummary.fromMetadata(summary2.getSummaryMetadata())
 
-    // Drop the whole hash space but not the null indicator column (it has an indicator group, so does not get
-    // picked up by the same check on parentCorr in SanityChecker)
+    // Check that all of the pivoted text columns are thrown away
     retrieved2.dropped.count(_.startsWith("textmap")) shouldBe 6
   }
 
