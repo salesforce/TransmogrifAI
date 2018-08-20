@@ -73,7 +73,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     for {vector <- vectCollect} {
       // number of feature generated for each categorical will be equal to or larger than 2 (nullIndicator + others)
       // and smaller or equal to (topK + nullIndicator + others)
-      vector.v.size <= (TransmogrifierDefaults.TopK + 2) * 5 shouldBe true
+      vector.v.size should be <= (TransmogrifierDefaults.TopK + 2) * 5
       vector.v.size should be >= 2 * 5
     }
 
