@@ -192,7 +192,7 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
     if (isSet(predictionCol) &&
-      !(isSet(predictionValueCol) && data.schema.fieldNames.contains(getPredictionValueCol))) {
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
       val fullPredictionColName = getPredictionCol
       val (predictionColName, rawPredictionColName, probabilityColName) =
         (s"${fullPredictionColName}_pred", s"${fullPredictionColName}_raw", s"${fullPredictionColName}_prob")
@@ -251,7 +251,7 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
     if (isSet(predictionCol) &&
-      !(isSet(predictionValueCol) && data.schema.fieldNames.contains(getPredictionValueCol))) {
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
       val fullPredictionColName = getPredictionCol
       val predictionColName = s"${fullPredictionColName}_pred"
       setPredictionValueCol(predictionColName)

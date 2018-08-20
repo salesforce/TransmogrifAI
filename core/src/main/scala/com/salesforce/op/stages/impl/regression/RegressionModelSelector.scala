@@ -124,7 +124,7 @@ case object RegressionModelSelector {
    * @param modelTypesToUse     list of model types to run grid search on must from supported types in
    *                            RegressionModelsToTry (OpLinearRegression, OpDecisionTreeRegressor,
    *                            OpRandomForestRegressor, OpGBTRegressor, OpGeneralizedLinearRegression)
-   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyper parameters to
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyperparameters to
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
@@ -162,7 +162,7 @@ case object RegressionModelSelector {
    * @param modelTypesToUse     list of model types to run grid search on must from supported types in
    *                            RegressionModelsToTry (OpLinearRegression, OpDecisionTreeRegressor,
    *                            OpRandomForestRegressor, OpGBTRegressor, OpGeneralizedLinearRegression)
-   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyper parameters to
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyperparameters to
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
