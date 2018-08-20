@@ -85,6 +85,11 @@ class RichMetadataTest extends FlatSpec with TestCommon {
     val mergedMetadata = meta1.deepMerge(map2.toMetadata)
     mergedMetadata.json shouldBe Serialization.write(mergedMap)
 
+    val m1 = Map("1" -> Array(Map("val" -> "a").toMetadata)).toMetadata
+    val m2 = Map("1" -> Array(Map("val" -> "b").toMetadata)).toMetadata
+    val mergedValue = Map("1" -> Array(Map("val" -> "a").toMetadata, Map("val" -> "b").toMetadata)).toMetadata
+
+    m1.deepMerge(m2) shouldBe mergedValue
   }
 
   it should "throw an error on incompatible value types in deep merge" in {
@@ -100,6 +105,17 @@ class RichMetadataTest extends FlatSpec with TestCommon {
     summaryMeta.containsSummaryMetadata shouldBe true
   }
 
+  it should "create summary for a given metadata" in {
+    val richMetaData = RichMetadata(meta1)
+    richMetaData.containsSummaryMetadata() shouldBe false
+
+    // create a summary for the metadata.
+    val expectedSummaryMetadata = Map("s" -> "summaryTest").toMetadata
+    val richMetaDataWithSummary = richMetaData.withSummaryMetadata(expectedSummaryMetadata)
+
+    richMetaDataWithSummary.getSummaryMetadata() shouldBe expectedSummaryMetadata
+    richMetaDataWithSummary.containsSummaryMetadata() shouldBe true
+  }
 }
 
 case class TestClass(name: String)
