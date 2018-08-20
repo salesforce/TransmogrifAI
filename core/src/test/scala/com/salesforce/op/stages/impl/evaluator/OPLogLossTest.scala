@@ -41,7 +41,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class OPLogLossTest extends FlatSpec with TestSparkContext {
 
-  val (ds, rawLabel, raw, prob, pred) = TestFeatureBuilder[RealNN, OPVector, OPVector, RealNN](
+  val (ds, rawLabel, pred) = TestFeatureBuilder[RealNN, Prediction](
     Seq(
       (1.0, Vectors.dense(8, 1, 1), Vectors.dense(0.8, 0.1, 0.1), 0.0),
       (0.0, Vectors.dense(1.0, 0.0, 0.0), Vectors.dense(1.0, 0.0, 0.0), 0.0),
@@ -53,13 +53,13 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
       (0.0, Vectors.dense(0.1, 0.6, 0.3), Vectors.dense(0.1, 0.6, 0.3), 1.0),
       (1.0, Vectors.dense(1.0, 0.8, 0.2), Vectors.dense(0.5, 0.4, 0.1), 0.0),
       (2.0, Vectors.dense(1.0, 0.8, 0.2), Vectors.dense(0.5, 0.4, 0.1), 0.0)
-    ).map(v => (v._1.toRealNN, v._2.toOPVector, v._3.toOPVector, v._4.toRealNN))
+    ).map(v => (v._1.toRealNN, Prediction(v._4, v._2, v._3)))
   )
 
   val label = rawLabel.copy(isResponse = true)
   val expected: Double = -math.log(0.1 * 0.5 * 0.8 * 0.4 * 0.1 * 0.4 * 0.1) / 10.0
 
-  val (dsEmpty, rawLabelEmpty, rawEmpty, probEmpty, predEmpty) = TestFeatureBuilder[RealNN, OPVector, OPVector, RealNN](
+  val (dsEmpty, rawLabelEmpty, predEmpty) = TestFeatureBuilder[RealNN, Prediction](
     Seq()
   )
 
@@ -69,7 +69,7 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
   val logLoss = LogLoss.mulitLogLoss
 
   Spec(LogLoss.getClass) should "compute logarithmic loss metric" in {
-    val metric = logLoss.setLabelCol(label).setPredictionCol(pred).setRawPredictionCol(raw).setProbabilityCol(prob)
+    val metric = logLoss.setLabelCol(label).setPredictionCol(pred)
       .evaluate(ds)
     metric shouldBe expected
 
@@ -78,10 +78,9 @@ class OPLogLossTest extends FlatSpec with TestSparkContext {
   it should "throw an error when the dataset is empty" in {
 
     the[IllegalArgumentException] thrownBy {
-      logLoss.setLabelCol(labelEmpty).setPredictionCol(predEmpty).setRawPredictionCol(rawEmpty)
-        .setProbabilityCol(probEmpty).evaluate(dsEmpty)
+      logLoss.setLabelCol(labelEmpty).setPredictionCol(predEmpty).evaluate(dsEmpty)
     } should have message
-      s"Metric ${logLoss.name} failed on empty dataset with (${labelEmpty.name}, ${rawEmpty.name}, ${probEmpty.name}," +
-        s" ${predEmpty.name})"
+      s"Metric ${logLoss.name} failed on empty dataset with (${labelEmpty.name}, ${predEmpty.name}_raw," +
+        s" ${predEmpty.name}_prob, ${predEmpty.name}_pred)"
   }
 }
