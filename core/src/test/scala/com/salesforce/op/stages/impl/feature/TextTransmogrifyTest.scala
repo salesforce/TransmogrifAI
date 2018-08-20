@@ -71,8 +71,10 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
 
     // all text features turned into categoricals since 10 < TextTokenizer.MaxCategoricalCardinality (30)
     for {vector <- vectCollect} {
-      vector.v.size < (TransmogrifierDefaults.TopK + 2) * 5  shouldBe true
-      vector.v.size >= 10 shouldBe true
+      // number of feature generated for each categorical will be equal to or larger than 2 (nullIndicator + others)
+      // and smaller or equal to (topK + nullIndicator + others)
+      vector.v.size <= (TransmogrifierDefaults.TopK + 2) * 5 shouldBe true
+      vector.v.size should be >= 2 * 5
     }
 
     val meta = vectorized.schema.toOpVectorMetadata(feature.name)
