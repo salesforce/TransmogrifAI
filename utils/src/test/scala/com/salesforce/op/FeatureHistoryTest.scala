@@ -66,7 +66,7 @@ class FeatureHistoryTest extends FlatSpec with TestCommon {
     featureHistoryCombined.stages shouldBe Seq(stage1, stage2)
   }
 
-  it should "create a metadata for a featurehistory map" in {
+  it should "create a metadata for a map" in {
     val featureHistory1 = FeatureHistory(originFeatures = Seq(feature1), stages = Seq(stage1))
     val featureHistory2 = FeatureHistory(originFeatures = Seq(feature2), stages = Seq(stage2))
 
@@ -93,7 +93,7 @@ class FeatureHistoryTest extends FlatSpec with TestCommon {
     f2.getStringArray(StagesKey) shouldBe Array(stage2)
   }
 
-  it should "create a FeatureHistory Map from metadata" in {
+  it should "create a map from metadata" in {
 
     val featureHistory1 = FeatureHistory(originFeatures = Seq(feature1), stages = Seq(stage1))
     val featureHistory2 = FeatureHistory(originFeatures = Seq(feature2), stages = Seq(stage2))
