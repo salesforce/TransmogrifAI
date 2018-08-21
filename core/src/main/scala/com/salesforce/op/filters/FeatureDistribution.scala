@@ -30,6 +30,7 @@
 
 package com.salesforce.op.filters
 
+import com.salesforce.op.features.FeatureDistributionBase
 import com.salesforce.op.stages.impl.feature.{Inclusion, NumericBucketizer}
 import com.twitter.algebird.Semigroup
 import com.twitter.algebird.Monoid._
@@ -55,7 +56,7 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double]
-) {
+) extends FeatureDistributionBase {
 
   /**
    * Get feature key associated to this distribution

@@ -31,14 +31,13 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.RawFeatureFilter
+import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
 import org.apache.spark.annotation.Experimental
@@ -108,7 +107,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Will set the blacklisted features variable and if list is non-empty it will
    * @param features list of features to blacklist
    */
-  private[op] def setBlacklist(features: Array[OPFeature]): Unit = {
+  private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
     blacklistedFeatures = features
     if (blacklistedFeatures.nonEmpty) {
       val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
@@ -125,7 +124,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       // for each stage remove anything blacklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
-        val blacklistRemoved = inFeatures.filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+        val blacklistRemoved = inFeatures
+          .filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+          .map{ f => if (f.isRaw) f.withDistributions(distributions.collect{ case d if d.name == f.name => d }) else f }
         val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
         Try{
@@ -229,8 +230,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         }
         checkReadersAndFeatures()
         val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
-        // Add distributions to raw features
-        setBlacklist(filteredRawData.featuresToDrop)
+        setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
+        setBlacklist(filteredRawData.featuresToDrop, filteredRawData.featureDistributions)
         setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
         filteredRawData.cleanedData
     }
