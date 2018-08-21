@@ -45,6 +45,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
@@ -606,39 +607,41 @@ case object ModelInsights {
   }
 
   private[op] def getModelContributions(model: Option[Model[_]]): Seq[Seq[Double]] = {
-    model.map {
-      case m: SparkWrapperParams[_] => m.getSparkMlStage() match { // TODO add additional models
-        case Some(m: LogisticRegressionModel) => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-        case Some(m: RandomForestClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
-        case Some(m: NaiveBayesModel) => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-        case Some(m: DecisionTreeClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
-        case Some(m: LinearRegressionModel) => Seq(m.coefficients.toArray.toSeq)
-        case Some(m: DecisionTreeRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
-        case Some(m: RandomForestRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
-        case _ => Seq.empty[Seq[Double]]
-      }
-      case _ => Seq.empty[Seq[Double]]
-    }.getOrElse(Seq.empty[Seq[Double]])
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    val contributions = stage.collect {
+      case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
+      case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
+      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
+    }
+    contributions.getOrElse(Seq.empty)
   }
 
   private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
     model match {
-      case Some(m: SelectedModel) => Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata()))
-        .toOption
+      case Some(m: SelectedModel) =>
+        Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
       case _ => None
     }
   }
 
   private def getStageInfo(stages: Array[OPStage]): Map[String, Any] = {
-    def getParams(stage: PipelineStage): Map[String, String] =
-      stage.extractParamMap().toSeq
-        .collect{
-          case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
-            p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
-          case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
-            p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value.toString
-        }.toMap
-
+    def getParams(stage: PipelineStage): Map[String, String] = {
+      stage.extractParamMap().toSeq.collect {
+        case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
+          p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
+        case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
+          p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value.toString
+      }.toMap
+    }
     stages.map { s =>
       val params = s match {
         case m: Model[_] => getParams(if (m.hasParent) m.parent else m) // try for parent estimator so can get params
