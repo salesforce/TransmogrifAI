@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
@@ -97,11 +97,8 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
 
-    val labelsMeta = new MetadataBuilder()
-      .putDoubleArray(ModelSelectorBaseNames.LabelsKept, getLabelsToKeep)
-      .putDoubleArray(ModelSelectorBaseNames.LabelsDropped, getLabelsToDrop)
-
-    new ModelData(dataUse, labelsMeta)
+    val labelsMeta = DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop)
+    new ModelData(dataUse, Option(labelsMeta))
   }
 
   /**
@@ -184,3 +181,23 @@ private[impl] trait DataCutterParams extends Params {
   private[op] def getLabelsToDrop: Array[Double] = $(labelsToDrop)
 
 }
+
+/**
+ * Summary of results for data cutter
+ * @param labelsKept labels retained
+ * @param labelsDropped labels dropped by datacutter
+ */
+case class DataCutterSummary
+(
+  labelsKept: Array[Double],
+  labelsDropped: Array[Double]
+) extends SplitterSummary {
+  override def toMetadata(): Metadata = {
+    new MetadataBuilder()
+      .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept)
+      .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped)
+      .build()
+  }
+}
+

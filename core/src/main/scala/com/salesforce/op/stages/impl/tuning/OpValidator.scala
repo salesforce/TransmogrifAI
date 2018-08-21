@@ -30,13 +30,12 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase}
-import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureLike}
+import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
-import com.salesforce.op.readers.DataFrameFieldNames
+import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.OpPipelineStage2
-import com.salesforce.op.stages.base.binary.OpTransformer2
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames, StageParamNames}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorNames, _}
+import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.log4j.{Level, LogManager}
@@ -44,35 +43,23 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.monotonically_increasing_id
-import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Row, SparkSession, functions}
 import org.apache.spark.util.SparkThreadUtils
 import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
-import scala.reflect.runtime.universe._
 
-
-/**
- * Best Model container
- *
- * @param name     the name of the best model
- * @param model    best trained model
- * @param metadata optional metadata
- * @tparam M model type
- */
-case class BestModel[M <: Model[_]](name: String, model: M, metadata: Option[MetadataBuilder] = None)
 
 /**
  * Best Estimator container
  *
  * @param name      the name of the best model
  * @param estimator best estimator
- * @param metadata  optional metadata
+ * @param summary  optional metadata
  * @tparam E model type
  */
-case class BestEstimator[E <: Estimator[_]](name: String, estimator: E, metadata: MetadataBuilder = new MetadataBuilder)
+case class BestEstimator[E <: Estimator[_]](name: String, estimator: E, summary: Seq[ModelEvaluation])
 
 /**
  * Validated Model container
@@ -104,7 +91,7 @@ private[tuning] case class ValidatedModel[E <: Estimator[_]]
  * Abstract class for Validator: Cross Validation or Train Validation Split
  * The model type should be the output of the estimator type but specifying that kills the scala compiler
  */
-private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializable {
+private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializable {
 
   @transient protected lazy val log: Logger = LoggerFactory.getLogger(this.getClass)
 
@@ -124,6 +111,7 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
     case _ => false
   }
 
+  def getParams(): Map[String, Any]
 
   /**
    * Function that performs the model selection
@@ -166,12 +154,12 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
       "Model Selection over {} with {} with {} and the {} metric",
       modelsFit.map(_.model.getClass.getSimpleName).mkString(","), validationName, splitInfo, evaluator.name
     )
-    val meta = new MetadataBuilder()
-    val cvFittedModels = modelsFit.map(v => updateBestModelMetadata(meta, v) -> v.bestMetric)
-    val newMeta = new MetadataBuilder().putMetadata(validationName, meta.build())
-    val (bestModelName, _) = if (evaluator.isLargerBetter) cvFittedModels.maxBy(_._2) else cvFittedModels.minBy(_._2)
+    val modelSummaries = modelsFit.flatMap(v => makeModelSummary(v))
+    val bestModelName =
+      if (evaluator.isLargerBetter) modelSummaries.maxBy(_.metricValues.asInstanceOf[SingleMetric].value).modelName
+      else modelSummaries.minBy(_.metricValues.asInstanceOf[SingleMetric].value).modelName
 
-    BestEstimator(name = bestModelName, estimator = bestEstimator, metadata = newMeta)
+    BestEstimator(name = bestModelName, estimator = bestEstimator, summary = modelSummaries)
   }
 
   /**
@@ -179,22 +167,22 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
    *
    * @return best model name
    */
-  private[op] def updateBestModelMetadata(metadataBuilder: MetadataBuilder, v: ValidatedModel[E]): String = {
-    val ValidatedModel(model, bestIndex, metrics, grids) = v
-    val modelParams = model.extractParamMap()
+  private[op] def makeModelSummary(v: ValidatedModel[E]): Seq[ModelEvaluation] = {
+    val ValidatedModel(model, _, metrics, grids) = v
+    val modelParams = model.extractParamMap().getAsMap()
 
     def makeModelName(index: Int) = s"${model.uid}_$index"
 
-    for {((paramGrid, met), ind) <- grids.zip(metrics).zipWithIndex} {
-      val paramMetBuilder = new MetadataBuilder()
-      paramMetBuilder.putString(evaluator.name, met.toString)
-      // put in all model params from the winner
-      modelParams.toSeq.foreach(p => paramMetBuilder.putString(p.param.name, p.value.toString))
-      // override with param map values if they exists
-      paramGrid.toSeq.foreach(p => paramMetBuilder.putString(p.param.name, p.value.toString))
-      metadataBuilder.putMetadata(makeModelName(ind), paramMetBuilder.build())
+    for {((paramGrid, met), ind) <- grids.zip(metrics).zipWithIndex} yield {
+      val updatedParams = modelParams ++ paramGrid.getAsMap()
+      ModelEvaluation(
+        modelUID = model.uid,
+        modelName = makeModelName(ind),
+        modelType = model.getClass.getSimpleName,
+        metricValues = SingleMetric(evaluator.name.humanFriendlyName, met),
+        modelParameters = updatedParams
+      )
     }
-    makeModelName(bestIndex)
   }
 
 
@@ -260,10 +248,10 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
       indexOfLastEstimator = Some(-1)
     )
     val selectTrain = newTrain.select(label, features)
-      .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val selectTest = newTest.select(label, features)
-      .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val (balancedTrain, balancedTest) = splitter.map(s => (
       s.prepare(selectTrain).train,
@@ -296,12 +284,12 @@ private[impl] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serial
         case e: OpPipelineStage2[RealNN, OPVector, Prediction]@unchecked =>
           val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked, _)) =
             FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
-              nonNullable = Set(features, DataFrameFieldNames.KeyFieldName))
+              nonNullable = Set(features, ModelSelectorNames.idColName))
           e.setInput(labelFeat, featuresFeat)
-          evaluator.setFullPredictionCol(e.getOutput())
+          evaluator.setPredictionCol(e.getOutput())
         case _ => // otherwise it is a spark estimator
-          val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-          val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
+          val pi1 = estimator.getParam(ModelSelectorNames.inputParam1Name)
+          val pi2 = estimator.getParam(ModelSelectorNames.inputParam2Name)
           estimator.set(pi1, label).set(pi2, features)
       }
       Future {

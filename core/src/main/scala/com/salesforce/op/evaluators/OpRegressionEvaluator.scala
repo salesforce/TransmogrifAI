@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory
 
 private[op] class OpRegressionEvaluator
 (
-  override val name: String = OpEvaluatorNames.regression,
+  override val name: EvalMetric = OpEvaluatorNames.Regression,
   override val isLargerBetter: Boolean = false,
   override val uid: String = UID[OpRegressionEvaluator]
 ) extends OpRegressionEvaluatorBase[RegressionMetrics](uid) {
@@ -80,7 +80,7 @@ private[op] class OpRegressionEvaluator
     val dataUse = makeDataToUse(dataset, labelName)
     new RegressionEvaluator()
       .setLabelCol(labelName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
       .evaluate(dataUse)
   }

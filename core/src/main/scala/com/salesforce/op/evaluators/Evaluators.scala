@@ -57,7 +57,7 @@ object Evaluators {
      */
     def auROC(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(
-        name = BinaryClassEvalMetrics.AuROC.humanFriendlyName, isLargerBetter = true) {
+        name = BinaryClassEvalMetrics.AuROC, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuROC, dataset)
       }
@@ -66,7 +66,7 @@ object Evaluators {
      * Area under Precision/Recall curve
      */
     def auPR(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR.humanFriendlyName, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuPR, dataset)
       }
@@ -76,10 +76,12 @@ object Evaluators {
      */
     def precision(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(
-        name = MultiClassEvalMetrics.Precision.humanFriendlyName, isLargerBetter = true) {
+        name = MultiClassEvalMetrics.Precision, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
-          new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).precision(1.0)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          new MulticlassMetrics(dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .precision(1.0)
         }
       }
 
@@ -88,10 +90,12 @@ object Evaluators {
      */
     def recall(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(
-        name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
+        name = MultiClassEvalMetrics.Recall, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
-          new MulticlassMetrics(dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).recall(1.0)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          new MulticlassMetrics(dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .recall(1.0)
         }
       }
 
@@ -99,11 +103,13 @@ object Evaluators {
      * F1 score
      */
     def f1(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.F1.humanFriendlyName, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = MultiClassEvalMetrics.F1, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double = {
           import dataset.sparkSession.implicits._
+          val dataUse = makeDataToUse(dataset, getLabelCol)
           new MulticlassMetrics(
-            dataset.select(getPredictionCol, getLabelCol).as[(Double, Double)].rdd).fMeasure(1.0)
+            dataUse.select(getPredictionValueCol, getLabelCol).as[(Double, Double)].rdd)
+            .fMeasure(1.0)
         }
       }
 
@@ -112,7 +118,7 @@ object Evaluators {
      */
     def error(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(
-        name = MultiClassEvalMetrics.Error.humanFriendlyName, isLargerBetter = false) {
+        name = MultiClassEvalMetrics.Error, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getMultiEvaluatorMetric(MultiClassEvalMetrics.Error, dataset)
       }
@@ -135,15 +141,16 @@ object Evaluators {
       new OpBinaryClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpBinaryClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: String = metricName
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
         override val isLargerBetter: Boolean = islbt
         override def getDefaultMetric: SingleMetric => Double = _.value
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionValueCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           val metric = evaluateFn(ds)
-          SingleMetric(name, metric)
+          SingleMetric(name.humanFriendlyName, metric)
         }
       }
     }
@@ -166,7 +173,7 @@ object Evaluators {
      */
     def precision(): OpMultiClassificationEvaluator =
       new OpMultiClassificationEvaluator(
-        name = MultiClassEvalMetrics.Precision.humanFriendlyName, isLargerBetter = true) {
+        name = MultiClassEvalMetrics.Precision, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Precision, dataset)
       }
@@ -175,7 +182,7 @@ object Evaluators {
      * Weighted Recall
      */
     def recall(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Recall.humanFriendlyName, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Recall, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Recall, dataset)
       }
@@ -184,7 +191,7 @@ object Evaluators {
      * F1 Score
      */
     def f1(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.F1.humanFriendlyName, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.F1, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.F1, dataset)
       }
@@ -193,7 +200,7 @@ object Evaluators {
      * Prediction Error
      */
     def error(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Error.humanFriendlyName, isLargerBetter = false) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Error, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getMultiEvaluatorMetric(MultiClassEvalMetrics.Error, dataset)
       }
@@ -216,22 +223,24 @@ object Evaluators {
       new OpMultiClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpMultiClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: String = metricName
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
         override val isLargerBetter: Boolean = islbt
 
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionCol)
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getRawPredictionCol, getProbabilityCol, getPredictionValueCol)
             .as[(Double, OPVector#Value, OPVector#Value, Double)]
           try {
             val metric = evaluateFn(ds)
-            SingleMetric(name, metric)
+            SingleMetric(name.humanFriendlyName, metric)
           } catch {
             case iae: IllegalArgumentException =>
               val size = dataset.count
-              val desc = s"dataset with ($getLabelCol, $getRawPredictionCol, $getProbabilityCol, $getPredictionCol)"
+              val desc = s"dataset with ($getLabelCol, $getRawPredictionCol," +
+                s" $getProbabilityCol, $getPredictionValueCol)"
               val msg = if (size == 0) s"empty $desc" else s"$desc of $size rows"
               throw new IllegalArgumentException(s"Metric $name failed on $msg", iae)
           }
@@ -257,7 +266,7 @@ object Evaluators {
      */
     def mse(): OpRegressionEvaluator =
       new OpRegressionEvaluator(
-        name = RegressionEvalMetrics.MeanSquaredError.humanFriendlyName, isLargerBetter = false) {
+        name = RegressionEvalMetrics.MeanSquaredError, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataset)
       }
@@ -267,7 +276,7 @@ object Evaluators {
      */
     def mae(): OpRegressionEvaluator =
       new OpRegressionEvaluator(
-        name = RegressionEvalMetrics.MeanAbsoluteError.humanFriendlyName, isLargerBetter = false) {
+        name = RegressionEvalMetrics.MeanAbsoluteError, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataset)
       }
@@ -276,7 +285,7 @@ object Evaluators {
      * R2
      */
     def r2(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = RegressionEvalMetrics.R2.humanFriendlyName, isLargerBetter = true) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.R2, isLargerBetter = true) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataset)
       }
@@ -286,7 +295,7 @@ object Evaluators {
      */
     def rmse(): OpRegressionEvaluator =
       new OpRegressionEvaluator(
-        name = RegressionEvalMetrics.RootMeanSquaredError.humanFriendlyName, isLargerBetter = false) {
+        name = RegressionEvalMetrics.RootMeanSquaredError, isLargerBetter = false) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataset)
       }
@@ -309,16 +318,17 @@ object Evaluators {
       new OpRegressionEvaluatorBase[SingleMetric](
         uid = UID[OpRegressionEvaluatorBase[SingleMetric]]
       ) {
-        override val name: String = metricName
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
         override val isLargerBetter: Boolean = islbt
 
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
-          val ds = dataset.select(getLabelCol, getPredictionCol).as[(Double, Double)]
+          val dataUse = makeDataToUse(dataset, getLabelCol)
+          val ds = dataUse.select(getLabelCol, getPredictionValueCol).as[(Double, Double)]
           val metric = evaluateFn(ds)
-          SingleMetric(name, metric)
+          SingleMetric(name.humanFriendlyName, metric)
         }
       }
     }
@@ -349,4 +359,3 @@ case class MultiMetrics(metrics: Map[String, EvaluationMetrics]) extends Evaluat
   }
   override def toString: String = JsonUtils.toJsonString(this.toMap, pretty = true)
 }
-

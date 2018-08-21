@@ -36,11 +36,9 @@ import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextTokenizer}
+import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
-import com.twitter.algebird.Monoid
-import com.twitter.algebird.Semigroup
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF

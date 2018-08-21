@@ -60,11 +60,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val dfWithMeta = addMetaData(df, "features", 40)
     val sparkModel = new OpLogisticRegression().setInput(l1r, f1).fit(df)
 
-    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
-      .asInstanceOf[LogisticRegressionModel]
-
     // val model = sparkModel.getSparkMlStage().get
-    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
+    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -79,10 +76,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val l1r = l1.copy(isResponse = true)
     val dfWithMeta = addMetaData(df, "features", 40)
     val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
-    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
-      .asInstanceOf[RandomForestClassificationModel]
 
-    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1).setTopK(2)
+    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 2)
     val parsed = insights.map(RecordInsightsParser.parseInsights)

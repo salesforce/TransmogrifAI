@@ -28,16 +28,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.classification
+package com.salesforce.op.utils.text
 
-import org.apache.spark.ml.classification.{ProbabilisticClassificationModel, ProbabilisticClassifier}
-import org.apache.spark.ml.linalg.Vector
+import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
+@RunWith(classOf[JUnitRunner])
+class TextUtilsTest extends FlatSpec with TestCommon {
+  Spec(TextUtils.getClass) should "concat strings" in {
+    TextUtils.concat("Left", "Right", ",") shouldBe "Left,Right"
+  }
 
-private[op] object ProbabilisticClassifierType {
-  type ProbClassifierModel = ProbabilisticClassificationModel[Vector, _]
+  it should "concat with no effect for right half alone" in {
+    TextUtils.concat("", "Right", ",") shouldBe "Right"
+  }
 
-  type ProbClassifier = ProbabilisticClassifier[Vector,
-    _ <: ProbabilisticClassifier[Vector, _, _],
-    _ <: ProbClassifierModel]
+  it should "concat with no effect for left half alone" in {
+    TextUtils.concat("Left", "", ",") shouldBe "Left"
+  }
+
+  it should "concat empty strings" in {
+    TextUtils.concat("", "", ",") shouldBe ""
+  }
+
+  it should "clean a string with special chars" in {
+    TextUtils.cleanString("A string wit#h %bad pun&ctuation mark<=>s") shouldBe "AStringWitHBadPunCtuationMarkS"
+  }
+
+  it should "clean an Option(string) with special chars" in {
+    val testString: Option[String] = Some("A string wit#h %bad pun&ctuation mark<=>s")
+    TextUtils.cleanOptString(testString) shouldBe Some("AStringWitHBadPunCtuationMarkS")
+  }
 }

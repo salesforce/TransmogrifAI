@@ -33,33 +33,28 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.ModelsToTry
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry
+import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames._
 import com.salesforce.op.stages.impl.selector._
-import com.salesforce.op.stages._
-import com.salesforce.op.utils.json.JsonUtils
+import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
+import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
-import enumeratum._
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
-import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
-import org.apache.spark.sql.types.Metadata
 import org.json4s._
-import org.json4s.jackson.JsonMethods._
-import org.json4s.jackson.Serialization.{write, writePretty}
+import org.json4s.jackson.Serialization
+import org.json4s.jackson.Serialization._
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.ClassTag
-import scala.util.{Success, Failure, Try}
+import scala.util.Try
 
 /**
  * Summary of all model insights
@@ -75,110 +70,10 @@ case class ModelInsights
 (
   label: LabelSummary,
   features: Seq[FeatureInsights],
-  selectedModelInfo: Map[String, Any],
+  selectedModelInfo: Option[ModelSelectorSummary],
   trainingParams: OpParams,
   stageInfo: Map[String, Any]
 ) {
-
-  /**
-   * Selected model UID
-   */
-  def selectedModelUID: String = selectedModelInfo(BestModelUid).toString
-
-  /**
-   * Selected model name
-   */
-  def selectedModelName: String = selectedModelInfo(BestModelName).toString
-
-  /**
-   * Selected model type, i.e. LogisticRegression, RandomForest etc.
-   */
-  def selectedModelType: ModelsToTry = modelType(selectedModelName).get
-
-  /**
-   * Selected model validation results computed during Cross Validation or Train Validation Split
-   */
-  def selectedModelValidationResults: Map[String, String] = validationResults(selectedModelName)
-
-  /**
-   * Train set evaluation metrics for selected model
-   */
-  def selectedModelTrainEvalMetrics: EvaluationMetrics = evaluationMetrics(TrainingEval)
-
-  /**
-   * Test set evaluation metrics (if any) for selected model
-   */
-  def selectedModelTestEvalMetrics: Option[EvaluationMetrics] = {
-    selectedModelInfo.get(HoldOutEval).map(_ => evaluationMetrics(HoldOutEval))
-  }
-
-  /**
-   * Validation results for all models computed during Cross Validation or Train Validation Split
-   *
-   * @return validation results keyed by model name
-   */
-  def validationResults: Map[String, Map[String, String]] = {
-    val res = for {
-      results <- getMap[String, Any](selectedModelInfo, TrainValSplitResults).recoverWith {
-        case e => getMap[String, Any](selectedModelInfo, CrossValResults)
-      }
-    } yield results.keys.map(k => k -> getMap[String, String](results, k).getOrElse(Map.empty))
-    res match {
-      case Failure(e) => throw new RuntimeException(s"Failed to extract validation results", e)
-      case Success(ok) => ok.toMap
-    }
-  }
-
-  /**
-   * Validation results for a specified model type computed during Cross Validation or Train Validation Split
-   *
-   * @return validation results keyed by model name
-   */
-  def validationResults(mType: ModelsToTry): Map[String, Map[String, String]] = {
-    validationResults.filter { case (modelName, _) => modelType(modelName).toOption.contains(mType) }
-  }
-
-  /**
-   * All validated model types
-   */
-  def validatedModelTypes: Set[ModelsToTry] =
-    validationResults.keys.flatMap(modelName => modelType(modelName).toOption).toSet
-
-  /**
-   * Validation type, i.e TrainValidationSplit, CrossValidation
-   */
-  def validationType: ValidationType = {
-    if (getMap[String, Any](selectedModelInfo, TrainValSplitResults).isSuccess) ValidationType.TrainValidationSplit
-    else if (getMap[String, Any](selectedModelInfo, CrossValResults).isSuccess) ValidationType.CrossValidation
-    else throw new RuntimeException(s"Failed to determine validation type")
-  }
-
-  /**
-   * Evaluation metric type, i.e. AuPR, AuROC, F1 etc.
-   */
-  def evaluationMetricType: EnumEntry with EvalMetric = {
-    val knownEvalMetrics = {
-      (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++ RegressionEvalMetrics.values)
-        .map(m => m.humanFriendlyName -> m).toMap
-    }
-    val evalMetrics = validationResults.flatMap(_._2.keys).flatMap(knownEvalMetrics.get).toSet.toList
-    evalMetrics match {
-      case evalMetric :: Nil => evalMetric
-      case Nil => throw new RuntimeException("Unable to determine evaluation metric type: no metrics were found")
-      case metrics => throw new RuntimeException(
-        s"Unable to determine evaluation metric type since: multiple metrics were found - " + metrics.mkString(","))
-    }
-  }
-
-  /**
-   * Problem type, i.e. Binary Classification, Multi Classification or Regression
-   */
-  def problemType: ProblemType = selectedModelTrainEvalMetrics match {
-    case _: BinaryClassificationMetrics => ProblemType.BinaryClassification
-    case _: MultiClassificationMetrics => ProblemType.MultiClassification
-    case _: RegressionMetrics => ProblemType.Regression
-    case _ => ProblemType.Unknown
-  }
 
   /**
    * Serialize to json string
@@ -187,9 +82,10 @@ case class ModelInsights
    * @return json string
    */
   def toJson(pretty: Boolean = true): String = {
-    implicit val formats = DefaultFormats
+    implicit val formats = ModelInsights.SerializationFormats
     if (pretty) writePretty(this) else write(this)
   }
+
 
   /**
    * High level model summary in a compact print friendly format containing:
@@ -209,23 +105,34 @@ case class ModelInsights
     res.mkString("\n")
   }
 
+  private def validatedModelTypes = selectedModelInfo.map(_.validationResults.map(_.modelType).toList.distinct)
+    .getOrElse(List.empty)
+  private def evaluationMetric = selectedModelInfo.map(_.evaluationMetric.humanFriendlyName)
+  private def validationResults(modelType: String) = selectedModelInfo
+    .map(_.validationResults.filter(_.modelType == modelType).toList).getOrElse(List.empty)
+
   private def prettyValidationResults: Seq[String] = {
     val evalSummary = {
       val vModelTypes = validatedModelTypes
-      "Evaluated %s model%s using %s and %s metric.".format(
-        vModelTypes.mkString(", "),
-        if (vModelTypes.size > 1) "s" else "",
-        validationType.humanFriendlyName, // TODO add number of folds or train/split ratio if possible
-        evaluationMetricType.humanFriendlyName
-      )
-    }
+      for {
+        ev <- selectedModelInfo.map(_.validationType.humanFriendlyName)
+        met <- evaluationMetric
+      } yield {
+        "Evaluated %s model%s using %s and %s metric.".format(
+          vModelTypes.mkString(", "),
+          if (vModelTypes.size > 1) "s" else "",
+          ev, // TODO add number of folds or train/split ratio
+          met
+        )
+      }
+    }.getOrElse("No model selector found")
     val modelEvalRes = for {
       modelType <- validatedModelTypes
       modelValidationResults = validationResults(modelType)
-      evalMetric = evaluationMetricType.humanFriendlyName
+      evalMetric <- evaluationMetric
     } yield {
-      val evalMetricValues = modelValidationResults.flatMap { case (_, metrics) =>
-        metrics.get(evalMetric).flatMap(v => Try(v.toDouble).toOption)
+      val evalMetricValues = modelValidationResults.map { eval =>
+        eval.metricValues.asInstanceOf[SingleMetric].value
       }
       val minMetricValue = evalMetricValues.reduceOption[Double](math.min).getOrElse(Double.NaN)
       val maxMetricValue = evalMetricValues.reduceOption[Double](math.max).getOrElse(Double.NaN)
@@ -243,32 +150,37 @@ case class ModelInsights
   }
 
   private def prettySelectedModelInfo: String = {
-    val bestModelType = selectedModelType
-    val name = s"Selected Model - $bestModelType"
-    val validationResults = selectedModelValidationResults.toSeq ++ Seq(
-      "name" -> selectedModelName,
-      "uid" -> selectedModelUID,
-      "modelType" -> selectedModelType
-    )
-    val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults.sortBy(_._1))
+    val name = selectedModelInfo.map( sm => s"Selected Model - ${sm.bestModelType} ${sm.bestModelName}" ).getOrElse("")
+    val validationResults: Seq[(String, Any)] = selectedModelInfo.map(
+      _.validationResults.flatMap(e => Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++
+        e.modelParameters.toSeq)
+    ).getOrElse(Seq.empty)
+    val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
     table.prettyString()
   }
 
   private def modelEvaluationMetrics: String = {
     val name = "Model Evaluation Metrics"
-    val trainEvalMetrics = selectedModelTrainEvalMetrics
-    val testEvalMetrics = selectedModelTestEvalMetrics
+    val niceMetricsNames = (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
+      RegressionEvalMetrics.values ++ OpEvaluatorNames.values)
+      .map(m => m.entryName -> m.humanFriendlyName).toMap
+    def niceName(nm: String): String = nm.split("_").lastOption.flatMap(n => niceMetricsNames.get(n)).getOrElse(nm)
+    val trainEvalMetrics = selectedModelInfo.map(_.trainEvaluation)
+    val testEvalMetrics = selectedModelInfo.flatMap(_.holdoutEvaluation)
     val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
-    val trainMetrics = trainEvalMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
-    val table = testEvalMetrics match {
-      case Some(testMetrics) =>
+    (trainEvalMetrics, testEvalMetrics) match {
+      case (Some(trainMetrics), Some(testMetrics)) =>
+        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
         val testMetricsMap = testMetrics.toMap
-        val rows = trainMetrics.map { case (k, v) => (k, v, testMetricsMap(k).toString) }
-        Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows)
-      case None =>
-        Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetrics)
+        val rows = trainMetricsMap
+          .map { case (k, v) => (niceName(k), v, testMetricsMap(k).toString) }
+        Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows).prettyString()
+      case (Some(trainMetrics), None) =>
+        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) =>
+          niceName(k) -> v.toString }.toSeq.sortBy(_._1)
+        Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetricsMap).prettyString()
+      case (None, _) => "No metrics found"
     }
-    table.prettyString()
   }
 
   private def topKInsights(s: Seq[(FeatureInsights, Insights, Double)], topK: Int): Seq[(String, Double)] = {
@@ -345,79 +257,6 @@ case class ModelInsights
   private def numericalTable(columns: Seq[String], rows: Seq[(String, Double)]): Option[String] =
     if (rows.isEmpty) None else Some(Table(columns, rows).prettyString(columnAlignments = Map(columns.last -> Right)))
 
-  private def modelType(modelName: String): Try[ModelsToTry] = Try {
-    classificationModelType.orElse(regressionModelType).lift(modelName).getOrElse(
-      throw new RuntimeException(s"Unsupported model type for best model '$modelName'"))
-  }
-
-  private def classificationModelType: PartialFunction[String, ClassificationModelsToTry] = {
-    case v if v.startsWith("logreg") => ClassificationModelsToTry.LogisticRegression
-    case v if v.startsWith("rfc") => ClassificationModelsToTry.RandomForest
-    case v if v.startsWith("dtc") => ClassificationModelsToTry.DecisionTree
-    case v if v.startsWith("nb") => ClassificationModelsToTry.NaiveBayes
-  }
-
-  private def regressionModelType: PartialFunction[String, RegressionModelsToTry] = {
-    case v if v.startsWith("linReg") => RegressionModelsToTry.LinearRegression
-    case v if v.startsWith("rfr") => RegressionModelsToTry.RandomForestRegression
-    case v if v.startsWith("dtr") => RegressionModelsToTry.DecisionTreeRegression
-    case v if v.startsWith("gbtr") => RegressionModelsToTry.GBTRegression
-  }
-
-  private def evaluationMetrics(metricsName: String): EvaluationMetrics = {
-    val res = for {
-      metricsMap <- getMap[String, Any](selectedModelInfo, metricsName)
-      evalMetrics <- Try(toEvaluationMetrics(metricsMap))
-    } yield evalMetrics
-    res match {
-      case Failure(e) => throw new RuntimeException(s"Failed to extract '$metricsName' metrics", e)
-      case Success(ok) => ok
-    }
-  }
-
-  private def getMap[K, V](m: Map[String, Any], name: String): Try[Map[K, V]] = Try {
-    m(name) match {
-      case m: Map[String, Any]@unchecked => m("map").asInstanceOf[Map[K, V]]
-      case m: Metadata => m.underlyingMap.asInstanceOf[Map[K, V]]
-    }
-  }
-
-  private val MetricName = "\\((.*)\\)\\_(.*)".r
-
-  private def toEvaluationMetrics(metrics: Map[String, Any]): EvaluationMetrics = {
-    import OpEvaluatorNames._
-    val metricsType = metrics.keys.headOption match {
-      case Some(MetricName(t, _)) if Set(binary, multi, regression).contains(t) => t
-      case v => throw new RuntimeException(s"Invalid model metric '$v'")
-    }
-    def parse[T <: EvaluationMetrics : ClassTag] = {
-      val vals = metrics.map { case (MetricName(_, name), value) => name -> value }
-      val valsJson = JsonUtils.toJsonString(vals)
-      JsonUtils.fromString[T](valsJson).get
-    }
-    metricsType match {
-      case `binary` => parse[BinaryClassificationMetrics]
-      case `multi` => parse[MultiClassificationMetrics]
-      case `regression` => parse[RegressionMetrics]
-      case t => throw new RuntimeException(s"Unsupported metrics type '$t'")
-    }
-  }
-}
-
-sealed trait ProblemType extends EnumEntry with Serializable
-  object ProblemType extends Enum[ProblemType] {
-  val values = findValues
-  case object BinaryClassification extends ProblemType
-  case object MultiClassification extends ProblemType
-  case object Regression extends ProblemType
-  case object Unknown extends ProblemType
-}
-
-sealed abstract class ValidationType(val humanFriendlyName: String) extends EnumEntry with Serializable
-object ValidationType extends Enum[ValidationType] {
-  val values = findValues
-  case object CrossValidation extends ValidationType("Cross Validation")
-  case object TrainValidationSplit extends ValidationType("Train Validation Split")
 }
 
 /**
@@ -446,6 +285,7 @@ case class LabelSummary
  */
 trait LabelInfo
 
+
 /**
  * Summary of label distribution for continuous label
  *
@@ -463,6 +303,7 @@ case class Continuous(min: Double, max: Double, mean: Double, variance: Double) 
  * @param prob   probabilities of each unique value observed in data (order is matched to domain order)
  */
 case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
+
 
 /**
  * Summary of feature insights for all features derived from a given input (raw) feature
@@ -521,15 +362,34 @@ case class Insights
 case object ModelInsights {
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
+  val SerializationFormats: Formats = {
+    val typeHints = FullTypeHints(List(
+      classOf[Continuous], classOf[Discrete],
+      classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
+      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics], classOf[ThresholdMetrics],
+      classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
+    ))
+    val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>
+      ( { case JString(s) => EvalMetric.withNameInsensitive(s) },
+        { case x: EvalMetric => JString(x.entryName) }
+      )
+    )
+    Serialization.formats(typeHints) +
+      EnumEntrySerializer.json4s[ValidationType](ValidationType) +
+      EnumEntrySerializer.json4s[ProblemType](ProblemType) +
+      new SpecialDoubleSerializer +
+      evalMetricsSerializer
+  }
+
   /**
    * Read ModelInsights from a json
    *
    * @param json model insights in json
    * @return Try[ModelInsights]
    */
-  def fromJson(json: String): Try[ModelInsights] = Try {
-    implicit val formats = DefaultFormats
-    parse(json).extract[ModelInsights]
+  def fromJson(json: String): Try[ModelInsights] = {
+    implicit val formats: Formats = SerializationFormats
+    Try { read[ModelInsights](json) }
   }
 
   /**
@@ -556,7 +416,10 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val models = stages.collect { case s: SelectedModel => s } // TODO support other model types?
+    val models = stages.collect{
+      case s: SelectedModel => s
+      case s: OpPredictorWrapperModel[_] => s
+    } // TODO support other model types?
     val model = models.lastOption
     log.info(
       s"Found ${models.length} models will " +
@@ -576,7 +439,7 @@ case object ModelInsights {
         // first try out to get vector metadata from sanity checker
         .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
         // fall back to model selector stage metadata
-        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelectorBase[_, _]])))
+        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelector[_, _]])))
         // finally try to get it from the last vector stage
         .orElse(
         stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
@@ -635,7 +498,7 @@ case object ModelInsights {
   private[op] def getFeatureInsights(
     vectorInfo: Option[OpVectorMetadata],
     summary: Option[SanityCheckerSummary],
-    model: Option[SelectedModel],
+    model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]]
@@ -742,33 +605,38 @@ case object ModelInsights {
     }
   }
 
-  private[op] def getModelContributions(model: Option[SelectedModel]): Seq[Seq[Double]] = {
-    model.flatMap {
-      _.getSparkMlStage().map {
-        case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-        case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: GradientBoostedTreesModel => Seq.empty[Seq[Double]]
-        case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+  private[op] def getModelContributions(model: Option[Model[_]]): Seq[Seq[Double]] = {
+    model.map {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage() match { // TODO add additional models
+        case Some(m: LogisticRegressionModel) => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
+        case Some(m: RandomForestClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: NaiveBayesModel) => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
+        case Some(m: DecisionTreeClassificationModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: LinearRegressionModel) => Seq(m.coefficients.toArray.toSeq)
+        case Some(m: DecisionTreeRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
+        case Some(m: RandomForestRegressionModel) => Seq(m.featureImportances.toArray.toSeq)
         case _ => Seq.empty[Seq[Double]]
       }
+      case _ => Seq.empty[Seq[Double]]
     }.getOrElse(Seq.empty[Seq[Double]])
   }
 
-  private def getModelInfo(model: Option[SelectedModel]): Map[String, Any] = {
-    model.map(_.getMetadata().getSummaryMetadata().wrapped.underlyingMap)
-      .getOrElse(Map.empty)
+  private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
+    model match {
+      case Some(m: SelectedModel) => Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata()))
+        .toOption
+      case _ => None
+    }
   }
 
   private def getStageInfo(stages: Array[OPStage]): Map[String, Any] = {
-    def getParams(stage: PipelineStage): Map[String, Any] =
+    def getParams(stage: PipelineStage): Map[String, String] =
       stage.extractParamMap().toSeq
         .collect{
+          case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
+            p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
           case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
-            p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value
+            p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value.toString
         }.toMap
 
     stages.map { s =>

@@ -30,6 +30,7 @@
 
 package com.salesforce.op.utils.spark
 
+import org.apache.spark.ml.PipelineStage
 import org.apache.spark.sql.types._
 
 import scala.collection.mutable.{Map => MMap}
@@ -185,6 +186,7 @@ object RichMetadata {
   private val intSeq = TypeCase[Seq[Int]]
   private val doubleSeq = TypeCase[Seq[Double]]
   private val stringSeq = TypeCase[Seq[String]]
+  private val metadataSeq = TypeCase[Seq[Metadata]]
 
   /**
    * Enrichment functions for Maps
@@ -194,24 +196,36 @@ object RichMetadata {
 
     def toMetadata: Metadata = {
       val builder = new MetadataBuilder()
-      def unsupported(k: String) = throw new RuntimeException(s"Key '$k' has unsupported value type")
+      def unsupported(k: String, v: Any) =
+        throw new RuntimeException(s"Key '$k' has unsupported value type $v of type ${v.getClass.getName}")
       def putCollection(key: String, seq: Seq[Any]): MetadataBuilder = seq match {
         case booleanSeq(v) => builder.putBooleanArray(key, v.toArray)
         case intSeq(v) => builder.putLongArray(key, v.map(_.toLong).toArray)
         case longSeq(v) => builder.putLongArray(key, v.toArray)
         case doubleSeq(v) => builder.putDoubleArray(key, v.toArray)
         case stringSeq(v) => builder.putStringArray(key, v.toArray)
-        case _ => unsupported(key)
+        case metadataSeq(v) => builder.putMetadataArray(key, v.toArray)
+        case _ => unsupported(key, seq)
       }
       theMap.foldLeft(builder) {
         case (m, (k, v: Boolean)) => m.putBoolean(k, v)
         case (m, (k, v: Double)) => m.putDouble(k, v)
         case (m, (k, v: Long)) => m.putLong(k, v)
+        case (m, (k, v: Int)) => m.putLong(k, v.toLong)
         case (m, (k, v: String)) => m.putString(k, v)
+        case (m, (k, v: PipelineStage)) => m.putString(k, v.getClass.getName)
+        case (m, (k, v: Metadata)) => m.putMetadata(k, v)
         case (m, (k, v: Seq[_])) => putCollection(k, v)
         case (m, (k, v: Array[_])) => putCollection(k, v)
         case (m, (k, v: Map[_, _])) => m.putMetadata(k, v.map { case (k, v) => k.toString -> v }.toMetadata)
-        case (_, (k, _)) => unsupported(k)
+        case (m, (k, v: Option[_])) => if (v.nonEmpty) { v.get match {
+          case vt: Boolean => m.putBoolean(k, vt)
+          case vt: Double => m.putDouble(k, vt)
+          case vt: Long => m.putLong(k, vt)
+          case vt: Int => m.putLong(k, vt.toLong)
+          case vt: String => m.putString(k, vt)
+        }} else m
+        case (_, (k, v)) => unsupported(k, v)
       }.build()
     }
   }

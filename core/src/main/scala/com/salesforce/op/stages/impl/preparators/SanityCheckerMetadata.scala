@@ -30,6 +30,8 @@
 
 package com.salesforce.op.stages.impl.preparators
 
+import com.salesforce.op.stages.impl.MetadataLike
+
 import scala.util.{Failure, Success, Try}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stats.OpStatistics
@@ -87,7 +89,7 @@ case class SanityCheckerSummary
   featuresStatistics: SummaryStatistics,
   names: Seq[String],
   categoricalStats: Array[CategoricalGroupStats]
-) {
+) extends MetadataLike {
 
   private[op] def this(
     stats: Array[ColumnStatistics],
@@ -146,7 +148,7 @@ case class SummaryStatistics
   min: Seq[Double],
   mean: Seq[Double],
   variance: Seq[Double]
-) {
+) extends MetadataLike {
 
   private[op] def this(colStats: MultivariateStatisticalSummary, sample: Double) = this(
     count = colStats.count,
@@ -199,7 +201,7 @@ case class CategoricalGroupStats
   mutualInfo: Double,
   maxRuleConfidences: Array[Double],
   supports: Array[Double]
-) {
+) extends MetadataLike {
   /**
    * @return metadata of this specific categorical group
    */
@@ -228,7 +230,7 @@ case class CategoricalGroupStats
  * @param mutualInfos          Values of MI for each feature (should be the same for everything coming from the same
  *                             contingency matrix)
  * @param counts               Counts of occurrence for categoricals (n x m array of arrays where n = number of labels
- *                             and m = number of features + 1 with last element being occurance count of labels
+ *                             and m = number of features + 1 with last element being occurrence count of labels
  */
 @deprecated("Functionality replaced by Array[CategoricalGroupStats]", "3.3.0")
 case class CategoricalStats
@@ -238,7 +240,7 @@ case class CategoricalStats
   pointwiseMutualInfos: LabelWiseValues.Type = LabelWiseValues.empty,
   mutualInfos: Array[Double] = Array.empty,
   counts: LabelWiseValues.Type = LabelWiseValues.empty
-) {
+) extends MetadataLike {
   // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
   def toMetadata(): Metadata = {
     val meta = new MetadataBuilder()
@@ -268,7 +270,7 @@ case class Correlations
   values: Seq[Double],
   nanCorrs: Seq[String],
   corrType: CorrelationType
-) {
+) extends MetadataLike {
   assert(featuresIn.length == values.length, "Feature names and correlation values arrays must have the same length")
 
   def this(corrs: Seq[(String, Double)], nans: Seq[String], corrType: CorrelationType) = this(

@@ -31,6 +31,7 @@
 package com.salesforce.op
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.github.fommil.netlib.{BLAS, LAPACK}
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
@@ -54,8 +55,8 @@ import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.{Failure, Success, Try}
 
 /**
- * A class for running an Optimus Prime Workflow.
- * Provides methods to train, score, evaluate and computeUpTo for Optimus Prime Workflow.
+ * A class for running an TransmogrifAI Workflow.
+ * Provides methods to train, score, evaluate and computeUpTo for TransmogrifAI Workflow.
  *
  * @param workflow             the workflow that you want to run (Note: the workflow should have the resultFeatures set)
  * @param trainingReader       reader to use to load up data for training
@@ -234,7 +235,7 @@ class OpWorkflowRunner
       "The streamingScore method requires an streaming score reader to be specified")
 
     // Prepare write path
-    def writePath(timeInMs: Long) = Some(s"${params.writeLocation.get.stripSuffix("/")}/$timeInMs")
+    def writePath(timeInMs: Long) = Some(Paths.get(params.writeLocation.get, timeInMs.toString).toString)
 
     // Load the model to score with and prepare the scoring function
     val workflowModel = workflow.loadModel(params.modelLocation.get).setParameters(params)
@@ -347,7 +348,6 @@ class OpWorkflowRunner
         val m = super.metrics
         log.info("Total run time: {}", m.appDurationPretty)
         OpWorkflowRunner.this.onApplicationEnd(m)
-        spark.sparkContext.removeSparkListener(this)
       }
     }
   }

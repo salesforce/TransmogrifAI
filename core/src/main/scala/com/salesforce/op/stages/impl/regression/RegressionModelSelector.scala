@@ -30,17 +30,15 @@
 
 package com.salesforce.op.stages.impl.regression
 
-import com.salesforce.op.UID
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry._
-import com.salesforce.op.stages.impl.regression.RegressorType._
-import com.salesforce.op.stages.impl.selector.DefaultSelectorParams._
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBase, StageParamNames}
+import com.salesforce.op.stages.impl.ModelsToTry
+import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.stages.makeOutputName
-
-import scala.util.Try
+import enumeratum.Enum
+import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.ml.tuning.ParamGridBuilder
 
 
 /**
@@ -48,10 +46,69 @@ import scala.util.Try
  */
 case object RegressionModelSelector {
 
+  private[op] val modelNames: Seq[RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
+    MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
+
+  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+
+    val lr = new OpLinearRegression()
+    val lrParams = new ParamGridBuilder()
+      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(lr.solver, DefaultSelectorParams.RegSolver)
+      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+      .addGrid(lr.tol, DefaultSelectorParams.Tol)
+      .build()
+
+    val rf = new OpRandomForestRegressor()
+    val rfParams = new ParamGridBuilder()
+      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .build()
+
+    val gbt = new OpGBTRegressor()
+    val gbtParams = new ParamGridBuilder()
+      .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
+      .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
+      .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+      .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
+      .build()
+
+    val dt = new OpDecisionTreeRegressor()
+    val dtParams = new ParamGridBuilder()
+      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+      .build()
+
+    val glr = new OpGeneralizedLinearRegression()
+    val glrParams = new ParamGridBuilder()
+      .addGrid(glr.fitIntercept, DefaultSelectorParams.FitIntercept)
+      .addGrid(glr.family, DefaultSelectorParams.DistFamily)
+      .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
+      .addGrid(glr.tol, DefaultSelectorParams.Tol)
+      .build()
+
+    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, dt -> dtParams, glr -> glrParams)
+  }
+
+
   /**
    * Creates a new Regression Model Selector with a Cross Validation
    */
-  def apply(): RegressionModelSelector = withCrossValidation()
+  def apply(): ModelSelector[ModelType, EstimatorType] = withCrossValidation()
 
   /**
    * Creates a new Regression Model Selector with a Cross Validation
@@ -64,6 +121,13 @@ case object RegressionModelSelector {
    * @param seed                random seed
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
+   * @param modelTypesToUse     list of model types to run grid search on must from supported types in
+   *                            RegressionModelsToTry (OpLinearRegression, OpDecisionTreeRegressor,
+   *                            OpRandomForestRegressor, OpGBTRegressor, OpGeneralizedLinearRegression)
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyperparameters to
+   *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
+   *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
+   *                            prediction (Prediction)
    * @return Regression Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -72,15 +136,17 @@ case object RegressionModelSelector {
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): RegressionModelSelector = {
-    val cv = new OpCrossValidation[RegressorModel, Regressor](
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
     )
-    selector(
-      cv, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
-    )
+    selector(cv, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
+
 
   /**
    * Creates a new Regression Model Selector with a Train Validation Split
@@ -93,6 +159,13 @@ case object RegressionModelSelector {
    * @param seed                random seed
    * @param parallelism         level of parallelism used to schedule a number of models to be trained/evaluated
    *                            so that the jobs can be run concurrently
+   * @param modelTypesToUse     list of model types to run grid search on must from supported types in
+   *                            RegressionModelsToTry (OpLinearRegression, OpDecisionTreeRegressor,
+   *                            OpRandomForestRegressor, OpGBTRegressor, OpGeneralizedLinearRegression)
+   * @param modelsAndParameters pass in an explicit list pairs of estimators and the accompanying hyperparameters to
+   *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
+   *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
+   *                            prediction (Prediction)
    * @return Regression Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -101,82 +174,53 @@ case object RegressionModelSelector {
     validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
-    parallelism: Int = ValidatorParamDefaults.Parallelism
-  ): RegressionModelSelector = {
-    val ts = new OpTrainValidationSplit[RegressorModel, Regressor](
+    parallelism: Int = ValidatorParamDefaults.Parallelism,
+    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
-    selector(
-      ts, dataSplitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators
-    )
+    selector(ts, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
 
+
   private def selector(
-    validator: OpValidator[RegressorModel, Regressor],
-    dataSplitter: Option[DataSplitter],
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]]): RegressionModelSelector = {
-    new RegressionModelSelector(
+    validator: OpValidator[ModelType, EstimatorType],
+    splitter: Option[DataSplitter],
+    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
+    modelTypesToUse: Seq[RegressionModelsToTry],
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
+  ): ModelSelector[ModelType, EstimatorType] = {
+    val modelStrings = modelTypesToUse.map(_.entryName)
+    val modelsToUse =
+      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
+        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+      else modelsAndParameters
+    new ModelSelector(
       validator = validator,
-      dataSplitter = dataSplitter,
+      splitter = splitter,
+      models = modelsToUse,
       evaluators = trainTestEvaluators
-    ) // models on by default
-      .setModelsToTry(RandomForestRegression, LinearRegression, GBTRegression)
-      // Random forest defaults
-      .setRandomForestMaxDepth(MaxDepth: _*)
-      .setRandomForestImpurity(ImpurityReg)
-      .setRandomForestMaxBins(MaxBin)
-      .setRandomForestMinInfoGain(MinInfoGain: _*)
-      .setRandomForestMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setRandomForestNumTrees(MaxTrees)
-      .setRandomForestSubsamplingRate(SubsampleRate)
-      // Linear regression defaults
-      .setLinearRegressionElasticNetParam(ElasticNet)
-      .setLinearRegressionFitIntercept(FitIntercept)
-      .setLinearRegressionMaxIter(MaxIterLin)
-      .setLinearRegressionRegParam(Regularization: _*)
-      .setLinearRegressionSolver(RegSolver)
-      .setLinearRegressionStandardization(Standardized)
-      .setLinearRegressionTol(Tol)
-      // GBT defaults
-      .setGradientBoostedTreeLossType(TreeLossType)
-      .setGradientBoostedTreeMaxBins(MaxBin)
-      .setGradientBoostedTreeMaxDepth(MaxDepth: _*)
-      .setGradientBoostedTreeMinInfoGain(MinInfoGain: _*)
-      .setGradientBoostedTreeMaxIter(MaxIterTree)
-      .setGradientBoostedTreeMinInstancesPerNode(MinInstancesPerNode: _*)
-      .setGradientBoostedTreeStepSize(StepSize)
-      .setGradientBoostedTreeImpurity(ImpurityReg)
-      .setGradientBoostedTreeSubsamplingRate(SubsampleRate)
-      // DT defaults
-      .setDecisionTreeImpurity(ImpurityReg)
-      .setDecisionTreeMaxBins(MaxBin)
-      .setDecisionTreeMaxDepth(MaxDepth: _*)
-      .setDecisionTreeMinInfoGain(MinInfoGain: _*)
-      .setDecisionTreeMinInstancesPerNode(MinInstancesPerNode: _*)
+    )
   }
 
 }
 
 /**
- * Model Selector that selects best regression model
- *
- * @param validator         validator used for the model selector
- * @param uid
- * @param dataSplitter      instance that will split the data into training set and test set
- * @param evaluators List of evaluators applied on training + holdout data for evaluation.
- *
+ * Enumeration of possible regression models in Model Selector
  */
-private[op] class RegressionModelSelector
-(
-  validator: OpValidator[RegressorModel, Regressor],
-  val dataSplitter: Option[DataSplitter],
-  evaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
-  uid: String = UID[RegressionModelSelector]
-) extends ModelSelectorBase[RegressorModel, Regressor](validator = validator, splitter = dataSplitter,
-  evaluators = evaluators, uid = uid)
-  with SelectorRegressors {
+sealed trait RegressionModelsToTry extends ModelsToTry
 
-  final override protected def getOutputsColNamesMap(f1: TransientFeature, f2: TransientFeature): Map[String, String] =
-    Map(StageParamNames.outputParam1Name -> makeOutputName(outputFeatureUid, Seq(f1, f2)))
-
+object RegressionModelsToTry extends Enum[RegressionModelsToTry] {
+  val values = findValues
+  case object OpLinearRegression extends RegressionModelsToTry
+  case object OpDecisionTreeRegressor extends RegressionModelsToTry
+  case object OpRandomForestRegressor extends RegressionModelsToTry
+  case object OpGBTRegressor extends RegressionModelsToTry
+  case object OpGeneralizedLinearRegression extends RegressionModelsToTry
+  case class Custom(private val modeType: Class[_ <: EstimatorType]) extends RegressionModelsToTry {
+    override val entryName: String = modeType.getSimpleName
+  }
 }

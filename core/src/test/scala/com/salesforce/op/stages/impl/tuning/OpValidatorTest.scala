@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.Evaluators
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.ProbabilisticClassifierType.{ProbClassifier, ProbClassifierModel}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomIntegral, RandomReal, RandomVector}
 import org.apache.spark.rdd.RDD
@@ -64,14 +64,11 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
   val label = rawLabel.copy(isResponse = true)
   val multiLabel = rawMultiLabel.copy(isResponse = true)
 
-  val cv = new OpCrossValidation[ProbClassifierModel, ProbClassifier](evaluator = Evaluators.BinaryClassification(),
-    seed = seed, stratify = true)
+  val cv = new OpCrossValidation[ModelSelectorNames.ModelType, ModelSelectorNames.EstimatorType](
+    evaluator = Evaluators.BinaryClassification(), seed = seed, stratify = true)
 
-  val ts = new OpTrainValidationSplit[ProbClassifierModel, ProbClassifier](
-    evaluator = Evaluators.BinaryClassification(),
-    seed = seed,
-    stratify = true
-  )
+  val ts = new OpTrainValidationSplit[ModelSelectorNames.ModelType, ModelSelectorNames.EstimatorType](
+    evaluator = Evaluators.BinaryClassification(), seed = seed, stratify = true)
 
   val binaryDS = data.select(label, features)
   val multiDS = data.select(multiLabel, features)
@@ -88,7 +85,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
+    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {
@@ -107,7 +104,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.metadataBuilder.build() should not be new MetadataBuilder().build()
+    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
   }
 
   it should "stratify multi class data" in {

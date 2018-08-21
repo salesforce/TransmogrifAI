@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
 import org.apache.spark.sql.Dataset
@@ -61,10 +61,10 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
     val dataCutter = DataCutter(seed = seed).setMinLabelFraction(0.0).setMaxLabelCategories(100000)
     val split = dataCutter.prepare(randDF)
     split.train.count() shouldBe dataSize
-    val keptMeta = split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept)
+    val keptMeta = split.summary.get.asInstanceOf[DataCutterSummary].labelsKept
     keptMeta.length shouldBe 1000
     keptMeta should contain theSameElementsAs dataCutter.getLabelsToKeep
-    val dropMeta = split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped)
+    val dropMeta = split.summary.get.asInstanceOf[DataCutterSummary].labelsDropped
     dropMeta.length shouldBe 0
     dropMeta should contain theSameElementsAs dataCutter.getLabelsToDrop
 
@@ -73,8 +73,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
       .setMaxLabelCategories(100000)
       .prepare(biasDF)
     split2.train.count() shouldBe dataSize
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept).length shouldBe 1000
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped).length shouldBe 0
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsKept.length shouldBe 1000
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsDropped.length shouldBe 0
   }
 
   it should "throw an error when all the data is filtered out" in {
@@ -93,13 +93,13 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
       .prepare(randDF)
 
     findDistinct(split.train).count() shouldBe 100
-    split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept).length shouldBe 100
-    split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped).length shouldBe 900
+    split.summary.get.asInstanceOf[DataCutterSummary].labelsKept.length shouldBe 100
+    split.summary.get.asInstanceOf[DataCutterSummary].labelsDropped.length shouldBe 900
 
     val split2 = DataCutter(seed = seed).setMaxLabelCategories(3).prepare(biasDF)
     findDistinct(split2.train).collect().toSet shouldEqual Set(0.0, 1.0, 2.0)
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept).length shouldBe 3
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped).length shouldBe 997
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsKept.length shouldBe 3
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsDropped.length shouldBe 997
   }
 
   it should "filter out anything that does not have at least the specified data fraction" in {
@@ -113,13 +113,13 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
     val distTrain = findDistinct(split.train)
     distTrain.count() < distinct shouldBe true
     distTrain.count() > 0 shouldBe true
-    split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept).length +
-      split.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped).length shouldBe distinct
+    split.summary.get.asInstanceOf[DataCutterSummary].labelsKept.length +
+      split.summary.get.asInstanceOf[DataCutterSummary].labelsDropped.length shouldBe distinct
 
     val split2 = DataCutter(seed = seed).setMinLabelFraction(0.20).setReserveTestFraction(0.5).prepare(biasDF)
     findDistinct(split2.train).count() shouldBe 3
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsKept).length shouldBe 3
-    split2.metadata.getDoubleArray(ModelSelectorBaseNames.LabelsDropped).length shouldBe 997
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsKept.length shouldBe 3
+    split2.summary.get.asInstanceOf[DataCutterSummary].labelsDropped.length shouldBe 997
   }
 
   it should "filter out using the var labelsToKeep" in {

@@ -80,9 +80,13 @@ class MimeTypeDetectorTest extends OpTransformerSpec[Text, MimeTypeDetector] wit
 trait Base64TestData {
   self: TestSparkContext =>
 
-  lazy val (randomData, randomBase64) = TestFeatureBuilder(
-    Base64.empty +: Base64("") +: RandomText.base64(0, 10000).take(10).toSeq
-  )
+  val seed = 42L
+
+  lazy val (randomData, randomBase64) = {
+    val rnd = RandomText.base64(0, 10000)
+    rnd.reset(seed)
+    TestFeatureBuilder(Base64.empty +: Base64("") +: rnd.take(10).toSeq)
+  }
   lazy val (realData, realBase64) = TestFeatureBuilder(
     Seq(
       "811harmo24to36.mp3", "820orig36to48.wav", "face.png",

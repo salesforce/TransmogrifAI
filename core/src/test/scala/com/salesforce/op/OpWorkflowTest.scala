@@ -37,15 +37,15 @@ import com.salesforce.op.filters.RawFeatureFilter
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.readers._
 import com.salesforce.op.stages.base.unary._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.ml.param.BooleanParam
+import org.apache.spark.ml.param.{BooleanParam, ParamMap}
+import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DoubleType, StringType}
 import org.apache.spark.sql.{Dataset, SparkSession}
@@ -132,9 +132,9 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val checked = survivedNum.sanityCheck(fv)
-    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, checked).getOutput()
+    val pred = BinaryClassificationModelSelector().setInput(survivedNum, checked).getOutput()
     val wf = new OpWorkflow()
-      .setResultFeatures(whyNotNormed, prob)
+      .setResultFeatures(whyNotNormed, pred)
       .withRawFeatureFilter(Option(dataReader), None)
     wf.rawFeatures should contain theSameElementsAs
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
@@ -152,11 +152,12 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val checked = survivedNum.sanityCheck(fv)
-    val (pred, rawPred, prob) = BinaryClassificationModelSelector
-      .withTrainValidationSplit(splitter = None, seed = 42, validationMetric = Evaluators.BinaryClassification.error())
+    val pred = BinaryClassificationModelSelector
+      .withTrainValidationSplit(splitter = None, seed = 42, validationMetric = Evaluators.BinaryClassification.error(),
+        modelTypesToUse = Seq(BinaryClassificationModelsToTry.OpLogisticRegression))
       .setInput(survivedNum, checked).getOutput()
     val wf = new OpWorkflow()
-      .setResultFeatures(whyNotNormed, prob)
+      .setResultFeatures(whyNotNormed, pred)
       .withRawFeatureFilter(
         trainingReader = Option(dataReader),
         scoringReader = None,
@@ -166,16 +167,16 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val wfM = wf.train()
     val data = wfM.score()
     data.schema.fields.size shouldBe 3
-    val Array(whyNotNormed2, prob2) = wfM.getUpdatedFeatures(Array(whyNotNormed, prob))
+    val Array(whyNotNormed2, prob2) = wfM.getUpdatedFeatures(Array(whyNotNormed, pred))
     data.select(whyNotNormed2.name, prob2.name).count() shouldBe 6
   }
 
   it should "throw an error when it is not possible to remove blacklisted features" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
-    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+    val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
     val wf = new OpWorkflow()
-      .setResultFeatures(whyNotNormed, prob)
+      .setResultFeatures(whyNotNormed)
       .withRawFeatureFilter(Option(dataReader), None)
 
     val error = intercept[RuntimeException](
@@ -226,9 +227,9 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "use the raw feature filter to generate data instead of the reader when the filter is specified" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
-    val (pred, rawPred, prob) = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+    val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
     val wf = new OpWorkflow()
-      .setResultFeatures(pred, rawPred, prob)
+      .setResultFeatures(pred)
       .withRawFeatureFilter( Option(dataReader), Option(simpleReader),
         maxFillRatioDiff = 1.0 ) // only height and the female key of maps should meet this criteria
     val data = wf.computeDataUpTo(weight)
@@ -292,43 +293,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     workflow.setParameters(new OpParams())
   }
 
-  it should "correctly set parameters on the workflow even when the params are not spark params" in {
-    val features = Seq(height, weight, gender, age).transmogrify()
-    val survivedNum = survived.occurs()
-    val (pred, rawPred, prob) =
-      BinaryClassificationModelSelector.withCrossValidation(
-        seed = 4242,
-        splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)))
-        .setModelsToTry(LogisticRegression)
-        .setLogisticRegressionRegParam(0.01)
-        .setInput(survivedNum, features)
-        .getOutput()
-    val newWorkflow = new OpWorkflow().setResultFeatures(features, pred)
-
-    newWorkflow.stages.collect {
-      case bc: Stage1BinaryClassificationModelSelector =>
-        bc.get(bc.useLR) shouldBe Some(true)
-        bc.get(bc.useRF) shouldBe Some(false)
-        bc.lRGrid.build().length shouldBe 1
-    }
-
-    newWorkflow.setParameters(
-      OpParams(stageParams =
-        Map("Stage1BinaryClassificationModelSelector" ->
-          Map("LogisticRegressionRegParam" -> Seq(0.05, 0.5, 5),
-            "ModelsToTry" -> Seq(LogisticRegression, RandomForest)
-          ))
-      )
-    )
-    newWorkflow.stages.collect {
-      case bc: Stage1BinaryClassificationModelSelector =>
-        bc.get(bc.useLR) shouldBe Some(true)
-        bc.get(bc.useRF) shouldBe Some(true)
-        bc.lRGrid.build().length shouldBe 3
-    }
-
-  }
-
   it should "allow addition of features to a fitted workflow by producing a new workflow with the fitted stages" in {
     val model = workflow.setReader(dataReader).train()
     val densityNormed = new NormEstimatorTest[Real]().setInput(density).getOutput()
@@ -374,14 +338,16 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .setCheckSample(1.0)
       .setInput(survivedNum, features)
       .getOutput()
-    val (pred, rawPred, prob) =
-      BinaryClassificationModelSelector.withCrossValidation(
-        seed = 4242,
-        splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)))
-        .setModelsToTry(LogisticRegression)
-        .setLogisticRegressionRegParam(0.01, 0.1)
-        .setInput(survivedNum, checked)
-        .getOutput()
+
+    val lr = new OpLogisticRegression()
+    val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
+
+    val pred = BinaryClassificationModelSelector.withCrossValidation(
+      seed = 4242,
+      splitter = Option(DataBalancer(reserveTestFraction = 0.2, seed = 4242)),
+      modelsAndParameters = Seq(lr -> lrParams))
+      .setInput(survivedNum, checked)
+      .getOutput()
     val newWorkflow = new OpWorkflow().setResultFeatures(features, pred).setReader(dataReader)
     val fittedWorkflow = newWorkflow.train()
 
@@ -390,16 +356,16 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary = fittedWorkflow.summary()
     log.info(summary)
     summary should include(classOf[SanityChecker].getSimpleName)
-    summary should include("logreg")
-    summary should include(""""regParam" : "0.1"""")
-    summary should include(""""regParam" : "0.01"""")
-    summary should include(ModelSelectorBaseNames.HoldOutEval)
-    summary should include(ModelSelectorBaseNames.TrainingEval)
+    summary should include("OpLogisticRegression")
+    summary should include("""  "regParam" : 0.1,""")
+    summary should include("""  "regParam" : 0.01,""")
+    summary should include("ValidationResults")
+    summary should include("HoldoutEvaluation")
 
     val prettySummary = fittedWorkflow.summaryPretty()
     log.info(prettySummary)
-    prettySummary should include(s"Selected Model - $LogisticRegression")
-    prettySummary should include("| area under PR    | 0.25")
+    prettySummary should include("Selected Model - OpLogisticRegression")
+    prettySummary should include("area under precision-recall | 1.0                | 0.0")
     prettySummary should include("Model Evaluation Metrics")
     prettySummary should include("Top Model Insights")
     prettySummary should include("Top Positive Correlations")
@@ -409,19 +375,18 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "be able to refit a workflow with calibrated probability" in {
     val features = Seq(height, weight, gender, age, stringMap, genderPL).transmogrify()
     val survivedNum = survived.occurs()
+    val lr = new OpLogisticRegression()
+    val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
     val checked = new SanityChecker().setCheckSample(1.0).setInput(survivedNum, features).getOutput()
-    val (pred, rawPred, prob) =
-      BinaryClassificationModelSelector
-        .withCrossValidation(seed = 42, splitter = None)
-        .setModelsToTry(LogisticRegression)
-        .setLogisticRegressionRegParam(0.01, 0.1)
-        .setInput(survivedNum, checked)
-        .getOutput()
+    val pred = BinaryClassificationModelSelector.withCrossValidation(seed = 42, splitter = None,
+      modelsAndParameters = Seq(lr -> lrParams))
+      .setInput(survivedNum, checked)
+      .getOutput()
     val newWorkflow = new OpWorkflow().setResultFeatures(pred).setReader(dataReader)
     val fittedWorkflow = newWorkflow.train()
     fittedWorkflow.save(workflowLocation3)
     val loadedWorkflow = newWorkflow.loadModel(workflowLocation3)
-    val probability = prob.map[RealNN](_.v(0).toRealNN)
+    val probability = pred.map[RealNN](_.probability(0).toRealNN)
     val calibrated = probability.toPercentile()
     val calibratedWorkflow = new OpWorkflow().setResultFeatures(calibrated).setReader(dataReader)
     val newTrained = calibratedWorkflow.withModelStages(loadedWorkflow).train()
@@ -437,22 +402,17 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val features = Seq(height, weight, gender, age).transmogrify()
     val survivedNum = survived.occurs()
     val checked = new SanityChecker().setCheckSample(1.0).setInput(survivedNum, features).getOutput()
-    val (pred, rawPred, prob) =
-      BinaryClassificationModelSelector
-        .withCrossValidation(seed = 42, splitter = None)
-        .setModelsToTry(LogisticRegression)
-        .setLogisticRegressionRegParam(0.01, 0.1)
-        .setInput(survivedNum, checked)
-        .getOutput()
-    val probability = prob.map[RealNN](_.v(0).toRealNN)
+    val lr = new OpLogisticRegression()
+    val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
+    val pred = BinaryClassificationModelSelector.withCrossValidation(seed = 42, splitter = None,
+      modelsAndParameters = Seq(lr -> lrParams))
+      .setInput(survivedNum, checked)
+      .getOutput()
+    val probability = pred.map[RealNN](_.probability(0).toRealNN)
     val calibrated = probability.toPercentile()
     val newWorkflow = new OpWorkflow().setResultFeatures(pred, calibrated).setReader(dataReader)
     val fittedWorkflow = newWorkflow.train()
-    val evaluator = Evaluators.BinaryClassification()
-      .setRawPredictionCol(rawPred)
-      .setLabelCol(survivedNum)
-      .setPredictionCol(pred)
-      .setProbabilityCol(prob)
+    val evaluator = Evaluators.BinaryClassification().setLabelCol(survivedNum).setPredictionCol(pred)
 
     val scores1 = fittedWorkflow.score(keepIntermediateFeatures = true)
     val (scores2, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator, keepIntermediateFeatures = true)
@@ -466,12 +426,10 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     scores1.schema.fields.map(_.metadata.toString()) should contain theSameElementsAs
       scores2.schema.fields.map(_.metadata.toString())
 
-    val probs = scores2.collect(prob)
-    val thresholds = probs.map(_.value(1)).distinct.sorted.reverse
+    val probs = scores2.collect(pred)
+    val thresholds = probs.map(_.probability(1)).distinct.sorted.reverse
 
-    metrics shouldBe BinaryClassificationMetrics(1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 1.0, 5.0, 0.0, 0.0,
-      thresholds.toSeq, Seq(1.0, 0.5, 0.25, 0.2, 1.0/6), Seq(1.0, 1.0, 1.0, 1.0, 1.0),
-      Seq(0.0, 0.2, 0.6, 0.8, 1.0))
+    metrics.isInstanceOf[BinaryClassificationMetrics] shouldBe true
   }
 
   it should "return an empty data set if passed empty data for scoring" in {

@@ -31,10 +31,10 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.slf4j.LoggerFactory
 
 case object DataBalancer {
@@ -72,7 +72,7 @@ case object DataBalancer {
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-  @transient private[op] val metadataBuilder = new MetadataBuilder()
+  @transient private[op] var summary: Option[DataBalancerSummary] = None
 
   /**
    * Computes the upSample and downSample proportions.
@@ -164,11 +164,6 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     val negativeCount = negativeData.count()
     val totalCount = positiveCount + negativeCount
     val sampleF = getSampleFraction
-
-    // feed metadata with counts and sample fraction
-    metadataBuilder.putLong(ModelSelectorBaseNames.Positive, positiveCount)
-    metadataBuilder.putLong(ModelSelectorBaseNames.Negative, negativeCount)
-    metadataBuilder.putDouble(ModelSelectorBaseNames.Desired, sampleF)
     log.info(s"Data has $positiveCount positive and $negativeCount negative.")
 
     val (smallCount, bigCount) = {
@@ -186,11 +181,14 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     if (smallCount.toDouble / totalCount.toDouble >= sampleF) {
       log.info(
         s"Not resampling data: $smallCount small count and $bigCount big count is greater than" +
-          s" requested ${sampleF}"
+          s" requested $sampleF"
       )
       // if data is too big downsample
       val fraction = if (maxTrainSample < totalCount) maxTrainSample / totalCount.toDouble else 1.0
       setAlreadyBalancedFraction(fraction)
+
+      summary = Option(DataBalancerSummary(positiveLabels = positiveCount, negativeLabels = negativeCount,
+        desiredFraction = sampleF, upSamplingFraction = 0.0, downSamplingFraction = fraction))
 
     } else {
       log.info(s"Sampling data to get $sampleF split versus $smallCount small and $bigCount big")
@@ -199,9 +197,9 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
       setDownSampleFraction(downSample)
       setUpSampleFraction(upSample)
 
-      // feed metadata with upsample and downsample
-      metadataBuilder.putDouble(ModelSelectorBaseNames.UpSample, upSample)
-      metadataBuilder.putDouble(ModelSelectorBaseNames.DownSample, downSample)
+      // feed metadata with summary
+      summary = Option(DataBalancerSummary(positiveLabels = positiveCount, negativeLabels = negativeCount,
+        desiredFraction = sampleF, upSamplingFraction = upSample, downSamplingFraction = downSample))
 
       val (posFraction, negFraction) =
         if (positiveCount < negativeCount) (upSample, downSample)
@@ -250,15 +248,15 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     // downSample and which class is in minority
     if (isSet(isPositiveSmall) && isSet(downSampleFraction) && isSet(upSampleFraction)) {
       val (down, up) = ($(downSampleFraction), $(upSampleFraction))
-      log.info(s"Sample fractions: downSample of ${down}, upSample of ${up}")
+      log.info(s"Sample fractions: downSample of $down, upSample of $up")
       val (smallData, bigData) = if ($(isPositiveSmall)) (positiveData, negativeData) else (negativeData, positiveData)
-      new ModelData(rebalance(smallData, up, bigData, down, seed).toDF(), metadataBuilder)
+      new ModelData(rebalance(smallData, up, bigData, down, seed).toDF().persist(), summary)
     } else { // Data is already balanced, but need to be sampled
       val fraction = $(alreadyBalancedFraction)
       log.info(s"Data is already balanced, yet it will be sampled by a fraction of $fraction")
       val balanced = sampleBalancedData(fraction = fraction, seed = seed,
         data = data, positiveData = positiveData, negativeData = negativeData).toDF()
-      new ModelData(balanced, metadataBuilder)
+      new ModelData(balanced.persist(), summary)
     }
   }
 
@@ -280,8 +278,6 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     downSampleFraction: Double,
     seed: Long
   ): Dataset[T] = {
-
-    import smallData.sparkSession.implicits._
     val bigDataTrain = bigData.sample(withReplacement = false, downSampleFraction, seed = seed)
     val smallDataTrain = upSampleFraction match {
       case u if u > 1.0 => smallData.sample(withReplacement = true, u, seed = seed)
@@ -426,4 +422,32 @@ trait DataBalancerParams extends Params {
   }
 
   private[op] def getAlreadyBalancedFraction: Double = $(alreadyBalancedFraction)
+}
+
+/**
+ * Summary for data balancer run for storage in metadata
+ * @param positiveLabels count of positive labels
+ * @param negativeLabels count of negative labels
+ * @param desiredFraction desired min fraction of smaller label count
+ * @param upSamplingFraction up/down sampling for smaller class of label
+ * @param downSamplingFraction down sampling for larger class of label
+ */
+case class DataBalancerSummary
+(
+  positiveLabels: Long,
+  negativeLabels: Long,
+  desiredFraction: Double,
+  upSamplingFraction: Double,
+  downSamplingFraction: Double
+) extends SplitterSummary {
+  override def toMetadata(): Metadata = {
+    new MetadataBuilder()
+      .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .putLong(ModelSelectorNames.Positive, positiveLabels)
+      .putLong(ModelSelectorNames.Negative, negativeLabels)
+      .putDouble(ModelSelectorNames.Desired, desiredFraction)
+      .putDouble(ModelSelectorNames.UpSample, upSamplingFraction)
+      .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
+      .build()
+  }
 }

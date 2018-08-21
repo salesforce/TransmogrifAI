@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import org.apache.spark.ml.util.Identifiable
 
 import scala.reflect._
-import scala.reflect.runtime.universe._
 
 /**
  * Unique Identifier (UID) generator

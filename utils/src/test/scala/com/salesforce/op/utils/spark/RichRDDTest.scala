@@ -52,14 +52,14 @@ class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
 
   property("save as a text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir + "/op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
       rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }
   }
   property("save as a compressed text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir + "/op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
       rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }

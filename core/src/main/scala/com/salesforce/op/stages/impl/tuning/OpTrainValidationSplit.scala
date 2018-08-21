@@ -21,7 +21,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.evaluators.OpEvaluatorBase
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
@@ -40,7 +40,10 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
   val parallelism: Int = ValidatorParamDefaults.Parallelism
 ) extends OpValidator[M, E] {
 
-  val validationName: String = ModelSelectorBaseNames.TrainValSplitResults
+  val validationName: String = ModelSelectorNames.TrainValSplitResults
+
+  override def getParams(): Map[String, Any] = Map("trainRatio" -> trainRatio, "seed" -> seed,
+    "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
 
   private[op] override def validate[T](
     modelInfo: Seq[(E, Array[ParamMap])],

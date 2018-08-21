@@ -28,14 +28,39 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.regression
+package com.salesforce.op.utils.io.csv
 
+import com.salesforce.op.test.TestSparkContext
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{AnalysisException, DataFrame}
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-import org.apache.spark.ml.Estimator
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.ml.regression.RegressionModel
+@RunWith(classOf[JUnitRunner])
+class CSVInOutTest extends FlatSpec with TestSparkContext {
+  private val csvReader = new CSVInOut(CSVOptions(header = true))
+  private val csvFile = s"$testDataDir/PassengerDataAllWithHeader.csv"
 
-object RegressorType {
-  type RegressorModel = RegressionModel[Vector, _]
-  type Regressor = Estimator[_ <: RegressorModel]
+  Spec[CSVInOut] should "throw error for bad file paths with DataFrame" in {
+    val error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))
+    error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/dataframe;")
+  }
+
+  it should "throw error for bad file paths with RDD" in {
+    val error = intercept[AnalysisException](csvReader.readRDD("/bad/file/path/read/rdd"))
+    error.getMessage should endWith ("Path does not exist: file:/bad/file/path/read/rdd;")
+  }
+
+  it should "read a CSV file to DataFrame" in {
+    val res = csvReader.readDataFrame(csvFile)
+    res shouldBe a[DataFrame]
+    res.count shouldBe 891
+  }
+
+  it should "read a CSV file to RDD" in {
+    val res = csvReader.readRDD(csvFile)
+    res shouldBe a[RDD[_]]
+    res.count shouldBe 891
+  }
 }

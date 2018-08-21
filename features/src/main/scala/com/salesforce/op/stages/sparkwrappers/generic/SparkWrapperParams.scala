@@ -32,7 +32,7 @@ package com.salesforce.op.stages.sparkwrappers.generic
 
 import com.salesforce.op.stages.SparkStageParam
 import org.apache.spark.ml.PipelineStage
-import org.apache.spark.ml.param.{Param, Params, StringArrayParam}
+import org.apache.spark.ml.param.{Params, StringArrayParam}
 
 
 /**
@@ -56,7 +56,7 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   )
 
   final val sparkMlStage = new SparkStageParam[S](
-    parent = this, name = "sparkMlStage", doc = "the spark stage that is being wrapped for optimus prime"
+    parent = this, name = "sparkMlStage", doc = "the spark stage that is being wrapped for TransmogrifAI"
   )
 
   setDefault(sparkMlStage, None)
