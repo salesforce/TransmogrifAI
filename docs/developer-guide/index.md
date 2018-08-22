@@ -1035,10 +1035,3 @@ workflow.setParameters(new OpParams(stageParams = ("MyTopKStage" -> ("TopK" -> 1
 ```
 
 Here we are resetting the “TopK” parameter of a stage with class name “MyTopKStage” to a value of 10. Caution must be exercised here because valid settings are not checked until runtime. This method is primarily designed to be used with CLI and Scheduler services as a means of injecting parameters values.
-
-
-***
-
-
-.. toctree::
-   :maxdepth: 2
