@@ -93,19 +93,13 @@ html_theme = 'sphinx_rtd_theme'
 #
 html_theme_options = {
     'display_version': True,
-    'prev_next_buttons_location': 'bottom',
+    'prev_next_buttons_location': 'None',
     'style_external_links': False,
     # Toc options
     'collapse_navigation': True,
     'sticky_navigation': True,
     'navigation_depth': 4,
     'titles_only': False
-}
-
-html_context = {
-    'display_github': False, # Add 'Edit on Github' link instead of 'View page source'
-    'last_updated': True,
-    'commit': False,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
