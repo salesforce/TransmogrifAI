@@ -160,7 +160,7 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       val distString = (json \ RawFeatureDistributions.entryName).extract[String]
       JsonUtils.fromString[Array[FeatureDistribution]](distString)
     } else {
-      Try(Array.empty[FeatureDistribution])
+      Success(Array.empty[FeatureDistribution])
     }
   }
 
