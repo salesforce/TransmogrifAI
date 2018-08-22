@@ -3,7 +3,6 @@
 We provide a convenient way to bootstrap you first project with TransmogrifAI using the TransmogrifAI CLI.
 As an illustration, let's generate a binary classification model with the Titanic passenger data.
 
-### Quick Start
 Clone the TransmogrifAI repo:
 ```bash
 git clone https://github.com/salesforce/TransmogrifAI.git
