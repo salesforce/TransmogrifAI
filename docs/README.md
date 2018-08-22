@@ -4,12 +4,12 @@
 
 ## Running locally
 
-If you wish to run the docs locally youw would need to have some dependencies installed:
+If you wish to run the docs locally install the following dependencies:
 ```bash
 pip install sphinx sphinx-autobuild recommonmark sphinx_rtd_theme
 ```
 
-Then simply:
+Then simply run:
 ```bash
 cd docs
 make html
