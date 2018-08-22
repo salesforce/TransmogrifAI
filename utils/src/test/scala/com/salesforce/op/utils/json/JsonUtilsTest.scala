@@ -99,7 +99,7 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     val person = Person("Foo Bar", Address("Talkeetna", "AK"))
     JsonUtils.fromFile[Person](jsonFile) match {
       case Failure(e) => fail(e)
-      case Success(value) => assert(value, person)
+      case Success(value) => value shouldBe person
     }
   }
 
@@ -108,7 +108,7 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     val person = Person("Foo Bar", Address("Talkeetna", "AK"))
     JsonUtils.fromFile[Person](ymlFile) match {
       case Failure(e) => fail(e)
-      case Success(value) => assert(value, person)
+      case Success(value) => value shouldBe person
     }
   }
 
@@ -146,11 +146,6 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
   def assert(v: Seq[Double], expected: Seq[Double]): Assertion = {
     v.seq.zip(expected).foreach { case (v1, v2) => assert(v1, v2) }
     v.seq.size shouldBe expected.size
-  }
-
-  def assert(v: Person, expected: Person): Assertion = {
-    assert(v.name === expected.name)
-    assert(v.address === expected.address)
   }
 
 }
