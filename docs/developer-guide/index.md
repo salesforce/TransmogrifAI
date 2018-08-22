@@ -1,49 +1,4 @@
-## Table Of Contents
-* [Features](Developer-Guide#features)
-  * [Type Hierarchy and Automatic Feature Engineering](Developer-Guide#type-hierarchy-and-automatic-feature-engineering)
-  * [Feature Creation](Developer-Guide#feature-creation)
-  * [FeatureBuilders](Developer-Guide#featurebuilders)
-* [Stages](Developer-Guide#stages)
-* [Transformers](Developer-Guide#transformers)
-  * [TransmogrifAI Transformers](Developer-Guide#transmogrifai-transformers)
-  * [Writing your own transformer](Developer-Guide#writing-your-own-transformer)
-  * [Wrapping a SparkML transformer](Developer-Guide#wrapping-a-sparkml-transformer)
-  * [Wrapping a non serializable external library](Developer-Guide#wrapping-a-non-serializable-external-library)
-* [Estimators](Developer-Guide#estimators)
-  * [TransmogrifAI Estimators](Developer-Guide#transmogrifai-estimators)
-  * [Writing your own estimator](Developer-Guide#writing-your-own-estimator)
-  * [Wrapping a SparkML estimator](Developer-Guide#wrapping-a-sparkml-estimator)
-* [Creating Shortcuts for Transformers and Estimators](Developer-Guide#creating-shortcuts-for-transformers-and-estimators)
-  * [Shortcuts Naming Convention](Developer-Guide#shortcuts-naming-convention)
-* [Customizing AutoML Stages](Developer-Guide#customizing-automl-stages)
-  * [Transmogrification](Developer-Guide#transmogrification)
-  * [SanityChecker](Developer-Guide#sanitychecker)
-  * [RawFeatureFilter](Developer-Guide#rawfeaturefilter)
-  * [Model Selector](Developer-Guide#modelselector)
-* [Interoperability with SparkML](Developer-Guide#interoperability-with-sparkml)
-* [Workflows](Developer-Guide#workflows)
-  * [Creating A Workflow](Developer-Guide#creating-a-workflow)
-  * [Fitting a Workflow](Developer-Guide#fitting-a-workflow)
-  * [Fitted Workflows](Developer-Guide#fitted-workflows)
-  * [Saving Workflows](Developer-Guide#saving-workflows)
-  * [Loading saved Workflows](Developer-Guide#loading-saved-workflows)
-  * [Removing problematic features](Developer-Guide#removing-problematic-features)
-  * [Extracting ModelInsights from a Fitted Workflow](Developer-Guide#extracting-modelinsights-from-a-fitted-workflow)
-  * [Extracting a Particular Stage from a Fitted Workflow](Developer-Guide#extracting-a-particular-stage-from-a-fitted-workflow)
-  * [Adding new features to a fitted workflow](Developer-Guide#adding-new-features-to-a-fitted-workflow)
-* [Metadata](Developer-Guide#metadata)
-* [DataReaders](Developer-Guide#datareaders)
-  * [Aggregate Data Readers](Developer-Guide#aggregate-data-readers)
-  * [Conditional Data Readers](Developer-Guide#conditional-data-readers)
-  * [Joined Data Readers](Developer-Guide#joined-data-readers)
-* [Evaluators](Developer-Guide#evaluators)
-  * [Evaluators Factory](Developer-Guide#evaluators-factory)
-  * [Single Evaluation](Developer-Guide#single-evaluation)
-  * [Multiple Evaluation](Developer-Guide#multiple-evaluation)
-  * [Creating a custom evaluator](Developer-Guide#creating-a-custom-evaluator)
-* [TransmogrifAI App and Runner](Developer-Guide#transmogrifai-app-and-runner)
-* [Parameter Injection Into Workflows and Workflow Runners](Developer-Guide#parameter-injection-into-workflows-and-workflow-runners)
-
+# Developer Guide
 
 ## Features
 
@@ -1083,3 +1038,7 @@ Here we are resetting the “TopK” parameter of a stage with class name “MyT
 
 
 ***
+
+
+.. toctree::
+   :maxdepth: 2

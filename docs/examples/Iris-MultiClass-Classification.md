@@ -1,3 +1,5 @@
+# Iris MultiClass Classification
+
 The following code illustrates how TransmogrifAI can be used to do classify multiple classes over the Iris dataset.
 The code for this example can be found [here](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld/src/main/scala/com/salesforce/hw/iris), and the data over [here](https://github.com/salesforce/op/tree/master/helloworld/src/main/resources/IrisDataset).
 

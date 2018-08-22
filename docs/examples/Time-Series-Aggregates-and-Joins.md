@@ -1,3 +1,5 @@
+# Time Series Aggregates and Joins
+
 In this example, we will walk you through some of the powerful tools TransmogrifAI has for data preparation, in particular for time series aggregates and joins. The code for this example can be found [here](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld/src/main/scala/com/salesforce/hw/dataprep/JoinsAndAggregates.scala), and the data over [here](https://github.com/salesforce/op/tree/master/helloworld/src/main/resources/EmailDataset). 
 
 In this example, we would like to build a training data set from two different tables -- a table of Email Sends, and a table of Email Clicks. The following case classes describe the schemas of the two tables:

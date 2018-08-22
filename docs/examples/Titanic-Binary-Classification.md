@@ -1,3 +1,5 @@
+# Titanic Binary Classification
+
 Here we describe a very simple TransmogrifAI workflow for predicting survivors in the often-cited Titanic dataset. The code for building and applying the Titanic model can be found here: [Titanic Code](https://github.com/salesforce/TransmogrifAI/blob/master/helloworld/src/main/scala/com/salesforce/hw/OpTitanicSimple.scala), and the data can be found here: [Titanic Data](https://github.com/salesforce/op/blob/master/helloworld/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv).
 
 You can run this code as follows:

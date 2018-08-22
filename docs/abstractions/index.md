@@ -1,3 +1,5 @@
+# Abstractions
+
 TransmogrifAI is designed to simplify the creation of machine learning workflows. To this end we have created an abstraction for creating and running machine learning workflows. The abstraction is made up of Features, Stages, Workflows and Readers which interact as shown in the diagram below.
 
 ![TransmogrifAI Abstractions](https://github.com/salesforce/TransmogrifAI/raw/master/resources/AbstractionDiagram-cropped.png)

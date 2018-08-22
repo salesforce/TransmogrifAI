@@ -1,3 +1,5 @@
+# Running from Spark Shell
+
 Start up your spark shell:
 
 ```bash

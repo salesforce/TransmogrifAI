@@ -1,3 +1,4 @@
+# AutoML Capabilities
 
 ## Vectorizers and Transmogrification
 
