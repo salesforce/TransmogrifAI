@@ -34,6 +34,8 @@ import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.stages.{OpPipelineStageReader, _}
 import OpPipelineStageReadWriteShared._
+import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
@@ -86,11 +88,13 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json, path))
       blacklist <- Try(resolveBlacklist(json))
+      distributions <- resolveRawFeatureDistributions(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
       .setBlacklist(blacklist)
+      .setRawFeatureDistributions(distributions)
   }
 
   private def resolveBlacklist(json: JValue): Array[OPFeature] = {
@@ -151,5 +155,13 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     }
   }
 
+  private def resolveRawFeatureDistributions(json: JValue): Try[Array[FeatureDistribution]] = {
+    if ((json \ RawFeatureDistributions.entryName) != JNothing) { // for backwards compatibility
+      val distString = (json \ RawFeatureDistributions.entryName).extract[String]
+      JsonUtils.fromString[Array[FeatureDistribution]](distString)
+    } else {
+      Try(Array.empty[FeatureDistribution])
+    }
+  }
 
 }

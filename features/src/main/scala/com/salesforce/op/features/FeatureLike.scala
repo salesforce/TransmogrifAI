@@ -75,7 +75,7 @@ trait FeatureLike[O <: FeatureType] {
   /**
    * The distribution information of the feature (is a sequence because map features have distribution for each key)
    */
-  val distributions: Seq[FeatureDistributionBase]
+  val distributions: Seq[FeatureDistributionLike]
 
   /**
    * Weak type tag of the feature type O
@@ -442,6 +442,6 @@ trait FeatureLike[O <: FeatureType] {
    * @param distributions Seq of the feature distributions for the feature
    * @return A feature with the distributions assocated
    */
-  private[op] def withDistributions(distributions: Seq[FeatureDistributionBase]): FeatureLike[O]
+  private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]): FeatureLike[O]
 
 }

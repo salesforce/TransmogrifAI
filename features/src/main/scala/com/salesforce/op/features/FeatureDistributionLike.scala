@@ -34,7 +34,7 @@ package com.salesforce.op.features
 /**
  * Keeps the distribution information for features
  */
-trait FeatureDistributionBase {
+trait FeatureDistributionLike {
 
   /**
    * name of the feature
@@ -42,7 +42,7 @@ trait FeatureDistributionBase {
   val name: String
 
   /**
-   * key map key associated with distribution (when the feature is a map)
+   * map key associated with distribution (when the feature is a map)
    */
   val key: Option[String]
 
@@ -57,7 +57,7 @@ trait FeatureDistributionBase {
   val nulls: Long
 
   /**
-   * binned counts of feature values (hashed for strings, evently spaced bins for numerics)
+   * binned counts of feature values (hashed for strings, evenly spaced bins for numerics)
    */
   val distribution: Array[Double]
 

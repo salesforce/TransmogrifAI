@@ -193,13 +193,13 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
     }
     "with distributions" should {
       "make a copy of the feature containing the specified distributions" in {
-        val distrib = new FeatureDistributionBase {
-          override val count: Long = 1L
-          override val nulls: Long = 1L
-          override val distribution: Array[Double] = Array(0.5)
-          override val summaryInfo: Array[Double] = Array(0.5)
-          override val name: String = age.name
-          override val key: Option[String] = None
+        val distrib = new FeatureDistributionLike {
+          val count: Long = 1L
+          val nulls: Long = 1L
+          val distribution: Array[Double] = Array(0.5)
+          val summaryInfo: Array[Double] = Array(0.5)
+          val name: String = age.name
+          val key: Option[String] = None
         }
         val newAge = age.withDistributions(Seq(distrib))
         newAge.name shouldEqual age.name

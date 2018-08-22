@@ -56,7 +56,7 @@ case class Feature[O <: FeatureType] private[op]
   originStage: OpPipelineStage[O],
   parents: Seq[OPFeature],
   uid: String,
-  distributions: Seq[FeatureDistributionBase] = Seq.empty
+  distributions: Seq[FeatureDistributionLike] = Seq.empty
 )(implicit val wtt: WeakTypeTag[O]) extends FeatureLike[O] {
 
   def this(
@@ -105,7 +105,7 @@ case class Feature[O <: FeatureType] private[op]
    * @param distributions Seq of the feature distributions for the feature
    * @return A feature with the distributions assocated
    */
-  override private[op] def withDistributions(distributions: Seq[FeatureDistributionBase]) =
+  override private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]) =
     this.copy(distributions = distributions)
 }
 

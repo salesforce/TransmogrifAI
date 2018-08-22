@@ -106,6 +106,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   /**
    * Will set the blacklisted features variable and if list is non-empty it will
    * @param features list of features to blacklist
+   * @param distributions feature distributions calculated in raw feature filter
    */
   private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
     blacklistedFeatures = features
@@ -343,6 +344,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setParameters(getParameters())
         .setBlacklist(getBlacklist())
         .setBlacklistMapKeys(getBlacklistMapKeys())
+        .setRawFeatureDistributions(getRawFeatureDistributions())
 
     reader.map(model.setReader).getOrElse(model)
   }
