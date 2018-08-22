@@ -75,7 +75,7 @@ val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).t
 val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
 ```
 
-Now that the raw features have been defined, we go ahead and define how we would like to manipulate them via Stages ([Transformers](/Developer-Guide#transformers) and [Estimators](/Developer-Guide#estimators)). A TransmogrifAI Stage takes one or more Features, and returns a new Feature. TransmogrifAI provides numerous handy short cuts for specifying common feature manipulations. For basic arithmetic operations, you can just use "+", "-", "*" and "/". In addition, shortcuts like "normalize", "pivot" and "map" are also available.
+Now that the raw features have been defined, we go ahead and define how we would like to manipulate them via Stages ([Transformers](developer-guide#transformers) and [Estimators](/Developer-Guide#estimators)). A TransmogrifAI Stage takes one or more Features, and returns a new Feature. TransmogrifAI provides numerous handy short cuts for specifying common feature manipulations. For basic arithmetic operations, you can just use "+", "-", "*" and "/". In addition, shortcuts like "normalize", "pivot" and "map" are also available.
 
 ```scala
 val familySize = sibSp + parCh + 1
