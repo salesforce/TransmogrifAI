@@ -5,4 +5,3 @@
 * Clone the TransmogrifAI repo: `git clone https://github.com/salesforce/TransmogrifAI.git`
 * Build the project: `cd TransmogrifAI && ./gradlew compileTestScala installDist`
 * Start hacking
-

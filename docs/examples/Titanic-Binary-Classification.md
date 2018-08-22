@@ -75,7 +75,7 @@ val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).t
 val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
 ```
 
-Now that the raw features have been defined, we go ahead and define how we would like to manipulate them via Stages ([Transformers](../developer-guide#transformers) and [Estimators](/Developer-Guide#estimators)). A TransmogrifAI Stage takes one or more Features, and returns a new Feature. TransmogrifAI provides numerous handy short cuts for specifying common feature manipulations. For basic arithmetic operations, you can just use "+", "-", "*" and "/". In addition, shortcuts like "normalize", "pivot" and "map" are also available.
+Now that the raw features have been defined, we go ahead and define how we would like to manipulate them via Stages ([Transformers](../developer-guide#transformers) and [Estimators](../developer-guide#estimators)). A TransmogrifAI Stage takes one or more Features, and returns a new Feature. TransmogrifAI provides numerous handy short cuts for specifying common feature manipulations. For basic arithmetic operations, you can just use "+", "-", "*" and "/". In addition, shortcuts like "normalize", "pivot" and "map" are also available.
 
 ```scala
 val familySize = sibSp + parCh + 1
@@ -97,7 +97,7 @@ The above notation is short-hand for the following, more formulaic way of invoki
 val normedAge: FeatureLike[Numeric] = new NormalizeEstimator().setInput(age).getOutput
 val pivotedSex: FeatureLike[Vector] = new PivotEstimator().setInput(sex).getOutput
 ```
-See [“Creating Shortcuts for Transformers and Estimators”](/Developer-Guide#creating-shortcuts-for-transformers-and-estimators) for more documentation on how shortcuts for stages can be created.
+See [“Creating Shortcuts for Transformers and Estimators”](../developer-guide#creating-shortcuts-for-transformers-and-estimators) for more documentation on how shortcuts for stages can be created.
 We now define a Feature of type Vector, that is a vector representation of all the features we would like to use as predictors in our workflow.
 
 ```scala
@@ -108,9 +108,9 @@ val passengerFeatures: FeatureLike[Vector] = Seq(
 ).transmogrify()
 ```
 
-The ```.transmogrify()``` shortcut is a special AutoML Estimator that applies a default set of transformations to all the specified inputs and combines them into a single vector. This is in essence the [automatic feature engineering Stage](/AutoML-Capabilities#vectorizers-and-transmogrification) of TransmogrifAI. This stage can be discarded in favor of hand-tuned feature engineering and manual vector creation followed by combination using the VectorsCombiner Transformer (short-hand ```Seq(....).combine()```) if the user desires to have complete control over feature engineering.
+The ```.transmogrify()``` shortcut is a special AutoML Estimator that applies a default set of transformations to all the specified inputs and combines them into a single vector. This is in essence the [automatic feature engineering Stage](../AutoML-Capabilities#vectorizers-and-transmogrification) of TransmogrifAI. This stage can be discarded in favor of hand-tuned feature engineering and manual vector creation followed by combination using the VectorsCombiner Transformer (short-hand ```Seq(....).combine()```) if the user desires to have complete control over feature engineering.
 
-The next stage applies another powerful AutoML Estimator — the [SanityChecker](/AutoML-Capabilities#sanitychecker). The SanityChecker applies a variety of statistical tests to the data based on Feature types and discards predictors that are indicative of label leakage or that show little to no predictive power. This is in essence the automatic feature selection Stage of TransmogrifAI:
+The next stage applies another powerful AutoML Estimator — the [SanityChecker](../AutoML-Capabilities#sanitychecker). The SanityChecker applies a variety of statistical tests to the data based on Feature types and discards predictors that are indicative of label leakage or that show little to no predictive power. This is in essence the automatic feature selection Stage of TransmogrifAI:
 
 ```scala
 // Optionally check the features with a sanity checker
@@ -125,7 +125,7 @@ import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 
 val (prediction, rawPrediction, prob) = new OpLogisticRegression().setInput(survived, finalFeatures).getOutput
 ```
-We could alternatively have used the [ModelSelector](/AutoML-Capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
+We could alternatively have used the [ModelSelector](../AutoML-Capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
 
 Notice that everything we've done so far has been purely at the level of definitions. We have defined how we would like to extract our raw features from data of type 'Passenger', and we have defined how we would like to manipulate them. In order to actually manifest the data described by these features, we need to add them to a workflow and attach a data source to the workflow:
 

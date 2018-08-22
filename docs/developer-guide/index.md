@@ -43,7 +43,7 @@ Each Feature is created either using a FeatureBuilder (which is a special type o
 
 ## FeatureBuilders
 
-FeatureBuilders are used to specify how raw features must be extracted and aggregated from the source data. They are passed into the [DataReaders](/Developer-Guide#datareaders) during the  feature generation stage in order to produce the data expected by later Stages (Estimators and Transformers) in the Workflow. FeatureBuilders specify all of the information needed to make the feature with various parts of the build command, for example:
+FeatureBuilders are used to specify how raw features must be extracted and aggregated from the source data. They are passed into the [DataReaders](#datareaders) during the  feature generation stage in order to produce the data expected by later Stages (Estimators and Transformers) in the Workflow. FeatureBuilders specify all of the information needed to make the feature with various parts of the build command, for example:
 
 ```scala
 val sex = FeatureBuilder.PickList[Passenger]
@@ -71,7 +71,7 @@ ML algorithms, such as Logistic Regression, are examples of Estimators that when
 
 Once you have specified how the raw features are extracted, you can also specify how you would like them to be transformed via Transformers.
 
-Transformers are a Spark ML concept that describes classes which perform a map operation from one or several columns in a dataset to a new column. The important thing to keep in mind about Transformers is that because they are map operations they act only within a row - no information about the contents of other rows can be integrated into transformers directly. If information about the contents of the full column are needed (for instance if you need to know the distribution of a numeric column) you must use an [Estimator](/Developer-Guide#estimators) to produce a transformer which contains that information.
+Transformers are a Spark ML concept that describes classes which perform a map operation from one or several columns in a dataset to a new column. The important thing to keep in mind about Transformers is that because they are map operations they act only within a row - no information about the contents of other rows can be integrated into transformers directly. If information about the contents of the full column are needed (for instance if you need to know the distribution of a numeric column) you must use an [Estimator](#estimators) to produce a transformer which contains that information.
 
 ### TransmogrifAI Transformers
 
@@ -453,7 +453,7 @@ When adding shortcuts one should follow the below conventions:
 
 ## Customizing AutoML Stages
 
-Each of the special [AutoML Estimators](/AutoML-Capabilities) we talked about previously can be be customized. 
+Each of the special [AutoML Estimators](../AutoML-Capabilities) we talked about previously can be be customized. 
 
 #### Transmogrification
 
@@ -510,12 +510,12 @@ The summary is composed as follows :
     - “featuresIn” (Array[String]) : name of feature columns with non Nan correlations
 * "correlationsWLabelIsNaN" (Array[String]) : names of the features that have a correlation of Nan with label column
 
-In order to relate the statistics summary from sanity checker to the original parent features it is best to use the `workflowModel.modelInsights(feature)` [method](/Developer-Guide#extracting-modelinsights-from-a-fitted-workflow). This will output all the information gathered during workflow fitting formatted so that all feature statistics are grouped by the raw parent feature.
+In order to relate the statistics summary from sanity checker to the original parent features it is best to use the `workflowModel.modelInsights(feature)` [method](#extracting-modelinsights-from-a-fitted-workflow). This will output all the information gathered during workflow fitting formatted so that all feature statistics are grouped by the raw parent feature.
 
 
 #### RawFeatureFilter
 
-[RawFeatureFilter](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/filters/RawFeatureFilter.scala) is an optional stage that would ensure that the data distribution between the training and scoring set is similar. [Workflows](Developer-Guide#workflows) has `withRawFeatureFilter(Option(trainReader), Option(scoreReader),...)` method which enables this. When the scoring reader is specified both the `readerParams` and the `alternateReaderParams` in the [OpParams](https://github.com/salesforce/op/blob/master/features/src/main/scala/com/salesforce/op/OpParams.scala) passed into the Workflow need contain paths for the data. You will need to set the score data path in the `alternateReaderParams`.  
+[RawFeatureFilter](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/filters/RawFeatureFilter.scala) is an optional stage that would ensure that the data distribution between the training and scoring set is similar. [Workflows](#workflows) have `withRawFeatureFilter(Option(trainReader), Option(scoreReader),...)` method which enables this. When the scoring reader is specified both the `readerParams` and the `alternateReaderParams` in the [OpParams](https://github.com/salesforce/op/blob/master/features/src/main/scala/com/salesforce/op/OpParams.scala) passed into the Workflow need contain paths for the data. You will need to set the score data path in the `alternateReaderParams`.  
 
 If only the training reader is specified the features will be checked for fill rates and correlation of filled values with the label. When both the training and scoring readers are specified the relationship between the two data sets is additionally checked for each raw feature and features which deviate beyond the specified acceptable range will be excluded from the workflow. The exclusion criteria have defaults, however you can set optional parameters for when to exclude features.
 
@@ -602,7 +602,7 @@ val workflow = new OpWorkflow()
    .setInputDataSet[Passenger](passengerDataSet) // passengerDataSet is a DataSet[Passenger] or RDD[Passenger]
 ```
 
-DataReaders are used to load and process data before entry into the workflow, for example aggregation of data or joining of multiple data sources can easily be performed using DataReaders as described in the [DataReaders](/Developer-Guide#datareaders) section below. If you have a dataset already loaded and simply wish to pass it into the Workflow the `setInputDataSet` and `setInputRdd` methods will create a simple DataReader for you to allow this.
+DataReaders are used to load and process data before entry into the workflow, for example aggregation of data or joining of multiple data sources can easily be performed using DataReaders as described in the [DataReaders](#datareaders) section below. If you have a dataset already loaded and simply wish to pass it into the Workflow the `setInputDataSet` and `setInputRdd` methods will create a simple DataReader for you to allow this.
 
 It is important to understand that up until this point nothing has happened. While all the Features, Stages (transformers + estimators), and data source have been defined, none of the actual data associated with the  features has been computed. Computation does not happen and Features are not materialized until the Workflow is fitted.
 
@@ -694,7 +694,7 @@ This stage can eliminate many issues, such as leakage of information that is onl
 
 Once you have fit your Workflow you often wish to examine the results of the fit to evaluate whether your should use the workflow going forward. We provide two mechanisms for examining the results of the workflow.
 
-The first is the `.summary()` (or `summaryJson()`) method that pulls all [metadata](/Developer-Guide#metadata) generated by the stages in the workflow into a string (or JSON) for consumption.
+The first is the `.summary()` (or `summaryJson()`) method that pulls all [metadata](#metadata) generated by the stages in the workflow into a string (or JSON) for consumption.
 
 The second mechanism is the `modelInsights(feature)` method. This method take the feature you which to get a model history for (necessary since multiple models can be run in the same workflow) and extracts as much information as possible about the modeling process for that feature, returning a [ModelInsights](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/ModelInsights.scala) object. This method traces the history of the input feature (which should be the output of the model of interest) to find the last ModelSelector stage aplied and the last SanityChecker stage applied to the feature vector that went into creating the model output feature. It collects the metadata from all of the stages and the feature vector to create a summary of all of the information collected in these stages and groups the information so that all feature information can be traced to the raw input features used in modeling. It also contains the training parameters and stage parameters used in training for reference across runs.
 
@@ -762,7 +762,7 @@ val metadata = workflowModel.getOriginStageOf(checkedFeatures).getMetadata()
 val summaryData = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
 ```
 
-If you wish to combine the metadata from stages commonly used in modeling (ModelSelectors, SanityCheckers, Vectorizers) into a single easy(er) to reference case class we have provided a method for this in the [WorkflowModel](/Developer-Guide#extracting-modelInsights-from-a-fitted-workflow) so that users don't need to stitch this information together for themselves.
+If you wish to combine the metadata from stages commonly used in modeling (ModelSelectors, SanityCheckers, Vectorizers) into a single easy(er) to reference case class we have provided a method for this in the [WorkflowModel](#extracting-modelinsights-from-a-fitted-workflow) so that users don't need to stitch this information together for themselves.
 
 In addition to accessing Metadata that is created by stages you may wish to add Metadata to stages of your own. For example if you created your own string indexer to map strings to integers (though we have a stage that does [this](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/stages/impl/feature/OpStringIndexerNoFilter.scala)), you might wish to save the mapping from idex back to string in the Metadata of the new column of integers you are creating. You would do this within the `fitFn` of the Estimator you are creating by using the `setMetadata(meta: Metadata)` method. You need a MetadataBuilder object to work with Metadata, which is essentially a wrapper around a Map of Map.  For example, within an Estimator you would get a reference to a MetadataBuilder and use it as follows:
 
@@ -793,7 +793,7 @@ val model = labelIndexer.fit(label)
 val metaData = model.getMetadata()
 ```
 
-We provide utility functions to simplify working with Metadata in [com.salesforce.op.utils.spark.RichMetadata](https://github.com/salesforce/TransmogrifAI/blob/master/utils/src/main/scala/com/salesforce/op/utils/spark/RichMetadata.scala). For example we have functions to add and get summary Metadata which are used in the workflow to log any information that has been saved as summary metadata.
+We provide utility functions to simplify working with Metadata in [RichMetadata](https://github.com/salesforce/TransmogrifAI/blob/master/utils/src/main/scala/com/salesforce/op/utils/spark/RichMetadata.scala). For example we have functions to add and get summary Metadata which are used in the workflow to log any information that has been saved as summary metadata.
 
 
 ## DataReaders 
@@ -801,7 +801,7 @@ We provide utility functions to simplify working with Metadata in [com.salesforc
  
 DataReaders define how data should be loaded into the workflow. They load and process raw data to produce the Dataframe used by the workflow. DataReaders are tied to a specific data source with the type of the raw loaded data (for example the AVRO schema or a case class describing the columns in a CSV).
 
-There are three types of DataReaders. [Simple DataReaders](/Developer-Guide/#datareaders) just load the data and return a DataFrame with one row for each row of data read. [Aggregate DataReaders](/Developer-Guide#aggregate-data-readers) will group the data by the entity (the thing you are scoring) key and combine values (with or without time filters) based on the aggregation function associated with each feature definition. For example aggregate readers can be used to compute features like total spend from a list of transactions. [Conditional DataReaders](/Developer-Guide/#conditional-data-readers) are like aggregate readers but they allow an dynamic time cuttoff for each row that depends on fullfilment of a user defined condition. For example conditional readers can be used to compute features like total spend before a user becomes a member. These readers can be combined to [join](/examples/Time-Series-Aggregates-and-Joins.html) multiple datasources.
+There are three types of DataReaders. [Simple DataReaders](#datareaders) just load the data and return a DataFrame with one row for each row of data read. [Aggregate DataReaders](#aggregate-data-readers) will group the data by the entity (the thing you are scoring) key and combine values (with or without time filters) based on the aggregation function associated with each feature definition. For example aggregate readers can be used to compute features like total spend from a list of transactions. [Conditional DataReaders](#conditional-data-readers) are like aggregate readers but they allow an dynamic time cuttoff for each row that depends on fullfilment of a user defined condition. For example conditional readers can be used to compute features like total spend before a user becomes a member. These readers can be combined to [join](../examples/Time-Series-Aggregates-and-Joins.html) multiple datasources.
 
 A constructor object provides shortcuts for defining most commonly used data readers. Defiing a data reader requires specifying the type of the data being read and the key for the data (the entity being scored).
 
@@ -900,7 +900,7 @@ val joinedDataReader = passengerDataReader.leftOuterJoin(shipInfoDataReader)
 
 Joined data readers allow your raw FeatureBuilders to be defined with respect to the simpler base types rather than the complex joint types.
 
-Inner, left outer and full outer joins are supported. Joins will by default use the keys specified in the reader to join the data sources. However, it is possible to specifiy an [alternative key](https://github.com/salesforce/TransmogrifAI/blob/master/readers/src/main/scala/com/salesforce/op/readers/JoinedDataReader.scala#L58) to join on for one of the tables, e.g. if you need to aggregate on a key other than the key you need to join on. Joins are done after feature extraction for each of the datasources.
+Inner, left outer and full outer joins are supported. Joins will by default use the keys specified in the reader to join the data sources. However, it is possible to specifiy an [alternative key](https://github.com/salesforce/TransmogrifAI/blob/master/readers/src/main/scala/com/salesforce/op/readers/JoinedDataReader.scala#L209) to join on for one of the tables, e.g. if you need to aggregate on a key other than the key you need to join on. Joins are done after feature extraction for each of the datasources.
 
 Sometimes it is important to aggreagte feature information after the join has been performed, e.g. you aggreagte only after an event in the first table has occured. We call this secondary aggreagtion and the most common use cases are supported by joined reasers. If a second aggregation phase is required it can be added using the JoinedReader method: 
 

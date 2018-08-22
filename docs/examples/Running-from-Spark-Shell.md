@@ -36,6 +36,6 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichStructType._
 ```
 
-Now follow along with the rest of the code from the Titanic example found [here](https://github.com/salesforce/TransmogrifAI/wiki/Example:-Titanic).
+Now follow along with the rest of the code from the Titanic example found [here](Titanic-Binary-Classification.html).
 
 
