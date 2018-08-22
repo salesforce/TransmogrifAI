@@ -32,7 +32,6 @@ package com.salesforce.op.utils.json
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.test.TestCommon
-import com.salesforce.op.utils.json.Format.Format
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalatest.junit.JUnitRunner
@@ -80,46 +79,50 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     }
 
   property("handle random entries correctly") {
-    forAll(dataGen) { d => (check(d, Format.Json)) }
-    forAll(dataGen) { d => (check(d, Format.Yaml)) }
+    forAll(dataGen)(checkJson)
+    forAll(dataGen)(checkYaml)
   }
 
   property("handle special entries correctly") {
-    forAll(specialDataGen) { d => (check(d, Format.Json)) }
-    forAll(specialDataGen) { d => (check(d, Format.Yaml)) }
+    forAll(specialDataGen)(checkJson)
+    forAll(specialDataGen)(checkYaml)
 
   }
 
   property("handle empty collections correctly") {
-    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None), Format.Json) }
-    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None), Format.Yaml) }
+    forAll(doubles) { d => checkJson(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
+    forAll(doubles) { d => checkYaml(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
   }
 
-  property(testName = "handle json file reading properly") {
+  property("read json file") {
     val jsonFile = resourceFile(name = "Person.json")
-    val person = Person("Alvin Alexander", Address("Talkeetna", "AK"))
+    val person = Person("Foo Bar", Address("Talkeetna", "AK"))
     JsonUtils.fromFile[Person](jsonFile) match {
       case Failure(e) => fail(e)
       case Success(value) => assert(value, person)
     }
   }
 
-  property(testName = "handle yml file reading properly") {
+  property("read yml file") {
     val ymlFile = resourceFile(name = "Person.yml")
-    val person = Person("Alvin Alexander", Address("Talkeetna", "AK"))
+    val person = Person("Foo Bar", Address("Talkeetna", "AK"))
     JsonUtils.fromFile[Person](ymlFile) match {
       case Failure(e) => fail(e)
       case Success(value) => assert(value, person)
     }
   }
 
-  def check(data: TestDouble, format: Format): Unit = {
-    val strValue: String =
-      format match {
-        case Format.Json => JsonUtils.toJsonString(data)
-        case Format.Yaml => JsonUtils.toYamlString(data)
-      }
-    JsonUtils.fromString[TestDouble](strValue) match {
+  def checkJson(data: TestDouble): Unit = {
+    val jsonValue: String = JsonUtils.toJsonString(data)
+    JsonUtils.fromString[TestDouble](jsonValue) match {
+      case Failure(e) => fail(e)
+      case Success(r) => assert(r, data)
+    }
+  }
+
+  def checkYaml(data: TestDouble): Unit = {
+    val yamlValue: String = JsonUtils.toYamlString(data)
+    JsonUtils.fromString[TestDouble](yamlValue) match {
       case Failure(e) => fail(e)
       case Success(r) => assert(r, data)
     }
@@ -166,8 +169,3 @@ case class TestDouble
 case class Person(name: String, address: Address)
 
 case class Address(city: String, state: String)
-
-private object Format extends Enumeration {
-  type Format = Value
-  val Json, Yaml = Value
-}
