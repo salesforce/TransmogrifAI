@@ -34,6 +34,7 @@ import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -70,7 +71,11 @@ private[op] trait OpWorkflowCore {
   // features that have been blacklisted from use in dag
   private[op] var blacklistedFeatures: Array[OPFeature] = Array[OPFeature]()
 
+  // map keys that were blacklisted from use in dag
   private[op] var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
+
+  // raw feature distributions calculated in raw feature filter
+  private[op] var rawFeatureDistributions: Array[FeatureDistribution] = Array[FeatureDistribution]()
 
   // stages of the workflow
   private[op] var stages: Array[OPStage] = Array[OPStage]()
@@ -85,6 +90,11 @@ private[op] trait OpWorkflowCore {
 
   private[op] final def setRawFeatures(features: Array[OPFeature]): this.type = {
     rawFeatures = features
+    this
+  }
+
+  private[op] final def setRawFeatureDistributions(distributions: Array[FeatureDistribution]): this.type = {
+    rawFeatureDistributions = distributions
     this
   }
 
@@ -183,6 +193,12 @@ private[op] trait OpWorkflowCore {
    * @return OpWorkflowParams set for this workflow
    */
   final def getParameters(): OpParams = parameters
+
+  /**
+   * Get raw feature distribution information computed during raw feature filter
+   * @return sequence of feature distribution information
+   */
+  final def getRawFeatureDistributions(): Array[FeatureDistribution] = rawFeatureDistributions
 
   /**
    * Determine if any of the raw features do not have a matching reader
