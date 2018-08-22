@@ -32,6 +32,7 @@ package com.salesforce.op.utils.json
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.test.TestCommon
+import com.salesforce.op.utils.json.Format.Format
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalatest.junit.JUnitRunner
@@ -79,20 +80,46 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     }
 
   property("handle random entries correctly") {
-    forAll(dataGen)(check)
+    forAll(dataGen) { d => (check(d, Format.Json)) }
+    forAll(dataGen) { d => (check(d, Format.Yaml)) }
   }
 
   property("handle special entries correctly") {
-    forAll(specialDataGen)(check)
+    forAll(specialDataGen) { d => (check(d, Format.Json)) }
+    forAll(specialDataGen) { d => (check(d, Format.Yaml)) }
+
   }
 
   property("handle empty collections correctly") {
-    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
+    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None), Format.Json) }
+    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None), Format.Yaml) }
   }
 
-  def check(data: TestDouble): Unit = {
-    val json = JsonUtils.toJsonString(data)
-    JsonUtils.fromString[TestDouble](json) match {
+  property(testName = "handle json file reading properly") {
+    val jsonFile = resourceFile(name = "Person.json")
+    val person = Person("Alvin Alexander", Address("Talkeetna", "AK"))
+    JsonUtils.fromFile[Person](jsonFile) match {
+      case Failure(e) => fail(e)
+      case Success(value) => assert(value, person)
+    }
+  }
+
+  property(testName = "handle yml file reading properly") {
+    val ymlFile = resourceFile(name = "Person.yml")
+    val person = Person("Alvin Alexander", Address("Talkeetna", "AK"))
+    JsonUtils.fromFile[Person](ymlFile) match {
+      case Failure(e) => fail(e)
+      case Success(value) => assert(value, person)
+    }
+  }
+
+  def check(data: TestDouble, format: Format): Unit = {
+    val strValue: String =
+      format match {
+        case Format.Json => JsonUtils.toJsonString(data)
+        case Format.Yaml => JsonUtils.toYamlString(data)
+      }
+    JsonUtils.fromString[TestDouble](strValue) match {
       case Failure(e) => fail(e)
       case Success(r) => assert(r, data)
     }
@@ -118,6 +145,11 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     v.seq.size shouldBe expected.size
   }
 
+  def assert(v: Person, expected: Person): Assertion = {
+    assert(v.name === expected.name)
+    assert(v.address === expected.address)
+  }
+
 }
 
 case class TestDouble
@@ -130,3 +162,12 @@ case class TestDouble
   map: Map[Int, Seq[Long]],
   nested: Option[TestDouble]
 )
+
+case class Person(name: String, address: Address)
+
+case class Address(city: String, state: String)
+
+private object Format extends Enumeration {
+  type Format = Value
+  val Json, Yaml = Value
+}
