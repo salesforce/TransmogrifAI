@@ -69,7 +69,7 @@ private[op] class OpBinaryClassificationEvaluator
     val dataUse = makeDataToUse(data, labelColName)
 
     val (rawPredictionColName, predictionColName, probabilityColName) =
-      (getRawPredictionCol, getPredictionCol, getProbabilityCol)
+      (getRawPredictionCol, getPredictionValueCol, getProbabilityCol)
     log.debug(
       "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
       labelColName, rawPredictionColName, predictionColName, probabilityColName
@@ -137,7 +137,7 @@ private[op] class OpBinaryClassificationEvaluator
     val dataUse = makeDataToUse(dataset, labelColName)
     new MulticlassClassificationEvaluator()
       .setLabelCol(labelColName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
       .evaluate(dataUse)
   }

@@ -577,4 +577,5 @@ private[op] trait OpTransformer {
    * @return a transform function to transform any key/value to a value
    */
   def transformKeyValue: KeyValue => Any
+
 }
