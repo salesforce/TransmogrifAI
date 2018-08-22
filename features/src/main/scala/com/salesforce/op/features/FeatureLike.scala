@@ -73,6 +73,11 @@ trait FeatureLike[O <: FeatureType] {
   val parents: Seq[OPFeature]
 
   /**
+   * The distribution information of the feature (is a sequence because map features have distribution for each key)
+   */
+  val distributions: Seq[FeatureDistributionLike]
+
+  /**
    * Weak type tag of the feature type O
    */
   implicit val wtt: WeakTypeTag[O]
@@ -159,7 +164,8 @@ trait FeatureLike[O <: FeatureType] {
     val oid = Option(originStage).map(_.uid).orNull
     val pids = parents.map(_.uid).mkString("[", ",", "]")
     s"${this.getClass.getSimpleName}(" +
-      s"name = $name, uid = $uid, isResponse = $isResponse, originStage = $oid, parents = $pids)"
+      s"name = $name, uid = $uid, isResponse = $isResponse, originStage = $oid, parents = $pids," +
+      s" distributions = ${distributions})"
   }
 
   /**
@@ -429,5 +435,13 @@ trait FeatureLike[O <: FeatureType] {
    *         with the stages in the map passed in)
    */
   private[op] def copyWithNewStages(stages: Array[OPStage]): FeatureLike[O]
+
+  /**
+   * Takes an a sequence of feature distributions assocaited with the feature
+   *
+   * @param distributions Seq of the feature distributions for the feature
+   * @return A feature with the distributions assocated
+   */
+  private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]): FeatureLike[O]
 
 }
