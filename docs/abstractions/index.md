@@ -57,19 +57,19 @@ Once all the Features and Feature transformations have been defined, actual data
 
 In the example below, we would like to materialize ```bucketizedAge``` and ```nameTokens```. So we set these two Features as the result Features for a new Workflow:
 
-```
+```scala
 val workflow = new OPWorkflow().setResultFeatures(bucketizedAge, nameTokens).setReader(PassengerReader)
 ```
 
 The PassengerReader is a DataReader that essentially specifies a ```read``` method that can be used for loading the Passenger data. When we train this workflow, it reads the Passenger data and fits the bucketization estimator by determining the optimal buckets for ```age```:
 
-```
+```scala
 val workflowModel = workflow.train()
 ```
 
 The workflowModel now has a prepped DAG of Transformers. By calling the ```score``` method on the workflowModel, we can transform any data of type Passenger to a DataFrame with two columns for ```bucketizedAge``` and ```nameTokens``` 
 
-```
+```scala
 val dataFrame = workflowModel.setReader(OtherPassengerReader).score()
 ```
 

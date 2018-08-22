@@ -45,7 +45,7 @@ def runner(opParams: OpParams): OpWorkflowRunner =
   )
 ```
 You can run the code using the following commands for train, score and evaluate:
-```
+```bash
 cd helloworld
 ./gradlew compileTestScala installDist
 ```

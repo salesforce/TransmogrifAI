@@ -3,7 +3,7 @@
 Here we describe a very simple TransmogrifAI workflow for predicting survivors in the often-cited Titanic dataset. The code for building and applying the Titanic model can be found here: [Titanic Code](https://github.com/salesforce/TransmogrifAI/blob/master/helloworld/src/main/scala/com/salesforce/hw/OpTitanicSimple.scala), and the data can be found here: [Titanic Data](https://github.com/salesforce/op/blob/master/helloworld/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv).
 
 You can run this code as follows:
-```
+```bash
 cd helloworld
 ./gradlew compileTestScala installDist
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
@@ -46,7 +46,6 @@ Basic FeatureBuilders will be created for you if you use the TransmogrifAI CLI t
 
 When defining raw features, specify the extract logic to be applied to the raw data, and  also  annotate the features as either predictor or response variables via the FeatureBuilders:
 ```scala
-
 // import necessary packages
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._

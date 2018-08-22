@@ -18,7 +18,7 @@ Build the TransmogrifAI CLI by running:
 alias transmogrifai="java -cp `pwd`/cli/build/libs/\* com.salesforce.op.cli.CLI"
 ```
 Finally generate your Titanic model project (follow the instructions on screen):
-```
+```bash
 transmogrifai gen --input `pwd`/test-data/PassengerDataAll.csv \
   --id passengerId --response survived \
   --schema `pwd`/test-data/PassengerDataAll.avsc Titanic
@@ -29,8 +29,11 @@ If you run this command more than once, two important command line arguments wil
 - `--answers <answers_file>` will provide answers to the questions that the generator asks.
 
 e.g.
-```
-transmogrifai gen --input `pwd`/test-data/PassengerDataAll.csv --id passengerId --response survived --schema `pwd`/test-data/PassengerDataAll.avsc --answers cli/passengers.answers Titanic --overwrite
+```bash
+transmogrifai gen --input `pwd`/test-data/PassengerDataAll.csv \
+  --id passengerId --response survived \
+  --schema `pwd`/test-data/PassengerDataAll.avsc \
+  --answers cli/passengers.answers Titanic --overwrite
 ```
 will do the generation without asking you anything.
 
