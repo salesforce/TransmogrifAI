@@ -35,7 +35,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryTransformer
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.utils.stats.JaccardSimilarity
+import com.salesforce.op.utils.stats.JaccardSim
 import org.apache.spark.ml.param.{BooleanParam, Param, Params, StringArrayParam}
 
 import scala.util.Try
@@ -298,7 +298,7 @@ case object PhoneNumberParser {
         val rcBi = rc.trim.sliding(2).toSet
         regionCodes.zip(countryNames).flatMap {
           case (regCode, country) => country.split(",").map{ // Can have multiple versions of country name
-            c => regCode -> JaccardSimilarity(rcBi, c.trim.sliding(2).toSet)
+            c => regCode -> JaccardSim(rcBi, c.trim.sliding(2).toSet)
           }}.maxBy(_._2)._1
       case _ => defaultRegionCode
     }

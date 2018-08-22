@@ -34,7 +34,7 @@ package com.salesforce.op.utils.stats
  * Calculates the Jaccard Similarity between two sets.
  * If both inputs are empty, Jaccard Similarity is defined as 1.0
  */
-object JaccardSimilarity {
+object JaccardSim {
 
   /**
    * Calculates the Jaccard Similarity between two sets.
