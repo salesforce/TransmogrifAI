@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryTransformer
-import com.salesforce.op.utils.stats.JaccardDistance
+import com.salesforce.op.utils.stats.JaccardSim
 
 /**
  * Calculates the Jaccard Similarity between two sets.
@@ -42,5 +42,5 @@ import com.salesforce.op.utils.stats.JaccardDistance
 class JaccardSimilarity(uid: String = UID[JaccardSimilarity])
   extends BinaryTransformer[MultiPickList, MultiPickList, RealNN](operationName = "jacSim", uid = uid) {
 
-  def transformFn: (MultiPickList, MultiPickList) => RealNN = (x, y) => JaccardDistance(x.value, y.value).toRealNN
+  def transformFn: (MultiPickList, MultiPickList) => RealNN = (x, y) => JaccardSim(x.value, y.value).toRealNN
 }
