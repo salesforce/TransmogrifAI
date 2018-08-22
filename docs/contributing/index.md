@@ -18,15 +18,15 @@ Use GitHub [Issues](https://github.com/salesforce/TransmogrifAI/issues) page to 
 
 ## Contribution Checklist
 
-- [x] Clean, simple, well styled code
-- [x] Comments
+- Clean, simple, well styled code
+- Comments
   - Module-level & function-level comments.
   - Comments on complex blocks of code or algorithms (include references to sources).
-- [x] Tests
+- Tests
   - Increase code coverage, not versa.
   - Use [ScalaTest](http://www.scalatest.org/) with `FlatSpec` and `PropSpec`.
   - Use our testkit that contains a bunch of testing facilities you would need. Simply `import com.salesforce.op.test._` and borrow inspiration from existing tests.
-- [x] Dependencies
+- Dependencies
   - Minimize number of dependencies.
   - Prefer BSD, Apache 2.0, MIT, ISC and MPL licenses.
 
@@ -34,4 +34,4 @@ Use GitHub [Issues](https://github.com/salesforce/TransmogrifAI/issues) page to 
 Follow the [Apache Code of Conduct](https://www.apache.org/foundation/policies/conduct.html).
 
 ## License
-By contributing your code, you agree to license your contribution under the terms of the [BSD 3-Clause](License).
+By contributing your code, you agree to license your contribution under the terms of the [BSD 3-Clause](/License).

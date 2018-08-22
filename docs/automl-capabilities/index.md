@@ -18,7 +18,7 @@ val emailFeature = email.vectorize()
 val features = Seq(emailFeature, phone, age, subject, zipcode).transmogrify()
 ```
 
-For advanced users, you can also completely [customize automatic feature engineering](Developer-Guide#transmogrification).
+For advanced users, you can also completely [customize automatic feature engineering](/Developer-Guide#transmogrification).
 
 ## Feature Validation
 
@@ -34,7 +34,7 @@ The SanityChecker can be instantiated as follows:
 // Add sanity checker estimator
 val checkedFeatures = new SanityChecker().setRemoveBadFeatures(true).setInput(label, features).getOutput()
 ```
-For advanced users, check out how to [customize default parameters](Developer-Guide#sanitychecker) and peek into the SanityChecker metadata using model insights.
+For advanced users, check out how to [customize default parameters](/Developer-Guide#sanitychecker) and peek into the SanityChecker metadata using model insights.
 
 #### RawFeatureFilter
 
@@ -50,7 +50,7 @@ val workflow =
 
 It will load the training and scoring data and exclude individual features based on fill rate, relative fill rates between training and scoring, or differences in the distribution of data between training and scoring. This stage can eliminate many issues, such as leakage of information that is only filled out after the label and changes in data collection practices, before they affect your model.
 
-For advanced users, check out how to set [optional parameters](Developer-Guide#rawfeaturefilter) for when to exclude features.
+For advanced users, check out how to set [optional parameters](/Developer-Guide#rawfeaturefilter) for when to exclude features.
 
 
 ## ModelSelectors
@@ -66,5 +66,5 @@ val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(label, feat
 
 The ModelSelector is an Estimator that uses data to find the best model. BinaryClassificationModelSelector is for  binary classification tasks, multi classification tasks can be done using MultiClassificationModelSelector. Best Regression model are done through RegressionModelSelector. Currently the possible classification models that can be applied in the selector are` LogisticRegression`, `DecisionTrees`, `RandomForest` and `NaiveBayes`. The possible regression models are ` LinearRegression`, `DecisionTrees`, `RandomForest` and `GBTrees`. The best model is selected via a CrossValidation or TrainingSplit, by picking the best SparkML model and wraping it. It is also possible to perform hyperparameter tuning for each model through a grid search.
 
-For advanced users, check out how to set CrossValidation parameters, balance datasets and customize hyperparameter-tuning [here](Developer-Guide#modelselector).
+For advanced users, check out how to set CrossValidation parameters, balance datasets and customize hyperparameter-tuning [here](/Developer-Guide#modelselector).
 

@@ -29,7 +29,7 @@ Of course if you want to manually perform these or other transformations you can
 
 ## What other AutoML functionality does TransmogrifAI provide? 
 
-Look at the [AutoML Capabilities](AutoML-Capabilities) section for a complete list of the powerful AutoML estimators that TransmogrifAI provides. In a nutshell, they are Transmogrifier for automatic feature engineering, SanityChecker and RawFeatureFilter for data cleaning and automatic feature selection, and ModelSelectors for different classes of problems for automatic model selection.
+Look at the [AutoML Capabilities](/AutoML-Capabilities) section for a complete list of the powerful AutoML estimators that TransmogrifAI provides. In a nutshell, they are Transmogrifier for automatic feature engineering, SanityChecker and RawFeatureFilter for data cleaning and automatic feature selection, and ModelSelectors for different classes of problems for automatic model selection.
 
 ## What imports do I need for TransmogrifAI to work?
 

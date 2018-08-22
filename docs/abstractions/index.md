@@ -15,7 +15,7 @@ val age: Feature[RealNN] = FeatureBuilder.RealNN[Passenger].extract(_.age.toReal
 
 The above lines of code define two ```Features``` of type ```Text``` and ```RealNN``` called ```name``` and ```age``` that are extracted from data of type ```Passenger``` by applying the stated extract methods. 
 
-One can also define Features that are the result of complex time-series aggregates. Take a look at this [example](Example%3A-Time-Series-Aggregates-and-Joins) and this [page](Developer-Guide#aggregate-data-readers) for more advanced reading on FeatureBuilders.
+One can also define Features that are the result of complex time-series aggregates. Take a look at this [example](/Examples/Time-Series-Aggregates-and-Joins.html) and this [page](/Developer-Guide#aggregate-data-readers) for more advanced reading on FeatureBuilders.
 
 Features can then be manipulated using Stages to produce new Features. In TransmogrifAI, as in SparkML, there are two types of Stages -- Transformers and Estimators.
 
@@ -34,7 +34,7 @@ The output ```nameTokens``` is a new Feature of type ```TextList```. Because Fea
 ```scala
 val nameTokens = name.tokenize()
 ``` 
-TransmogrifAI provides an easy way for wrapping all Spark Transformers, and additionally provides many Transformers of its own. For more reading about creating new Transformers and shortcuts, follow the links [here](Developer-Guide#transformers) and [here](Developer-Guide#creating-shortcuts-for-transformers-and-estimators).
+TransmogrifAI provides an easy way for wrapping all Spark Transformers, and additionally provides many Transformers of its own. For more reading about creating new Transformers and shortcuts, follow the links [here](/Developer-Guide#transformers) and [here](/Developer-Guide#creating-shortcuts-for-transformers-and-estimators).
 
 ### Estimators
 
@@ -49,7 +49,7 @@ Similar to Transformers above, one can easily create shortcuts for Estimators, a
 ```scala
 val bucketizedAge = age.autoBucketize(label = label)
 ```
-TransmogrifAI provides an easy way for wrapping all Spark Estimators, and additionally provides many Estimators of its own. For more reading about creating new Estimators follow the link [here](Developer-Guide#estimators).
+TransmogrifAI provides an easy way for wrapping all Spark Estimators, and additionally provides many Estimators of its own. For more reading about creating new Estimators follow the link [here](/Developer-Guide#estimators).
 
 ## Workflows and Readers
 
@@ -73,7 +73,7 @@ The workflowModel now has a prepped DAG of Transformers. By calling the ```score
 val dataFrame = workflowModel.setReader(OtherPassengerReader).score()
 ```
 
-WorkflowModels can be saved and loaded. For more advanced reading on topics like stacking workflows, aggregate DataReaders for time-series data, or joins for DataReaders, follow our links to [Workflows](Developer-Guide#workflows) and [Readers](Developer-Guide#datareaders).
+WorkflowModels can be saved and loaded. For more advanced reading on topics like stacking workflows, aggregate DataReaders for time-series data, or joins for DataReaders, follow our links to [Workflows](/Developer-Guide#workflows) and [Readers](/Developer-Guide#datareaders).
 
 
 
