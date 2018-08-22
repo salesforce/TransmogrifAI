@@ -263,9 +263,10 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    val FilteredRawData(df, dropped, droppedKeyValue) = getFilter(maxCorrelation).generateFilteredRaw(features, params)
+    val FilteredRawData(df, dropped, droppedKeyValue, _) =
+      getFilter(maxCorrelation).generateFilteredRaw(features, params)
 
-    dropped should contain theSameElementsAs expectedDropped.toSeq
+    dropped should contain theSameElementsAs expectedDropped
     droppedKeyValue should contain theSameElementsAs expectedDroppedMapKeys
     df.schema.fields.map(_.name) should contain theSameElementsAs
       DataFrameFieldNames.KeyFieldName +: features.diff(dropped).map(_.name)

@@ -55,7 +55,8 @@ case class Feature[O <: FeatureType] private[op]
   isResponse: Boolean,
   originStage: OpPipelineStage[O],
   parents: Seq[OPFeature],
-  uid: String
+  uid: String,
+  distributions: Seq[FeatureDistributionLike] = Seq.empty
 )(implicit val wtt: WeakTypeTag[O]) extends FeatureLike[O] {
 
   def this(
@@ -68,7 +69,8 @@ case class Feature[O <: FeatureType] private[op]
     isResponse = isResponse,
     originStage = originStage,
     parents = parents,
-    uid = FeatureUID(originStage.uid)
+    uid = FeatureUID(originStage.uid),
+    distributions = Seq.empty
   )(wtt)
 
   /**
@@ -89,13 +91,22 @@ case class Feature[O <: FeatureType] private[op]
       val stage = stagesMap.getOrElse(f.originStage.uid, f.originStage).asInstanceOf[OpPipelineStage[T]]
       val newParents = f.parents.map(p => copy[T](p.asInstanceOf[FeatureLike[T]]))
       Feature[T](
-        name = f.name, isResponse = f.isResponse, originStage = stage, parents = newParents, uid = f.uid
+        name = f.name, isResponse = f.isResponse, originStage = stage, parents = newParents, uid = f.uid,
+        distributions = f.distributions
       )(f.wtt)
     }
 
     copy(this)
   }
 
+  /**
+   * Takes an a sequence of feature distributions assocaited with the feature
+   *
+   * @param distributions Seq of the feature distributions for the feature
+   * @return A feature with the distributions assocated
+   */
+  override private[op] def withDistributions(distributions: Seq[FeatureDistributionLike]) =
+    this.copy(distributions = distributions)
 }
 
 /**
