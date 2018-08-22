@@ -168,7 +168,7 @@ import com.salesforce.op.utils.spark.RichStructType._
 
 See the [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
 
-See [Scaladoc](https://docs.transmogrif.ai) for the programming API (can also be viewed [locally](docs/README.md)).
+See [Scaladoc](https://docs.transmogrif.ai) for the programming API.
 
 ## License
 

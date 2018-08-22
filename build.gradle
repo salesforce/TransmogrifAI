@@ -25,8 +25,8 @@ allprojects {
 
 apply from: 'gradle/version-properties.gradle'
 
-def allProjs = allprojects - project(':templates').subprojects - project(':docs')
-def subProjs = subprojects - project(':templates').subprojects - project(':docs')
+def allProjs = allprojects - project(':templates').subprojects
+def subProjs = subprojects - project(':templates').subprojects
 
 // distribute to all projects
 ext.subProjs = subProjs
@@ -362,5 +362,14 @@ configure(subProjs) {
     }
 }
 
+task allScaladoc(type: ScalaDoc) {
+    group 'Documentation'
+    description 'Generates Scaladoc for the main source code of all subprojects.'
+    title 'TransmogrifAI'
+    source subProjs.collect { it.sourceSets.main.allJava + it.sourceSets.main.allScala }
+    classpath = files(subProjs.collect { it.sourceSets.main.compileClasspath })
+    destinationDir = file("build/scaladoc")
+}
+
 // run by Heroku to build docs
-task stage(dependsOn: ':docs:buildDocs')
+task stage(dependsOn: ':allScaladoc')
