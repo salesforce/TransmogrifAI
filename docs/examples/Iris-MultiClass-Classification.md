@@ -21,7 +21,7 @@ val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrif
 ```
 **Modeling & Evaluation**
 ```scala
-val (pred, raw, prob) = MultiClassificationModelSelector
+val pred = MultiClassificationModelSelector
   .withCrossValidation(splitter = Some(DataCutter(reserveTestFraction = 0.2, seed = randomSeed)), seed = randomSeed)
   .setDecisionTreeSeed(randomSeed)
   .setInput(labels, features).getOutput()
@@ -29,10 +29,8 @@ val (pred, raw, prob) = MultiClassificationModelSelector
 private val evaluator = Evaluators.MultiClassification.f1()
   .setLabelCol(labels)
   .setPredictionCol(pred)
-  .setRawPredictionCol(raw)
-  .setProbabilityCol(prob)
 
-private val wf = new OpWorkflow().setResultFeatures(pred, raw, prob, labels)
+private val wf = new OpWorkflow().setResultFeatures(pred, labels)
 
 def runner(opParams: OpParams): OpWorkflowRunner =
   new OpWorkflowRunner(

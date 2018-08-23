@@ -61,10 +61,10 @@ TransmogrifAI will select the best model and hyper-parameters for you based on t
 Smart model selection and comparison gives the next layer of improvements over traditional ML workflows.
 
 ```scala
-val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(label, features).getOutput()
+val pred = BinaryClassificationModelSelector().setInput(label, features).getOutput()
 ```
 
-The ModelSelector is an Estimator that uses data to find the best model. BinaryClassificationModelSelector is for  binary classification tasks, multi classification tasks can be done using MultiClassificationModelSelector. Best Regression model are done through RegressionModelSelector. Currently the possible classification models that can be applied in the selector are` LogisticRegression`, `DecisionTrees`, `RandomForest` and `NaiveBayes`. The possible regression models are ` LinearRegression`, `DecisionTrees`, `RandomForest` and `GBTrees`. The best model is selected via a CrossValidation or TrainingSplit, by picking the best SparkML model and wraping it. It is also possible to perform hyperparameter tuning for each model through a grid search.
+The ModelSelector is an Estimator that uses data to find the best model. BinaryClassificationModelSelector is for  binary classification tasks, multi classification tasks can be done using MultiClassificationModelSelector. Best Regression model are done through RegressionModelSelector. Currently the possible classification models that can be applied in the selector are `GBTCLassifier`, `LinearSVC`, `LogisticRegression`, `DecisionTrees`, `RandomForest` and `NaiveBayes`, though `GBTClassifier` and `LinearSVC` only support binary classification. The possible regression models are `GeneralizedLinearRegression`,  `LinearRegression`, `DecisionTrees`, `RandomForest` and `GBTreeRegressor`. The best model is selected via a CrossValidation or TrainingSplit, by picking the best model and wrapping it. By default each of these models comes with a predefined set of hyperparameters that will be tested in determining the best model.  
 
-For advanced users, check out how to set CrossValidation parameters, balance datasets and customize hyperparameter-tuning [here](../developer-guide#modelselector).
+For advanced users, check out how to specify specific models and hyperparameters, add your own models, set validation parameters, and balance datasets [here](../developer-guide#modelselector).
 

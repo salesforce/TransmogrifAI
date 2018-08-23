@@ -123,7 +123,7 @@ Finally, the OpLogisticRegression Estimator is applied to derive a new triplet o
 // Define the model we want to use (here a simple logistic regression) and get the resulting output
 import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 
-val (prediction, rawPrediction, prob) = new OpLogisticRegression().setInput(survived, finalFeatures).getOutput
+val prediction = new OpLogisticRegression().setInput(survived, finalFeatures).getOutput
 ```
 We could alternatively have used the [ModelSelector](../AutoML-Capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
 
@@ -139,7 +139,7 @@ val trainDataReader = DataReaders.Simple.csvCase[Passenger](
 
 val workflow =
    new OpWorkflow()
-      .setResultFeatures(survived, rawPrediction, prob, prediction)
+      .setResultFeatures(survived, prediction)
       .setReader(trainDataReader)
 ```
 
@@ -151,7 +151,6 @@ val fittedWorkflow = workflow.train()
 
 val evaluator = Evaluators.BinaryClassification()
    .setLabelCol(survived)
-   .setRawPredictionCol(rawPrediction)
    .setPredictionCol(prediction)
 
 // Apply the fitted workflow to the train data and manifest

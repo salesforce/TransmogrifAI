@@ -9,6 +9,10 @@ Use TransmogrifAI if you need a machine learning library to:
 * Rapidly train good quality machine learnt models with minimal hand tuning
 * Build modular, reusable, strongly typed machine learning workflows
 
+## Why is "op" in the package name and at the start of many class names?
+
+Op is a reference to the internal codename that the project was developed under: Optimus Prime.
+
 ## I am used to working in Python why should I care about type safety?
 
 The flexibility of Salesforce Objects allows customers to modify even standard objects schemas. This means that when writing models for a multi-tenant environment the only information about what is in a column that we can really count on is the Salesforce type (i.e. Phone, Email, Mulipicklist, Percent, etc.). Working in a strictly typed environment allows us to leverage this information to perform sensible automatic feature engineering. 

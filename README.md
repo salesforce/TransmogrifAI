@@ -42,7 +42,7 @@ val featureVector = predictors.transmogrify()
 val checkedFeatures = survived.sanityCheck(featureVector, removeBadFeatures = true)
 
 // Automated model selection
-val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
+val pred = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 
 // Setting up a TransmogrifAI workflow and training the model
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
