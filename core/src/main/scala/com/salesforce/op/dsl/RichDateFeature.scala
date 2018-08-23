@@ -71,7 +71,10 @@ trait RichDateFeature {
     }
 
     /**
-     * Converts a sequence of Date features into DateList feature and then applies DateList vectorizer.
+     * Converts DateTime features into cartesian coordinate representation of an extracted time periods
+     * (specified in circularDateRepresentations as seq of: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay,
+     * WeekOfMonth, WeekOfYear) on the unit circle.
+     * Also converts a sequence of Date features into DateList feature and then applies DateList vectorizer.
      *
      * DateListPivot can specify:
      * 1) SinceFirst - replace the feature by the number of days between the first event and reference date
@@ -85,6 +88,8 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
+     * @param circularDateRepresentations list of all the circular date representations that should be included
+     *                                    feature vector
      * @return result feature of type Vector
      */
     def vectorize
@@ -92,10 +97,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
-      f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate, trackNulls = trackNulls,
+      val timePeriods = circularDateRepresentations.flatMap(tp => (f +: others).map(_.toUnitCircle(tp)))
+      val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate, trackNulls = trackNulls,
         others = others.map(_.toDateList()))
+      (timePeriods :+ time).combine()
     }
 
   }
@@ -134,7 +142,10 @@ trait RichDateFeature {
     }
 
     /**
-     * Converts a sequence of DateTime features into DateTimeList feature and then applies DateTimeList vectorizer.
+     * Converts DateTime features into cartesian coordinate representation of an extracted time periods
+     * (specified in circularDateRepresentations as seq of: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay,
+     * WeekOfMonth, WeekOfYear) on the unit circle.
+     * Also converts a sequence of DateTime features into DateTimeList feature and then applies DateTimeList vectorizer.
      *
      * DateListPivot can specify:
      * 1) SinceFirst - replace the feature by the number of days between the first event and reference date
@@ -148,6 +159,8 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
+     * @param circularDateRepresentations list of all the circular date representations that should be included
+     *                                    feature vector
      * @return result feature of type Vector
      */
     def vectorize
@@ -155,10 +168,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTime]] = Array.empty
     ): FeatureLike[OPVector] = {
-      f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
+      val timePeriods = circularDateRepresentations.flatMap(tp => (f +: others).map(_.toUnitCircle(tp)))
+      val time = f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
         trackNulls = trackNulls, others = others.map(_.toDateTimeList()))
+      (timePeriods :+ time).combine()
     }
 
   }

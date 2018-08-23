@@ -76,6 +76,8 @@ private[op] trait TransmogrifierDefaults {
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
   val MaxCategoricalCardinality = 30
+  val CircularDateRepresentations: Seq[TimePeriod] = Seq(TimePeriod.HourOfDay, TimePeriod.DayOfWeek,
+    TimePeriod.DayOfMonth, TimePeriod.DayOfYear)
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -234,10 +236,12 @@ private[op] case object Transmogrifier {
             trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Date] =>
           val (f, other) = castAs[Date](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateRepresentations = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[DateTime] =>
           val (f, other) = castAs[DateTime](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateRepresentations = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
           f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
