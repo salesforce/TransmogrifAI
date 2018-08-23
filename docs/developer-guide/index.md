@@ -590,7 +590,7 @@ val modelSelector = RegressionModelSelector.withCrossValidation(
    modelsAndParameters = models)
 ```
 
-If you wished to use a fancier hyperparameter optimization you could also directly insert the ParamMaps for each model to support baysean or random hypeparameter search. 
+If you wished to use a fancier hyperparameter optimization you could also directly insert the ParamMaps for each model to support bayesian or random hyperparameter search. 
 
 
 The return type of the ModelSelectors is a Prediction feature. This is a map type feature which contains the prediction of the estimator. For models that produce raw prediction and normalized raw prediction (or probability) values, eg. classification models, these values are also contained within the map.
