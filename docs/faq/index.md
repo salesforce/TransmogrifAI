@@ -11,7 +11,7 @@ Use TransmogrifAI if you need a machine learning library to:
 
 ## Why is "op" in the package name and at the start of many class names?
 
-Op is a reference to the internal codename that the project was developed under: Optimus Prime.
+OP is a reference to the internal codename that the project was developed under: Optimus Prime.
 
 ## I am used to working in Python why should I care about type safety?
 
