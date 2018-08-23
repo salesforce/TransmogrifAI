@@ -11,7 +11,7 @@ def cmdCaller = { commandln ->
 }
 
 
-configure(allprojects - project(':templates').subprojects - project(':docs'))  {
+configure(allprojects - project(':templates').subprojects) {
     // Note: to make this function to work on TeamCity set 'VCS checkout mode' to 'Automatically on Agent'
     //noinspection GroovyAssignabilityCheck
     task createVersionProperties() {
