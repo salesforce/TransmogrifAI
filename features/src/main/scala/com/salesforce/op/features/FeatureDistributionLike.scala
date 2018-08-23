@@ -28,19 +28,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.feature
+package com.salesforce.op.features
 
-import com.salesforce.op.UID
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.binary.BinaryTransformer
-import com.salesforce.op.utils.stats.JaccardSim
 
 /**
- * Calculates the Jaccard Similarity between two sets.
- * If both inputs are empty, Jaccard Similarity is defined as 1.0
+ * Keeps the distribution information for features
  */
-class JaccardSimilarity(uid: String = UID[JaccardSimilarity])
-  extends BinaryTransformer[MultiPickList, MultiPickList, RealNN](operationName = "jacSim", uid = uid) {
+trait FeatureDistributionLike {
 
-  def transformFn: (MultiPickList, MultiPickList) => RealNN = (x, y) => JaccardSim(x.value, y.value).toRealNN
+  /**
+   * name of the feature
+   */
+  val name: String
+
+  /**
+   * map key associated with distribution (when the feature is a map)
+   */
+  val key: Option[String]
+
+  /**
+   * total count of feature seen
+   */
+  val count: Long
+
+  /**
+   * number of empties seen in feature
+   */
+  val nulls: Long
+
+  /**
+   * binned counts of feature values (hashed for strings, evenly spaced bins for numerics)
+   */
+  val distribution: Array[Double]
+
+  /**
+   *  either min and max number of tokens for text data, or number of splits used for bins for numeric data
+   */
+  val summaryInfo: Array[Double]
 }

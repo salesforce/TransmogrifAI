@@ -140,7 +140,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
 
     val blacklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
-    wf.setBlacklist(blacklist)
+    wf.setBlacklist(blacklist, Seq.empty)
     wf.getBlacklist() should contain theSameElementsAs blacklist
     wf.rawFeatures should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
@@ -148,7 +148,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       Array(boarded, booleanMap, height, survived, weight)
   }
 
-  it should "correctly allow you to interact with updated features when things are blacklisted" in {
+  it should "allow you to interact with updated features when things are blacklisted and" +
+    " features should have distributions" in {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val checked = survivedNum.sanityCheck(fv)
@@ -165,6 +166,15 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
         protectedFeatures = Array(height, weight))
 
     val wfM = wf.train()
+    wf.rawFeatures.foreach{ f =>
+      f.distributions.nonEmpty shouldBe true
+      f.name shouldEqual f.distributions.head.name
+    }
+    wfM.rawFeatures.foreach{ f =>
+      f.distributions.nonEmpty shouldBe true
+      f.name shouldEqual f.distributions.head.name
+    }
+    wf.getRawFeatureDistributions().length shouldBe 13
     val data = wfM.score()
     data.schema.fields.size shouldBe 3
     val Array(whyNotNormed2, prob2) = wfM.getUpdatedFeatures(Array(whyNotNormed, pred))
@@ -180,7 +190,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       .withRawFeatureFilter(Option(dataReader), None)
 
     val error = intercept[RuntimeException](
-      wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap))
+      wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     )
     error.getMessage.contains("creation of required result feature (height-weight_4-stagesApplied_Real")
   }
