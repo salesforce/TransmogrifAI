@@ -23,7 +23,6 @@ val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrif
 ```scala
 val pred = MultiClassificationModelSelector
   .withCrossValidation(splitter = Some(DataCutter(reserveTestFraction = 0.2, seed = randomSeed)), seed = randomSeed)
-  .setDecisionTreeSeed(randomSeed)
   .setInput(labels, features).getOutput()
 
 private val evaluator = Evaluators.MultiClassification.f1()

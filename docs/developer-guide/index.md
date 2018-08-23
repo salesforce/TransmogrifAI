@@ -196,7 +196,7 @@ class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransforme
 
 ### Wrapping a SparkML transformer
 
-Many of SparkML's transformers inherit from their [UnaryTransformer](https://spark.apache.org/docs/2.0.0/api/java/org/apache/spark/ml/UnaryTransformer.html), which is an abstract class for transformers that take one input column, apply a transformation, and output the result as a new column.  An example of such a transformer is [Normalizer](https://spark.apache.org/docs/2.0.0/api/java/org/apache/spark/ml/feature/Normalizer.html), which normalizes a vector to have unit norm using the given p-norm.  We can use the Normalizer to illustrate how to wrap a SparkML transformer that inherits from their UnaryTransformer:
+Many of SparkML's transformers inherit from their [UnaryTransformer](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Transformer.scala#L82), which is an abstract class for transformers that take one input column, apply a transformation, and output the result as a new column.  An example of such a transformer is [Normalizer](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/Normalizer.scala), which normalizes a vector to have unit norm using the given p-norm.  We can use the Normalizer to illustrate how to wrap a SparkML transformer that inherits from their UnaryTransformer:
 
 ```scala
 val sparkNormalizer = new Normalizer().setP(1.0)
@@ -359,7 +359,7 @@ class UnaryEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], U
 
 ### Wrapping a SparkML estimator
 
-To wrap a SparkML estimator, we follow a similar pattern as when wrapping a SparkML transformer.  SparkML estimators all inherit from [Estimator](https://spark.apache.org/docs/2.0.1/api/java/org/apache/spark/ml/Estimator.html), with a couple of specializations, like [Predictor](https://spark.apache.org/docs/2.0.1/api/java/org/apache/spark/ml/Predictor.html) and BinaryEstimator.  We have wrapper classes for each of those, respectively: OpEstimatorWrapper, OpPredictorWrapper, [etc](https://github.com/salesforce/TransmogrifAI/tree/master/core/src/main/scala/com/salesforce/op/stages/sparkwrappers).  For example, to wrap SparkML's [PCA](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/PCA.scala) estimator, we proceed as follows:
+To wrap a SparkML estimator, we follow a similar pattern as when wrapping a SparkML transformer.  SparkML estimators all inherit from [Estimator](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Estimator.scala), with a couple of specializations, like [Predictor](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Predictor.scala) and BinaryEstimator.  We have wrapper classes for each of those, respectively: OpEstimatorWrapper, OpPredictorWrapper, [etc](https://github.com/salesforce/TransmogrifAI/tree/master/core/src/main/scala/com/salesforce/op/stages/sparkwrappers).  For example, to wrap SparkML's [PCA](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/PCA.scala) estimator, we proceed as follows:
 
 ```scala
 
