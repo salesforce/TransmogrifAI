@@ -75,7 +75,7 @@ Transformers are a Spark ML concept that describes classes which perform a map o
 
 ### TransmogrifAI Transformers
 
-TransmogrifAI Transformers extend Spark Transformers but are designed to interact with Features rather than DataFrame column names. Rather than directly passing in the data to transform function, the input Feature (or Features) are set using the setInput method and the return Feature (or Features) are obtained using the getOutput method. Both the input and output Features can then be acted on as many times as desired to obtain the final result Features. When a Workflow is called, the data described by the output Feature is materialized by passing the data described by the input Features into the transformer.
+TransmogrifAI Transformers extend Spark Transformers but are designed to interact with Features rather than DataFrame column names. Rather than directly passing in the data to transform function, the input Feature (or Features) are set using the setInput method and the return Feature is obtained using the getOutput method. Both the input and output Features can then be acted on as many times as desired to obtain the final result Features. When a Workflow is called, the data described by the output Feature is materialized by passing the data described by the input Features into the transformer.
 
 ### Writing your own transformer
 
@@ -98,7 +98,7 @@ class UnaryLambdaTransformer[I, O]
   val transformFn: I => O,
   override val uid: String = UID[UnaryTransformerBase[I, O])
   ) (implicit override ...)
-  extends UnaryTransformerBase[I, O](operationName = operationName, uid = uid)
+  extends UnaryTransformer[I, O](operationName = operationName, uid = uid)
 ```
 
 And extend it to create the new transformer:
@@ -196,7 +196,7 @@ class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransforme
 
 ### Wrapping a SparkML transformer
 
-Many of SparkML's transformers inherit from their [UnaryTransformer](https://spark.apache.org/docs/2.0.0/api/java/org/apache/spark/ml/UnaryTransformer.html), which is an abstract class for transformers that take one input column, apply a transformation, and output the result as a new column.  An example of such a transformer is [Normalizer](https://spark.apache.org/docs/2.0.0/api/java/org/apache/spark/ml/feature/Normalizer.html), which normalizes a vector to have unit norm using the given p-norm.  We can use the Normalizer to illustrate how to wrap a SparkML transformer that inherits from their UnaryTransformer:
+Many of SparkML's transformers inherit from their [UnaryTransformer](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Transformer.scala#L82), which is an abstract class for transformers that take one input column, apply a transformation, and output the result as a new column.  An example of such a transformer is [Normalizer](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/Normalizer.scala), which normalizes a vector to have unit norm using the given p-norm.  We can use the Normalizer to illustrate how to wrap a SparkML transformer that inherits from their UnaryTransformer:
 
 ```scala
 val sparkNormalizer = new Normalizer().setP(1.0)
@@ -210,8 +210,7 @@ val normalizedFeature: Feature[OpVector] = wrappedNormalizer
 
 The flow illustrated above  instantiates and configures the transformer we aim to wrap, Normalizer, and then to passes it in as a constructor parameter to an TransmogrifAI transformer wrapper, in this case, OpUnaryTransformerWrapper.
 
-The spark wrappers built into TransmogrifAI allow users to take advantage of any estimator or transformer in Spark ML, whether or not it has been explicitly wrapped for use within TransmogrifAI.
-
+The spark wrappers built into TransmogrifAI allow users to take advantage of any estimator or transformer in Spark ML, whether or not it has been explicitly wrapped for use within TransmogrifAI. We provide a set of base classes to deal with various classes of spark stages to make this [easier](https://github.com/salesforce/TransmogrifAI/tree/master/core/src/main/scala/com/salesforce/op/stages/sparkwrappers).
 
 ### Wrapping a non serializable external library
 
@@ -360,20 +359,15 @@ class UnaryEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], U
 
 ### Wrapping a SparkML estimator
 
-To wrap a SparkML estimator, we follow a similar pattern as when wrapping a SparkML transformer.  SparkML estimators all inherit from [Estimator](https://spark.apache.org/docs/2.0.1/api/java/org/apache/spark/ml/Estimator.html), with a couple of specializations, like [Predictor](https://spark.apache.org/docs/2.0.1/api/java/org/apache/spark/ml/Predictor.html) and [ProbabilisticClassifier](https://spark.apache.org/docs/2.0.0/api/java/org/apache/spark/ml/classification/ProbabilisticClassifier.html).  We have wrapper classes for each of those, respectively: OpEstimatorWrapper, OpPredictorWrapper, and OpProbabilisticClassifierWrapper.  For example, to wrap SparkML's [LinearRegression](https://spark.apache.org/docs/2.0.2/api/java/org/apache/spark/ml/regression/LinearRegression.html) estimator, which inherits from Predictor, we proceed as follows:
+To wrap a SparkML estimator, we follow a similar pattern as when wrapping a SparkML transformer.  SparkML estimators all inherit from [Estimator](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Estimator.scala), with a couple of specializations, like [Predictor](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/Predictor.scala) and BinaryEstimator.  We have wrapper classes for each of those, respectively: OpEstimatorWrapper, OpPredictorWrapper, [etc](https://github.com/salesforce/TransmogrifAI/tree/master/core/src/main/scala/com/salesforce/op/stages/sparkwrappers).  For example, to wrap SparkML's [PCA](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/feature/PCA.scala) estimator, we proceed as follows:
 
 ```scala
-val linReg = new LinearRegression()
-    .setMaxIter(10)
-    .setRegParam(0.3)
-    .setElasticNetParam(0.8)
-    .setFitIntercept(true)
 
-val wrappedLinReg: OpPredictorWrapper[RealNN, RealNN, LinearRegression, LinearRegressionModel] =
-   new OpPredictorWrapper[Numeric, Numeric, LinearRegression, LinearRegressionModel](linReg)
+val wrappedPCA: OpEstimatorWrapper[OPVector, OPVector, PCA, PCAModel] =
+   new OpEstimatorWrapper[OPVector, OPVector, PCA, PCAModel](new PCA().setK(10))
 ```
 
-Basically, we instantiate and configure the estimator to be wrapped, LinearRegression, and then pass it in as a constructor parameter to an TransmogrifAI estimator wrapper, in this case, OpPredictorWrapper.
+Basically, we instantiate and configure the estimator to be wrapped, PCA, and pass it in as a constructor parameter to an TransmogrifAI estimator wrapper.
 
 ### Creating Shortcuts for Transformers and Estimators
 
@@ -430,7 +424,7 @@ Once we defined the above implicit classes we can use them as follows:
 // Once you have the implicits in scope you can write simply this
 val nameIdf: Feature[Vector] = name.tokenize().tf().idf()
 // Or even shorter
-val nameIdf: Feature[Vector] = name.tokenize().tfidf(ocFreq)
+val nameIdf: Feature[Vector] = name.tokenize().tfidf(minDocFreq = 2)
 ```
 
 Standard stages within TransmogrifAI have shortcuts that can be imported using:
@@ -464,6 +458,14 @@ val normedAge = age.fillMissingWithMean().zNormalize()
 val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList).pivot() 
 val combinedFeature = Seq(normedAge, ageGroup).combine()
 ```
+
+This hand engineered feature can be used at the same time as default feature engineering other features by simply passing custom engineered features into `.transmogrify()` along with the features that the default should be applied to.
+
+```scala
+val features = Seq(fair, sex, combinedFeature).transmogrify()
+```
+
+Any feature that is already in vector format will simply be appended to the final feature vector unchanged by transmogrify.
 
 #### SanityChecker 
 
@@ -540,39 +542,61 @@ val workflow = new OpWorkflow().setResultFeatures(survived, rawPrediction, prob,
 
 #### ModelSelector
 
-It is possible to set validation parameters such as the number of folds  or the evaluation metric (`AUROC` or `AUPR`) :
+It is possible to set the type of validation as well as validation parameters such as the number of folds, the evaluation metric (`AUROC` or `AUPR` etc), or the subset of model types to try:
 
 ```scala
 val modelSelector = BinaryClassificationModelSelector
- .withCrossValidation(numFolds = 10, validationMetric = Evaluators.BinaryClassification.auROC)
- .setModelsToTry(LogisticRegression, RandomForest)
- .setInput(survived, passengerFeatures)
+  .withCrossValidation(numFolds = 10, validationMetric = Evaluators.BinaryClassification.auROC,
+     modelTypesToUse = Seq(OpLogisticRegression, OpRandomForestClassifier))
+  .setInput(survived, passengerFeatures)
 ```
 
-Before evaluating each model,  it is possible for the BinaryClassificationModelSelector to balance the dataset by oversampling the minority class and undersampling the majority class. The user can decide on the balancing by for instance setting the targeted  proportion for the minority class the balanced dataset : 
+Before evaluating each model, it is possible for the BinaryClassificationModelSelector to balance the dataset by oversampling the minority class and undersampling the majority class. The user can decide on the balancing by for instance setting the targeted  proportion for the minority class the balanced dataset: 
 
 ```scala
 val modelSelector = BinaryClassificationModelSelector
- .withCrossValidation(Option(DataBalancer(sampleFraction = 0.2)), numFolds = 10, validationMetric = Evaluators.BinaryClassification.auROC)
- .setModelsToTry(LogisticRegression, RandomForest)
- .setInput(survived, passengerFeatures)
+  .withTrainValidationSplit(Option(DataBalancer(reserveTestFraction = 0.1, sampleFraction = 0.2)))
+  .setInput(survived, passengerFeatures)
 ```
 
-Finally, each potential model can have its hyper-parameters tuned for the model selection. In case of setting multiple values for the same parameter,  ModelSelector will add a grid that will be used during Cross Validation via grid search: 
+Similarly the MultiClassificationModelSelector allows the specification of the maximum number of labels that are allowed and the minimum support for each label:
 
 ```scala
-modelSelector.setLogisticRegressionRegParam(0.1)
-             .setLogisticRegressionMaxIter(10, 100)
-             .setRandomForestMaxDepth(2, 5, 10)
-             .setRandomForestNumTrees(10)
+val modelSelector = MultiClassificationModelSelector
+  .withTrainValidationSplit(Option(DataCutter(reserveTestFraction = 0.1, maxLabelCategories = 100, minLabelFraction = 0.01)))
+  .setInput(survived, passengerFeatures)
+```
+ 
+
+Finally, it is possible to directly pass in both the models and their associated hyper parameters for any model selector. The simples way to do this is to use the spark [ParamGridBuilder](https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/tuning/ParamGridBuilder.scala) and do a grid search: 
+
+```scala
+val lr = new OpLinearRegression()
+val lrParams = new ParamGridBuilder()
+   .addGrid(lr.fitIntercept, true)
+   .addGrid(lr.regParam, Array(0.001, 0.005, 0.01, 0.05, 0.1, 0.15, 0.2))
+   .addGrid(lr.elasticNetParam, Array(0.0, 0.1, 0.5))
+   .build()
+   
+val myModel = new MyCustomModel() // must extend BinaryEstimator[RealNN, OPVector, Prediction]
+val myParams = new ParamGridBuilder()
+   .addGrid(myModel.myParam, Array(1, 2, 3))
+   .build()
+   
+val models = Seq(lr -> lrParams, myModel -> myParams)
+   
+val modelSelector = RegressionModelSelector.withCrossValidation(
+   dataSplitter = Option(DataSplitter(reserveTestFraction = 0.1)),
+   modelsAndParameters = models)
 ```
 
+If you wished to use a fancier hyperparameter optimization you could also directly insert the ParamMaps for each model to support bayesian or random hyperparameter search. 
 
-The return type of the BinaryClassificationModelSelector (and MultiClassificationModelSelector) is a triplet of numeric, vector, and vector features representing the prediction, raw prediction and normalized raw prediction (or probability) columns outputted by the model selector once it is fit and applied to raw data.
+
+The return type of the ModelSelectors is a Prediction feature. This is a map type feature which contains the prediction of the estimator. For models that produce raw prediction and normalized raw prediction (or probability) values, eg. classification models, these values are also contained within the map.
 
 ```scala
-val (pred, rawPred, prob): (Feature[RealNN], Feature[OpVector], Feature[OpVector]) =
-    modelSelector.getOutput()
+val pred: Feature[Prediction] =  modelSelector.getOutput()
 ```
 
 ## Interoperability with SparkML
@@ -935,10 +959,10 @@ Evaluators are stored in a Factory that contains 3 categories :
 
 ### Single Evaluation
 
-Like in Spark MLib's evaluators, TransmogrifAI evaluators have a `evaluate`  method that returns one metric. As example, let's compute the AUROC of a transformed dataset `transformedData`  with features `label`, `pred`, `rawPred` and `prob`:
+Like in Spark MLib's evaluators, TransmogrifAI evaluators have a `evaluate`  method that returns one metric. As example, let's compute the AUROC of a transformed dataset `transformedData`  with features `label` and `pred`:
 
 ```scala
-val evaluator = Evaluators.BinaryClassification.auROC().setLabelCol(label).setRawPredictionCol(rawPred)
+val evaluator = Evaluators.BinaryClassification.auROC().setLabelCol(label).setPredictionCol(red)
 val metric = evaluator.evaluate(transformedData)
 ```
 
@@ -967,18 +991,18 @@ val crossEntropy = Evaluators.MultiClassification.custom(
       isLargerBetter = false,
       evaluateFn = ds => ds.map { case (lbl, _, prob, _) => -math.log(prob.toArray(lbl.toInt)) }.reduce(_ + _)
     )
-val evaluator = crossEntropy.setLabelCol(lbl).setRawPredictionCol(rawPrediction).setPredictionCol(prediction).setProbabilityCol(prob)
+val evaluator = crossEntropy.setLabelCol(lbl).setPredictionCol(prediction)
 
 ```
 
 The field `isLargerBetter` is the same as the one in Spark's evaluators. It indicates whether the metric returned  should be maximized.
-The method `evaluateFn`  takes a Dataset with columns `(label, rawPrediction, prediction, probability)` then returns the custom metric.
+The method `evaluateFn`  takes a Dataset with columns `(label, prediciton)`. For classification problems this will be flattened into `(label, rawPrediction, prediction, probability)` for compatibility with spark classification evaluators and easy access to different parts of the prediction feature. The evalutor returns the custom metric.
 Base classes `OpEvaluatorBase`, `OpBinaryClassificationEvaluatorBase`,
  `OpMultiClassificationEvaluatorBase` and `OpRegressionEvaluatorBase`  are also available to define custom evaluators.
 
 ## TransmogrifAI App and Runner
 
-Workflows can be run as spark applications using the `OpAppWithRunner` (or `OpApp`). Extend the `OpAppWithRunner` base class and define your workflow object and the training and testing data readers and then your workflow can be run as a spark app. Command line arguments are then used to specify the type of run you wish to do on the workflow (train, score, generate features, or evaluate).
+Workflows can be run as spark applications using the `OpAppWithRunner` (or `OpApp`). Extend the `OpAppWithRunner` [base class](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/OpApp.scala)) and define your workflow object and the training and testing data readers as part of the [OpWorkflowRunner](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/OpWorkflowRunner.scala) and then your workflow can be run as a spark app. Command line arguments are then used to specify the type of run you wish to do on the workflow (train, score, generate features, or evaluate).
 
 ```scala
 // a simpler version with just a runner
