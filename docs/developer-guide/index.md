@@ -367,7 +367,7 @@ val wrappedPCA: OpEstimatorWrapper[OPVector, OPVector, PCA, PCAModel] =
    new OpEstimatorWrapper[OPVector, OPVector, PCA, PCAModel](new PCA().setK(10))
 ```
 
-Basically, we instantiate and configure the estimator to be wrapped, PCAn, and pass it in as a constructor parameter to an TransmogrifAI estimator wrapper.
+Basically, we instantiate and configure the estimator to be wrapped, PCA, and pass it in as a constructor parameter to an TransmogrifAI estimator wrapper.
 
 ### Creating Shortcuts for Transformers and Estimators
 
