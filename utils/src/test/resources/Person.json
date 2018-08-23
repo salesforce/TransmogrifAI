@@ -1,0 +1,7 @@
+{
+  "name": "Foo Bar",
+  "address": {
+    "city": "Talkeetna",
+    "state": "AK"
+  }
+}

@@ -186,6 +186,7 @@ object RichMetadata {
   private val intSeq = TypeCase[Seq[Int]]
   private val doubleSeq = TypeCase[Seq[Double]]
   private val stringSeq = TypeCase[Seq[String]]
+  private val metadataSeq = TypeCase[Seq[Metadata]]
 
   /**
    * Enrichment functions for Maps
@@ -203,6 +204,7 @@ object RichMetadata {
         case longSeq(v) => builder.putLongArray(key, v.toArray)
         case doubleSeq(v) => builder.putDoubleArray(key, v.toArray)
         case stringSeq(v) => builder.putStringArray(key, v.toArray)
+        case metadataSeq(v) => builder.putMetadataArray(key, v.toArray)
         case _ => unsupported(key, seq)
       }
       theMap.foldLeft(builder) {

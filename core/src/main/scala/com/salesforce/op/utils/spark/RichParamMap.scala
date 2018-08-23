@@ -48,21 +48,19 @@ object RichParamMap {
      * Extract param names and values from param map
      * @return map of names to values
      */
-    def getAsMap(): Map[String, Any] =
-      params.toSeq.map(pp => pp.param.name -> pp.value).toMap.map{
+    def getAsMap(): Map[String, Any] = {
+      val mapped = params.toSeq.map(pp => pp.param.name -> pp.value).toMap
+      mapped.map {
         case (k, v: Array[_]) =>
           if (v.headOption.exists(_.isInstanceOf[TransientFeature])) {
-            k -> v.map(_.asInstanceOf[TransientFeature].toJsonString())
-          } else k -> v
+            k -> v.map(_.asInstanceOf[TransientFeature].toJsonString()).toList
+          } else k -> v.toList
         case (k, v: StructType) => k -> v.toString()
         case (k, v: PipelineStage) => k -> v.getClass.getName
-        case (k, v: Option[_]) =>
-          if (v.exists(_.isInstanceOf[PipelineStage])) {
-            k -> v.getClass.getName
-          } else k -> v
+        case (k, Some(v: PipelineStage)) => k -> v.getClass.getName
         case (k, v) => k -> v
       }
-
+    }
   }
 
 }
