@@ -33,7 +33,7 @@ package com.salesforce.op.local
 import java.io.File
 
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.spark.RichDataset._
@@ -49,12 +49,11 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
 
-  val (pred, raw, prob) = BinaryClassificationModelSelector.withTrainValidationSplit(None)
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0)
-    .setInput(survivedNum, features).getOutput()
+  val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
+    splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
+  ).setInput(survivedNum, features).getOutput()
 
-  val workflow = new OpWorkflow().setResultFeatures(pred, raw, prob, survivedNum).setReader(dataReader)
+  val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum).setReader(dataReader)
 
   lazy val model = workflow.train()
 
@@ -66,8 +65,9 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).collect().map(_.toMap)
 
-  lazy val expectedScores = model.score().collect(pred, raw, prob, survivedNum)
+  lazy val expectedScores = model.score().collect(prediction, survivedNum)
 
+  // TODO: actually test spark wrapped stage with PFA
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
     val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
@@ -75,18 +75,14 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
     val numOfRuns = 1000
     var elapsed = 0L
-    for { _ <- 0 until numOfRuns }  {
+    for { _ <- 0 until numOfRuns } {
       val start = System.currentTimeMillis()
       val scores = rawData.map(row => scoreFn(row))
       elapsed += System.currentTimeMillis() - start
       for {
-        (score, (predV, rawV, probV, survivedV)) <- scores.zip(expectedScores)
+        (score, (predV, survivedV)) <- scores.zip(expectedScores)
         expected = Map(
-          pred.name -> Map(
-            pred.name -> predV.value.get,
-            raw.name -> rawV.value.toArray.toList,
-            prob.name -> probV.value.toArray.toList
-          ),
+          prediction.name -> predV.value,
           survivedNum.name -> survivedV.value.get
         )
       } score shouldBe expected

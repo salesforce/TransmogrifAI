@@ -42,7 +42,7 @@ import org.apache.spark.ml.linalg.Vector
 
 
 /**
- * A class for running an Optimus Prime Workflow without Spark.
+ * A class for running TransmogrifAI Workflow without Spark.
  *
  * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
  */
@@ -62,9 +62,9 @@ class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
 
     val stagesWithIndex = model.stages.zipWithIndex
     val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => s -> i }
-    val sparkStages = stagesWithIndex.collect {
+    val sparkStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
       case (s: SparkWrapperParams[_], i) => s.getSparkMlStage().map(_ -> i)
-      case (s: Transformer, i) if !s.isInstanceOf[OpTransformer] => Some(s -> i)
+      case (s: Transformer, i) => Some(s -> i)
     }.flatten.map(v => v._1.asInstanceOf[Transformer] -> v._2)
 
     val pfaStages = sparkStages.map { case (s, i) => toPFA(s, pretty = true) -> i }
@@ -75,10 +75,10 @@ class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
       val rowMap = collection.mutable.Map.empty ++ row
       val transformedRow = loadedStages.foldLeft(rowMap) { (r, s) =>
         s match {
-          case (s: OpTransformer, _) => {
+          case (s: OpTransformer, _) =>
             r += s.asInstanceOf[OpPipelineStage[_]].getOutputFeatureName -> s.transformKeyValue(r.apply)
-          }
-          case (e: PFAEngine[AnyRef, AnyRef], i) => {
+
+          case (e: PFAEngine[AnyRef, AnyRef], i) =>
             val stage = stagesWithIndex.find(_._2 == i).map(_._1.asInstanceOf[OpPipelineStage[_]]).get
             val outName = stage.getOutputFeatureName
             val inputName = stage.getInputFeatures().collect {
@@ -88,7 +88,6 @@ class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
             val input = s"""{"$inputName":${vector.mkString("[", ",", "]")}}"""
             val res = e.action(e.jsonInput(input)).toString
             r += outName -> JsonUtils.fromString[Map[String, Any]](res).get
-          }
         }
       }
       val resultFeatures = model.getResultFeatures().map(_.name)

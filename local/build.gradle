@@ -1,3 +1,8 @@
+repositories {
+    // TODO: remove once Aardpfark release if official
+    maven { url 'https://jitpack.io' }
+}
+
 dependencies {
     compile project(':core')
     testCompile project(':testkit')
