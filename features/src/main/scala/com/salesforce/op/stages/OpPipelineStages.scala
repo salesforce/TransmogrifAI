@@ -550,12 +550,12 @@ trait OpPipelineStageN[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
 }
 
 /**
-  * Pipeline stage of single Feature of type I1 with multiple Features of type I2 to output 1Feature of type O
-  *
-  * @tparam I1 input single feature type
-  * @tparam I2 input sequence feature type
-  * @tparam O output feature type
-  */
+ * Pipeline stage of single Feature of type I1 with multiple Features of type I2 to output 1Feature of type O
+ *
+ * @tparam I1 input single feature type
+ * @tparam I2 input sequence feature type
+ * @tparam O output feature type
+ */
 trait OpPipelineStage2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType] extends OpPipelineStage[O]
   with HasIn1PlusN {
   self: PipelineStage =>
