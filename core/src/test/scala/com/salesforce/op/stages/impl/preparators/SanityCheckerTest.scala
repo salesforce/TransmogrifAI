@@ -535,7 +535,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   // TODO: Not sure if we should do this test since it may not fail if spark settings are changed
-  it should "fail (due to a Kyro buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
+  it should "fail (due to a Kryo buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
     val numHashes = 5000
 
     val vectorized = textMap.vectorize(
