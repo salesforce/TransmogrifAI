@@ -487,12 +487,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_512")
+    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_513")
     val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
-        "textMap_beverage_NullIndicatorValue_514")
-    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
-      "textMap_beverage_NullIndicatorValue_514"
+      Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
+        "textMap_fruit_NullIndicatorValue_514")
+    val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
+      "textMap_fruit_NullIndicatorValue_514"
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
@@ -535,7 +535,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   // TODO: Not sure if we should do this test since it may not fail if spark settings are changed
-  it should "fail (due to a Kyro buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
+  it should "fail (due to a Kryo buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
     val numHashes = 5000
 
     val vectorized = textMap.vectorize(
@@ -595,14 +595,14 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val featuresToDrop = Seq.empty[String]
     val totalFeatures = (0 until numHashes).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_color_NullIndicatorValue_" + numHashes.toString,
-        "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
-        "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+      Seq("textMap_beverage_NullIndicatorValue_" + numHashes.toString,
+        "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
+        "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
     val featuresWithCorr = Seq("textMap_8", "textMap_89", "textMap_294", "textMap_706", "textMap_971",
       "textMap_1364", "textMap_1633", "textMap_2382", "textMap_2527", "textMap_3159", "textMap_3491",
-      "textMap_3804", "textMap_color_NullIndicatorValue_" + numHashes.toString,
-      "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
-      "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+      "textMap_3804", "textMap_beverage_NullIndicatorValue_" + numHashes.toString,
+      "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
+      "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
     val featuresWithNaNCorr = totalFeatures.filterNot(featuresWithCorr.contains)
 
 
