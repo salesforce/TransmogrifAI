@@ -2,7 +2,7 @@
 
 [Sphinx](http://www.sphinx-doc.org) based docs site hosted on [ReadTheDocs](https://readthedocs.org/projects/transmogrifai).
 
-Scala docs are located [here](https://docs.transmogrif.ai/).
+Scala docs are located [here](https://scaladoc.transmogrif.ai/).
 
 ## Running locally
 
