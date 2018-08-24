@@ -42,7 +42,7 @@ val featureVector = predictors.transmogrify()
 val checkedFeatures = survived.sanityCheck(featureVector, removeBadFeatures = true)
 
 // Automated model selection
-val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
+val pred = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
 
 // Setting up a TransmogrifAI workflow and training the model
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
@@ -166,9 +166,9 @@ import com.salesforce.op.utils.spark.RichStructType._
 
 ## Quick Start and Documentation
 
-Visit our [docs site](https://transmogrifai.readthedocs.io/) for full documentation, getting started, examples, faq and other information.
+Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
-See [Scaladoc](https://docs.transmogrif.ai) for the programming API.
+See [Scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
 
 ## License
 
