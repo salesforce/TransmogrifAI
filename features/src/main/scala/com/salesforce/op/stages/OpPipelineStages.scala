@@ -550,6 +550,43 @@ trait OpPipelineStageN[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
 }
 
 /**
+  * Pipeline stage of single Feature of type I1 with multiple Features of type I2 to output 1Feature of type O
+  *
+  * @tparam I1 input single feature type
+  * @tparam I2 input sequence feature type
+  * @tparam O output feature type
+  */
+trait OpPipelineStage2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType] extends OpPipelineStage[O]
+  with HasIn1PlusN {
+  self: PipelineStage =>
+
+  implicit val tto: TypeTag[O]
+  implicit val ttov: TypeTag[O#Value]
+
+  final override type InputFeatures = (FeatureLike[I1], Array[FeatureLike[I2]])
+
+  final override def checkInputLength(features: Array[_]): Boolean = features.length > 0
+
+  final override def inputAsArray(in: InputFeatures): Array[OPFeature] = {
+    Array(in._1) ++ in._2.asInstanceOf[Array[OPFeature]]
+  }
+
+  final def setInput(feature: FeatureLike[I1], features: FeatureLike[I2]*): this.type =
+    super.setInput(feature, features.toArray)
+
+  protected[op] override def outputFeatureUid: String = FeatureUID[O](uid)
+
+  override def getOutput(): FeatureLike[O] = new Feature[O](
+    uid = outputFeatureUid,
+    name = getOutputFeatureName,
+    originStage = this,
+    isResponse = outputIsResponse,
+    parents = getInputFeatures()
+  )(tto)
+}
+
+
+/**
  * Trait to mix into transformers that indicates their transform functions can be combined into a single stage
  */
 private[op] trait OpTransformer {
