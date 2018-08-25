@@ -125,4 +125,4 @@ with `Map("NEW_INPUT" -> ".myMethod(blah)")` becomes:
     .getOutput()
 ```
 
-See also [the relevant section on our docs site](https://transmogrifai.readthedocs.io/en/latest/examples/Bootstrap-Your-First-Project.html).
+See also [the relevant section on our docs site](https://docs.transmogrif.ai/en/latest/examples/Bootstrap-Your-First-Project.html).

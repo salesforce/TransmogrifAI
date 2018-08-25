@@ -121,7 +121,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
   def makeSmartTextMapVectorizerModelArgs(aggregatedStats: Array[TextMapStats]): SmartTextMapVectorizerModelArgs = {
     val maxCard = $(maxCardinality)
-    val minSup = ${minSupport}
+    val minSup = $(minSupport)
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
