@@ -80,7 +80,7 @@ configure(allProjs) {
         chillAvroVersion = '0.8.0'
         reflectionsVersion = '0.9.11'
         collectionsVersion = '3.2.2'
-        optimaizeLangDetectorVersion = '0.7.1'
+        optimaizeLangDetectorVersion = '0.0.1'
         tikaVersion = '1.16'
         sparkTestingBaseVersion = '2.2.0_0.8.0'
         sourceCodeVersion = '0.1.3'
