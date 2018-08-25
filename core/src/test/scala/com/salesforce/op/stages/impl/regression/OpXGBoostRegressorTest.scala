@@ -45,7 +45,7 @@ class OpXGBoostRegressorTest extends OpEstimatorSpec[Prediction, OpPredictorWrap
   OpPredictorWrapper[XGBoostRegressor, XGBoostRegressionModel]]
   with PredictionEquality with OpXGBoostQuietLogging {
 
-  override def specName: String = classOf[OpXGBoostRegressor].getSimpleName
+  override def specName: String = Spec[OpXGBoostRegressor]
 
   val rawData = Seq(
     (10.0, Vectors.dense(1.0, 4.3, 1.3)),

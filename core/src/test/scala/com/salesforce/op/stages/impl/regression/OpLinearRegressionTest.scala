@@ -44,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 class OpLinearRegressionTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[LinearRegressionModel],
   OpPredictorWrapper[LinearRegression, LinearRegressionModel]] with PredictionEquality {
 
-  override def specName: String = classOf[OpLinearRegression].getSimpleName
+  override def specName: String = Spec[OpLinearRegression]
 
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](

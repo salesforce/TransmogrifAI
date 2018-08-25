@@ -43,7 +43,7 @@ import org.scalatest.junit.JUnitRunner
 class OpGBTRegressorTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[GBTRegressionModel],
   OpPredictorWrapper[GBTRegressor, GBTRegressionModel]] with PredictionEquality {
 
-  override def specName: String = classOf[OpGBTRegressor].getSimpleName
+  override def specName: String = Spec[OpGBTRegressor]
 
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](

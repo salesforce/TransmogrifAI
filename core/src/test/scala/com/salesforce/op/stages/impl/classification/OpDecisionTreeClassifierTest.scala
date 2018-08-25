@@ -45,7 +45,7 @@ class OpDecisionTreeClassifierTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[DecisionTreeClassificationModel],
   OpPredictorWrapper[DecisionTreeClassifier, DecisionTreeClassificationModel]] with PredictionEquality {
 
-  override def specName: String = classOf[OpDecisionTreeClassifier].getSimpleName
+  override def specName: String = Spec[OpDecisionTreeClassifier]
 
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](

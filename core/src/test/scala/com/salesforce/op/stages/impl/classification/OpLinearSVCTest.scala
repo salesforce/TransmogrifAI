@@ -44,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 class OpLinearSVCTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[LinearSVCModel],
   OpPredictorWrapper[LinearSVC, LinearSVCModel]] with PredictionEquality {
 
-  override def specName: String = classOf[OpLinearSVC].getSimpleName
+  override def specName: String = Spec[OpLinearSVC]
 
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](

@@ -44,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 class OpNaiveBayesTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[NaiveBayesModel],
   OpPredictorWrapper[NaiveBayes, NaiveBayesModel]] with PredictionEquality {
 
-  override def specName: String = classOf[OpNaiveBayes].getSimpleName
+  override def specName: String = Spec[OpNaiveBayes]
 
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](

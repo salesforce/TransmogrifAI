@@ -45,7 +45,7 @@ class OpXGBoostClassifierTest extends OpEstimatorSpec[Prediction, OpPredictorWra
   OpPredictorWrapper[XGBoostClassifier, XGBoostClassificationModel]]
   with PredictionEquality with OpXGBoostQuietLogging {
 
-  override def specName: String = classOf[OpXGBoostClassifier].getSimpleName
+  override def specName: String = Spec[OpXGBoostClassifier]
 
   val rawData = Seq(
     1.0 -> Vectors.dense(12.0, 4.3, 1.3),
