@@ -198,10 +198,8 @@ configure(allProjs) {
         ignoreFailures = true
         include '**/*.java', '**/*.scala'
         exclude '**/org/apache/spark/ml/SparkDefaultParamsReadWrite.scala',
-                '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.scala',
                 '**/com/salesforce/op/test/TestSparkContext.scala',
                 '**/com/salesforce/op/test/TempDirectoryTest.scala',
-                '**/com/salesforce/op/utils/io/DirectOutputCommitter.scala',
                 '**/com/salesforce/op/stages/impl/tuning/OpCrossValidation.scala',
                 '**/com/salesforce/op/stages/impl/tuning/OpTrainValidationSplit.scala',
                 '**/com/salesforce/op/test/*.java',
