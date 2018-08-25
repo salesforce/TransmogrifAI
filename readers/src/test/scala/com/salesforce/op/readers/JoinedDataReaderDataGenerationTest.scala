@@ -290,7 +290,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     aggregatedData.collect(description) should contain theSameElementsAs
       Array(Text.empty, Text.empty, Text.empty, Text(""),
-        Text("this is a description stuff this is a description stuff this is a description stuff"),
+        Text("stuff this is a description stuff this is a description stuff this is a description"),
         Text("this is a description"))
 
     aggregatedData.collect(stringMap) should contain theSameElementsAs
@@ -300,7 +300,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
 
     aggregatedData.collect(boarded) should contain theSameElementsAs
       Array(DateList.empty, DateList.empty, DateList(Array(1471046100L)), DateList(Array(1471046400L)),
-        DateList(Array(1471046400L, 1471046300L, 1471046400L, 1471046300L, 1471046400L, 1471046300L)),
+        DateList(Array(1471046300L, 1471046400L, 1471046300L, 1471046400L, 1471046300L, 1471046400L)),
         DateList(Array(1471046600L)))
 
     // height has a special integration window so this features tests that things included in other
