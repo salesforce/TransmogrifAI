@@ -70,8 +70,7 @@ task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
             "spark.hadoop.avro.output.codec=deflate",
             "spark.hadoop.avro.mapred.deflate.level=6",
             "spark.hadoop.validateOutputSpecs=false",
-            "spark.hadoop.mapred.output.committer.class=com.salesforce.op.utils.io.DirectOutputCommitter",
-            "spark.hadoop.spark.sql.sources.outputCommitterClass=com.salesforce.op.utils.io.DirectMapreduceOutputCommitter"
+            "spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2"
     ].collect { ["--conf", it] }.flatten()
 
     environment SPARK_HOME: sparkHome
