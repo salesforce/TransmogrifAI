@@ -62,12 +62,15 @@ trait RichDateFeature {
      * of an extracted time period on the unit circle
      *
      * @param timePeriod The time period to extract from the timestamp
+     * @param others     Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
-    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
-      f.transformWith(
-        new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod)
-      )
+    def toUnitCircle
+    (
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      others: Array[FeatureLike[Date]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod).setInput(f +: others).getOutput()
     }
 
     /**
@@ -100,9 +103,9 @@ trait RichDateFeature {
       circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
-      val timePeriods = circularDateRepresentations.flatMap(tp => (f +: others).map(_.toUnitCircle(tp)))
-      val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate, trackNulls = trackNulls,
-        others = others.map(_.toDateList()))
+      val timePeriods = circularDateRepresentations.map(tp => f.toUnitCircle(tp, others))
+      val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
+        trackNulls = trackNulls, others = others.map(_.toDateList()))
       (timePeriods :+ time).combine()
     }
 
@@ -133,12 +136,14 @@ trait RichDateFeature {
      * of an extracted time period on the unit circle
      *
      * @param timePeriod The time period to extract from the timestamp
+     * @param others     Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
-    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
-      f.transformWith(
-        new DateToUnitCircleTransformer[DateTime]().setTimePeriod(timePeriod)
-      )
+    def toUnitCircle(
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      others: Array[FeatureLike[DateTime]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateToUnitCircleTransformer[DateTime]().setTimePeriod(timePeriod).setInput(f +: others).getOutput()
     }
 
     /**
@@ -171,7 +176,7 @@ trait RichDateFeature {
       circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTime]] = Array.empty
     ): FeatureLike[OPVector] = {
-      val timePeriods = circularDateRepresentations.flatMap(tp => (f +: others).map(_.toUnitCircle(tp)))
+      val timePeriods = circularDateRepresentations.map(tp => f.toUnitCircle(tp, others))
       val time = f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
         trackNulls = trackNulls, others = others.map(_.toDateTimeList()))
       (timePeriods :+ time).combine()

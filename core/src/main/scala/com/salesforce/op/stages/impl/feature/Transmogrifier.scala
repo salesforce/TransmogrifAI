@@ -148,11 +148,13 @@ private[op] case object Transmogrifier {
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[DateMap] =>
-          val (f, other) = castAs[DateMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateRepresentations = CircularDateRepresentations)
         case t if t =:= weakTypeOf[DateTimeMap] =>
-          val (f, other) = castAs[DateTimeMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateTimeMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateRepresentations = CircularDateRepresentations)
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
