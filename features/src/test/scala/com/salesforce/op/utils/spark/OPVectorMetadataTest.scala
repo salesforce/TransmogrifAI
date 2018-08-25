@@ -45,7 +45,7 @@ import org.scalatest.prop.PropertyChecks
 @RunWith(classOf[JUnitRunner])
 class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks {
 
-  type OpVectorColumnTuple = (Seq[String], Seq[String], Option[String], Option[String], Int)
+  type OpVectorColumnTuple = (Seq[String], Seq[String], Option[String], Option[String], Option[String], Int)
   type FeatureHistoryTuple = (Seq[String], Seq[String])
   type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple)
 
@@ -61,9 +61,10 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
     nameSeq <- Gen.containerOf[Seq, String](genName)
     typeSeq <- Gen.listOfN(nameSeq.length, genType)
     group <- Gen.option(genName)
-    value <- Gen.option(genValue)
+    ivalue <- Gen.option(genValue)
+    dvalue <- Gen.option(genValue)
   } yield {
-    (nameSeq, typeSeq, group, value, 0)
+    (nameSeq, typeSeq, group, ivalue, if (ivalue.isEmpty) dvalue else None, 0)
   }
 
   val featHistTupleGen: Gen[FeatureHistoryTuple] = Gen.zip(
@@ -185,7 +186,8 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
           hist.parentFeatureName shouldBe meta.parentFeatureName
           hist.parentFeatureType shouldBe meta.parentFeatureType
           hist.indicatorValue shouldBe meta.indicatorValue
-          hist.indicatorGroup shouldBe meta.indicatorGroup
+          hist.grouping shouldBe meta.grouping
+          hist.descriptorValue shouldBe meta.descriptorValue
           hist.indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe meta.isNullIndicator
           hist.parentFeatureType.exists(p => p.contains("Map") || p.contains("Prediction")) shouldBe
             meta.hasParentOfSubType[OPMap[_]]

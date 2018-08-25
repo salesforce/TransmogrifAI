@@ -278,7 +278,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-        indicatorGroup <- col.indicatorGroup
+        indicatorGroup <- col.grouping
       } yield (indicatorGroup, (col, col.index))
 
     nullGroups.groupBy(_._1).foreach {
@@ -387,7 +387,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
     // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
     // to remove a feature from a single column stats (eg. associate rule confidence/support check)
-    val groupByGroups = stats.groupBy(_.column.flatMap(_.indicatorGroup))
+    val groupByGroups = stats.groupBy(_.column.flatMap(_.grouping))
     val ruleConfGroupsToDrop = groupByGroups.toSeq.flatMap{
       case (Some(group), colStats) =>
         val colsToRemove = colStats.filter(f =>
@@ -465,10 +465,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
       // Only perform Cramer's V calculation on columns that have an indicatorGroup and indicatorValue defined (right
       // now, the only things that will have indicatorValue defined and indicatorGroup be None is numeric maps)
-      val columnsWithIndicator = columnMeta.filter(f => f.indicatorGroup.isDefined && f.indicatorValue.isDefined)
+      val columnsWithIndicator = columnMeta.filter(f => f.grouping.isDefined && f.indicatorValue.isDefined)
       val colIndicesByIndicatorGroup =
         columnsWithIndicator
-          .map { meta => meta.indicatorGroup.get -> meta }
+          .map { meta => meta.grouping.get -> meta }
           .groupBy(_._1)
           // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
           .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index),
@@ -601,7 +601,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
           // Indices are determined to be hashed if they come from Text/TextArea types (or their maps) and don't have
           // an indicator group or indicator value (indicating that they are not pivoted out by the SmartTextVectorizer
           // TODO: Find a better way to do this with the feature history
-          f.indicatorGroup.isEmpty && f.indicatorValue.isEmpty &&
+          f.grouping.isEmpty && f.indicatorValue.isEmpty &&
             f.parentFeatureType.exists { t =>
               val tt = FeatureType.featureTypeTag(t)
               tt.tpe =:= typeTag[Text].tpe || tt.tpe =:= typeTag[TextArea].tpe ||
@@ -814,7 +814,7 @@ private[op] case class ColumnStatistics
             s"Max association rule confidence $conf is above threshold of $maxRuleConfidence and support $sup is " +
             s"above the required support threshold of $minRequiredRuleSupport"
         },
-        column.flatMap(_.indicatorGroup).filter(removedGroups.contains(_)).map(ig =>
+        column.flatMap(_.grouping).filter(removedGroups.contains(_)).map(ig =>
           s"other feature in indicator group $ig flagged for removal via rule confidence checks"
         )
       ).flatten
@@ -842,7 +842,7 @@ private[op] case class ColumnStatistics
   def isTextSharedHash(metadata: OpVectorColumnMetadata): Boolean = {
     val isDerivedFromText = metadata.hasParentOfType[Text] || metadata.hasParentOfType[TextArea] ||
       metadata.hasParentOfType[TextMap] || metadata.hasParentOfType[TextAreaMap]
-    isDerivedFromText && metadata.indicatorGroup.isEmpty && metadata.indicatorValue.isEmpty
+    isDerivedFromText && metadata.grouping.isEmpty && metadata.indicatorValue.isEmpty
   }
 
   override def toString: String = {

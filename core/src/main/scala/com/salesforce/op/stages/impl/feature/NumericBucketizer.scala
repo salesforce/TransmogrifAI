@@ -161,7 +161,7 @@ private[op] trait NumericBucketizerMetadata {
     trackInvalid: Boolean,
     trackNulls: Boolean
   ): Array[OpVectorColumnMetadata] = {
-    val meta = input.toColumnMetaData(true).copy(indicatorGroup = indicatorGroup)
+    val meta = input.toColumnMetaData(true).copy(grouping = indicatorGroup)
     val bucketLabelCols = bucketLabels.map(bucketLabel => meta.copy(indicatorValue = Option(bucketLabel)))
     val trkInvCol = if (trackInvalid) Seq(meta.copy(indicatorValue = Some(TransmogrifierDefaults.OtherString))) else Nil
     val trackNullCol = if (trackNulls) Seq(meta) else Nil

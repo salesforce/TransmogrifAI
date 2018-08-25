@@ -382,13 +382,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     OpVectorColumnMetadata(
       parentFeatureName = Seq("f1"),
       parentFeatureType = Seq(classOf[Real].getName),
-      indicatorGroup = None,
+      grouping = None,
       indicatorValue = None
     ) +: Array("f2", "f3").map { name =>
       OpVectorColumnMetadata(
         parentFeatureName = Seq("f0"),
         parentFeatureType = Seq(classOf[PickList].getName),
-        indicatorGroup = Option("f0"),
+        grouping = Option("f0"),
         indicatorValue = Option(name)
       )
     },

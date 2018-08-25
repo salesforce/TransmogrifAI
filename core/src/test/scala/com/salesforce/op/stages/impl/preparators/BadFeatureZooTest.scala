@@ -130,7 +130,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-      indicatorGroup <- col.indicatorGroup
+      indicatorGroup <- col.grouping
     } yield (indicatorGroup, (col, col.index))
     nullGroups.groupBy(_._1).foreach {
       case (group, cols) =>
@@ -175,7 +175,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-        indicatorGroup <- col.indicatorGroup
+        indicatorGroup <- col.grouping
       } yield (indicatorGroup, (col, col.index))
     nullGroups.groupBy(_._1).foreach {
       case (group, cols) =>

@@ -122,7 +122,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       OpVectorColumnMetadata(
         parentFeatureName = Seq(name),
         parentFeatureType = Seq(FeatureTypeDefaults.Real.getClass.getName),
-        indicatorGroup = None,
+        grouping = None,
         indicatorValue = None
       )
     },
