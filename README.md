@@ -115,7 +115,7 @@ Top model insights computed using CramersV:
 |-----------------------|----------------------|
 ```
 
-While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. Visit our [docs site](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples, faq and other information.
+While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
 
 ## Adding TransmogrifAI into your project
@@ -171,7 +171,7 @@ import com.salesforce.op.utils.spark.RichStructType._
 
 Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
-See [Scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
+See [scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
 
 ## License
 
