@@ -69,7 +69,7 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext {
     }
     val meta = OpVectorMetadata(vector.name, transformed.schema(vector.name).metadata)
     meta.columns.length shouldBe 3
-    meta.columns.map(_.indicatorGroup) should contain theSameElementsAs Array(Option("a"), Option("b"), Option("c"))
+    meta.columns.map(_.grouping) should contain theSameElementsAs Array(Option("a"), Option("b"), Option("c"))
 
     val vector2 = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = true)
     val transformed2 = new OpWorkflow().setResultFeatures(vector2).transform(ds)

@@ -319,23 +319,6 @@ case object SanityCheckerSummary {
     )
   }
 
-  @deprecated("CategoricalStats replaced by Array[CategoricalGroupStats]", "3.3.0")
-  private def categoricalStatsFromMetadata(meta: Metadata): CategoricalStats = {
-    val wrapped = meta.wrapped
-    CategoricalStats(
-      categoricalFeatures = wrapped.getArray[String](SanityCheckerNames.CategoricalFeatures),
-      cramersVs = wrapped.getArray[Double](SanityCheckerNames.CramersV),
-      mutualInfos = wrapped.getArray[Double](SanityCheckerNames.MutualInfo),
-      pointwiseMutualInfos = meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
-        .underlyingMap.asInstanceOf[LabelWiseValues.Type],
-      counts = if (meta.contains(SanityCheckerNames.CountMatrix)) {
-        meta.getMetadata(SanityCheckerNames.CountMatrix)
-          .underlyingMap.asInstanceOf[LabelWiseValues.Type]
-      }
-      else OpStatistics.LabelWiseValues.empty
-    )
-  }
-
   private def categoricalGroupStatsFromMetadata(meta: Metadata): CategoricalGroupStats = {
     val wrapped = meta.wrapped
     CategoricalGroupStats(
@@ -373,41 +356,7 @@ case object SanityCheckerSummary {
     } match {
       case Success(summary) => summary
       // Parse it under the old format
-      case Failure(_) =>
-        val oldCatStats = categoricalStatsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CategoricalStats))
-        SanityCheckerSummary(
-          // Try to parse correlations under an even older OP 3.1 format (for PLS backwards compatibility)
-          correlationsWLabel = Try(
-            correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel))
-          ) match {
-            case Success(corr) => corr
-            case Failure(_) =>
-              Correlations(
-                featuresIn = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
-                  .getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
-                values = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
-                  .getArray[Double](SanityCheckerNames.Values).toSeq,
-                nanCorrs = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
-                corrType = wrapped.get[String](SanityCheckerNames.CorrelationType) match {
-                  case CorrelationType.Pearson.`sparkName` => CorrelationType.Pearson
-                  case CorrelationType.Spearman.`sparkName` => CorrelationType.Spearman
-                }
-              )
-          },
-          dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
-          featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
-          names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
-          categoricalStats = Array(CategoricalGroupStats(
-            group = "Unknown - deprecated metadata",
-            categoricalFeatures = oldCatStats.categoricalFeatures,
-            contingencyMatrix = oldCatStats.counts,
-            pointwiseMutualInfo = oldCatStats.pointwiseMutualInfos,
-            cramersV = oldCatStats.cramersVs.head,
-            mutualInfo = oldCatStats.mutualInfos.head,
-            maxRuleConfidences = Array.empty[Double],
-            supports = Array.empty[Double]
-          ))
-        )
+      case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
     }
   }
 }
