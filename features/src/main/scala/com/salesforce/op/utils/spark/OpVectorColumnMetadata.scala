@@ -79,9 +79,7 @@ case class OpVectorColumnMetadata
   assert(parentFeatureName.length == parentFeatureType.length,
     s"must provide both type and name for every parent feature," +
       s" names: $parentFeatureName and types: $parentFeatureType do not have the same length")
-  assert(indicatorValue.isEmpty || descriptorValue.isEmpty, "cannot have both an indicatorValue and a," +
-    " descriptorValue the column is either boolean or continuous and the value appropriate for that type should" +
-    " be used")
+  assert(indicatorValue.isEmpty || descriptorValue.isEmpty, "cannot have both indicatorValue and descriptorValue")
 
   /**
    * Convert this column into Spark metadata.
