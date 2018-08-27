@@ -28,28 +28,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.local
-
-import com.salesforce.op.{OpParams, OpWorkflow}
+package com.salesforce.op
 
 
-/**
- * A class for running TransmogrifAI Workflow without Spark.
- *
- * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
- */
-class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
+package object local extends OpWorkflowModelLocal {
 
   /**
-   * Load the model & prepare a score function for local scoring
-   *
-   * @param params params to use during scoring
-   * @return score function for local scoring
+   * Score function for local scoring: raw record => transformed record
    */
-  def score(params: OpParams): ScoreFunction = {
-    require(params.modelLocation.isDefined, "Model location must be set in params")
-    val model = workflow.loadModel(params.modelLocation.get)
-    model.scoreFunction
-  }
+  type ScoreFunction = Map[String, Any] => Map[String, Any]
 
 }

@@ -9,9 +9,9 @@ dependencies {
 
     // PFA serialization for Spark models
     // TODO: replace with official Aardpfark release when ready
-    compile "com.github.relateiq:aardpfark:0.1.0-SNAPSHOT"
+    compile "com.github.relateiq:aardpfark:$aardpfarkVersion"
 
     // Hadrian PFA runtime for JVM
-    compileOnly "com.opendatagroup:hadrian:0.8.5"
-    testRuntime "com.opendatagroup:hadrian:0.8.5"
+    compileOnly "com.opendatagroup:hadrian:$hadrianVersion"
+    testRuntime "com.opendatagroup:hadrian:$hadrianVersion"
 }

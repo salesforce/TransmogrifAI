@@ -30,21 +30,25 @@
 
 package com.salesforce.op.local
 
-import java.io.File
+import java.nio.file.Paths
 
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
-import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.{OpParams, OpWorkflow}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest with TestCommon {
+
+  val log = LoggerFactory.getLogger(this.getClass)
 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
@@ -58,7 +62,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   lazy val model = workflow.train()
 
   lazy val modelLocation = {
-    val path = new File(tempDir + "/op-runner-local-test-model").toString
+    val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     path
   }
@@ -67,28 +71,41 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   lazy val expectedScores = model.score().collect(prediction, survivedNum)
 
-  // TODO: actually test spark wrapped stage with PFA
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
+    val params = new OpParams().withValues(modelLocation = Some(modelLocation))
+    val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
+    scoreFn shouldBe a[ScoreFunction]
+    val scores = rawData.map(row => scoreFn(row))
+    assert(scores, expectedScores)
+  }
+
+  it should "produce scores without Spark in timely fashion" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
     val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
     val _ = rawData.map(row => scoreFn(row)) // warm up
 
     val numOfRuns = 1000
     var elapsed = 0L
-    for { _ <- 0 until numOfRuns } {
+    for {_ <- 0 until numOfRuns} {
       val start = System.currentTimeMillis()
       val scores = rawData.map(row => scoreFn(row))
       elapsed += System.currentTimeMillis() - start
-      for {
-        (score, (predV, survivedV)) <- scores.zip(expectedScores)
-        expected = Map(
-          prediction.name -> predV.value,
-          survivedNum.name -> survivedV.value.get
-        )
-      } score shouldBe expected
+      assert(scores, expectedScores)
     }
-    println(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
-    println(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
+    log.info(s"Scored ${expectedScores.length * numOfRuns} records in ${elapsed}ms")
+    log.info(s"Average time per record: ${elapsed.toDouble / (expectedScores.length * numOfRuns)}ms")
+    elapsed should be <= 10000L
+  }
+
+  private def assert(scores: Array[Map[String, Any]], expectedScores: Array[(Prediction, RealNN)]) {
+    scores.length shouldBe expectedScores.length
+    for {
+      (score, (predV, survivedV)) <- scores.zip(expectedScores)
+      expected = Map(
+        prediction.name -> predV.value,
+        survivedNum.name -> survivedV.value.get
+      )
+    } score shouldBe expected
   }
 
 }
