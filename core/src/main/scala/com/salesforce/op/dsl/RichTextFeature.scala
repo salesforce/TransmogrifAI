@@ -256,10 +256,10 @@ trait RichTextFeature {
      */
     def indexed(
       unseenName: String = OpStringIndexerNoFilter.UnseenNameDefault,
-      handleInvalid: StringIndexerHandleInvalid = StringIndexerHandleInvalid.NoFilter
+      handleInvalid: StringIndexerHandleInvalid = StringIndexerHandleInvalid.Keep
     ): FeatureLike[RealNN] = {
       handleInvalid match {
-        case StringIndexerHandleInvalid.NoFilter => f.transformWith(
+        case StringIndexerHandleInvalid.Keep => f.transformWith(
           new OpStringIndexerNoFilter[T]().setUnseenName(unseenName)
         )
         case _ => f.transformWith(new OpStringIndexer[T]().setHandleInvalid(handleInvalid))
