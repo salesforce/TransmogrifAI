@@ -259,7 +259,7 @@ trait RichTextFeature {
       handleInvalid: StringIndexerHandleInvalid = StringIndexerHandleInvalid.Keep
     ): FeatureLike[RealNN] = {
       handleInvalid match {
-        case StringIndexerHandleInvalid.Keep => f.transformWith(
+        case StringIndexerHandleInvalid.NoFilter => f.transformWith(
           new OpStringIndexerNoFilter[T]().setUnseenName(unseenName)
         )
         case _ => f.transformWith(new OpStringIndexer[T]().setHandleInvalid(handleInvalid))

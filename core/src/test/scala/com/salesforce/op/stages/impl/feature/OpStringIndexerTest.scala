@@ -46,7 +46,12 @@ class OpStringIndexerTest extends FlatSpec with TestSparkContext{
     indexer.setHandleInvalid(StringIndexerHandleInvalid.Error)
     indexer.getSparkMlStage().get.getHandleInvalid shouldBe StringIndexerHandleInvalid.Error.entryName.toLowerCase
     indexer.setHandleInvalid(StringIndexerHandleInvalid.Keep)
-    indexer.getSparkMlStage().get.getHandleInvalid shouldBe StringIndexerHandleInvalid.Skip.entryName.toLowerCase
+    indexer.getSparkMlStage().get.getHandleInvalid shouldBe StringIndexerHandleInvalid.Keep.entryName.toLowerCase
+  }
+
+  it should "throw an error if you try to set noFilter as the indexer" in {
+    val indexer = new OpStringIndexer[Text]()
+    intercept[AssertionError](indexer.setHandleInvalid(StringIndexerHandleInvalid.NoFilter))
   }
 
 }
