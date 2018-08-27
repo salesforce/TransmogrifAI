@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid._
+import com.salesforce.op.stages.impl.feature.{StringIndexerHandleInvalid => Inv}
 import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
 import enumeratum._
 import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
@@ -63,7 +63,8 @@ class OpStringIndexer[T <: Text]
    * @return this stage
    */
   def setHandleInvalid(value: StringIndexerHandleInvalid): this.type = {
-    assert(Seq(Skip, Error, Keep).contains(value), "OpStringIndexer only supports Skip, Error, and Keep for handle invalid")
+    assert(Seq(Inv.Skip, Inv.Error, Inv.Keep).contains(value),
+      "OpStringIndexer only supports Skip, Error, and Keep for handle invalid")
     getSparkMlStage().get.setHandleInvalid(value.entryName.toLowerCase)
     this
   }
