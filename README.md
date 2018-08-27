@@ -173,6 +173,43 @@ Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getti
 
 See [scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
 
+## Authors
+
+ - Kevin Moore	[jauntbox](https://github.com/jauntbox)
+ - Kin Fai Kan	[kinfaikan](https://github.com/kinfaikan)
+ - Leah McGuire [leahmcguire](https://github.com/leahmcguire)
+ - Matthew Tovbin [tovbinm](https://github.com/tovbinm)
+ - Max Ovsiankin	[maxov](https://github.com/maxov)
+ - Michael Loh	[mikeloh77](https://github.com/mikeloh77)
+ - Michael Weil	[michaelweilsalesforce](https://github.com/michaelweilsalesforce)
+ - Shubha Nabar	[snabar](https://github.com/snabar)
+ - Vitaly Gordon	[vitalyg](https://github.com/vitalyg)
+ - Vlad Patryshev	[vpatryshev](https://github.com/vpatryshev)
+
+## Internal Contributors (prior to release)
+
+ - Chris Rupley	[crupley](https://github.com/crupley)
+ - Chris Wu	[cjwooo](https://github.com/cjwooo)
+ - Eric Wayman	[ericwayman](https://github.com/ericwayman)
+ - Felipe Oliveira	[feliperazeek](https://github.com/feliperazeek)
+ - Gera Shegalov	[gerashegalov](https://github.com/gerashegalov)
+ - Jean-Marc Soumet	[ajmssc](https://github.com/ajmssc)
+ - Marco Vivero	[marcovivero](https://github.com/marcovivero)
+ - Mario Rodriguez	
+ - Mayukh Bhaowal	[mayukhb](https://github.com/mayukhb)
+ - Minh-An Quinn	[minhanquinn](https://github.com/minhanquinn)
+ - Nicolas Drizard	[nicodri](https://github.com/nicodri)
+ - Oleg Gusak	[ogusak](https://github.com/ogusak)
+ - Patrick Framption	[tricktrap](https://github.com/tricktrap)
+ - Ryle Goehausen	[ryleg](https://github.com/ryleg)
+ - Sanmitra Ijeri	[sanmitra](https://github.com/sanmitra)
+ - Sky Chen	[almandsky](https://github.com/almandsky)
+ - Sophie Xiaodan Sun	[sxd929](https://github.com/sxd929)
+ - Till Bergmann	[tillbe](https://github.com/tillbe)
+ - Xiaoqian Liu	[wingsrc](https://github.com/wingsrc)
+
+
+
 ## License
 
 [BSD 3-Clause](LICENSE) © Salesforce.com, Inc.
