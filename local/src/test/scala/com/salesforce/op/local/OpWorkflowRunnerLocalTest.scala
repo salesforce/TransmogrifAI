@@ -106,7 +106,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   private def assert(
     scores: Array[Map[String, Any]],
     expectedScores: Array[(Prediction, RealNN, RealNN)]
-  ) {
+  ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
       (score, (predV, survivedV, indexedV)) <- scores.zip(expectedScores)
