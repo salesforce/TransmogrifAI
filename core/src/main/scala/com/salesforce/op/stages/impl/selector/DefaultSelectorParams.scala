@@ -34,18 +34,18 @@ import com.salesforce.op.stages.impl.classification.Impurity._
 
 object DefaultSelectorParams {
 
-  val MaxDepth = Array(3, 6, 12) // for trees spark default 5
+  val MaxDepth = Array(5, 10, 20) // for trees spark default 5
   val MaxBin = Array(32) // bins for cont variables in trees - 32 is spark default
-  val MinInstancesPerNode = Array(10, 100) // spark default 1
-  val MinInfoGain = Array(0.001, 0.01, 0.1) // spark default 0
-  val Regularization = Array(0.001, 0.01, 0.1, 0.2) // spark default 0
-  val MaxIterLin = Array(50) // spark default is 100
+  val MinInstancesPerNode = Array(1, 10, 15, 20, 30) // spark default 1
+  val MinInfoGain = Array(0, 0.001, 0.01) // spark default 0
+  val Regularization = Array(0, 0.001, 0.01, 0.05, 0.1) // spark default 0
+  val MaxIterLin = Array(10, 50, 100) // spark default is 100
   val MaxIterTree = Array(20) // spark default is 20
   val SubsampleRate = Array(1.0) // sample of data used for tree fits spark default 1.0
   val StepSize = Array(0.1) // spark default 0.1
   val ImpurityReg = Array(Variance.sparkName) // spark default variance
   val ImpurityClass = Array(Gini.sparkName) // spark default gini
-  val ElasticNet = Array(0.1, 0.5) // turn on spark default 0
+  val ElasticNet = Array(0, 0.001, 0.01, 0.1, 0.5, 1) // turn on spark default 0
   val MaxTrees = Array(50) // spark default 20
   val Standardized = Array(true) // standardize for linear spark default true
   val Tol = Array(1E-6) // termination tol spark default 1E-6
