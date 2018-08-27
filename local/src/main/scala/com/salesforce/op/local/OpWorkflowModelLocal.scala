@@ -113,13 +113,13 @@ trait OpWorkflowModelLocal {
     }
 
     private def toPFAJson(r: mutable.Map[String, Any], inputs: Map[String, String]): String = {
-      // Convert Spark values into a json convertible Map
-      // See [[FeatureTypeSparkConverter.toSpark]] for all possible values
+      // Convert Spark values back into a json convertible Map
+      // See [[FeatureTypeSparkConverter.toSpark]] for all possible values - we invert them here
       val in = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
         case Some(v: Vector) => v.toArray
-        case Some(v: mutable.WrappedArray[_]) => v.toList
+        case Some(v: mutable.WrappedArray[_]) => v.toArray(v.elemTag)
         case Some(v: Map[_, _]) => v.mapValues {
-          case v: mutable.WrappedArray[_] => v.toList
+          case v: mutable.WrappedArray[_] => v.toArray(v.elemTag)
           case x => x
         }
         case None | Some(null) => null
