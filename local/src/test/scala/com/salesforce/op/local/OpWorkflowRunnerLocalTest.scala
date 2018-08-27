@@ -35,6 +35,7 @@ import java.nio.file.Paths
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
+import com.salesforce.op.stages.impl.feature.{OpStringIndexer, StringIndexerHandleInvalid}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
@@ -52,12 +53,15 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
+  val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.NoFilter)
 
   val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
     splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
   ).setInput(survivedNum, features).getOutput()
 
-  val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum).setReader(dataReader)
+  val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum, indexed).setReader(dataReader)
+
+  passengersDataSet.show(false)
 
   lazy val model = workflow.train()
 
@@ -69,7 +73,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).collect().map(_.toMap)
 
-  lazy val expectedScores = model.score().collect(prediction, survivedNum)
+  lazy val expectedScores = model.score().collect(prediction, survivedNum, indexed)
 
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
@@ -97,13 +101,17 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     elapsed should be <= 10000L
   }
 
-  private def assert(scores: Array[Map[String, Any]], expectedScores: Array[(Prediction, RealNN)]) {
+  private def assert(
+    scores: Array[Map[String, Any]],
+    expectedScores: Array[(Prediction, RealNN, RealNN)]
+  ) {
     scores.length shouldBe expectedScores.length
     for {
-      (score, (predV, survivedV)) <- scores.zip(expectedScores)
+      (score, (predV, survivedV, indexedV)) <- scores.zip(expectedScores)
       expected = Map(
         prediction.name -> predV.value,
-        survivedNum.name -> survivedV.value.get
+        survivedNum.name -> survivedV.value.get,
+        indexed.name -> indexedV.value.get
       )
     } score shouldBe expected
   }

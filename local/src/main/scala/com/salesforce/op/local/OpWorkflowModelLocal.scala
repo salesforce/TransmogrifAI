@@ -33,17 +33,24 @@ package com.salesforce.op.local
 import com.ibm.aardpfark.spark.ml.SparkSupport
 import com.opendatagroup.hadrian.jvmcompiler.PFAEngine
 import com.salesforce.op.OpWorkflowModel
-import com.salesforce.op.features.types.OPVector
+import com.salesforce.op.features.types.{FeatureType, OPVector}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.json.JsonUtils
-import org.apache.spark.ml.Transformer
+import org.apache.spark.ml.{SparkMLSharedParamConstants, Transformer}
+import org.apache.spark.ml.SparkMLSharedParamConstants._
 import org.apache.spark.ml.linalg.Vector
+import org.json4s._
+import org.json4s.jackson.Serialization._
+
+import scala.collection.mutable
+import scala.collection.mutable.IndexedSeq
 
 /**
  * [[OpWorkflowModel]] enrichment functionality for local scoring
  */
 trait OpWorkflowModelLocal {
+
 
   /**
    * [[OpWorkflowModel]] enrichment functionality for local scoring
@@ -51,6 +58,8 @@ trait OpWorkflowModelLocal {
    * @param model [[OpWorkflowModel]]
    */
   implicit class OpWorkflowModelLocal(model: OpWorkflowModel) {
+
+    implicit val formats: Formats = DefaultFormats
 
     /**
      * Prepares a score function for local scoring
@@ -67,9 +76,21 @@ trait OpWorkflowModelLocal {
       }
       val pfaEngines = for {
         ((s, sparkStage), i) <- sparkStages
+        inParam = sparkStage.getParam(inputCol.name)
+        outParam = sparkStage.getParam(outputCol.name)
+        inputs = s.getInputFeatures().map(_.name).map {
+          case n if sparkStage.get(inParam).contains(n) => n -> inputCol.name
+          case n if sparkStage.get(outParam).contains(n) => n -> outputCol.name
+          case n => n -> n
+        }.toMap
+        output = s.getOutputFeatureName
+        _ = sparkStage.set(inParam, inputCol.name).set(outParam, outputCol.name)
         pfaJson = SparkSupport.toPFA(sparkStage, pretty = true)
         pfaEngine = PFAEngine.fromJson(pfaJson).head
-      } yield ((s, pfaEngine), i)
+      } yield {
+        println(sparkStage.extractParamMap())
+        ((inputs, (output, outputCol.name), pfaEngine), i)
+      }
 
       val allStages = (opStages ++ pfaEngines).sortBy(_._2)
 
@@ -79,21 +100,38 @@ trait OpWorkflowModelLocal {
           case (r, (s: OPStage with OpTransformer, i)) =>
             r += s.getOutputFeatureName -> s.transformKeyValue(r.apply)
 
-          case (r, (engine: PFAEngine[AnyRef, AnyRef]@unchecked, i)) =>
-            val stage = stagesWithIndex.find(_._2 == i).map(_._1.asInstanceOf[OpPipelineStage[_]]).get
-            val outName = stage.getOutputFeatureName
-            val inputName = stage.getInputFeatures().collect {
-              case f if f.isSubtypeOf[OPVector] => f.name
-            }.head
-            val vector = r(inputName).asInstanceOf[Vector].toArray
-            val input = s"""{"$inputName":${vector.mkString("[", ",", "]")}}"""
-            val engineIn = engine.jsonInput(input)
-            val res = engine.action(engineIn).toString
-            r += outName -> JsonUtils.fromString[Map[String, Any]](res).get
+          case (r, ((inputs: Map[String, String],
+          output: (String, String),
+          engine: PFAEngine[AnyRef, AnyRef]@unchecked), i)) =>
+            val json = toPFAJson(r, inputs)
+            println("INPUT: " + json)
+            val engineIn = engine.jsonInput(json)
+            val result = engine.action(engineIn)
+            println("RESULT: " + result)
+            val resMap = JsonUtils.fromString[Map[String, Any]](result.toString).get
+            val (out, outCol) = output
+            r += out -> resMap(outCol)
         }
         transformedRow.filterKeys(resultFeatures.contains).toMap
       }
     }
+
+    private def toPFAJson(r: collection.mutable.Map[String, Any], inputs: Map[String, String]): String = {
+      // Convert Spark values into a json convertible Map
+      // See [[FeatureTypeSparkConverter.toSpark]] for all possible values
+      val in = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
+        case None => null
+        case Some(v: Vector) => v.toArray
+        case Some(v: mutable.WrappedArray[_]) => v.toList
+        case Some(v: Map[String, _]) => v.mapValues {
+          case v: mutable.WrappedArray[_] => v.toList
+          case x => x
+        }
+        case Some(v) => v
+      }
+      JsonUtils.toJsonString(in)
+    }
+
   }
 
 }
