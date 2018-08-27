@@ -149,7 +149,7 @@ object TestOpVectorMetadataBuilder {
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),
-      indicatorGroup = col match {
+      grouping = col match {
         case RootCol => None
         case PivotColNoInd(_) => None
         case IndCol(name) => Option(f.name)

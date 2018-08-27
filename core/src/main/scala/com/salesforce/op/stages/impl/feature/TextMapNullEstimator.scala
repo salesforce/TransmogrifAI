@@ -69,7 +69,7 @@ class TextMapNullEstimator[T <: OPMap[String]]
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(tf.name),
       parentFeatureType = Seq(tf.typeName),
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = Option(OpVectorColumnMetadata.NullString)
     )
 

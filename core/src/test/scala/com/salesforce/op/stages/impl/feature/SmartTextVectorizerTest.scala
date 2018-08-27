@@ -176,21 +176,21 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
       } else if (col.index == 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else if (col.index == 3) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else if (col.index < 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
@@ -209,25 +209,25 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
       } else if (col.index == 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else if (col.index == 3) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else if (col.index < 6) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
       } else if (col.index == 6) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
@@ -246,17 +246,17 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 4) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else if (col.index < 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else if (col.index == 8) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
