@@ -29,15 +29,21 @@
  */
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.types._
 import com.salesforce.op.features.types.Text
-import com.salesforce.op.test.TestSparkContext
-import org.apache.spark.ml.feature.StringIndexer
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
 class OpStringIndexerTest extends FlatSpec with TestSparkContext{
+
+  val txtData = Seq("a", "b", "c", "a", "a", "c").map(_.toText)
+  val (ds, txtF) = TestFeatureBuilder(txtData)
+  val expected = Array(0.0, 2.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN)
+
 
   Spec[OpStringIndexer[_]] should "correctly set the wrapped spark stage params" in {
     val indexer = new OpStringIndexer[Text]()
@@ -52,6 +58,23 @@ class OpStringIndexerTest extends FlatSpec with TestSparkContext{
   it should "throw an error if you try to set noFilter as the indexer" in {
     val indexer = new OpStringIndexer[Text]()
     intercept[AssertionError](indexer.setHandleInvalid(StringIndexerHandleInvalid.NoFilter))
+  }
+
+  it should "correctly index a text column" in {
+    val stringIndexer = new OpStringIndexer[Text]().setInput(txtF)
+    val indices = stringIndexer.fit(ds).transform(ds).collect(stringIndexer.getOutput())
+
+    indices shouldBe expected
+  }
+
+  it should "correctly deinxed a numeric column" in {
+    val indexedStage = new OpStringIndexer[Text]().setInput(txtF)
+    val indexed = indexedStage.getOutput()
+    val indices = indexedStage.fit(ds).transform(ds)
+    val deindexedStage = new OpIndexToString().setInput(indexed)
+    val deindexed = deindexedStage.getOutput()
+    val deindexedData = deindexedStage.transform(indices).collect(deindexed)
+    deindexedData shouldBe txtData
   }
 
 }
