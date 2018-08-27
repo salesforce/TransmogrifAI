@@ -193,7 +193,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     featureVectorMeta.columns.foreach{ col =>
       col.parentFeatureName should contain theSameElementsAs Seq("currencyMap")
       col.parentFeatureType should contain theSameElementsAs Seq("com.salesforce.op.features.types.CurrencyMap")
-      col.indicatorGroup shouldBe Some("c0")
+      col.grouping shouldBe Some("c0")
     }
   }
 

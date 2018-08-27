@@ -112,9 +112,4 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
     recovered.hashCode() shouldEqual summary.toMetadata().hashCode()
   }
 
-  it should "be able to be constructed (albeit poorly) from the old metadata format" in {
-    val oldMeta = Metadata.fromJson(loadResource("/SanityCheckerSummaryMetadata_pre3.3.0.json"))
-    Try(SanityCheckerSummary.fromMetadata(oldMeta)).isSuccess shouldBe true
-  }
-
 }
