@@ -64,7 +64,7 @@ import scala.reflect.runtime.universe._
  * @param index             Index of the vector this info is associated with (this is updated when
  *                          OpVectorColumnMetadata is passed into [[OpVectorMetadata]]
  */
-case class OpVectorColumnMetadata
+case class OpVectorColumnMetadata // TODO make separate case classes extending this for categorical and numeric
 (
   parentFeatureName: Seq[String],
   parentFeatureType: Seq[String],
@@ -118,7 +118,7 @@ case class OpVectorColumnMetadata
    */
   def makeColName(): String =
     s"${parentFeatureName.mkString("_")}${grouping.map("_" + _).getOrElse("")}" +
-      s"${indicatorValue.map("_" + _).getOrElse("")}_$index"
+      s"${indicatorValue.map("_" + _).getOrElse("")}${descriptorValue.map("_" + _).getOrElse("")}_$index"
 
   /**
    * Does column have parent features of specified feature type O
