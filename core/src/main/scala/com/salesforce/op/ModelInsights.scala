@@ -527,7 +527,7 @@ case object ModelInsights {
             Insights(
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
-              derivedFeatureGroup = h.indicatorGroup,
+              derivedFeatureGroup = h.grouping,
               derivedFeatureValue = h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlationsWLabel, h.columnName),
@@ -555,7 +555,7 @@ case object ModelInsights {
           Insights(
             derivedFeatureName = h.columnName,
             stagesApplied = h.parentFeatureStages,
-            derivedFeatureGroup = h.indicatorGroup,
+            derivedFeatureGroup = h.grouping,
             derivedFeatureValue = h.indicatorValue,
             contribution = contributions.map(_.applyOrElse(h.index, Seq.empty)) // nothing dropped without sanity check
           )

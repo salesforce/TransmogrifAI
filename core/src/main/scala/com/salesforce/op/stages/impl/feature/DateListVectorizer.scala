@@ -281,8 +281,9 @@ class DateListVectorizer[T <: OPList[Long]]
         } yield OpVectorColumnMetadata(
           parentFeatureName = col.parentFeatureName,
           parentFeatureType = col.parentFeatureType,
-          indicatorGroup = col.parentFeatureName,
-          indicatorValue = Option(pivotValue)
+          grouping = col.parentFeatureName,
+          indicatorValue = Option(pivotValue),
+          descriptorValue = None
         )
         vectorMeta.withColumns(updatedCols)
       }

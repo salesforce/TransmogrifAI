@@ -119,7 +119,7 @@ class TransientFeature
     new OpVectorColumnMetadata(
       parentFeatureName = Seq(name),
       parentFeatureType = Seq(typeName),
-      indicatorGroup = if (isNull) Some(name) else None,
+      grouping = if (isNull) Some(name) else None,
       indicatorValue = if (isNull) Some(OpVectorColumnMetadata.NullString) else None)
     }
 
@@ -135,7 +135,7 @@ class TransientFeature
    */
   def toVectorMetaData(size: Int, fieldName: Option[String] = None): OpVectorMetadata = {
     val columns = (0 until size)
-      .map{ i => toColumnMetaData().copy(indicatorGroup = Option(name)) }
+      .map{ i => toColumnMetaData().copy(grouping = Option(name)) }
       .toArray
     val history = Map(name -> FeatureHistory(originFeatures = originFeatures, stages = stages))
     OpVectorMetadata(fieldName.getOrElse(name), columns, history)
