@@ -137,7 +137,7 @@ case class OpVectorColumnMetadata // TODO make separate case classes extending t
     }
 
   /**
-   * Return parent features names with the key (indicatorGroup) from any map parents included in name
+   * Return parent features names with the key (grouping) from any map parents included in name
    * @return Sequence of parent feature names, simple names when features are not maps, names plus keys
    *         for columns with map parent features
    */

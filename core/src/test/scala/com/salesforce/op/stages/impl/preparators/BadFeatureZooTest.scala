@@ -104,7 +104,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
       retrieved.names.length - 2
   }
 
-  ignore should "Group Indicator Groups separately for transformations computed on same feature" in {
+  ignore should "Group groupings separately for transformations computed on same feature" in {
     val ageData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 20.0)
       .withProbabilityOfEmpty(0.5).limit(200) ++ RandomReal.uniform[Real](minValue = 40.0, maxValue = 70.0)
       .withProbabilityOfEmpty(0.0).limit(100)
@@ -130,8 +130,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-      indicatorGroup <- col.grouping
-    } yield (indicatorGroup, (col, col.index))
+      group <- col.grouping
+    } yield (group, (col, col.index))
     nullGroups.groupBy(_._1).foreach {
       case (group, cols) =>
         require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
@@ -175,8 +175,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-        indicatorGroup <- col.grouping
-      } yield (indicatorGroup, (col, col.index))
+        group <- col.grouping
+      } yield (group, (col, col.index))
     nullGroups.groupBy(_._1).foreach {
       case (group, cols) =>
         require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")

@@ -278,8 +278,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val nullGroups = for {
       col <- metaCols
       if col.isNullIndicator
-        indicatorGroup <- col.grouping
-      } yield (indicatorGroup, (col, col.index))
+        grouping <- col.grouping
+      } yield (grouping, (col, col.index))
 
     nullGroups.groupBy(_._1).foreach {
       case (group, cols) =>
@@ -463,10 +463,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
       logInfo("Label is assumed to be categorical since either categoricalLabel = true or " +
         "number of distinct labels < count * 0.1")
 
-      // Only perform Cramer's V calculation on columns that have an indicatorGroup and indicatorValue defined (right
-      // now, the only things that will have indicatorValue defined and indicatorGroup be None is numeric maps)
+      // Only perform Cramer's V calculation on columns that have an grouping and indicatorValue defined (right
+      // now, the only things that will have indicatorValue defined and grouping be None is numeric maps)
       val columnsWithIndicator = columnMeta.filter(f => f.grouping.isDefined && f.indicatorValue.isDefined)
-      val colIndicesByIndicatorGroup =
+      val colIndicesByGrouping =
         columnsWithIndicator
           .map { meta => meta.grouping.get -> meta }
           .groupBy(_._1)
@@ -475,7 +475,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
             cols.exists(_._2.hasParentOfSubType[MultiPickList]))
           }
 
-      colIndicesByIndicatorGroup.map {
+      colIndicesByGrouping.map {
         case (group, colNames, valueIndices, isMpl) =>
           val groupContingency =
             if (valueIndices.length == 1) {
