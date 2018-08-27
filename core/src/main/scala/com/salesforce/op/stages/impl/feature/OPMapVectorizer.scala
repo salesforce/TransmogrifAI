@@ -290,7 +290,7 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = None
     )
     meta.withColumns(cols.toArray)
@@ -305,7 +305,7 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
         OpVectorColumnMetadata(
           parentFeatureName = col.parentFeatureName,
           parentFeatureType = col.parentFeatureType,
-          indicatorGroup = col.indicatorGroup,
+          grouping = col.grouping,
           indicatorValue = Some(TransmogrifierDefaults.NullString)
         )
       )

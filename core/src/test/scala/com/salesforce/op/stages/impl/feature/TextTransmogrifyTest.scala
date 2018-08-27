@@ -86,7 +86,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
         !h.indicatorValue.contains(TransmogrifierDefaults.NullString) &&
         !h.indicatorValue.contains(TransmogrifierDefaults.OtherString)
     )
-    cityColumns.forall(c => c.parentFeatureName.head == c.indicatorGroup.get) shouldBe true
+    cityColumns.forall(c => c.parentFeatureName.head == c.grouping.get) shouldBe true
 
     val allCities = cityData.map(v => v.value.map(TextUtils.cleanString(_)))
     cityColumns.forall(c => allCities.contains(c.indicatorValue)) shouldBe true
