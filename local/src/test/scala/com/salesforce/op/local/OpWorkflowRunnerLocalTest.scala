@@ -33,9 +33,10 @@ package com.salesforce.op.local
 import java.nio.file.Paths
 
 import com.salesforce.op.features.types._
+import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
-import com.salesforce.op.stages.impl.feature.{OpStringIndexer, StringIndexerHandleInvalid}
+import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
@@ -53,15 +54,16 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
-  val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.NoFilter)
+
+  // TODO: remove .map[Text] once Aardpfark supports null inputs for StringIndexer
+  val indexed = description.map[Text](v => if (v.isEmpty) Text("") else v)
+    .indexed(handleInvalid = StringIndexerHandleInvalid.Skip)
 
   val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
     splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
   ).setInput(survivedNum, features).getOutput()
 
   val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum, indexed).setReader(dataReader)
-
-  passengersDataSet.show(false)
 
   lazy val model = workflow.train()
 
@@ -71,9 +73,9 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     path
   }
 
-  lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).collect().map(_.toMap)
+  lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).sort(KeyFieldName).collect().map(_.toMap)
 
-  lazy val expectedScores = model.score().collect(prediction, survivedNum, indexed)
+  lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed)
 
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))

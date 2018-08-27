@@ -40,6 +40,7 @@ import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.ml.{SparkMLSharedParamConstants, Transformer}
 import org.apache.spark.ml.SparkMLSharedParamConstants._
 import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.ml.param.ParamMap
 import org.json4s._
 import org.json4s.jackson.Serialization._
 
@@ -72,7 +73,7 @@ trait OpWorkflowModelLocal {
       val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => s -> i }
       val sparkStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
         case (s: OPStage with SparkWrapperParams[_], i) if s.getSparkMlStage().isDefined =>
-          ((s, s.getSparkMlStage().get.asInstanceOf[Transformer]), i)
+          ((s, s.getSparkMlStage().get.asInstanceOf[Transformer].copy(ParamMap.empty)), i)
       }
       val pfaEngines = for {
         ((s, sparkStage), i) <- sparkStages
@@ -87,10 +88,7 @@ trait OpWorkflowModelLocal {
         _ = sparkStage.set(inParam, inputCol.name).set(outParam, outputCol.name)
         pfaJson = SparkSupport.toPFA(sparkStage, pretty = true)
         pfaEngine = PFAEngine.fromJson(pfaJson).head
-      } yield {
-        println(sparkStage.extractParamMap())
-        ((inputs, (output, outputCol.name), pfaEngine), i)
-      }
+      } yield ((inputs, (output, outputCol.name), pfaEngine), i)
 
       val allStages = (opStages ++ pfaEngines).sortBy(_._2)
 
@@ -104,10 +102,8 @@ trait OpWorkflowModelLocal {
           output: (String, String),
           engine: PFAEngine[AnyRef, AnyRef]@unchecked), i)) =>
             val json = toPFAJson(r, inputs)
-            println("INPUT: " + json)
             val engineIn = engine.jsonInput(json)
             val result = engine.action(engineIn)
-            println("RESULT: " + result)
             val resMap = JsonUtils.fromString[Map[String, Any]](result.toString).get
             val (out, outCol) = output
             r += out -> resMap(outCol)
@@ -120,13 +116,13 @@ trait OpWorkflowModelLocal {
       // Convert Spark values into a json convertible Map
       // See [[FeatureTypeSparkConverter.toSpark]] for all possible values
       val in = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
-        case None => null
         case Some(v: Vector) => v.toArray
         case Some(v: mutable.WrappedArray[_]) => v.toList
         case Some(v: Map[String, _]) => v.mapValues {
           case v: mutable.WrappedArray[_] => v.toList
           case x => x
         }
+        case None | Some(null) => null
         case Some(v) => v
       }
       JsonUtils.toJsonString(in)
