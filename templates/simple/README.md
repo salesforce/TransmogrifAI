@@ -69,5 +69,5 @@ To evaluate your project, run
 ## Read More
 
 - [TransmogrifAI](https://github.com/salesforce/TransmogrifAI)
-- [Docs](https://transmogrifai.readthedocs.io/)
+- [Docs](https://docs.transmogrif.ai)
 - [Hello World examples](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld)

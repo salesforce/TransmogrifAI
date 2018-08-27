@@ -114,8 +114,8 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
-      if (m.index < 4) m.indicatorGroup shouldBe f.indicatorGroup
-      else m.indicatorGroup shouldBe Option(f2.name)
+      if (m.index < 4) m.grouping shouldBe f.grouping
+      else m.grouping shouldBe Option(f2.name)
       m.indicatorValue shouldBe f.indicatorValue
     }
 
@@ -143,7 +143,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
-      m.indicatorGroup shouldBe f.indicatorGroup
+      m.grouping shouldBe f.grouping
       m.indicatorValue shouldBe f.indicatorValue
     }
 
@@ -173,8 +173,8 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
-      if (m.index < 4 || m.index == 8) m.indicatorGroup shouldBe Option(f1.name)
-      else if (m.index < 8 || m.index == 9) m.indicatorGroup shouldBe Option(f2.name)
+      if (m.index < 4 || m.index == 8) m.grouping shouldBe Option(f1.name)
+      else if (m.index < 8 || m.index == 9) m.grouping shouldBe Option(f2.name)
       m.indicatorValue shouldBe f.indicatorValue
     }
 
@@ -205,9 +205,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index == 4) {
-        assert(m.indicatorGroup === Option(f1.name), s"first null indicator should be from ${f1.name}")
+        assert(m.grouping === Option(f1.name), s"first null indicator should be from ${f1.name}")
       } else if (m.index == 5) {
-        assert(m.indicatorGroup === Option(f2.name), s"second null indicator should be from ${f2.name}")
+        assert(m.grouping === Option(f2.name), s"second null indicator should be from ${f2.name}")
       }
       m.indicatorValue shouldBe f.indicatorValue
     }
@@ -239,9 +239,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index == TransmogrifierDefaults.MaxNumOfFeatures) {
-        assert(m.indicatorGroup === Option(f1.name), s"first null indicator should be from ${f1.name}")
+        assert(m.grouping === Option(f1.name), s"first null indicator should be from ${f1.name}")
       } else if (m.index > TransmogrifierDefaults.MaxNumOfFeatures) {
-        assert(m.indicatorGroup === Option(f2.name), s"second null indicator should be from ${f2.name}")
+        assert(m.grouping === Option(f2.name), s"second null indicator should be from ${f2.name}")
       }
       m.indicatorValue shouldBe f.indicatorValue
     }
@@ -273,7 +273,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     smartMeta.columns.zip(shortcutMeta.columns).foreach{ case (smart, shortcut) =>
       smart.parentFeatureName shouldBe shortcut.parentFeatureName
       smart.parentFeatureType shouldBe shortcut.parentFeatureType
-      smart.indicatorGroup shouldBe shortcut.indicatorGroup
+      smart.grouping shouldBe shortcut.grouping
       smart.indicatorValue shouldBe shortcut.indicatorValue
     }
 
@@ -303,7 +303,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       textMap.parentFeatureName shouldBe textareaMap.parentFeatureName
       textMap.parentFeatureType shouldBe Array("com.salesforce.op.features.types.TextMap")
       textareaMap.parentFeatureType shouldBe Array("com.salesforce.op.features.types.TextAreaMap")
-      textMap.indicatorGroup shouldBe textareaMap.indicatorGroup
+      textMap.grouping shouldBe textareaMap.grouping
       textMap.indicatorValue shouldBe textareaMap.indicatorValue
     }
 

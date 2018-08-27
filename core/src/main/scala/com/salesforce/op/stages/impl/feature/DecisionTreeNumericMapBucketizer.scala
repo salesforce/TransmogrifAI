@@ -116,7 +116,7 @@ class DecisionTreeNumericMapBucketizer[N, I2 <: OPMap[N]]
     val cols: Array[Array[OpVectorColumnMetadata]] = allSplits.map { case (key, split) =>
       makeVectorColumnMetadata(
         input = in2,
-        indicatorGroup = Some(key),
+        grouping = Some(key),
         bucketLabels = split.bucketLabels,
         trackNulls = $(trackNulls),
         trackInvalid = split.shouldSplit && $(trackInvalid)

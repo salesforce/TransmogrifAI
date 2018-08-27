@@ -650,7 +650,7 @@ trait MapStringPivotHelper extends SaveOthersParams {
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = Option(value)
     )
   }
