@@ -65,10 +65,10 @@ class BinarySequenceEstimatorTest
   val estimator = new WeightedFractionOfResponsesEstimator().setInput(weights, clicks, opens, purchases)
 
   val expectedResult = Seq(
-    Vectors.dense(0.4, 0.5, Double.PositiveInfinity).toOPVector,
-    Vectors.dense(0.4, 1.0, Double.PositiveInfinity).toOPVector,
-    Vectors.dense(0.2, 0.5, Double.PositiveInfinity).toOPVector
-  )
+    Vectors.dense(0.4, 0.5, Double.PositiveInfinity),
+    Vectors.dense(0.4, 1.0, Double.PositiveInfinity),
+    Vectors.dense(0.2, 0.5, Double.PositiveInfinity)
+  ).map(_.toOPVector)
 }
 
 

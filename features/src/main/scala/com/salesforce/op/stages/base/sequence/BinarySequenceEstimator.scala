@@ -53,8 +53,8 @@ import scala.util.Try
  * @param tti1          type tag for input1
  * @param tti2          type tag for input2
  * @param tto           type tag for input
- * @param tti1v         type tag for input1 value
- * @param tti2v         type tag for input2 value
+ * @param ttiv1         type tag for input1 value
+ * @param ttiv2         type tag for input2 value
  * @param ttov          type tag for output value
  * @tparam I1 input single feature type
  * @tparam I2 input sequence feature type
@@ -68,8 +68,8 @@ abstract class BinarySequenceEstimator[I1 <: FeatureType, I2 <: FeatureType, O <
   implicit val tti1: TypeTag[I1],
   val tti2: TypeTag[I2],
   val tto: TypeTag[O],
-  val tti1v: TypeTag[I1#Value],
-  val tti2v: TypeTag[I2#Value],
+  val ttiv1: TypeTag[I1#Value],
+  val ttiv2: TypeTag[I2#Value],
   val ttov: TypeTag[O#Value]
 ) extends Estimator[BinarySequenceModel[I1, I2, O]] with OpPipelineStage2N[I1, I2, O] {
 
@@ -100,22 +100,18 @@ abstract class BinarySequenceEstimator[I1 <: FeatureType, I2 <: FeatureType, O <
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): BinarySequenceModel[I1, I2, O] = {
-    assert(inN.nonEmpty, "Inputs cannot be empty")
+    assert(getTransientFeatures.size > 1, "Inputs cannot be empty")
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val seqColumns = inN.map(feature => col(feature.name))
     val columns = Array(col(in1.name)) ++ seqColumns
 
     val df = dataset.select(columns: _*)
-    val ds = df.map(r => {
-      val arr = new ArrayBuffer[I2](r.length-1)
-      var i = 1
-      while (i < r.length) {
-        arr += seqIConvert.fromSpark(r.get(i))
-        i += 1
-      }
-      (convertI1.fromSpark(r.get(0)).value, arr.map(_.value).toSeq)
-    })
+
+    val ds = df.map { r =>
+      val rowSeq = r.toSeq
+      (convertI1.fromSpark(rowSeq.head).value, rowSeq.tail.map(seqIConvert.fromSpark(_).value))
+    }
     val model = fitFn(ds)
 
     model

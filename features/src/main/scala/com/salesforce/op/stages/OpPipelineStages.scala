@@ -550,7 +550,7 @@ trait OpPipelineStageN[I <: FeatureType, O <: FeatureType] extends OpPipelineSta
 }
 
 /**
- * Pipeline stage of single Feature of type I1 with multiple Features of type I2 to output 1Feature of type O
+ * Pipeline stage of single Feature of type I1 with multiple Features of type I2 to output Feature of type O
  *
  * @tparam I1 input single feature type
  * @tparam I2 input sequence feature type

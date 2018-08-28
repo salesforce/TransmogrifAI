@@ -55,10 +55,10 @@ class BinarySequenceTransformerTest
   ).setInput(f1, f2, f3)
 
   val expectedResult = Seq(
-    Set("1.0", "one", "two").toMultiPickList,
-    Set("-1.0", "three", "four").toMultiPickList,
-    Set("15.0", "five", "six").toMultiPickList,
-    Set("1.111", "seven", "").toMultiPickList
-  )
+    Set("1.0", "one", "two"),
+    Set("-1.0", "three", "four"),
+    Set("15.0", "five", "six"),
+    Set("1.111", "seven", "")
+  ).map(_.toMultiPickList)
 }
 

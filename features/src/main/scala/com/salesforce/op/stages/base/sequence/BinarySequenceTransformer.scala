@@ -42,6 +42,15 @@ import org.apache.spark.sql.functions._
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
+/**
+ * Base trait for binary sequence transformers and models which take a single feature as first argument and a
+ * sequence of input features of a similar type and perform the specified function on them to give a
+ * new output feature
+ *
+ * @tparam I1 input feature of singular type
+ * @tparam I2 input feature of sequence type
+ * @tparam O output feature type
+ */
 trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
   extends Transformer with OpPipelineStage2N[I1, I2, O] with OpTransformer {
 
@@ -67,7 +76,7 @@ trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
    * @return a new dataset containing a column for the transformed feature
    */
   override def transform(dataset: Dataset[_]): DataFrame = {
-    assert(inN.nonEmpty, "Inputs cannot be empty")
+    assert(getTransientFeatures.size > 1, "Inputs cannot be empty")
     val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val functionUDF = FeatureSparkTypes.udf2N[I1, I2, O](transformFn)
     val meta = newSchema(getOutputFeatureName).metadata
@@ -75,7 +84,7 @@ trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
     dataset.select(col("*"), functionUDF(struct(columns: _*)).as(getOutputFeatureName, meta))
   }
 
-  private val transformNFn = FeatureSparkTypes.transform2N[I1, I2, O](transformFn)
+  private lazy val transformNFn = FeatureSparkTypes.transform2N[I1, I2, O](transformFn)
   override def transformKeyValue: KeyValue => Any = {
     val inName1 = in1.name
     val inNames = inN.map(_.name)

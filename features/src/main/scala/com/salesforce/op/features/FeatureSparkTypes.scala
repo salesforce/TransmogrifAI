@@ -470,6 +470,15 @@ case object FeatureSparkTypes {
     }
   }
 
+  /**
+   * Creates a Spark UDF with given function (I1, Seq[I2]) => O
+   *
+   * @param f function (I1, Seq[I2]) => O
+   * @tparam I1 input of singular type
+   * @tparam I2 input of sequence type
+   * @tparam O output type
+   * @return a Spark UDF
+   */
   def udf2N[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, O <: FeatureType : TypeTag]
   (
     f: (I1, Seq[I2]) => O
@@ -479,7 +488,7 @@ case object FeatureSparkTypes {
     val convertI1 = FeatureTypeSparkConverter[I1]()
     val convertI2 = FeatureTypeSparkConverter[I2]()
     val func = (r: Row) => {
-      val arr = new ArrayBuffer[I2](r.length-1)
+      val arr = new ArrayBuffer[I2](r.length - 1)
       val i1: I1 = convertI1.fromSpark(r.get(0))
       var i = 1
       while (i < r.length) {
@@ -491,6 +500,15 @@ case object FeatureSparkTypes {
     UserDefinedFunction(func, outputType, inputTypes = None)
   }
 
+  /**
+   * Creates a transform function suitable for Spark types with given function (I1, Seq[I2]) => O
+   *
+   * @param f function (I1, Seq[I2]) => O
+   * @tparam I1 input of singular type
+   * @tparam I2 input of sequence type
+   * @tparam O output type
+   * @return transform function
+   */
   def transform2N[I1 <: FeatureType : TypeTag, I2 <: FeatureType : TypeTag, O <: FeatureType: TypeTag]
   (
     f: (I1, Seq[I2]) => O
