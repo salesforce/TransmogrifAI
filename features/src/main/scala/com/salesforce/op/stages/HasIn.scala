@@ -58,3 +58,8 @@ trait HasInN {
   final protected def inN: Array[TransientFeature] = getTransientFeatures()
 }
 
+trait HasIn1PlusN extends HasIn1 {
+  self: OpPipelineStageBase =>
+  final protected def inN: Array[TransientFeature] = getTransientFeatures.tail
+}
+

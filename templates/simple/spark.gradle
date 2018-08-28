@@ -43,7 +43,7 @@
  *
  * By default (unless you add any new arguments,) spark-submit task will work exactly the same
  * as before, uploading your local spark libs / project libs every time. This is just a precaution
- * to maintain backwards compatability.
+ * to maintain backwards compatibility.
  */
 
 task copyLog4jToSparkNoInstall(type: Copy) {
@@ -197,8 +197,7 @@ task sparkSubmit(dependsOn: copyLog4jToSparkNoInstall) {
                 "spark.hadoop.avro.output.codec=deflate",
                 "spark.hadoop.avro.mapred.deflate.level=6",
                 "spark.hadoop.validateOutputSpecs=false",
-                "spark.hadoop.mapred.output.committer.class=com.salesforce.op.utils.io.DirectOutputCommitter",
-                "spark.hadoop.spark.sql.sources.outputCommitterClass=com.salesforce.op.utils.io.DirectMapreduceOutputCommitter"
+                "spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version=2"
         ].collect { ["--conf", it] }.flatten()
 
         def hadoopConfDir = System.env.HOME + "/.fake_hadoop_conf"

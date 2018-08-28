@@ -80,7 +80,7 @@ private[op] class OpRegressionEvaluator
     val dataUse = makeDataToUse(dataset, labelName)
     new RegressionEvaluator()
       .setLabelCol(labelName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
       .evaluate(dataUse)
   }

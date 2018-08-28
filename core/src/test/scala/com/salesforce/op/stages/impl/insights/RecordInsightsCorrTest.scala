@@ -59,8 +59,8 @@ class RecordInsightsCorrTest extends FlatSpec with TestSparkContext {
 
   it  should "work with randomly generated features and one prediction" in {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
-    val predicitons = RandomVector.dense(RandomReal.normal(), 1).limit(1000)
-    val (df, f1, p1) = TestFeatureBuilder("features", "predictions", features.zip(predicitons))
+    val predictions = RandomVector.dense(RandomReal.normal(), 1).limit(1000)
+    val (df, f1, p1) = TestFeatureBuilder("features", "predictions", features.zip(predictions))
     val dfWithMeta = addMetaData(df, "features", 40)
     val p1r = p1.copy(isResponse = true)
 
@@ -77,8 +77,8 @@ class RecordInsightsCorrTest extends FlatSpec with TestSparkContext {
 
   it should "work with randomly generated features and multiple predictions" in {
     val features = RandomVector.dense(RandomReal.poisson(1), 10).limit(1000)
-    val predicitons = RandomVector.dense(RandomReal.normal(), 5).limit(1000)
-    val (df, f1, p1) = TestFeatureBuilder("features", "predictions", features.zip(predicitons))
+    val predictions = RandomVector.dense(RandomReal.normal(), 5).limit(1000)
+    val (df, f1, p1) = TestFeatureBuilder("features", "predictions", features.zip(predictions))
     val dfWithMeta = addMetaData(df, "features", 10)
     val p1r = p1.copy(isResponse = true)
 

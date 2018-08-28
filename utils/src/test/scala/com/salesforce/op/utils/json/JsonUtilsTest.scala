@@ -79,20 +79,50 @@ class JsonUtilsTest extends PropSpec with PropertyChecks with TestCommon {
     }
 
   property("handle random entries correctly") {
-    forAll(dataGen)(check)
+    forAll(dataGen)(checkJson)
+    forAll(dataGen)(checkYaml)
   }
 
   property("handle special entries correctly") {
-    forAll(specialDataGen)(check)
+    forAll(specialDataGen)(checkJson)
+    forAll(specialDataGen)(checkYaml)
+
   }
 
   property("handle empty collections correctly") {
-    forAll(doubles) { d => check(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
+    forAll(doubles) { d => checkJson(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
+    forAll(doubles) { d => checkYaml(TestDouble(d, Array.empty, Seq.empty, Map.empty, None)) }
   }
 
-  def check(data: TestDouble): Unit = {
-    val json = JsonUtils.toJsonString(data)
-    JsonUtils.fromString[TestDouble](json) match {
+  property("read json file") {
+    val jsonFile = resourceFile(name = "Person.json")
+    val person = Person("Foo Bar", Address("Talkeetna", "AK"))
+    JsonUtils.fromFile[Person](jsonFile) match {
+      case Failure(e) => fail(e)
+      case Success(value) => value shouldBe person
+    }
+  }
+
+  property("read yml file") {
+    val ymlFile = resourceFile(name = "Person.yml")
+    val person = Person("Foo Bar", Address("Talkeetna", "AK"))
+    JsonUtils.fromFile[Person](ymlFile) match {
+      case Failure(e) => fail(e)
+      case Success(value) => value shouldBe person
+    }
+  }
+
+  def checkJson(data: TestDouble): Unit = {
+    val jsonValue: String = JsonUtils.toJsonString(data)
+    JsonUtils.fromString[TestDouble](jsonValue) match {
+      case Failure(e) => fail(e)
+      case Success(r) => assert(r, data)
+    }
+  }
+
+  def checkYaml(data: TestDouble): Unit = {
+    val yamlValue: String = JsonUtils.toYamlString(data)
+    JsonUtils.fromString[TestDouble](yamlValue) match {
       case Failure(e) => fail(e)
       case Success(r) => assert(r, data)
     }
@@ -130,3 +160,7 @@ case class TestDouble
   map: Map[Int, Seq[Long]],
   nested: Option[TestDouble]
 )
+
+case class Person(name: String, address: Address)
+
+case class Address(city: String, state: String)

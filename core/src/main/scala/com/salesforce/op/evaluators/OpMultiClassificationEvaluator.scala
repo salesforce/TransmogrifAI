@@ -32,8 +32,6 @@ package com.salesforce.op.evaluators
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.Prediction
-import com.salesforce.op.utils.json.JsonLike
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.evaluation.MulticlassClassificationEvaluator
@@ -45,8 +43,6 @@ import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
-
-import scala.collection.mutable
 
 /**
  * Instance to evaluate Multi Classification metrics
@@ -94,7 +90,7 @@ private[op] class OpMultiClassificationEvaluator
 
     val dataUse = makeDataToUse(data, labelColName)
 
-    val (predictionColName, rawPredictionColName, probabilityColName) = (getPredictionCol,
+    val (predictionColName, rawPredictionColName, probabilityColName) = (getPredictionValueCol,
       getRawPredictionCol, getProbabilityCol)
 
     log.debug(
@@ -251,7 +247,7 @@ private[op] class OpMultiClassificationEvaluator
     val dataUse = makeDataToUse(dataset, labelName)
     new MulticlassClassificationEvaluator()
       .setLabelCol(labelName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
       .evaluate(dataUse)
   }

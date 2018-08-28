@@ -1,10 +1,21 @@
-# TransmogrifAI Docs
+# Docs
 
-- `git clone https://github.com/salesforce/TransmogrifAI.git` - clone TransmogrifAI repo
-- `cd ./TransmogrifAI` - go to cloned directory
-- `./gradlew docs:buildDocs` - build documentation files
-- `./gradlew docs:serve` - run a web server to serve the docs (Ctrl-C to stop).
-- `open http://localhost:3000` or visit http://localhost:3000 in your browser
+[Sphinx](http://www.sphinx-doc.org) based docs site hosted on [ReadTheDocs](https://readthedocs.org/projects/transmogrifai).
 
-You can also run `./gradlew docs:buildDocs --continuous` in one terminal to automatically rebuild the docs when
-something changes, then run `./gradlew docs:serve` in another terminal to run the web server.
+Scala docs are located [here](https://scaladoc.transmogrif.ai/).
+
+## Running locally
+
+If you wish to run the docs locally install the following dependencies:
+```bash
+pip install sphinx sphinx-autobuild recommonmark sphinx_rtd_theme
+```
+
+Then simply run:
+```bash
+cd docs
+make html
+sphinx-autobuild . _build/html
+```
+
+Browse to - http://localhost:8000

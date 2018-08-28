@@ -50,6 +50,8 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
   val postalData: Seq[PostalCode] = RandomText.postalCodes.take(10).toList
   val textAreaData: Seq[TextArea] = RandomText.textAreas(0, 10).take(10).toList
   val textData: Seq[Text] = RandomText.strings(0, 10).take(10).toList
+  val largeTextData: Seq[Text] = RandomText.strings(1, 10).take(40).toList
+  val largeTextAreaData: Seq[TextArea] = RandomText.textAreas(1, 10).take(40).toList
 
   val data: Seq[(City, Country, PostalCode, Text, TextArea)] =
     cityData.zip(countryData).zip(postalData).zip(textData).zip(textAreaData)
@@ -58,14 +60,21 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
   val (ds, city, country, postal, text, textarea) = TestFeatureBuilder("city", "country", "postal", "text",
     "textarea", data)
 
+  val largeData: Seq[(Text, TextArea)] = largeTextData.zip(largeTextAreaData)
+  val (largeDS, largeText, largeTextarea) = TestFeatureBuilder("largerText", "largerTextarea", largeData)
+
+
   "TextVectorizers" should "vectorize various text feature types" in {
-    val feature = Seq(city, country, postal, text).transmogrify()
+    val feature = Seq(city, country, postal, text, textarea).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val vectCollect = vectorized.collect(feature)
 
+    // all text features turned into categoricals since 10 < TextTokenizer.MaxCategoricalCardinality (30)
     for {vector <- vectCollect} {
-      vector.v.size < TransmogrifierDefaults.DefaultNumOfFeatures + (TransmogrifierDefaults.TopK + 2) * 3 shouldBe true
-      vector.v.size >= TransmogrifierDefaults.DefaultNumOfFeatures + 6 shouldBe true
+      // number of feature generated for each categorical will be equal to or larger than 2 (nullIndicator + others)
+      // and smaller or equal to (topK + nullIndicator + others)
+      vector.v.size should be <= (TransmogrifierDefaults.TopK + 2) * 5
+      vector.v.size should be >= 2 * 5
     }
 
     val meta = vectorized.schema.toOpVectorMetadata(feature.name)
@@ -77,10 +86,20 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
         !h.indicatorValue.contains(TransmogrifierDefaults.NullString) &&
         !h.indicatorValue.contains(TransmogrifierDefaults.OtherString)
     )
-    cityColumns.forall(c => c.parentFeatureName.head == c.indicatorGroup.get) shouldBe true
+    cityColumns.forall(c => c.parentFeatureName.head == c.grouping.get) shouldBe true
 
     val allCities = cityData.map(v => v.value.map(TextUtils.cleanString(_)))
     cityColumns.forall(c => allCities.contains(c.indicatorValue)) shouldBe true
+  }
+
+  "TextVectorizers" should "hash text feature correctly" in {
+    val feature = Seq(largeText, largeTextarea).transmogrify()
+    val vectorized = new OpWorkflow().setResultFeatures(feature).transform(largeDS)
+    val vectCollect = vectorized.collect(feature)
+
+    for {vector <- vectCollect} {
+      vector.v.size shouldBe TransmogrifierDefaults.DefaultNumOfFeatures * 2 + 2
+    }
   }
 
   "Transmogrify" should "work on phone features" in {

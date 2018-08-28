@@ -32,7 +32,6 @@ package com.salesforce.op.utils.io.avro
 
 import java.net.URI
 
-import com.salesforce.op.utils.io.DirectOutputCommitter
 import com.salesforce.op.utils.spark.RichRDD._
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
@@ -156,7 +155,6 @@ object AvroInOut {
 
     private def createJobConfFromContext(schema: String)(implicit sc: SparkSession) = {
       val jobConf = new JobConf(sc.sparkContext.hadoopConfiguration)
-      jobConf.setOutputCommitter(classOf[DirectOutputCommitter])
       AvroJob.setOutputSchema(jobConf, new Schema.Parser().parse(schema))
       jobConf
     }

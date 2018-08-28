@@ -80,7 +80,7 @@ class OpVectorMetadata private
    */
   def toMetadata: Metadata = {
     val groupedCol = columns
-      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.indicatorGroup, c.indicatorValue))
+      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue))
     val colData = groupedCol.toSeq
       .map{ case (_, g) => g.head -> g.map(_.index) }
     val colMeta = colData.map{ case (c, i) => c.toMetadata(i) }
@@ -115,8 +115,9 @@ class OpVectorMetadata private
         parentFeatureOrigins = histComb.originFeatures,
         parentFeatureStages = histComb.stages,
         parentFeatureType = c.parentFeatureType,
-        indicatorGroup = c.indicatorGroup,
+        grouping = c.grouping,
         indicatorValue = c.indicatorValue,
+        descriptorValue = c.descriptorValue,
         index = c.index
       )
     }
@@ -151,7 +152,7 @@ class OpVectorMetadata private
       case _ => false
     }
 
-  // have to override to support overriden .equals
+  // have to override to support overridden .equals
   override def hashCode(): Int = 37 * columns.toSeq.hashCode()
 
   override def toString: String =

@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.DoubleArrayParam
 import org.apache.spark.sql.{Dataset, Encoders}
@@ -66,7 +66,7 @@ class GeolocationMapVectorizer
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = None
     )
     meta.withColumns(cols.toArray)
@@ -79,7 +79,7 @@ class GeolocationMapVectorizer
       col :+ OpVectorColumnMetadata(
         parentFeatureName = head.parentFeatureName,
         parentFeatureType = head.parentFeatureType,
-        indicatorGroup = head.indicatorGroup,
+        grouping = head.grouping,
         indicatorValue = Some(TransmogrifierDefaults.NullString)
       )
     }

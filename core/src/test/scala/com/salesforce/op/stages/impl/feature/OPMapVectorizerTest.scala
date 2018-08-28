@@ -351,9 +351,6 @@ object OPMapVectorizerTestHelper extends Matchers {
       override val ReferenceDate = TransmogrifierDefaults.ReferenceDate
       override val PrependFeatureName: Boolean = false
 
-      // Map vectorizers can only do shared hash space currently, so need to add this as well
-      override val HashSpaceStrategy: HashSpaceStrategy =
-        com.salesforce.op.stages.impl.feature.HashSpaceStrategy.Shared
     }
 
     val featureVector = Transmogrifier.transmogrify(Seq(rawF1, rawF2, rawF3))(TransmogrifierTestDefaults).combine()
@@ -393,7 +390,7 @@ object OPMapVectorizerTestHelper extends Matchers {
 
     // val baseIndicesToCompare: Array[Int] = baseColMetaArray.filterNot(_.isNullIndicator).map(_.index).sorted
     val baseIndicesToCompare: Array[Int] = baseColMetaArray
-      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.indicatorGroup) match {
+      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.grouping) match {
         case (pfName, Some(iv), Some(ig)) => (pfName + ig + iv, f.index)
         case (pfName, Some(iv), None) => (pfName + iv, f.index)
         case (pfName, None, Some(ig)) => (pfName + ig, f.index)
@@ -401,7 +398,7 @@ object OPMapVectorizerTestHelper extends Matchers {
       }).sortBy(_._1).map(_._2)
     // Also need to sort map vectorized indices by feature name since they can come out in arbitrary orders
     val mapIndicesToCompare: Array[Int] = mapColMetaArray
-      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.indicatorGroup) match {
+      .map(f => (f.parentFeatureName.head, f.indicatorValue, f.grouping) match {
         case (pfName, Some(iv), Some(ig)) => (pfName + ig + iv, f.index)
         case (pfName, Some(iv), None) => (pfName + iv, f.index)
         case (pfName, None, Some(ig)) => (pfName + ig, f.index)

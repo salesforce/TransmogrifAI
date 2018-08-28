@@ -35,9 +35,7 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
-import com.salesforce.op.stages.impl.feature.HashSpaceStrategy.findValues
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
 import org.apache.spark.ml.param._
 import org.apache.spark.mllib.feature.HashingTF
@@ -218,7 +216,7 @@ private[op] trait HashingFun {
         OpVectorColumnMetadata(
           parentFeatureName = features.map(_.name),
           parentFeatureType = features.map(_.typeName),
-          indicatorGroup = None,
+          grouping = None,
           indicatorValue = None
         )
       }.toArray
@@ -326,7 +324,7 @@ private[op] trait MapHashingFun extends HashingFun {
           OpVectorColumnMetadata(
             parentFeatureName = features.map(_.name),
             parentFeatureType = features.map(_.typeName),
-            indicatorGroup = None,
+            grouping = None,
             indicatorValue = None
           )
         }.toArray
@@ -335,13 +333,13 @@ private[op] trait MapHashingFun extends HashingFun {
           (keys, f) <- allKeys.toArray.zip(features)
           key <- keys
           i <- 0 until numHashes
-        } yield f.toColumnMetaData().copy(indicatorGroup = Option(key))
+        } yield f.toColumnMetaData().copy(grouping = Option(key))
       }
     val nullColumns = if (shouldTrackNulls) {
       for {
         (keys, f) <- allKeys.toArray.zip(features)
         key <- keys
-      } yield f.toColumnMetaData(isNull = true).copy(indicatorGroup = Option(key))
+      } yield f.toColumnMetaData(isNull = true).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
     hashColumns ++ nullColumns

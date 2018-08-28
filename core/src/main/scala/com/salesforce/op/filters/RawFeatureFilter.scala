@@ -36,11 +36,9 @@ import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextTokenizer}
+import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
-import com.twitter.algebird.Monoid
-import com.twitter.algebird.Semigroup
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
@@ -138,7 +136,6 @@ class RawFeatureFilter[T]
         .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
-        val emptyCorr: Map[FeatureKey, Map[FeatureKey, Double]] = Map()
         val responseKeys: Array[FeatureKey] = responseSummariesArr.map(_._1)
         val predictorKeys: Array[FeatureKey] = predictorSummariesArr.map(_._1)
         val corrRDD: RDD[Vector] = preparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, predictorKeys))
@@ -251,14 +248,13 @@ class RawFeatureFilter[T]
    * @return dataframe that has had bad features and bad map keys removed and a list of all features that should be
    *         dropped from the DAG
    */
-  // TODO return distribution information to attach to features that are kept
   def generateFilteredRaw(rawFeatures: Array[OPFeature], parameters: OpParams)
     (implicit spark: SparkSession): FilteredRawData = {
 
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
     assert(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
-    val trainingSummary = computeFeatureStats(trainData, rawFeatures) // TODO also response summaries??
+    val trainingSummary = computeFeatureStats(trainData, rawFeatures)
     log.info("Computed summary stats for training features")
     log.debug(trainingSummary.predictorDistributions.mkString("\n"))
 
@@ -273,7 +269,7 @@ class RawFeatureFilter[T]
     }
 
     val scoringSummary = scoreData.map{ sd =>
-      val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary)) // TODO also response summaries??
+      val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary))
       log.info("Computed summary stats for scoring features")
       log.debug(ss.predictorDistributions.mkString("\n"))
       ss
@@ -304,7 +300,8 @@ class RawFeatureFilter[T]
     trainData.unpersist()
     scoreData.map(_.unpersist())
 
-    FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop)
+    FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop,
+      trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions)
   }
 }
 
@@ -313,10 +310,12 @@ class RawFeatureFilter[T]
  * @param cleanedData RFF cleaned data
  * @param featuresToDrop raw features dropped by RFF
  * @param mapKeysToDrop keys in map features dropped by RFF
+ * @param featureDistributions the feature distributions calculated from the training data
  */
 case class FilteredRawData
 (
   cleanedData: DataFrame,
   featuresToDrop: Array[OPFeature],
-  mapKeysToDrop: Map[String, Set[String]]
+  mapKeysToDrop: Map[String, Set[String]],
+  featureDistributions: Seq[FeatureDistribution]
 )

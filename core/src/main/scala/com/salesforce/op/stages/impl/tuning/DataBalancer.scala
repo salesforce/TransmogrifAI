@@ -31,9 +31,9 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.apache.spark.sql.{Dataset, Row}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.slf4j.LoggerFactory
 
@@ -278,8 +278,6 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     downSampleFraction: Double,
     seed: Long
   ): Dataset[T] = {
-
-    import smallData.sparkSession.implicits._
     val bigDataTrain = bigData.sample(withReplacement = false, downSampleFraction, seed = seed)
     val smallDataTrain = upSampleFraction match {
       case u if u > 1.0 => smallData.sample(withReplacement = true, u, seed = seed)
@@ -445,11 +443,11 @@ case class DataBalancerSummary
   override def toMetadata(): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
-      .putLong(ModelSelectorBaseNames.Positive, positiveLabels)
-      .putLong(ModelSelectorBaseNames.Negative, negativeLabels)
-      .putDouble(ModelSelectorBaseNames.Desired, desiredFraction)
-      .putDouble(ModelSelectorBaseNames.UpSample, upSamplingFraction)
-      .putDouble(ModelSelectorBaseNames.DownSample, downSamplingFraction)
+      .putLong(ModelSelectorNames.Positive, positiveLabels)
+      .putLong(ModelSelectorNames.Negative, negativeLabels)
+      .putDouble(ModelSelectorNames.Desired, desiredFraction)
+      .putDouble(ModelSelectorNames.UpSample, upSamplingFraction)
+      .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
       .build()
   }
 }

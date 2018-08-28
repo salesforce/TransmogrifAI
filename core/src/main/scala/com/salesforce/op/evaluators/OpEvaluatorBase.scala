@@ -61,58 +61,55 @@ trait OpHasLabelCol[T <: FeatureType] extends Params {
 /**
  * Trait for predictionCol which contains all output results param
  */
-trait OpHasFullPredictionCol extends Params {
-  final val fullPredictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
-
-  def setFullPredictionCol(value: String): this.type = set(fullPredictionCol, value)
-  def setFullPredictionCol(value: FeatureLike[Prediction]): this.type = setFullPredictionCol(value.name)
-  final def getFullPredictionCol: String = $(fullPredictionCol)
-}
-
-/**
- * Trait for predictionCol param
- */
-trait OpHasPredictionCol[T <: FeatureType] extends Params {
+trait OpHasPredictionCol extends Params {
   final val predictionCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
-  setDefault(predictionCol, "prediction")
 
   def setPredictionCol(value: String): this.type = set(predictionCol, value)
-  def setPredictionCol(value: FeatureLike[T]): this.type = setPredictionCol(value.name)
+  def setPredictionCol(value: FeatureLike[Prediction]): this.type = setPredictionCol(value.name)
   final def getPredictionCol: String = $(predictionCol)
 }
 
 /**
- * Trait for rawPredictionColParam
+ * Trait for internal flattened predictionCol param
  */
-trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
-  final val rawPredictionCol: Param[String] = new Param[String](
-    this,
-    "rawPredictionCol",
-    "raw prediction (a.k.a. confidence) column name"
-  )
-  setDefault(rawPredictionCol, "rawPrediction")
+trait OpHasPredictionValueCol[T <: FeatureType] extends Params {
+  final val predictionValueCol: Param[String] = new Param[String](this, "predictionValueCol", "prediction column name")
+  setDefault(predictionValueCol, "prediction")
 
-  def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
-  def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
-  final def getRawPredictionCol: String = $(rawPredictionCol)
+  protected def setPredictionValueCol(value: String): this.type = set(predictionValueCol, value)
+  protected def setPredictionValueCol(value: FeatureLike[T]): this.type = setPredictionValueCol(value.name)
+  protected final def getPredictionValueCol: String = $(predictionValueCol)
 }
 
 /**
- * Trait for probabilityCol Param
+ * Trait for internal flattened rawPredictionColParam
+ */
+trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
+  final val rawPredictionCol: Param[String] = new Param[String](
+    this, "rawPredictionCol", "raw prediction (a.k.a. confidence) column name"
+  )
+  setDefault(rawPredictionCol, "rawPrediction")
+
+  protected def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
+  protected def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
+  protected final def getRawPredictionCol: String = $(rawPredictionCol)
+}
+
+/**
+ * Trait for internal flattened probabilityCol Param
  */
 trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   final val probabilityCol: Param[String] = new Param[String](
-    this,
-    "probabilityCol",
+    this, "probabilityCol",
     "Column name for predicted class conditional probabilities." +
       " Note: Not all models output well-calibrated probability estimates!" +
       " These probabilities should be treated as confidences, not precise probabilities"
   )
   setDefault(probabilityCol, "probability")
 
-  def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
-  def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
-  final def getProbabilityCol: String = $(probabilityCol)
+  protected def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
+  protected def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
+  protected final def getProbabilityCol: String = $(probabilityCol)
 }
 
 
@@ -138,8 +135,8 @@ trait EvaluationMetrics extends JsonLike {
  */
 abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   with OpHasLabelCol[RealNN]
-  with OpHasPredictionCol[RealNN]
-  with OpHasFullPredictionCol {
+  with OpHasPredictionValueCol[RealNN]
+  with OpHasPredictionCol {
   /**
    * Name of evaluator
    */
@@ -171,7 +168,7 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   override def evaluate(dataset: Dataset[_]): Double = getDefaultMetric(evaluateAll(dataset))
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
@@ -188,23 +185,23 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
     with OpHasProbabilityCol[OPVector] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val (predictionColName, rawPredictionColName, probabilityColName) =
         (s"${fullPredictionColName}_pred", s"${fullPredictionColName}_raw", s"${fullPredictionColName}_prob")
 
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
       setRawPredictionCol(rawPredictionColName)
       setProbabilityCol(probabilityColName)
 
-      val flattenedData = data.select(labelColName, getFullPredictionCol).rdd.map{ r =>
+      val flattenedData = data.select(labelColName, getPredictionCol).rdd.map{ r =>
         val label = r.getDouble(0)
         val predMap: Prediction = r.getMap[String, Double](1).toMap.toPrediction
         val raw = Vectors.dense(predMap.rawPrediction)
@@ -247,17 +244,17 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 ) extends OpEvaluatorBase[T] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val predictionColName = s"${fullPredictionColName}_pred"
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
 
       val flattenedData = data.select(labelColName, fullPredictionColName).rdd
         .map(r => (r.getDouble(0), r.getMap[String, Double](1).toMap.toPrediction.prediction ))
