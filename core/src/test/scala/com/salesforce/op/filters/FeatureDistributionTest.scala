@@ -31,10 +31,8 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
-import org.apache.spark.mllib.feature.HashingTF
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -108,9 +106,6 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Map("A" -> Summary(-1.6, 10.6), "B" -> Summary(0.0, 3.0)),
       Map("B" -> Summary(0.0, 0.0)))
     val bins = 10
-    val hasher: HashingTF = new HashingTF(numFeatures = bins)
-      .setBinary(false)
-      .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
     val distribs = features.map(_.name).zip(summary).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
