@@ -3,7 +3,7 @@
  [ ![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg?version=0.3.4) ](https://bintray.com/salesforce/maven/TransmogrifAI/0.3.4/link) [![Javadocs](https://www.javadoc.io/badge/com.salesforce.transmogrifai/transmogrifai-core_2.11.svg?color=blue)](https://www.javadoc.io/doc/com.salesforce.transmogrifai/transmogrifai-core_2.11) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE) [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
-[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg)](https://codecov.io/gh/salesforce/TransmogrifAI)
+[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg)](https://codecov.io/gh/salesforce/TransmogrifAI) [![CodeFactor](https://www.codefactor.io/repository/github/salesforce/transmogrifai/badge)](https://www.codefactor.io/repository/github/salesforce/transmogrifai)
 
 TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
@@ -115,7 +115,7 @@ Top model insights computed using CramersV:
 |-----------------------|----------------------|
 ```
 
-While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. Visit our [docs site](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples, faq and other information.
+While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
 
 ## Adding TransmogrifAI into your project
@@ -171,7 +171,44 @@ import com.salesforce.op.utils.spark.RichStructType._
 
 Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
-See [Scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
+See [scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
+
+## Authors
+
+ - Kevin Moore	[@jauntbox](https://github.com/jauntbox)
+ - Kin Fai Kan	[@kinfaikan](https://github.com/kinfaikan)
+ - Leah McGuire [@leahmcguire](https://github.com/leahmcguire)
+ - Matthew Tovbin [@tovbinm](https://github.com/tovbinm)
+ - Max Ovsiankin	[@maxov](https://github.com/maxov)
+ - Michael Loh	[@mikeloh77](https://github.com/mikeloh77)
+ - Michael Weil	[@michaelweilsalesforce](https://github.com/michaelweilsalesforce)
+ - Shubha Nabar	[@snabar](https://github.com/snabar)
+ - Vitaly Gordon	[@vitalyg](https://github.com/vitalyg)
+ - Vlad Patryshev	[@vpatryshev](https://github.com/vpatryshev)
+
+## Internal Contributors (prior to release)
+
+ - Chris Rupley	[@crupley](https://github.com/crupley)
+ - Chris Wu	[@cjwooo](https://github.com/cjwooo)
+ - Eric Wayman	[@ericwayman](https://github.com/ericwayman)
+ - Felipe Oliveira	[@feliperazeek](https://github.com/feliperazeek)
+ - Gera Shegalov	[@gerashegalov](https://github.com/gerashegalov)
+ - Jean-Marc Soumet	[@ajmssc](https://github.com/ajmssc)
+ - Marco Vivero	[@marcovivero](https://github.com/marcovivero)
+ - Mario Rodriguez	
+ - Mayukh Bhaowal	[@mayukhb](https://github.com/mayukhb)
+ - Minh-An Quinn	[@minhanquinn](https://github.com/minhanquinn)
+ - Nicolas Drizard	[@nicodri](https://github.com/nicodri)
+ - Oleg Gusak	[@ogusak](https://github.com/ogusak)
+ - Patrick Framption	[@tricktrap](https://github.com/tricktrap)
+ - Ryle Goehausen	[@ryleg](https://github.com/ryleg)
+ - Sanmitra Ijeri	[@sanmitra](https://github.com/sanmitra)
+ - Sky Chen	[@almandsky](https://github.com/almandsky)
+ - Sophie Xiaodan Sun	[@sxd929](https://github.com/sxd929)
+ - Till Bergmann	[@tillbe](https://github.com/tillbe)
+ - Xiaoqian Liu	[@wingsrc](https://github.com/wingsrc)
+
+
 
 ## License
 
