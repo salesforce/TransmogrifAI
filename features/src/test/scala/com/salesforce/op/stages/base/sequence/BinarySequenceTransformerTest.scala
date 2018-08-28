@@ -28,38 +28,37 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.stages.base.sequence
 
-import com.salesforce.op.features.TransientFeature
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 
-trait HasIn1 {
-  self: OpPipelineStageBase =>
-  final protected def in1: TransientFeature = getTransientFeature(0).get
-}
+@RunWith(classOf[JUnitRunner])
+class BinarySequenceTransformerTest
+  extends OpTransformerSpec[MultiPickList, BinarySequenceTransformer[Real, Text, MultiPickList]] {
 
-trait HasIn2 {
-  self: OpPipelineStageBase =>
-  final protected def in2: TransientFeature = getTransientFeature(1).get
-}
+  val sample = Seq(
+    (1.toReal, "one".toText, "two".toText),
+    ((-1).toReal, "three".toText, "four".toText),
+    (15.toReal, "five".toText, "six".toText),
+    (1.111.toReal, "seven".toText, "".toText)
+  )
 
-trait HasIn3 {
-  self: OpPipelineStageBase =>
-  final protected def in3: TransientFeature = getTransientFeature(2).get
-}
+  val (inputData, f1, f2, f3) = TestFeatureBuilder(sample)
 
-trait HasIn4 {
-  self: OpPipelineStageBase =>
-  final protected def in4: TransientFeature = getTransientFeature(3).get
-}
+  val transformer = new BinarySequenceLambdaTransformer[Real, Text, MultiPickList](
+    operationName = "realToMultiPicklist",
+    transformFn = (r, texts) => MultiPickList(texts.map(_.value.get).toSet + r.value.get.toString)
+  ).setInput(f1, f2, f3)
 
-trait HasInN {
-  self: OpPipelineStageBase =>
-  final protected def inN: Array[TransientFeature] = getTransientFeatures()
-}
-
-trait HasIn1PlusN extends HasIn1 {
-  self: OpPipelineStageBase =>
-  final protected def inN: Array[TransientFeature] = getTransientFeatures.tail
+  val expectedResult = Seq(
+    Set("1.0", "one", "two"),
+    Set("-1.0", "three", "four"),
+    Set("15.0", "five", "six"),
+    Set("1.111", "seven", "")
+  ).map(_.toMultiPickList)
 }
 
