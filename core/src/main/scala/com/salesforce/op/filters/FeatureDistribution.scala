@@ -31,7 +31,7 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.stages.impl.feature.{Inclusion, NumericBucketizer}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
 import com.twitter.algebird.Semigroup
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
@@ -142,6 +142,7 @@ case class FeatureDistribution
 private[op] object FeatureDistribution {
 
   val MaxBins = 100000
+  val AvgBinValue = 5000
 
   implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
     override def plus(l: FeatureDistribution, r: FeatureDistribution) = l.reduce(r)
@@ -154,18 +155,16 @@ private[op] object FeatureDistribution {
    * @param summary feature summary
    * @param value optional processed sequence
    * @param bins number of histogram bins
-   * @param hasher hashing method to use for text and categorical features
    * @return feature distribution given the provided information
    */
   def apply(
     featureKey: FeatureKey,
     summary: Summary,
     value: Option[ProcessedSeq],
-    bins: Int,
-    hasher: HashingTF
+    bins: Int
   ): FeatureDistribution = {
     val (nullCount, (summaryInfo, distribution)): (Int, (Array[Double], Array[Double])) =
-      value.map(seq => 0 -> histValues(seq, summary, bins, hasher))
+      value.map(seq => 0 -> histValues(seq, summary, bins))
         .getOrElse(1 -> (Array(summary.min, summary.max) -> Array.fill(bins)(0.0)))
 
     FeatureDistribution(
@@ -182,18 +181,25 @@ private[op] object FeatureDistribution {
    * @param values values to bin
    * @param sum summary info for feature (max and min)
    * @param bins number of bins to produce
-   * @param hasher hasing function to use for text
    * @return the bin information and the binned counts
    */
   // TODO avoid wrapping and unwrapping??
   private def histValues(
     values: ProcessedSeq,
     sum: Summary,
-    bins: Int,
-    hasher: HashingTF
+    bins: Int
   ): (Array[Double], Array[Double]) = {
     values match {
-      case Left(seq) => Array(sum.min, sum.max) -> hasher.transform(seq).toArray // TODO use summary info to pick hashes
+      case Left(seq) => {
+        val minBins = bins
+        val maxBins = MaxBins
+        val numBins = math.min(math.max(bins, sum.max/AvgBinValue), maxBins).toInt
+
+        val hasher: HashingTF = new HashingTF(numFeatures = numBins)
+          .setBinary(false)
+          .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
+        Array(sum.min, sum.max) -> hasher.transform(seq).toArray
+      }
       case Right(seq) => // TODO use kernel fit instead of histogram
         if (sum == Summary.empty) {
           Array(sum.min, sum.max) -> seq.toArray // the seq will always be empty in this case

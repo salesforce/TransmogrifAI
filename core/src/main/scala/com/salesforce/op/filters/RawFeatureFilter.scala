@@ -95,10 +95,6 @@ class RawFeatureFilter[T]
 
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  private val hasher: HashingTF = new HashingTF(numFeatures = bins)
-    .setBinary(false)
-    .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
-
 
   /**
    * Get binned counts of the feature distribution and empty count for each raw feature
@@ -138,8 +134,7 @@ class RawFeatureFilter[T]
         .map(_.getFeatureDistributions(
           responseSummaries = responseSummariesArr,
           predictorSummaries = predictorSummariesArr,
-          bins = bins,
-          hasher = hasher))
+          bins = bins))
         .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {

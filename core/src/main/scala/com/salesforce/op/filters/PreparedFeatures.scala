@@ -88,13 +88,12 @@ private[filters] case class PreparedFeatures(
   def getFeatureDistributions(
     responseSummaries: Array[(FeatureKey, Summary)],
     predictorSummaries: Array[(FeatureKey, Summary)],
-    bins: Int,
-    hasher: HashingTF
+    bins: Int
   ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
     val responseFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(responses, responseSummaries, bins, hasher)
+      getFeatureDistributions(responses, responseSummaries, bins)
     val predictorFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(predictors, predictorSummaries, bins, hasher)
+      getFeatureDistributions(predictors, predictorSummaries, bins)
 
     responseFeatureDistributions -> predictorFeatureDistributions
   }
@@ -102,15 +101,13 @@ private[filters] case class PreparedFeatures(
   private def getFeatureDistributions(
     features: Map[FeatureKey, ProcessedSeq],
     summaries: Array[(FeatureKey, Summary)],
-    bins: Int,
-    hasher: HashingTF
+    bins: Int
   ): Array[FeatureDistribution] = summaries.map { case (featureKey, summary) =>
     FeatureDistribution(
       featureKey = featureKey,
       summary = summary,
       value = features.get(featureKey),
-      bins = bins,
-      hasher = hasher)
+      bins = bins)
   }
 }
 
