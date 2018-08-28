@@ -7,10 +7,17 @@ before_install:
 env:
   global:
     - GRADLE_OPTS="-Xmx256m"
+    - BUILD_TYPE="CLOUD"
 install:
   - true
-script: 
-  - ./gradlew --no-daemon reportScoverage
+matrix:
+  include:
+    - name: "Core Module Build"
+      env: BUILD_PARAMETERS='core:reportScoverage'
+    - name: "Non-Core Modules Build"
+      env: BUILD_PARAMETERS='reportScoverage -x core:reportScoverage'
+script:
+  - ./gradlew --no-daemon $BUILD_PARAMETERS
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:

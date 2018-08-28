@@ -6,7 +6,8 @@ jobs:
     environment:
       GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
       TERM: dumb
-    
+      BUILD_TYPE: CLOUD
+
     steps:
       - checkout
       - restore_cache:
