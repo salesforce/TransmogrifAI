@@ -84,7 +84,6 @@ abstract class OPMapVectorizer[A, T <: OPMap[A]]
     val meta = if ($(trackNulls)) makeVectorMetaWithNullIndicators(allKeys) else makeVectorMetadata(allKeys)
     setMetadata(meta.toMetadata)
 
-
     val args = OPMapVectorizerModelArgs(
       allKeys = allKeys,
       fillByKey = fillByKey(dataset),
@@ -124,14 +123,14 @@ class IntegralMapVectorizer[T <: OPMap[Long]](uid: String = UID[IntegralMapVecto
   def setFillWithMode(shouldFill: Boolean): this.type = set(withConstant, !shouldFill)
 
   override def fillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = {
-    val size = getInputFeatures().length
-    val cleanedData = dataset.map(_.map(
-      cleanMap(_, shouldCleanKey = $(cleanKeys), shouldCleanValue = shouldCleanValues)
-    ))
-
     if ($(withConstant)) Seq.empty
     else {
+      val size = getInputFeatures().length
       val modeAggr = SequenceAggregators.ModeSeqMapLong(size = size)
+      val shouldCleanKeys = $(cleanKeys)
+      val cleanedData = dataset.map(_.map(
+        cleanMap(_, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
+      ))
       cleanedData.select(modeAggr.toColumn).first()
     }.map(convertFn)
   }
@@ -203,8 +202,6 @@ class TextMapHashingVectorizer[T <: OPMap[String]]
   def setHashSpaceStrategy(v: HashSpaceStrategy): this.type = set(hashSpaceStrategy, v.entryName)
   def getHashSpaceStrategy: HashSpaceStrategy = HashSpaceStrategy.withNameInsensitive($(hashSpaceStrategy))
 
-  def getFillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = Seq.empty
-
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[String, T] =
     new TextMapHashingVectorizerModel[T](
       args = args.copy(shouldCleanValues = $(cleanText)),
@@ -230,14 +227,14 @@ class RealMapVectorizer[T <: OPMap[Double]](uid: String = UID[RealMapVectorizer[
   def setFillWithMean(shouldFill: Boolean): this.type = set(withConstant, !shouldFill)
 
   override def fillByKey(dataset: Dataset[Seq[T#Value]]): Seq[Map[String, Double]] = {
-    val size = getInputFeatures().length
-    val cleanedData = dataset.map(_.map(
-      cleanMap(_, shouldCleanKey = $(cleanKeys), shouldCleanValue = shouldCleanValues)
-    ))
-
     if ($(withConstant)) Seq.empty
     else {
+      val size = getInputFeatures().length
       val meanAggr = SequenceAggregators.MeanSeqMapDouble(size = size)
+      val shouldCleanKeys = $(cleanKeys)
+      val cleanedData = dataset.map(_.map(
+        cleanMap(_, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
+      ))
       cleanedData.select(meanAggr.toColumn).first()
     }
   }
@@ -282,7 +279,7 @@ trait MapVectorizerFuns[A, T <: OPMap[A]] extends VectorizerDefaults with MapPiv
     in.map(_.map(kb => filterKeys(kb, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues).keySet))
       .select(sumAggr.toColumn)
       .first()
-      .map(_.toSeq)
+      .map(_.toSeq.sorted)
   }
 
   protected def makeVectorMetadata(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
