@@ -192,7 +192,7 @@ private[op] object FeatureDistribution {
       case Left(seq) => {
         val minBins = bins
         val maxBins = MaxBins
-        val numBins = math.min(math.max(bins, sum.max/AvgBinValue), maxBins).toInt
+        val numBins = math.min(math.max(bins, sum.max / AvgBinValue), maxBins).floor
 
         val hasher: HashingTF = new HashingTF(numFeatures = numBins)
           .setBinary(false)
