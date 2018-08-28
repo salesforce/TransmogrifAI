@@ -46,6 +46,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
+// import org.apache.log4j.Level
 
 import scala.collection.Traversable
 import scala.reflect.runtime.universe._
@@ -385,8 +386,8 @@ object OPMapVectorizerTestHelper extends Matchers {
       summary.getMetadataArray(OpVectorMetadata.ColumnsKey).flatMap(OpVectorColumnMetadata.fromMetadata)
     val mapColMetaArray =
       mapSummary.getMetadataArray(OpVectorMetadata.ColumnsKey).flatMap(OpVectorColumnMetadata.fromMetadata)
-    log.info("baseColMetaArray: {}", baseColMetaArray.map(_.toString).mkString("\n"))
-    log.info("mapColMetaArray: {}", mapColMetaArray.map(_.toString).mkString("\n"))
+    log.info("baseColMetaArray: {}", baseColMetaArray.sortBy(_.index).map(_.toString).mkString("\n"))
+    log.info("mapColMetaArray: {}", mapColMetaArray.sortBy(_.index).map(_.toString).mkString("\n"))
 
     // val baseIndicesToCompare: Array[Int] = baseColMetaArray.filterNot(_.isNullIndicator).map(_.index).sorted
     val baseIndicesToCompare: Array[Int] = baseColMetaArray
@@ -411,9 +412,6 @@ object OPMapVectorizerTestHelper extends Matchers {
     log.info("base indices to compare: {}", baseIndicesToCompare.toList)
     log.info("map indices to compare: {}", mapIndicesToCompare.toList)
 
-    println(baseIndicesToCompare.toList)
-    println(mapIndicesToCompare.toList)
-
     vectorizedBaseFeatures.zip(vectorizedMapFeatures).zipWithIndex.foreach {
       case ((baseFeat, mapFeat), i) =>
         log.info("baseFeat: {}", baseFeat)
@@ -423,8 +421,6 @@ object OPMapVectorizerTestHelper extends Matchers {
 
         val isTheSame =
           baseIndicesToCompare.map(baseFeat.value.apply) sameElements mapIndicesToCompare.map(mapFeat.value.apply)
-        println(baseIndicesToCompare.map(baseFeat.value.apply).toList)
-        println(mapIndicesToCompare.map(mapFeat.value.apply).toList)
 
         if (!isTheSame) {
           log.error(
