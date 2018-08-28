@@ -94,7 +94,8 @@ class DateToUnitCircleTransformer[T <: Date]
     super.onGetMetadata()
     val timePeriod = getTimePeriod
     val columns = inN.flatMap{
-      f => DateToUnitCircle.metadataValues(timePeriod).map(iv => f.toColumnMetaData().copy(indicatorValue = Option(iv)))
+      f => DateToUnitCircle.metadataValues(timePeriod)
+        .map(iv => f.toColumnMetaData().copy(descriptorValue = Option(iv)))
     }
     val history = inN.flatMap(f => Seq(f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages)))
     setMetadata(OpVectorMetadata(getOutputFeatureName, columns, history.toMap).toMetadata)
@@ -140,9 +141,10 @@ class DateMapToUnitCircleVectorizer[T <: DateMap]
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
-      indicatorGroup = Option(key),
-      indicatorValue = Option(dec) // TODO fix this cause will break sanity checker
+      grouping = Option(key),
+      descriptorValue = Option(dec)
     )
+
     meta.withColumns(cols.toArray)
   }
 

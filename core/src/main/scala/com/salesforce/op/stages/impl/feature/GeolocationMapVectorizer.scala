@@ -60,13 +60,12 @@ class GeolocationMapVectorizer
     val cols = for {
       (keys, col) <- allKeys.zip(meta.columns)
       key <- keys
-      // We don't store this in the metadata directly, but need to make 3 cols per key - lat, lon, acc
-      index <- Seq("latitude", "longitude", "accuracy") // TODO keep
+      nm <- Geolocation.Names
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
       grouping = Option(key),
-      indicatorValue = None
+      descriptorValue = Option(nm)
     )
     meta.withColumns(cols.toArray)
   }

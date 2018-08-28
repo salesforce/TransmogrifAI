@@ -801,7 +801,7 @@ trait RichMapFeature {
       others: Array[FeatureLike[DateTimeMap]] = Array.empty
     ): FeatureLike[OPVector] = {
 
-      val timePeriods =  circularDateRepresentations.map {
+      val timePeriods = circularDateRepresentations.map {
         tp => f.toUnitCircle(tp, cleanKeys, whiteListKeys, blackListKeys, others)
       }
 

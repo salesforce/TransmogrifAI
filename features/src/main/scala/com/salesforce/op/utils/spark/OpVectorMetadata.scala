@@ -80,7 +80,7 @@ class OpVectorMetadata private
    */
   def toMetadata: Metadata = {
     val groupedCol = columns
-      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue))
+      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue, c.descriptorValue))
     val colData = groupedCol.toSeq
       .map{ case (_, g) => g.head -> g.map(_.index) }
     val colMeta = colData.map{ case (c, i) => c.toMetadata(i) }

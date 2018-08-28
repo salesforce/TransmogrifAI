@@ -101,9 +101,11 @@ class GeolocationVectorizer
    */
   private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {
     val tf = getTransientFeatures()
-    val cols = // TODO fix
-      if (withNullTracking) tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()) ++ Seq(f.toColumnMetaData(isNull = true)))
-      else tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()))
+    val cols =
+      if (withNullTracking) tf.flatMap{ f =>
+        Geolocation.Names.map(nm => f.toColumnMetaData().copy(descriptorValue = Option(nm))) ++
+          Seq(f.toColumnMetaData(isNull = true))}
+      else tf.flatMap(f => Geolocation.Names.map(nm => f.toColumnMetaData().copy(descriptorValue = Option(nm))))
     OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
   }
 

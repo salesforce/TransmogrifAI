@@ -33,9 +33,11 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import org.apache.spark.ml.Transformer
+import com.salesforce.op.utils.spark.OpVectorMetadata
+import org.apache.spark.ml.{Estimator, Transformer}
 import org.apache.spark.ml.linalg.Vectors
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.joda.time.{DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -73,7 +75,8 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
 
   it should "work with its shortcut as a DateMap" in {
     val output = f1.toUnitCircle(TimePeriod.HourOfDay)
-    val transformed = output.originStage.asInstanceOf[Transformer].transform(inputData)
+    val transformed = output.originStage.asInstanceOf[DateMapToUnitCircleVectorizer[DateMap]]
+      .fit(inputData).transform(inputData)
     val actual = transformed.collect(output)
     all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
@@ -83,13 +86,18 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
       sampleDateTimes.map(x => Map("a" -> x.getMillis, "b" -> x.getMillis).toDateTimeMap)
     )
     val output = f1DT.toUnitCircle(TimePeriod.HourOfDay)
-    val transformed = output.originStage.asInstanceOf[Transformer].transform(inputDataDT)
+    val transformed = output.originStage.asInstanceOf[DateMapToUnitCircleVectorizer[DateMap]]
+      .fit(inputData).transform(inputData)
     val actual = transformed.collect(output)
     all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "make the correct metadata" in {
-
+    val fitted = estimator.fit(inputData)
+    val meta = OpVectorMetadata(fitted.getOutputFeatureName, fitted.getMetadata())
+    meta.columns.length shouldBe 4
+    meta.columns.map(_.grouping.get) shouldEqual Seq("a", "a", "b", "b")
+    meta.columns.map(_.descriptorValue.get) shouldEqual Seq("x_HourOfDay", "y_HourOfDay", "x_HourOfDay", "y_HourOfDay")
   }
 
 }
