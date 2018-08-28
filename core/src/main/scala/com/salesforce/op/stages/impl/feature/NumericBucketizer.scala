@@ -147,7 +147,7 @@ private[op] trait NumericBucketizerMetadata {
     val cols = makeVectorColumnMetadata(
       input = input,
       bucketLabels = bucketLabels,
-      indicatorGroup = Some(input.name),
+      grouping = Some(input.name),
       trackInvalid = trackInvalid,
       trackNulls = trackNulls
     )
@@ -157,11 +157,11 @@ private[op] trait NumericBucketizerMetadata {
   protected def makeVectorColumnMetadata(
     input: TransientFeature,
     bucketLabels: Array[String],
-    indicatorGroup: Option[String],
+    grouping: Option[String],
     trackInvalid: Boolean,
     trackNulls: Boolean
   ): Array[OpVectorColumnMetadata] = {
-    val meta = input.toColumnMetaData(true).copy(indicatorGroup = indicatorGroup)
+    val meta = input.toColumnMetaData(true).copy(grouping = grouping)
     val bucketLabelCols = bucketLabels.map(bucketLabel => meta.copy(indicatorValue = Option(bucketLabel)))
     val trkInvCol = if (trackInvalid) Seq(meta.copy(indicatorValue = Some(TransmogrifierDefaults.OtherString))) else Nil
     val trackNullCol = if (trackNulls) Seq(meta) else Nil
