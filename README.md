@@ -195,7 +195,7 @@ See [scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
  - Gera Shegalov	[@gerashegalov](https://github.com/gerashegalov)
  - Jean-Marc Soumet	[@ajmssc](https://github.com/ajmssc)
  - Marco Vivero	[@marcovivero](https://github.com/marcovivero)
- - Mario Rodriguez	
+ - Mario Rodriguez	[@mrodriguezsfiq](https://github.com/mrodriguezsfiq)
  - Mayukh Bhaowal	[@mayukhb](https://github.com/mayukhb)
  - Minh-An Quinn	[@minhanquinn](https://github.com/minhanquinn)
  - Nicolas Drizard	[@nicodri](https://github.com/nicodri)
