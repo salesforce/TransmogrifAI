@@ -223,7 +223,7 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     val elapsedReflect = measure(method.apply().asInstanceOf[Int])
     val actual = measure(myClass.getValuePerf)
 
-    elapsedReflect should be <= 10 * actual
+    elapsedReflect should be <= 20 * actual
   }
 
 }

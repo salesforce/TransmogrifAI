@@ -85,7 +85,7 @@ class FeatureTypeSparkConverterTest
   }
   property("create a feature type instance and back in a timely fashion") {
     forAllConcurrentCheck[FeatureTypeSparkConverter[_ <: FeatureType]](
-      numThreads = 10, numInvocationsPerThread = 10000, atMost = 10.seconds,
+      numThreads = 10, numInvocationsPerThread = 10000, atMost = 20.seconds,
       table = featureTypeConverters,
       functionCheck = ft => {
         assertCreate(ft.fromSpark(null), (v: FeatureType) => {

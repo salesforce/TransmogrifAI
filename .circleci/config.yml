@@ -1,29 +1,37 @@
 version: 2
 jobs:
-  build:
+  checkout_code_and_dependencies:
+    machine: true
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Download project code and dependency jars
+          command: ./gradlew resolveAllDependencies
+      - save_cache:
+          key: repo-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/repo
+            - ~/.gradle
+            - ~/.m2
+  test_core:
     machine: true
     working_directory: ~/repo
     environment:
       GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
       TERM: dumb
       BUILD_TYPE: CLOUD
-
     steps:
-      - checkout
       - restore_cache:
           keys:
+            - repo-{{ .Environment.CIRCLE_SHA1 }}
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-
       - run:
           name: Java version
           command: java -version
       - run:
-          name: Build core project
+          name: Test core module
           command: ./gradlew core:reportScoverage
-      - run:
-          name: Build everything else
-          command: ./gradlew reportScoverage -x core:reportScoverage
-
       - run:
           name: Collect test results
           command: |
@@ -32,17 +40,53 @@ jobs:
             find . -type d -regex ".*/build/test-results/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit.xml/$f' \;
             find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
           when: always
+      - save_cache:
+          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/junit.xml
+            - ~/junit
+  test_non_core:
+    machine: true
+    working_directory: ~/repo
+    environment:
+      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
+      TERM: dumb
+      BUILD_TYPE: CLOUD
+    steps:
+      - restore_cache:
+          keys:
+            - repo-{{ .Environment.CIRCLE_SHA1 }}
+            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Java version
+          command: java -version
+      - run:
+          name: Test non core modules
+          command: ./gradlew reportScoverage -x core:reportScoverage
+      - run:
+          name: Collect test results
+          command: |
+            mkdir -p ~/junit/
+            mkdir -p ~/junit.xml/
+            find . -type d -regex ".*/build/test-results/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit.xml/$f' \;
+            find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
+          when: always
+      - save_cache:
+          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+          paths:
+            - ~/junit.xml
+            - ~/junit
+  save_assets:
+    machine: true
+    working_directory: ~/repo
+    steps:
+      - restore_cache:
+          keys:
+            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - store_test_results:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-
-      - save_cache:
-          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle
-            - ~/.m2
-
       - run:
           name: Report scoverage resuts to Codecov
           command: bash <(curl -s https://codecov.io/bash)
@@ -51,4 +95,14 @@ workflows:
   version: 2
   build:
     jobs:
-      - build
+      - checkout_code_and_dependencies
+      - test_core:
+          requires:
+            - checkout_code_and_dependencies
+      - test_non_core:
+          requires:
+            - checkout_code_and_dependencies
+      - save_assets:
+          requires:
+          - test_core
+          - test_non_core

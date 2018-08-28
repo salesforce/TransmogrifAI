@@ -360,6 +360,14 @@ configure(subProjs) {
     }
 }
 
+allprojects {
+    task resolveAllDependencies {
+        doLast {
+            configurations.all { if(it.canBeResolved) it.resolve() }
+        }
+    }
+}
+
 task allScaladoc(type: ScalaDoc) {
     group 'Documentation'
     description 'Generates Scaladoc for the main source code of all subprojects.'
