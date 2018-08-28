@@ -81,20 +81,19 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
     val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
     scoreFn shouldBe a[ScoreFunction]
-    val scores = rawData.map(row => scoreFn(row))
+    val scores = rawData.map(scoreFn)
     assert(scores, expectedScores)
   }
 
   it should "produce scores without Spark in timely fashion" in {
-    val params = new OpParams().withValues(modelLocation = Some(modelLocation))
-    val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
-    val _ = rawData.map(row => scoreFn(row)) // warm up
-
+    val scoreFn = model.scoreFunction
+    scoreFn shouldBe a[ScoreFunction]
+    val warmUp = rawData.map(scoreFn)
     val numOfRuns = 1000
     var elapsed = 0L
     for {_ <- 0 until numOfRuns} {
       val start = System.currentTimeMillis()
-      val scores = rawData.map(row => scoreFn(row))
+      val scores = rawData.map(scoreFn)
       elapsed += System.currentTimeMillis() - start
       assert(scores, expectedScores)
     }

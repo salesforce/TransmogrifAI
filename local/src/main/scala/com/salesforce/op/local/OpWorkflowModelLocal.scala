@@ -35,25 +35,29 @@ import com.opendatagroup.hadrian.jvmcompiler.PFAEngine
 import com.salesforce.op.OpWorkflowModel
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.{OPStage, OpTransformer}
-import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.ml.SparkMLSharedParamConstants._
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.ParamMap
+import org.json4s._
+import org.json4s.native.JsonMethods._
+import org.json4s.native.Serialization
 
 import scala.collection.mutable
 
 /**
- * [[OpWorkflowModel]] enrichment functionality for local scoring
+ * Enrichment for [[OpWorkflowModel]] to allow local scoring functionality
  */
 trait OpWorkflowModelLocal {
 
   /**
-   * [[OpWorkflowModel]] enrichment functionality for local scoring
+   * Enrichment for [[OpWorkflowModel]] to allow local scoring functionality
    *
    * @param model [[OpWorkflowModel]]
    */
-  implicit class OpWorkflowModelLocal(model: OpWorkflowModel) {
+  implicit class RichOpWorkflowModel(model: OpWorkflowModel) {
+
+    private implicit val formats = DefaultFormats
 
     /**
      * Internal PFA model representation
@@ -62,7 +66,15 @@ trait OpWorkflowModelLocal {
      * @param output output mapping
      * @param engine PFA engine
      */
-    case class PFAModel(inputs: Map[String, String], output: (String, String), engine: PFAEngine[AnyRef, AnyRef])
+    private case class PFAModel(inputs: Map[String, String], output: (String, String), engine: PFAEngine[AnyRef, AnyRef])
+
+    /**
+     * Internal OP model representation
+     *
+     * @param output output name
+     * @param model model instance
+     */
+    private case class OPModel(output: String, model: OPStage with OpTransformer)
 
     /**
      * Prepares a score function for local scoring
@@ -72,7 +84,7 @@ trait OpWorkflowModelLocal {
     def scoreFunction: ScoreFunction = {
       val resultFeatures = model.getResultFeatures().map(_.name).toSet
       val stagesWithIndex = model.stages.zipWithIndex
-      val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => s -> i }
+      val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => OPModel(s.getOutputFeatureName, s) -> i }
       val sparkStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
         case (s: OPStage with SparkWrapperParams[_], i) if s.getSparkMlStage().isDefined =>
           ((s, s.getSparkMlStage().get.asInstanceOf[Transformer].copy(ParamMap.empty)), i)
@@ -97,15 +109,15 @@ trait OpWorkflowModelLocal {
       row: Map[String, Any] => {
         val rowMap = mutable.Map.empty ++ row
         val transformedRow = allStages.foldLeft(rowMap) {
-          case (r, (s: OPStage with OpTransformer, i)) =>
-            r += s.getOutputFeatureName -> s.transformKeyValue(r.apply)
+          case (r, (OPModel(output, stage), i)) =>
+            r += output -> stage.transformKeyValue(r.apply)
 
           case (r, (PFAModel(inputs, output, engine), i)) =>
-            val json = toPFAJson(r, inputs)
-            val engineIn = engine.jsonInput(json)
+            val inJson = toPFAJson(r, inputs)
+            val engineIn = engine.jsonInput(inJson)
             val result = engine.action(engineIn)
-            val resMap = JsonUtils.fromString[Map[String, Any]](result.toString).get
             val (out, outCol) = output
+            val resMap = parse(result.toString).extract[Map[String, Any]]
             r += out -> resMap(outCol)
         }
         transformedRow.filterKeys(resultFeatures.contains).toMap
@@ -115,7 +127,7 @@ trait OpWorkflowModelLocal {
     private def toPFAJson(r: mutable.Map[String, Any], inputs: Map[String, String]): String = {
       // Convert Spark values back into a json convertible Map
       // See [[FeatureTypeSparkConverter.toSpark]] for all possible values - we invert them here
-      val in = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
+      val in: Map[String, Any] = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
         case Some(v: Vector) => v.toArray
         case Some(v: mutable.WrappedArray[_]) => v.toArray(v.elemTag)
         case Some(v: Map[_, _]) => v.mapValues {
@@ -125,7 +137,7 @@ trait OpWorkflowModelLocal {
         case None | Some(null) => null
         case Some(v) => v
       }
-      JsonUtils.toJsonString(in)
+      Serialization.write(in)
     }
   }
 
