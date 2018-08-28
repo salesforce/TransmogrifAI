@@ -82,52 +82,66 @@ trait OpWorkflowModelLocal {
      * @return score function for local scoring
      */
     def scoreFunction: ScoreFunction = {
-      val resultFeatures = model.getResultFeatures().map(_.name).toSet
+      // Prepare the stages for scoring
       val stagesWithIndex = model.stages.zipWithIndex
+      // Collect all OP stages
       val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => OPModel(s.getOutputFeatureName, s) -> i }
+      // Collect all Spark wrapped stages
       val sparkStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
         case (s: OPStage with SparkWrapperParams[_], i) if s.getSparkMlStage().isDefined =>
-          ((s, s.getSparkMlStage().get.asInstanceOf[Transformer].copy(ParamMap.empty)), i)
+          (s, s.getSparkMlStage().get.asInstanceOf[Transformer].copy(ParamMap.empty), i)
       }
-      val pfaEngines = for {
-        ((s, sparkStage), i) <- sparkStages
-        inParam = sparkStage.getParam(inputCol.name)
-        outParam = sparkStage.getParam(outputCol.name)
-        inputs = s.getInputFeatures().map(_.name).map {
-          case n if sparkStage.get(inParam).contains(n) => n -> inputCol.name
-          case n if sparkStage.get(outParam).contains(n) => n -> outputCol.name
-          case n => n -> n
-        }.toMap
-        output = s.getOutputFeatureName
-        _ = sparkStage.set(inParam, inputCol.name).set(outParam, outputCol.name)
-        pfaJson = SparkSupport.toPFA(sparkStage, pretty = true)
-        pfaEngine = PFAEngine.fromJson(pfaJson).head
-      } yield (PFAModel(inputs, (output, outputCol.name), pfaEngine), i)
+      // Convert Spark wrapped stages into PFA models
+      val pfaStages = sparkStages.map { case (opStage, sparkStage, i) => toPFAModel(opStage, sparkStage) -> i }
+      // Combine all stages and apply the original order
+      val allStages = (opStages ++ pfaStages).sortBy(_._2).map(_._1)
+      val resultFeatures = model.getResultFeatures().map(_.name).toSet
 
-      val allStages = (opStages ++ pfaEngines).sortBy(_._2)
+      // Score Function
+      input: Map[String, Any] => {
+        val inputMap = mutable.Map.empty ++= input
+        val transformedRow = allStages.foldLeft(inputMap) {
+          // For OP Models we simply call transform
+          case (row, OPModel(output, stage)) =>
+            row += output -> stage.transformKeyValue(row.apply)
 
-      row: Map[String, Any] => {
-        val rowMap = mutable.Map.empty ++ row
-        val transformedRow = allStages.foldLeft(rowMap) {
-          case (r, (OPModel(output, stage), i)) =>
-            r += output -> stage.transformKeyValue(r.apply)
-
-          case (r, (PFAModel(inputs, output, engine), i)) =>
-            val inJson = toPFAJson(r, inputs)
+          // For PFA Models we execute PFA engine action with json in/out
+          case (row, PFAModel(inputs, (out, outCol), engine)) =>
+            val inJson = rowToJson(row, inputs)
             val engineIn = engine.jsonInput(inJson)
-            val result = engine.action(engineIn)
-            val (out, outCol) = output
-            val resMap = parse(result.toString).extract[Map[String, Any]]
-            r += out -> resMap(outCol)
+            val engineOut = engine.action(engineIn)
+            val resMap = parse(engineOut.toString).extract[Map[String, Any]]
+            row += out -> resMap(outCol)
         }
         transformedRow.filterKeys(resultFeatures.contains).toMap
       }
     }
 
-    private def toPFAJson(r: mutable.Map[String, Any], inputs: Map[String, String]): String = {
-      // Convert Spark values back into a json convertible Map
-      // See [[FeatureTypeSparkConverter.toSpark]] for all possible values - we invert them here
-      val in: Map[String, Any] = inputs.map { case (k, v) => (v, r.get(k)) }.mapValues {
+    /**
+     * Convert Spark wrapped staged into PFA Models
+     */
+    private def toPFAModel(opStage: OPStage with SparkWrapperParams[_], sparkStage: Transformer): PFAModel = {
+      // Update input/output params for Spark stages to default ones
+      val inParam = sparkStage.getParam(inputCol.name)
+      val outParam = sparkStage.getParam(outputCol.name)
+      val inputs = opStage.getInputFeatures().map(_.name).map {
+        case n if sparkStage.get(inParam).contains(n) => n -> inputCol.name
+        case n if sparkStage.get(outParam).contains(n) => n -> outputCol.name
+        case n => n -> n
+      }.toMap
+      val output = opStage.getOutputFeatureName
+      sparkStage.set(inParam, inputCol.name).set(outParam, outputCol.name)
+      val pfaJson = SparkSupport.toPFA(sparkStage, pretty = true)
+      val pfaEngine = PFAEngine.fromJson(pfaJson).head
+      PFAModel(inputs, (output, outputCol.name), pfaEngine)
+    }
+
+    /**
+     * Convert row of Spark values into a json convertible Map
+     * See [[FeatureTypeSparkConverter.toSpark]] for all possible values - we invert them here
+     */
+    private def rowToJson(row: mutable.Map[String, Any], inputs: Map[String, String]): String = {
+      val in = inputs.map { case (k, v) => (v, row.get(k)) }.mapValues {
         case Some(v: Vector) => v.toArray
         case Some(v: mutable.WrappedArray[_]) => v.toArray(v.elemTag)
         case Some(v: Map[_, _]) => v.mapValues {
