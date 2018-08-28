@@ -260,9 +260,9 @@ configure(allProjs) {
 }
 
 wrapper {
-    gradleVersion = '4.9'
+    gradleVersion = '4.10'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
+    distributionSha256Sum = '248cfd92104ce12c5431ddb8309cf713fe58de8e330c63176543320022f59f18'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
@@ -353,11 +353,13 @@ configure(subProjs) {
         }
     }
 
-    signing {
-        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
-        // and https://gpgtools.org/ (gpg2 installed and configured)
-        useGpgCmd()
-        sign publishing.publications.mavenJava
+    if (System.getenv("SIGN_RELEASE") == 'true') {
+        signing {
+            // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+            // and https://gpgtools.org/ (gpg2 installed and configured)
+            useGpgCmd()
+            sign publishing.publications.mavenJava
+        }
     }
 }
 
