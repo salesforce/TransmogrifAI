@@ -66,7 +66,12 @@ trait OpWorkflowModelLocal {
      * @param output output mapping
      * @param engine PFA engine
      */
-    private case class PFAModel(inputs: Map[String, String], output: (String, String), engine: PFAEngine[AnyRef, AnyRef])
+    private case class PFAModel
+    (
+      inputs: Map[String, String],
+      output: (String, String),
+      engine: PFAEngine[AnyRef, AnyRef]
+    )
 
     /**
      * Internal OP model representation
