@@ -352,11 +352,13 @@ configure(subProjs) {
         }
     }
 
-    signing {
-        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
-        // and https://gpgtools.org/ (gpg2 installed and configured)
-        useGpgCmd()
-        sign publishing.publications.mavenJava
+    if (System.getenv("SIGN_RELEASE") == 'true') {
+        signing {
+            // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
+            // and https://gpgtools.org/ (gpg2 installed and configured)
+            useGpgCmd()
+            sign publishing.publications.mavenJava
+        }
     }
 }
 
