@@ -234,6 +234,10 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
         setBlacklist(filteredRawData.featuresToDrop, filteredRawData.featureDistributions)
         setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
+
+        println(s"Inside generateRawData:")
+        println(s"filteredRawData.featuresToDrop: ${filteredRawData.featuresToDrop.map(_.name).toList}")
+
         filteredRawData.cleanedData
     }
   }

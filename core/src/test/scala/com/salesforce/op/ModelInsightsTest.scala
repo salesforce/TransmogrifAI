@@ -33,6 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
@@ -109,6 +110,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
+
+  lazy val workflowWithRFF = new OpWorkflow()
+    .withRawFeatureFilter(trainingReader = Some(dataReader), scoringReader = None)
+    .setResultFeatures(predWithMaps)
+    .setParameters(params)
+
+  lazy val workflowModelWithRFF = workflowWithRFF.train()
 
   val rawNames = Set(age.name, weight.name, height.name, genderPL.name, description.name)
 
@@ -409,7 +417,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
-      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]]
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
+      Array.empty[FeatureDistribution]
     )
     featureInsights.size shouldBe 2
 
@@ -472,6 +481,52 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer3.max shouldBe Some(0.3)
     f0InDer3.mean shouldBe Some(2.3)
     f0InDer3.variance shouldBe Some(3.3)
+  }
+
+  it should "include raw feature distribution information calculated in RawFeatureFilter when it's included" in {
+    val insights = workflowModelWithRFF.modelInsights(checkedWithMaps)
+    insights.features.foreach(f => {
+      println(s"Feature: ${f.featureName}")
+      println(s"Derived features: ${f.derivedFeatures}")
+      println(s"Distributions: ${f.distributions}")
+      println()
+    })
+
+    println(s"workflowModelWithRFF.rawFeatures")
+    workflowModelWithRFF.rawFeatures.foreach(f => println(f.name))
+    println()
+
+    println(s"workflowModelWithRFF.rawFeatureDistributions")
+    workflowModelWithRFF.getRawFeatureDistributions().foreach(println)
+    println()
+
+    val wfRawFeatureDistributions = workflowModelWithRFF.getRawFeatureDistributions()
+    val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
+
+    // Why is decription not here???
+
+    wfDistributionsGrouped.foreach {
+      // val res = insights.features.filter(_.featureName == fName).flatMap(_.distributions)
+      case (fName, distributions) =>
+        val res = insights.features.filter(_.featureName == fName).flatMap(_.distributions)
+        println(s"distributions: ${distributions.toList}")
+        println(s"res: ${res.toList}")
+        distributions should contain theSameElementsAs
+          insights.features.filter(_.featureName == fName).flatMap(_.distributions)
+    }
+
+    /*
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.label.labelName shouldBe None
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    genderInsights.derivedFeatures.size shouldBe 4
+    insights.selectedModelInfo.isEmpty shouldBe true
+    insights.trainingParams shouldEqual params
+    insights.stageInfo.keys.size shouldEqual 8
+     */
   }
 
 }
