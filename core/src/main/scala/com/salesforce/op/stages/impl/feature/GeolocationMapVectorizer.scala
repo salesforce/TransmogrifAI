@@ -66,7 +66,7 @@ class GeolocationMapVectorizer
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = None
     )
     meta.withColumns(cols.toArray)
@@ -79,7 +79,7 @@ class GeolocationMapVectorizer
       col :+ OpVectorColumnMetadata(
         parentFeatureName = head.parentFeatureName,
         parentFeatureType = head.parentFeatureType,
-        indicatorGroup = head.indicatorGroup,
+        grouping = head.grouping,
         indicatorValue = Some(TransmogrifierDefaults.NullString)
       )
     }

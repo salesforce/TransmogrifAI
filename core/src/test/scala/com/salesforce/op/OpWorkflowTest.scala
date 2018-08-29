@@ -537,7 +537,7 @@ object NormEstimatorTest {
   val columnMeta = OpVectorColumnMetadata(
     parentFeatureName = Seq("parentFeature"),
     parentFeatureType = Seq(FeatureTypeDefaults.Real.getClass.getName),
-    indicatorGroup = Some("indicator_group"),
+    grouping = Some("indicator_group"),
     indicatorValue = None
   )
 
