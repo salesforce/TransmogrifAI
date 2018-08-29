@@ -144,6 +144,12 @@ private[op] object FeatureDistribution {
 
   val MaxBins = 100000
   val AvgBinValue = 5000
+  val MaxTokenLowerLimit = 10
+  val getBins = (sum: Summary, bins: Int) => {
+    // To catch categoricals
+    if (sum.max < MaxTokenLowerLimit) bins
+    else math.min(math.max(bins, sum.sum / AvgBinValue), MaxBins).intValue()
+  }
 
   implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
     override def plus(l: FeatureDistribution, r: FeatureDistribution) = l.reduce(r)
@@ -165,7 +171,7 @@ private[op] object FeatureDistribution {
     bins: Int
   ): FeatureDistribution = {
     val (nullCount, (summaryInfo, distribution)): (Int, (Array[Double], Array[Double])) =
-      value.map(seq => 0 -> histValues(seq, summary, bins))
+      value.map(seq => 0 -> histValues(seq, summary, bins, getBins))
         .getOrElse(1 -> (Array(summary.min, summary.max, summary.sum, summary.count) -> Array.fill(bins)(0.0)))
 
     FeatureDistribution(
@@ -182,19 +188,19 @@ private[op] object FeatureDistribution {
    * @param values values to bin
    * @param sum summary info for feature (max and min)
    * @param bins number of bins to produce
+   * @param getBins
    * @return the bin information and the binned counts
    */
   // TODO avoid wrapping and unwrapping??
   private def histValues(
     values: ProcessedSeq,
     sum: Summary,
-    bins: Int
+    bins: Int,
+    getBins: (Summary, Int) => Int
   ): (Array[Double], Array[Double]) = {
     values match {
       case Left(seq) => {
-        val minBins = bins
-        val maxBins = MaxBins
-        val numBins = math.min(math.max(bins, sum.max / AvgBinValue), maxBins).intValue()
+        val numBins = getBins(sum, bins)
 
         val hasher: HashingTF = new HashingTF(numFeatures = numBins)
           .setBinary(false)
