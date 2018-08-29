@@ -256,6 +256,12 @@ configure(allProjs) {
             println sourceSets.main.runtimeClasspath.asPath
         }
     }
+
+    task resolveAllDependencies {
+        doLast {
+            configurations.all { if(it.canBeResolved) it.resolve() }
+        }
+    }
 }
 
 wrapper {
@@ -358,14 +364,6 @@ configure(subProjs) {
             // and https://gpgtools.org/ (gpg2 installed and configured)
             useGpgCmd()
             sign publishing.publications.mavenJava
-        }
-    }
-}
-
-allprojects {
-    task resolveAllDependencies {
-        doLast {
-            configurations.all { if(it.canBeResolved) it.resolve() }
         }
     }
 }
