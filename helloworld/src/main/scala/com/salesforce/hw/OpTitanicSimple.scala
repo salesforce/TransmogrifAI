@@ -100,25 +100,15 @@ object OpTitanicSimple {
 
     // Define features using the OP types based on the data
     val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
-
     val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
-
     val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
-
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
-
     val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
-
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
-
     val parCh = FeatureBuilder.Integral[Passenger].extract(_.parCh.toIntegral).asPredictor
-
     val ticket = FeatureBuilder.PickList[Passenger].extract(_.ticket.map(_.toString).toPickList).asPredictor
-
     val fare = FeatureBuilder.Real[Passenger].extract(_.fare.toReal).asPredictor
-
     val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).toPickList).asPredictor
-
     val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +118,6 @@ object OpTitanicSimple {
     // Do some basic feature engineering using knowledge of the underlying dataset
     val familySize = sibSp + parCh + 1
     val estimatedCostOfTickets = familySize * fare
-    // val pivotedSex = sex.map[PickList](v => v).pivot()
     val pivotedSex = sex.pivot()
     val normedAge = age.fillMissingWithMean().zNormalize()
     val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
