@@ -202,6 +202,7 @@ private[op] object FeatureDistribution {
       case Left(seq) => {
         val numBins = getBins(sum, bins)
 
+        // Todo: creating too many hashers may cause problem, efficiency, garbage collection etc
         val hasher: HashingTF = new HashingTF(numFeatures = numBins)
           .setBinary(false)
           .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
