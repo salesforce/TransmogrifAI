@@ -118,9 +118,9 @@ object RichRow {
       conv.fromSpark(getAny(f.name))
 
     /**
-     * Converts row to a [[collection.mutable.Map]]
+     * Converts row to a [[collection.immutable.Map]]
      *
-     * @return a [[collection.mutable.Map]] with row contents
+     * @return a [[collection.immutable.Map]] with all row contents
      */
     def toMutableMap: collection.mutable.Map[String, Any] = {
       val res = collection.mutable.Map.empty[String, Any]
@@ -130,9 +130,9 @@ object RichRow {
     }
 
     /**
-     * Converts row to a [[collection.immutable.Map]]
+     * Converts row to a [[collection.mutable.Map]]
      *
-     * @return a [[collection.immutable.Map]] with row contents
+     * @return a [[collection.mutable.Map]] with all row contents
      */
     def toMap: Map[String, Any] = toMutableMap.toMap
 
