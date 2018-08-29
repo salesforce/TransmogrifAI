@@ -72,7 +72,7 @@ object OpTitanicMini {
 
     // Automated feature engineering
     val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
-    val featureVector = features.toSeq.autoTransform()
+    val featureVector = features.transmogrify()
 
     // Automated feature selection
     val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, removeBadFeatures = true)
