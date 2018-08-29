@@ -125,7 +125,7 @@ object RichRow {
     def toMutableMap: collection.mutable.Map[String, Any] = {
       val res = collection.mutable.Map.empty[String, Any]
       val fields = row.schema.fields
-      for {i <- 0 until row.size} res.put(fields(i).name, row(i))
+      for {i <- fields.indices} res.put(fields(i).name, row(i))
       res
     }
 
