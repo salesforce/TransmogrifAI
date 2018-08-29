@@ -26,9 +26,11 @@ tasks.withType(Test) {
     // Default forks config applied to local builds
     maxParallelForks = Runtime.runtime.availableProcessors() / 2 ?: 1
 
-    // Forks config for cloud build systems (Eg. travis)
+    // Disabling fork on cloud builds
+    // Enabling would lead to timed test failures
     if (System.getenv('BUILD_TYPE') == 'CLOUD' ) {
-        maxParallelForks = Runtime.runtime.availableProcessors()
+        maxParallelForks = 1
+        project.setProperty('org.gradle.parallel', false)
     }
     maxHeapSize = "1500m"
     failFast = System.getenv('TESTS_FAIL_FAST') == 'true'
