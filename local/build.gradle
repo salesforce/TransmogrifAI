@@ -1,5 +1,5 @@
 repositories {
-    // TODO: remove once Aardpfark release if official
+    // TODO: remove once Aardpfark release is official
     maven { url 'https://jitpack.io' }
 }
 
