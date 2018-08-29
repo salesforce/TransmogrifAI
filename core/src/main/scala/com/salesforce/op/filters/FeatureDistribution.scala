@@ -166,7 +166,7 @@ private[op] object FeatureDistribution {
   ): FeatureDistribution = {
     val (nullCount, (summaryInfo, distribution)): (Int, (Array[Double], Array[Double])) =
       value.map(seq => 0 -> histValues(seq, summary, bins))
-        .getOrElse(1 -> (Array(summary.min, summary.max) -> Array.fill(bins)(0.0)))
+        .getOrElse(1 -> (Array(summary.min, summary.max, summary.sum, summary.count) -> Array.fill(bins)(0.0)))
 
     FeatureDistribution(
       name = featureKey._1,
@@ -194,12 +194,12 @@ private[op] object FeatureDistribution {
       case Left(seq) => {
         val minBins = bins
         val maxBins = MaxBins
-        val numBins = math.min(math.max(bins, sum.max / AvgBinValue), maxBins).floor
+        val numBins = math.min(math.max(bins, sum.max / AvgBinValue), maxBins).intValue()
 
         val hasher: HashingTF = new HashingTF(numFeatures = numBins)
           .setBinary(false)
           .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
-        Array(sum.min, sum.max) -> hasher.transform(seq).toArray
+        Array(sum.min, sum.max, sum.sum, sum.count) -> hasher.transform(seq).toArray
       }
       case Right(seq) => // TODO use kernel fit instead of histogram
         if (sum == Summary.empty) {
@@ -218,7 +218,7 @@ private[op] object FeatureDistribution {
         } else {
           val same = seq.map(v => if (v == sum.max) 1.0 else 0.0).sum
           val other = seq.map(v => if (v != sum.max) 1.0 else 0.0).sum
-          Array(sum.min, sum.max) -> Array(same, other)
+          Array(sum.min, sum.max, sum.sum, sum.count) -> Array(same, other)
         }
     }
   }
