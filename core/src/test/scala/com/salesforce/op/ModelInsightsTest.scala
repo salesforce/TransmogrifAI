@@ -32,6 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
@@ -107,6 +108,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
+
+  lazy val modelWithRFF = new OpWorkflow()
+    .setResultFeatures(predWithMaps)
+    .setParameters(params)
+    .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
+      maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 1.0, maxCorrelation = 0.4)
+    .train()
 
   val rawNames = Set(age.name, weight.name, height.name, genderPL.name, description.name)
 
@@ -316,21 +325,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "have feature insights for features that are removed by the raw feature filter" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
 
-    val model = new OpWorkflow()
-      .setResultFeatures(predWithMaps)
-      .setParameters(params)
-      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
-        maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,
-        maxJSDivergence = 1.0, maxCorrelation = 0.4)
-      .train()
-    val insights = model.modelInsights(predWithMaps)
-    model.blacklistedFeatures should contain theSameElementsAs Array(age, description, genderPL, weight)
+    modelWithRFF.blacklistedFeatures should contain theSameElementsAs Array(age, description, genderPL, weight)
     val heightIn = insights.features.find(_.featureName == age.name).get
     heightIn.derivedFeatures.size shouldBe 1
     heightIn.derivedFeatures.head.excluded shouldBe Some(true)
 
-    model.blacklistedMapKeys should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    modelWithRFF.blacklistedMapKeys should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
     val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
     val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
     mapDerivedIn.size shouldBe 3
@@ -407,7 +409,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
-      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]]
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
+      Array.empty[FeatureDistribution]
     )
     featureInsights.size shouldBe 2
 
@@ -470,6 +473,27 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer3.max shouldBe Some(0.3)
     f0InDer3.mean shouldBe Some(2.3)
     f0InDer3.variance shouldBe Some(3.3)
+  }
+
+  it should "include raw feature distribution information when RawFeatureFilter is used" in {
+    val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
+    val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
+
+    /*
+    Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+    explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+    weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+    it's not explicitly blacklisted itself.
+     */
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+    insights.features.foreach(f =>
+      f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
+    )
+  }
+
+  it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
+    val insights = workflowModel.modelInsights(pred)
+    insights.features.foreach(f => f.distributions shouldBe empty)
   }
 
 }

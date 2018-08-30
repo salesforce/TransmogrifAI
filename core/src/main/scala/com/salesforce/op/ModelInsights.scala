@@ -33,6 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
@@ -312,8 +313,15 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param featureName     name of raw feature insights are about
  * @param featureType     type of raw feature insights are about
  * @param derivedFeatures sequence containing insights for each feature derived from the raw feature
+ * @param distributions   distribution information for the raw feature (if calculated in RawFeatureFilter)
  */
-case class FeatureInsights(featureName: String, featureType: String, derivedFeatures: Seq[Insights])
+case class FeatureInsights
+(
+  featureName: String,
+  featureType: String,
+  derivedFeatures: Seq[Insights],
+  distributions: Seq[FeatureDistribution] = Seq.empty
+)
 
 /**
  * Summary of insights for a derived feature
@@ -406,7 +414,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     trainingParams: OpParams,
     blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]]
+    blacklistedMapKeys: Map[String, Set[String]],
+    rawFeatureDistributions: Array[FeatureDistribution]
   ): ModelInsights = {
     val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
     val sanityChecker = sanityCheckers.lastOption
@@ -431,7 +440,6 @@ case object ModelInsights {
     val label = model.map(_.getInputFeature[RealNN](0)).orElse(sanityChecker.map(_.getInputFeature[RealNN](0))).flatten
     log.info(s"Found ${label.map(_.name + " as label").getOrElse("no label")} to fill in model insights")
 
-
     // Recover the vector metadata
     val vectorInput: Option[OpVectorMetadata] = {
       def makeMeta(s: => OpPipelineStageParams) = Try(OpVectorMetadata(s.getInputSchema().last)).toOption
@@ -454,7 +462,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureDistributions),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = getStageInfo(stages)
@@ -502,7 +510,8 @@ case object ModelInsights {
     model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]]
+    blacklistedMapKeys: Map[String, Set[String]],
+    rawFeatureDistributions: Array[FeatureDistribution]
   ): Seq[FeatureInsights] = {
     val contributions = getModelContributions(model)
 
@@ -588,7 +597,9 @@ case object ModelInsights {
           val ftype = allFeatures.find(_.name == fname)
             .getOrElse(throw new RuntimeException(s"No raw feature with name $fname found in raw features"))
             .typeName
-          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2))
+          val distributions = rawFeatureDistributions.filter(_.name == fname)
+          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
+            distributions = distributions)
       }.toSeq
   }
 

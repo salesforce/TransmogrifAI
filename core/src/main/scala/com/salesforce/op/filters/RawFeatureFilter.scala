@@ -55,6 +55,10 @@ import scala.math.{abs, min}
 /**
  * Specialized stage that will load up data and compute distributions and empty counts on raw features.
  * This information is then used to compute which raw features should be excluded from the workflow DAG
+ * Note: Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+ * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. However, they
+ * are accessible from an OpWorkflowModel via getRawFeatureDistributions().
+ *
  * @param trainingReader reader to get the training data
  * @param scoreReader reader to get the scoring data for comparison (optional - if not present will exclude based on
  *                    training data features only)

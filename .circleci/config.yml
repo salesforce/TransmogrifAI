@@ -1,28 +1,37 @@
 version: 2
+
 jobs:
-  build:
+  clone_repo_and_resolve_dependencies:
+    machine: true
+    working_directory: ~/repo
+    steps:
+      - checkout
+      - run:
+          name: Clone repo & resolve dependencies
+          command: ./gradlew resolveAllDependencies
+      - save_cache:
+          key: repo-{{ .Environment.CIRCLE_SHA1 }}
+          paths:
+            - ~/repo
+            - ~/.gradle
+            - ~/.m2
+  build_core:
     machine: true
     working_directory: ~/repo
     environment:
       GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
       TERM: dumb
-    
     steps:
-      - checkout
       - restore_cache:
           keys:
+            - repo-{{ .Environment.CIRCLE_SHA1 }}
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-
       - run:
           name: Java version
           command: java -version
       - run:
           name: Build core project
           command: ./gradlew core:reportScoverage
-      - run:
-          name: Build everything else
-          command: ./gradlew reportScoverage -x core:reportScoverage
-
       - run:
           name: Collect test results
           command: |
@@ -35,13 +44,38 @@ jobs:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-
-      - save_cache:
-          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle
-            - ~/.m2
-
+      - run:
+          name: Report scoverage resuts to Codecov
+          command: bash <(curl -s https://codecov.io/bash)
+  build_non_core:
+    machine: true
+    working_directory: ~/repo
+    environment:
+      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
+      TERM: dumb
+    steps:
+      - restore_cache:
+          keys:
+            - repo-{{ .Environment.CIRCLE_SHA1 }}
+            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Java version
+          command: java -version
+      - run:
+          name: Build non core projects
+          command: ./gradlew reportScoverage -x core:reportScoverage
+      - run:
+          name: Collect test results
+          command: |
+            mkdir -p ~/junit/
+            mkdir -p ~/junit.xml/
+            find . -type d -regex ".*/build/test-results/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit.xml/$f' \;
+            find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
+          when: always
+      - store_test_results:
+          path: ~/junit.xml/
+      - store_artifacts:
+          path: ~/junit/
       - run:
           name: Report scoverage resuts to Codecov
           command: bash <(curl -s https://codecov.io/bash)
@@ -50,4 +84,10 @@ workflows:
   version: 2
   build:
     jobs:
-      - build
+      - clone_repo_and_resolve_dependencies
+      - build_core:
+          requires:
+            - clone_repo_and_resolve_dependencies
+      - build_non_core:
+          requires:
+            - clone_repo_and_resolve_dependencies
