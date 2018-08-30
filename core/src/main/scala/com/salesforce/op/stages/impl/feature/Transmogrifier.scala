@@ -150,11 +150,11 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[DateMap] =>
           val (f, other) = castAs[DateMap](g)
           f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
-            referenceDate = ReferenceDate, circularDateRepresentations = CircularDateRepresentations)
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[DateTimeMap] =>
           val (f, other) = castAs[DateTimeMap](g)
           f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
-            referenceDate = ReferenceDate, circularDateRepresentations = CircularDateRepresentations)
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -239,11 +239,11 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[Date] =>
           val (f, other) = castAs[Date](g)
           f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
-            circularDateRepresentations = CircularDateRepresentations, others = other)
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[DateTime] =>
           val (f, other) = castAs[DateTime](g)
           f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
-            circularDateRepresentations = CircularDateRepresentations, others = other)
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
           f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,

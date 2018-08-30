@@ -46,7 +46,6 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
-// import org.apache.log4j.Level
 
 import scala.collection.Traversable
 import scala.reflect.runtime.universe._

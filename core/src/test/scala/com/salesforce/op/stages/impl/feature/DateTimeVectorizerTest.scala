@@ -80,7 +80,7 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext {
       dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = false,
-      circularDateRepresentations = Seq(),
+      circularDateReps = Seq(),
       others = Array(f2, f3)
     )
     val transformed = new OpWorkflow().setResultFeatures(vector).transform(ds)
@@ -96,7 +96,7 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext {
       dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = true,
-      circularDateRepresentations = Seq(),
+      circularDateReps = Seq(),
       others = Array(f2, f3)
     )
     val transformed2 = new OpWorkflow().setResultFeatures(vector2).transform(ds)

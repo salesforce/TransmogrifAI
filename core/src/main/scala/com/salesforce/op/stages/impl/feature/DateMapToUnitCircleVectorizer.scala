@@ -27,33 +27,17 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.salesforce.op.stages.impl.feature
+
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.sequence.SequenceTransformer
-import com.salesforce.op.utils.spark.OpVectorMetadata
-import com.salesforce.op.{FeatureHistory, UID}
+import com.salesforce.op.features.types.{DateMap, OPVector}
+import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.{Param, Params}
-import org.joda.time.{DateTime => JDateTime}
+import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe.TypeTag
-
-trait DateToUnitCircleParams extends Params {
-
-  final val timePeriod: Param[String] = new Param[String](parent = this,
-    name = "timePeriods",
-    doc = "The time period to extract from the timestamp",
-    isValid = (value: String) => TimePeriod.values.map(_.entryName).contains(value)
-  )
-
-  setDefault(timePeriod, TimePeriod.HourOfDay.entryName)
-
-  /** @group setParam */
-  final def getTimePeriod: TimePeriod = TimePeriod.withName($(timePeriod))
-
-  final def setTimePeriod(value: TimePeriod): this.type = set(timePeriod, value.entryName)
-}
 
 /**
  * Following: http://webspace.ship.edu/pgmarr/geo441/lectures/lec%2016%20-%20directional%20statistics.pdf
@@ -75,48 +59,75 @@ trait DateToUnitCircleParams extends Params {
  * Monday is the first day of the week
  * & the first week of the year is the week wit the first Monday after Jan 1.
  */
-class DateToUnitCircleTransformer[T <: Date]
+class DateMapToUnitCircleVectorizer[T <: DateMap]
 (
-  uid: String = UID[DateToUnitCircleTransformer[_]]
-)(implicit tti: TypeTag[T], val ttiv: TypeTag[T#Value]) extends SequenceTransformer[T, OPVector](
-  operationName = "dateToUnitCircle",
+  uid: String = UID[DateMapToUnitCircleVectorizer[_]]
+)(implicit tti: TypeTag[T], override val ttiv: TypeTag[T#Value]) extends SequenceEstimator[T, OPVector](
+  operationName = "dateMapToUnitCircle",
   uid = uid
-) with DateToUnitCircleParams {
+) with DateToUnitCircleParams with MapVectorizerFuns[Long, T]  {
 
-  override def transformFn: Seq[T] => OPVector = timestamp => {
-    val randians = timestamp.flatMap(ts => DateToUnitCircle.convertToRandians(ts.v, getTimePeriod)).toArray
-    Vectors.dense(randians).toOPVector
-  }
-
-  override def onGetMetadata(): Unit = {
-    super.onGetMetadata()
+  override def makeVectorMetadata(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
+    val meta = vectorMetadataFromInputFeatures
     val timePeriod = getTimePeriod
-    val columns = inN.flatMap{
-      f => DateToUnitCircle.metadataValues(timePeriod)
-        .map(iv => f.toColumnMetaData().copy(descriptorValue = Option(iv)))
-    }
-    val history = inN.flatMap(f => Seq(f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages)))
-    setMetadata(OpVectorMetadata(getOutputFeatureName, columns, history.toMap).toMetadata)
+
+    val cols = for {
+      (keys, col) <- allKeys.zip(meta.columns)
+      key <- keys
+      dec <- DateToUnitCircle.metadataValues(timePeriod)
+    } yield new OpVectorColumnMetadata(
+      parentFeatureName = col.parentFeatureName,
+      parentFeatureType = col.parentFeatureType,
+      grouping = Option(key),
+      descriptorValue = Option(dec)
+    )
+
+    meta.withColumns(cols.toArray)
+  }
+
+  override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
+    val shouldClean = $(cleanKeys)
+    val allKeys = getKeyValues(dataset, shouldClean, shouldCleanValues = false)
+
+    val meta = makeVectorMetadata(allKeys)
+    setMetadata(meta.toMetadata)
+    new DateMapToUnitCircleVectorizerModel[T](allKeys = allKeys, shouldClean = shouldClean,
+      timePeriod = getTimePeriod, operationName = operationName, uid = uid
+    )
+  }
+
+}
+
+/**
+ * Model for DateMapToUnitCircleVectorizer
+ * @param allKeys map keys in order to flatten data consistenly
+ * @param shouldClean map keys are have text cleaned
+ * @param timePeriod time period for circular representations
+ * @param operationName unique name of the operation this stage performs
+ * @param uid           uid for instance
+ * @param tti           type tag for input
+ * @tparam T            DateMap type
+ */
+final class DateMapToUnitCircleVectorizerModel[T <: DateMap] private[op]
+(
+  val allKeys: Seq[Seq[String]],
+  val shouldClean: Boolean,
+  val timePeriod: TimePeriod,
+  operationName: String,
+  uid: String
+)(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
+  with CleanTextMapFun {
+
+  override def transformFn: Seq[T] => OPVector = row => {
+    val eachPivoted: Array[Array[Double]] =
+      row.map(_.value).zip(allKeys).flatMap { case (map, keys) =>
+        val cleanedMap = cleanMap(map, shouldClean, shouldCleanValue = false)
+        keys.map(k => {
+          val vOpt = cleanedMap.get(k)
+          DateToUnitCircle.convertToRandians(vOpt, timePeriod)
+        })
+      }.toArray
+    Vectors.dense(eachPivoted.flatten).compressed.toOPVector
   }
 }
 
-private[op] object DateToUnitCircle {
-
-  def metadataValues(timePeriod: TimePeriod): Seq[String] = Seq(s"x_$timePeriod", s"y_$timePeriod")
-
-  def convertToRandians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] = {
-    val datetime: Option[JDateTime] = timestamp.map(new JDateTime(_))
-    val (timePeriod, periodSize) = timePeriodDesired match {
-      case TimePeriod.DayOfMonth => (datetime.map(_.dayOfMonth().get() - 1), 31)
-      case TimePeriod.DayOfWeek => (datetime.map(_.dayOfWeek().get() - 1), 7)
-      case TimePeriod.DayOfYear => (datetime.map(_.dayOfYear().get() - 1), 366)
-      case TimePeriod.HourOfDay => (datetime.map(_.hourOfDay().get()), 24)
-      case TimePeriod.MonthOfYear => (datetime.map(_.monthOfYear().get() - 1), 12)
-      case TimePeriod.WeekOfMonth => (
-        datetime.map(x => x.weekOfWeekyear().get() - x.withDayOfMonth(1).weekOfWeekyear().get()), 6)
-      case TimePeriod.WeekOfYear => (datetime.map(_.weekOfWeekyear().get() - 1), 53)
-    }
-    val radians = timePeriod.map(2 * math.Pi * _ / periodSize)
-    radians.map(r => Array(math.cos(r), math.sin(r))).getOrElse(Array(0.0, 0.0))
-  }
-}

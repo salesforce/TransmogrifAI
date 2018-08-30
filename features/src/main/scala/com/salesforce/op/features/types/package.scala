@@ -198,8 +198,8 @@ package object types extends FeatureTypeSparkConverters {
   }
   // Arrays
   implicit class ArrayDoubleConversions(val v: Array[Double]) extends AnyVal {
-    def toReal: Seq[Real] = v.map(_.toReal)
-    def toRealNN: Seq[RealNN] = v.map(_.toRealNN)
+    def toReal: Array[Real] = v.map(_.toReal)
+    def toRealNN: Array[RealNN] = v.map(_.toRealNN)
     def toOPVector: OPVector = new OPVector(Vectors.dense(v))
     def toGeolocation: Geolocation = new Geolocation(v)
   }

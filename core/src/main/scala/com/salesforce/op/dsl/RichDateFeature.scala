@@ -91,7 +91,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
-     * @param circularDateRepresentations list of all the circular date representations that should be included
+     * @param circularDateReps list of all the circular date representations that should be included
      *                                    feature vector
      * @return result feature of type Vector
      */
@@ -100,13 +100,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
-      val timePeriods = circularDateRepresentations.map(tp => f.toUnitCircle(tp, others))
+      val timePeriods = circularDateReps.map(tp => f.toUnitCircle(tp, others))
       val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
         trackNulls = trackNulls, others = others.map(_.toDateList()))
-      (timePeriods :+ time).combine()
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
   }
@@ -164,7 +164,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
-     * @param circularDateRepresentations list of all the circular date representations that should be included
+     * @param circularDateReps list of all the circular date representations that should be included
      *                                    feature vector
      * @return result feature of type Vector
      */
@@ -173,13 +173,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTime]] = Array.empty
     ): FeatureLike[OPVector] = {
-      val timePeriods = circularDateRepresentations.map(tp => f.toUnitCircle(tp, others))
+      val timePeriods = circularDateReps.map(tp => f.toUnitCircle(tp, others))
       val time = f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
         trackNulls = trackNulls, others = others.map(_.toDateTimeList()))
-      (timePeriods :+ time).combine()
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
   }

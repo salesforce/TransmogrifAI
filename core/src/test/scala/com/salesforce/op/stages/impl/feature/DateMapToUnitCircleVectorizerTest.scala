@@ -96,8 +96,8 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
     val fitted = estimator.fit(inputData)
     val meta = OpVectorMetadata(fitted.getOutputFeatureName, fitted.getMetadata())
     meta.columns.length shouldBe 4
-    meta.columns.map(_.grouping.get) shouldEqual Seq("a", "a", "b", "b")
-    meta.columns.map(_.descriptorValue.get) shouldEqual Seq("x_HourOfDay", "y_HourOfDay", "x_HourOfDay", "y_HourOfDay")
+    meta.columns.flatMap(_.grouping) shouldEqual Seq("a", "a", "b", "b")
+    meta.columns.flatMap(_.descriptorValue) shouldEqual Seq("x_HourOfDay", "y_HourOfDay", "x_HourOfDay", "y_HourOfDay")
   }
 
 }

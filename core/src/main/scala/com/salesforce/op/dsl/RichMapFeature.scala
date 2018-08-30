@@ -705,7 +705,7 @@ trait RichMapFeature {
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
      * @param referenceDate reference date to subtract off before converting to vector
-     * @param circularDateRepresentations list of all the circular date representations that should be included
+     * @param circularDateReps list of all the circular date representations that should be included
      *                                    feature vector
      * @return result feature of type Vector
      * @param others        other features of the same type
@@ -718,11 +718,11 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
-      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateMap]] = Array.empty
     ): FeatureLike[OPVector] = {
 
-      val timePeriods = circularDateRepresentations.map {
+      val timePeriods = circularDateReps.map {
         tp => f.toUnitCircle(tp, cleanKeys, whiteListKeys, blackListKeys, others)
       }
 
@@ -736,7 +736,7 @@ trait RichMapFeature {
         .setReferenceDate(referenceDate)
         .getOutput()
 
-      (timePeriods :+ time).combine()
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
   }
 
@@ -785,7 +785,7 @@ trait RichMapFeature {
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
      * @param referenceDate reference date to subtract off before converting to vector
-     * @param circularDateRepresentations list of all the circular date representations that should be included
+     * @param circularDateReps list of all the circular date representations that should be included
      *                                    feature vector
      * @param others        other features of the same type
      * @return an OPVector feature
@@ -797,11 +797,11 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
-      circularDateRepresentations: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTimeMap]] = Array.empty
     ): FeatureLike[OPVector] = {
 
-      val timePeriods = circularDateRepresentations.map {
+      val timePeriods = circularDateReps.map {
         tp => f.toUnitCircle(tp, cleanKeys, whiteListKeys, blackListKeys, others)
       }
 
@@ -815,7 +815,7 @@ trait RichMapFeature {
         .setReferenceDate(referenceDate)
         .getOutput()
 
-      (timePeriods :+ time).combine()
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
   }
 
