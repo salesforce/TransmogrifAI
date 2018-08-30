@@ -158,6 +158,7 @@ final class OpParams
     )
   }
 
+  // scalastyle:off parameter.number
   def copy(
     stageParams: Map[String, Map[String, Any]] = this.stageParams,
     readerParams: Map[String, ReaderParams] = this.readerParams,
@@ -191,6 +192,7 @@ final class OpParams
     customParams = customParams,
     alternateReaderParams = alternateReaderParams
   )
+  // scalastyle:on
 
   /**
    * Switch the reader params with the alternate reader params and return a new params instance
