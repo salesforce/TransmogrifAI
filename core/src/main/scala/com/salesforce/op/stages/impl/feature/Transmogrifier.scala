@@ -76,6 +76,8 @@ private[op] trait TransmogrifierDefaults {
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
   val MaxCategoricalCardinality = 30
+  val CircularDateRepresentations: Seq[TimePeriod] = Seq(TimePeriod.HourOfDay, TimePeriod.DayOfWeek,
+    TimePeriod.DayOfMonth, TimePeriod.DayOfYear)
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -146,11 +148,13 @@ private[op] case object Transmogrifier {
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[DateMap] =>
-          val (f, other) = castAs[DateMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[DateTimeMap] =>
-          val (f, other) = castAs[DateTimeMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateTimeMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -234,10 +238,12 @@ private[op] case object Transmogrifier {
             trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Date] =>
           val (f, other) = castAs[Date](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[DateTime] =>
           val (f, other) = castAs[DateTime](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
           f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
