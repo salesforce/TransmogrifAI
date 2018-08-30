@@ -59,14 +59,16 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
 
+  // Automated feature engineering
   val featureVector = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()
 
+  // Automated feature selection
   val checkedFeatures = survived.sanityCheck(
     featureVector = featureVector, checkSample = 1.0, sampleSeed = randomSeed, removeBadFeatures = true
   )
 
+  // Automated model selection
   val splitter = DataSplitter(seed = randomSeed, reserveTestFraction = 0.1)
-
   val (pred, raw, prob) = BinaryClassificationModelSelector
     .withCrossValidation(splitter = Option(splitter), seed = randomSeed)
     .setLogisticRegressionRegParam(0.05, 0.1)

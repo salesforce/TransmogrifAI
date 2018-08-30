@@ -28,38 +28,36 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.local
 
-import com.salesforce.op.features.TransientFeature
+import com.salesforce.op.{OpParams, OpWorkflow}
 
 
-trait HasIn1 {
-  self: OpPipelineStageBase =>
-  final protected def in1: TransientFeature = getTransientFeature(0).get
+/**
+ * A class for running TransmogrifAI Workflow without Spark.
+ *
+ * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
+ */
+class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
+
+  /**
+   * Load the model & prepare a score function for local scoring
+   *
+   * Note: since we use Spark native [[org.apache.spark.ml.util.MLWriter]] interface
+   * to load stages the Spark session is being created internally. So if you would not like
+   * to have an open SparkSession please make sure to stop it after creating the score function:
+   *
+   *   val scoreFunction = new OpWorkflowRunnerLocal(workflow).score(params)
+   *   // stop the session after creating the scoreFunction if needed
+   *   SparkSession.builder().getOrCreate().stop()
+   *
+   * @param params params to use during scoring
+   * @return score function for local scoring
+   */
+  def score(params: OpParams): ScoreFunction = {
+    require(params.modelLocation.isDefined, "Model location must be set in params")
+    val model = workflow.loadModel(params.modelLocation.get)
+    model.scoreFunction
+  }
+
 }
-
-trait HasIn2 {
-  self: OpPipelineStageBase =>
-  final protected def in2: TransientFeature = getTransientFeature(1).get
-}
-
-trait HasIn3 {
-  self: OpPipelineStageBase =>
-  final protected def in3: TransientFeature = getTransientFeature(2).get
-}
-
-trait HasIn4 {
-  self: OpPipelineStageBase =>
-  final protected def in4: TransientFeature = getTransientFeature(3).get
-}
-
-trait HasInN {
-  self: OpPipelineStageBase =>
-  final protected def inN: Array[TransientFeature] = getTransientFeatures()
-}
-
-trait HasIn1PlusN extends HasIn1 {
-  self: OpPipelineStageBase =>
-  final protected def inN: Array[TransientFeature] = getTransientFeatures.tail
-}
-
