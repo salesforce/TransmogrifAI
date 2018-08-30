@@ -108,9 +108,9 @@ val passengerFeatures: FeatureLike[Vector] = Seq(
 ).transmogrify()
 ```
 
-The ```.transmogrify()``` shortcut is a special AutoML Estimator that applies a default set of transformations to all the specified inputs and combines them into a single vector. This is in essence the [automatic feature engineering Stage](../AutoML-Capabilities#vectorizers-and-transmogrification) of TransmogrifAI. This stage can be discarded in favor of hand-tuned feature engineering and manual vector creation followed by combination using the VectorsCombiner Transformer (short-hand ```Seq(....).combine()```) if the user desires to have complete control over feature engineering.
+The ```.transmogrify()``` shortcut is a special AutoML Estimator that applies a default set of transformations to all the specified inputs and combines them into a single vector. This is in essence the [automatic feature engineering Stage](../automl-capabilities#vectorizers-and-transmogrification) of TransmogrifAI. This stage can be discarded in favor of hand-tuned feature engineering and manual vector creation followed by combination using the VectorsCombiner Transformer (short-hand ```Seq(....).combine()```) if the user desires to have complete control over feature engineering.
 
-The next stage applies another powerful AutoML Estimator — the [SanityChecker](../AutoML-Capabilities#sanitychecker). The SanityChecker applies a variety of statistical tests to the data based on Feature types and discards predictors that are indicative of label leakage or that show little to no predictive power. This is in essence the automatic feature selection Stage of TransmogrifAI:
+The next stage applies another powerful AutoML Estimator — the [SanityChecker](../automl-capabilities#sanitychecker). The SanityChecker applies a variety of statistical tests to the data based on Feature types and discards predictors that are indicative of label leakage or that show little to no predictive power. This is in essence the automatic feature selection Stage of TransmogrifAI:
 
 ```scala
 // Optionally check the features with a sanity checker
@@ -125,7 +125,7 @@ import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 
 val prediction = new OpLogisticRegression().setInput(survived, finalFeatures).getOutput
 ```
-We could alternatively have used the [ModelSelector](../AutoML-Capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
+We could alternatively have used the [ModelSelector](../automl-capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
 
 Notice that everything we've done so far has been purely at the level of definitions. We have defined how we would like to extract our raw features from data of type 'Passenger', and we have defined how we would like to manipulate them. In order to actually manifest the data described by these features, we need to add them to a workflow and attach a data source to the workflow:
 
