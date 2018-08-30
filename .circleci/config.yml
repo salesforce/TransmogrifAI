@@ -1,7 +1,7 @@
 version: 2
 
 jobs:
-  checkout_code_and_dependencies:
+  clone_code_and_resolve_dependencies:
     machine: true
     working_directory: ~/repo
     steps:
@@ -15,7 +15,7 @@ jobs:
             - ~/repo
             - ~/.gradle
             - ~/.m2
-  test_core:
+  build_core:
     machine: true
     working_directory: ~/repo
     environment:
@@ -47,7 +47,7 @@ jobs:
       - run:
           name: Report scoverage resuts to Codecov
           command: bash <(curl -s https://codecov.io/bash)
-  test_non_core:
+  build_non_core:
     machine: true
     working_directory: ~/repo
     environment:
@@ -84,10 +84,10 @@ workflows:
   version: 2
   build:
     jobs:
-      - checkout_code_and_dependencies
-      - test_core:
+      - clone_code_and_resolve_dependencies
+      - build_core:
           requires:
             - checkout_code_and_dependencies
-      - test_non_core:
+      - build_non_core:
           requires:
             - checkout_code_and_dependencies
