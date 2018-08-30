@@ -109,6 +109,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param distributions feature distributions calculated in raw feature filter
    */
   private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
+    // TODO: Figure out a way to keep track of raw features that aren't explicitly blacklisted, but can't be used
+    // TODO: because they're inputs into an explicitly blacklisted feature. Eg. "height" in ModelInsightsTest
     blacklistedFeatures = features
     if (blacklistedFeatures.nonEmpty) {
       val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
@@ -234,10 +236,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
         setBlacklist(filteredRawData.featuresToDrop, filteredRawData.featureDistributions)
         setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
-
-        println(s"Inside generateRawData:")
-        println(s"filteredRawData.featuresToDrop: ${filteredRawData.featuresToDrop.map(_.name).toList}")
-
         filteredRawData.cleanedData
     }
   }

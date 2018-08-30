@@ -111,12 +111,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   lazy val workflowModel = workflow.train()
 
-  lazy val workflowWithRFF = new OpWorkflow()
-    .withRawFeatureFilter(trainingReader = Some(dataReader), scoringReader = None)
+  lazy val modelWithRFF = new OpWorkflow()
     .setResultFeatures(predWithMaps)
     .setParameters(params)
-
-  lazy val workflowModelWithRFF = workflowWithRFF.train()
+    .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
+      maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 1.0, maxCorrelation = 0.4)
+    .train()
 
   val rawNames = Set(age.name, weight.name, height.name, genderPL.name, description.name)
 
@@ -326,21 +327,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "have feature insights for features that are removed by the raw feature filter" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
 
-    val model = new OpWorkflow()
-      .setResultFeatures(predWithMaps)
-      .setParameters(params)
-      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), bins = 10, minFillRate = 0.0,
-        maxFillDifference = 1.0, maxFillRatioDiff = Double.PositiveInfinity,
-        maxJSDivergence = 1.0, maxCorrelation = 0.4)
-      .train()
-    val insights = model.modelInsights(predWithMaps)
-    model.blacklistedFeatures should contain theSameElementsAs Array(age, description, genderPL, weight)
+    modelWithRFF.blacklistedFeatures should contain theSameElementsAs Array(age, description, genderPL, weight)
     val heightIn = insights.features.find(_.featureName == age.name).get
     heightIn.derivedFeatures.size shouldBe 1
     heightIn.derivedFeatures.head.excluded shouldBe Some(true)
 
-    model.blacklistedMapKeys should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    modelWithRFF.blacklistedMapKeys should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
     val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
     val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
     mapDerivedIn.size shouldBe 3
@@ -484,49 +478,21 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "include raw feature distribution information calculated in RawFeatureFilter when it's included" in {
-    val insights = workflowModelWithRFF.modelInsights(checkedWithMaps)
-    insights.features.foreach(f => {
-      println(s"Feature: ${f.featureName}")
-      println(s"Derived features: ${f.derivedFeatures}")
-      println(s"Distributions: ${f.distributions}")
-      println()
-    })
-
-    println(s"workflowModelWithRFF.rawFeatures")
-    workflowModelWithRFF.rawFeatures.foreach(f => println(f.name))
-    println()
-
-    println(s"workflowModelWithRFF.rawFeatureDistributions")
-    workflowModelWithRFF.getRawFeatureDistributions().foreach(println)
-    println()
-
-    val wfRawFeatureDistributions = workflowModelWithRFF.getRawFeatureDistributions()
+    val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
-    // Why is decription not here???
+    // Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+    // explicitly blacklisted features (eg. weight is explicitly blacklisted here, which means that height will
+    // not be added as a raw feature even though it's not explicitly blacklisted itself.
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+    insights.features.foreach(f =>
+      f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
+    )
+  }
 
-    wfDistributionsGrouped.foreach {
-      // val res = insights.features.filter(_.featureName == fName).flatMap(_.distributions)
-      case (fName, distributions) =>
-        val res = insights.features.filter(_.featureName == fName).flatMap(_.distributions)
-        println(s"distributions: ${distributions.toList}")
-        println(s"res: ${res.toList}")
-        distributions should contain theSameElementsAs
-          insights.features.filter(_.featureName == fName).flatMap(_.distributions)
-    }
-
-    /*
-    val ageInsights = insights.features.filter(_.featureName == age.name).head
-    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-    insights.label.labelName shouldBe None
-    insights.features.size shouldBe 5
-    insights.features.map(_.featureName).toSet shouldEqual rawNames
-    ageInsights.derivedFeatures.size shouldBe 2
-    genderInsights.derivedFeatures.size shouldBe 4
-    insights.selectedModelInfo.isEmpty shouldBe true
-    insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 8
-     */
+  it should "not include raw feature distribution information if RawFeatureFilter is not used" in {
+    val insights = workflowModel.modelInsights(pred)
+    insights.features.foreach(f => f.distributions shouldBe empty)
   }
 
 }
