@@ -314,8 +314,12 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param derivedFeatures sequence containing insights for each feature derived from the raw feature
  * @param distributions   distribution information for the raw feature (if calculated in RawFeatureFilter)
  */
-case class FeatureInsights(featureName: String, featureType: String, derivedFeatures: Seq[Insights],
-  distributions: Seq[FeatureDistributionLike] = Seq.empty)
+case class FeatureInsights(
+  featureName: String,
+  featureType: String,
+  derivedFeatures: Seq[Insights],
+  distributions: Seq[FeatureDistribution] = Seq.empty
+)
 
 /**
  * Summary of insights for a derived feature
