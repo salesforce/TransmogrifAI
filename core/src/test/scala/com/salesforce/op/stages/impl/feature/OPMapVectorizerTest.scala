@@ -46,7 +46,6 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
-import org.apache.log4j.Level
 
 import scala.collection.Traversable
 import scala.reflect.runtime.universe._
@@ -58,7 +57,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
   import OPMapVectorizerTestHelper._
 
   val log = LoggerFactory.getLogger(this.getClass)
-  loggingLevel(Level.INFO)
+  // loggingLevel(Level.INFO)
 
   Spec[TextMapPivotVectorizer[_]] should "return the expected vector with the default param settings" in {
     val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
