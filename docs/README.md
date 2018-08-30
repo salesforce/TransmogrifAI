@@ -8,7 +8,7 @@ Scala docs are located [here](https://scaladoc.transmogrif.ai/).
 
 If you wish to run the docs locally install the following dependencies:
 ```bash
-pip install sphinx sphinx-autobuild recommonmark sphinx_rtd_theme
+pip install sphinx sphinx-autobuild recommonmark sphinx_rtd_theme --upgrade
 ```
 
 Then simply run:
