@@ -43,6 +43,14 @@ class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
   /**
    * Load the model & prepare a score function for local scoring
    *
+   * Note: since we use Spark native [[org.apache.spark.ml.util.MLWriter]] interface
+   * to load stages the Spark session is being created internally. So if you would not like
+   * to have an open SparkSession please make sure to stop it after creating the score function:
+   *
+   *   val scoreFunction = new OpWorkflowRunnerLocal(workflow).score(params)
+   *   // stop the session after creating the scoreFunction if needed
+   *   SparkSession.builder().getOrCreate().stop()
+   *
    * @param params params to use during scoring
    * @return score function for local scoring
    */
