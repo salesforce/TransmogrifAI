@@ -145,11 +145,13 @@ private[op] object FeatureDistribution {
   val MaxBins = 100000
   val AvgBinValue = 5000
   val MaxTokenLowerLimit = 10
-  val getBins = (sum: Summary, bins: Int) => {
-    // To catch categoricals
-    if (sum.max < MaxTokenLowerLimit) bins
-    else math.min(math.max(bins, sum.sum / AvgBinValue), MaxBins).intValue()
-  }
+  val getBins = (sum: Summary, bins: Int) => bins
+  // Todo: find out the right formula example:
+  //  {
+  //  To catch categoricals
+  //    if (sum.max < MaxTokenLowerLimit) bins
+  //    else math.min(math.max(bins, sum.sum / AvgBinValue), MaxBins).intValue()
+  //  }
 
   implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
     override def plus(l: FeatureDistribution, r: FeatureDistribution) = l.reduce(r)
