@@ -170,7 +170,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
         val parentStageIds = feature.traverse[Set[String]](Set.empty[String])((s, f) => s + f.originStage.uid)
         val modelStages = stages.filter(s => parentStageIds.contains(s.uid))
         ModelInsights.extractFromStages(modelStages, rawFeatures, trainingParams,
-          blacklistedFeatures, blacklistedMapKeys)
+          blacklistedFeatures, blacklistedMapKeys, rawFeatureDistributions)
     }
   }
 
