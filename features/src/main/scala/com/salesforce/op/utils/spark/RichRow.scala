@@ -69,6 +69,7 @@ object RichRow {
 
     /**
      * Returns map feature by name
+     *
      * @param fieldName name of map feature
      * @return feature value as instance of Map[String, Any]
      */
@@ -88,19 +89,19 @@ object RichRow {
     /**
      * Returns the value of field named {fieldName}. If the value is null, None is returned.
      */
-    def getOption[T](fieldName: String): Option[T] = getOptionAny(fieldName) collect { case t: T @unchecked => t }
+    def getOption[T](fieldName: String): Option[T] = getOptionAny(fieldName) collect { case t: T@unchecked => t }
 
     /**
      * Returns the value at position i. If the value is null, None is returned.
      */
-    def getOption[T](i: Integer): Option[T] = getOptionAny(i) collect { case t: T @unchecked => t }
+    def getOption[T](i: Integer): Option[T] = getOptionAny(i) collect { case t: T@unchecked => t }
 
     /**
      * Returns the value of a given feature casted into the feature type
      *
      * @throws UnsupportedOperationException when schema is not defined.
-     * @throws IllegalArgumentException when fieldName do not exist.
-     * @throws ClassCastException when data type does not match.
+     * @throws IllegalArgumentException      when fieldName do not exist.
+     * @throws ClassCastException            when data type does not match.
      */
     def getFeatureType[T <: FeatureType](f: FeatureLike[T])(implicit conv: FeatureTypeSparkConverter[T]): T =
       conv.fromSpark(getAny(f.name))
@@ -110,11 +111,30 @@ object RichRow {
      * weak type tag of features
      *
      * @throws UnsupportedOperationException when schema is not defined.
-     * @throws IllegalArgumentException when fieldName do not exist.
-     * @throws ClassCastException when data type does not match.
+     * @throws IllegalArgumentException      when fieldName do not exist.
+     * @throws ClassCastException            when data type does not match.
      */
     def getFeatureType[T <: FeatureType](f: TransientFeature)(implicit conv: FeatureTypeSparkConverter[T]): T =
       conv.fromSpark(getAny(f.name))
+
+    /**
+     * Converts row to a [[collection.immutable.Map]]
+     *
+     * @return a [[collection.immutable.Map]] with all row contents
+     */
+    def toMutableMap: collection.mutable.Map[String, Any] = {
+      val res = collection.mutable.Map.empty[String, Any]
+      val fields = row.schema.fields
+      for {i <- fields.indices} res.put(fields(i).name, row(i))
+      res
+    }
+
+    /**
+     * Converts row to a [[collection.mutable.Map]]
+     *
+     * @return a [[collection.mutable.Map]] with all row contents
+     */
+    def toMap: Map[String, Any] = toMutableMap.toMap
 
   }
 
