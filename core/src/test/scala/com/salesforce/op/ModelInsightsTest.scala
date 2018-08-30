@@ -477,20 +477,23 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer3.variance shouldBe Some(3.3)
   }
 
-  it should "include raw feature distribution information calculated in RawFeatureFilter when it's included" in {
+  it should "include raw feature distribution information when RawFeatureFilter is used" in {
     val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
-    // Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-    // explicitly blacklisted features (eg. weight is explicitly blacklisted here, which means that height will
-    // not be added as a raw feature even though it's not explicitly blacklisted itself.
+    /*
+    Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+    explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+    weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+    it's not explicitly blacklisted itself.
+     */
     val insights = modelWithRFF.modelInsights(predWithMaps)
     insights.features.foreach(f =>
       f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
     )
   }
 
-  it should "not include raw feature distribution information if RawFeatureFilter is not used" in {
+  it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
     val insights = workflowModel.modelInsights(pred)
     insights.features.foreach(f => f.distributions shouldBe empty)
   }
