@@ -115,7 +115,9 @@ trait OpWorkflowModelLocal {
             val inJson = rowToJson(row, inputs)
             val engineIn = engine.jsonInput(inJson)
             val engineOut = engine.action(engineIn)
-            val resMap = parse(engineOut.toString).extract[Map[String, Any]]
+            val resMap =
+              parse(engineOut.toString, useBigDecimalForDouble = false, useBigIntForLong = true)
+                .extract[Map[String, Any]]
             row += out -> resMap(outCol)
         }
         transformedRow.filterKeys(resultFeatures.contains).toMap
