@@ -87,7 +87,7 @@ workflows:
       - clone_repo_and_resolve_dependencies
       - build_core:
           requires:
-            - checkout_code_and_dependencies
+            - clone_repo_and_resolve_dependencies
       - build_non_core:
           requires:
-            - checkout_code_and_dependencies
+            - clone_repo_and_resolve_dependencies
