@@ -62,8 +62,8 @@ configure(allProjs) {
         avroVersion = '1.7.7'
         sparkVersion = '2.2.1'
         sparkAvroVersion = '4.0.0'
-        scalaGraphVersion = '1.11.2'
-        scalafmtVersion = '1.0.0-RC1'
+        scalaGraphVersion = '1.12.5'
+        scalafmtVersion = '1.5.1'
         hadoopVersion = 'hadoop2'
         scalajCollVersion = '0.1.2'
         json4sVersion = '3.2.11' // matches Spark dependency version
