@@ -369,7 +369,6 @@ configure(subProjs) {
         }
     }
 }
-
 task allScaladoc(type: ScalaDoc) {
     group 'Documentation'
     description 'Generates Scaladoc for the main source code of all subprojects.'
