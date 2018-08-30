@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
+import com.salesforce.op.test.TestOpVectorColumnType.{DescColWithGroup, IndColWithGroup}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichStructType._
@@ -66,29 +66,27 @@ class GeolocationMapVectorizerTest
 
   val expectedMeta = TestOpVectorMetadataBuilder(
     estimator,
-    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
-      IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
-      IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C")),
-    m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
-      IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
-      IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"))
+    m1 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "A")) ++
+      Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) ++
+      Geolocation.Names.map(n => DescColWithGroup(Option(n), "C"))).toList,
+    m2 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "X")) ++
+      Geolocation.Names.map(n => DescColWithGroup(Option(n), "Y")) ++
+      Geolocation.Names.map(n => DescColWithGroup(Option(n), "Z"))).toList
   )
   val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
 
   val expectedMetaTrackNulls = TestOpVectorMetadataBuilder(
     estimator,
-    m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
-      IndColWithGroup(nullIndicatorValue, "A"),
-      IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
-      IndColWithGroup(nullIndicatorValue, "B"),
-      IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C"),
-      IndColWithGroup(nullIndicatorValue, "C")),
-    m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
-      IndColWithGroup(nullIndicatorValue, "X"),
-      IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
-      IndColWithGroup(nullIndicatorValue, "Y"),
-      IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"),
-      IndColWithGroup(nullIndicatorValue, "Z"))
+    m1 -> (
+      (Geolocation.Names.map(n => DescColWithGroup(Option(n), "A")) :+ IndColWithGroup(nullIndicatorValue, "A")) ++
+        (Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) :+ IndColWithGroup(nullIndicatorValue, "B")) ++
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "C")) :+ IndColWithGroup(nullIndicatorValue, "C")
+      ).toList,
+    m2 -> (
+      (Geolocation.Names.map(n => DescColWithGroup(Option(n), "X")) :+ IndColWithGroup(nullIndicatorValue, "X")) ++
+        (Geolocation.Names.map(n => DescColWithGroup(Option(n), "Y")) :+ IndColWithGroup(nullIndicatorValue, "Y")) ++
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "Z")) :+ IndColWithGroup(nullIndicatorValue, "Z")
+      ).toList
   )
 
   it should "return a model that correctly transforms the data" in {
@@ -168,9 +166,10 @@ class GeolocationMapVectorizerTest
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
-        IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"))
+      m1 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "A")) ++
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "B"))
+        ).toList,
+      m2 -> Geolocation.Names.map(n => DescColWithGroup(Option(n), "Z")).toList
     )
 
     transformed.collect(vector) shouldBe expected
@@ -191,12 +190,13 @@ class GeolocationMapVectorizerTest
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "A"), IndColWithGroup(None, "A"),
-        IndColWithGroup(nullIndicatorValue, "A"),
-        IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
-        IndColWithGroup(nullIndicatorValue, "B")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"), IndColWithGroup(None, "Z"),
-        IndColWithGroup(nullIndicatorValue, "Z"))
+      m1 -> (
+        (Geolocation.Names.map(n => DescColWithGroup(Option(n), "A")) :+ IndColWithGroup(nullIndicatorValue, "A")) ++
+          Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) :+ IndColWithGroup(nullIndicatorValue, "B")
+        ).toList,
+      m2 -> (
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "Z")) :+ IndColWithGroup(nullIndicatorValue, "Z")
+        ).toList
     )
 
     transformed.collect(vector) shouldBe expected
@@ -217,10 +217,10 @@ class GeolocationMapVectorizerTest
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
-        IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
-        IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"))
+      m1 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) ++
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "C"))).toList,
+      m2 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "X")) ++
+        Geolocation.Names.map(n => DescColWithGroup(Option(n), "Y"))).toList
     )
 
     transformed.collect(vector) shouldBe expected
@@ -241,14 +241,14 @@ class GeolocationMapVectorizerTest
     ).map(_.toOPVector)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
-      m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "B"), IndColWithGroup(None, "B"),
-        IndColWithGroup(nullIndicatorValue, "B"),
-        IndColWithGroup(None, "C"), IndColWithGroup(None, "C"), IndColWithGroup(None, "C"),
-        IndColWithGroup(nullIndicatorValue, "C")),
-      m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "X"), IndColWithGroup(None, "X"),
-        IndColWithGroup(nullIndicatorValue, "X"),
-        IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Y"),
-        IndColWithGroup(nullIndicatorValue, "Y"))
+      m1 -> (
+        (Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) :+ IndColWithGroup(nullIndicatorValue, "B")) ++
+          Geolocation.Names.map(n => DescColWithGroup(Option(n), "C")) :+ IndColWithGroup(nullIndicatorValue, "C")
+        ).toList,
+      m2 -> (
+        (Geolocation.Names.map(n => DescColWithGroup(Option(n), "X")) :+ IndColWithGroup(nullIndicatorValue, "X")) ++
+          Geolocation.Names.map(n => DescColWithGroup(Option(n), "Y")) :+ IndColWithGroup(nullIndicatorValue, "Y")
+        ).toList
     )
 
     transformed.collect(vector) shouldBe expected
