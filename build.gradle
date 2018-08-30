@@ -258,6 +258,12 @@ configure(allProjs) {
             println sourceSets.main.runtimeClasspath.asPath
         }
     }
+
+    task resolveAllDependencies {
+        doLast {
+            configurations.all { if(it.canBeResolved) it.resolve() }
+        }
+    }
 }
 
 wrapper {

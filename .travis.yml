@@ -9,8 +9,14 @@ env:
     - GRADLE_OPTS="-Xmx256m"
 install:
   - true
-script: 
-  - ./gradlew --no-daemon reportScoverage
+matrix:
+  include:
+    - name: "Build core project"
+      env: BUILD_PARAMETERS='core:reportScoverage'
+    - name: "Build non core projects"
+      env: BUILD_PARAMETERS='reportScoverage -x core:reportScoverage'
+script:
+  - ./gradlew --no-daemon $BUILD_PARAMETERS
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:
