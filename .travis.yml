@@ -11,9 +11,9 @@ install:
   - true
 matrix:
   include:
-    - name: "Core Module Build"
+    - name: "Build core project"
       env: BUILD_PARAMETERS='core:reportScoverage'
-    - name: "Non-Core Modules Build"
+    - name: "Build non core projects"
       env: BUILD_PARAMETERS='reportScoverage -x core:reportScoverage'
 script:
   - ./gradlew --no-daemon $BUILD_PARAMETERS

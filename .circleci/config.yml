@@ -7,7 +7,7 @@ jobs:
     steps:
       - checkout
       - run:
-          name: Download project code and dependency jars
+          name: Clone repo & resolve dependencies
           command: ./gradlew resolveAllDependencies
       - save_cache:
           key: repo-{{ .Environment.CIRCLE_SHA1 }}
@@ -30,7 +30,7 @@ jobs:
           name: Java version
           command: java -version
       - run:
-          name: Test core module
+          name: Build core project
           command: ./gradlew core:reportScoverage
       - run:
           name: Collect test results
@@ -62,7 +62,7 @@ jobs:
           name: Java version
           command: java -version
       - run:
-          name: Test non core modules
+          name: Build non core projects
           command: ./gradlew reportScoverage -x core:reportScoverage
       - run:
           name: Collect test results
