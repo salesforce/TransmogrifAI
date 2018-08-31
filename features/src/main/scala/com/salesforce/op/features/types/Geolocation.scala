@@ -120,6 +120,7 @@ object Geolocation {
   }
   val EquatorInMiles = 24901.0
   val EarthRadius = 3959.0
+  val Names = Seq("latitude", "longitude", "accuracy")
 }
 
 /**

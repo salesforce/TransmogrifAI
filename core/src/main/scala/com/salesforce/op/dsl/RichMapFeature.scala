@@ -668,15 +668,47 @@ trait RichMapFeature {
   implicit class RichDateMapFeature(val f: FeatureLike[DateMap]) {
 
     /**
+     * transforms a DateMap field into a series of cartesian coordinate representation
+     * of an extracted time period on the unit circle
+     *
+     * @param timePeriod The time period to extract from the timestamp
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     * @param others     Other features of same type
+     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     */
+    def toUnitCircle
+    (
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty,
+      others: Array[FeatureLike[DateMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateMapToUnitCircleVectorizer[DateMap]()
+        .setInput(f +: others)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys)
+        .setTimePeriod(timePeriod)
+        .getOutput()
+    }
+
+
+    /**
      * Apply DateMapVectorizer on any OPMap that has long values
      *
-     * @param others        other features of the same type
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
      * @param referenceDate reference date to subtract off before converting to vector
+     * @param circularDateReps list of all the circular date representations that should be included
+     *                                    feature vector
+     * @return result feature of type Vector
+     * @param others        other features of the same type
      * @return an OPVector feature
      */
     def vectorize(
@@ -684,11 +716,17 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
-      others: Array[FeatureLike[DateMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      others: Array[FeatureLike[DateMap]] = Array.empty
     ): FeatureLike[OPVector] = {
-      new DateMapVectorizer()
+
+      val timePeriods = circularDateReps.map {
+        tp => f.toUnitCircle(tp, cleanKeys, whiteListKeys, blackListKeys, others)
+      }
+
+      val time = new DateMapVectorizer()
         .setInput(f +: others)
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
@@ -697,6 +735,8 @@ trait RichMapFeature {
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
+
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
   }
 
@@ -706,16 +746,48 @@ trait RichMapFeature {
    * @param f FeatureLike
    */
   implicit class RichDateTimeMapFeature(val f: FeatureLike[DateTimeMap]) {
+
+
+    /**
+     * transforms a DateTimeMap field into a series of cartesian coordinate representation
+     * of an extracted time period on the unit circle
+     *
+     * @param timePeriod The time period to extract from the timestamp
+     * @param cleanKeys     clean text before pivoting
+     * @param whiteListKeys keys to whitelist
+     * @param blackListKeys keys to blacklist
+     * @param others     Other features of same type
+     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     */
+    def toUnitCircle
+    (
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
+      whiteListKeys: Array[String] = Array.empty,
+      blackListKeys: Array[String] = Array.empty,
+      others: Array[FeatureLike[DateTimeMap]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateMapToUnitCircleVectorizer[DateTimeMap]()
+        .setInput(f +: others)
+        .setCleanKeys(cleanKeys)
+        .setWhiteListKeys(whiteListKeys)
+        .setBlackListKeys(blackListKeys)
+        .setTimePeriod(timePeriod)
+        .getOutput()
+    }
+
     /**
      * Apply DateMapVectorizer on any OPMap that has long values
      *
-     * @param others        other features of the same type
      * @param defaultValue  value to give missing keys on pivot
      * @param cleanKeys     clean text before pivoting
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
      * @param referenceDate reference date to subtract off before converting to vector
+     * @param circularDateReps list of all the circular date representations that should be included
+     *                                    feature vector
+     * @param others        other features of the same type
      * @return an OPVector feature
      */
     def vectorize(
@@ -723,11 +795,17 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
-      others: Array[FeatureLike[DateTimeMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate
+      referenceDate: org.joda.time.DateTime = TransmogrifierDefaults.ReferenceDate,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
+      others: Array[FeatureLike[DateTimeMap]] = Array.empty
     ): FeatureLike[OPVector] = {
-      new DateMapVectorizer()
+
+      val timePeriods = circularDateReps.map {
+        tp => f.toUnitCircle(tp, cleanKeys, whiteListKeys, blackListKeys, others)
+      }
+
+      val time = new DateMapVectorizer()
         .setInput(f +: others)
         .setDefaultValue(defaultValue)
         .setCleanKeys(cleanKeys)
@@ -736,6 +814,8 @@ trait RichMapFeature {
         .setTrackNulls(trackNulls)
         .setReferenceDate(referenceDate)
         .getOutput()
+
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
   }
 
@@ -978,7 +1058,7 @@ trait RichMapFeature {
       def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
         (f.map[RealNN](_.prediction.toRealNN),
           f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
-            f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
+          f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
         )
       }
 

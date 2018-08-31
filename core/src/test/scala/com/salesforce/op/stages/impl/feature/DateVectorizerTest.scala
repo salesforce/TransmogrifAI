@@ -58,6 +58,7 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
       dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = false,
+      circularDateReps = Seq(),
       others = Array(f2, f3)
     )
     val transformed = new OpWorkflow().setResultFeatures(vector).transform(ds)
@@ -73,6 +74,7 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
       dateListPivot = TransmogrifierDefaults.DateListDefault,
       referenceDate = moment,
       trackNulls = true,
+      circularDateReps = Seq(),
       others = Array(f2, f3)
     )
     val transformed2 = new OpWorkflow().setResultFeatures(vector2).transform(ds)
@@ -81,6 +83,17 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     val meta2 = OpVectorMetadata(vector2.name, transformed2.schema(vector2.name).metadata)
     meta2.columns.length shouldBe 6
     meta2.history.keys.size shouldBe 3
+
+    val vector3 = f1.vectorize(
+      dateListPivot = TransmogrifierDefaults.DateListDefault,
+      others = Array(f2, f3)
+    )
+    val transformed3 = new OpWorkflow().setResultFeatures(vector3).transform(ds)
+    transformed3.collect(vector3).head.v.size shouldBe 30
+
+    val meta3 = OpVectorMetadata(vector3.name, transformed3.schema(vector3.name).metadata)
+    meta3.columns.length shouldBe 30
+    meta3.history.keys.size shouldBe 6
   }
 
   private def buildTestData(moment: DateTime) = {

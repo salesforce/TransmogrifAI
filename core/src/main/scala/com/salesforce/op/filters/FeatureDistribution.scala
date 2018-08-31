@@ -47,7 +47,7 @@ import org.apache.spark.mllib.feature.HashingTF
  * @param nulls number of empties seen in feature
  * @param distribution binned counts of feature values (hashed for strings, evently spaced bins for numerics)
  * @param summaryInfo either min and max number of tokens for text data,
- *                    or number of splits used for bins for numeric data
+ *                    or splits used for bins for numeric data
  */
 case class FeatureDistribution
 (

@@ -27,103 +27,107 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{DateMap, OPVector}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.DoubleArrayParam
-import org.apache.spark.sql.{Dataset, Encoders}
+import org.apache.spark.sql.Dataset
 
+import scala.reflect.runtime.universe.TypeTag
 
-class GeolocationMapVectorizer
+/**
+ * Following: http://webspace.ship.edu/pgmarr/geo441/lectures/lec%2016%20-%20directional%20statistics.pdf
+ * Transforms a Date or DateTime field into a cartesian coordinate representation
+ * of an extracted time period on the unit circle
+ *
+ * parameter timePeriod The time period to extract from the timestamp
+ * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, MonthOfYear, WeekOfMonth, WeekOfYear
+ *
+ * We extract the timePeriod from the timestamp and
+ * map this onto the unit circle containing the number of time periods equally spaced.
+ * For example, when timePeriod = HourOfDay, the timestamp 01/01/2018 6:37 maps to the point on the circle with
+ * angle radians = 2*math.Pi*6/24
+ * We return the cartesian coordinates of this point: (math.cos(radians), math.sin(radians))
+ *
+ * The first time period always has angle 0.
+ *
+ * Note: We use the ISO week date format https://en.wikipedia.org/wiki/ISO_week_date#First_week
+ * Monday is the first day of the week
+ * & the first week of the year is the week wit the first Monday after Jan 1.
+ */
+class DateMapToUnitCircleVectorizer[T <: DateMap]
 (
-  operationName: String = "vecGeoMap",
-  uid: String = UID[GeolocationMapVectorizer]
-) extends SequenceEstimator[GeolocationMap, OPVector](operationName = operationName, uid = uid)
-  with MapVectorizerFuns[Seq[Double], GeolocationMap] with TrackNullsParam {
-  private implicit val seqArrayEncoder = Encoders.kryo[Seq[Array[Double]]]
-
-  final val defaultValue = new DoubleArrayParam(
-    parent = this, name = "defaultValue", doc = "value to give missing keys when pivoting"
-  )
-  setDefault(defaultValue, TransmogrifierDefaults.DefaultGeolocation.toArray)
-
-  def setDefaultValue(value: Geolocation): this.type = set(defaultValue, value.toArray)
+  uid: String = UID[DateMapToUnitCircleVectorizer[_]]
+)(implicit tti: TypeTag[T], override val ttiv: TypeTag[T#Value]) extends SequenceEstimator[T, OPVector](
+  operationName = "dateMapToUnitCircle",
+  uid = uid
+) with DateToUnitCircleParams with MapVectorizerFuns[Long, T]  {
 
   override def makeVectorMetadata(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
     val meta = vectorMetadataFromInputFeatures
+    val timePeriod = getTimePeriod
 
     val cols = for {
       (keys, col) <- allKeys.zip(meta.columns)
       key <- keys
-      nm <- Geolocation.Names
+      dec <- DateToUnitCircle.metadataValues(timePeriod)
     } yield new OpVectorColumnMetadata(
       parentFeatureName = col.parentFeatureName,
       parentFeatureType = col.parentFeatureType,
       grouping = Option(key),
-      descriptorValue = Option(nm)
+      descriptorValue = Option(dec)
     )
+
     meta.withColumns(cols.toArray)
   }
 
-  override def makeVectorMetaWithNullIndicators(allKeys: Seq[Seq[String]]): OpVectorMetadata = {
-    val vectorMeta = makeVectorMetadata(allKeys)
-    val updatedCols = vectorMeta.columns.grouped(3).flatMap { col => {
-      val head = col.head
-      col :+ OpVectorColumnMetadata(
-        parentFeatureName = head.parentFeatureName,
-        parentFeatureType = head.parentFeatureType,
-        grouping = head.grouping,
-        indicatorValue = Some(TransmogrifierDefaults.NullString)
-      )
-    }
-    }.toArray
-    vectorMeta.withColumns(updatedCols)
-  }
-
-  def fitFn(dataset: Dataset[Seq[GeolocationMap#Value]]): SequenceModel[GeolocationMap, OPVector] = {
+  override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldClean = $(cleanKeys)
-    val defValue = $(defaultValue).toSeq
     val allKeys = getKeyValues(dataset, shouldClean, shouldCleanValues = false)
-    val trackNullsValue = $(trackNulls)
 
-    val meta = if (trackNullsValue) makeVectorMetaWithNullIndicators(allKeys) else makeVectorMetadata(allKeys)
+    val meta = makeVectorMetadata(allKeys)
     setMetadata(meta.toMetadata)
-
-    new GeolocationMapVectorizerModel(
-      allKeys = allKeys, defaultValue = defValue, shouldClean = shouldClean, trackNulls = trackNullsValue,
-      operationName = operationName, uid = uid
+    new DateMapToUnitCircleVectorizerModel[T](allKeys = allKeys, shouldClean = shouldClean,
+      timePeriod = getTimePeriod, operationName = operationName, uid = uid
     )
   }
 
 }
 
-final class GeolocationMapVectorizerModel private[op]
+/**
+ * Model for DateMapToUnitCircleVectorizer
+ * @param allKeys map keys in order to flatten data consistenly
+ * @param shouldClean map keys are have text cleaned
+ * @param timePeriod time period for circular representations
+ * @param operationName unique name of the operation this stage performs
+ * @param uid           uid for instance
+ * @param tti           type tag for input
+ * @tparam T            DateMap type
+ */
+final class DateMapToUnitCircleVectorizerModel[T <: DateMap] private[op]
 (
   val allKeys: Seq[Seq[String]],
-  val defaultValue: Seq[Double],
   val shouldClean: Boolean,
-  val trackNulls: Boolean,
+  val timePeriod: TimePeriod,
   operationName: String,
   uid: String
-) extends SequenceModel[GeolocationMap, OPVector](operationName = operationName, uid = uid)
+)(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
   with CleanTextMapFun {
 
-  def transformFn: Seq[GeolocationMap] => OPVector = row => {
+  override def transformFn: Seq[T] => OPVector = row => {
     val eachPivoted: Array[Array[Double]] =
       row.map(_.value).zip(allKeys).flatMap { case (map, keys) =>
         val cleanedMap = cleanMap(map, shouldClean, shouldCleanValue = false)
         keys.map(k => {
           val vOpt = cleanedMap.get(k)
-          val isEmpty = vOpt.isEmpty
-          val v = vOpt.getOrElse(defaultValue).toArray
-          if (trackNulls) v :+ (if (isEmpty) 1.0 else 0.0) else v
+          DateToUnitCircle.convertToRandians(vOpt, timePeriod)
         })
       }.toArray
     Vectors.dense(eachPivoted.flatten).compressed.toOPVector
   }
 }
+

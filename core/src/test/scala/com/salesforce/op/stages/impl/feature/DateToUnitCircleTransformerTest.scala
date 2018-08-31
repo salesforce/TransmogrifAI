@@ -99,8 +99,8 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val transformed = vectorizer.transform(ds)
     val meta = OpVectorMetadata(transformed.schema(vectorizer.getOutput().name))
     meta.columns.length should equal (2)
-    meta.columns(0).indicatorValue.get should equal("x_HourOfDay")
-    meta.columns(1).indicatorValue.get should equal("y_HourOfDay")
+    meta.columns(0).descriptorValue shouldBe Some("x_HourOfDay")
+    meta.columns(1).descriptorValue shouldBe Some("y_HourOfDay")
   }
 
   it should "transform the data correctly when there are null dates" in {
