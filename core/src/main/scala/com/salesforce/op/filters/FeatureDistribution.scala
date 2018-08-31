@@ -30,7 +30,7 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm}
 import com.salesforce.op.features.FeatureDistributionLike
 import com.salesforce.op.stages.impl.feature.{Inclusion, NumericBucketizer}
 import com.twitter.algebird.Semigroup
