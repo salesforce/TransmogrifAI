@@ -158,6 +158,42 @@ final class OpParams
     )
   }
 
+  // scalastyle:off parameter.number
+  def copy(
+    stageParams: Map[String, Map[String, Any]] = this.stageParams,
+    readerParams: Map[String, ReaderParams] = this.readerParams,
+    modelLocation: Option[String] = this.modelLocation,
+    writeLocation: Option[String] = this.writeLocation,
+    metricsLocation: Option[String] = this.metricsLocation,
+    metricsCompress: Option[Boolean] = this.metricsCompress,
+    metricsCodec: Option[String] = this.metricsCodec,
+    batchDurationSecs: Option[Int] = this.batchDurationSecs,
+    awaitTerminationTimeoutSecs: Option[Int] = this.awaitTerminationTimeoutSecs,
+    customTagName: Option[String] = this.customTagName,
+    customTagValue: Option[String] = this.customTagValue,
+    logStageMetrics: Option[Boolean] = this.logStageMetrics,
+    collectStageMetrics: Option[Boolean] = this.collectStageMetrics,
+    customParams: Map[String, Any] = this.customParams,
+    alternateReaderParams: Map[String, ReaderParams] = this.alternateReaderParams
+  ): OpParams = new OpParams(
+    stageParams = stageParams,
+    readerParams = readerParams,
+    modelLocation = modelLocation,
+    writeLocation = writeLocation,
+    metricsLocation = metricsLocation,
+    metricsCompress = metricsCompress,
+    metricsCodec = metricsCodec,
+    batchDurationSecs = batchDurationSecs,
+    awaitTerminationTimeoutSecs = awaitTerminationTimeoutSecs,
+    customTagName = customTagName,
+    customTagValue = customTagValue,
+    logStageMetrics = logStageMetrics,
+    collectStageMetrics = collectStageMetrics,
+    customParams = customParams,
+    alternateReaderParams = alternateReaderParams
+  )
+  // scalastyle:on
+
   /**
    * Switch the reader params with the alternate reader params and return a new params instance
    * this is necessary because the readers will always try to use readerParams so if you want to

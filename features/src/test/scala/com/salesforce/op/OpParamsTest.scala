@@ -59,6 +59,19 @@ class OpParamsTest extends FlatSpec with TestCommon {
     assertParams(workflowParams.get)
   }
 
+  it should "correctly copy parameters" in {
+    val workflowParams = expectedParamsSimple.copy(
+      customTagName = None,
+      metricsLocation = Some("xyz"),
+      metricsCompress = Some(true),
+      customParams = expectedParamsSimple.customParams + ("abc" -> Seq(1, 2, 3))
+    )
+    workflowParams.customTagName shouldBe None
+    workflowParams.metricsLocation shouldBe Some("xyz")
+    workflowParams.metricsCompress shouldBe Some(true)
+    workflowParams.customParams shouldBe Map("custom1" -> 1, "custom2" -> "2", "abc" -> Seq(1, 2, 3))
+  }
+
   it should "correctly swap reader params" in {
     val switched = expectedParamsSimple.switchReaderParams()
     readerParamsCompare(expectedParamsSimple.readerParams, switched.alternateReaderParams)
