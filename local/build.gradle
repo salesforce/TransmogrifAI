@@ -1,0 +1,17 @@
+repositories {
+    // TODO: remove once Aardpfark release is official
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    compile project(':core')
+    testCompile project(':testkit')
+
+    // PFA serialization for Spark models
+    // TODO: replace with official Aardpfark release when ready
+    compile "com.github.relateiq:aardpfark:$aardpfarkVersion"
+
+    // Hadrian PFA runtime for JVM
+    compileOnly "com.opendatagroup:hadrian:$hadrianVersion"
+    testRuntime "com.opendatagroup:hadrian:$hadrianVersion"
+}
