@@ -46,7 +46,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       (false, Right(Seq(1.0))), (true, Right(Seq.empty[Double])), (false, Left(Seq("male", "female"))),
       (true, Left(Seq.empty[String])), (false, Right(Seq(1.0, 3.0, 5.0)))
     )
-    val summary =
+    val summaries =
       Array(Summary(0.0, 1.0, 6.0, 10), Summary(-1.6, 10.6, 3.0, 10),
         Summary(0.0, 3.0, 7.0, 10), Summary(0.0, 0.0, 5.0, 10), Summary(1.0, 5.0, 10.0, 10))
     val bins = 10
@@ -55,8 +55,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
       if (isEmpty) None else Option(processed)
     }
-    val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution(key, summ, seq, bins)
+    val distribs = featureKeys.zip(summaries).zip(processedSeqs).map { case ((key, summary), seq) =>
+      FeatureDistribution(key, summary, seq, bins, (_, bins) => bins)
     }
     distribs.foreach{ d =>
       d.key shouldBe None
@@ -85,7 +85,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       if (isEmpty) None else Option(processed)
     }
     val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution(key, summ, seq, bins)
+      FeatureDistribution(key, summ, seq, bins, (_, bins) => bins)
     }
 
     distribs(0).distribution.length shouldBe 100
@@ -99,15 +99,15 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Map("A" -> Left(Seq("male", "female"))),
       Map("A" -> Right(Seq(1.0)), "B" -> Right(Seq(1.0))),
       Map("B" -> Right(Seq(0.0))))
-    val summary = Array(
+    val summaries = Array(
       Map("A" -> Summary(0.0, 2.0, 100.0, 10), "B" -> Summary(0.0, 5.0, 10.0, 10)),
       Map("A" -> Summary(-1.6, 10.6, 30.0, 10), "B" -> Summary(0.0, 3.0, 11.0, 10)),
       Map("B" -> Summary(0.0, 0.0, 0.0, 10)))
     val bins = 10
-    val distribs = features.map(_.name).zip(summary).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
+    val distribs = features.map(_.name).zip(summaries).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
-        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins)
+        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins, (_, bins) => bins)
       }
     }
 

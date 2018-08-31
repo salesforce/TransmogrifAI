@@ -35,29 +35,14 @@ import com.twitter.algebird.Monoid
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
  *
- * @param min minimum value seen for double, minimum number of tokens in one text for text
- * @param max maximum value seen for double, maximum number of tokens in one text for text
- * @param sum sum of values for double, total number of tokens for text
+ * @param min   minimum value seen for double, minimum number of tokens in one text for text
+ * @param max   maximum value seen for double, maximum number of tokens in one text for text
+ * @param sum   sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
  */
-private[op] case class Summary(min: Double, max: Double, sum: Double, count: Double) {
-  /**
-   * to calculate the hashing size for RFF (compare js distance) for Text
-   * @param bins default bins of RFF
-   * @return
-   */
-  def getBinsText(bins: Int): Int = bins
-  // Todo: find out the right formula example:
-  //  val AvgBinValue = 5000
-  //  val MaxTokenLowerLimit = 10
-  //  {
-  //  To catch categoricals
-  //    if (max < MaxTokenLowerLimit) bins
-  //    else math.min(math.max(bins, sum / AvgBinValue), MaxBins).intValue()
-  //  }
-}
+case class Summary(min: Double, max: Double, sum: Double, count: Double)
 
-private[op] case object Summary {
+case object Summary {
 
   val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0)
 

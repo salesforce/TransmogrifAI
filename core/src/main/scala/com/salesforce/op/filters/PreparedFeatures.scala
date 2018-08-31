@@ -35,7 +35,6 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
-import org.apache.spark.mllib.feature.HashingTF
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.sql.Row
 
@@ -82,18 +81,19 @@ private[filters] case class PreparedFeatures(
    * @param responseSummaries global feature metadata
    * @param predictorSummaries set of feature summary statistics (derived from metadata)
    * @param bins number of bins to put numerics into
-   * @param hasher hash function to use on strings
+   * @param textBinsFormula formula to compute the text features bin size
    * @return a pair consisting of response and predictor feature distributions (in this order)
    */
   def getFeatureDistributions(
     responseSummaries: Array[(FeatureKey, Summary)],
     predictorSummaries: Array[(FeatureKey, Summary)],
-    bins: Int
+    bins: Int,
+    textBinsFormula: (Summary, Int) => Int
   ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
     val responseFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(responses, responseSummaries, bins)
+      getFeatureDistributions(responses, responseSummaries, bins, textBinsFormula)
     val predictorFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(predictors, predictorSummaries, bins)
+      getFeatureDistributions(predictors, predictorSummaries, bins, textBinsFormula)
 
     responseFeatureDistributions -> predictorFeatureDistributions
   }
@@ -101,13 +101,16 @@ private[filters] case class PreparedFeatures(
   private def getFeatureDistributions(
     features: Map[FeatureKey, ProcessedSeq],
     summaries: Array[(FeatureKey, Summary)],
-    bins: Int
+    bins: Int,
+    textBinsFormula: (Summary, Int) => Int
   ): Array[FeatureDistribution] = summaries.map { case (featureKey, summary) =>
     FeatureDistribution(
       featureKey = featureKey,
       summary = summary,
       value = features.get(featureKey),
-      bins = bins)
+      bins = bins,
+      textBinsFormula = textBinsFormula
+    )
   }
 }
 
@@ -123,7 +126,7 @@ private[filters] object PreparedFeatures {
    * @return set of prepared features
    */
   def apply(row: Row, responses: Array[TransientFeature], predictors: Array[TransientFeature]): PreparedFeatures = {
-    val empty: Map[FeatureKey, ProcessedSeq] = Map()
+    val empty: Map[FeatureKey, ProcessedSeq] = Map.empty
     val preparedResponses = responses.foldLeft(empty) { case (map, feature) =>
       val converter = FeatureTypeSparkConverter.fromFeatureTypeName(feature.typeName)
       map ++ prepareFeature(feature.name, row.getFeatureType(feature)(converter))
@@ -147,13 +150,11 @@ private[filters] object PreparedFeatures {
   private def prepareFeature[T <: FeatureType](name: String, value: T): Map[FeatureKey, ProcessedSeq] =
     value match {
       case v: Text => v.value
-        .map(s => Map[FeatureKey, ProcessedSeq]((name, None) -> Left(tokenize(s))))
-        .getOrElse(Map())
+        .map(s => Map[FeatureKey, ProcessedSeq]((name, None) -> Left(tokenize(s)))).getOrElse(Map.empty)
       case v: OPNumeric[_] => v.toDouble
-        .map(d => Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(d))))
-        .getOrElse(Map())
-      case ft@SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
-      case ft@SomeValue(v: SparseVector) => Map((name, None) -> Right(v.indices.map(_.toDouble).toSeq))
+        .map(d => Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(d)))).getOrElse(Map.empty)
+      case SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
+      case SomeValue(v: SparseVector) => Map((name, None) -> Right(v.indices.map(_.toDouble).toSeq))
       case ft@SomeValue(_) => ft match {
         case v: Geolocation => Map((name, None) -> Right(v.value))
         case v: TextList => Map((name, None) -> Left(v.value))
@@ -170,7 +171,7 @@ private[filters] object PreparedFeatures {
         }}
         case _ => throw new RuntimeException(s"Feature type $value is not supported in RawFeatureFilter")
       }
-      case _ => Map()
+      case _ => Map.empty
     }
 
   /**

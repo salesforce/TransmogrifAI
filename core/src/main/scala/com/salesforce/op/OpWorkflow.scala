@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter}
+import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.preparators.CorrelationType
@@ -488,19 +488,21 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Add a raw features filter to the workflow to look at fill rates and distributions of raw features and exclude
    * features that do not meet specifications from modeling DAG
    *
-   * @param trainingReader training reader to use in filter if not suplied will fall back to reader specified for
-   *                       workflow (note that this reader will take precidence over readers directly input to the
-   *                       workflow if both are supplied)
-   * @param scoringReader scoring reader to use in filter if not supplied will do the checks possible with only
-   *                      training data avaialable
-   * @param bins number of bins to use in estimating feature distributions
-   * @param minFillRate minimum non-null fraction of instances that a feature should contain
+   * @param trainingReader    training reader to use in filter if not supplied will fall back to reader specified for
+   *                          workflow (note that this reader will take precedence over readers directly input to the
+   *                          workflow if both are supplied)
+   * @param scoringReader     scoring reader to use in filter if not supplied will do the checks possible with only
+   *                          training data available
+   * @param bins              number of bins to use in estimating feature distributions
+   * @param minFillRate       minimum non-null fraction of instances that a feature should contain
    * @param maxFillDifference maximum absolute difference in fill rate between scoring and training data for a feature
-   * @param maxFillRatioDiff maximum difference in fill ratio (symetric) between scoring and training data for a feature
-   * @param maxJSDivergence maximum Jensen-Shannon divergence between the training and scoring distributions
-   *                        for a feature
+   * @param maxFillRatioDiff  maximum difference in fill ratio (symmetric) between scoring and training data for
+   *                          a feature
+   * @param maxJSDivergence   maximum Jensen-Shannon divergence between the training and scoring distributions
+   *                          for a feature
    * @param protectedFeatures list of features that should never be removed (features that are used to create them will
    *                          also be protected)
+   * @param textBinsFormula   formula to compute the text features bin size
    * @tparam T Type of the data read in
    */
   @Experimental
@@ -514,7 +516,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     maxJSDivergence: Double = 0.90,
     maxCorrelation: Double = 0.95,
     correlationType: CorrelationType = CorrelationType.Pearson,
-    protectedFeatures: Array[OPFeature] = Array.empty
+    protectedFeatures: Array[OPFeature] = Array.empty,
+    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
@@ -531,7 +534,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         maxJSDivergence = maxJSDivergence,
         maxCorrelation = maxCorrelation,
         correlationType = correlationType,
-        protectedFeatures = protectedRawFeatures)
+        protectedFeatures = protectedRawFeatures,
+        textBinsFormula = textBinsFormula
+      )
     }
     this
   }

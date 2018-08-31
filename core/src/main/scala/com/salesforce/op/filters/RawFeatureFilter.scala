@@ -30,24 +30,24 @@
 
 package com.salesforce.op.filters
 
-import scala.math.{abs, min}
-
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
-import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.feature.HashingTF
 import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row, SparkSession}
+import org.apache.spark.util.ClosureUtils
 import org.slf4j.LoggerFactory
+
+import scala.math.{abs, min}
+import scala.util.Failure
 
 /**
  * Specialized stage that will load up data and compute distributions and empty counts on raw features.
@@ -56,18 +56,25 @@ import org.slf4j.LoggerFactory
  * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. However, they
  * are accessible from an OpWorkflowModel via getRawFeatureDistributions().
  *
- * @param trainingReader reader to get the training data
- * @param scoreReader reader to get the scoring data for comparison (optional - if not present will exclude based on
- *                    training data features only)
- * @param bins number of bins to use in computing feature distributions (histograms for numerics, hashes for strings)
- * @param minFill minimum fill rate a feature must have in the training dataset and scoring dataset to be kept
- * @param maxFillDifference maximum acceptable fill rate difference between training and scoring data to be kept
- * @param maxFillRatioDiff maximum acceptable fill ratio between training and scoring (larger / smaller)
- * @param maxJSDivergence maximum Jensen-Shannon divergence between training and scoring distributions to be kept
- * @param maxCorrelation maximum absolute correlation allowed between raw predictor null indicator and label
- * @param correlationType type of correlation metric to use
+ * @param trainingReader                reader to get the training data
+ * @param scoreReader                   reader to get the scoring data for comparison (optional - if not present will
+ *                                      exclude based on
+ *                                      training data features only)
+ * @param bins                          number of bins to use in computing feature distributions
+ *                                      (histograms for numerics, hashes for strings)
+ * @param minFill                       minimum fill rate a feature must have in the training dataset and
+ *                                      scoring dataset to be kept
+ * @param maxFillDifference             maximum acceptable fill rate difference between training
+ *                                      and scoring data to be kept
+ * @param maxFillRatioDiff              maximum acceptable fill ratio between training and scoring (larger / smaller)
+ * @param maxJSDivergence               maximum Jensen-Shannon divergence between training
+ *                                      and scoring distributions to be kept
+ * @param maxCorrelation                maximum absolute correlation allowed between
+ *                                      raw predictor null indicator and label
+ * @param correlationType               type of correlation metric to use
  * @param jsDivergenceProtectedFeatures features that are protected from removal by JS divergence check
- * @param protectedFeatures features that are protected from removal
+ * @param protectedFeatures             features that are protected from removal
+ * @param textBinsFormula               formula to compute the text features bin size
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
@@ -82,7 +89,8 @@ class RawFeatureFilter[T]
   val maxCorrelation: Double,
   val correlationType: CorrelationType = CorrelationType.Pearson,
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
-  val protectedFeatures: Set[String] = Set.empty
+  val protectedFeatures: Set[String] = Set.empty,
+  val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula
 ) extends Serializable {
 
   assert(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -95,8 +103,12 @@ class RawFeatureFilter[T]
   assert(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
     s" maxJSDivergence must be between 0 and 1")
 
-  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
+  ClosureUtils.checkSerializable(textBinsFormula) match {
+    case Failure(e) => throw new AssertionError("The argument textBinsFormula must be serializable", e)
+    case ok => ok
+  }
 
+  @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Get binned counts of the feature distribution and empty count for each raw feature
@@ -136,7 +148,9 @@ class RawFeatureFilter[T]
         .map(_.getFeatureDistributions(
           responseSummaries = responseSummariesArr,
           predictorSummaries = predictorSummariesArr,
-          bins = bins))
+          bins = bins,
+          textBinsFormula = textBinsFormula
+        ))
         .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
@@ -163,9 +177,10 @@ class RawFeatureFilter[T]
   /**
    * Take in the distribution summaries for datasets (scoring summary may be empty) and determine which
    * features should be dropped (including maps with all keys dropped) and which map keys need to be dropped
+   *
    * @param trainingDistribs summary of distributions for training data features
-   * @param scoringDistribs summary of distributions for scoring data features (may be an empty seq)
-   * @param correlationInfo info needed to determine feature to drop based on null label-leakage correlation
+   * @param scoringDistribs  summary of distributions for scoring data features (may be an empty seq)
+   * @param correlationInfo  info needed to determine feature to drop based on null label-leakage correlation
    * @return a list of feature names that should be dropped and a map of map keys that should be dropped
    *         Map(featureName -> key)
    */
@@ -193,7 +208,7 @@ class RawFeatureFilter[T]
         for {distrib <- trainingDistribs} yield {
           // Only filter if feature absolute null-label leakage correlation is greater than allowed correlation
           val nullLabelLeakerIndicators = absoluteCorrs.map(_.get(distrib.featureKey).exists(_ > maxCorrelation))
-          nullLabelLeakerIndicators.exists(identity(_))
+          nullLabelLeakerIndicators.exists(identity)
         }
       }
     }
@@ -246,9 +261,10 @@ class RawFeatureFilter[T]
   /**
    * Function that gets raw features and params used in workflow. Will use this information along with readers for this
    * stage to determine which features should be dropped from the workflow
+   *
    * @param rawFeatures raw features used in the workflow
-   * @param parameters parameters used in the workflow
-   * @param spark spark instance
+   * @param parameters  parameters used in the workflow
+   * @param spark       spark instance
    * @return dataframe that has had bad features and bad map keys removed and a list of all features that should be
    *         dropped from the DAG
    */
@@ -309,11 +325,34 @@ class RawFeatureFilter[T]
   }
 }
 
+
+object RawFeatureFilter {
+
+  /**
+   * Default calculation for the hashing size for RFF (compare js distance) for text features
+   *
+   * @param summary summary info for feature (max, min, etc)
+   * @param bins number of bins to use
+   * @return
+   */
+  def textBinsFormula(summary: Summary, bins: Int): Int = {
+    // TODO: find out the right formula. Example:
+    //  val AvgBinValue = 5000
+    //  val MaxTokenLowerLimit = 10
+    //  // To catch categoricals
+    //  if (max < MaxTokenLowerLimit) bins
+    //  else math.min(math.max(bins, sum / AvgBinValue), MaxBins).toInt()
+    bins
+  }
+
+}
+
 /**
  * case class for the RFF filtered data and features to drop
- * @param cleanedData RFF cleaned data
- * @param featuresToDrop raw features dropped by RFF
- * @param mapKeysToDrop keys in map features dropped by RFF
+ *
+ * @param cleanedData          RFF cleaned data
+ * @param featuresToDrop       raw features dropped by RFF
+ * @param mapKeysToDrop        keys in map features dropped by RFF
  * @param featureDistributions the feature distributions calculated from the training data
  */
 case class FilteredRawData
