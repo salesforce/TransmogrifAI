@@ -13,7 +13,7 @@ Gradle:
 ```gradle
 dependencies {
     compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.4.0'
-    runtime "com.opendatagroup:hadrian:0.8.5"
+    runtime 'com.opendatagroup:hadrian:0.8.5'
 }
 ```
 SBT:
