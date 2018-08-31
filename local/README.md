@@ -1,7 +1,7 @@
 # TransmogrifAI Local
 
 This module enables local scoring of TransmogrifAI models without need in Spark session,
-instead using [Aardpfark](https://github.com/CODAIT/aardpfark) and [Hadrian](https://github.com/opendatagroup/hadrian)
+instead it uses [Aardpfark](https://github.com/CODAIT/aardpfark) and [Hadrian](https://github.com/opendatagroup/hadrian)
 runtime for JVM. It delivers unprecedented portability and performance of TransmogrifAI models
 allowing scores serving from any JVM process.
 
@@ -9,21 +9,21 @@ allowing scores serving from any JVM process.
 
 Add the `transmogrifai-local` dependency into your project together with `hadrian` for runtime.
 
-Gradle: 
+For Gradle in `build.gradle` add:
 ```gradle
 dependencies {
     compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.4.0'
     runtime 'com.opendatagroup:hadrian:0.8.5'
 }
 ```
-SBT:
+For SBT in `build.sbt` add:
 ```sbt
 libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.4.0"
 
 libraryDependencies ++= libraryDependencies += "com.opendatagroup" % "hadrian" % "0.8.5" % Runtime
 ```
 
-Then in your code you might score as follows:
+Then in your code you might load and score models as follows:
 ```scala
 import com.salesforce.op.local._
 
