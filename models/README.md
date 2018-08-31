@@ -1,4 +1,4 @@
-# Models
+# TransmogrifAI Models
 
 This project contains all the pretrained models used in OP, e.g. OpenNLP POS/NER models etc.
 
