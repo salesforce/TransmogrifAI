@@ -63,6 +63,13 @@ object TestOpVectorColumnType {
    */
   case class IndVal(name: Option[String]) extends TestOpVectorColumnType
 
+  /**
+   * Represents a column with an descriptor value but no defined grouping beyond the parent feature name
+   *
+   * @param name Name of the indicator value
+   */
+  case class DescVal(name: Option[String]) extends TestOpVectorColumnType
+
 
   /**
    * Represents a column with an indicator (e.g. (featurename)_operationName_indicatorValue), but the
@@ -79,9 +86,18 @@ object TestOpVectorColumnType {
    * group than the parent feature's name.
    *
    * @param name Name of the indicator
-   * @param groupName Name of the indicator's group
+   * @param groupName Name of the grouping
    */
   case class IndColWithGroup(name: Option[String], groupName: String) extends TestOpVectorColumnType
+
+  /**
+   * Represents a column with an descriptor, but the resulting [[OpVectorColumnMetadata]] should have a different
+   * group than the parent feature's name.
+   *
+   * @param name Name of the descriptor
+   * @param groupName Name of the grouping
+   */
+  case class DescColWithGroup(name: Option[String], groupName: String) extends TestOpVectorColumnType
 
 }
 
@@ -154,15 +170,28 @@ object TestOpVectorMetadataBuilder {
         case PivotColNoInd(_) => None
         case IndCol(name) => Option(f.name)
         case IndVal(_) => None
+        case DescVal(_) => None
         case IndColWithGroup(_, groupName) => Option(groupName)
+        case DescColWithGroup(_, groupName) => Option(groupName)
       },
       indicatorValue = col match {
         case RootCol => None
         case PivotColNoInd(_) => None
         case IndCol(maybeName) => maybeName
         case IndVal(name) => name
+        case DescVal(_) => None
         case IndColWithGroup(maybeName, _) => maybeName
-      }
+        case DescColWithGroup(_, _) => None
+      },
+      descriptorValue = col match {
+        case RootCol => None
+        case PivotColNoInd(_) => None
+        case IndCol(_) => None
+        case IndVal(_) => None
+        case DescVal(maybeName) => maybeName
+        case IndColWithGroup(_, _) => None
+        case DescColWithGroup(maybeName, _) => maybeName
+    }
     )
     OpVectorMetadata(stage.getOutputFeatureName, cols, hist)
   }

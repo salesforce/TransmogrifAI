@@ -196,6 +196,13 @@ package object types extends FeatureTypeSparkConverters {
   implicit class VectorConversions(val v: Vector) extends AnyVal {
     def toOPVector: OPVector = new OPVector(v)
   }
+  // Arrays
+  implicit class ArrayDoubleConversions(val v: Array[Double]) extends AnyVal {
+    def toReal: Array[Real] = v.map(_.toReal)
+    def toRealNN: Array[RealNN] = v.map(_.toRealNN)
+    def toOPVector: OPVector = new OPVector(Vectors.dense(v))
+    def toGeolocation: Geolocation = new Geolocation(v)
+  }
 
   // Maps
   implicit class JMapStringConversions(val v: java.util.Map[String, String]) extends AnyVal {

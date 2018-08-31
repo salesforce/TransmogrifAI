@@ -62,7 +62,8 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 
   def checkAt(moment: JDateTime): Unit = new SampleData(moment) {
-    val vector = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = false)
+    val vector = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = false,
+      circularDateReps = Seq())
     val transformed = new OpWorkflow().setResultFeatures(vector).transform(ds)
     withClue(s"Checking transformation at $moment") {
       transformed.collect(vector) shouldBe expected(moment)
@@ -71,12 +72,21 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext {
     meta.columns.length shouldBe 3
     meta.columns.map(_.grouping) should contain theSameElementsAs Array(Option("a"), Option("b"), Option("c"))
 
-    val vector2 = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = true)
+    val vector2 = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = true,
+      circularDateReps = Seq())
     val transformed2 = new OpWorkflow().setResultFeatures(vector2).transform(ds)
     transformed2.collect(vector2).head.v.size shouldBe 6
 
     val meta2 = OpVectorMetadata(vector2.name, transformed2.schema(vector2.name).metadata)
     meta2.columns.length shouldBe 6
+    meta2.history.keys.size shouldBe 1
+
+    val vector3 = f1.vectorize(defaultValue = 0)
+    val transformed3 = new OpWorkflow().setResultFeatures(vector3).transform(ds)
+    transformed3.collect(vector3).head.v.size shouldBe 30
+
+    val meta3 = OpVectorMetadata(vector3.name, transformed3.schema(vector3.name).metadata)
+    meta3.columns.length shouldBe 30
     meta2.history.keys.size shouldBe 1
   }
 
