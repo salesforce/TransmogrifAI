@@ -48,6 +48,8 @@ private[op] case class Summary(min: Double, max: Double, sum: Double, count: Dou
    */
   def getBinsText(bins: Int): Int = bins
   // Todo: find out the right formula example:
+  //  val AvgBinValue = 5000
+  //  val MaxTokenLowerLimit = 10
   //  {
   //  To catch categoricals
   //    if (max < MaxTokenLowerLimit) bins
