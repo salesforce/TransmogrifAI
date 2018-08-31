@@ -506,6 +506,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @tparam T Type of the data read in
    */
   @Experimental
+  // scalastyle:off parameter.number
   def withRawFeatureFilter[T](
     trainingReader: Option[Reader[T]],
     scoringReader: Option[Reader[T]],
@@ -540,5 +541,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     }
     this
   }
+  // scalastyle:on
 
 }
