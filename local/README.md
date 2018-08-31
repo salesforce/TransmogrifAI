@@ -23,6 +23,22 @@ libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-local" 
 libraryDependencies ++= libraryDependencies += "com.opendatagroup" % "hadrian" % "0.8.5" % Runtime
 ```
 
+Then in your code you might score as follows:
+```scala
+import com.salesforce.op.local._
+
+val model = workflow.loadModel("/path/to/model")
+val scoreFn = model.scoreFunction
+val rawData = Seq(Map("age" -> 18, "name" -> "Peter"), Map("name" -> "John"))
+val scores= rawData.map(scoreFn)
+```
+
+Or using the local runner:
+```scala
+val scoreFn = new OpWorkflowRunnerLocal(workflow).score(opParams)
+```
+
+
 ## Performance Results
 
 Below is an example of measured scoring performance on 6m records with 10 fields and 12 transformations applied.
