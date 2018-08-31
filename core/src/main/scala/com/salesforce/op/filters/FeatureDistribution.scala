@@ -173,7 +173,7 @@ private[op] object FeatureDistribution {
     bins: Int
   ): FeatureDistribution = {
     val (nullCount, (summaryInfo, distribution)): (Int, (Array[Double], Array[Double])) =
-      value.map(seq => 0 -> histValues(seq, summary, bins, getBins))
+      value.map(seq => 0 -> histValues(seq, summary, bins))
         .getOrElse(1 -> (Array(summary.min, summary.max, summary.sum, summary.count) -> Array.fill(bins)(0.0)))
 
     FeatureDistribution(
@@ -190,19 +190,17 @@ private[op] object FeatureDistribution {
    * @param values values to bin
    * @param sum summary info for feature (max and min)
    * @param bins number of bins to produce
-   * @param getBins
    * @return the bin information and the binned counts
    */
   // TODO avoid wrapping and unwrapping??
   private def histValues(
     values: ProcessedSeq,
     sum: Summary,
-    bins: Int,
-    getBins: (Summary, Int) => Int
+    bins: Int
   ): (Array[Double], Array[Double]) = {
     values match {
       case Left(seq) => {
-        val numBins = getBins(sum, bins)
+        val numBins = sum.getBinsText(bins)
 
         // Todo: creating too many hashers may cause problem, efficiency, garbage collection etc
         val hasher: HashingTF = new HashingTF(numFeatures = numBins)

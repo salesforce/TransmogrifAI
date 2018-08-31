@@ -40,7 +40,20 @@ import com.twitter.algebird.Monoid
  * @param sum sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
  */
-private[op] case class Summary(min: Double, max: Double, sum: Double, count: Double)
+private[op] case class Summary(min: Double, max: Double, sum: Double, count: Double) {
+  /**
+   * to calculate the hashing size for RFF (compare js distance) for Text
+   * @param bins default bins of RFF
+   * @return
+   */
+  def getBinsText(bins: Int): Int = bins
+  // Todo: find out the right formula example:
+  //  {
+  //  To catch categoricals
+  //    if (max < MaxTokenLowerLimit) bins
+  //    else math.min(math.max(bins, sum / AvgBinValue), MaxBins).intValue()
+  //  }
+}
 
 private[op] case object Summary {
 
