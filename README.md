@@ -122,7 +122,7 @@ While this may seem a bit too magical, for those who want more control, Transmog
 You can simply add TransmogrifAI as a regular dependency to an existing project.
 
 For Gradle in `build.gradle` add:
-```groovy
+```gradle
 repositories {
     mavenCentral()
     maven { url 'https://dl.bintray.com/salesforce/maven' }
@@ -137,7 +137,7 @@ dependencies {
 ```
 
 For SBT in `build.sbt` add:
-```scala
+```sbt
 scalaVersion := "2.11.12"
 
 resolvers += Resolver.bintrayRepo("salesforce", "maven")
