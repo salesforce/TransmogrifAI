@@ -149,11 +149,15 @@ configure(allProjs) {
     }
     compileScala {
         scalaCompileOptions.additionalParameters = [
-            "-optimize", "-feature", "-language:implicitConversions", "-language:existentials"
+            "-optimize", "-feature",
+            "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
         ]
     }
     compileTestScala {
-        scalaCompileOptions.additionalParameters = ["-Yrangepos"]
+        scalaCompileOptions.additionalParameters = [
+            "-Yrangepos", "-feature",
+            "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
+        ]
     }
     [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 

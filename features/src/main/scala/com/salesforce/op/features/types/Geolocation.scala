@@ -181,7 +181,7 @@ case object GeolocationAccuracy extends IntEnum[GeolocationAccuracy] {
    * @return accuracy
    */
   def forRangeInMiles(miles: Double): GeolocationAccuracy = {
-    val result = values.dropWhile(_.rangeInMiles < miles * 0.99).headOption getOrElse Unknown
+    val result = values.dropWhile(v => v.rangeInMiles < miles * 0.99).headOption getOrElse Unknown
     result
   }
 
