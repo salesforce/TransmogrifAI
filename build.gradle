@@ -91,6 +91,7 @@ configure(allProjs) {
         hadrianVersion = '0.8.5'
         aardpfarkVersion = '0.1.0-SNAPSHOT'
         xgboostVersion = '0.80'
+        akkaSlf4jVersion = '2.3.11'
 
         mainClassName = 'com.salesforce.Main'
     }
