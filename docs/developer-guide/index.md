@@ -941,6 +941,21 @@ Sometimes it is important to aggreagte feature information after the join has be
   reader1.leftJoin(reader2).withSecondayAggreagtion(timeFilter).innerJoin(reader3)
 ```
 
+### Streaming Data Readers
+
+[Streaming Data Readers](https://github.com/salesforce/TransmogrifAI/blob/master/readers/src/main/scala/com/salesforce/op/readers/StreamingReaders.scala) allow computation of scores with TransmogrifAI models over a stream of data. Below is an example usage using [OpWorkflowRunner](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/OpWorkflowRunner.scala):
+```scala
+val streamingReader = StreamingReaders.avro[GenericRecord]()
+val opParams = new OpParams().copy(
+  modelLocation = Some(modelLocation) // model load location
+  writeLocation = Some(scoresLocation), // scores write location
+  readLocations = Map(streamingReader.typeName -> readLocation) // stream read location
+)
+val runner = new OpWorkflowRunner(streamingReader = streamingReader /* all other args... */ )
+
+// run scoring over the stream
+runner.run(OpWorkflowRunType.StreamingScore, opParams)(spark, streamingContext)
+```
 
 ## Evaluators
 
