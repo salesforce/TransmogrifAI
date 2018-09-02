@@ -38,7 +38,7 @@ import com.salesforce.op.{OpParams, OpWorkflow}
  *
  * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
  */
-class OpWorkflowRunnerLocal(val workflow: OpWorkflow) {
+class OpWorkflowRunnerLocal(val workflow: OpWorkflow) extends Serializable {
 
   /**
    * Load the model & prepare a score function for local scoring
