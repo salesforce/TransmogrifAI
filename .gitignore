@@ -1,6 +1,7 @@
 classes/
 build/
 target/
+build-cache/
 /out/
 **/out/
 **/tmp/

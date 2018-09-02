@@ -265,8 +265,12 @@ configure(allProjs) {
 
     task resolveAllDependencies {
         doLast {
-            configurations.all { if(it.canBeResolved) it.resolve() }
+            configurations.all { if (it.canBeResolved) it.resolve() }
         }
+    }
+
+    if(System.getenv('TEST_FILES') != null) {
+        testScoverage.setIncludes(Arrays.asList(System.getenv('TEST_FILES').split('\n')))
     }
 }
 
@@ -373,6 +377,7 @@ configure(subProjs) {
         }
     }
 }
+
 task allScaladoc(type: ScalaDoc) {
     group 'Documentation'
     description 'Generates Scaladoc for the main source code of all subprojects.'
