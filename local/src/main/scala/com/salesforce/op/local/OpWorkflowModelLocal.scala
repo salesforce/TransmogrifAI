@@ -48,7 +48,7 @@ import scala.collection.mutable
 /**
  * Enrichment for [[OpWorkflowModel]] to allow local scoring functionality
  */
-trait OpWorkflowModelLocal {
+trait OpWorkflowModelLocal extends Serializable {
 
   /**
    * Enrichment for [[OpWorkflowModel]] to allow local scoring functionality
