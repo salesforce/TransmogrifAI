@@ -8,7 +8,7 @@ env:
   global:
     - GRADLE_OPTS='-Xmx256m'
     - BUILD_CACHE_DIR="$HOME/build-cache"
-    - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/test_file.txt"
+    - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/tests.txt"
     - TESTS_FILES_PREFIX='tests'
 install:
   - true
@@ -17,23 +17,23 @@ after_success:
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
   - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
-  - mkdir -p $HOME/build-cache
+  - mkdir -p $BUILD_CACHE_DIR
 cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
-    - $HOME/build-cache
+    - $BUILD_CACHE_DIR
 jobs:
   include:
     - stage: 'clone repo and compile project'
       name: 'Clone repo & compile project'
       script: |
-        find **/src/test/scala/**  -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
+        find **/src/test/scala/** -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
         TOTAL_TESTS=`cat $TESTS_FILE_NAME | wc -l`
         pushd $BUILD_CACHE_DIR
         echo 'Splitting test files into following parts'
         split --numeric-suffixes -l `echo "($TOTAL_TESTS/4)+1" | bc` $TESTS_FILE_NAME $TESTS_FILES_PREFIX
-        ls "$TESTS_FILES_PREFIX"* | xargs wc -l
+        ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
         sed -i 's/\\n/ /g' "$TESTS_FILES_PREFIX"*
         popd
         ./gradlew resolveAllDependencies

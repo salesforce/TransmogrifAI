@@ -3,13 +3,3 @@ enableFeaturePreview('STABLE_PUBLISHING')
 rootProject.name='transmogrifai'
 
 include 'utils', 'features', 'readers', 'core', 'models', 'testkit', 'cli', 'templates:simple', 'local'
-
-buildCache {
-    local(DirectoryBuildCache) {
-        directory = new File(rootDir, 'build-cache')
-        if(System.getenv('BUILD_CACHE_DIR') != null){
-            directory = new File(rootDir, System.getenv('BUILD_CACHE_DIR').toString())
-        }
-        removeUnusedEntriesAfterDays = 15
-    }
-}
