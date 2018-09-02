@@ -8,7 +8,7 @@ jobs:
       - checkout
       - run:
           name: Clone repo & compile project
-          command: ./gradlew compileScala --parallel
+          command: ./gradlew compileTestScala --parallel
       - save_cache:
           key: repo-{{ .Environment.CIRCLE_SHA1 }}
           paths:
