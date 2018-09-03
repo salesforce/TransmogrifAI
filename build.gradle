@@ -389,14 +389,3 @@ task allScaladoc(type: ScalaDoc) {
 
 // run by Heroku to build docs
 task stage(dependsOn: ':allScaladoc')
-
-import java.time.Instant
-import java.time.Duration
-
-gradle.taskGraph.beforeTask { task ->
-    task.ext.setProperty("startTime", Instant.now())
-}
-
-gradle.taskGraph.afterTask { task ->
-    println "${task.path} took ${Duration.between(task.ext.startTime, Instant.now()).toSeconds().precision()} seconds"
-}

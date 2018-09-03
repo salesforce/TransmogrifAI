@@ -1,14 +1,14 @@
 version: 2
 
 jobs:
-  clone_repo_and_compile_project:
+  clone_repo_and_resolve_dependencies:
     machine: true
     working_directory: ~/repo
     steps:
       - checkout
       - run:
-          name: Clone repo & compile project
-          command: ./gradlew compileTestScala --parallel
+          name: Clone repo & resolve dependencies
+          command: ./gradlew resolveAllDependencies --parallel
       - save_cache:
           key: repo-{{ .Environment.CIRCLE_SHA1 }}
           paths:
@@ -19,7 +19,7 @@ jobs:
     machine: true
     working_directory: ~/repo
     environment:
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
+      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true
       TERM: dumb
     parallelism: 4
     steps:
@@ -33,8 +33,8 @@ jobs:
       - run:
           name: Build project
           command: |
-            COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
             TEST_FILES=$(circleci tests glob '**/src/test/scala/**/*.scala')
+            COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
             echo "Total test file : `eval $COUNT_TEST_FILE_CMD`"
             TEST_FILES=$(echo "$TEST_FILES" | circleci tests split --split-by=timings --timings-type=classname --index=$CIRCLE_NODE_INDEX | tr ' ' '\n' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g')
             echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES"
@@ -65,7 +65,7 @@ workflows:
   version: 2
   build:
     jobs:
-      - clone_repo_and_compile_project
+      - clone_repo_and_resolve_dependencies
       - build:
           requires:
-            - clone_repo_and_compile_project
+            - clone_repo_and_resolve_dependencies

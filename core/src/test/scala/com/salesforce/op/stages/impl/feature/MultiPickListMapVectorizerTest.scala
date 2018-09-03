@@ -34,9 +34,8 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.log4j.Level
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
