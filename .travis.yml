@@ -34,7 +34,7 @@ jobs:
         echo 'Splitting test files into following parts'
         split --numeric-suffixes -l `echo "($TOTAL_TESTS/5)+1" | bc` $TESTS_FILE_NAME $TESTS_FILES_PREFIX
         ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
-        sed -i 's/\\n/ /g' "$TESTS_FILES_PREFIX"*
+        sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
         ./gradlew resolveAllDependencies --parallel
     - stage: 'build'
