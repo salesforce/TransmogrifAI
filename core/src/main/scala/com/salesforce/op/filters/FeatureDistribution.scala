@@ -31,10 +31,10 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.FeatureDistributionLike
-import com.salesforce.op.stages.impl.feature.{Inclusion, NumericBucketizer}
-import com.twitter.algebird.Semigroup
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.Semigroup
 import org.apache.spark.mllib.feature.HashingTF
 
 /**
@@ -44,7 +44,7 @@ import org.apache.spark.mllib.feature.HashingTF
  * @param key map key associated with distribution (when the feature is a map)
  * @param count total count of feature seen
  * @param nulls number of empties seen in feature
- * @param distribution binned counts of feature values (hashed for strings, evently spaced bins for numerics)
+ * @param distribution binned counts of feature values (hashed for strings, evenly spaced bins for numerics)
  * @param summaryInfo either min and max number of tokens for text data,
  *                    or splits used for bins for numeric data
  */
@@ -125,8 +125,8 @@ case class FeatureDistribution
   def jsDivergence(fd: FeatureDistribution): Double = {
     checkMatch(fd)
     val combinedCounts = distribution.zip(fd.distribution).filterNot{ case (a, b) => a == 0.0 && b == 0.0 }
-    val (thisCount, thatCount) = combinedCounts
-      .fold[(Double, Double)]( (0, 0)){ case ((a1, b1), (a2, b2)) => (a1 + a2, b1 + b2) }
+    val (thisCount, thatCount) =
+      combinedCounts.fold[(Double, Double)]((0.0, 0.0)){ case ((a1, b1), (a2, b2)) => (a1 + a2, b1 + b2) }
     val probs = combinedCounts.map{ case (a, b) => a / thisCount -> b / thatCount }
     val meanProb = probs.map{ case (a, b) => (a + b) / 2}
     def log2(x: Double) = math.log10(x) / math.log10(2.0)
@@ -154,7 +154,10 @@ private[op] object FeatureDistribution {
    * @param summary feature summary
    * @param value optional processed sequence
    * @param bins number of histogram bins
-   * @param hasher hashing method to use for text and categorical features
+   * @param textBinsFormula formula to compute the text features bin size.
+   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   * @return a pair consisting of response and predictor feature distributions (in this order)
    * @return feature distribution given the provided information
    */
   def apply(
@@ -162,11 +165,11 @@ private[op] object FeatureDistribution {
     summary: Summary,
     value: Option[ProcessedSeq],
     bins: Int,
-    hasher: HashingTF
+    textBinsFormula: (Summary, Int) => Int
   ): FeatureDistribution = {
     val (nullCount, (summaryInfo, distribution)): (Int, (Array[Double], Array[Double])) =
-      value.map(seq => 0 -> histValues(seq, summary, bins, hasher))
-        .getOrElse(1 -> (Array(summary.min, summary.max) -> Array.fill(bins)(0.0)))
+      value.map(seq => 0 -> histValues(seq, summary, bins, textBinsFormula))
+        .getOrElse(1 -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     FeatureDistribution(
       name = featureKey._1,
@@ -179,40 +182,49 @@ private[op] object FeatureDistribution {
 
   /**
    * Function to put data into histogram of counts
-   * @param values values to bin
-   * @param sum summary info for feature (max and min)
-   * @param bins number of bins to produce
-   * @param hasher hasing function to use for text
+   *
+   * @param values  values to bin
+   * @param summary summary info for feature (max, min, etc)
+   * @param bins    number of bins to produce
+   * @param textBinsFormula formula to compute the text features bin size.
+   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   * @return a pair consisting of response and predictor feature distributions (in this order)
    * @return the bin information and the binned counts
    */
-  // TODO avoid wrapping and unwrapping??
   private def histValues(
     values: ProcessedSeq,
-    sum: Summary,
+    summary: Summary,
     bins: Int,
-    hasher: HashingTF
-  ): (Array[Double], Array[Double]) = {
-    values match {
-      case Left(seq) => Array(sum.min, sum.max) -> hasher.transform(seq).toArray // TODO use summary info to pick hashes
-      case Right(seq) => // TODO use kernel fit instead of histogram
-        if (sum == Summary.empty) {
-          Array(sum.min, sum.max) -> seq.toArray // the seq will always be empty in this case
-        } else if (sum.min < sum.max) {
-          val step = (sum.max - sum.min) / (bins - 2.0) // total number of bins includes one for edge and one for other
-          val splits = (0 until bins).map(b => sum.min + step * b).toArray
-          val binned = seq.map { v =>
-            NumericBucketizer.bucketize(
-              splits = splits, trackNulls = false, trackInvalid = true,
-              splitInclusion = Inclusion.Left, input = Option(v)
-            ).toArray
-          }
-          val hist = binned.fold(new Array[Double](bins))(_ + _)
-          splits -> hist
-        } else {
-          val same = seq.map(v => if (v == sum.max) 1.0 else 0.0).sum
-          val other = seq.map(v => if (v != sum.max) 1.0 else 0.0).sum
-          Array(sum.min, sum.max) -> Array(same, other)
+    textBinsFormula: (Summary, Int) => Int
+  ): (Array[Double], Array[Double]) = values match {
+    case Left(seq) =>
+      val numBins = textBinsFormula(summary, bins)
+      // TODO: creating too many hasher instances may cause problem, efficiency, garbage collection etc
+      val hasher =
+        new HashingTF(numFeatures = numBins).setBinary(false)
+          .setHashAlgorithm(HashAlgorithm.MurMur3.entryName.toLowerCase)
+      Array(summary.min, summary.max, summary.sum, summary.count) -> hasher.transform(seq).toArray
+
+    case Right(seq) => // TODO use kernel fit instead of histogram
+      if (summary == Summary.empty) {
+        Array(summary.min, summary.max) -> seq.toArray // the seq will always be empty in this case
+      } else if (summary.min < summary.max) {
+        // total number of bins includes one for edge and one for other
+        val step = (summary.max - summary.min) / (bins - 2.0)
+        val splits = (0 until bins).map(b => summary.min + step * b).toArray
+        val binned = seq.map { v =>
+          NumericBucketizer.bucketize(
+            splits = splits, trackNulls = false, trackInvalid = true,
+            splitInclusion = Inclusion.Left, input = Option(v)
+          ).toArray
         }
-    }
+        val hist = binned.fold(new Array[Double](bins))(_ + _)
+        splits -> hist
+      } else {
+        val same = seq.map(v => if (v == summary.max) 1.0 else 0.0).sum
+        val other = seq.map(v => if (v != summary.max) 1.0 else 0.0).sum
+        Array(summary.min, summary.max, summary.sum, summary.count) -> Array(same, other)
+      }
   }
 }
