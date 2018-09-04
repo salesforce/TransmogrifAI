@@ -154,7 +154,10 @@ private[op] object FeatureDistribution {
    * @param summary feature summary
    * @param value optional processed sequence
    * @param bins number of histogram bins
-   * @param textBinsFormula formula to compute the text features bin size
+   * @param textBinsFormula formula to compute the text features bin size.
+   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   * @return a pair consisting of response and predictor feature distributions (in this order)
    * @return feature distribution given the provided information
    */
   def apply(
@@ -183,7 +186,10 @@ private[op] object FeatureDistribution {
    * @param values  values to bin
    * @param summary summary info for feature (max, min, etc)
    * @param bins    number of bins to produce
-   * @param textBinsFormula formula to compute the text features bin size
+   * @param textBinsFormula formula to compute the text features bin size.
+   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   * @return a pair consisting of response and predictor feature distributions (in this order)
    * @return the bin information and the binned counts
    */
   private def histValues(

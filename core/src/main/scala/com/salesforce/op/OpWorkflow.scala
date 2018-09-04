@@ -503,8 +503,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param protectedFeatures list of features that should never be removed (features that are used to create them will
    *                          also be protected)
    * @param textBinsFormula   formula to compute the text features bin size.
-   *                          Input arguments are [[Summary]] and number of bins to use in computing feature distributions
-   *                          (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   *                          Input arguments are [[Summary]] and number of bins to use in computing
+   *                          feature distributions (histograms for numerics, hashes for strings).
+   *                          Output is the bins for the text features.
    * @tparam T Type of the data read in
    */
   @Experimental
