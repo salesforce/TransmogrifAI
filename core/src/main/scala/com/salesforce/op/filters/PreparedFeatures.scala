@@ -81,7 +81,9 @@ private[filters] case class PreparedFeatures(
    * @param responseSummaries global feature metadata
    * @param predictorSummaries set of feature summary statistics (derived from metadata)
    * @param bins number of bins to put numerics into
-   * @param textBinsFormula formula to compute the text features bin size
+   * @param textBinsFormula formula to compute the text features bin size.
+   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
    * @return a pair consisting of response and predictor feature distributions (in this order)
    */
   def getFeatureDistributions(

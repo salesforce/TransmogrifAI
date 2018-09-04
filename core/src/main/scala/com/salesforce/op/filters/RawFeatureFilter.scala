@@ -74,7 +74,9 @@ import scala.util.Failure
  * @param correlationType               type of correlation metric to use
  * @param jsDivergenceProtectedFeatures features that are protected from removal by JS divergence check
  * @param protectedFeatures             features that are protected from removal
- * @param textBinsFormula               formula to compute the text features bin size
+ * @param textBinsFormula               formula to compute the text features bin size.
+ *                                      Input arguments are [[Summary]] and number of bins to use in computing feature distributions
+ *                                      (histograms for numerics, hashes for strings). Output is the bins for the text features.
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
