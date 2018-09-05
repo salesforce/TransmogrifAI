@@ -94,9 +94,9 @@ class OpVectorMetadata private
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
     val attributes = columns.map { c =>
-      if (c.indicatorValue.isDefined || textTypes.exists(c.parentFeatureType.contains))
+      if (c.indicatorValue.isDefined || textTypes.exists(c.parentFeatureType.contains)) {
         BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
-      else {
+      } else {
         NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
       }
     }
