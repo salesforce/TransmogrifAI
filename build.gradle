@@ -159,13 +159,24 @@ configure(allProjs) {
             "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
         ]
     }
+    compileScoverageScala {
+        scalaCompileOptions.additionalParameters = [
+            "-feature", "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
+        ]
+    }
+    compileTestScoverageScala {
+        scalaCompileOptions.additionalParameters = [
+            "-feature", "-language:existentials",  "-language:postfixOps"
+        ]
+    }
     [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 
     jar {
         manifest.attributes "Main-Class": "$mainClassName"
         baseName = "${rootProject.name}"
     }
-    jar.dependsOn(createVersionProperties)
+    // Enabling version file creation on jar breaks compile task caching
+    // jar.dependsOn(createVersionProperties)
 
     scalaStyle {
         configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
@@ -189,8 +200,8 @@ configure(allProjs) {
             }
         }
         scoverage {
-            runtimeClasspath += sourceSets.main.output
-            compileClasspath += sourceSets.main.output
+            runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+            compileClasspath += sourceSets.main.output + sourceSets.test.output
         }
         testScoverage {
             runtimeClasspath += sourceSets.main.output + sourceSets.test.output

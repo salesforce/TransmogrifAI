@@ -1,14 +1,14 @@
 version: 2
 
 jobs:
-  clone_repo_and_resolve_dependencies:
+  clone_repo_and_compile_project:
     machine: true
     working_directory: ~/repo
     steps:
       - checkout
       - run:
-          name: Clone repo & resolve dependencies
-          command: ./gradlew resolveAllDependencies --parallel
+          name: Clone repo & compile project
+          command: ./gradlew testScoverageClasses --parallel
       - save_cache:
           key: repo-{{ .Environment.CIRCLE_SHA1 }}
           paths:
@@ -65,7 +65,7 @@ workflows:
   version: 2
   build:
     jobs:
-      - clone_repo_and_resolve_dependencies
+      - clone_repo_and_compile_project
       - build:
           requires:
-            - clone_repo_and_resolve_dependencies
+            - clone_repo_and_compile_project
