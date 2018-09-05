@@ -31,6 +31,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
+import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NominalAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 
@@ -38,8 +39,9 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
  * Represents a metadata wrapper that includes parent feature information.
  *
  * The metadata includes a columns field that describes the columns in the vector.
- * @param name name of the feature vector
- * @param col information about each element in the vector
+ *
+ * @param name    name of the feature vector
+ * @param col     information about each element in the vector
  * @param history history of parent features used to create the vector map is from
  *                OpVectorColumnMetadata.parentFeatureName (String) to FeatureHistory
  */
@@ -53,7 +55,7 @@ class OpVectorMetadata private
   /**
    * Column metadata with indicies fixed to match order passed in
    */
-  val columns: Array[OpVectorColumnMetadata] = col.zipWithIndex.map{ case(c, i) => c.copy(index = i) }
+  val columns: Array[OpVectorColumnMetadata] = col.zipWithIndex.map { case (c, i) => c.copy(index = i) }
 
   /**
    * Get the number of columns in vectors of this type
@@ -82,12 +84,24 @@ class OpVectorMetadata private
     val groupedCol = columns
       .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue, c.descriptorValue))
     val colData = groupedCol.toSeq
-      .map{ case (_, g) => g.head -> g.map(_.index) }
-    val colMeta = colData.map{ case (c, i) => c.toMetadata(i) }
-    new MetadataBuilder()
+      .map { case (_, g) => g.head -> g.map(_.index) }
+    val colMeta = colData.map { case (c, i) =>
+      c.toMetadata(i)
+    }
+    val meta = new MetadataBuilder()
       .putMetadataArray(OpVectorMetadata.ColumnsKey, colMeta.toArray)
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
+    val nominalValues = columns
+      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping))
+      .mapValues(_.filter(_.indicatorValue.isDefined).map(_.indicatorValue.get).distinct)
+    val attributes = columns.map { c =>
+      if (c.indicatorValue.isDefined) BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
+      else {
+        NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
+      }
+    }
+    new AttributeGroup(name, attributes).toMetadata(meta)
   }
 
   /**
@@ -102,10 +116,11 @@ class OpVectorMetadata private
 
   /**
    * Extract the full history for each element of the vector
+   *
    * @return Sequence of [[OpVectorColumnHistory]]
    */
   def getColumnHistory(): Seq[OpVectorColumnHistory] = {
-    columns.map{ c =>
+    columns.map { c =>
       val hist = c.parentFeatureName.map(pn => history.getOrElse(pn,
         throw new RuntimeException(s"Parent feature name '${pn}' has no associated history")))
       val histComb = hist.head.merge(hist.tail: _*)
@@ -161,6 +176,7 @@ class OpVectorMetadata private
 }
 
 object OpVectorMetadata {
+
   import com.salesforce.op.utils.spark.RichMetadata._
 
   val ColumnsKey = "vector_columns"
