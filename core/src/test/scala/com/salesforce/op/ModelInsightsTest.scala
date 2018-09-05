@@ -30,16 +30,17 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.tuning.DataSplitter
+import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
+import com.salesforce.op.stages.impl.tuning.{DataSplitter, SplitterSummary}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -281,8 +282,34 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "pretty print" in {
     val insights = workflowModel.modelInsights(pred)
+    insights.selectedModelInfo.isDefined shouldBe true
     val pretty = insights.prettyPrint()
-    pretty shouldBe loadResource("/ModelInsightsPrettyPrint.txt")
+    val modelType = BinaryClassificationModelsToTry.OpLogisticRegression
+    val sm = insights.selectedModelInfo.get
+    sm.bestModelType shouldBe modelType.toString
+    sm.validationResults.size shouldBe 2
+
+    pretty should include(s"Selected Model - $modelType")
+    withClue("include only best model info: ") {
+      pretty should include(sm.bestModelUID)
+      pretty should include(sm.bestModelType)
+      pretty should include(sm.bestModelName)
+    }
+    withClue("not include other models info: ") {
+      val others = sm.validationResults.filterNot(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+      others.size shouldBe 1
+      others.foreach { m =>
+        pretty should not include(m.modelName)
+      }
+    }
+    pretty should include("area under precision-recall | 0.0")
+    pretty should include("Model Evaluation Metrics")
+    pretty should include("Top Model Insights")
+    pretty should include("Top Positive Correlations")
+    pretty should include("Top Negative Correlations")
+    pretty should include("Top Contributions")
   }
 
   it should "correctly serialize and deserialize from json" in {
