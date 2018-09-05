@@ -153,13 +153,11 @@ case class ModelInsights
   private def prettySelectedModelInfo: String = {
     val excludedParams = Set(
       SparkWrapperParams.SparkStageParamName,
-      ModelSelectorNames.outputParamName,
-      ModelSelectorNames.inputParam1Name,
-      ModelSelectorNames.inputParam2Name,
-      ModelSelectorNames.outputParamName,
-      OpPipelineStageParamsNames.InputFeatures,
-      OpPipelineStageParamsNames.InputSchema,
-      OpPipelineStageParamsNames.OutputMetadata
+      ModelSelectorNames.outputParamName, ModelSelectorNames.inputParam1Name,
+      ModelSelectorNames.inputParam2Name, ModelSelectorNames.outputParamName,
+      OpPipelineStageParamsNames.InputFeatures, OpPipelineStageParamsNames.InputSchema,
+      OpPipelineStageParamsNames.OutputMetadata,
+      "labelCol", "predictionCol", "predictionValueCol", "rawPredictionCol", "probabilityCol"
     )
     val name = selectedModelInfo.map(sm => s"Selected Model - ${sm.bestModelType}").getOrElse("")
     val validationResults = (for {
