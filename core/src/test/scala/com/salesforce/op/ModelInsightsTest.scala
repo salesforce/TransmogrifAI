@@ -30,17 +30,16 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataSplitter, SplitterSummary}
+import com.salesforce.op.stages.impl.tuning.DataSplitter
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -283,12 +282,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "pretty print" in {
     val insights = workflowModel.modelInsights(pred)
     val pretty = insights.prettyPrint()
-    pretty should include(s"Selected Model - ${BinaryClassificationModelsToTry.OpLogisticRegression}")
-    pretty should include("area under precision-recall | 0.0")
-    pretty should include("Model Evaluation Metrics")
-    pretty should include("Top Model Insights")
-    pretty should include("Top Positive Correlations")
-    pretty should include("Top Contributions")
+    pretty shouldBe loadResource("/ModelInsightsPrettyPrint.txt")
   }
 
   it should "correctly serialize and deserialize from json" in {

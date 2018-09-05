@@ -1,0 +1,80 @@
+Evaluated OpLogisticRegression model using Cross Validation and area under precision-recall metric.
+Evaluated 2 OpLogisticRegression models with area under precision-recall metric between [0.0, 0.0].
++--------------------------------------------------------+
+|         Selected Model - OpLogisticRegression          |
++--------------------------------------------------------+
+| Model Param      | Value                               |
++------------------+-------------------------------------+
+| aggregationDepth | 2                                   |
+| elasticNetParam  | 0.0                                 |
+| family           | auto                                |
+| fitIntercept     | true                                |
+| maxIter          | 100                                 |
+| modelType        | OpLogisticRegression                |
+| name             | OpLogisticRegression_00000000001d_0 |
+| regParam         | 0.01                                |
+| standardization  | true                                |
+| threshold        | 0.5                                 |
+| tol              | 1.0E-6                              |
+| uid              | OpLogisticRegression_00000000001d   |
++------------------+-------------------------------------+
++-----------------------------------------------------------------------+
+|                       Model Evaluation Metrics                        |
++-----------------------------------------------------------------------+
+| Metric Name                 | Training Set Value | Hold Out Set Value |
++-----------------------------+--------------------+--------------------+
+| area under precision-recall | 0.0                | 0.75               |
+| area under ROC              | 0.0                | 0.5                |
+| error                       | 0.0                | 0.5                |
+| f1                          | 0.0                | 0.0                |
+| false negative              | 0.0                | 1.0                |
+| false positive              | 0.0                | 0.0                |
+| precision                   | 0.0                | 0.0                |
+| recall                      | 0.0                | 0.0                |
+| true negative               | 4.0                | 1.0                |
+| true positive               | 0.0                | 0.0                |
++-----------------------------+--------------------+--------------------+
++-------------------------------------------------------------------------------------------------+
+|                                       Top Model Insights                                        |
++-------------------------------------------------------------------------------------------------+
+| Top Positive Correlations                                             |       Correlation Value |
++-----------------------------------------------------------------------+-------------------------+
+| age(age = null)                                                       | -1.7976931348623157E308 |
+| age                                                                   | -1.7976931348623157E308 |
+| height(height-weight_1-stagesApplied_Real_00000000000f = null)        | -1.7976931348623157E308 |
+| height                                                                | -1.7976931348623157E308 |
+| description(description_1-stagesApplied_TextList_000000000011 = null) | -1.7976931348623157E308 |
+| description                                                           | -1.7976931348623157E308 |
+| weight                                                                | -1.7976931348623157E308 |
+| weight(height-weight_1-stagesApplied_Real_00000000000f = null)        | -1.7976931348623157E308 |
+| genderPL(genderPL = Male)                                             | -1.7976931348623157E308 |
+| genderPL(genderPL = Female)                                           | -1.7976931348623157E308 |
++-----------------------------------------------------------------------+-------------------------+
++------------------------------------------------------------------------------------------------+
+| Top Negative Correlations                                             |      Correlation Value |
++-----------------------------------------------------------------------+------------------------+
+| genderPL(genderPL = Female)                                           | 1.7976931348623157E308 |
+| genderPL(genderPL = Male)                                             | 1.7976931348623157E308 |
+| weight                                                                | 1.7976931348623157E308 |
+| weight(height-weight_1-stagesApplied_Real_00000000000f = null)        | 1.7976931348623157E308 |
+| description                                                           | 1.7976931348623157E308 |
+| description(description_1-stagesApplied_TextList_000000000011 = null) | 1.7976931348623157E308 |
+| height                                                                | 1.7976931348623157E308 |
+| height(height-weight_1-stagesApplied_Real_00000000000f = null)        | 1.7976931348623157E308 |
+| age                                                                   | 1.7976931348623157E308 |
+| age(age = null)                                                       | 1.7976931348623157E308 |
++-----------------------------------------------------------------------+------------------------+
++--------------------------------------------------------------------------------------------+
+| Top Contributions                                                     | Contribution Value |
++-----------------------------------------------------------------------+--------------------+
+| age(age = null)                                                       |                0.0 |
+| age                                                                   |                0.0 |
+| height(height-weight_1-stagesApplied_Real_00000000000f = null)        |                0.0 |
+| height                                                                |                0.0 |
+| description(description_1-stagesApplied_TextList_000000000011 = null) |                0.0 |
+| description                                                           |                0.0 |
+| weight                                                                |                0.0 |
+| weight(height-weight_1-stagesApplied_Real_00000000000f = null)        |                0.0 |
+| genderPL(genderPL = Male)                                             |                0.0 |
+| genderPL(genderPL = Female)                                           |                0.0 |
++-----------------------------------------------------------------------+--------------------+
