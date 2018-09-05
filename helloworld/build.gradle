@@ -12,6 +12,7 @@ plugins {
     id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
 }
 repositories {
+    mavenLocal()
     mavenCentral()
     maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
@@ -38,7 +39,7 @@ ext {
     junitVersion = '4.11'
     sparkVersion = '2.2.1'
     scalatestVersion = '3.0.0'
-    transmogrifaiVersion ='0.3.4'
+    transmogrifaiVersion ='0.4.0'
     collectionsVersion = '3.2.2'
     mainClassName = "com.salesforce.dummy.DummyMain"
 }
