@@ -26,7 +26,7 @@ Breaking changes:
 - Made `FileOutputCommiter` a default and got rid of `DirectMapreduceOutputCommitter` and `DirectOutputCommitter` [#86](https://github.com/salesforce/TransmogrifAI/pull/86)
 - Refactored `OpVectorColumnMetadata` to allow numeric column descriptors [#89](https://github.com/salesforce/TransmogrifAI/pull/89)
 - Renaming `JaccardDistance` to `JaccardSimilarity` [#80](https://github.com/salesforce/TransmogrifAI/pull/80)
-- New model selector interface [#55](https://github.com/salesforce/TransmogrifAI/pull/55). The breaking changes are related to return type and the way the parameters are passed into model selectors. Starting this version model selectors would return a single result feature of type `Prediction` (instead of a variable number of feature - `(pred, raw, prob)` ). Example:
+- New model selector interface [#55](https://github.com/salesforce/TransmogrifAI/pull/55). The breaking changes are related to return type and the way the parameters are passed into model selectors. Starting this version model selectors would return a single result feature of type `Prediction` (instead of a variable number of feature - `(pred, raw, prob)`). Example:
 ```scala
 val (pred, raw, prob) = MultiClassificationModelSelector() // won't compile anymore
 val prediction = MultiClassificationModelSelector() // ok!
