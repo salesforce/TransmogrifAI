@@ -44,7 +44,11 @@ class SummaryTest extends FlatSpec with TestCommon {
     val f2s = Summary(f2)
     f1s.min shouldBe 3
     f1s.max shouldBe 3
+    f1s.sum shouldBe 3
+    f1s.count shouldBe 1
     f2s.min shouldBe 0.5
     f2s.max shouldBe 1.0
+    f2s.sum shouldBe 1.5
+    f2s.count shouldBe 2
   }
 }

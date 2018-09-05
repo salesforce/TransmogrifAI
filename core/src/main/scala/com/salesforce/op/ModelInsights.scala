@@ -151,11 +151,24 @@ case class ModelInsights
   }
 
   private def prettySelectedModelInfo: String = {
-    val name = selectedModelInfo.map( sm => s"Selected Model - ${sm.bestModelType} ${sm.bestModelName}" ).getOrElse("")
-    val validationResults: Seq[(String, Any)] = selectedModelInfo.map(
-      _.validationResults.flatMap(e => Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++
-        e.modelParameters.toSeq)
-    ).getOrElse(Seq.empty)
+    val excludedParams = Set(
+      SparkWrapperParams.SparkStageParamName,
+      ModelSelectorNames.outputParamName, ModelSelectorNames.inputParam1Name,
+      ModelSelectorNames.inputParam2Name, ModelSelectorNames.outputParamName,
+      OpPipelineStageParamsNames.InputFeatures, OpPipelineStageParamsNames.InputSchema,
+      OpPipelineStageParamsNames.OutputMetadata,
+      "labelCol", "predictionCol", "predictionValueCol", "rawPredictionCol", "probabilityCol"
+    )
+    val name = selectedModelInfo.map(sm => s"Selected Model - ${sm.bestModelType}").getOrElse("")
+    val validationResults = (for {
+      sm <- selectedModelInfo.toSeq
+      e <- sm.validationResults.filter(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+    } yield {
+      val params = e.modelParameters.filterKeys(!excludedParams.contains(_))
+      Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++ params
+    }).flatten.sortBy(_._1)
     val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
     table.prettyString()
   }
