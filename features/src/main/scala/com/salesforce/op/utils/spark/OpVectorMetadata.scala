@@ -31,6 +31,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
+import com.salesforce.op.features.types.{Binary, BinaryMap, Text, TextArea, TextAreaMap, TextMap}
 import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NominalAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -74,7 +75,7 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-
+  val textTypes = Seq(Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap).map(_.getClass.toString.dropRight(1))
   /**
    * Serialize to spark metadata
    *
@@ -92,11 +93,9 @@ class OpVectorMetadata private
       .putMetadataArray(OpVectorMetadata.ColumnsKey, colMeta.toArray)
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
-    val nominalValues = columns
-      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping))
-      .mapValues(_.filter(_.indicatorValue.isDefined).map(_.indicatorValue.get).distinct)
     val attributes = columns.map { c =>
-      if (c.indicatorValue.isDefined) BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
+      if (c.indicatorValue.isDefined || textTypes.exists(c.parentFeatureType.contains))
+        BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
       else {
         NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
       }
