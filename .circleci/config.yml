@@ -18,7 +18,7 @@ jobs:
           name: Clone repo & compile project
           command: ./gradlew testScoverageClasses --parallel
       - save_cache:
-          key: repo-{{ .Environment.CIRCLE_SHA1 }}
+          key: repo-{{ .Branch }}
           paths:
             - ~/repo
             - ~/.gradle
@@ -33,7 +33,7 @@ jobs:
     steps:
       - restore_cache:
           keys:
-            - repo-{{ .Environment.CIRCLE_SHA1 }}
+            - repo-{{ .Branch }}
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
           name: Java version

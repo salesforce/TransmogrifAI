@@ -274,10 +274,9 @@ configure(allProjs) {
         }
     }
 
-    task resolveAllDependencies {
-        doLast {
-            configurations.all { if (it.canBeResolved) it.resolve() }
-        }
+    task versionedJar {
+        dependsOn createVersionProperties
+        dependsOn jar
     }
 
     if(System.getenv('TEST_FILES') != null) {
