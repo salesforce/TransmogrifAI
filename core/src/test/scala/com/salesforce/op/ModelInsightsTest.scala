@@ -282,12 +282,33 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "pretty print" in {
     val insights = workflowModel.modelInsights(pred)
+    insights.selectedModelInfo.isDefined shouldBe true
     val pretty = insights.prettyPrint()
-    pretty should include(s"Selected Model - ${BinaryClassificationModelsToTry.OpLogisticRegression}")
+    val modelType = BinaryClassificationModelsToTry.OpLogisticRegression
+    val sm = insights.selectedModelInfo.get
+    sm.bestModelType shouldBe modelType.toString
+    sm.validationResults.size shouldBe 2
+
+    pretty should include(s"Selected Model - $modelType")
+    withClue("include only best model info: ") {
+      pretty should include(sm.bestModelUID)
+      pretty should include(sm.bestModelType)
+      pretty should include(sm.bestModelName)
+    }
+    withClue("not include other models info: ") {
+      val others = sm.validationResults.filterNot(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+      others.size shouldBe 1
+      others.foreach { m =>
+        pretty should not include(m.modelName)
+      }
+    }
     pretty should include("area under precision-recall | 0.0")
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
     pretty should include("Top Positive Correlations")
+    pretty should include("Top Negative Correlations")
     pretty should include("Top Contributions")
   }
 
