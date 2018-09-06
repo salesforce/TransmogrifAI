@@ -80,8 +80,13 @@ class EmailVectorizerTest
   ).map(_.toOPVector)
 
 
-  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] =
-    new OpWorkflow().setResultFeatures(feature).transform(ds).collect(feature)
+  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
+    val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
+    val field = transformed.schema(feature.name)
+    val collected =  transformed.collect(feature)
+    AttributeTestUtils.assertNominal(field, Array.fill(collected.head.value.size)(true))
+    collected
+  }
 
   Spec[RichEmailMapFeature] should "vectorize EmailMaps correctly" in {
     val (ds1, f1) = TestFeatureBuilder(emails.map(e => Map(emailKey -> e.value.get).toEmailMap))

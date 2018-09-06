@@ -39,6 +39,7 @@ import org.apache.spark.ml.linalg.{DenseVector, Vectors}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+import com.salesforce.op.utils.spark.RichDataset._
 
 
 @RunWith(classOf[JUnitRunner])
@@ -97,6 +98,10 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
       (Array(45.0, -105.5, 4.0), null, null, null,
         Vectors.dense(45.0, -105.5, 4.0, 50.0, 50.0, 4.0, 50.0, 50.0, 4.0, 50.0, 50.0, 4.0))
     )
+    val output = testModelConstant.getOutputFeatureName
+    val field = testDataTransformedConstant.schema(output)
+    AttributeTestUtils.assertNominal(
+      field, Array.fill(expectedConstant.head._5.size)(false))
 
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedConstant.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedConstant.map(_._2)
@@ -129,7 +134,10 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
       (Array(45.0, -105.5, 4.0), null, null, null,
         Vectors.dense(Array(45.0, -105.5, 4.0) ++ mean1 ++ mean2 ++ mean3))
     )
-
+    val output = testModelMean.getOutputFeatureName
+    val field = testDataTransformedMean.schema(output)
+    AttributeTestUtils.assertNominal(
+      field, Array.fill(expectedMean.head._5.size)(false))
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)
@@ -169,7 +177,10 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
       (Array(45.0, -105.5, 4.0), null, null, null,
         Vectors.dense(Array(45.0, -105.5, 4.0, 0.0) ++ mean1 ++ mean2 ++ mean3))
     )
-
+    val output = testModelMean.getOutputFeatureName
+    val field = testDataTransformedMean.schema(output)
+    AttributeTestUtils.assertNominal(
+      field, Array.fill(expectedMean.head._5.size / 4)(Seq(false, false, false, true)).flatten)
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)

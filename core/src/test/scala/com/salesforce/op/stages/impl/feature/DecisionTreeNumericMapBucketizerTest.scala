@@ -228,6 +228,8 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     )
     val scored = model.setInputDataset(data).score(keepIntermediateFeatures = true)
     val res = scored.collect(out)
+    val field = scored.schema(out.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(res.head.value.size)(true))
     assertMetadata(
       shouldSplit = stage.shouldSplitByKey.toArray.sortBy(_._1).map(_._2),
       splits = stage.splitsByKey.toArray.sortBy(_._1).map(_._2),

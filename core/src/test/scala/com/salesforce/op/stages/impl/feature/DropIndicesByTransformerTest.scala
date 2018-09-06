@@ -73,8 +73,11 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
       .setInput(vectorizedPicklist)
       .getOutput()
     val materializedFeatures = new OpWorkflow().setResultFeatures(vectorizedPicklist, prunedVector).transform(df)
+    val field = materializedFeatures.schema(prunedVector.name)
+    val collectedFeatures = materializedFeatures.collect(prunedVector)
+    AttributeTestUtils.assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
 
-    materializedFeatures.collect(prunedVector).foreach(_.value.size shouldBe 4)
+    collectedFeatures.foreach(_.value.size shouldBe 4)
     materializedFeatures.collect().foreach { r =>
       if (r.getString(0) == "Red") r.getAs[Vector](2).toArray.forall(_ == 0) shouldBe true
       else r.getAs[Vector](2).toArray.max shouldBe 1
@@ -89,8 +92,11 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val vectorizedPicklist = picklistFeature.vectorize(topK = 10, minSupport = 3, cleanText = false)
     val prunedVector = vectorizedPicklist.dropIndicesBy(_.isNullIndicator)
     val materializedFeatures = new OpWorkflow().setResultFeatures(vectorizedPicklist, prunedVector).transform(df)
+    val field = materializedFeatures.schema(prunedVector.name)
+    val collectedFeatures = materializedFeatures.collect(prunedVector)
+    AttributeTestUtils.assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
 
-    materializedFeatures.collect(prunedVector).foreach(_.value.size shouldBe 4)
+    collectedFeatures.foreach(_.value.size shouldBe 4)
     materializedFeatures.collect().foreach( _.getAs[Vector](2).toArray.max shouldBe 1)
     val rawMeta = OpVectorMetadata(vectorizedPicklist.name, vectorizedPicklist.originStage.getMetadata())
     val trimmedMeta = OpVectorMetadata(materializedFeatures.schema(prunedVector.name))
