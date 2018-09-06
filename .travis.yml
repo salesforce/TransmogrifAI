@@ -6,7 +6,7 @@ before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS='-Xmx256m'
+    - GRADLE_OPTS='-Xmx256m -Dorg.gradle.daemon=false'
     - BUILD_CACHE_DIR="$HOME/build-cache"
     - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/tests.txt"
     - TESTS_FILES_PREFIX='tests'
@@ -46,16 +46,16 @@ jobs:
       name: 'Build Part 1'
       script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"00`
-        ./gradlew --no-daemon reportScoverage
+        ./gradlew reportScoverage
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"01`
-        ./gradlew --no-daemon reportScoverage
+        ./gradlew reportScoverage
       name: 'Build Part 2'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"02`
-        ./gradlew --no-daemon reportScoverage
+        ./gradlew reportScoverage
       name: 'Build Part 3'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"03`
-        ./gradlew --no-daemon reportScoverage
+        ./gradlew reportScoverage
       name: 'Build Part 4'
