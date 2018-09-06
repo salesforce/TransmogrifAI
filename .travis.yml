@@ -38,10 +38,7 @@ jobs:
         ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
-        ./gradlew testScoverageClasses --parallel
-    - script: ./gradlew scalaStyle --parallel
-      name: 'Scala style check'
-
+        ./gradlew scalaStyle testScoverageClasses --parallel
     - stage: 'Build'
       name: 'Build Part 1'
       script: |
