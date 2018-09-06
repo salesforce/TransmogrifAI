@@ -158,7 +158,9 @@ configure(allProjs) {
         manifest.attributes "Main-Class": "$mainClassName"
         baseName = "${rootProject.name}"
     }
-    jar.dependsOn(createVersionProperties)
+    if (System.getenv("CI") != 'true') {
+        jar.dependsOn(createVersionProperties)
+    }
 
     scalaStyle {
         configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
@@ -167,7 +169,7 @@ configure(allProjs) {
         testSource = "src/test/scala"
     }
 
-    if(!(System.getenv('CI') != null && System.getenv('CI').toBoolean())) {
+    if (System.getenv("CI") != 'true') {
         compileScala.dependsOn(scalaStyle)
     }
 
@@ -259,8 +261,8 @@ configure(allProjs) {
         }
     }
 
-    if(System.getenv('TEST_FILES') != null) {
-        testScoverage.setIncludes(Arrays.asList(System.getenv('TEST_FILES').split('\n')))
+    if (System.getenv("TEST_FILES") != null) {
+        testScoverage.setIncludes(Arrays.asList(System.getenv("TEST_FILES").split('\n')))
     }
 }
 
