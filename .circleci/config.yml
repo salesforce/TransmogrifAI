@@ -13,7 +13,7 @@ jobs:
     machine: true
     working_directory: ~/repo
     environment:
-      OP_VERSION_PROPS_DISABLED: false
+      OP_VERSION_PROPS_DISABLED: true
     steps:
       - checkout
       - restore_cache:
@@ -31,7 +31,7 @@ jobs:
     machine: true
     working_directory: ~/repo
     environment:
-      OP_VERSION_PROPS_DISABLED: false
+      OP_VERSION_PROPS_DISABLED: true
       GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true
       TERM: dumb
     parallelism: 4

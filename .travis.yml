@@ -10,7 +10,7 @@ env:
     - BUILD_CACHE_DIR="$HOME/build-cache"
     - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/tests.txt"
     - TESTS_FILES_PREFIX='tests'
-    - OP_VERSION_PROPS_DISABLED=false
+    - OP_VERSION_PROPS_DISABLED=true
 install:
   - true
 after_success:
