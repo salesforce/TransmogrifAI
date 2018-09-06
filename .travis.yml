@@ -6,11 +6,10 @@ before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS='-Xmx256m'
+    - GRADLE_OPTS='-Xmx256m -Dorg.gradle.daemon=false'
     - BUILD_CACHE_DIR="$HOME/build-cache"
     - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/tests.txt"
     - TESTS_FILES_PREFIX='tests'
-    - OP_VERSION_PROPS_DISABLED=true
 install:
   - true
 after_success:
@@ -26,7 +25,7 @@ cache:
     - $BUILD_CACHE_DIR
 jobs:
   include:
-    - stage: 'clone repo and compile project'
+    - stage: 'Clone repo and compile project'
       name: 'Clone repo & compile project'
       script: |
         find **/src/test/scala/* -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
@@ -39,23 +38,33 @@ jobs:
         ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
-        ./gradlew testScoverageClasses --parallel
-    - script: ./gradlew scalaStyle --parallel
-      name: 'Scala style check'
-    - stage: 'build'
+        ./gradlew scalaStyle testScoverageClasses --parallel
+    - stage: 'Build'
       name: 'Build Part 1'
       script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"00`
-        ./gradlew --no-daemon reportScoverage
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"01`
-        ./gradlew --no-daemon reportScoverage
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
       name: 'Build Part 2'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"02`
-        ./gradlew --no-daemon reportScoverage
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
       name: 'Build Part 3'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"03`
-        ./gradlew --no-daemon reportScoverage
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
       name: 'Build Part 4'
