@@ -47,16 +47,28 @@ jobs:
       name: 'Build Part 1'
       script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"00`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"01`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
       name: 'Build Part 2'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"02`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
       name: 'Build Part 3'
     - script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"03`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
       name: 'Build Part 4'
