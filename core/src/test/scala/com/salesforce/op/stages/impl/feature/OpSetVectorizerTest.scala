@@ -38,13 +38,11 @@ import com.salesforce.op.test.TestOpVectorColumnType.IndCol
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestOpWorkflowBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.{Estimator, Transformer}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 
