@@ -93,6 +93,8 @@ class BinaryVectorizerTest extends OpTransformerSpec[OPVector, BinaryVectorizer]
       f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
   }
 
   it should "transform the data correctly [trackNulls=true,fillValue=true]" in {
@@ -117,6 +119,8 @@ class BinaryVectorizerTest extends OpTransformerSpec[OPVector, BinaryVectorizer]
       f1 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(RootCol, IndCol(Some(TransmogrifierDefaults.NullString)))
     )
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
   }
 
   it should "transform the data correctly [trackNulls=false,fillValue=false]" in {
@@ -141,6 +145,8 @@ class BinaryVectorizerTest extends OpTransformerSpec[OPVector, BinaryVectorizer]
       f1 -> List(RootCol),
       f2 -> List(RootCol)
     )
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
   }
 
   it should "transform the data correctly [trackNulls=false,fillValue=true]" in {
@@ -165,5 +171,7 @@ class BinaryVectorizerTest extends OpTransformerSpec[OPVector, BinaryVectorizer]
       f1 -> List(RootCol),
       f2 -> List(RootCol)
     )
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
   }
 }

@@ -75,7 +75,7 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-  val textTypes = Seq(Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap).map(_.getClass.toString.dropRight(1))
+  val textTypes = Seq(Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap).map(_.getClass.getName.dropRight(1))
   /**
    * Serialize to spark metadata
    *

@@ -9,7 +9,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 object AttributeTestUtils extends Matchers{
 
-  final def assert(schema: StructField, expectedNominal: Array[Boolean]) = {
+  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]) = {
     val attributes = AttributeGroup.fromStructField(schema).attributes.get
     attributes.map(_.isNominal) shouldBe expectedNominal
   }

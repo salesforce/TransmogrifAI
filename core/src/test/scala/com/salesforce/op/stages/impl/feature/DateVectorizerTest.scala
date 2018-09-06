@@ -69,6 +69,8 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     val meta = OpVectorMetadata(vector.name, transformed.schema(vector.name).metadata)
     meta.columns.length shouldBe 3
     meta.history.keys.size shouldBe 3
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expectedAt(moment).head.value.size)(false))
 
     val vector2 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
@@ -83,6 +85,8 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     val meta2 = OpVectorMetadata(vector2.name, transformed2.schema(vector2.name).metadata)
     meta2.columns.length shouldBe 6
     meta2.history.keys.size shouldBe 3
+    val field2 = transformed2.schema(vector2.name)
+    AttributeTestUtils.assertNominal(field2, Array.fill(expectedAt(moment).head.value.size)(Seq(false, true)).flatten)
 
     val vector3 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
@@ -94,6 +98,9 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     val meta3 = OpVectorMetadata(vector3.name, transformed3.schema(vector3.name).metadata)
     meta3.columns.length shouldBe 30
     meta3.history.keys.size shouldBe 6
+    val field3 = transformed3.schema(vector3.name)
+    val expectedNominal = Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten.asInstanceOf[Array[Boolean]]
+    AttributeTestUtils.assertNominal(field3, expectedNominal)
   }
 
   private def buildTestData(moment: DateTime) = {
