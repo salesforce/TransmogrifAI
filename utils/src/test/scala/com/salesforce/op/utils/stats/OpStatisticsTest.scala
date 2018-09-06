@@ -32,15 +32,13 @@ package com.salesforce.op.utils.stats
 
 import com.salesforce.op.test.{TestCommon, TestSparkContext}
 import org.apache.spark.mllib.linalg.{DenseMatrix, Vector => OldVector}
-import org.junit.runner.RunWith
-import org.scalacheck.Gen
-import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.Inspectors._
-import org.scalatest.{FlatSpec, PropSpec}
 import org.apache.spark.mllib.random.RandomRDDs._
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.Inspectors._
+import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpStatisticsTest extends FlatSpec with TestCommon with TestSparkContext {
@@ -204,35 +202,6 @@ class OpStatisticsTest extends FlatSpec with TestCommon with TestSparkContext {
     // Comparing double-precision numbers so use a small tolerance on relative error
     val tol = 1e-12
     forAll(sparkRes.zip(opRes)) { case (sp, op) => math.abs((sp - op)/sp) should be < tol }
-  }
-
-}
-
-@RunWith(classOf[JUnitRunner])
-class OpStatisticsPropertyTest extends PropSpec with TestCommon with PropertyChecks {
-
-  val genInt = Gen.posNum[Int]
-  private def genArray(n: Int) = Gen.containerOfN[Array, Int](n, genInt)
-
-  val genMatrix = for {
-    rowSize <- Gen.choose(1, 13)
-    colSize <- Gen.choose(1, 13)
-    size = rowSize * colSize
-    array <- genArray(size)
-  } yield {
-    new DenseMatrix(rowSize, colSize, array.map(_.toDouble))
-  }
-
-  property("cramerV function should produce results in expected ranges") {
-    forAll(genMatrix) { (matrix: DenseMatrix) =>
-      val res = OpStatistics.chiSquaredTest(matrix).cramersV
-      if (matrix.numRows > 1 && matrix.numCols > 1) {
-        res >= 0 shouldBe true
-        res <= 1 shouldBe true
-      } else {
-        res.isNaN shouldBe true
-      }
-    }
   }
 
 }

@@ -1,69 +1,58 @@
 version: 2
 
 jobs:
-  clone_repo_and_resolve_dependencies:
+  scala_style_check:
     machine: true
     working_directory: ~/repo
     steps:
       - checkout
       - run:
-          name: Clone repo & resolve dependencies
-          command: ./gradlew resolveAllDependencies
+          name: Scala style check
+          command: ./gradlew scalaStyle --parallel
+  clone_repo_and_compile_project:
+    machine: true
+    working_directory: ~/repo
+    environment:
+      OP_VERSION_PROPS_DISABLED: true
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Clone repo & compile project
+          command: ./gradlew testScoverageClasses --parallel
       - save_cache:
-          key: repo-{{ .Environment.CIRCLE_SHA1 }}
+          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
-            - ~/repo
             - ~/.gradle
             - ~/.m2
-  build_core:
+  build:
     machine: true
     working_directory: ~/repo
     environment:
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
+      OP_VERSION_PROPS_DISABLED: true
+      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true
       TERM: dumb
+    parallelism: 4
     steps:
+      - checkout
       - restore_cache:
           keys:
-            - repo-{{ .Environment.CIRCLE_SHA1 }}
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
           name: Java version
           command: java -version
       - run:
-          name: Build core project
-          command: ./gradlew core:reportScoverage
-      - run:
-          name: Collect test results
+          name: Build project
           command: |
-            mkdir -p ~/junit/
-            mkdir -p ~/junit.xml/
-            find . -type d -regex ".*/build/test-results/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit.xml/$f' \;
-            find . -type d -regex ".*/build/reports/tests/testScoverage" -exec bash -c 'f=$(echo {} | cut -d/ -f2); cp -r {} ~/junit/$f' \;
-          when: always
-      - store_test_results:
-          path: ~/junit.xml/
-      - store_artifacts:
-          path: ~/junit/
-      - run:
-          name: Report scoverage resuts to Codecov
-          command: bash <(curl -s https://codecov.io/bash)
-  build_non_core:
-    machine: true
-    working_directory: ~/repo
-    environment:
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
-      TERM: dumb
-    steps:
-      - restore_cache:
-          keys:
-            - repo-{{ .Environment.CIRCLE_SHA1 }}
-            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-      - run:
-          name: Java version
-          command: java -version
-      - run:
-          name: Build non core projects
-          command: ./gradlew reportScoverage -x core:reportScoverage
+            TEST_FILES=$(circleci tests glob '**/src/test/scala/**/*.scala')
+            COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+            echo "Total test file : `eval $COUNT_TEST_FILE_CMD`"
+            TEST_FILES=$(echo "$TEST_FILES" | circleci tests split --split-by=timings --timings-type=classname --index=$CIRCLE_NODE_INDEX | tr ' ' '\n' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g')
+            echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES"
+            export TEST_FILES=$(echo "$TEST_FILES" | sed 's/\\n$//' )
+            ./gradlew --no-daemon reportScoverage
       - run:
           name: Collect test results
           command: |
@@ -84,10 +73,9 @@ workflows:
   version: 2
   build:
     jobs:
-      - clone_repo_and_resolve_dependencies
-      - build_core:
+      - scala_style_check
+      - clone_repo_and_compile_project
+      - build:
           requires:
-            - clone_repo_and_resolve_dependencies
-      - build_non_core:
-          requires:
-            - clone_repo_and_resolve_dependencies
+            - scala_style_check
+            - clone_repo_and_compile_project

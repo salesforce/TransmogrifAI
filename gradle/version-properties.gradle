@@ -16,7 +16,7 @@ configure(allprojects - project(':templates').subprojects) {
     //noinspection GroovyAssignabilityCheck
     task createVersionProperties() {
         doLast {
-            if (!System.env.OP_VERSION_PROPS_DISABLED) {
+            if (!(System.getenv('OP_VERSION_PROPS_DISABLED') != null && System.getenv('OP_VERSION_PROPS_DISABLED').toBoolean())) {
                 String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
                 String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
                 String gitBranch = cmdCaller(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
