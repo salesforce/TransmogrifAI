@@ -52,6 +52,7 @@ Dependency upgrades & misc:
 - Updated Gradle to 4.10
 - Updated `scala-graph` to `1.12.5`
 - Updated `scalafmt` to `1.5.1`
+- New `transmogrifai-local` subproject [#41](https://github.com/salesforce/TransmogrifAI/pull/41) introduces `aardpfark` and `hadrian` dependencies.
 
 
 ## 0.3.4
