@@ -6,7 +6,6 @@ jobs:
     working_directory: ~/repo
     environment:
       TERM: dumb
-      OP_VERSION_PROPS_DISABLED: true
       GRADLE_OPTS: -Xmx256m
     steps:
       - checkout
@@ -18,7 +17,6 @@ jobs:
     working_directory: ~/repo
     environment:
       TERM: dumb
-      OP_VERSION_PROPS_DISABLED: true
       GRADLE_OPTS: -Xmx256m
     steps:
       - checkout
@@ -41,7 +39,6 @@ jobs:
     working_directory: ~/repo
     environment:
       TERM: dumb
-      OP_VERSION_PROPS_DISABLED: true
       GRADLE_OPTS: -Xmx256m
     parallelism: 4
     steps:
