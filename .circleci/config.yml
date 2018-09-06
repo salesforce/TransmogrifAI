@@ -68,11 +68,6 @@ jobs:
       - run:
           name: Report scoverage resuts to Codecov
           command: bash <(curl -s https://codecov.io/bash)
-      - save_cache:
-          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle
-            - ~/.m2
 
 workflows:
   version: 2
