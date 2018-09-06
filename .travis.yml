@@ -33,7 +33,7 @@ jobs:
         TOTAL_TESTS=`cat $TESTS_FILE_NAME | wc -l`
         pushd $BUILD_CACHE_DIR
         echo 'Splitting test files into following parts'
-        split --numeric-suffixes -l `echo "($TOTAL_TESTS/5)+1" | bc` $TESTS_FILE_NAME $TESTS_FILES_PREFIX
+        split --numeric-suffixes -l `echo "($TOTAL_TESTS/4)+1" | bc` $TESTS_FILE_NAME $TESTS_FILES_PREFIX
         ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
@@ -57,7 +57,3 @@ jobs:
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"03`
         ./gradlew --no-daemon reportScoverage
       name: 'Build Part 4'
-    - script: |
-        export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"04`
-        ./gradlew --no-daemon reportScoverage
-      name: 'Build Part 5'

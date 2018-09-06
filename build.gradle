@@ -166,7 +166,10 @@ configure(allProjs) {
         source = "src/main/scala"
         testSource = "src/test/scala"
     }
-    // compileScala.dependsOn(scalaStyle)
+
+    if(!(System.getenv('CI') != null && System.getenv('CI').toBoolean())) {
+        compileScala.dependsOn(scalaStyle)
+    }
 
     avro {
         createSetters = true
