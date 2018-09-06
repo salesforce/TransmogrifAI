@@ -7,19 +7,19 @@ jobs:
     environment:
       TERM: dumb
       OP_VERSION_PROPS_DISABLED: true
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=false
+      GRADLE_OPTS: -Xmz256m
     steps:
       - checkout
       - run:
           name: Scala style check
-          command: ./gradlew scalaStyle --parallel
+          command: ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
     machine: true
     working_directory: ~/repo
     environment:
       TERM: dumb
       OP_VERSION_PROPS_DISABLED: true
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=false
+      GRADLE_OPTS: -Xmx256m
     steps:
       - checkout
       - restore_cache:
@@ -27,7 +27,7 @@ jobs:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
           name: Clone repo & compile project
-          command: ./gradlew testScoverageClasses --parallel
+          command: ./gradlew --parallel testScoverageClasses
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
@@ -39,7 +39,7 @@ jobs:
     environment:
       TERM: dumb
       OP_VERSION_PROPS_DISABLED: true
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=false
+      GRADLE_OPTS: -Xmx256m
     parallelism: 4
     steps:
       - checkout

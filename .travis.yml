@@ -26,7 +26,7 @@ cache:
     - $BUILD_CACHE_DIR
 jobs:
   include:
-    - stage: 'clone repo and compile project'
+    - stage: 'Clone repo and compile project'
       name: 'Clone repo & compile project'
       script: |
         find **/src/test/scala/* -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
@@ -42,7 +42,7 @@ jobs:
         ./gradlew testScoverageClasses --parallel
     - script: ./gradlew scalaStyle --parallel
       name: 'Scala style check'
-    - stage: 'build'
+    - stage: 'Build'
       name: 'Build Part 1'
       script: |
         export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"00`
