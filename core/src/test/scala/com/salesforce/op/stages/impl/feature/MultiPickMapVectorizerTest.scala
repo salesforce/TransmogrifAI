@@ -95,6 +95,10 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
   it should "return the a fitted vectorizer with the correct default parameters" in {
     val fitted = vectorizer.setTrackNulls(false).fit(dataSet)
     fitted shouldBe a[SequenceModel[_, _]]
+    val transformed = fitted.transform(dataSet)
+    val vector = vectorizer.getOutput()
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
     val vectorMetadata = fitted.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
@@ -116,6 +120,10 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
   it should "track nulls with the correct default parameters" in {
     val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
     fitted shouldBe a[SequenceModel[_, _]]
+    val transformed = fitted.transform(dataSet)
+    val vector = vectorizer.getOutput()
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
     val vectorMetadata = fitted.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
@@ -152,6 +160,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
@@ -168,6 +178,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(20, Array(0, 6, 9, 10, 13, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(20, Array(0, 3, 9, 12, 15, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
@@ -184,6 +196,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(17, Array(0, 9, 11), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(1, 3, 14), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
@@ -213,6 +227,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(23, Array(0, 7, 10, 12, 15, 22), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(23, Array(1, 4, 10, 14, 18, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
@@ -244,6 +260,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(12, Array(0, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(0, 2, 10), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -259,6 +277,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(18, Array(0, 5, 8, 9, 12, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(18, Array(0, 3, 8, 11, 14, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -272,6 +292,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(10, Array(0, 5, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(0, 2, 9), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -285,6 +307,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(16, Array(0, 5, 7, 8, 11, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(16, Array(0, 3, 7, 10, 13, 14), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -299,6 +323,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
 
     transformed.collect(vector) shouldBe expected
 
@@ -309,6 +335,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
+    val field2 = transformed2.schema(vector.name)
+    AttributeTestUtils.assertNominal(field2, Array.fill(expected2.head.value.size)(true))
     transformed2.collect(vector) shouldBe expected2
   }
 
@@ -323,6 +351,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
 
     transformed.collect(vector) shouldBe expected
 
@@ -333,6 +363,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
+    val field2 = transformed2.schema(vector.name)
+    AttributeTestUtils.assertNominal(field2, Array.fill(expected2.head.value.size)(true))
     transformed2.collect(vector) shouldBe expected2
   }
 
@@ -345,6 +377,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(Array.empty[Double]),
       Vectors.dense(Array.empty[Double])
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -362,6 +396,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(5, Array(3), Array(1.0)),
       Vectors.sparse(5, Array(0), Array(1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -379,6 +415,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(7, Array(3, 4), Array(1.0, 1.0)),
       Vectors.sparse(7, Array(0, 6), Array(1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -396,6 +434,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(9, Array(0, 7), Array(1.0, 1.0)),
       Vectors.sparse(9, Array(0, 4), Array(1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -413,6 +453,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(13, Array(0, 5, 9, 10), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(0, 5, 6, 12), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -432,6 +474,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(8, Array(3, 7), Array(2.0, 1.0)),
       Vectors.sparse(8, Array(0, 2, 3, 4, 5, 6), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 
@@ -451,6 +495,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(10, Array(3, 8), Array(2.0, 1.0)),
       Vectors.dense(1.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0)
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
   }
 

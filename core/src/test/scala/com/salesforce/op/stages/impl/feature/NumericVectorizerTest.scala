@@ -75,6 +75,8 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
       Array(3.0, 0.0, 0.0, 1.0),
       Array(4.0, 0.0, 0.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
+    val field = vectorized.schema(autoBucketFeature.name)
+    AttributeTestUtils.assertNominal(field, false +: Array.fill(expected.head.value.size - 1)(true))
     vectorized.collect(autoBucketFeature) should contain theSameElementsAs expected
   }
   it should "vectorize single real feature with a label" in {
@@ -86,7 +88,9 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
       age.autoBucketize(labelData, trackNulls = false)
     ).combine()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
-
+    val field = vectorized.schema(autoBucketFeature.name)
+    AttributeTestUtils.assertNominal(field, false +:
+      Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 1)(true))
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray
     }
@@ -101,7 +105,9 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
       height, height.autoBucketize(labelData, trackNulls = false)
     ).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
-
+    val field = vectorized.schema(autoBucketFeature.name)
+    AttributeTestUtils.assertNominal(field, Array(false, true, false) ++
+      Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 3)(true))
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray
     }
@@ -118,6 +124,12 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
     val autoBucketFeature = Seq(count).transmogrify(label = Some(labelData))
     val manualBucketFeature = Seq(count, count.autoBucketize(labelData, trackNulls = false)).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
+    val field = vectorized.schema(autoBucketFeature.name)
+    AttributeTestUtils.assertNominal(field, false +:
+      Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 1)(true))
+    val field2 = vectorized.schema(manualBucketFeature.name)
+    AttributeTestUtils.assertNominal(field2, false +:
+      Array.fill(vectorized.collect(manualBucketFeature).head.value.size -1)(true))
 
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray
