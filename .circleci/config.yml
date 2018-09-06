@@ -7,7 +7,7 @@ jobs:
     environment:
       TERM: dumb
       OP_VERSION_PROPS_DISABLED: true
-      GRADLE_OPTS: -Xmz256m
+      GRADLE_OPTS: -Xmx256m
     steps:
       - checkout
       - run:
@@ -25,6 +25,9 @@ jobs:
       - restore_cache:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Java version
+          command: java -version
       - run:
           name: Clone repo & compile project
           command: ./gradlew --parallel testScoverageClasses
@@ -46,9 +49,6 @@ jobs:
       - restore_cache:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-      - run:
-          name: Java version
-          command: java -version
       - run:
           name: Build project
           command: |

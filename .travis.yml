@@ -42,6 +42,7 @@ jobs:
         ./gradlew testScoverageClasses --parallel
     - script: ./gradlew scalaStyle --parallel
       name: 'Scala style check'
+
     - stage: 'Build'
       name: 'Build Part 1'
       script: |
