@@ -44,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class DateVectorizerTest extends FlatSpec with TestSparkContext {
+class DateVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
   require(DateTimeUtils.DefaultTimeZone == DateTimeZone.UTC)
 
   // Sunday July 12th 1998 at 22:45
@@ -70,7 +70,7 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     meta.columns.length shouldBe 3
     meta.history.keys.size shouldBe 3
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedAt(moment).head.value.size)(false))
+    assertNominal(field, Array.fill(expectedAt(moment).head.value.size)(false))
 
     val vector2 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
@@ -86,7 +86,7 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     meta2.columns.length shouldBe 6
     meta2.history.keys.size shouldBe 3
     val field2 = transformed2.schema(vector2.name)
-    AttributeTestUtils.assertNominal(field2, Array.fill(expectedAt(moment).head.value.size)(Seq(false, true)).flatten)
+    assertNominal(field2, Array.fill(expectedAt(moment).head.value.size)(Seq(false, true)).flatten)
 
     val vector3 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
@@ -100,7 +100,7 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
     meta3.history.keys.size shouldBe 6
     val field3 = transformed3.schema(vector3.name)
     val expectedNominal = Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten.asInstanceOf[Array[Boolean]]
-    AttributeTestUtils.assertNominal(field3, expectedNominal)
+    assertNominal(field3, expectedNominal)
   }
 
   private def buildTestData(moment: DateTime) = {

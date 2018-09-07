@@ -45,7 +45,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
+class NumericVectorizerTest extends FlatSpec with FeatureTestBase with AttributeAsserts {
 
   val ageData: Seq[Real] = RandomReal.uniform[Real](maxValue = 80.0).limit(100)
   val heightData: Seq[Real] = RandomReal.normal[Real](mean = 65.0, sigma = 8).limit(100)
@@ -76,7 +76,7 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
       Array(4.0, 0.0, 0.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
     val field = vectorized.schema(autoBucketFeature.name)
-    AttributeTestUtils.assertNominal(field, false +: Array.fill(expected.head.value.size - 1)(true))
+    assertNominal(field, false +: Array.fill(expected.head.value.size - 1)(true))
     vectorized.collect(autoBucketFeature) should contain theSameElementsAs expected
   }
   it should "vectorize single real feature with a label" in {
@@ -89,7 +89,7 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
     ).combine()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
     val field = vectorized.schema(autoBucketFeature.name)
-    AttributeTestUtils.assertNominal(field, false +:
+    assertNominal(field, false +:
       Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 1)(true))
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray
@@ -106,7 +106,7 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
     ).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
     val field = vectorized.schema(autoBucketFeature.name)
-    AttributeTestUtils.assertNominal(field, Array(false, true, false) ++
+    assertNominal(field, Array(false, true, false) ++
       Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 3)(true))
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray
@@ -125,11 +125,11 @@ class NumericVectorizerTest extends FlatSpec with FeatureTestBase {
     val manualBucketFeature = Seq(count, count.autoBucketize(labelData, trackNulls = false)).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(autoBucketFeature, manualBucketFeature).transform(ds)
     val field = vectorized.schema(autoBucketFeature.name)
-    AttributeTestUtils.assertNominal(field, false +:
+    assertNominal(field, false +:
       Array.fill(vectorized.collect(autoBucketFeature).head.value.size - 1)(true))
     val field2 = vectorized.schema(manualBucketFeature.name)
-    AttributeTestUtils.assertNominal(field2, false +:
-      Array.fill(vectorized.collect(manualBucketFeature).head.value.size -1)(true))
+    assertNominal(field2, false +:
+      Array.fill(vectorized.collect(manualBucketFeature).head.value.size - 1)(true))
 
     for {(autoAge, manualAge) <- vectorized.collect(autoBucketFeature, manualBucketFeature)} {
       autoAge.v.toArray should contain theSameElementsAs manualAge.v.toArray

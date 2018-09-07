@@ -45,7 +45,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class URLVectorizerTest
-  extends FlatSpec with FeatureTestBase with RichTextFeature with RichMapFeature with RichFeature {
+  extends FlatSpec with FeatureTestBase with RichTextFeature with RichMapFeature with RichFeature
+    with AttributeAsserts {
   val urlKey = "Url1"
   val urlKey2 = "Url2"
   val urls = (RandomText.urlsOn(_ => "salesforce.com").take(2) ++ RandomText.urlsOn(_ => "data.com").take(2)).toSeq
@@ -83,7 +84,7 @@ class URLVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val results = transformed.collect(feature)
     val field = transformed.schema(feature.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true))
     results
   }
 

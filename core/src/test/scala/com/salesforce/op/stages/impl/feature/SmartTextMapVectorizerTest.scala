@@ -42,7 +42,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
+class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
   lazy val (data, m1, m2, f1, f2) = TestFeatureBuilder("textMap1", "textMap2", "text1", "text2",
     Seq[(TextMap, TextMap, Text, Text)](
       (TextMap(Map("text1" -> "hello world", "text2" -> "Hello world!")), TextMap.empty,
@@ -106,9 +106,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -139,9 +139,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -173,9 +173,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -208,9 +208,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -246,9 +246,9 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -285,10 +285,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, shortcutMapVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, shortcutMapVectorized)
     val field = transformed.schema(shortcutMapVectorized.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(transformed.collect(shortcutMapVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val smartMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val shortcutMeta = OpVectorMetadata(transformed.schema(shortcutMapVectorized.name))
@@ -319,10 +319,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(textMapVectorized, textAreaMapVectorized).transform(data)
     val result = transformed.collect(textMapVectorized, textAreaMapVectorized)
     val field = transformed.schema(textMapVectorized.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(transformed.collect(textMapVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(textAreaMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap,
+    assertNominal(fieldMap,
       Array.fill(transformed.collect(textAreaMapVectorized).head.value.size)(true))
     val textMapMeta = OpVectorMetadata(transformed.schema(textMapVectorized.name))
     val textareaMapMeta = OpVectorMetadata(transformed.schema(textAreaMapVectorized.name))

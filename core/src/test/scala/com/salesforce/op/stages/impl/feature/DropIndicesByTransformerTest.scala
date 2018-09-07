@@ -43,9 +43,8 @@ import org.scalatest.junit.JUnitRunner
 import org.apache.spark.sql.functions._
 
 
-
 @RunWith(classOf[JUnitRunner])
-class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndicesByTransformer] {
+class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndicesByTransformer] with AttributeAsserts {
 
   val (inputData, transformer) = {
     val vecData = Seq(
@@ -75,7 +74,7 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val materializedFeatures = new OpWorkflow().setResultFeatures(vectorizedPicklist, prunedVector).transform(df)
     val field = materializedFeatures.schema(prunedVector.name)
     val collectedFeatures = materializedFeatures.collect(prunedVector)
-    AttributeTestUtils.assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
+    assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
 
     collectedFeatures.foreach(_.value.size shouldBe 4)
     materializedFeatures.collect().foreach { r =>
@@ -94,10 +93,10 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val materializedFeatures = new OpWorkflow().setResultFeatures(vectorizedPicklist, prunedVector).transform(df)
     val field = materializedFeatures.schema(prunedVector.name)
     val collectedFeatures = materializedFeatures.collect(prunedVector)
-    AttributeTestUtils.assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
+    assertNominal(field, Array.fill(collectedFeatures.head.value.size)(true))
 
     collectedFeatures.foreach(_.value.size shouldBe 4)
-    materializedFeatures.collect().foreach( _.getAs[Vector](2).toArray.max shouldBe 1)
+    materializedFeatures.collect().foreach(_.getAs[Vector](2).toArray.max shouldBe 1)
     val rawMeta = OpVectorMetadata(vectorizedPicklist.name, vectorizedPicklist.originStage.getMetadata())
     val trimmedMeta = OpVectorMetadata(materializedFeatures.schema(prunedVector.name))
     rawMeta.columns.length - 1 shouldBe trimmedMeta.columns.length

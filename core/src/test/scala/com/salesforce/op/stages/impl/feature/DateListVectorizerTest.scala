@@ -45,7 +45,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectorizer[DateList]] {
+class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectorizer[DateList]] with AttributeAsserts {
 
   // Sunday July 12th 1998 at 22:45
   val defaultDate = new DateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
@@ -127,7 +127,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
+    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
 
@@ -155,7 +155,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)
+    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)
     (Seq(false, true)).flatten)
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
@@ -184,7 +184,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
+    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
 
@@ -208,7 +208,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 7)(true))
+    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 7)(true))
     testModelModeDay.getMetadata() shouldEqual fieldMetadata
 
     val daysOfWeek = List("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday").map(s =>
@@ -239,7 +239,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 8)(true))
+    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 8)(true))
     testModelModeDay.getMetadata() shouldEqual fieldMetadata
 
     val daysOfWeek = List("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -269,7 +269,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelModeMonth.getInputFeatures().size * 12)(true))
+    assertNominal(schema, Array.fill(testModelModeMonth.getInputFeatures().size * 12)(true))
     testModelModeMonth.getMetadata() shouldEqual fieldMetadata
 
     val months = List(
@@ -301,7 +301,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    AttributeTestUtils.assertNominal(schema, Array.fill(testModelModeHour.getInputFeatures().size * 24)(true))
+    assertNominal(schema, Array.fill(testModelModeHour.getInputFeatures().size * 24)(true))
     testModelModeHour.getMetadata() shouldEqual fieldMetadata
 
     val hours = (0 until 24).map(i => IndCol(Some(s"$i:00"))).toList

@@ -42,7 +42,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class TextListNullTransformerTest extends FlatSpec with TestSparkContext {
+class TextListNullTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (ds, f1, f2) = TestFeatureBuilder(
     Seq[(TextList, TextList)](
@@ -84,7 +84,7 @@ class TextListNullTransformerTest extends FlatSpec with TestSparkContext {
       Array(1.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
+    assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(vector) shouldBe expected
 
     val vectorMetadata = vectorizer.getMetadata()

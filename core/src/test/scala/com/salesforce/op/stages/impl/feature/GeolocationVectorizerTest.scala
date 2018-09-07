@@ -43,7 +43,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 
 
 @RunWith(classOf[JUnitRunner])
-class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
+class GeolocationVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (testData, inA, inB, inC, inD) = TestFeatureBuilder("inA", "inB", "inC", "inD",
     Seq[(Geolocation, Geolocation, Geolocation, Geolocation)](
@@ -100,7 +100,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
     )
     val output = testModelConstant.getOutputFeatureName
     val field = testDataTransformedConstant.schema(output)
-    AttributeTestUtils.assertNominal(
+    assertNominal(
       field, Array.fill(expectedConstant.head._5.size)(false))
 
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedConstant.map(_._1)
@@ -136,7 +136,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
     )
     val output = testModelMean.getOutputFeatureName
     val field = testDataTransformedMean.schema(output)
-    AttributeTestUtils.assertNominal(
+    assertNominal(
       field, Array.fill(expectedMean.head._5.size)(false))
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
@@ -179,7 +179,7 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext {
     )
     val output = testModelMean.getOutputFeatureName
     val field = testDataTransformedMean.schema(output)
-    AttributeTestUtils.assertNominal(
+    assertNominal(
       field, Array.fill(expectedMean.head._5.size / 4)(Seq(false, false, false, true)).flatten)
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)

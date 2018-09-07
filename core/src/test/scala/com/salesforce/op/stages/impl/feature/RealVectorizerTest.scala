@@ -43,7 +43,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class RealVectorizerTest extends FlatSpec with TestSparkContext {
+class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (testData, inA, inB, inC) = TestFeatureBuilder("inA", "inB", "inC",
     Seq[(Real, Real, Real)](
@@ -107,7 +107,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 4.2, 4.2))
     )
     val field = testDataTransformedConstant.schema(testModelConstant.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
+    assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedZero.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedZero.map(_._2)
     transformedValuesConstant.map(_.get(2)) shouldEqual expectedZero.map(_._3)
@@ -134,7 +134,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 2.0, 0.0))
     )
     val field = testDataTransformedMean.schema(testModelMean.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedMean.head._4.size)(false))
+    assertNominal(field, Array.fill(expectedMean.head._4.size)(false))
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)
@@ -157,7 +157,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 0.0, 0.0, 1.0, 0.0, 1.0))
     )
     val field = testDataTransformedConstantTracked.schema(testModelConstantTracked.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedZeroTracked.head._4.size / 2)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(expectedZeroTracked.head._4.size / 2)(Seq(false, true)).flatten)
     transformedValuesZeroTracked.map(_.get(0)) shouldEqual expectedZeroTracked.map(_._1)
     transformedValuesZeroTracked.map(_.get(1)) shouldEqual expectedZeroTracked.map(_._2)
     transformedValuesZeroTracked.map(_.get(2)) shouldEqual expectedZeroTracked.map(_._3)
@@ -191,7 +191,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 0.0, 2.0, 1.0, 0.0, 1.0))
     )
     val field = testDataTransformedMeanTracked.schema(testModelMeanTracked.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedMeanTracked.head._4.size / 2)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(expectedMeanTracked.head._4.size / 2)(Seq(false, true)).flatten)
     transformedValuesMeanTracked.map(_.get(0)) shouldEqual expectedMeanTracked.map(_._1)
     transformedValuesMeanTracked.map(_.get(1)) shouldEqual expectedMeanTracked.map(_._2)
     transformedValuesMeanTracked.map(_.get(2)) shouldEqual expectedMeanTracked.map(_._3)
@@ -225,7 +225,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 0.0, 2.0, 1.0, 0.0, 1.0))
     )
     val field = testDataTransformedMeanTracked.schema(testModelMeanTracked.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedMeanTracked.head._4.size / 2)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(expectedMeanTracked.head._4.size / 2)(Seq(false, true)).flatten)
     transformedValuesMeanTracked.map(_.get(0)) shouldEqual expectedMeanTracked.map(_._1)
     transformedValuesMeanTracked.map(_.get(1)) shouldEqual expectedMeanTracked.map(_._2)
     transformedValuesMeanTracked.map(_.get(2)) shouldEqual expectedMeanTracked.map(_._3)
@@ -258,7 +258,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 4.2, 4.2))
     )
     val field = testDataTransformedConstant.schema(testModelConstant.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
+    assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedZero.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedZero.map(_._2)
     transformedValuesConstant.map(_.get(2)) shouldEqual expectedZero.map(_._3)
@@ -280,7 +280,7 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext {
       (2.0, null, null, Vectors.dense(2.0, 4.2, 4.2))
     )
     val field = testDataTransformedConstant.schema(testModelConstant.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
+    assertNominal(field, Array.fill(expectedZero.head._4.size)(false))
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedZero.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedZero.map(_._2)
     transformedValuesConstant.map(_.get(2)) shouldEqual expectedZero.map(_._3)

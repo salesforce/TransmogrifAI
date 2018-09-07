@@ -32,18 +32,16 @@ package com.salesforce.op.stages.impl.feature
 
 import org.apache.spark.ml.attribute.AttributeGroup
 import org.apache.spark.sql.types.StructField
-import org.junit.runner.RunWith
-import org.scalatest.Matchers
-import org.scalatest.junit.JUnitRunner
+import org.scalatest.{Assertion, Matchers}
 
-object AttributeTestUtils extends Matchers{
-
+trait AttributeAsserts {
+  self: Matchers =>
   /**
    * Assert if attributes are nominal or not
    * @param schema
    * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
    */
-  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]): Unit = {
+  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]): Assertion = {
     val attributes = AttributeGroup.fromStructField(schema).attributes.get
     attributes.map(_.isNominal) shouldBe expectedNominal
   }

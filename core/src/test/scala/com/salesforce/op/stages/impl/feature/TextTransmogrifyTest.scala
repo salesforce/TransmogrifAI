@@ -43,7 +43,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
+class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with AttributeAsserts {
 
   val cityData: Seq[City] = RandomText.cities.take(10).toList
   val countryData: Seq[Country] = RandomText.countries.take(10).toList
@@ -55,7 +55,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
 
   val data: Seq[(City, Country, PostalCode, Text, TextArea)] =
     cityData.zip(countryData).zip(postalData).zip(textData).zip(textAreaData)
-      .map{ case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
+      .map { case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
 
   val (ds, city, country, postal, text, textarea) = TestFeatureBuilder("city", "country", "postal", "text",
     "textarea", data)
@@ -97,7 +97,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(largeDS)
     val vectCollect = vectorized.collect(feature)
     val field = vectorized.schema(feature.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(vectCollect.head.value.size)(true))
+    assertNominal(field, Array.fill(vectCollect.head.value.size)(true))
     for {vector <- vectCollect} {
       vector.v.size shouldBe TransmogrifierDefaults.DefaultNumOfFeatures * 2 + 2
     }
@@ -111,9 +111,9 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val vectorized = new OpWorkflow().setResultFeatures(feature, feature2).transform(ds)
     val vectCollect = vectorized.collect(feature, feature2)
     val field = vectorized.schema(feature.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(vectCollect.head._1.value.size)(true))
+    assertNominal(field, Array.fill(vectCollect.head._1.value.size)(true))
     val field2 = vectorized.schema(feature2.name)
-    AttributeTestUtils.assertNominal(field2, Array.fill(vectCollect.head._2.value.size)(true))
+    assertNominal(field2, Array.fill(vectCollect.head._2.value.size)(true))
     for {(vector1, vector2) <- vectCollect} {
       vector1.v.size shouldBe 2
       vector1.v.toArray should contain theSameElementsAs vector2.v.toArray
@@ -127,7 +127,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val vectCollect = vectorized.collect(feature)
     val field = vectorized.schema(feature.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(vectCollect.head.value.size)(true))
+    assertNominal(field, Array.fill(vectCollect.head.value.size)(true))
     vectCollect.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures + 1)
   }
 

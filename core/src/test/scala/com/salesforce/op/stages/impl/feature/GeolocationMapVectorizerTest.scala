@@ -44,7 +44,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class GeolocationMapVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[GeolocationMap, OPVector], GeolocationMapVectorizer] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[GeolocationMap, OPVector], GeolocationMapVectorizer]
+    with AttributeAsserts {
 
   val (inputData, m1, m2) = TestFeatureBuilder("m1", "m2",
     Seq(
@@ -94,7 +95,7 @@ class GeolocationMapVectorizerTest
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
     transformed.collect(vector) shouldBe expectedResult
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -114,7 +115,7 @@ class GeolocationMapVectorizerTest
     ).map(_.toOPVector)
 
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
@@ -133,7 +134,7 @@ class GeolocationMapVectorizerTest
       Array.fill(18)(6.0)
     ).map(v => Vectors.dense(v).toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
@@ -154,7 +155,7 @@ class GeolocationMapVectorizerTest
       (0 until 6).flatMap(k => Seq.fill(3)(6.0) :+ 1.0).toArray
     ).map(v => Vectors.dense(v).toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
 
     transformed.collect(vector) shouldBe expected
@@ -174,7 +175,7 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(9, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
@@ -201,7 +202,7 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(12, Array(3, 7, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -232,7 +233,7 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(12, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
@@ -259,7 +260,7 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(16, Array(3, 7, 11, 15), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field,
+    assertNominal(field,
       Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -287,7 +288,7 @@ class GeolocationMapVectorizerTest
     val expectedOutput = transformed.collect()
 
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size / 4)
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size / 4)
     (Seq(false, false, false, true)).flatten)
     // Now using the shortcut
     val res = m1.vectorize(cleanKeys = TransmogrifierDefaults.CleanKeys, others = Array(m2))

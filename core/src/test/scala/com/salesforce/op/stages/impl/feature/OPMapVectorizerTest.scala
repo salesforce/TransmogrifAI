@@ -52,7 +52,7 @@ import scala.reflect.runtime.universe._
 
 
 @RunWith(classOf[JUnitRunner])
-class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
+class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   import OPMapVectorizerTestHelper._
 
@@ -85,7 +85,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
 
     val output = vectorizer.getOutput()
     val field = transformed.schema(output.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
+    assertNominal(field, Array.fill(expected.head.value.size)(true))
     transformed.collect(output) shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
@@ -325,7 +325,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
   }
 }
 
-object OPMapVectorizerTestHelper extends Matchers {
+object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -338,7 +338,6 @@ object OPMapVectorizerTestHelper extends Matchers {
    * @param f2Data            Sequence of base feature type data (eg. from generators)
    * @param f3Data            Sequence of base feature type data (eg. from generators)
    * @param isCategorical     If the vector contains categoricals
-   * @param numberOfContinous It the vector contains categoricals
    * @tparam F  Base feature type (eg. ID, Text, Integer)
    * @tparam FM OPMap feature type (eg. IDMap, TextMap, IntegerMap)
    * @tparam MT Value type of map inside OPMap feature (eg. String, String, Int)
@@ -378,7 +377,7 @@ object OPMapVectorizerTestHelper extends Matchers {
       }
     }
     val field = transformed.schema(featureVector.name)
-    AttributeTestUtils.assertNominal(field, isCategoricalArray)
+    assertNominal(field, isCategoricalArray)
 
     val summary = transformed.schema(featureVector.name).metadata
     log.info("summary:\n{}", summary)
@@ -395,7 +394,7 @@ object OPMapVectorizerTestHelper extends Matchers {
       transformedMap.show(10)
     }
     val fieldMap = transformedMap.schema(mapFeatureVector.name)
-    AttributeTestUtils.assertNominal(fieldMap, isCategoricalArray)
+    assertNominal(fieldMap, isCategoricalArray)
 
 
     // Check that the actual features are the same

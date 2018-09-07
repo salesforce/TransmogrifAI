@@ -41,7 +41,7 @@ import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
+class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (catData, top, bot) = TestFeatureBuilder("top", "bot",
     Seq[(MultiPickList, MultiPickList)](
@@ -105,7 +105,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -142,7 +142,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -181,7 +181,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -213,7 +213,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(realMapData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -240,7 +240,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -275,7 +275,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -356,7 +356,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -388,7 +388,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -418,7 +418,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(catData)
     val vector = vectorizer.getOutput()
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
     val meta = OpVectorMetadata(transformed.schema(feature.name))
     meta.history.keys shouldBe Set(top.name, bot.name)
     meta.columns.length shouldBe 20
@@ -435,7 +435,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = vectorizer.transform(catData)
     val vector = vectorizer.getOutput()
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
     val meta = OpVectorMetadata(transformed.schema(feature.name))
     meta.history.keys shouldBe Set(top.name, bot.name)
     meta.columns.length shouldBe 10

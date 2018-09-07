@@ -44,7 +44,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class IntegralMapVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[IntegralMap, OPVector], IntegralMapVectorizer[IntegralMap]] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[IntegralMap, OPVector], IntegralMapVectorizer[IntegralMap]]
+    with AttributeAsserts {
 
   val (inputData, m1, m2) = TestFeatureBuilder("m1", "m2",
     Seq(
@@ -84,7 +85,7 @@ class IntegralMapVectorizerTest
     val vector = estimator.getOutput()
     val transformed = model.transform(inputData)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
 
     transformed.collect(vector) shouldBe expectedResult
     transformed.schema.toOpVectorMetadata(estimator.getOutputFeatureName) shouldEqual expectedMeta
@@ -103,7 +104,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
@@ -122,7 +123,7 @@ class IntegralMapVectorizerTest
       Vectors.dense(Array(100.0, 100.0, 100.0, 100.0, 100.0, 100.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
@@ -141,7 +142,7 @@ class IntegralMapVectorizerTest
       Vectors.dense(Array(100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
@@ -162,7 +163,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(3, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
@@ -188,7 +189,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(6, Array(1, 3, 5), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(3)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(3)(Seq(false, true)).flatten)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
@@ -214,7 +215,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(4, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
@@ -239,7 +240,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(8, Array(1, 3, 5, 7), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(4)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(4)(Seq(false, true)).flatten)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),

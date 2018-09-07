@@ -48,7 +48,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
   BinaryModel[RealNN, Real, OPVector], DecisionTreeNumericBucketizer[Double, Real]]
-  with DecisionTreeNumericBucketizerAsserts
+  with DecisionTreeNumericBucketizerAsserts with AttributeAsserts
 {
   val (inputData, estimator) = {
     val numericData = Seq(1.0.toReal, 18.0.toReal, Real.empty, (-1.23).toReal, 0.0.toReal)
@@ -206,7 +206,7 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val transformed = model.transform(data)
     val res = transformed.collect(out)
     val field = transformed.schema(out.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(res.head.value.size)(true))
+    assertNominal(field, Array.fill(res.head.value.size)(true))
       assertMetadata(
       shouldSplit = Array(shouldSplit),
       splits = Array(splits),

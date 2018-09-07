@@ -45,7 +45,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class EmailVectorizerTest
-  extends FlatSpec with FeatureTestBase with RichMapFeature with RichFeature with RichTextFeature {
+  extends FlatSpec with FeatureTestBase with RichMapFeature with RichFeature with RichTextFeature
+    with AttributeAsserts {
   val emailKey = "Email1"
   val emailKey2 = "Email2"
   val emails = (RandomText.emails("salesforce.com").take(2) ++ RandomText.emails("einstein.ai").take(2)).toSeq
@@ -84,7 +85,7 @@ class EmailVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val field = transformed.schema(feature.name)
     val collected = transformed.collect(feature)
-    AttributeTestUtils.assertNominal(field, Array.fill(collected.head.value.size)(true))
+    assertNominal(field, Array.fill(collected.head.value.size)(true))
     collected
   }
 

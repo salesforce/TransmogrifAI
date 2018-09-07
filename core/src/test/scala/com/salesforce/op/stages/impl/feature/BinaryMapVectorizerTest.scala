@@ -43,7 +43,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class BinaryMapVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[BinaryMap, OPVector], BinaryMapVectorizer[BinaryMap]] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[BinaryMap, OPVector], BinaryMapVectorizer[BinaryMap]]
+    with AttributeAsserts {
 
   val (inputData, m1, m2) = TestFeatureBuilder("m1", "m2",
     Seq(
@@ -73,7 +74,7 @@ class BinaryMapVectorizerTest
 
     transformed.collect(vector) shouldBe expectedResult
     val field = transformed.schema(estimator.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(true))
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(true))
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
@@ -101,7 +102,7 @@ class BinaryMapVectorizerTest
 
     transformed.collect(vector) shouldBe expected
     val field = transformed.schema(estimator.getOutputFeatureName)
-    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(true))
+    assertNominal(field, Array.fill(expected.head.value.size)(true))
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
