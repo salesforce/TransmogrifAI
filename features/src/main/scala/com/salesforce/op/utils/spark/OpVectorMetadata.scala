@@ -31,7 +31,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
-import com.salesforce.op.features.types.{Binary, BinaryMap, Text, TextArea, TextAreaMap, TextMap}
+import com.salesforce.op.features.types.{Binary, BinaryMap, MultiPickList, MultiPickListMap, Text, TextArea, TextAreaMap, TextList, TextMap}
 import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NominalAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -75,7 +75,9 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-  val textTypes = Seq(Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap).map(_.getClass.getName.dropRight(1))
+  val textTypes = Seq(MultiPickList, MultiPickListMap, Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap,
+    TextList).map(_.getClass.getName.dropRight(1))
+
   /**
    * Serialize to spark metadata
    *
