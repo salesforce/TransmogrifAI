@@ -30,7 +30,6 @@
 
 package com.salesforce.op
 
-// scalastyle:off ensure.single.space.after.token
 package object filters {
   private[filters] type FeatureKey = (String, Option[String])
   private[filters] type ProcessedSeq = Either[Seq[String], Seq[Double]]

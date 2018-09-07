@@ -28,27 +28,40 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.utils.stats
 
 import com.salesforce.op.test.TestCommon
+import org.apache.spark.mllib.linalg.DenseMatrix
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalacheck.Gen
+import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.PropertyChecks
 
 @RunWith(classOf[JUnitRunner])
-class SummaryTest extends FlatSpec with TestCommon {
-  Spec[Summary] should "be correctly created from a sequence of features" in {
-    val f1 = Left(Seq("a", "b", "c"))
-    val f2 = Right(Seq(0.5, 1.0))
-    val f1s = Summary(f1)
-    val f2s = Summary(f2)
-    f1s.min shouldBe 3
-    f1s.max shouldBe 3
-    f1s.sum shouldBe 3
-    f1s.count shouldBe 1
-    f2s.min shouldBe 0.5
-    f2s.max shouldBe 1.0
-    f2s.sum shouldBe 1.5
-    f2s.count shouldBe 2
+class OpStatisticsPropertyTest extends PropSpec with TestCommon with PropertyChecks {
+
+  val genInt = Gen.posNum[Int]
+  private def genArray(n: Int) = Gen.containerOfN[Array, Int](n, genInt)
+
+  val genMatrix = for {
+    rowSize <- Gen.choose(1, 13)
+    colSize <- Gen.choose(1, 13)
+    size = rowSize * colSize
+    array <- genArray(size)
+  } yield {
+    new DenseMatrix(rowSize, colSize, array.map(_.toDouble))
+  }
+
+  property("cramerV function should produce results in expected ranges") {
+    forAll(genMatrix) { (matrix: DenseMatrix) =>
+      val res = OpStatistics.chiSquaredTest(matrix).cramersV
+      if (matrix.numRows > 1 && matrix.numCols > 1) {
+        res >= 0 shouldBe true
+        res <= 1 shouldBe true
+      } else {
+        res.isNaN shouldBe true
+      }
+    }
   }
 }

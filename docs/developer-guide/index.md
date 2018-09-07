@@ -8,21 +8,24 @@ Features are objects within TransmogrifAI which contain all information about wh
 /**
  * Feature instance
  *
+ * Note: can only be created using [[FeatureBuilder]].
+ *
  * @param name        name of feature, represents the name of the column in the dataframe.
  * @param isResponse  whether or not this feature is a response feature, ie dependent variable
- * @param originStage reference to OpStage responsible for generating the feature.
+ * @param originStage reference to OpPipelineStage responsible for generating the feature.
  * @param parents     references to the features that are transformed by the originStage that produces this feature
  * @param uid         unique identifier of the feature instance
  * @param wtt         feature's value type tag
  * @tparam O feature value type
  */
-private[op] case class Feature[O <: FeatureType]
+case class Feature[O <: FeatureType] private[op]
 (
   name: String,
   isResponse: Boolean,
   originStage: OpPipelineStage[O],
-  parents: Seq[OPFeature] = Seq.empty,
-  uid: String = UID[Feature[O]]
+  parents: Seq[OPFeature],
+  uid: String,
+  distributions: Seq[FeatureDistributionLike] = Seq.empty
 )(implicit val wtt: WeakTypeTag[O]) extends FeatureLike[O] {
   /* ... */
   def history: FeatureHistory // contains history of how feature was created
@@ -941,6 +944,21 @@ Sometimes it is important to aggreagte feature information after the join has be
   reader1.leftJoin(reader2).withSecondayAggreagtion(timeFilter).innerJoin(reader3)
 ```
 
+### Streaming Data Readers
+
+[Streaming Data Readers](https://github.com/salesforce/TransmogrifAI/blob/master/readers/src/main/scala/com/salesforce/op/readers/StreamingReaders.scala) allow computation of scores with TransmogrifAI models over a stream of data. Below is an example usage using [OpWorkflowRunner](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/OpWorkflowRunner.scala):
+```scala
+val streamingReader = StreamingReaders.avro[GenericRecord]()
+val opParams = new OpParams().copy(
+  modelLocation = Some(modelLocation) // model load location
+  writeLocation = Some(scoresLocation), // scores write location
+  readLocations = Map(streamingReader.typeName -> readLocation) // stream read location
+)
+val runner = new OpWorkflowRunner(streamingReader = streamingReader /* all other args... */ )
+
+// run scoring over the stream
+runner.run(OpWorkflowRunType.StreamingScore, opParams)(spark, streamingContext)
+```
 
 ## Evaluators
 

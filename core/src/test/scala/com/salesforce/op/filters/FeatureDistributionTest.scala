@@ -30,12 +30,9 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.OpParams
-import com.salesforce.op.features.{OPFeature, TransientFeature}
-import com.salesforce.op.stages.impl.feature.HashAlgorithm
+import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.test.PassengerSparkFixtureTest
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.mllib.feature.HashingTF
+import com.salesforce.op.testkit.RandomText
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -49,19 +46,17 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       (false, Right(Seq(1.0))), (true, Right(Seq.empty[Double])), (false, Left(Seq("male", "female"))),
       (true, Left(Seq.empty[String])), (false, Right(Seq(1.0, 3.0, 5.0)))
     )
-    val summary =
-      Array(Summary(0.0, 1.0), Summary(-1.6, 10.6), Summary(0.0, 3.0), Summary(0.0, 0.0), Summary(1.0, 5.0))
+    val summaries =
+      Array(Summary(0.0, 1.0, 6.0, 10), Summary(-1.6, 10.6, 3.0, 10),
+        Summary(0.0, 3.0, 7.0, 10), Summary(0.0, 0.0, 5.0, 10), Summary(1.0, 5.0, 10.0, 10))
     val bins = 10
-    val hasher: HashingTF = new HashingTF(numFeatures = bins)
-      .setBinary(false)
-      .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
 
     val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
     val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
       if (isEmpty) None else Option(processed)
     }
-    val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution(key, summ, seq, bins, hasher)
+    val distribs = featureKeys.zip(summaries).zip(processedSeqs).map { case ((key, summary), seq) =>
+      FeatureDistribution(key, summary, seq, bins, (_, bins) => bins)
     }
     distribs.foreach{ d =>
       d.key shouldBe None
@@ -72,10 +67,30 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(1).nulls shouldBe 1
     distribs(1).distribution.sum shouldBe 0
     distribs(2).distribution.sum shouldBe 2
-    distribs(2).summaryInfo should contain theSameElementsAs Array(0.0, 3.0)
+    distribs(2).summaryInfo should contain theSameElementsAs Array(0.0, 3.0, 7.0, 10.0)
     distribs(3).distribution.sum shouldBe 0
     distribs(4).distribution.sum shouldBe 3
     distribs(4).summaryInfo.length shouldBe bins
+  }
+
+  it should "be correctly created for text features" in {
+    val features = Array(description, gender)
+    val values: Array[(Boolean, ProcessedSeq)] = Array(
+      (false, Left(RandomText.strings(1, 10).take(10000).toSeq.map(_.value.get)))
+    )
+    val summary = Array(Summary(1000.0, 50000.0, 70000.0, 10))
+    val bins = 100
+    val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
+    val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
+      if (isEmpty) None else Option(processed)
+    }
+    val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
+      FeatureDistribution(key, summ, seq, bins, (_, bins) => bins)
+    }
+
+    distribs(0).distribution.length shouldBe 100
+    distribs(0).distribution.sum shouldBe 10000
+
   }
 
   it should "be correctly created for map features" in {
@@ -84,18 +99,15 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Map("A" -> Left(Seq("male", "female"))),
       Map("A" -> Right(Seq(1.0)), "B" -> Right(Seq(1.0))),
       Map("B" -> Right(Seq(0.0))))
-    val summary = Array(
-      Map("A" -> Summary(0.0, 1.0), "B" -> Summary(0.0, 5.0)),
-      Map("A" -> Summary(-1.6, 10.6), "B" -> Summary(0.0, 3.0)),
-      Map("B" -> Summary(0.0, 0.0)))
+    val summaries = Array(
+      Map("A" -> Summary(0.0, 2.0, 100.0, 10), "B" -> Summary(0.0, 5.0, 10.0, 10)),
+      Map("A" -> Summary(-1.6, 10.6, 30.0, 10), "B" -> Summary(0.0, 3.0, 11.0, 10)),
+      Map("B" -> Summary(0.0, 0.0, 0.0, 10)))
     val bins = 10
-    val hasher: HashingTF = new HashingTF(numFeatures = bins)
-      .setBinary(false)
-      .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
-    val distribs = features.map(_.name).zip(summary).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
+    val distribs = features.map(_.name).zip(summaries).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
-        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins, hasher)
+        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins, (_, bins) => bins)
       }
     }
 
@@ -107,7 +119,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       else d.distribution.length shouldBe 2
     }
     distribs(0).nulls shouldBe 0
-    distribs(0).summaryInfo should contain theSameElementsAs Array(0.0, 1.0)
+    distribs(0).summaryInfo should contain theSameElementsAs Array(0.0, 2.0, 100.0, 10.0)
     distribs(1).nulls shouldBe 1
     distribs(0).distribution.sum shouldBe 2
     distribs(1).distribution.sum shouldBe 0
@@ -115,7 +127,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(2).distribution.sum shouldBe 1
     distribs(4).distribution(0) shouldBe 1
     distribs(4).distribution(1) shouldBe 0
-    distribs(4).summaryInfo.length shouldBe 2
+    distribs(4).summaryInfo.length shouldBe 4
   }
 
   it should "correctly compare fill rates" in {

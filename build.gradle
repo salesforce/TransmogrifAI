@@ -146,22 +146,21 @@ configure(allProjs) {
             memoryMaximumSize = '1g'
             jvmArgs = ['-XX:MaxMetaspaceSize=256m']
         }
-    }
-    compileScala {
         scalaCompileOptions.additionalParameters = [
-            "-optimize", "-feature", "-language:implicitConversions", "-language:existentials"
+                "-Yrangepos", "-feature",
+                "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
         ]
     }
-    compileTestScala {
-        scalaCompileOptions.additionalParameters = ["-Yrangepos"]
-    }
+    compileScala.scalaCompileOptions.additionalParameters += "-optimize"
     [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 
     jar {
         manifest.attributes "Main-Class": "$mainClassName"
         baseName = "${rootProject.name}"
     }
-    jar.dependsOn(createVersionProperties)
+    if (System.getenv("CI") != 'true') {
+        jar.dependsOn(createVersionProperties)
+    }
 
     scalaStyle {
         configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
@@ -169,7 +168,10 @@ configure(allProjs) {
         source = "src/main/scala"
         testSource = "src/test/scala"
     }
-    compileScala.dependsOn(scalaStyle)
+
+    if (System.getenv("CI") != 'true') {
+        compileScala.dependsOn(scalaStyle)
+    }
 
     avro {
         createSetters = true
@@ -259,10 +261,8 @@ configure(allProjs) {
         }
     }
 
-    task resolveAllDependencies {
-        doLast {
-            configurations.all { if(it.canBeResolved) it.resolve() }
-        }
+    if (System.getenv("TEST_FILES") != null) {
+        testScoverage.setIncludes(Arrays.asList(System.getenv("TEST_FILES").split('\n')))
     }
 }
 
@@ -369,6 +369,7 @@ configure(subProjs) {
         }
     }
 }
+
 task allScaladoc(type: ScalaDoc) {
     group 'Documentation'
     description 'Generates Scaladoc for the main source code of all subprojects.'
