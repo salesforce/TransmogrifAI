@@ -108,13 +108,14 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val field = transformed.schema(smartVectorized.name)
     AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
     mapMeta.columns.length shouldBe meta.columns.length
 
-    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index < 4) m.grouping shouldBe f.grouping
@@ -122,7 +123,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.indicatorValue shouldBe f.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "detect two categorical text features" in {
@@ -140,20 +141,21 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val field = transformed.schema(smartVectorized.name)
     AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
     mapMeta.columns.length shouldBe meta.columns.length
 
-    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       m.grouping shouldBe f.grouping
       m.indicatorValue shouldBe f.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "use separate hash space for each text feature" in {
@@ -173,13 +175,14 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val field = transformed.schema(smartVectorized.name)
     AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
     mapMeta.columns.length shouldBe meta.columns.length
 
-    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index < 4 || m.index == 8) m.grouping shouldBe Option(f1.name)
@@ -187,7 +190,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.indicatorValue shouldBe f.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "use shared hash space for two text features" in {
@@ -207,13 +210,14 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val field = transformed.schema(smartVectorized.name)
     AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
     mapMeta.columns.length shouldBe meta.columns.length
 
-    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index == 4) {
@@ -224,7 +228,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.indicatorValue shouldBe f.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "use shared hash space for two text features again" in {
@@ -244,13 +248,14 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val field = transformed.schema(smartVectorized.name)
     AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
     mapMeta.columns.length shouldBe meta.columns.length
 
-    mapMeta.columns.zip(meta.columns).foreach{ case (m, f) =>
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
       m.parentFeatureName shouldBe Array(m1.name)
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index == TransmogrifierDefaults.MaxNumOfFeatures) {
@@ -261,7 +266,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       m.indicatorValue shouldBe f.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "product the same result for shortcut" in {
@@ -280,22 +285,24 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, shortcutMapVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, shortcutMapVectorized)
     val field = transformed.schema(shortcutMapVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(shortcutMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(field,
+      Array.fill(transformed.collect(shortcutMapVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(smartMapVectorized).head.value.size)(true))
     val smartMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val shortcutMeta = OpVectorMetadata(transformed.schema(shortcutMapVectorized.name))
     smartMeta.history.keys shouldBe shortcutMeta.history.keys
     smartMeta.columns.length shouldBe shortcutMeta.columns.length
 
-    smartMeta.columns.zip(shortcutMeta.columns).foreach{ case (smart, shortcut) =>
+    smartMeta.columns.zip(shortcutMeta.columns).foreach { case (smart, shortcut) =>
       smart.parentFeatureName shouldBe shortcut.parentFeatureName
       smart.parentFeatureType shouldBe shortcut.parentFeatureType
       smart.grouping shouldBe shortcut.grouping
       smart.indicatorValue shouldBe shortcut.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
   it should "work on textarea map fields" in {
@@ -312,15 +319,17 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(textMapVectorized, textAreaMapVectorized).transform(data)
     val result = transformed.collect(textMapVectorized, textAreaMapVectorized)
     val field = transformed.schema(textMapVectorized.name)
-    AttributeTestUtils.assertNominal(field, Array.fill(transformed.collect(textMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(field,
+      Array.fill(transformed.collect(textMapVectorized).head.value.size)(true))
     val fieldMap = transformed.schema(textAreaMapVectorized.name)
-    AttributeTestUtils.assertNominal(fieldMap, Array.fill(transformed.collect(textAreaMapVectorized).head.value.size)(true))
+    AttributeTestUtils.assertNominal(fieldMap,
+      Array.fill(transformed.collect(textAreaMapVectorized).head.value.size)(true))
     val textMapMeta = OpVectorMetadata(transformed.schema(textMapVectorized.name))
     val textareaMapMeta = OpVectorMetadata(transformed.schema(textAreaMapVectorized.name))
     textMapMeta.history.keys shouldBe textareaMapMeta.history.keys
     textMapMeta.columns.length shouldBe textareaMapMeta.columns.length
 
-    textMapMeta.columns.zip(textareaMapMeta.columns).foreach{ case (textMap, textareaMap) =>
+    textMapMeta.columns.zip(textareaMapMeta.columns).foreach { case (textMap, textareaMap) =>
       textMap.parentFeatureName shouldBe textareaMap.parentFeatureName
       textMap.parentFeatureType shouldBe Array("com.salesforce.op.features.types.TextMap")
       textareaMap.parentFeatureType shouldBe Array("com.salesforce.op.features.types.TextAreaMap")
@@ -328,6 +337,6 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext {
       textMap.indicatorValue shouldBe textareaMap.indicatorValue
     }
 
-    result.foreach{ case (vec1, vec2) => vec1 shouldBe vec2}
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 }

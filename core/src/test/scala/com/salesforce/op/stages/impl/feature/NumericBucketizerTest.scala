@@ -262,7 +262,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     )
     val bucketizer = buck.originStage
     val transformed = bucketizer.asInstanceOf[NumericBucketizer[_]].transform(ds)
-    val results =  transformed.collect(buck)
+    val results = transformed.collect(buck)
     val field = transformed.schema(buck.name)
     AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))
 
@@ -286,7 +286,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     val buck = num.bucketize(trackNulls = true, trackInvalid = true, splits = Array(0.0, 1.0, 5.0))
     val stage = buck.originStage.asInstanceOf[NumericBucketizer[_]]
     val transformed = stage.transform(ds)
-    val results =  transformed.collect(buck)
+    val results = transformed.collect(buck)
 
     results shouldBe Seq(
       Vectors.dense(0.0, 0.0, 0.0, 1.0),
@@ -310,7 +310,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
   it should "transform the data correctly (integrals)" in new IntegralTest {
     val vector = integralBucketizer.getOutput()
     val transformed = integralBucketizer.transform(data1)
-    val results =  transformed.collect(vector)
+    val results = transformed.collect(vector)
     results shouldBe expectedAns
 
     val field = transformed.schema(vector.name)
@@ -327,7 +327,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     vector.originStage shouldBe a[NumericBucketizer[_]]
     val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
     val transformed = buck.transform(data1)
-    val results =  transformed.collect(vector)
+    val results = transformed.collect(vector)
     results shouldBe expectedAns
     val field = transformed.schema(vector.name)
     AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))
@@ -336,7 +336,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
   it should "keep track of null values if wanted (integrals)" in new IntegralTest {
     val vector = trackNullsIntegralBucketizer.getOutput()
     val transformed = trackNullsIntegralBucketizer.transform(data1)
-    val results =  transformed.collect(vector)
+    val results = transformed.collect(vector)
     results shouldBe trackNullsExpectedAns
     val field = transformed.schema(vector.name)
     AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))
@@ -356,7 +356,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext {
     val vector = num.bucketize(trackNulls = false, splits = splitsRightInclusive, splitInclusion = Inclusion.Right)
     val buck = vector.originStage.asInstanceOf[NumericBucketizer[_]]
     val transformed = buck.transform(data1)
-    val results =  transformed.collect(vector)
+    val results = transformed.collect(vector)
     results shouldBe expectedRightInclusiveAns
     val field = transformed.schema(vector.name)
     AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))

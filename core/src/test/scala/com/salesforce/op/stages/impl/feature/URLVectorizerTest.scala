@@ -79,7 +79,7 @@ class URLVectorizerTest
     Vectors.dense(1.0, 0.0, 0.0, 0.0)
   ).map(_.toOPVector)
 
-  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] ={
+  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val results = transformed.collect(feature)
     val field = transformed.schema(feature.name)

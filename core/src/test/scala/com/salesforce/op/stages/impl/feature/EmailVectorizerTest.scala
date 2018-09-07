@@ -83,7 +83,7 @@ class EmailVectorizerTest
   def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val field = transformed.schema(feature.name)
-    val collected =  transformed.collect(feature)
+    val collected = transformed.collect(feature)
     AttributeTestUtils.assertNominal(field, Array.fill(collected.head.value.size)(true))
     collected
   }
