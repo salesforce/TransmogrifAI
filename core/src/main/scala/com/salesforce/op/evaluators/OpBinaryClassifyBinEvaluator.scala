@@ -66,25 +66,19 @@ private[op] class OpBinaryClassifyBinEvaluator
   def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.BrierScore
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
-    val labelColName = getLabelCol
-    val dataUse = makeDataToUse(data, labelColName)
+    val labelColumnName = getLabelCol
+    val dataProcessed = makeDataToUse(data, labelColumnName)
 
-    val (rawPredictionColName, predictionColName, probabilityColName) =
-      (getRawPredictionCol, getPredictionValueCol, getProbabilityCol)
-    log.debug(
-      "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
-      labelColName, rawPredictionColName, predictionColName, probabilityColName
-    )
-
-    import dataUse.sparkSession.implicits._
-    val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
+    import dataProcessed.sparkSession.implicits._
+    val rdd = dataProcessed.select(getPredictionValueCol, labelColumnName).as[(Double, Double)].rdd
 
     if (rdd.isEmpty()) {
-      log.error("The dataset is empty")
+      log.error("The dataset is empty. Returning empty metrics")
       BinaryClassificationBinMetrics(0.0, Seq.empty[Double], Seq.empty[Long], Seq.empty[Double], Seq.empty[Double])
     } else {
       val scoreAndLabels =
-        dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).rdd.map {
+        dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd.map
+        {
           case Row(prob: Vector, label: Double) => (prob(1), label)
           case Row(prob: Double, label: Double) => (prob, label)
         }
