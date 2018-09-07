@@ -92,7 +92,8 @@ class RealMapVectorizerTest
     val vectorizer = estimator.setDefaultValue(0.0).setTrackNulls(false).fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
     transformed.collect(vector) shouldBe expectedResult
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -108,7 +109,8 @@ class RealMapVectorizerTest
       Vectors.sparse(12, Array(1, 3, 4, 8, 11), Array(1.0, 1.0, 11.0, 3.0, 1.0)),
       Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size / 2)(Seq(false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
@@ -124,7 +126,8 @@ class RealMapVectorizerTest
       Vectors.dense(Array(100.0, 100.0, 11.0, 0.0, 3.0, 100.0)),
       Vectors.dense(Array(100.0, 100.0, 100.0, 100.0, 100.0, 100.0))
     ).map(_.toOPVector)
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -141,7 +144,8 @@ class RealMapVectorizerTest
       Vectors.dense(Array(100.0, 1.0, 100.0, 1.0, 11.0, 0.0, 0.0, 0.0, 3.0, 0.0, 100.0, 1.0)),
       Vectors.dense(Array(100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0))
     ).map(_.toOPVector)
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size / 2)(Seq(false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
@@ -162,7 +166,8 @@ class RealMapVectorizerTest
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
       m2 -> List(IndColWithGroup(None, "Z")))
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -186,7 +191,8 @@ class RealMapVectorizerTest
         IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B")),
       m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
     )
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size / 2)(Seq(false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -208,8 +214,8 @@ class RealMapVectorizerTest
       m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
       m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "Y"))
     )
-
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size)(false))
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -233,7 +239,8 @@ class RealMapVectorizerTest
       m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"),
         IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"))
     )
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size / 2)(Seq(false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -251,7 +258,8 @@ class RealMapVectorizerTest
       Vectors.dense(-1.0, 4.0, 11.0, 0.0, 1.0, 5.0),
       Vectors.dense(-1.0, 4.0, 11.0, 0.0, 8.0 / 3, 15.0 / 2)
     ).map(_.toOPVector)
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
     transformed.collect(vector) shouldBe expected
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -275,7 +283,8 @@ class RealMapVectorizerTest
       Vectors.dense(-1.0, 1.0, 4.0, 1.0, 11.0, 1.0, 0.0, 0.0, 1.0, 0.0, 5.0, 0.0),
       Vectors.dense(-1.0, 1.0, 4.0, 1.0, 11.0, 1.0, 0.0, 1.0, 8.0 / 3, 1.0, 15.0 / 2, 1.0)
     ).map(_.toOPVector)
-
+    val field = transformed.schema(vector.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(expected.head.value.size / 2)(Seq(false, true)).flatten)
     transformed.collect(vector) shouldBe expected
 
     val expectedMetaTrackNulls = TestOpVectorMetadataBuilder(
