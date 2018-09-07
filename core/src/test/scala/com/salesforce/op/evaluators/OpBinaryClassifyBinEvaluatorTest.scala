@@ -117,7 +117,6 @@ class OpBinaryClassifyBinEvaluatorTest extends FlatSpec with TestSparkContext {
       .setLabelCol(labelName).setPredictionCol(predictionLabel)
 
     val brierScore = evaluator.getDefaultMetric(evaluator.evaluateAll(df))
-
     BigDecimal(brierScore).setScale(3, BigDecimal.RoundingMode.HALF_UP).toDouble shouldBe 0.098
   }
 }

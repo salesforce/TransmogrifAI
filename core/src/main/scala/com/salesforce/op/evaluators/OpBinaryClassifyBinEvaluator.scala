@@ -84,7 +84,6 @@ private[op] class OpBinaryClassifyBinEvaluator
           case Row(prob: Double, label: Double) => (prob, label)
         }
 
-      BinaryClassificationBinMetrics(0.0, Seq.empty[Double], Seq.empty[Long], Seq.empty[Double], Seq.empty[Double])
       if (numBins == 0) {
         log.error("numBins is set to 0. Returning empty metrics")
         BinaryClassificationBinMetrics(0.0, Seq.empty[Double], Seq.empty[Long], Seq.empty[Double], Seq.empty[Double])
