@@ -11,7 +11,7 @@ task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
     def sparkVersion = "$sparkHome-is node determined since SPARK_HOME is not set".split("/").last().split("-").drop(1).head()
     def wrkDir = System.getProperty("working-dir", sparkHome)
     def verbose = System.getProperty("verbose", "true") == "true" ? ["-v"] : []
-    def master = System.getProperty("master", "local[4]")
+    def master = System.getProperty("master", "local[*]")
     def yarnResMngr = System.getProperty("yarn-res-mngr", "")
     def deployMode = master.endsWith("cluster") ? "cluster" : (master.endsWith("client") ? "client" : System.getProperty("deploy-mode", "client"))
     def driverCores = System.getProperty("driver-cores", "1")
@@ -37,20 +37,13 @@ task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
             "spark.eventLog.enabled=false",
             // "spark.eventLog.enabled=true",
             // "spark.eventLog.dir=hdfs:///var/log/spark/apps",
-            "spark.driver.extraClassPath=/usr/lib/hadoop-lzo/lib/*",
-            "spark.driver.extraLibraryPath=/usr/lib64/atlas",
             "spark.driver.extraJavaOptions=$extraJavaOpts",
-            "spark.executor.extraLibraryPath=/usr/lib64/atlas",
             "spark.executor.extraJavaOptions=$extraJavaOpts",
-            "spark.task.maxFailures=21",
+            "spark.task.maxFailures=10",
             "spark.yarn.maxAppAttempts=3",
-            "spark.yarn.max.executor.failures=25",
+            "spark.yarn.max.executor.failures=10",
             "spark.yarn.submit.waitAppCompletion=false",
-            "spark.yarn.archive=hdfs://$yarnResMngr:8020/tmp/spark-$sparkVersion-assembly.zip",
-            "spark.dynamicAllocation.enabled=true",
-            "spark.dynamicAllocation.executorIdleTimeout=900s",
-            "spark.shuffle.service.enabled=true",
-            "spark.shuffle.io.maxRetries=120",
+            // "spark.yarn.archive=hdfs://$yarnResMngr:8020/tmp/spark-$sparkVersion-assembly.zip",
             "spark.sql.avro.compression.codec=deflate",
             "spark.sql.avro.deflate.level=6",
             "spark.io.compression.codec=lzf",
@@ -58,14 +51,6 @@ task sparkSubmit(type: Exec, dependsOn: copyLog4jToSpark) {
             "spark.hadoop.fs.defaultFS=hdfs://$yarnResMngr:8020/",
             "spark.hadoop.fs.hdfs.impl=org.apache.hadoop.hdfs.DistributedFileSystem",
             "spark.hadoop.fs.file.impl=org.apache.hadoop.fs.LocalFileSystem",
-            "spark.hadoop.fs.AbstractFileSystem.s3a.impl=org.apache.hadoop.fs.s3a.S3AFs",
-            "spark.hadoop.fs.s3a.impl=org.apache.hadoop.fs.s3a.S3AFileSystem",
-            "spark.hadoop.fs.s3a.attempts.maximum=20",
-            "spark.hadoop.fs.s3a.fast.upload=true",
-            "spark.hadoop.fs.s3a.fast.buffer.size=10485760",
-            "spark.hadoop.fs.s3a.multipart.size=10485760",
-            "spark.hadoop.fs.s3a.multipart.threshold=104857600",
-            "spark.hadoop.fs.s3a.server-side-encryption-algorithm=AES256",
             "spark.hadoop.mapred.output.compress=true",
             "spark.hadoop.avro.output.codec=deflate",
             "spark.hadoop.avro.mapred.deflate.level=6",
