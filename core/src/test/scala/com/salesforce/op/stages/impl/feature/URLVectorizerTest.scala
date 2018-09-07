@@ -79,8 +79,13 @@ class URLVectorizerTest
     Vectors.dense(1.0, 0.0, 0.0, 0.0)
   ).map(_.toOPVector)
 
-  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] =
-    new OpWorkflow().setResultFeatures(feature).transform(ds).collect(feature)
+  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] ={
+    val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
+    val results = transformed.collect(feature)
+    val field = transformed.schema(feature.name)
+    AttributeTestUtils.assertNominal(field, Array.fill(results.head.value.size)(true))
+    results
+  }
 
   Spec[RichURLMapFeature] should "vectorize UrlMaps correctly" in {
     val (ds1, f1) = TestFeatureBuilder(urls.map(e => Map(urlKey -> e.value.get).toURLMap))

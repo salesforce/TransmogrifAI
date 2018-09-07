@@ -68,7 +68,6 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
       val h = f.history()
       h.originFeatures.map(o => o -> FeatureHistory(Seq(o), h.stages))
     }.toMap
-
     transformed.schema.toOpVectorMetadata(feature.name) shouldEqual
       TestOpVectorMetadataBuilder.withOpNamesAndHist(
         feature.originStage,
@@ -92,6 +91,8 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
         List(1.0, 0.0, 363.0, 0.0, 172.0, 0.0),
         List(1.0, 0.0, 186.0, 0.0, 96.0, 0.0)
       )
+    val field = transformed.schema(feature.name)
+    AttributeTestUtils.assertNominal(field, Array(true, true, false, true, false, true))
   }
 
 }
