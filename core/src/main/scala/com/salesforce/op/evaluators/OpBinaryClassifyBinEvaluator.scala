@@ -39,14 +39,19 @@ import org.apache.spark.Partitioner
 
 /**
  *
- * Instance to evaluate BinaryClassificationBinMetrics metrics
- * The metrics are ,AverageScore, count, conversion rate and
- * each bin' centers for each bin and its overall brier score.
- * Default evaluation returns BrierScore
+ * Evaluator for Binary Classification which provides statistics about the predicted scores.
+ * This evaluator creates the specified number of bins and computes the statistics for each bin
+ * and returns BinaryClassificationBinMetrics, which contains
  *
- * @param name name of default metric
- * @param isLargerBetter is metric better if larger
- * @param uid uid for instance
+ * Total number of data points per bin
+ * Average Score per bin
+ * Average Conversion rate per bin
+ * Bin Centers for each bin
+ * BrierScore for the overall dataset is also computed, which is a default metric as well.
+ *
+ * @param name            name of default metric
+ * @param isLargerBetter  is metric better if larger
+ * @param uid             uid for instance
  */
 private[op] class OpBinaryClassifyBinEvaluator
 (
@@ -139,8 +144,8 @@ private[op] class OpBinaryClassifyBinEvaluator
 // BinPartitioner which partition the bins.
 class OpBinPartitioner(override val numPartitions: Int) extends Partitioner {
 
-  // computes the bin number(0-indexed) to which the score is assigned to.
-  // For Score 1.0, overflow happens. So, use math.min(last_bin, bin_computed).
+  // computes the bin number(0-indexed) to which the datapoint is assigned.
+  // For Score 1.0, overflow happens. So, use math.min(last_bin, bin_index__computed).
   def getPartition(key: Any): Int = key match {
     case score: Double => math.min(numPartitions - 1, (score * numPartitions).toInt)
   }
