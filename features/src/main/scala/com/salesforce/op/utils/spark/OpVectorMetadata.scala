@@ -31,8 +31,8 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
-import com.salesforce.op.features.types.{Binary, BinaryMap, MultiPickList, MultiPickListMap, Text, TextArea, TextAreaMap, TextList, TextMap}
-import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NominalAttribute, NumericAttribute}
+import com.salesforce.op.features.types._
+import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 
