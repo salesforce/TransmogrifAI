@@ -29,6 +29,7 @@
  */
 package com.salesforce.op.evaluators
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.functions.col
@@ -53,17 +54,18 @@ import org.apache.spark.Partitioner
  * @param isLargerBetter  is metric better if larger
  * @param uid             uid for instance
  */
-private[op] class OpBinaryClassifyBinEvaluator
+private[op] class OpBinScoreEvaluator
 (
   override val name: EvalMetric = OpEvaluatorNames.Binary,
   override val isLargerBetter: Boolean = true,
-  override val uid: String = UID[BinaryClassificationBinMetrics],
+  override val uid: String = UID[OpBinScoreEvaluator],
   val numBins: Int = 100
 ) extends OpBinaryClassificationEvaluatorBase[BinaryClassificationBinMetrics](uid = uid) {
 
+  require(numBins > 0, "numBins must be positive")
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.BrierScore
+  def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.brierScore
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
     val labelColumnName = getLabelCol
@@ -74,7 +76,7 @@ private[op] class OpBinaryClassifyBinEvaluator
 
     if (rdd.isEmpty()) {
       log.error("The dataset is empty. Returning empty metrics")
-      BinaryClassificationBinMetrics(0.0, Seq.empty[Double], Seq.empty[Long], Seq.empty[Double], Seq.empty[Double])
+      BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
     } else {
       val scoreAndLabels =
         dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd.map
@@ -83,54 +85,49 @@ private[op] class OpBinaryClassifyBinEvaluator
           case Row(prob: Double, label: Double) => (prob, label)
         }
 
-      if (numBins == 0) {
-        log.error("numBins is set to 0. Returning empty metrics")
-        BinaryClassificationBinMetrics(0.0, Seq.empty[Double], Seq.empty[Long], Seq.empty[Double], Seq.empty[Double])
-      } else {
-        // Find the significant digit to which the scores needs to be rounded, based of numBins.
-        val significantDigitToRoundOff = math.log10(numBins).toInt + 1
-        val scoreAndLabelsRounded = for {i <- scoreAndLabels}
-          yield (BigDecimal(i._1).setScale(significantDigitToRoundOff,
-            BigDecimal.RoundingMode.HALF_UP).toDouble, (i._1, i._2))
-
-        // Create `numBins` bins and place each score in its corresponding bin.
-        val binnedValues = scoreAndLabelsRounded.partitionBy(new OpBinPartitioner(numBins)).values
-
-        // compute the average score per bin
-        val averageScore = binnedValues.mapPartitions(scores => {
-          val (totalScore, count) = scores.foldLeft(0.0, 0)(
-            (r: (Double, Int), s: (Double, Double)) => (r._1 + s._1, r._2 + 1))
-          Iterator(if (count == 0) 0.0 else totalScore / count)
-        }).collect().toSeq
-
-        // compute the average conversion rate per bin. Convertion rate is the number of 1's in labels.
-        val averageConvertionRate = binnedValues.mapPartitions(scores => {
-          val (totalConversion, count) = scores.foldLeft(0.0, 0)(
-            (r: (Double, Int), s: (Double, Double)) => (r._1 + s._2, r._2 + 1))
-          Iterator(if (count == 0) 0.0 else totalConversion / count)
-        }).collect().toSeq
-
-        // compute total number of data points in each bin.
-        val numberOfDataPoints = binnedValues.mapPartitions(scores => Iterator(scores.length.toLong)).collect().toSeq
-
-        // binCenters is the center point in each bin.
-        // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
-        val binCenters = (for {i <- 0 to numBins} yield ((i + 0.5) / numBins)).dropRight(1)
-
-        // brier score of entire dataset.
-        val brierScore = scoreAndLabels.map { case (score, label) => math.pow((score - label), 2) }.mean()
-
-        val metrics = BinaryClassificationBinMetrics(
-          BrierScore = brierScore,
-          BinCenters = binCenters,
-          NumberOfDataPoints = numberOfDataPoints,
-          AverageScore = averageScore,
-          AverageConversionRate = averageConvertionRate
-        )
-
-        log.info("Evaluated metrics: {}", metrics.toString)
-        metrics
+      // Find the significant digit to which the scores needs to be rounded, based of numBins.
+      val significantDigitToRoundOff = math.log10(numBins).toInt + 1
+      val scoreAndLabelsRounded = scoreAndLabels.map { scoreAndLabels =>
+        (BigDecimal(scoreAndLabels._1).setScale(significantDigitToRoundOff, BigDecimal.RoundingMode.HALF_UP).toDouble,
+          scoreAndLabels)
       }
+      // Create `numBins` bins and place each score in its corresponding bin.
+      val binnedValues = scoreAndLabelsRounded.partitionBy(new OpBinPartitioner(numBins)).values
+
+      // compute the average score per bin
+      val averageScore = binnedValues.mapPartitions(scores => {
+        val (totalScore, count) = scores.foldLeft(0.0, 0)(
+          (r: (Double, Int), s: (Double, Double)) => (r._1 + s._1, r._2 + 1))
+        Iterator(if (count == 0) 0.0 else totalScore / count)
+      }).collect().toSeq
+
+      // compute the average conversion rate per bin. Convertion rate is the number of 1's in labels.
+      val averageConvertionRate = binnedValues.mapPartitions(scores => {
+        val (totalConversion, count) = scores.foldLeft(0.0, 0)(
+          (r: (Double, Int), s: (Double, Double)) => (r._1 + s._2, r._2 + 1))
+        Iterator(if (count == 0) 0.0 else totalConversion / count)
+      }).collect().toSeq
+
+      // compute total number of data points in each bin.
+      val numberOfDataPoints = binnedValues.mapPartitions(scores => Iterator(scores.length.toLong)).collect().toSeq
+
+      // binCenters is the center point in each bin.
+      // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
+      val binCenters = (for {i <- 0 to numBins} yield ((i + 0.5) / numBins)).dropRight(1)
+
+      // brier score of entire dataset.
+      val brierScore = scoreAndLabels.map { case (score, label) => math.pow((score - label), 2) }.mean()
+
+      val metrics = BinaryClassificationBinMetrics(
+        brierScore = brierScore,
+        binCenters = binCenters,
+        numberOfDataPoints = numberOfDataPoints,
+        averageScore = averageScore,
+        averageConversionRate = averageConvertionRate
+      )
+
+      log.info("Evaluated metrics: {}", metrics.toString)
+      metrics
     }
   }
 }
@@ -148,17 +145,21 @@ class OpBinPartitioner(override val numPartitions: Int) extends Partitioner {
 /**
  * Metrics of BinaryClassificationBinMetrics
  *
- * @param BinCenters            center of each bin
- * @param NumberOfDataPoints    total number of data points in each bin
- * @param AverageScore          average score in each bin
- * @param AverageConversionRate average conversion rate in each bin
- * @param BrierScore            brier score for overall dataset
+ * @param binCenters            center of each bin
+ * @param numberOfDataPoints    total number of data points in each bin
+ * @param averageScore          average score in each bin
+ * @param averageConversionRate average conversion rate in each bin
+ * @param brierScore            brier score for overall dataset
  */
 case class BinaryClassificationBinMetrics
 (
-  BrierScore: Double,
-  BinCenters: Seq[Double],
-  NumberOfDataPoints: Seq[Long],
-  AverageScore: Seq[Double],
-  AverageConversionRate: Seq[Double]
+  brierScore: Double,
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  binCenters: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Long])
+  numberOfDataPoints: Seq[Long],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  averageScore: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  averageConversionRate: Seq[Double]
 ) extends EvaluationMetrics

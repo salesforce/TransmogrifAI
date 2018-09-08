@@ -52,6 +52,13 @@ object Evaluators {
      */
     def apply(): OpBinaryClassificationEvaluator = auROC()
 
+    /*
+     * Brier Score for the prediction
+     */
+    def brierScore(): OpBinScoreEvaluator =
+      new OpBinScoreEvaluator(
+        name = BinaryClassEvalMetrics.BrierScore, isLargerBetter = true)
+
     /**
      * Area under ROC
      */
