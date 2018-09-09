@@ -118,19 +118,8 @@ private[op] class OpBinScoreEvaluator
     }
   }
 
-   def getBinIndex(score: Double): Int = {
+   private def getBinIndex(score: Double): Int = {
     math.min(numBins - 1, (score * numBins).toInt)
-  }
-}
-
-
-// BinPartitioner which partition the bins.
-class OpBinPartitioner(override val numPartitions: Int) extends Partitioner {
-
-  // computes the bin number(0-indexed) to which the datapoint is assigned.
-  // For Score 1.0, overflow happens. So, use math.min(last_bin, bin_index__computed).
-  def getPartition(key: Any): Int = key match {
-    case score: Double => math.min(numPartitions - 1, (score * numPartitions).toInt)
   }
 }
 
