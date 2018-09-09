@@ -32,11 +32,12 @@ package com.salesforce.op.evaluators
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.{Dataset, Row}
-import org.apache.spark.sql.types.DoubleType
 import org.slf4j.LoggerFactory
 import org.apache.spark.Partitioner
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.DoubleType
+import com.twitter.algebird.Operators._
 
 /**
  *
@@ -56,7 +57,7 @@ import org.apache.spark.Partitioner
  */
 private[op] class OpBinScoreEvaluator
 (
-  override val name: EvalMetric = OpEvaluatorNames.Binary,
+  override val name: EvalMetric = OpEvaluatorNames.BinScore,
   override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpBinScoreEvaluator],
   val numBins: Int = 100
@@ -72,44 +73,30 @@ private[op] class OpBinScoreEvaluator
     val dataProcessed = makeDataToUse(data, labelColumnName)
 
     import dataProcessed.sparkSession.implicits._
-    val rdd = dataProcessed.select(getPredictionValueCol, labelColumnName).as[(Double, Double)].rdd
 
-    if (rdd.isEmpty()) {
+    if (dataProcessed.select(getPredictionValueCol, labelColumnName).as[(Double, Double)].rdd.isEmpty()) {
       log.error("The dataset is empty. Returning empty metrics")
       BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
     } else {
-      val scoreAndLabels =
-        dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd.map
-        {
-          case Row(prob: Vector, label: Double) => (prob(1), label)
-          case Row(prob: Double, label: Double) => (prob, label)
-        }
-
-      // Find the significant digit to which the scores needs to be rounded, based of numBins.
-      val significantDigitToRoundOff = math.log10(numBins).toInt + 1
-      val scoreAndLabelsRounded = scoreAndLabels.map { scoreAndLabels =>
-        (BigDecimal(scoreAndLabels._1).setScale(significantDigitToRoundOff, BigDecimal.RoundingMode.HALF_UP).toDouble,
-          scoreAndLabels)
+      val scoreAndLabels = dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd.map {
+        case Row(prob: Vector, label: Double) => (prob(1), label)
+        case Row(prob: Double, label: Double) => (prob, label)
       }
-      // Create `numBins` bins and place each score in its corresponding bin.
-      val binnedValues = scoreAndLabelsRounded.partitionBy(new OpBinPartitioner(numBins)).values
 
-      // compute the average score per bin
-      val averageScore = binnedValues.mapPartitions(scores => {
-        val (totalScore, count) = scores.foldLeft(0.0, 0)(
-          (r: (Double, Int), s: (Double, Double)) => (r._1 + s._1, r._2 + 1))
-        Iterator(if (count == 0) 0.0 else totalScore / count)
-      }).collect().toSeq
+      val stats = scoreAndLabels.map {
+        case (score, label) => (getBinIndex(score), (score, label, 1L))
+      }.reduceByKeyLocally(_ + _).map {
+        case (bin, (scoreSum, labelSum, count)) => (bin, (scoreSum / count, labelSum / count, count))
+      }
 
-      // compute the average conversion rate per bin. Convertion rate is the number of 1's in labels.
-      val averageConvertionRate = binnedValues.mapPartitions(scores => {
-        val (totalConversion, count) = scores.foldLeft(0.0, 0)(
-          (r: (Double, Int), s: (Double, Double)) => (r._1 + s._2, r._2 + 1))
-        Iterator(if (count == 0) 0.0 else totalConversion / count)
-      }).collect().toSeq
+      // For the bins, which don't have any scores, fill 0's.
+      val statsForBins = {
+        for {i <- 0 to numBins - 1}  yield stats.getOrElse(i, (0.0, 0.0, 0L))
+      }
 
-      // compute total number of data points in each bin.
-      val numberOfDataPoints = binnedValues.mapPartitions(scores => Iterator(scores.length.toLong)).collect().toSeq
+      val averageScore = statsForBins.map(_._1)
+      val averageConversionRate = statsForBins.map(_._2)
+      val numberOfDataPoints = statsForBins.map(_._3)
 
       // binCenters is the center point in each bin.
       // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
@@ -123,14 +110,19 @@ private[op] class OpBinScoreEvaluator
         binCenters = binCenters,
         numberOfDataPoints = numberOfDataPoints,
         averageScore = averageScore,
-        averageConversionRate = averageConvertionRate
+        averageConversionRate = averageConversionRate
       )
 
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
     }
   }
+
+   def getBinIndex(score: Double): Int = {
+    math.min(numBins - 1, (score * numBins).toInt)
+  }
 }
+
 
 // BinPartitioner which partition the bins.
 class OpBinPartitioner(override val numPartitions: Int) extends Partitioner {

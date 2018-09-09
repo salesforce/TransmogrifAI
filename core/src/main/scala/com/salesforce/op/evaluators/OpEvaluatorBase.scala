@@ -319,7 +319,7 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object TN extends ClassificationEvalMetric("TN", "true negative")
   case object FP extends ClassificationEvalMetric("FP", "false positive")
   case object FN extends ClassificationEvalMetric("FN", "false negative")
-  case object BrierScore extends ClassificationEvalMetric("brierscore", "mean squared error")
+  case object brierScore extends ClassificationEvalMetric("brierscore", "brier score")
 }
 
 /**
@@ -372,6 +372,8 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   val values: Seq[OpEvaluatorNames] = findValues
 
   case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metics")
+
+  case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
 
   case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metics")
 

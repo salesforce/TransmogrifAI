@@ -241,6 +241,8 @@ case object ModelSelectorSummary {
               nm match {
                 case OpEvaluatorNames.Binary.humanFriendlyName =>
                   nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
+                case OpEvaluatorNames.BinScore.humanFriendlyName =>
+                  nm -> JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson).get
                 case OpEvaluatorNames.Multi.humanFriendlyName =>
                   nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
                 case OpEvaluatorNames.Regression.humanFriendlyName =>
@@ -269,11 +271,13 @@ object ProblemType extends Enum[ProblemType] {
   def fromEvalMetrics(eval: EvaluationMetrics): ProblemType = {
     eval match {
       case _: BinaryClassificationMetrics => ProblemType.BinaryClassification
+      case _: BinaryClassificationBinMetrics => ProblemType.BinaryClassification
       case _: MultiClassificationMetrics => ProblemType.MultiClassification
       case _: RegressionMetrics => ProblemType.Regression
       case m: MultiMetrics =>
         val keys = m.metrics.keySet
         if (keys.exists(_.contains(OpEvaluatorNames.Binary.humanFriendlyName))) ProblemType.BinaryClassification
+        else if (keys.exists(_.contains(OpEvaluatorNames.BinScore.humanFriendlyName))) ProblemType.BinaryClassification
         else if (keys.exists(_.contains(OpEvaluatorNames.Multi.humanFriendlyName))) ProblemType.MultiClassification
         else if (keys.exists(_.contains(OpEvaluatorNames.Regression.humanFriendlyName))) ProblemType.Regression
         else ProblemType.Unknown
