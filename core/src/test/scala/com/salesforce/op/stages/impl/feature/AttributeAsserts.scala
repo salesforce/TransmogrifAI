@@ -38,11 +38,12 @@ trait AttributeAsserts {
   self: Matchers =>
   /**
    * Assert if attributes are nominal or not
+   *
    * @param schema
    * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
    */
   final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]): Assertion = {
-    val attributes = AttributeGroup.fromStructField(schema).attributes.get
-    attributes.map(_.isNominal) shouldBe expectedNominal
+    val attributes = AttributeGroup.fromStructField(schema).attributes
+    attributes.map(_.map(_.isNominal)) shouldBe Some(expectedNominal)
   }
 }
