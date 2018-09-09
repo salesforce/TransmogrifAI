@@ -31,7 +31,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{FeatureType, _}
 import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
@@ -75,8 +75,10 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-  val textTypes = Seq(MultiPickList, MultiPickListMap, Text, TextArea, TextAreaMap, TextMap, Binary, BinaryMap,
-    TextList).map(_.getClass.getName.dropRight(1))
+  val categoricalTypes = Seq(FeatureType.typeName[MultiPickList], FeatureType.typeName[MultiPickListMap],
+    FeatureType.typeName[Text], FeatureType.typeName[TextArea], FeatureType.typeName[TextAreaMap],
+    FeatureType.typeName[TextMap], FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap],
+    FeatureType.typeName[TextList])
 
   /**
    * Serialize to spark metadata
@@ -96,7 +98,7 @@ class OpVectorMetadata private
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
     val attributes = columns.map { c =>
-      if (c.indicatorValue.isDefined || textTypes.exists(c.parentFeatureType.contains)) {
+      if (c.indicatorValue.isDefined || categoricalTypes.exists(c.parentFeatureType.contains)) {
         BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
       } else {
         NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
