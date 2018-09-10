@@ -105,7 +105,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -142,7 +142,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -181,7 +181,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -240,7 +240,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(catData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -275,7 +275,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -356,7 +356,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe false
 
@@ -388,7 +388,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(textListData)
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
 
     vectorizer.isSharedHashSpace shouldBe true
 
@@ -418,7 +418,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(catData)
     val vector = vectorizer.getOutput()
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
     val meta = OpVectorMetadata(transformed.schema(feature.name))
     meta.history.keys shouldBe Set(top.name, bot.name)
     meta.columns.length shouldBe 20
@@ -435,7 +435,7 @@ class OPCollectionHashingVectorizerTest extends FlatSpec with TestSparkContext w
     val transformed = vectorizer.transform(catData)
     val vector = vectorizer.getOutput()
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(true))
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size)(false))
     val meta = OpVectorMetadata(transformed.schema(feature.name))
     meta.history.keys shouldBe Set(top.name, bot.name)
     meta.columns.length shouldBe 10

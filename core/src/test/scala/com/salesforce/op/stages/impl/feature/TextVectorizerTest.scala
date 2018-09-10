@@ -64,7 +64,7 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     val result = transformed.collect(vectorized)
     val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
     val field = transformed.schema(vectorized.name)
-    assertNominal(field, Array.fill(result.head.value.size)(true))
+    assertNominal(field, Array.fill(result.head.value.size - 1)(false) :+ true)
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) should be >= 1.0
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "question")) should be >= 1.0
@@ -88,7 +88,7 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     val result = transformed.collect(vectorized)
     val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
     val field = transformed.schema(vectorized.name)
-    assertNominal(field, Array.fill(result.head.value.size)(true))
+    assertNominal(field, Array.fill(result.head.value.size - 2)(false) ++ Array(true, true))
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) shouldBe 1.0
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) shouldBe 1.0

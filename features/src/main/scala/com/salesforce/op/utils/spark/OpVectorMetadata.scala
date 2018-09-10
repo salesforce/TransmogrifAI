@@ -75,10 +75,7 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-  val categoricalTypes = Seq(FeatureType.typeName[MultiPickList], FeatureType.typeName[MultiPickListMap],
-    FeatureType.typeName[Text], FeatureType.typeName[TextArea], FeatureType.typeName[TextAreaMap],
-    FeatureType.typeName[TextMap], FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap],
-    FeatureType.typeName[TextList])
+  val categoricalTypes = Seq(FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap])
 
   /**
    * Serialize to spark metadata
@@ -90,19 +87,15 @@ class OpVectorMetadata private
       .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue, c.descriptorValue))
     val colData = groupedCol.toSeq
       .map { case (_, g) => g.head -> g.map(_.index) }
-    val colMeta = colData.map { case (c, i) =>
-      c.toMetadata(i)
-    }
+    val colMeta = colData.map { case (c, i) => c.toMetadata(i) }
     val meta = new MetadataBuilder()
       .putMetadataArray(OpVectorMetadata.ColumnsKey, colMeta.toArray)
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
-    val attributes = columns.map { c =>
-      if (c.indicatorValue.isDefined || categoricalTypes.exists(c.parentFeatureType.contains)) {
+    val attributes = columns.map {
+      case c if c.indicatorValue.isDefined || categoricalTypes.exists(c.parentFeatureType.contains) =>
         BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
-      } else {
-        NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
-      }
+      case c => NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
     }
     new AttributeGroup(name, attributes).toMetadata(meta)
   }

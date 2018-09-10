@@ -242,7 +242,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val textAreaData3: Seq[TextArea] = RandomText.textAreas(minLen = 5, maxLen = 10)
       .withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[TextArea, TextAreaMap, String](textAreaData, textAreaData2, textAreaData3)
+    testFeatureToMap[TextArea, TextAreaMap, String](textAreaData, textAreaData2, textAreaData3, false)
   }
 
   "Text features" should "be vectorized the same whether they're in maps or not" in {
@@ -250,7 +250,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val textData2: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
     val textData3: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Text, TextMap, String](textData, textData2, textData3)
+    testFeatureToMap[Text, TextMap, String](textData, textData2, textData3, false)
   }
 
   "URL features" should "be vectorized the same whether they're in maps or not" in {
@@ -334,10 +334,10 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
    * corresponds to its own key in the OPMap feature. This is used to test whether base feature types are vectorized
    * the same as their corresponding map types.
    *
-   * @param f1Data            Sequence of base feature type data (eg. from generators)
-   * @param f2Data            Sequence of base feature type data (eg. from generators)
-   * @param f3Data            Sequence of base feature type data (eg. from generators)
-   * @param isCategorical     If the vector contains categoricals
+   * @param f1Data        Sequence of base feature type data (eg. from generators)
+   * @param f2Data        Sequence of base feature type data (eg. from generators)
+   * @param f3Data        Sequence of base feature type data (eg. from generators)
+   * @param isCategorical If the vector contains categoricals
    * @tparam F  Base feature type (eg. ID, Text, Integer)
    * @tparam FM OPMap feature type (eg. IDMap, TextMap, IntegerMap)
    * @tparam MT Value type of map inside OPMap feature (eg. String, String, Int)
@@ -371,6 +371,8 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
       rawF1 match {
         case f if f.isSubtypeOf[Date] => Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten
           .asInstanceOf[Array[Boolean]]
+        case f if f.isSubtypeOf[TextArea] || f.isSubtypeOf[Text] => Array.fill(
+          transformed.collect(featureVector).head.value.size - 3)(false) ++ Array.fill(3)(true)
         case f if f.isSubtypeOf[Geolocation] => Array.fill(transformed.collect(featureVector).head.value.size / 4)(
           Seq(false, false, false, true)).flatten
         case _ => Array.fill(transformed.collect(featureVector).head.value.size / 2)(Seq(false, true)).flatten

@@ -44,6 +44,6 @@ trait AttributeAsserts {
    */
   final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]): Assertion = {
     val attributes = AttributeGroup.fromStructField(schema).attributes
-    attributes.map(_.map(_.isNominal)) shouldBe Some(expectedNominal)
+    attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
   }
 }

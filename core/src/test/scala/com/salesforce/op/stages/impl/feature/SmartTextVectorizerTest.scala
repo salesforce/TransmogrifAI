@@ -83,13 +83,13 @@ class SmartTextVectorizerTest
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
     assertNominal(fieldCategorical,
       Array.fill(transformed.collect(categoricalVectorized).head.value.size)(true))
     val fieldText = transformed.schema(textVectorized.name)
     assertNominal(fieldText,
-      Array.fill(transformed.collect(textVectorized).head.value.size)(true))
+      Array.fill(transformed.collect(textVectorized).head.value.size)(false))
     val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
       smartVector -> combined
@@ -133,10 +133,9 @@ class SmartTextVectorizerTest
       .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true))
     val fieldText = transformed.schema(textVectorized.name)
-    assertNominal(fieldText,
-      Array.fill(transformed.collect(textVectorized).head.value.size)(true))
+    assertNominal(fieldText, Array.fill(transformed.collect(textVectorized).head.value.size)(false))
     val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
       smartVector -> combined
@@ -160,10 +159,9 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
     val fieldShortcut = transformed.schema(shortcutVectorized.name)
-    assertNominal(fieldShortcut,
-      Array.fill(transformed.collect(shortcutVectorized).head.value.size)(true))
+    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
     val (regular, shortcut) = result.unzip
 
     regular shouldBe shortcut
