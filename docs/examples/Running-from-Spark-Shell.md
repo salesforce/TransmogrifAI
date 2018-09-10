@@ -12,7 +12,7 @@ cd TransmogrifAI && ./gradlew core:shadowJar
 $SPARK_HOME/bin/spark-shell --jars core/build/libs/transmogrifai-x.y.z-all.jar
 ```
 
-Once the spark-shell starts up, create your spark session:
+Once the `spark-shell` starts up, create your spark session:
 
 ```scala
 // Use the existing Spark session
