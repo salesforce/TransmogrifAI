@@ -83,24 +83,24 @@ private[op] class OpBinScoreEvaluator
         case Row(prob: Double, label: Double) => (prob, label)
       }
 
+      // Finding stats per bin -> avg score, avg conv rate,
+      // total num of data points, bin center.
       val stats = scoreAndLabels.map {
         case (score, label) => (getBinIndex(score), (score, label, 1L))
       }.reduceByKeyLocally(_ + _).map {
-        case (bin, (scoreSum, labelSum, count)) => (bin, (scoreSum / count, labelSum / count, count))
+        case (bin, (scoreSum, labelSum, count)) =>
+          (bin, (scoreSum / count, labelSum / count, count, (bin + 0.5) / numBins))
       }
 
-      // For the bins, which don't have any scores, fill 0's.
+      // For the bins, which don't have any scores, fill 0's and bin center.
       val statsForBins = {
-        for {i <- 0 to numBins - 1}  yield stats.getOrElse(i, (0.0, 0.0, 0L))
+        for {i <- 0 to numBins - 1}  yield stats.getOrElse(i, (0.0, 0.0, 0L, (i + 0.5) / numBins))
       }
 
-      val averageScore = statsForBins.map(_._1)
-      val averageConversionRate = statsForBins.map(_._2)
-      val numberOfDataPoints = statsForBins.map(_._3)
-
-      // binCenters is the center point in each bin.
-      // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
-      val binCenters = (for {i <- 0 to numBins} yield ((i + 0.5) / numBins)).dropRight(1)
+      val (averageScore, averageConversionRate, numberOfDataPoints, binCenters) =
+        statsForBins.foldLeft((Seq.empty[Double], Seq.empty[Double], Seq.empty[Long], Seq.empty[Double])) {
+        (columns, row) => (columns._1 :+ row._1, columns._2 :+ row._2, columns._3 :+ row._3, columns._4 :+ row._4)
+      }
 
       // brier score of entire dataset.
       val brierScore = scoreAndLabels.map { case (score, label) => math.pow((score - label), 2) }.mean()
@@ -118,7 +118,8 @@ private[op] class OpBinScoreEvaluator
     }
   }
 
-   private def getBinIndex(score: Double): Int = {
+  // getBinIndex finds which bin the score associates with.
+  private def getBinIndex(score: Double): Int = {
     math.min(numBins - 1, (score * numBins).toInt)
   }
 }
