@@ -34,7 +34,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, MakeSelector, ModelSelector}
 import com.salesforce.op.stages.impl.tuning.{DataSplitter, Splitter, _}
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
@@ -44,13 +44,13 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 /**
  * A factory for Binary Classification Model Selector
  */
-case object BinaryClassificationModelSelector {
+case object BinaryClassificationModelSelector extends MakeSelector {
 
   private[op] val modelNames: Seq[BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
     MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
   // OpNaiveBayes and OpDecisionTreeClassifier off by default
 
-  private def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -197,30 +197,6 @@ case object BinaryClassificationModelSelector {
       modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
 
-  private def selector(
-    validator: OpValidator[ModelType, EstimatorType],
-    splitter: Option[Splitter],
-    trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry],
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
-  ): ModelSelector[ModelType, EstimatorType] = {
-    val modelStrings = modelTypesToUse.map(_.entryName)
-    val modelsToUse =
-      // if no models are specified use the defaults and filter by the named models to use
-      if (modelsAndParameters.isEmpty) defaultModelsAndParams
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-      // if models to use has been specified and the models have been specified filter the models by the names
-      else if (modelTypesToUse != modelNames) modelsAndParameters
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-      // else just use the specified models
-      else modelsAndParameters
-    new ModelSelector(
-      validator = validator,
-      splitter = splitter,
-      models = modelsToUse,
-      evaluators = trainTestEvaluators
-    )
-  }
 }
 
 /**
