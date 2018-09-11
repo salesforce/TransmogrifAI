@@ -40,7 +40,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextVectorizerTest extends FlatSpec with TestSparkContext {
+class TextVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
   // scalastyle:off
   lazy val (data, f1, f2) = TestFeatureBuilder(
     Seq[(Text, Text)](
@@ -63,7 +63,8 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(data)
     val result = transformed.collect(vectorized)
     val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
-
+    val field = transformed.schema(vectorized.name)
+    assertNominal(field, Array.fill(result.head.value.size - 1)(false) :+ true)
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) should be >= 1.0
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "question")) should be >= 1.0
@@ -86,7 +87,8 @@ class TextVectorizerTest extends FlatSpec with TestSparkContext {
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(data)
     val result = transformed.collect(vectorized)
     val f1NameHash = hasher.indexOf(vectorized.parents.head.originStage.getInputFeatures().head.name)
-
+    val field = transformed.schema(vectorized.name)
+    assertNominal(field, Array.fill(result.head.value.size - 2)(false) ++ Array(true, true))
     // scalastyle:off
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) shouldBe 1.0
     result(0).value(hasher.indexOf(s"${f1NameHash}_" + "hamlet")) shouldBe 1.0

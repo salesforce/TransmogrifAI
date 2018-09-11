@@ -47,7 +47,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
   BinaryModel[RealNN, RealMap, OPVector], DecisionTreeNumericMapBucketizer[Double, RealMap]]
-  with DecisionTreeNumericBucketizerAsserts
+  with DecisionTreeNumericBucketizerAsserts with AttributeAsserts
 {
   import OPMapVectorizerTestHelper._
 
@@ -228,6 +228,8 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     )
     val scored = model.setInputDataset(data).score(keepIntermediateFeatures = true)
     val res = scored.collect(out)
+    val field = scored.schema(out.name)
+    assertNominal(field, Array.fill(res.head.value.size)(true))
     assertMetadata(
       shouldSplit = stage.shouldSplitByKey.toArray.sortBy(_._1).map(_._2),
       splits = stage.splitsByKey.toArray.sortBy(_._1).map(_._2),
