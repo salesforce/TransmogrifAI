@@ -34,10 +34,11 @@ import com.salesforce.op.UID
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.{Dataset, Row}
 import org.slf4j.LoggerFactory
-import org.apache.spark.Partitioner
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.Monoid._
+import org.apache.spark.rdd.RDD
 
 /**
  *
@@ -72,41 +73,44 @@ private[op] class OpBinScoreEvaluator
     val labelColumnName = getLabelCol
     val dataProcessed = makeDataToUse(data, labelColumnName)
 
-    import dataProcessed.sparkSession.implicits._
-
-    if (dataProcessed.select(getPredictionValueCol, labelColumnName).as[(Double, Double)].rdd.isEmpty()) {
+    val rdd = dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd
+    if (rdd.isEmpty()) {
       log.error("The dataset is empty. Returning empty metrics")
       BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
     } else {
-      val scoreAndLabels = dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd.map {
+      val scoreAndLabels = rdd.map {
         case Row(prob: Vector, label: Double) => (prob(1), label)
         case Row(prob: Double, label: Double) => (prob, label)
       }
 
       // Finding stats per bin -> avg score, avg conv rate,
-      // total num of data points, bin center.
+      // total num of data points and overall brier score.
       val stats = scoreAndLabels.map {
-        case (score, label) => (getBinIndex(score), (score, label, 1L))
-      }.reduceByKeyLocally(_ + _).map {
-        case (bin, (scoreSum, labelSum, count)) =>
-          (bin, (scoreSum / count, labelSum / count, count, (bin + 0.5) / numBins))
-      }
+        case (score, label) => (getBinIndex(score), (score, label, 1L, math.pow((score - label), 2)))
+      }.reduceByKey(_ + _).map {
+        case (bin, (scoreSum, labelSum, count, squaredError)) =>
+          (bin, scoreSum / count, labelSum / count, count, squaredError)
+      }.collect()
 
-      // For the bins, which don't have any scores, fill 0's and bin center.
-      val statsForBins = {
-        for {i <- 0 to numBins - 1}  yield stats.getOrElse(i, (0.0, 0.0, 0L, (i + 0.5) / numBins))
-      }
+      val (averageScore, averageConversionRate, numberOfDataPoints, brierScoreSum, numberOfPoints) =
+        stats.foldLeft((new Array[Double](numBins), new Array[Double](numBins), new Array[Long](numBins), 0.0, 0L)) {
+          (columns, row) => {
+            val binIndex = row._1
 
-      val (averageScore, averageConversionRate, numberOfDataPoints, binCenters) =
-        statsForBins.foldLeft((Seq.empty[Double], Seq.empty[Double], Seq.empty[Long], Seq.empty[Double])) {
-        (columns, row) => (columns._1 :+ row._1, columns._2 :+ row._2, columns._3 :+ row._3, columns._4 :+ row._4)
-      }
+            columns._1(binIndex) = row._2
+            columns._2(binIndex) = row._3
+            columns._3(binIndex) = row._4
 
-      // brier score of entire dataset.
-      val brierScore = scoreAndLabels.map { case (score, label) => math.pow((score - label), 2) }.mean()
+            (columns._1, columns._2, columns._3, columns._4 + row._5, columns._5 + row._4)
+          }
+        }
+
+      // binCenters is the center point in each bin.
+      // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
+      val binCenters = (for {i <- 0 to numBins} yield ((i + 0.5) / numBins)).dropRight(1)
 
       val metrics = BinaryClassificationBinMetrics(
-        brierScore = brierScore,
+        brierScore = brierScoreSum / numberOfPoints,
         binCenters = binCenters,
         numberOfDataPoints = numberOfDataPoints,
         averageScore = averageScore,
