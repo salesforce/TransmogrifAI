@@ -20,6 +20,7 @@ New features and bug fixes:
 - Redundant and deadlock-prone end listener removal [#52](https://github.com/salesforce/TransmogrifAI/pull/52)
 - OS-neutral filesystem path creation [#51](https://github.com/salesforce/TransmogrifAI/pull/51)
 - Make Feature class public instead hide it's ctor [#45](https://github.com/salesforce/TransmogrifAI/pull/45)
+- Specify categorical variables in metadata [#120](https://github.com/salesforce/TransmogrifAI/pull/120)
 
 Breaking changes:
 - Made case class to deal with model selector metadata [#39](https://github.com/salesforce/TransmogrifAI/pull/39)
