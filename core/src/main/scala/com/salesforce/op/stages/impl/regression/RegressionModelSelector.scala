@@ -34,7 +34,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
@@ -44,12 +44,12 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 /**
  * A factory for Regression Model Selector
  */
-case object RegressionModelSelector {
+case object RegressionModelSelector extends ModelSelectorFactory {
 
   private[op] val modelNames: Seq[RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
     MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
 
-  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
 
     val lr = new OpLinearRegression()
     val lrParams = new ParamGridBuilder()
@@ -138,7 +138,7 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
@@ -176,34 +176,13 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(ts, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
-  }
-
-
-  private def selector(
-    validator: OpValidator[ModelType, EstimatorType],
-    splitter: Option[DataSplitter],
-    trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[RegressionModelsToTry],
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
-  ): ModelSelector[ModelType, EstimatorType] = {
-    val modelStrings = modelTypesToUse.map(_.entryName)
-    val modelsToUse =
-      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-      else modelsAndParameters
-    new ModelSelector(
-      validator = validator,
-      splitter = splitter,
-      models = modelsToUse,
-      evaluators = trainTestEvaluators
-    )
   }
 
 }
