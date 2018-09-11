@@ -34,7 +34,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, MakeSelector, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
@@ -44,7 +44,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 /**
  * A factory for Regression Model Selector
  */
-case object RegressionModelSelector extends MakeSelector {
+case object RegressionModelSelector extends ModelSelectorFactory {
 
   private[op] val modelNames: Seq[RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
     MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default

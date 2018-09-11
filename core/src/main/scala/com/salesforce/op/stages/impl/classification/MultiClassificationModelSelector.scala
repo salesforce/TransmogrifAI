@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, MakeSelector, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
@@ -44,7 +44,7 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 /**
  * A factory for Multi Classification Model Selector
  */
-case object MultiClassificationModelSelector extends MakeSelector {
+case object MultiClassificationModelSelector extends ModelSelectorFactory {
 
   private[op] val modelNames: Seq[MultiClassClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
     MTT.OpRandomForestClassifier) // OpDecisionTreeClassifier and OpNaiveBayes off by default

@@ -38,7 +38,7 @@ import org.apache.spark.ml.param.ParamMap
 /**
  * Creates the model selector class
  */
-private[op] trait MakeSelector {
+private[op] trait ModelSelectorFactory {
 
   /**
    * Subset of models to use
