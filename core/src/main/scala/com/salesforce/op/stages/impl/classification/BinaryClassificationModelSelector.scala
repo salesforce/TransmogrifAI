@@ -50,7 +50,7 @@ case object BinaryClassificationModelSelector {
     MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
   // OpNaiveBayes and OpDecisionTreeClassifier off by default
 
-  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+  private def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -146,7 +146,7 @@ case object BinaryClassificationModelSelector {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
@@ -187,7 +187,7 @@ case object BinaryClassificationModelSelector {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
@@ -206,7 +206,9 @@ case object BinaryClassificationModelSelector {
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)
     val modelsToUse =
-      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
+      if (modelsAndParameters.isEmpty) defaultModelsAndParams
+        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+      else if (modelTypesToUse != modelNames) modelsAndParameters
         .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
       else modelsAndParameters
     new ModelSelector(

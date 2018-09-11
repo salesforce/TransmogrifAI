@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector.defaultModelsAndParams
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
@@ -49,7 +50,7 @@ case object RegressionModelSelector {
   private[op] val modelNames: Seq[RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
     MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
 
-  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+  private def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
 
     val lr = new OpLinearRegression()
     val lrParams = new ParamGridBuilder()
@@ -138,7 +139,7 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
@@ -176,7 +177,7 @@ case object RegressionModelSelector {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
@@ -195,7 +196,9 @@ case object RegressionModelSelector {
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)
     val modelsToUse =
-      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
+      if (modelsAndParameters.isEmpty) defaultModelsAndParams
+        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+      else if (modelTypesToUse != modelNames) modelsAndParameters
         .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
       else modelsAndParameters
     new ModelSelector(
