@@ -43,7 +43,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], SmartTextVectorizer[Text]] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], SmartTextVectorizer[Text]] with AttributeAsserts {
 
   lazy val (inputData, f1, f2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
@@ -82,7 +82,14 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    assertNominal(fieldCategorical,
+      Array.fill(transformed.collect(categoricalVectorized).head.value.size)(true))
+    val fieldText = transformed.schema(textVectorized.name)
+    assertNominal(fieldText,
+      Array.fill(transformed.collect(textVectorized).head.value.size)(false))
     val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
       smartVector -> combined
@@ -101,7 +108,11 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, categoricalVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    assertNominal(fieldCategorical,
+      Array.fill(transformed.collect(categoricalVectorized).head.value.size)(true))
     val (smart, expected) = result.unzip
 
     smart shouldBe expected
@@ -121,7 +132,10 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true))
+    val fieldText = transformed.schema(textVectorized.name)
+    assertNominal(fieldText, Array.fill(transformed.collect(textVectorized).head.value.size)(false))
     val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
       smartVector -> combined
@@ -144,7 +158,10 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
+    val fieldShortcut = transformed.schema(shortcutVectorized.name)
+    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
     val (regular, shortcut) = result.unzip
 
     regular shouldBe shortcut
