@@ -42,7 +42,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
+class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (ds, f1) = TestFeatureBuilder(
     Seq[(TextMap)](
@@ -74,7 +74,8 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext {
       Array(1.0, 1.0, 0.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
     transformed.collect(vector) shouldBe expected
-
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(true))
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
