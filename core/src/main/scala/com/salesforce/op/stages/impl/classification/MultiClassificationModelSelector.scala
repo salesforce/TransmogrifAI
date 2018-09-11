@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
@@ -44,12 +44,12 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 /**
  * A factory for Multi Classification Model Selector
  */
-case object MultiClassificationModelSelector {
+case object MultiClassificationModelSelector extends ModelSelectorFactory {
 
   private[op] val modelNames: Seq[MultiClassClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
     MTT.OpRandomForestClassifier) // OpDecisionTreeClassifier and OpNaiveBayes off by default
 
-  private val defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
     val lr = new OpLogisticRegression()
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -124,7 +124,7 @@ case object MultiClassificationModelSelector {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
@@ -165,7 +165,7 @@ case object MultiClassificationModelSelector {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = modelNames,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = defaultModelsAndParams
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
@@ -174,27 +174,8 @@ case object MultiClassificationModelSelector {
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
-
-  private def selector(
-    validator: OpValidator[ModelType, EstimatorType],
-    splitter: Option[DataCutter],
-    trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]],
-    modelTypesToUse: Seq[MultiClassClassificationModelsToTry],
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
-  ): ModelSelector[ModelType, EstimatorType] = {
-    val modelStrings = modelTypesToUse.map(_.entryName)
-    val modelsToUse =
-      if (modelsAndParameters == defaultModelsAndParams || modelTypesToUse != modelNames) modelsAndParameters
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-      else modelsAndParameters
-    new ModelSelector(
-      validator = validator,
-      splitter = splitter,
-      models = modelsToUse,
-      evaluators = trainTestEvaluators
-    )
-  }
 }
+
 /**
  * Enumeration of possible classification models in Model Selector
  */
