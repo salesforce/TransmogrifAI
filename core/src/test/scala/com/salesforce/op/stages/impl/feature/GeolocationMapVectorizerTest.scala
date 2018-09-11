@@ -44,7 +44,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class GeolocationMapVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[GeolocationMap, OPVector], GeolocationMapVectorizer] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[GeolocationMap, OPVector], GeolocationMapVectorizer]
+    with AttributeAsserts {
 
   val (inputData, m1, m2) = TestFeatureBuilder("m1", "m2",
     Seq(
@@ -93,7 +94,8 @@ class GeolocationMapVectorizerTest
     val vectorizer = estimator.fit(inputData)
     val transformed = vectorizer.transform(inputData)
     val vector = vectorizer.getOutput()
-
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
     transformed.collect(vector) shouldBe expectedResult
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
@@ -112,6 +114,9 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(24, Array(3, 7, 11, 15, 19, 23), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
 
+    val field = transformed.schema(vector.name)
+    assertNominal(field,
+      Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
@@ -128,6 +133,8 @@ class GeolocationMapVectorizerTest
       Array(6.0, 6.0, 6.0, 6.0, 6.0, 6.0, 33.8, -108.7, 2.0, 40.4, -116.3, 2.0, 42.5, -95.4, 4.0, 6.0, 6.0, 6.0),
       Array.fill(18)(6.0)
     ).map(v => Vectors.dense(v).toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
@@ -147,6 +154,9 @@ class GeolocationMapVectorizerTest
         0.0, 6.0, 6.0, 6.0, 1.0),
       (0 until 6).flatMap(k => Seq.fill(3)(6.0) :+ 1.0).toArray
     ).map(v => Vectors.dense(v).toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field,
+      Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
 
     transformed.collect(vector) shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
@@ -164,6 +174,9 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(9, Array(), Array()),
       Vectors.sparse(9, Array(), Array())
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
+
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "A")) ++
@@ -188,6 +201,10 @@ class GeolocationMapVectorizerTest
       Vectors.sparse(12, Array(3, 7, 11), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(3, 7, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field,
+      Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
+
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> (
@@ -215,6 +232,9 @@ class GeolocationMapVectorizerTest
       Vectors.dense(Array(0.0, 0.0, 0.0, 33.8, -108.7, 2.0, 40.4, -116.3, 2.0, 42.5, -95.4, 4.0)),
       Vectors.sparse(12, Array(), Array())
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(false))
+
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> (Geolocation.Names.map(n => DescColWithGroup(Option(n), "B")) ++
@@ -239,6 +259,10 @@ class GeolocationMapVectorizerTest
       Vectors.dense(Array(0.0, 0.0, 0.0, 1.0, 33.8, -108.7, 2.0, 0.0, 40.4, -116.3, 2.0, 0.0, 42.5, -95.4, 4.0, 0.0)),
       Vectors.sparse(16, Array(3, 7, 11, 15), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field,
+      Array.fill(expected.head.value.size / 4)(Seq(false, false, false, true)).flatten)
+
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> (
@@ -263,6 +287,9 @@ class GeolocationMapVectorizerTest
     val vector = vectorizer.getOutput()
     val expectedOutput = transformed.collect()
 
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(transformed.collect(vector).head.value.size / 4)
+    (Seq(false, false, false, true)).flatten)
     // Now using the shortcut
     val res = m1.vectorize(cleanKeys = TransmogrifierDefaults.CleanKeys, others = Array(m2))
     res.originStage shouldBe a[GeolocationMapVectorizer]
