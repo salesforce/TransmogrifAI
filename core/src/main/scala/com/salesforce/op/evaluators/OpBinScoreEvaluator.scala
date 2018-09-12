@@ -124,7 +124,8 @@ private[op] class OpBinScoreEvaluator
 
   // getBinIndex finds which bin the score associates with.
   private def getBinIndex(score: Double): Int = {
-    math.min(numBins - 1, (score * numBins).toInt)
+    val binIndex = math.min(numBins - 1, (score * numBins).toInt)
+    math.max(binIndex, 0) // if score is negative, assign it to bin 0.
   }
 }
 

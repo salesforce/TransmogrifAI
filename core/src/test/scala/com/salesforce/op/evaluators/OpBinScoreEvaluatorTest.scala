@@ -61,6 +61,13 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
   val (emptyData, predictionEmptyData, labelEmptyData) = TestFeatureBuilder[Prediction, RealNN](Seq())
 
+  val (outOfBoundScoreDataset, outOfBoundScoreprediction, outOfBoundScorelabel) = TestFeatureBuilder(
+    Seq (
+      Prediction(1.0, Array(10.0, 10.0), Array(0.0001, -0.99999)) -> 1.0.toRealNN,
+      Prediction(1.0, Array(10.0, 10.0), Array(0.0001, 1.99999)) -> 1.0.toRealNN
+    )
+  )
+
   Spec[OpBinScoreEvaluator] should "return the bin metrics" in {
     val metrics = new OpBinScoreEvaluator(numBins = 4)
           .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
@@ -71,6 +78,19 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
       Seq(2, 0, 1, 2),
       Seq(0.003205, 0.0, 0.7, 0.99999),
       Seq(0.0, 0.0, 0.0, 1.0))
+  }
+
+  it should "evaluate bin metrics for scores not between 0 and 1" in {
+    val metrics = new OpBinScoreEvaluator(numBins = 4)
+      .setLabelCol(outOfBoundScorelabel.name).setPredictionCol(outOfBoundScoreprediction.name)
+      .evaluateAll(outOfBoundScoreDataset)
+
+    metrics shouldBe BinaryClassificationBinMetrics(
+      2.4999700001,
+      Seq(0.125, 0.375, 0.625, 0.875),
+      Seq(1, 0, 0, 1),
+      Seq(-0.99999, 0.0, 0.0, 1.99999),
+      Seq(1.0, 0.0, 0.0, 1.0))
   }
 
   it should "error on invalid number of bins" in {
