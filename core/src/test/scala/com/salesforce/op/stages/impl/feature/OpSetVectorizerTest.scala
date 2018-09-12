@@ -117,7 +117,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.sparse(10, Array(0, 1, 7), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
@@ -135,7 +135,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.sparse(13, Array(1, 2, 9), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
@@ -160,7 +160,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val vector = vectorizer.getOutput()
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expectedData
     vectorizer.setTopK(10)
@@ -178,7 +178,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0)
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
   }
 
@@ -194,7 +194,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 1.0)
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
@@ -230,7 +230,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.dense(0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
@@ -257,7 +257,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val expected = Array(Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0)).map(_.toOPVector)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(vector)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
@@ -278,7 +278,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val actual = df.collect(result)
     actual shouldBe expectedData
     val field = df.schema(result.name)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, actual)
   }
 
@@ -317,7 +317,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val vector = localVectorizer.getOutput()
     val field = transformed.schema(vector.name)
     val result = transformed.collect(vector)
-    val expect = OpVectorMetadata("", field.metadata).columns.map(c => if (c.isOtherIndicator) false else true)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
   }
 
@@ -364,8 +364,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val field = transformed.schema(vectorized.name)
     val result = transformed.collect(vectorized)
     val expect = OpVectorMetadata("", field.metadata).columns
-      .map(c => if (c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]) false
-      else true)
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
     assertNominal(field, expect, result)
 
     val metaMap = transformed.metadata(vectorized)
@@ -393,8 +392,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val field = transformed.schema(res.name)
     val result = transformed.collect(res)
     val expect = OpVectorMetadata("", field.metadata).columns
-      .map(c => if (c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]) false
-      else true)
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
     assertNominal(field, expect, result)
   }
 
