@@ -94,14 +94,14 @@ private[op] class OpBinScoreEvaluator
 
       val (averageScore, averageConversionRate, numberOfDataPoints, brierScoreSum, numberOfPoints) =
         stats.foldLeft((new Array[Double](numBins), new Array[Double](numBins), new Array[Long](numBins), 0.0, 0L)) {
-          (columns, row) => {
-            val binIndex = row._1
+          case ((score, convRate, dataPoints, brierScoreSum, totalPoints),
+          (binIndex, avgScore, avgConvRate, counts, squaredError)) => {
 
-            columns._1(binIndex) = row._2
-            columns._2(binIndex) = row._3
-            columns._3(binIndex) = row._4
+            score(binIndex) = avgScore
+            convRate(binIndex) = avgConvRate
+            dataPoints(binIndex) = counts
 
-            (columns._1, columns._2, columns._3, columns._4 + row._5, columns._5 + row._4)
+            (score, convRate, dataPoints, brierScoreSum + squaredError, totalPoints + counts)
           }
         }
 
