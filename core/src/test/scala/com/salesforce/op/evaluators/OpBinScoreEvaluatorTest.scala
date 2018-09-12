@@ -50,7 +50,7 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
     )
   )
 
-  val (dataset_skewed, prediction_skewed, label_skewed) = TestFeatureBuilder(
+  val (dataSkewed, predictionSkewedData, labelSkewedData) = TestFeatureBuilder(
     Seq (
       Prediction(1.0, Array(10.0, 10.0), Array(0.0001, 0.99999)) -> 1.0.toRealNN,
       Prediction(1.0, Array(10.0, 10.0), Array(0.0001, 0.99999)) -> 1.0.toRealNN,
@@ -59,9 +59,7 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
     )
   )
 
-  val (emptyDataSet, prediction_emptydataset, label_empty_dataset) = TestFeatureBuilder[Prediction, RealNN](
-    Seq()
-  )
+  val (emptyData, predictionEmptyData, labelEmptyData) = TestFeatureBuilder[Prediction, RealNN](Seq())
 
   Spec[OpBinScoreEvaluator] should "return the bin metrics" in {
     val metrics = new OpBinScoreEvaluator(numBins = 4)
@@ -84,14 +82,14 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
   it should "evaluate the empty data" in {
     val metrics = new OpBinScoreEvaluator(numBins = 10)
-      .setLabelCol(label_empty_dataset.name).setPredictionCol(prediction_emptydataset.name).evaluateAll(emptyDataSet)
+      .setLabelCol(labelEmptyData.name).setPredictionCol(predictionEmptyData.name).evaluateAll(emptyData)
 
     metrics shouldBe BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
   }
 
   it should "evaluate bin metrics for skewed data" in {
     val metrics = new OpBinScoreEvaluator(numBins = 5)
-      .setLabelCol(label_skewed.name).setPredictionCol(prediction_skewed.name).evaluateAll(dataset_skewed)
+      .setLabelCol(labelSkewedData.name).setPredictionCol(predictionSkewedData.name).evaluateAll(dataSkewed)
 
     metrics shouldBe BinaryClassificationBinMetrics(
       7.294225500000013E-4,
