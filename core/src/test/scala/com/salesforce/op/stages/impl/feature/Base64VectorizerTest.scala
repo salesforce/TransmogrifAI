@@ -64,7 +64,7 @@ class Base64VectorizerTest extends FlatSpec with TestSparkContext with Base64Tes
     val result = new OpWorkflow().setResultFeatures(vec).transform(realData)
     val vectors = result.collect(vec)
     val schema = result.schema(vec.name)
-    assertNominal(schema, Array.fill(vectors.head.value.size)(true))
+    assertNominal(schema, Array.fill(vectors.head.value.size)(true), vectors)
 
     vectors.length shouldBe expected.length
     // TODO add a more robust check

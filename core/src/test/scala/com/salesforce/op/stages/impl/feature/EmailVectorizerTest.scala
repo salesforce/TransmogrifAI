@@ -85,7 +85,7 @@ class EmailVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val field = transformed.schema(feature.name)
     val collected = transformed.collect(feature)
-    assertNominal(field, Array.fill(collected.head.value.size)(true))
+    assertNominal(field, Array.fill(collected.head.value.size)(true), collected)
     collected
   }
 

@@ -75,7 +75,8 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
-  val categoricalTypes = Seq(FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap])
+  private val categoricalTypes = Seq(FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap])
+  private val multiPicklistTypes = Seq(FeatureType.typeName[MultiPickList], FeatureType.typeName[MultiPickListMap])
 
   /**
    * Serialize to spark metadata
@@ -93,7 +94,8 @@ class OpVectorMetadata private
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
     val attributes = columns.map {
-      case c if c.indicatorValue.isDefined || categoricalTypes.exists(c.parentFeatureType.contains) =>
+      case c if (c.indicatorValue.isDefined || categoricalTypes.exists(c.parentFeatureType.contains)) &&
+        !(multiPicklistTypes.exists(c.parentFeatureType.contains) && c.isOtherIndicator) =>
         BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
       case c => NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
     }

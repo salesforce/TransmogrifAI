@@ -206,7 +206,7 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val transformed = model.transform(data)
     val res = transformed.collect(out)
     val field = transformed.schema(out.name)
-    assertNominal(field, Array.fill(res.head.value.size)(true))
+    assertNominal(field, Array.fill(res.head.value.size)(true), res)
       assertMetadata(
       shouldSplit = Array(shouldSplit),
       splits = Array(splits),
