@@ -14,6 +14,8 @@
     "values": [-0.03896426769874738, 0.038964267698747154, 0.039681455178797155, 1.8984581663074715E-16, -1.0, 5.562616143139679E-16, -1.0],
     "features": ["city_city_OTHER_0", "city_city_NullIndicatorValue_1", "currency_2", "expectedRevenue_4", "expectedRevenue_expectedRevenue_NullIndicatorValue_5", "real_6", "real_real_NullIndicatorValue_7"]
   },
+  "First": [],
+  "Second": [],
   "categoricalStats": {
     "cramersV": [0.9999999999999999, 0.9999999999999999, 0.038964267698747265, 0.038964267698747265, 0.0],
     "pointwiseMutualInfoAgainstLabel": {
@@ -24,5 +26,6 @@
     "categoricalFeatures": ["expectedRevenue_expectedRevenue_NullIndicatorValue_5", "real_real_NullIndicatorValue_7", "city_city_OTHER_0", "city_city_NullIndicatorValue_1", "currency_currency_NullIndicatorValue_3"]
   },
   "featuresDropped": ["currency_currency_NullIndicatorValue_3", "expectedRevenue_4", "expectedRevenue_expectedRevenue_NullIndicatorValue_5", "real_6", "real_real_NullIndicatorValue_7"],
-  "correlationsWithLabelIsNaN": ["currency_currency_NullIndicatorValue_3"]
+  "correlationsWithLabelIsNaN": ["currency_currency_NullIndicatorValue_3"],
+  "Reasons":[{"Reasons":["yo"],"name":"currency_currency_NullIndicatorValue_3"}, {"Reasons":["yo"],"name":"expectedRevenue_4"}, {"Reasons":["yo"],"name":"expectedRevenue_expectedRevenue_NullIndicatorValue_5"}, {"Reasons":["yo"],"name":"real_6"}, {"Reasons":["yo"],"name":"real_real_NullIndicatorValue_7"}]
 }

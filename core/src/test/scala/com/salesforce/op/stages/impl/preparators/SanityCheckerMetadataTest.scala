@@ -45,7 +45,10 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
   val summary = SanityCheckerSummary(
     correlationsWLabel = Correlations(Seq("f2", "f3"), Seq(0.2, 0.3), Seq(), CorrelationType.Pearson),
     dropped = Seq("f1"),
-    featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
+    sharedNullsFirst = Seq.empty[String],
+    sharedNullsSecond = Seq.empty[String],
+    reasons = Seq(List("yo")),
+      featuresStatistics = SummaryStatistics(3, 0.01, Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3),
       Seq(0.1, 0.2, 0.3), Seq(0.1, 0.2, 0.3)),
     names = Seq("f1", "f2", "f3"),
     Array(
@@ -87,6 +90,10 @@ class SanityCheckerMetadataTest extends FlatSpec with TestSparkContext {
       summary.categoricalStats.map(_.cramersV)
 
     retrieved.dropped should contain theSameElementsAs summary.dropped
+
+    retrieved.sharedNullsFirst should contain theSameElementsAs summary.sharedNullsFirst
+    retrieved.sharedNullsSecond should contain theSameElementsAs summary.sharedNullsSecond
+    retrieved.reasons should contain theSameElementsAs summary.reasons
 
     retrieved.featuresStatistics.count shouldBe summary.featuresStatistics.count
     retrieved.featuresStatistics.max should contain theSameElementsAs summary.featuresStatistics.max

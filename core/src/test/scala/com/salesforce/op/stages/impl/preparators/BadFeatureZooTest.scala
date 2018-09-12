@@ -203,7 +203,7 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     retrieved.categoricalStats.head.cramersV shouldBe retrieved2.categoricalStats.head.cramersV
   }
 
-  it should "not fail to run or serialize when passed empty features" in {
+  ignore should "not fail to run or serialize when passed empty features" in {
     // First set up the raw features:
     val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(1.0).take(1000).toList
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(1.0).take(1000).toList

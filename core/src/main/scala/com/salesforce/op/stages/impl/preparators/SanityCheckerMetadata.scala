@@ -69,6 +69,9 @@ case object SanityCheckerNames {
   val NumNonZeros = "numNonZeros"
   val Variance = "variance"
   val NumNull = "number of nulls"
+  val First = "First"
+  val Second = "Second"
+  val Reasons = "Reasons"
 }
 
 /**
@@ -84,6 +87,9 @@ case class SanityCheckerSummary
 (
   correlationsWLabel: Correlations,
   dropped: Seq[String],
+  sharedNullsFirst: Seq[String],
+  sharedNullsSecond: Seq[String],
+  reasons: Seq[List[String]],
   featuresStatistics: SummaryStatistics,
   names: Seq[String],
   categoricalStats: Array[CategoricalGroupStats]
@@ -93,6 +99,9 @@ case class SanityCheckerSummary
     stats: Array[ColumnStatistics],
     catStats: Array[CategoricalGroupStats],
     dropped: Seq[String],
+    sharedNullsFirst: Seq[String],
+    sharedNullsSecond: Seq[String],
+    reasons: Seq[List[String]],
     colStats: MultivariateStatisticalSummary,
     names: Seq[String],
     correlationType: CorrelationType,
@@ -107,7 +116,10 @@ case class SanityCheckerSummary
       dropped = dropped,
       featuresStatistics = new SummaryStatistics(colStats, sample),
       names = names,
-      categoricalStats = catStats
+      sharedNullsFirst = sharedNullsFirst,
+      sharedNullsSecond = sharedNullsSecond,
+      categoricalStats = catStats,
+      reasons = reasons
     )
   }
 
@@ -120,9 +132,16 @@ case class SanityCheckerSummary
     val summaryMeta = new MetadataBuilder()
     summaryMeta.putMetadata(SanityCheckerNames.CorrelationsWLabel, correlationsWLabel.toMetadata())
     summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
+    summaryMeta.putStringArray(SanityCheckerNames.First, sharedNullsFirst.toArray)
+    summaryMeta.putStringArray(SanityCheckerNames.Second, sharedNullsSecond.toArray)
     summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata())
     summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
     summaryMeta.putMetadataArray(SanityCheckerNames.CategoricalStats, categoricalStats.map(_.toMetadata()))
+    summaryMeta.putMetadataArray(SanityCheckerNames.Reasons, reasons.zip(dropped).map { case (reason, dropped) =>
+      new MetadataBuilder().putString("name", dropped)
+        .putStringArray(SanityCheckerNames.Reasons, reason.toArray)
+        .build()
+    }.toArray)
     summaryMeta.build()
   }
 
@@ -358,6 +377,7 @@ case object SanityCheckerSummary {
    */
   def fromMetadata(meta: Metadata): SanityCheckerSummary = {
     val wrapped = meta.wrapped
+
     // Try parsing as an older version of metadata (pre-3.3.0) if this doesn't work
     Try {
       SanityCheckerSummary(
@@ -366,7 +386,11 @@ case object SanityCheckerSummary {
         featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
         names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
         categoricalStats = wrapped.getArray[Metadata](SanityCheckerNames.CategoricalStats)
-          .map(categoricalGroupStatsFromMetadata)
+          .map(categoricalGroupStatsFromMetadata),
+        sharedNullsFirst = wrapped.getArray[String](SanityCheckerNames.First).toSeq,
+        sharedNullsSecond = wrapped.getArray[String](SanityCheckerNames.Second).toSeq,
+        reasons = wrapped.getArray[Metadata](SanityCheckerNames.Reasons)
+          .map(_.getStringArray(SanityCheckerNames.Reasons).toList)
       )
     } match {
       case Success(summary) => summary
@@ -393,6 +417,10 @@ case object SanityCheckerSummary {
               )
           },
           dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
+          sharedNullsFirst = wrapped.getArray[String](SanityCheckerNames.First).toSeq,
+          sharedNullsSecond = wrapped.getArray[String](SanityCheckerNames.Second).toSeq,
+          reasons = wrapped.getArray[Metadata](SanityCheckerNames.Reasons)
+            .map(_.getStringArray(SanityCheckerNames.Reasons).toList),
           featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
           names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
           categoricalStats = Array(CategoricalGroupStats(

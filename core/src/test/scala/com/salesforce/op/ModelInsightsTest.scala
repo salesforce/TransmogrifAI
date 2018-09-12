@@ -334,7 +334,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     correlationsWLabel = Correlations(Seq("f0_f0_f2_1", "f0_f0_f3_2"), Seq(5.2, 5.3), Seq("f1_0"),
       CorrelationType.Pearson),
     dropped = Seq("f1_0"),
-    featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
+    sharedNullsFirst = Seq("f1_0", "f2_0"),
+    sharedNullsSecond = Seq("f0_0", "f1_0"),
+    reasons = Seq(List("yo")),
+      featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
       min = Seq(1.1, 1.2, 1.3, 1.0), mean = Seq(2.1, 2.2, 2.3, 2.0), variance = Seq(3.1, 3.2, 3.3, 3.0)),
     names = Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2", labelName),
     categoricalStats = Array(
@@ -412,6 +415,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f1InDer.excluded shouldBe Option(true)
     f1InDer.corr.map(_.toString) shouldBe Some("NaN")
     f1InDer.cramersV shouldBe None
+    f1InDer.sharedNulls shouldBe Some("f0_0,f2_0")
+    f1InDer.reason shouldBe Some(List("yo"))
     f1InDer.mutualInformation shouldBe None
     f1InDer.pointwiseMutualInformation shouldBe Map.empty
     f1InDer.countMatrix shouldBe Map.empty
@@ -434,6 +439,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer2.excluded shouldBe Option(false)
     f0InDer2.corr shouldBe Some(5.2)
     f0InDer2.cramersV shouldBe Some(6.2)
+    f0InDer2.sharedNulls shouldBe None
     f0InDer2.mutualInformation shouldBe Some(10.2)
     f0InDer2.pointwiseMutualInformation shouldBe Map("0" -> 7.2, "1" -> 8.2, "2" -> 9.2)
     f0InDer2.countMatrix shouldBe Map("0" -> 13.0, "1" -> 5.0, "2" -> 14.0)
@@ -442,6 +448,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer2.max shouldBe Some(0.2)
     f0InDer2.mean shouldBe Some(2.2)
     f0InDer2.variance shouldBe Some(3.2)
+    f0InDer2.reason shouldBe None
+
 
     val f0InDer3 = f0In.derivedFeatures.last
     f0InDer3.derivedFeatureName shouldBe "f0_f0_f3_2"
@@ -459,6 +467,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     f0InDer3.max shouldBe Some(0.3)
     f0InDer3.mean shouldBe Some(2.3)
     f0InDer3.variance shouldBe Some(3.3)
+    f0InDer3.sharedNulls shouldBe None
+    f0InDer3.reason shouldBe None
+
+
   }
 
 }

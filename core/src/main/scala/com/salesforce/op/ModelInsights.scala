@@ -505,6 +505,8 @@ case class Insights
   stagesApplied: Seq[String],
   derivedFeatureGroup: Option[String],
   derivedFeatureValue: Option[String],
+  sharedNulls: Option[String] = None,
+  reason: Option[List[String]] = None,
   excluded: Option[Boolean] = None,
   corr: Option[Double] = None,
   cramersV: Option[Double] = None,
@@ -649,6 +651,11 @@ case object ModelInsights {
           .collect { case c if !droppedSet.contains(c.makeColName()) => c.index }
           .zipWithIndex.toMap
 
+
+        val sharedNulls = s.sharedNullsFirst zip s.sharedNullsSecond
+        val dropppedAndReasons = s.dropped zip s.reasons
+
+
         v.getColumnHistory().map { h =>
           val catGroupIndex = s.categoricalStats.zipWithIndex.collectFirst {
             case (groupStats, index) if groupStats.categoricalFeatures.contains(h.columnName) => index
@@ -667,6 +674,15 @@ case object ModelInsights {
               derivedFeatureGroup = h.indicatorGroup,
               derivedFeatureValue = h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
+              sharedNulls = sharedNulls.filter { case (null1, null2) => Array(null1, null2).contains(h.columnName) }
+                .toList
+              match {
+                case l if (!l.isEmpty) => Some(l.map {
+                  case (null1, null2) => if (null1 == h.columnName) null2 else null1
+                }.mkString(","))
+                case _ => None
+              },
+              reason = dropppedAndReasons.filter(_._1 == h.columnName).headOption.map(_._2),
               corr = getCorr(s.correlationsWLabel, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
               mutualInformation = catGroupIndex.map(i => s.categoricalStats(i).mutualInfo),
