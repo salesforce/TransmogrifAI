@@ -32,19 +32,24 @@ package com.salesforce.op.filters
 
 import scala.math.round
 
+import com.salesforce.op.features.{FeatureBuilder, OPFeature, TransientFeature}
+import com.salesforce.op.features.types._
+import com.salesforce.op.readers._
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
+class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
 
   val responseKey1: FeatureKey = "Response1" -> None
   val responseKey2: FeatureKey = "Response2" -> None
@@ -155,6 +160,68 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
       Array(1.0, 0.5),
       Array(1.0))
     testCorrMatrix(allResponseKeys2, CorrelationType.Spearman, expected)
+  }
+
+  it should "correctly transform date features when time period is specified" in {
+    val dateMap =
+      FeatureBuilder.DateMap[Passenger].extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
+    val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
+    val df: DataFrame = dataReader.generateDataFrame(dateFeatures)
+
+    val ppRDD5: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.WeekOfMonth)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD7: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfWeek)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD12: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.MonthOfYear)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD24: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.HourOfDay)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD31: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfMonth)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD53: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.WeekOfYear)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDD366: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfYear)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+    val ppRDDNone: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), None))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
+
+    def createExpected(d: Double): Seq[(FeatureKey, ProcessedSeq)] = Seq(
+      (boarded.name, None) -> Right(List(d, d)),
+      (boarded.name, None) -> Right(List(d)),
+      (boardedTime.name, None) -> Right(List(d)),
+      (boardedTimeAsDateTime.name, None) -> Right(List(d)),
+      (dateMap.name, Option("DTMap")) -> Right(List(d)))
+
+    val expected5 = Seq(4.0).map(createExpected)
+    val expected7 = Seq(0.0).map(createExpected)
+    val expected12 = Seq(1.0).map(createExpected)
+    val expected24 = Seq(0.0).map(createExpected)
+    val expected31 = Seq(18.0).map(createExpected)
+    val expected53 = Seq(4.0).map(createExpected)
+    val expected366 = Seq(18.0).map(createExpected)
+
+    ppRDD5.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected5.flatMap(identity(_))
+    ppRDD7.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected7.flatMap(identity(_))
+    ppRDD12.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected12.flatMap(identity(_))
+    ppRDD24.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected24.flatMap(identity(_))
+    ppRDD53.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected53.flatMap(identity(_))
+    ppRDD366.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected366.flatMap(identity(_))
   }
 
   def testCorrMatrix(

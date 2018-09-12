@@ -30,9 +30,14 @@
 
 package com.salesforce.op.filters
 
+
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
+import java.time.temporal.WeekFields
+import java.util.Locale
+
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.TextTokenizer
+import com.salesforce.op.stages.impl.feature.{TextTokenizer, TimePeriod}
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
@@ -127,15 +132,19 @@ private[filters] object PreparedFeatures {
    * @param predictors transient features derived from predictors
    * @return set of prepared features
    */
-  def apply(row: Row, responses: Array[TransientFeature], predictors: Array[TransientFeature]): PreparedFeatures = {
+  def apply(
+    row: Row,
+    responses: Array[TransientFeature],
+    predictors: Array[TransientFeature],
+    timePeriod: Option[TimePeriod]): PreparedFeatures = {
     val empty: Map[FeatureKey, ProcessedSeq] = Map.empty
     val preparedResponses = responses.foldLeft(empty) { case (map, feature) =>
       val converter = FeatureTypeSparkConverter.fromFeatureTypeName(feature.typeName)
-      map ++ prepareFeature(feature.name, row.getFeatureType(feature)(converter))
+      map ++ prepareFeature(feature.name, row.getFeatureType(feature)(converter), timePeriod)
     }
     val preparedPredictors = predictors.foldLeft(empty) { case (map, feature) =>
       val converter = FeatureTypeSparkConverter.fromFeatureTypeName(feature.typeName)
-      map ++ prepareFeature(feature.name, row.getFeatureType(feature)(converter))
+      map ++ prepareFeature(feature.name, row.getFeatureType(feature)(converter), timePeriod)
     }
 
     PreparedFeatures(responses = preparedResponses, predictors = preparedPredictors)
@@ -149,10 +158,16 @@ private[filters] object PreparedFeatures {
    * @tparam T type of the feature
    * @return tuple containing whether the feature was empty and a sequence of either doubles or strings
    */
-  private def prepareFeature[T <: FeatureType](name: String, value: T): Map[FeatureKey, ProcessedSeq] =
+  private def prepareFeature[T <: FeatureType](
+    name: String,
+    value: T,
+    timePeriod: Option[TimePeriod]): Map[FeatureKey, ProcessedSeq] =
     value match {
       case v: Text => v.value
         .map(s => Map[FeatureKey, ProcessedSeq]((name, None) -> Left(tokenize(s)))).getOrElse(Map.empty)
+      case v: Date => v.value.map { timestamp =>
+        Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(prepareDateValue(timestamp, timePeriod))))
+      }.getOrElse(Map.empty)
       case v: OPNumeric[_] => v.toDouble
         .map(d => Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(d)))).getOrElse(Map.empty)
       case SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
@@ -160,10 +175,12 @@ private[filters] object PreparedFeatures {
       case ft@SomeValue(_) => ft match {
         case v: Geolocation => Map((name, None) -> Right(v.value))
         case v: TextList => Map((name, None) -> Left(v.value))
-        case v: DateList => Map((name, None) -> Right(v.value.map(_.toDouble)))
+        case v: DateList => Map((name, None) -> Right(v.value.map(prepareDateValue(_, timePeriod))))
         case v: MultiPickList => Map((name, None) -> Left(v.value.toSeq))
         case v: MultiPickListMap => v.value.map { case (k, e) => (name, Option(k)) -> Left(e.toSeq) }
         case v: GeolocationMap => v.value.map{ case (k, e) => (name, Option(k)) -> Right(e) }
+        case v: DateMap =>
+          v.value.map { case (k, e) => (name, Option(k)) -> Right(Seq(prepareDateValue(e, timePeriod))) }
         case v: OPMap[_] => v.value.map { case (k, e) => e match {
           case d: Double => (name, Option(k)) -> Right(Seq(d))
           // Do not need to distinguish between string map types, all text is tokenized for distribution calculation
@@ -183,4 +200,38 @@ private[filters] object PreparedFeatures {
    * @return array of string tokens
    */
   private def tokenize(s: String) = TextTokenizer.Analyzer.analyze(s, Language.Unknown)
+
+  private def prepareDateValue(timestamp: Long, timePeriod: Option[TimePeriod]): Double =
+    timePeriod match {
+      case Some(period) =>
+        val dt = Instant.ofEpochMilli(timestamp).atZone(ZoneOffset.UTC).toOffsetDateTime
+        val unproj = period match {
+          case TimePeriod.DayOfMonth => dt.getDayOfMonth.toDouble
+          case TimePeriod.DayOfWeek => dt.getDayOfWeek.getValue.toDouble
+          case TimePeriod.DayOfYear => dt.getDayOfYear.toDouble
+          case TimePeriod.HourOfDay => dt.getHour.toDouble
+          case TimePeriod.MonthOfYear => dt.getMonthValue.toDouble
+          case TimePeriod.WeekOfMonth => dt.get(WeekFields.of(Locale.US).weekOfMonth).toDouble
+          case TimePeriod.WeekOfYear => dt.get(WeekFields.of(Locale.US).weekOfYear).toDouble
+        }
+
+        unproj % getTimePeriodMaxBins(period)
+      case None => timestamp.toDouble
+    }
+
+  /**
+   * Utility for getting maximum number of bins to use given an input time period.
+   *
+   * @param period input time period
+   * @return maximum number of bins associated to input time period
+   */
+  private def getTimePeriodMaxBins(period: TimePeriod): Int = period match {
+    case TimePeriod.DayOfMonth => 31
+    case TimePeriod.DayOfWeek => 7
+    case TimePeriod.DayOfYear => 366
+    case TimePeriod.HourOfDay => 24
+    case TimePeriod.MonthOfYear => 12
+    case TimePeriod.WeekOfMonth => 5
+    case TimePeriod.WeekOfYear => 53
+  }
 }
