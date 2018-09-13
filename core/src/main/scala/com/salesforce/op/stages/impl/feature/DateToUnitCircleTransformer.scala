@@ -100,7 +100,7 @@ class DateToUnitCircleTransformer[T <: Date]
   }
 }
 
-object DateToUnitCircle {
+private[op] object DateToUnitCircle {
 
   def metadataValues(timePeriod: TimePeriod): Seq[String] = Seq(s"x_$timePeriod", s"y_$timePeriod")
 
