@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.types.OPVector
 import org.apache.spark.ml.attribute.AttributeGroup
 import org.apache.spark.sql.types.StructField
 import org.scalatest.{Assertion, Matchers}
@@ -41,9 +42,14 @@ trait AttributeAsserts {
    *
    * @param schema
    * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
+   * @param output the output OPVector associated with the column
    */
-  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean]): Assertion = {
+  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean], output: Array[OPVector]): Assertion = {
     val attributes = AttributeGroup.fromStructField(schema).attributes
+    for {
+      x <- output
+      (value, nominal) <- x.value.toArray.zip(expectedNominal)
+    } if (nominal) value should (be (0.0) or be (1.0))
     attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
   }
 }

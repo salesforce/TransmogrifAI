@@ -84,9 +84,10 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     ).map(_.toOPVector)
 
     val output = vectorizer.getOutput()
+    val result = transformed.collect(output)
     val field = transformed.schema(output.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(output) shouldBe expected
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -192,7 +193,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val mplData3: Seq[MultiPickList] = RandomMultiPickList.of(texts =
       RandomText.pickLists(domain = List("A", "B", "C", "D", "E")), maxLen = 3).limit(1000)
 
-    testFeatureToMap[MultiPickList, MultiPickListMap, Set[String]](mplData, mplData2, mplData3)
+    testFeatureToMap[MultiPickList, MultiPickListMap, Set[String]](mplData, mplData2, mplData3, false)
   }
 
   "Percent features" should "be vectorized the same whether they're in maps or not" in {
@@ -365,21 +366,24 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
       log.info("transformed data:")
       transformed.show(10)
     }
+    val result = transformed.collect(featureVector)
     val isCategoricalArray = if (isCategorical) {
-      Array.fill(transformed.collect(featureVector).head.value.size)(true)
+      Array.fill(result.head.value.size)(true)
     } else {
       rawF1 match {
         case f if f.isSubtypeOf[Date] => Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten
           .asInstanceOf[Array[Boolean]]
         case f if f.isSubtypeOf[TextArea] || f.isSubtypeOf[Text] => Array.fill(
-          transformed.collect(featureVector).head.value.size - 3)(false) ++ Array.fill(3)(true)
-        case f if f.isSubtypeOf[Geolocation] => Array.fill(transformed.collect(featureVector).head.value.size / 4)(
+          result.head.value.size - 3)(false) ++ Array.fill(3)(true)
+        case f if f.isSubtypeOf[Geolocation] => Array.fill(result.head.value.size / 4)(
           Seq(false, false, false, true)).flatten
-        case _ => Array.fill(transformed.collect(featureVector).head.value.size / 2)(Seq(false, true)).flatten
+        case f if f.isSubtypeOf[MultiPickList] => Array(true, true, true, true, true, false, true, true, true,
+          true, true, true, false, true, true, true, true, true, true, false, true)
+        case _ => Array.fill(result.head.value.size / 2)(Seq(false, true)).flatten
       }
     }
     val field = transformed.schema(featureVector.name)
-    assertNominal(field, isCategoricalArray)
+    assertNominal(field, isCategoricalArray, result)
 
     val summary = transformed.schema(featureVector.name).metadata
     log.info("summary:\n{}", summary)
@@ -396,7 +400,7 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
       transformedMap.show(10)
     }
     val fieldMap = transformedMap.schema(mapFeatureVector.name)
-    assertNominal(fieldMap, isCategoricalArray)
+    assertNominal(fieldMap, isCategoricalArray, result)
 
 
     // Check that the actual features are the same
