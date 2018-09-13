@@ -30,20 +30,16 @@
 
 package com.salesforce.op.filters
 
-import scala.math.round
-
-import com.salesforce.op.features.{FeatureBuilder, OPFeature, TransientFeature}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers._
+import com.salesforce.op.features.{FeatureBuilder, OPFeature, TransientFeature}
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -77,10 +73,6 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
   val allPredictorKeys1 = Array(predictorKey1, predictorKey2A, predictorKey2B)
   val allPredictorKeys2 = Array(predictorKey1)
 
-  val dateMap =
-    FeatureBuilder.DateMap[Passenger].extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
-  val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
-  lazy val dateDataFrame: DataFrame = dataReader.generateDataFrame(dateFeatures)
 
   Spec[PreparedFeatures] should "produce correct summaries" in {
     val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
@@ -167,59 +159,48 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     testCorrMatrix(allResponseKeys2, CorrelationType.Spearman, expected)
   }
 
-  it should "correctly transform date features when time period DayOfMonth is specified" in {
-    runDateToUnitCircleTest(TimePeriod.DayOfMonth, 16.0, 16.0, 16.0, 16.0, 16.0)
-  }
+  it should "transform dates for each period" in {
+    val expectedBins = Map(
+      TimePeriod.DayOfMonth -> 17.0,
+      TimePeriod.DayOfWeek -> 6.0,
+      TimePeriod.DayOfYear -> 17.0,
+      TimePeriod.HourOfDay -> 0.0,
+      TimePeriod.MonthOfYear -> 0.0,
+      TimePeriod.WeekOfMonth -> 2.0,
+      TimePeriod.WeekOfYear -> 2.0
+    )
+    expectedBins.keys should contain theSameElementsAs TimePeriod.values
 
-  it should "correctly transform date features when time period DayOfWeek is specified" in {
-    runDateToUnitCircleTest(TimePeriod.DayOfWeek, 5.0, 5.0, 5.0, 5.0, 5.0)
-  }
+    val dateMap = FeatureBuilder.DateMap[Passenger]
+      .extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
 
-  it should "correctly transform date features when time period DayOfYear is specified" in {
-    runDateToUnitCircleTest(TimePeriod.DayOfYear, 16.0, 16.0, 16.0, 16.0, 16.0)
-  }
+    val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
+    val dateDataFrame: DataFrame = dataReader.generateDataFrame(dateFeatures).persist()
 
-  it should "correctly transform date features when time period HourOfDay is specified" in {
-    runDateToUnitCircleTest(TimePeriod.HourOfDay, 16.0, 16.0, 16.0, 16.0, 16.0)
-  }
+    for {
+      (period, expectedBin) <- expectedBins
+    } {
+      def createExpectedDateMap(d: Double, aggregates: Int): Map[FeatureKey, ProcessedSeq] = Map(
+        (boarded.name, None) -> Right((0 until aggregates).map(_ => d).toList),
+        (boardedTime.name, None) -> Right(List(d)),
+        (boardedTimeAsDateTime.name, None) -> Right(List(d)),
+        (dateMap.name, Option("DTMap")) -> Right(List(d)))
 
-  it should "correctly transform date features when time period MonthOfYear is specified" in {
-    runDateToUnitCircleTest(TimePeriod.MonthOfYear, 0.0, 0.0, 0.0, 0.0, 0.0)
-  }
+      val res = dateDataFrame.rdd
+        .map(PreparedFeatures(_, Array.empty, dateFeatures.map(TransientFeature(_)), Option(period)))
+        .map(_.predictors.mapValues(_.right.map(_.toList)))
+        .collect()
 
-  it should "correctly transform date features when time period WeekOfMonth is specified" in {
-    runDateToUnitCircleTest(TimePeriod.WeekOfMonth, 2.0, 2.0, 2.0, 2.0, 2.0)
-  }
-
-  it should "correctly transform date features when time period WeekOfYear is specified" in {
-    runDateToUnitCircleTest(TimePeriod.WeekOfYear, 2.0, 2.0, 2.0, 2.0, 2.0)
-  }
-
-  def runDateToUnitCircleTest(
-    period: TimePeriod,
-    expected1: Double,
-    expected2: Double,
-    expected3: Double,
-    expected4: Double,
-    expected5: Double): Unit = {
-    def createExpectedDateMap(d: Double, aggregates: Int): Map[FeatureKey, ProcessedSeq] = Map(
-      (boarded.name, None) -> Right((0 until aggregates).map(_ => d).toList),
-      (boardedTime.name, None) -> Right(List(d)),
-      (boardedTimeAsDateTime.name, None) -> Right(List(d)),
-      (dateMap.name, Option("DTMap")) -> Right(List(d)))
-
-    val ppRDD: RDD[Map[FeatureKey, ProcessedSeq]] = dateDataFrame.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(period)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-
-    val expected: Seq[Map[FeatureKey, ProcessedSeq]] =
+      val expectedResults: Seq[Map[FeatureKey, ProcessedSeq]] =
       // The first observation is expected to be aggregated twice
-      Seq(createExpectedDateMap(expected1, 2)) ++
-      Seq(expected2, expected3, expected4, expected5).map(createExpectedDateMap(_, 1)) ++
-        Seq(Map[FeatureKey, ProcessedSeq]())
+        Seq(createExpectedDateMap(expectedBin, 2)) ++
+          Seq.fill(4)(expectedBin).map(createExpectedDateMap(_, 1)) ++
+          Seq(Map[FeatureKey, ProcessedSeq]())
 
-    ppRDD.collect should contain theSameElementsAs expected
+      withClue(s"Computed bin for $period period does not match:\n") {
+        res should contain theSameElementsAs expectedResults
+      }
+    }
   }
 
   def testCorrMatrix(
@@ -227,8 +208,7 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     correlationType: CorrelationType,
     expectedResult: Seq[Array[Double]]
   ): Unit = {
-    val corrRDD =
-      sc.parallelize(allPreparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, allPredictorKeys1)))
+    val corrRDD = sc.parallelize(allPreparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, allPredictorKeys1)))
     val corrMatrix = Statistics.corr(corrRDD, correlationType.sparkName)
 
     corrMatrix.colIter.zipWithIndex.map { case(vec, idx) =>
