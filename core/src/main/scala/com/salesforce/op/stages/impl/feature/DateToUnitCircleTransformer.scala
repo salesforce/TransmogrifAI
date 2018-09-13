@@ -35,7 +35,7 @@ import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.{FeatureHistory, UID}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{Param, Params}
-import org.joda.time.{DateTime => JDateTime}
+import org.joda.time.{DateTime => JDateTime, DateTimeZone}
 
 import scala.reflect.runtime.universe.TypeTag
 

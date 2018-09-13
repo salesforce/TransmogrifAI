@@ -162,13 +162,31 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     testCorrMatrix(allResponseKeys2, CorrelationType.Spearman, expected)
   }
 
-  it should "correctly transform date features when time period is specified" in {
+  it should "correctly transform date features when time period DayOfMonth is specified" in {
     runDateToUnitCircleTest(TimePeriod.DayOfMonth, 16.0, 16.0, 16.0, 16.0, 16.0)
+  }
+
+  it should "correctly transform date features when time period DayOfWeek is specified" in {
     runDateToUnitCircleTest(TimePeriod.DayOfWeek, 5.0, 5.0, 5.0, 5.0, 5.0)
+  }
+
+  it should "correctly transform date features when time period DayOfYear is specified" in {
     runDateToUnitCircleTest(TimePeriod.DayOfYear, 16.0, 16.0, 16.0, 16.0, 16.0)
+  }
+
+  it should "correctly transform date features when time period HourOfDay is specified" in {
     runDateToUnitCircleTest(TimePeriod.HourOfDay, 16.0, 16.0, 16.0, 16.0, 16.0)
+  }
+
+  it should "correctly transform date features when time period MonthOfYear is specified" in {
     runDateToUnitCircleTest(TimePeriod.MonthOfYear, 0.0, 0.0, 0.0, 0.0, 0.0)
+  }
+
+  it should "correctly transform date features when time period WeekOfMonth is specified" in {
     runDateToUnitCircleTest(TimePeriod.WeekOfMonth, 2.0, 2.0, 2.0, 2.0, 2.0)
+  }
+
+  it should "correctly transform date features when time period WeekOfYear is specified" in {
     runDateToUnitCircleTest(TimePeriod.WeekOfYear, 2.0, 2.0, 2.0, 2.0, 2.0)
   }
 
