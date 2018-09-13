@@ -34,6 +34,7 @@ import com.salesforce.op.features.OPFeature
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
@@ -521,12 +522,15 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     maxCorrelation: Double = 0.95,
     correlationType: CorrelationType = CorrelationType.Pearson,
     protectedFeatures: Array[OPFeature] = Array.empty,
-    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula
+    protectedJSFeatures: Array[OPFeature] = Array.empty,
+    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
+    timePeriod: Option[TimePeriod] = None
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
       "as the reader for the workflow")
     val protectedRawFeatures = protectedFeatures.flatMap(_.rawFeatures).map(_.name).toSet
+    val protectedRawJSFeatures = protectedJSFeatures.flatMap(_.rawFeatures).map(_.name).toSet
     rawFeatureFilter = Option {
       new RawFeatureFilter(
         trainingReader = training.get,
@@ -539,8 +543,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         maxCorrelation = maxCorrelation,
         correlationType = correlationType,
         protectedFeatures = protectedRawFeatures,
-        textBinsFormula = textBinsFormula
-      )
+        jsDivergenceProtectedFeatures = protectedRawJSFeatures,
+        textBinsFormula = textBinsFormula)
     }
     this
   }
