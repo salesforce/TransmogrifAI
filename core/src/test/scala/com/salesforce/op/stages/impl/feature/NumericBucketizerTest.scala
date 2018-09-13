@@ -171,7 +171,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed = realBucketizer.transform(data1)
     val actual = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(true))
+    assertNominal(field, Array.fill(actual.head.value.size)(true), actual)
     actual shouldBe expectedAns
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -190,7 +190,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed2 = realBucketizer2.transform(data1)
     val actual2 = transformed2.collect(vector2)
     val field2 = transformed2.schema(vector2.name)
-    assertNominal(field2, Array.fill(actual2.head.value.size)(true))
+    assertNominal(field2, Array.fill(actual2.head.value.size)(true), actual2)
   }
 
   it should "work as a shortcut (reals)" in new RealTest {
@@ -200,7 +200,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed = buck.transform(data1)
     val actual = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(true))
+    assertNominal(field, Array.fill(actual.head.value.size)(true), actual)
     actual shouldBe expectedAns
   }
 
@@ -209,7 +209,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed = trackNullsRealBucketizer.transform(data1)
     val actual = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(true))
+    assertNominal(field, Array.fill(actual.head.value.size)(true), actual)
     actual shouldBe trackNullsExpectedAns
 
     val expectedMeta = TestOpVectorMetadataBuilder(
@@ -236,7 +236,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed2 = trackNullsRealBucketizer2.transform(data1)
     val actual2 = transformed2.collect(vector2)
     val field2 = transformed2.schema(vector2.name)
-    assertNominal(field2, Array.fill(actual2.head.value.size)(true))
+    assertNominal(field2, Array.fill(actual2.head.value.size)(true), actual2)
   }
 
   it should "allow right inclusive splits (reals)" in new RealTest {
@@ -245,7 +245,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed = buck.transform(data1)
     val actual = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(true))
+    assertNominal(field, Array.fill(actual.head.value.size)(true), actual)
     actual shouldBe expectedRightInclusiveAns
   }
 
@@ -264,7 +264,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val transformed = bucketizer.asInstanceOf[NumericBucketizer[_]].transform(ds)
     val results = transformed.collect(buck)
     val field = transformed.schema(buck.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
 
     bucketizer shouldBe a[NumericBucketizer[_]]
 
@@ -297,7 +297,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     ).map(_.toOPVector)
 
     val field = transformed.schema(buck.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       stage, num -> List(IndCol(Some("[0.0-1.0)")), IndCol(Some("[1.0-5.0)")),
@@ -314,7 +314,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     results shouldBe expectedAns
 
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
     val expectedMeta = TestOpVectorMetadataBuilder(
       integralBucketizer,
       num -> List(IndCol(Some("0-1")), IndCol(Some("1-5")), IndCol(Some("5-10")), IndCol(Some("10-Infinity")))
@@ -330,7 +330,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val results = transformed.collect(vector)
     results shouldBe expectedAns
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
   }
 
   it should "keep track of null values if wanted (integrals)" in new IntegralTest {
@@ -339,7 +339,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val results = transformed.collect(vector)
     results shouldBe trackNullsExpectedAns
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
 
     val expectedMeta = TestOpVectorMetadataBuilder(
       trackNullsIntegralBucketizer,
@@ -359,7 +359,7 @@ class NumericBucketizerTest extends FlatSpec with TestSparkContext with Attribut
     val results = transformed.collect(vector)
     results shouldBe expectedRightInclusiveAns
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
 
   }
 

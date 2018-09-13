@@ -117,8 +117,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val transformed = testModelTimeSinceFirst.transform(testDataCurrent)
     val output = testModelTimeSinceFirst.getOutput()
     transformed.schema.fieldNames shouldEqual Array(clicks.name, opens.name, purchases.name, output.name)
-
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.dense(0.0, 0.0, 0.0).toOPVector,
       Vectors.dense(3.0, 0.0, 0.0).toOPVector,
       Vectors.dense(0.0, 0.0, 0.0).toOPVector,
@@ -127,7 +127,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
+    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false), result)
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
 
@@ -146,7 +146,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val output = testModelTimeSinceFirst.getOutput()
     transformed.schema.fieldNames shouldEqual Array(clicks.name, opens.name, purchases.name, output.name)
 
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0, 1.0).toOPVector,
       Vectors.dense(3.0, 0.0, 0.0, 0.0, 0.0, 0.0).toOPVector,
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0, 0.0).toOPVector,
@@ -156,7 +157,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
     assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)
-    (Seq(false, true)).flatten)
+    (Seq(false, true)).flatten, result)
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
 
@@ -175,7 +176,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val output = testModelTimeSinceFirst.getOutput()
     transformed.schema.fieldNames shouldEqual Array(clicks.name, opens.name, purchases.name, output.name)
 
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.dense(0.0, 0.0, 0.0).toOPVector,
       Vectors.dense(-27.0, -30.0, -30.0).toOPVector,
       Vectors.dense(-30.0, -30.0, -30.0).toOPVector,
@@ -184,7 +186,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false))
+    assertNominal(schema, Array.fill(testModelTimeSinceFirst.getInputFeatures().size)(false), result)
     testModelTimeSinceFirst.getMetadata() shouldEqual fieldMetadata
   }
 
@@ -199,7 +201,9 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val transformed = testModelModeDay.transform(testData)
 
     val output = testModelModeDay.getOutput()
-    transformed.collect(output) shouldBe Array(
+
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.sparse(21, Array(6, 7, 20), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(21, Array(3, 11, 14), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(21, Array(0, 8, 14), Array(1.0, 1.0, 1.0)).toOPVector,
@@ -208,7 +212,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 7)(true))
+    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 7)(true), result)
     testModelModeDay.getMetadata() shouldEqual fieldMetadata
 
     val daysOfWeek = List("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday").map(s =>
@@ -230,7 +234,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val transformed = testModelModeDay.transform(testData)
 
     val output = testModelModeDay.getOutput()
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.sparse(24, Array(6, 8, 22), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(24, Array(3, 12, 16), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(24, Array(0, 9, 16), Array(1.0, 1.0, 1.0)).toOPVector,
@@ -239,7 +244,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 8)(true))
+    assertNominal(schema, Array.fill(testModelModeDay.getInputFeatures().size * 8)(true), result)
     testModelModeDay.getMetadata() shouldEqual fieldMetadata
 
     val daysOfWeek = List("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday",
@@ -260,7 +265,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val transformed = testModelModeMonth.transform(testData)
 
     val output = testModelModeMonth.getOutput()
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.sparse(36, Array(6, 18, 30), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(36, Array(6, 17, 30), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(36, Array(6, 16, 30), Array(1.0, 1.0, 1.0)).toOPVector,
@@ -269,7 +275,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelModeMonth.getInputFeatures().size * 12)(true))
+    assertNominal(schema, Array.fill(testModelModeMonth.getInputFeatures().size * 12)(true), result)
     testModelModeMonth.getMetadata() shouldEqual fieldMetadata
 
     val months = List(
@@ -292,7 +298,8 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
     val transformed = testModelModeHour.transform(testData)
 
     val output = testModelModeHour.getOutput()
-    transformed.collect(output) shouldBe Array(
+    val result = transformed.collect(output)
+    result shouldBe Array(
       Vectors.sparse(72, Array(22, 46, 70), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(72, Array(22, 36, 67), Array(1.0, 1.0, 1.0)).toOPVector,
       Vectors.sparse(72, Array(22, 26, 64), Array(1.0, 1.0, 1.0)).toOPVector,
@@ -301,7 +308,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
 
     val schema = transformed.schema(output.name)
     val fieldMetadata = schema.metadata
-    assertNominal(schema, Array.fill(testModelModeHour.getInputFeatures().size * 24)(true))
+    assertNominal(schema, Array.fill(testModelModeHour.getInputFeatures().size * 24)(true), result)
     testModelModeHour.getMetadata() shouldEqual fieldMetadata
 
     val hours = (0 until 24).map(i => IndCol(Some(s"$i:00"))).toList
