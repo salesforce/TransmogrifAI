@@ -42,7 +42,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
+class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with AttributeAsserts {
 
   val inputFeatures = Array[OPFeature](heightNoWindow, weight, gender)
 
@@ -64,11 +64,10 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val feature = inputFeatures.toSeq.transmogrify()
     val model = new OpWorkflow().setResultFeatures(feature).setReader(dataReader).train()
     val transformed = model.score(keepRawFeatures = true, keepIntermediateFeatures = true)
-    val hist = feature.parents.flatMap{ f =>
+    val hist = feature.parents.flatMap { f =>
       val h = f.history()
       h.originFeatures.map(o => o -> FeatureHistory(Seq(o), h.stages))
     }.toMap
-
     transformed.schema.toOpVectorMetadata(feature.name) shouldEqual
       TestOpVectorMetadataBuilder.withOpNamesAndHist(
         feature.originStage,
@@ -92,6 +91,8 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
         List(1.0, 0.0, 363.0, 0.0, 172.0, 0.0),
         List(1.0, 0.0, 186.0, 0.0, 96.0, 0.0)
       )
+    val field = transformed.schema(feature.name)
+    assertNominal(field, Array(false, true, false, true, false, true), collected)
   }
 
 }

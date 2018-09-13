@@ -152,11 +152,24 @@ case class ModelInsights
   }
 
   private def prettySelectedModelInfo: String = {
-    val name = selectedModelInfo.map( sm => s"Selected Model - ${sm.bestModelType} ${sm.bestModelName}" ).getOrElse("")
-    val validationResults: Seq[(String, Any)] = selectedModelInfo.map(
-      _.validationResults.flatMap(e => Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++
-        e.modelParameters.toSeq)
-    ).getOrElse(Seq.empty)
+    val excludedParams = Set(
+      SparkWrapperParams.SparkStageParamName,
+      ModelSelectorNames.outputParamName, ModelSelectorNames.inputParam1Name,
+      ModelSelectorNames.inputParam2Name, ModelSelectorNames.outputParamName,
+      OpPipelineStageParamsNames.InputFeatures, OpPipelineStageParamsNames.InputSchema,
+      OpPipelineStageParamsNames.OutputMetadata,
+      "labelCol", "predictionCol", "predictionValueCol", "rawPredictionCol", "probabilityCol"
+    )
+    val name = selectedModelInfo.map(sm => s"Selected Model - ${sm.bestModelType}").getOrElse("")
+    val validationResults = (for {
+      sm <- selectedModelInfo.toSeq
+      e <- sm.validationResults.filter(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+    } yield {
+      val params = e.modelParameters.filterKeys(!excludedParams.contains(_))
+      Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++ params
+    }).flatten.sortBy(_._1)
     val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
     table.prettyString()
   }
@@ -627,9 +640,13 @@ case object ModelInsights {
       case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
       case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
       case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: LinearSVCModel => Seq(m.coefficients.toArray.toSeq)
       case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
       case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
       case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
       case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
     }

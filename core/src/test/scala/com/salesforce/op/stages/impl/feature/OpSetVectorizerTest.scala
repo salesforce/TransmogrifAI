@@ -38,18 +38,16 @@ import com.salesforce.op.test.TestOpVectorColumnType.IndCol
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestOpWorkflowBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.{Estimator, Transformer}
-import org.apache.spark.sql.{DataFrame, SparkSession}
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
+class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -111,13 +109,17 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vector = vectorizer.getOutput()
+    val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(10, Array(0, 2, 5), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(0, 6, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(0, 1, 7), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -125,13 +127,17 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(false).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vector = vectorizer.getOutput()
+    val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(13, Array(0, 3, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(0, 8, 10), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(4, 7, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(1, 2, 9), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
@@ -152,7 +158,11 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setTopK(1).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vector = vectorizer.getOutput()
-    transformed.collect(vector) shouldBe expectedData
+    val result = transformed.collect(vector)
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expectedData
     vectorizer.setTopK(10)
   }
 
@@ -160,12 +170,16 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setCleanText(true).setMinSupport(3).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vector = vectorizer.getOutput()
+    val result = transformed.collect(vector)
     transformed.collect(vector) shouldBe Array(
       Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 2.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 2.0, 0.0),
       Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0)
     ).map(_.toOPVector)
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
   }
 
   it should "return a vector with elements only in the other & null columns and not throw errors when passed data" +
@@ -173,12 +187,16 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = vectorizer.setMinSupport(0).setTopK(10).fit(dataSetEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetEmpty)
+    val result = transformed.collect(vector)
     val expected = Array(
       Vectors.dense(1.0, 1.0, 0.0, 0.0, 0.0, 1.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 1.0)
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
@@ -205,12 +223,16 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = localVectorizer.fit(dataSetEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetEmpty)
+    val result = transformed.collect(vector)
     val expected = Array(
       Vectors.dense(1.0, 1.0, 0.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0),
       Vectors.dense(0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       localVectorizer,
@@ -233,7 +255,11 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetAllEmpty)
     val expected = Array(Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0)).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
+    result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
@@ -249,7 +275,11 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       .asInstanceOf[Transformer].transform(dataSet)
 
     result.originStage shouldBe a[OpSetVectorizer[_]]
-    df.collect(result) shouldBe expectedData
+    val actual = df.collect(result)
+    actual shouldBe expectedData
+    val field = df.schema(result.name)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, actual)
   }
 
   it should "expand number of columns for picklist features by two (one for other & one for null)" in {
@@ -262,8 +292,6 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
 
     val untypedVectorizedStage = vectorized.originStage
     untypedVectorizedStage shouldBe a[OpSetVectorizer[_]]
-    val vectorizedStage = untypedVectorizedStage.asInstanceOf[OpSetVectorizer[_]]
-
     val inputDF = TestOpWorkflowBuilder(df, vectorized).computeDataUpTo(vectorized)
     val featArray = inputDF.collect(vectorized)
     featArray.foreach { opVec => opVec.value.size shouldBe 5 }
@@ -287,6 +315,10 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val fitted = localVectorizer.fit(localDataSet)
     val transformed = fitted.transform(localDataSet)
     val vector = localVectorizer.getOutput()
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
+    assertNominal(field, expect, result)
   }
 
   it should "process multiple columns of PickList using the vectorize shortcut" in {
@@ -304,8 +336,10 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val (localDF, f1, f2) = TestFeatureBuilder(localData.map(v => v._1.toPickList -> v._2.toPickList))
     val vectorized = Seq(f1, f2).transmogrify()
 
-    val inputDF = TestOpWorkflowBuilder(localDF, vectorized).computeDataUpTo(vectorized)
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
+    val field = transformed.schema(vectorized.name)
+    val result = transformed.collect(vectorized)
+    assertNominal(field, Array.fill(result.head.value.toArray.length)(true), result)
 
     val metaMap = transformed.metadata(vectorized)
     log.info(metaMap.toString)
@@ -326,8 +360,12 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val (localDF, f1, f2) = TestFeatureBuilder(localData.map(v => v._1.toPickList -> v._2.toMultiPickList))
     val vectorized = Seq(f1, f2).transmogrify()
 
-    val inputDF = TestOpWorkflowBuilder(localDF, vectorized).computeDataUpTo(vectorized)
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
+    val field = transformed.schema(vectorized.name)
+    val result = transformed.collect(vectorized)
+    val expect = OpVectorMetadata("", field.metadata).columns
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
+    assertNominal(field, expect, result)
 
     val metaMap = transformed.metadata(vectorized)
     log.info(metaMap.toString)
@@ -351,6 +389,11 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
     val res = f2.transformWith[OPVector](stage = oPSetVectorizer.setTopK(3), Array.empty[FeatureLike[MultiPickList]])
 
     val transformed = new OpWorkflow().setResultFeatures(res).transform(localDF)
+    val field = transformed.schema(res.name)
+    val result = transformed.collect(res)
+    val expect = OpVectorMetadata("", field.metadata).columns
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
+    assertNominal(field, expect, result)
   }
 
   it should "process multiple columns of numerics, PickLists, and MultiPickLists using the vectorize shortcut" in {
@@ -369,8 +412,9 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext {
       v._3.toMultiPickList)))
     val vectorized = Seq(f1, f2, f3).transmogrify()
 
-    val inputDF = TestOpWorkflowBuilder(localDF, vectorized).computeDataUpTo(vectorized)
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(localDF)
+    val field = transformed.schema(vectorized.name)
+    assertNominal(field, Array(false, true, true, true, false, true), transformed.collect(vectorized))
 
     val metaMap = transformed.metadata(vectorized)
     log.info(metaMap.toString)

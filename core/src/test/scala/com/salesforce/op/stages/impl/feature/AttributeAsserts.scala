@@ -28,27 +28,28 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.test.TestCommon
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features.types.OPVector
+import org.apache.spark.ml.attribute.AttributeGroup
+import org.apache.spark.sql.types.StructField
+import org.scalatest.{Assertion, Matchers}
 
-@RunWith(classOf[JUnitRunner])
-class SummaryTest extends FlatSpec with TestCommon {
-  Spec[Summary] should "be correctly created from a sequence of features" in {
-    val f1 = Left(Seq("a", "b", "c"))
-    val f2 = Right(Seq(0.5, 1.0))
-    val f1s = Summary(f1)
-    val f2s = Summary(f2)
-    f1s.min shouldBe 3
-    f1s.max shouldBe 3
-    f1s.sum shouldBe 3
-    f1s.count shouldBe 1
-    f2s.min shouldBe 0.5
-    f2s.max shouldBe 1.0
-    f2s.sum shouldBe 1.5
-    f2s.count shouldBe 2
+trait AttributeAsserts {
+  self: Matchers =>
+  /**
+   * Assert if attributes are nominal or not
+   *
+   * @param schema
+   * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
+   * @param output the output OPVector associated with the column
+   */
+  final def assertNominal(schema: StructField, expectedNominal: Array[Boolean], output: Array[OPVector]): Assertion = {
+    val attributes = AttributeGroup.fromStructField(schema).attributes
+    for {
+      x <- output
+      (value, nominal) <- x.value.toArray.zip(expectedNominal)
+    } if (nominal) value should (be (0.0) or be (1.0))
+    attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
   }
 }

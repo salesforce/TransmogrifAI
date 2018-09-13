@@ -52,7 +52,7 @@ import scala.reflect.runtime.universe._
 
 
 @RunWith(classOf[JUnitRunner])
-class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
+class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   import OPMapVectorizerTestHelper._
 
@@ -83,7 +83,11 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
 
-    transformed.collect(vectorizer.getOutput()) shouldBe expected
+    val output = vectorizer.getOutput()
+    val result = transformed.collect(output)
+    val field = transformed.schema(output.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -122,7 +126,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val currencyData3: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
       .withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Currency, CurrencyMap, Double](currencyData, currencyData2, currencyData3)
+    testFeatureToMap[Currency, CurrencyMap, Double](currencyData, currencyData2, currencyData3, isCategorical = false)
   }
 
   "Date features" should "be vectorized the same whether they're in maps or not" in {
@@ -135,7 +139,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val dateData3: Seq[Date] = RandomIntegral.dates(init = new JDate(1500000000000L),
       minStep = minSec, maxStep = maxSec).withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Date, DateMap, Long](dateData, dateData2, dateData3)
+    testFeatureToMap[Date, DateMap, Long](dateData, dateData2, dateData3, false)
   }
 
   "DateTime features" should "be vectorized the same whether they're in maps or not" in {
@@ -148,7 +152,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val dateTimeData3: Seq[DateTime] = RandomIntegral.datetimes(init = new JDate(), minStep = minSec, maxStep = maxSec)
       .withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[DateTime, DateTimeMap, Long](dateTimeData, dateTimeData2, dateTimeData3)
+    testFeatureToMap[DateTime, DateTimeMap, Long](dateTimeData, dateTimeData2, dateTimeData3, false)
   }
 
   "Email features" should "be vectorized the same whether they're in maps or not" in {
@@ -178,7 +182,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val integralData3: Seq[Integral] = RandomIntegral.integrals(from = -100L, to = 100L)
       .withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Integral, IntegralMap, Long](integralData, integralData2, integralData3)
+    testFeatureToMap[Integral, IntegralMap, Long](integralData, integralData2, integralData3, false)
   }
 
   "MultiPickList features" should "be vectorized the same whether they're in maps or not" in {
@@ -189,7 +193,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val mplData3: Seq[MultiPickList] = RandomMultiPickList.of(texts =
       RandomText.pickLists(domain = List("A", "B", "C", "D", "E")), maxLen = 3).limit(1000)
 
-    testFeatureToMap[MultiPickList, MultiPickListMap, Set[String]](mplData, mplData2, mplData3)
+    testFeatureToMap[MultiPickList, MultiPickListMap, Set[String]](mplData, mplData2, mplData3, false)
   }
 
   "Percent features" should "be vectorized the same whether they're in maps or not" in {
@@ -197,7 +201,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val percentData2: Seq[Percent] = RandomReal.uniform[Percent]().withProbabilityOfEmpty(0.5).limit(1000)
     val percentData3: Seq[Percent] = RandomReal.uniform[Percent]().withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Percent, PercentMap, Double](percentData, percentData2, percentData3)
+    testFeatureToMap[Percent, PercentMap, Double](percentData, percentData2, percentData3, false)
   }
 
   // TODO: Fix failing test
@@ -228,7 +232,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val realData2: Seq[Real] = RandomReal.uniform[Real]().withProbabilityOfEmpty(0.5).limit(1000)
     val realData3: Seq[Real] = RandomReal.uniform[Real]().withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Real, RealMap, Double](realData, realData2, realData3)
+    testFeatureToMap[Real, RealMap, Double](realData, realData2, realData3, false)
   }
 
   "TextArea features" should "be vectorized the same whether they're in maps or not" in {
@@ -239,7 +243,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val textAreaData3: Seq[TextArea] = RandomText.textAreas(minLen = 5, maxLen = 10)
       .withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[TextArea, TextAreaMap, String](textAreaData, textAreaData2, textAreaData3)
+    testFeatureToMap[TextArea, TextAreaMap, String](textAreaData, textAreaData2, textAreaData3, false)
   }
 
   "Text features" should "be vectorized the same whether they're in maps or not" in {
@@ -247,7 +251,7 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val textData2: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
     val textData3: Seq[Text] = RandomText.strings(minLen = 5, maxLen = 10).withProbabilityOfEmpty(0.5).limit(1000)
 
-    testFeatureToMap[Text, TextMap, String](textData, textData2, textData3)
+    testFeatureToMap[Text, TextMap, String](textData, textData2, textData3, false)
   }
 
   "URL features" should "be vectorized the same whether they're in maps or not" in {
@@ -317,11 +321,12 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext {
     val GeolocationData2: Seq[Geolocation] = RandomList.ofGeolocations.limit(1000)
     val GeolocationData3: Seq[Geolocation] = RandomList.ofGeolocations.limit(1000)
 
-    testFeatureToMap[Geolocation, GeolocationMap, Seq[Double]](GeolocationData, GeolocationData2, GeolocationData3)
+    testFeatureToMap[Geolocation, GeolocationMap, Seq[Double]](GeolocationData, GeolocationData2, GeolocationData3,
+      false)
   }
 }
 
-object OPMapVectorizerTestHelper extends Matchers {
+object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -330,15 +335,17 @@ object OPMapVectorizerTestHelper extends Matchers {
    * corresponds to its own key in the OPMap feature. This is used to test whether base feature types are vectorized
    * the same as their corresponding map types.
    *
-   * @param f1Data Sequence of base feature type data (eg. from generators)
-   * @param f2Data Sequence of base feature type data (eg. from generators)
-   * @param f3Data Sequence of base feature type data (eg. from generators)
+   * @param f1Data        Sequence of base feature type data (eg. from generators)
+   * @param f2Data        Sequence of base feature type data (eg. from generators)
+   * @param f3Data        Sequence of base feature type data (eg. from generators)
+   * @param isCategorical If the vector contains categoricals
    * @tparam F  Base feature type (eg. ID, Text, Integer)
    * @tparam FM OPMap feature type (eg. IDMap, TextMap, IntegerMap)
    * @tparam MT Value type of map inside OPMap feature (eg. String, String, Int)
    */
   def testFeatureToMap[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
-  (f1Data: Seq[F], f2Data: Seq[F], f3Data: Seq[F])(implicit spark: SparkSession): Unit = {
+  (f1Data: Seq[F], f2Data: Seq[F], f3Data: Seq[F], isCategorical: Boolean = true)(implicit spark: SparkSession):
+  Unit = {
 
     val generatedData: Seq[(F, F, F)] = f1Data.zip(f2Data).zip(f3Data).map { case ((f1, f2), f3) => (f1, f2, f3) }
     val (rawDF, rawF1, rawF2, rawF3) = TestFeatureBuilder("f1", "f2", "f3", generatedData)
@@ -359,6 +366,24 @@ object OPMapVectorizerTestHelper extends Matchers {
       log.info("transformed data:")
       transformed.show(10)
     }
+    val result = transformed.collect(featureVector)
+    val isCategoricalArray = if (isCategorical) {
+      Array.fill(result.head.value.size)(true)
+    } else {
+      rawF1 match {
+        case f if f.isSubtypeOf[Date] => Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten
+          .asInstanceOf[Array[Boolean]]
+        case f if f.isSubtypeOf[TextArea] || f.isSubtypeOf[Text] => Array.fill(
+          result.head.value.size - 3)(false) ++ Array.fill(3)(true)
+        case f if f.isSubtypeOf[Geolocation] => Array.fill(result.head.value.size / 4)(
+          Seq(false, false, false, true)).flatten
+        case f if f.isSubtypeOf[MultiPickList] => Array(true, true, true, true, true, false, true, true, true,
+          true, true, true, false, true, true, true, true, true, true, false, true)
+        case _ => Array.fill(result.head.value.size / 2)(Seq(false, true)).flatten
+      }
+    }
+    val field = transformed.schema(featureVector.name)
+    assertNominal(field, isCategoricalArray, result)
 
     val summary = transformed.schema(featureVector.name).metadata
     log.info("summary:\n{}", summary)
@@ -374,6 +399,9 @@ object OPMapVectorizerTestHelper extends Matchers {
       log.info("transformedMap:")
       transformedMap.show(10)
     }
+    val fieldMap = transformedMap.schema(mapFeatureVector.name)
+    assertNominal(fieldMap, isCategoricalArray, result)
+
 
     // Check that the actual features are the same
     val vectorizedBaseFeatures = transformed.collect(featureVector)
@@ -459,6 +487,7 @@ object OPMapVectorizerTestHelper extends Matchers {
             case _ => Map.empty
           }
         }
+
         val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
         ftFactory.newInstance(mapData)
       }

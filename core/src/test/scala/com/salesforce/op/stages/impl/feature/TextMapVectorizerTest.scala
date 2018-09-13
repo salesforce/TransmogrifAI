@@ -44,7 +44,7 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
+class TextMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(classOf[TextMapVectorizerTest])
 
@@ -92,17 +92,17 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
     val vectorMetadata = fitted.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
-      top -> List(
-        IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"), IndColWithGroup(Some("D"), "A"),
-        IndColWithGroup(Some("E"), "A"), IndColWithGroup(Some("OTHER"), "A"),
-        IndColWithGroup(Some("D"), "B"), IndColWithGroup(Some("OTHER"), "B")
-      ),
-      bot -> List(
-        IndColWithGroup(Some("W"), "X"), IndColWithGroup(Some("OTHER"), "X"), IndColWithGroup(Some("V"), "Y"),
-        IndColWithGroup(Some("OTHER"), "Y"), IndColWithGroup(Some("V"), "Z"),
-        IndColWithGroup(Some("W"), "Z"), IndColWithGroup(Some("OTHER"), "Z")
+        top -> List(
+          IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"), IndColWithGroup(Some("D"), "A"),
+          IndColWithGroup(Some("E"), "A"), IndColWithGroup(Some("OTHER"), "A"),
+          IndColWithGroup(Some("D"), "B"), IndColWithGroup(Some("OTHER"), "B")
+        ),
+        bot -> List(
+          IndColWithGroup(Some("W"), "X"), IndColWithGroup(Some("OTHER"), "X"), IndColWithGroup(Some("V"), "Y"),
+          IndColWithGroup(Some("OTHER"), "Y"), IndColWithGroup(Some("V"), "Z"),
+          IndColWithGroup(Some("W"), "Z"), IndColWithGroup(Some("OTHER"), "Z")
+        )
       )
-    )
     fitted.getInputFeatures() shouldBe Array(top, bot)
     fitted.parent shouldBe vectorizer
   }
@@ -118,8 +118,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -134,8 +136,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(20, Array(0, 6, 9, 10, 13, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(20, Array(0, 3, 9, 12, 15, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -150,21 +154,24 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(17, Array(0, 9, 11), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(1, 3, 14), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
-      top -> List(
-        IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
-        IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
-        IndColWithGroup(Some("OTHER"), "a"), IndColWithGroup(Some("d"), "b"), IndColWithGroup(Some("OTHER"), "b")
-      ),
-      bot -> List(
-        IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("OTHER"), "x"),
-        IndColWithGroup(Some("V"), "y"), IndColWithGroup(Some("v"), "y"),
-        IndColWithGroup(Some("OTHER"), "y"), IndColWithGroup(Some("v"), "z"), IndColWithGroup(Some("w"), "z"),
-        IndColWithGroup(Some("OTHER"), "z")
+        top -> List(
+          IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
+          IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
+          IndColWithGroup(Some("OTHER"), "a"), IndColWithGroup(Some("d"), "b"), IndColWithGroup(Some("OTHER"), "b")
+        ),
+        bot -> List(
+          IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("OTHER"), "x"),
+          IndColWithGroup(Some("V"), "y"), IndColWithGroup(Some("v"), "y"),
+          IndColWithGroup(Some("OTHER"), "y"), IndColWithGroup(Some("v"), "z"), IndColWithGroup(Some("w"), "z"),
+          IndColWithGroup(Some("OTHER"), "z")
+        )
       )
-    )
   }
 
   it should "track nulls when clean text is set to false" in {
@@ -178,23 +185,26 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(23, Array(0, 7, 10, 12, 15, 22), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(23, Array(1, 4, 10, 14, 18, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
-      top -> List(
-        IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
-        IndColWithGroup(nullIndicatorValue, "c"), IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
-        IndColWithGroup(Some("OTHER"), "a"), IndColWithGroup(nullIndicatorValue, "a"),
-        IndColWithGroup(Some("d"), "b"), IndColWithGroup(Some("OTHER"), "b"), IndColWithGroup(nullIndicatorValue, "b")
-      ),
-      bot -> List(
-        IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("OTHER"), "x"),
-        IndColWithGroup(nullIndicatorValue, "x"), IndColWithGroup(Some("V"), "y"), IndColWithGroup(Some("v"), "y"),
-        IndColWithGroup(Some("OTHER"), "y"), IndColWithGroup(nullIndicatorValue, "y"),
-        IndColWithGroup(Some("v"), "z"), IndColWithGroup(Some("w"), "z"),
-        IndColWithGroup(Some("OTHER"), "z"), IndColWithGroup(nullIndicatorValue, "z")
+        top -> List(
+          IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
+          IndColWithGroup(nullIndicatorValue, "c"), IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
+          IndColWithGroup(Some("OTHER"), "a"), IndColWithGroup(nullIndicatorValue, "a"),
+          IndColWithGroup(Some("d"), "b"), IndColWithGroup(Some("OTHER"), "b"), IndColWithGroup(nullIndicatorValue, "b")
+        ),
+        bot -> List(
+          IndColWithGroup(Some("W"), "x"), IndColWithGroup(Some("w"), "x"), IndColWithGroup(Some("OTHER"), "x"),
+          IndColWithGroup(nullIndicatorValue, "x"), IndColWithGroup(Some("V"), "y"), IndColWithGroup(Some("v"), "y"),
+          IndColWithGroup(Some("OTHER"), "y"), IndColWithGroup(nullIndicatorValue, "y"),
+          IndColWithGroup(Some("v"), "z"), IndColWithGroup(Some("w"), "z"),
+          IndColWithGroup(Some("OTHER"), "z"), IndColWithGroup(nullIndicatorValue, "z")
+        )
       )
-    )
   }
 
   it should "return only the specified number of elements when top K is set" in {
@@ -208,7 +218,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(12, Array(0, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(0, 2, 10), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls the specified number of elements when top K is set" in {
@@ -222,7 +235,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(18, Array(0, 5, 8, 9, 12, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(18, Array(0, 3, 8, 11, 14, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "return only the elements that exceed the minimum support requirement when minSupport is set" in {
@@ -234,7 +250,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(10, Array(0, 5, 7), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(0, 2, 9), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls the elements that exceed the minimum support requirement when minSupport is set" in {
@@ -246,7 +265,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(16, Array(0, 5, 7, 8, 11, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(16, Array(0, 3, 7, 10, 13, 14), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "behave correctly when passed empty maps and not throw errors when passed data it was not trained with" in {
@@ -259,7 +281,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
 
     val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
@@ -268,7 +293,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
-    transformed2.collect(fitted.getOutput()) shouldBe expected2
+    val field2 = transformed2.schema(vector.name)
+    val result2 = transformed2.collect(fitted.getOutput())
+    assertNominal(field2, Array.fill(expected.head.value.size)(true), result2)
+    result2 shouldBe expected2
   }
 
   it should "track nulls when passed empty maps and not throw errors when passed data it was not trained with" in {
@@ -281,7 +309,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
 
     val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
@@ -290,7 +321,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
-    transformed2.collect(fitted.getOutput()) shouldBe expected2
+    val field2 = transformed2.schema(vector.name)
+    val result2 = transformed2.collect(fitted.getOutput())
+    assertNominal(field2, Array.fill(expected.head.value.size)(true), result2)
+    result2 shouldBe expected2
   }
 
 
@@ -302,7 +336,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.dense(Array.empty[Double]),
       Vectors.dense(Array.empty[Double])
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "correctly whitelist keys" in {
@@ -316,7 +353,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(5, Array(3), Array(1.0)),
       Vectors.sparse(5, Array(0), Array(1.0))
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls with whitelist keys" in {
@@ -330,7 +370,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(7, Array(3, 4), Array(1.0, 1.0)),
       Vectors.sparse(7, Array(0, 6), Array(1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "correctly blacklist keys" in {
@@ -345,7 +388,10 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(9, Array(0, 7), Array(1.0, 1.0)),
       Vectors.sparse(9, Array(0, 4), Array(1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls with blacklist keys" in {
@@ -360,6 +406,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext {
       Vectors.sparse(13, Array(0, 5, 9, 10), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(0, 5, 6, 12), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 }

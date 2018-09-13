@@ -41,7 +41,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class Base64VectorizerTest extends FlatSpec with TestSparkContext with Base64TestData {
+class Base64VectorizerTest extends FlatSpec with TestSparkContext with Base64TestData with AttributeAsserts {
 
   "Base64Vectorizer" should "vectorize random binary data" in {
     val vec = randomBase64.vectorize(topK = 10, minSupport = 0, cleanText = true, trackNulls = false)
@@ -63,6 +63,8 @@ class Base64VectorizerTest extends FlatSpec with TestSparkContext with Base64Tes
   def assertVectorizer(vec: FeatureLike[OPVector], expected: Seq[Text]): Unit = {
     val result = new OpWorkflow().setResultFeatures(vec).transform(realData)
     val vectors = result.collect(vec)
+    val schema = result.schema(vec.name)
+    assertNominal(schema, Array.fill(vectors.head.value.size)(true), vectors)
 
     vectors.length shouldBe expected.length
     // TODO add a more robust check

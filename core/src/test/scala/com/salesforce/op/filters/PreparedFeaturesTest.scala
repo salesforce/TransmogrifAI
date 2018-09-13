@@ -77,21 +77,23 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
     val (responseSummaries3, predictorSummaries3) = preparedFeatures3.summaries
 
     responseSummaries1 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(1.0, 1.0), responseKey2 -> Summary(0.5, 0.5))
+      Seq(responseKey1 -> Summary(1.0, 1.0, 1.0, 1), responseKey2 -> Summary(0.5, 0.5, 0.5, 1))
     predictorSummaries1 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.0), predictorKey2A -> Summary(2.0, 2.0), predictorKey2B -> Summary(1.0, 1.0))
+      Seq(predictorKey1 -> Summary(0.0, 0.0, 0.0, 2), predictorKey2A -> Summary(2.0, 2.0, 2.0, 1),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
     responseSummaries2 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 0.0))
+      Seq(responseKey1 -> Summary(0.0, 0.0, 0.0, 1))
     predictorSummaries2 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.4, 0.5))
+      Seq(predictorKey1 -> Summary(0.4, 0.5, 0.9, 2))
     responseSummaries3 should contain theSameElementsAs
-      Seq(responseKey2 -> Summary(-0.5, -0.5))
+      Seq(responseKey2 -> Summary(-0.5, -0.5, -0.5, 1))
     predictorSummaries3 should contain theSameElementsAs
-      Seq(predictorKey2A -> Summary(1.0, 1.0))
+      Seq(predictorKey2A -> Summary(1.0, 1.0, 1.0, 1))
     allResponseSummaries should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 1.0), responseKey2 -> Summary(-0.5, 0.5))
+      Seq(responseKey1 -> Summary(0.0, 1.0, 1.0, 2), responseKey2 -> Summary(-0.5, 0.5, 0.0, 2))
     allPredictorSummaries should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.5), predictorKey2A -> Summary(1.0, 2.0), predictorKey2B -> Summary(1.0, 1.0))
+      Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4), predictorKey2A -> Summary(1.0, 2.0, 3.0, 2),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
   }
 
   it should "produce correct null-label leakage vector with single response" in {

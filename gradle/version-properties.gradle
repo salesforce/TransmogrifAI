@@ -16,24 +16,22 @@ configure(allprojects - project(':templates').subprojects) {
     //noinspection GroovyAssignabilityCheck
     task createVersionProperties() {
         doLast {
-            if (!System.env.OP_VERSION_PROPS_DISABLED) {
-                String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
-                String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
-                String gitBranch = cmdCaller(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
-                String gitDate = cmdCaller(['git', 'log', '-1', '--format=%cd', 'HEAD']);
-                def formattedDate = new Date().format('yyyy-MM-dd HH:mm:ss Z')
+            String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
+            String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
+            String gitBranch = cmdCaller(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
+            String gitDate = cmdCaller(['git', 'log', '-1', '--format=%cd', 'HEAD']);
+            def formattedDate = new Date().format('yyyy-MM-dd HH:mm:ss Z')
 
-                String propsStr = 'version=' + version + '\n' +
-                        'build.time=' + formattedDate + '\n' +
-                        'git.repo=' + gitRepo + '\n' +
-                        'git.branch=' + gitBranch + '\n' +
-                        'git.commit.id=' + gitCommitHash + '\n' +
-                        'git.commit.time=' + gitDate + '\n'
+            String propsStr = 'version=' + version + '\n' +
+                    'build.time=' + formattedDate + '\n' +
+                    'git.repo=' + gitRepo + '\n' +
+                    'git.branch=' + gitBranch + '\n' +
+                    'git.commit.id=' + gitCommitHash + '\n' +
+                    'git.commit.time=' + gitDate + '\n'
 
-                File versionFile = file('build/resources/main/op-version.properties')
-                versionFile.parentFile.mkdirs()
-                versionFile.write(propsStr)
-            }
+            File versionFile = file('build/resources/main/op-version.properties')
+            versionFile.parentFile.mkdirs()
+            versionFile.write(propsStr)
         }
     }
 }

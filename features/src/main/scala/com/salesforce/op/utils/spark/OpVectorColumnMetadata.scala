@@ -100,10 +100,16 @@ case class OpVectorColumnMetadata // TODO make separate case classes extending t
   }
 
   /**
-   * Is this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
-   * @return true if this column corresponds to a null-encoded categorical (maybe also other types - investigating!)
+   * Is this column corresponds to a null-encoded value
+   * @return true if this column corresponds to a null-encoded value
    */
   def isNullIndicator: Boolean = indicatorValue.contains(OpVectorColumnMetadata.NullString)
+
+  /**
+   * Is this column corresponds the other category of a one hot encoded categorical
+   * @return true if this column corresponds to the other category of a one hot encoded categorical
+   */
+  def isOtherIndicator: Boolean = indicatorValue.contains(OpVectorColumnMetadata.OtherString)
 
   /**
    * Convert this column into Spark metadata.
@@ -155,6 +161,7 @@ object OpVectorColumnMetadata {
   val DescriptorValueKey = "descriptor_value"
   val IndicesKey = "indices"
   val NullString = "NullIndicatorValue"
+  val OtherString = "OTHER"
 
   /**
    * Alternate constructor for OpVectorColumnMetadata cannot be in class because causes serialization issues

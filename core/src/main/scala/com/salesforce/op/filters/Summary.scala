@@ -35,18 +35,22 @@ import com.twitter.algebird.Monoid
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
  *
- * @param min minimum value seen
- * @param max maximum value seen
+ * @param min   minimum value seen for double, minimum number of tokens in one text for text
+ * @param max   maximum value seen for double, maximum number of tokens in one text for text
+ * @param sum   sum of values for double, total number of tokens for text
+ * @param count number of doubles for double, number of texts for text
  */
-private[op] case class Summary(min: Double, max: Double)
+case class Summary(min: Double, max: Double, sum: Double, count: Double)
 
-private[op] case object Summary {
+case object Summary {
 
-  val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity)
+  val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0)
 
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
-    override def plus(l: Summary, r: Summary) = Summary(math.min(l.min, r.min), math.max(l.max, r.max))
+    override def plus(l: Summary, r: Summary) = Summary(
+      math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count
+    )
   }
 
   /**
@@ -55,8 +59,8 @@ private[op] case object Summary {
    */
   def apply(preppedFeature: ProcessedSeq): Summary = {
     preppedFeature match {
-      case Left(v) => Summary(v.size, v.size)
-      case Right(v) => monoid.sum(v.map(d => Summary(d, d)))
+      case Left(v) => Summary(v.size, v.size, v.size, 1.0)
+      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
     }
   }
 }

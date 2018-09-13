@@ -8,21 +8,24 @@ Features are objects within TransmogrifAI which contain all information about wh
 /**
  * Feature instance
  *
+ * Note: can only be created using [[FeatureBuilder]].
+ *
  * @param name        name of feature, represents the name of the column in the dataframe.
  * @param isResponse  whether or not this feature is a response feature, ie dependent variable
- * @param originStage reference to OpStage responsible for generating the feature.
+ * @param originStage reference to OpPipelineStage responsible for generating the feature.
  * @param parents     references to the features that are transformed by the originStage that produces this feature
  * @param uid         unique identifier of the feature instance
  * @param wtt         feature's value type tag
  * @tparam O feature value type
  */
-private[op] case class Feature[O <: FeatureType]
+case class Feature[O <: FeatureType] private[op]
 (
   name: String,
   isResponse: Boolean,
   originStage: OpPipelineStage[O],
-  parents: Seq[OPFeature] = Seq.empty,
-  uid: String = UID[Feature[O]]
+  parents: Seq[OPFeature],
+  uid: String,
+  distributions: Seq[FeatureDistributionLike] = Seq.empty
 )(implicit val wtt: WeakTypeTag[O]) extends FeatureLike[O] {
   /* ... */
   def history: FeatureHistory // contains history of how feature was created

@@ -44,7 +44,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class DateVectorizerTest extends FlatSpec with TestSparkContext {
+class DateVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
   require(DateTimeUtils.DefaultTimeZone == DateTimeZone.UTC)
 
   // Sunday July 12th 1998 at 22:45
@@ -62,13 +62,16 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
       others = Array(f2, f3)
     )
     val transformed = new OpWorkflow().setResultFeatures(vector).transform(ds)
+    val result = transformed.collect(vector)
     withClue(s"Checking transformation at $moment") {
-      transformed.collect(vector) shouldBe expectedAt(moment)
+      result shouldBe expectedAt(moment)
     }
 
     val meta = OpVectorMetadata(vector.name, transformed.schema(vector.name).metadata)
     meta.columns.length shouldBe 3
     meta.history.keys.size shouldBe 3
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expectedAt(moment).head.value.size)(false), result)
 
     val vector2 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
@@ -78,22 +81,29 @@ class DateVectorizerTest extends FlatSpec with TestSparkContext {
       others = Array(f2, f3)
     )
     val transformed2 = new OpWorkflow().setResultFeatures(vector2).transform(ds)
-    transformed2.collect(vector2).head.v.size shouldBe 6
+    val result2 = transformed2.collect(vector2)
+    result2.head.v.size shouldBe 6
 
     val meta2 = OpVectorMetadata(vector2.name, transformed2.schema(vector2.name).metadata)
     meta2.columns.length shouldBe 6
     meta2.history.keys.size shouldBe 3
+    val field2 = transformed2.schema(vector2.name)
+    assertNominal(field2, Array.fill(expectedAt(moment).head.value.size)(Seq(false, true)).flatten, result2)
 
     val vector3 = f1.vectorize(
       dateListPivot = TransmogrifierDefaults.DateListDefault,
       others = Array(f2, f3)
     )
     val transformed3 = new OpWorkflow().setResultFeatures(vector3).transform(ds)
-    transformed3.collect(vector3).head.v.size shouldBe 30
+    val result3 = transformed3.collect(vector3)
+    result3.head.v.size shouldBe 30
 
     val meta3 = OpVectorMetadata(vector3.name, transformed3.schema(vector3.name).metadata)
     meta3.columns.length shouldBe 30
     meta3.history.keys.size shouldBe 6
+    val field3 = transformed3.schema(vector3.name)
+    val expectedNominal = Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten.asInstanceOf[Array[Boolean]]
+    assertNominal(field3, expectedNominal, result3)
   }
 
   private def buildTestData(moment: DateTime) = {

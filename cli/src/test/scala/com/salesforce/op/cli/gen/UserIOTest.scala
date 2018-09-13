@@ -31,11 +31,14 @@
 package com.salesforce.op.cli.gen
 
 import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec}
 
 /**
  * Test for Console methods.
  */
+@RunWith(classOf[JUnitRunner])
 class UserIOTest extends FlatSpec with TestCommon with Assertions {
 
 

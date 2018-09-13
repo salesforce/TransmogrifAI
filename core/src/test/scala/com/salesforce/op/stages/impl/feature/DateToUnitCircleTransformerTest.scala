@@ -43,7 +43,8 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateToUnitCircleTransformer[Date]] {
+class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateToUnitCircleTransformer[Date]]
+  with AttributeAsserts {
 
   val eps = 1E-4
   val sampleDateTimes = Seq[JDateTime](
@@ -66,7 +67,10 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val vectorizer = new DateToUnitCircleTransformer().setTimePeriod(timePeriod).setInput(f)
     val transformed = vectorizer.transform(ds)
     val vector = vectorizer.getOutput()
-    transformed.collect(vector)
+    val actual = transformed.collect(vector)
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
+    actual
   }
 
   def indexSeqToUnitCircle(indices: Seq[Int], numIndices: Int): Seq[OPVector] = {
@@ -80,7 +84,9 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val output = dateFeature.toUnitCircle(TimePeriod.HourOfDay)
     val transformed = output.originStage.asInstanceOf[Transformer].transform(ds)
     val actual = transformed.collect(output)
-    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    val field = transformed.schema(output.name)
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "work with its DateTime shortcut" in {
@@ -89,7 +95,9 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val output = dateTimeFeature.toUnitCircle(TimePeriod.HourOfDay)
     val transformed = output.originStage.asInstanceOf[Transformer].transform(ds)
     val actual = transformed.collect(output)
-    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    val field = transformed.schema(output.name)
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "store the proper meta data" in {
@@ -98,7 +106,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val vectorizer = new DateToUnitCircleTransformer().setTimePeriod(HourOfDay).setInput(feature)
     val transformed = vectorizer.transform(ds)
     val meta = OpVectorMetadata(transformed.schema(vectorizer.getOutput().name))
-    meta.columns.length should equal (2)
+    meta.columns.length should equal(2)
     meta.columns(0).descriptorValue shouldBe Some("x_HourOfDay")
     meta.columns(1).descriptorValue shouldBe Some("y_HourOfDay")
   }
@@ -117,12 +125,14 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
       Array(0.0, 0.0),
       Array(1.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "transform the data correctly when the timePeriod is HourOfDay" in {
     val actual = transformData(sampleDateTimes, HourOfDay)
-    all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be <  eps
+    all(actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is DayOfYear" in {
@@ -136,7 +146,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val actual = transformData(dateTimes, DayOfYear)
     val sampleDaysOfYearMinusOne = Array(0, 1, 2, 3, 31)
     val expected = indexSeqToUnitCircle(sampleDaysOfYearMinusOne, 366)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is DayOfWeek" in {
@@ -151,7 +161,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     )
     val actual = transformData(dateTimes, DayOfWeek)
     val expectedDaysOfWeekMinusOne = indexSeqToUnitCircle(Seq(0, 1, 2, 3, 4, 5, 6), 7)
-    all (actual.zip(expectedDaysOfWeekMinusOne).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expectedDaysOfWeekMinusOne).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is WeekOfYear" in {
@@ -165,14 +175,14 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val actual = transformData(dateTimes, WeekOfYear)
     val sampleWeeksOfYearMinusOne = Seq(51, 0, 1, 2, 3)
     val expected = indexSeqToUnitCircle(sampleWeeksOfYearMinusOne, 53)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is DayOfMonth" in {
     val actual = transformData(sampleDateTimes, DayOfMonth)
     val sampleDaysOfMonthMinusOne = Seq(10, 27, 16, 16, 12)
     val expected = indexSeqToUnitCircle(sampleDaysOfMonthMinusOne, 31)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is MonthOfYear" in {
@@ -186,7 +196,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val actual = transformData(dateTimes, MonthOfYear)
     val sampleMonthsOfYearMinusOne = Seq(0, 1, 2, 3, 11)
     val expected = indexSeqToUnitCircle(sampleMonthsOfYearMinusOne, 12)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
   it should "transform the data correctly when the timePeriod is WeekOfMonth" in {
@@ -199,6 +209,6 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     )
     val actual = transformData(dateTimes, WeekOfMonth)
     val expected = indexSeqToUnitCircle(Seq(0, 1, 2, 3, 4), 6)
-    all (actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
+    all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 }
