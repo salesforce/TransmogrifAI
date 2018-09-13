@@ -83,13 +83,13 @@ class SmartTextVectorizerTest
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
-    assertNominal(fieldCategorical,
-      Array.fill(transformed.collect(categoricalVectorized).head.value.size)(true))
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
     val fieldText = transformed.schema(textVectorized.name)
-    assertNominal(fieldText,
-      Array.fill(transformed.collect(textVectorized).head.value.size)(false))
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
       smartVector -> combined
@@ -109,10 +109,11 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, categoricalVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(transformed.collect(smartVectorized).head.value.size)(true))
+    val smartRes = transformed.collect(smartVectorized)
+    assertNominal(field, Array.fill(smartRes.head.value.size)(true), smartRes)
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
-    assertNominal(fieldCategorical,
-      Array.fill(transformed.collect(categoricalVectorized).head.value.size)(true))
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
     val (smart, expected) = result.unzip
 
     smart shouldBe expected
@@ -133,9 +134,10 @@ class SmartTextVectorizerTest
       .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(8)(false) ++ Array(true, true))
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartVectorized))
     val fieldText = transformed.schema(textVectorized.name)
-    assertNominal(fieldText, Array.fill(transformed.collect(textVectorized).head.value.size)(false))
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
       val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
       smartVector -> combined
@@ -159,9 +161,10 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
     val fieldShortcut = transformed.schema(shortcutVectorized.name)
-    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true)
+    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+      transformed.collect(shortcutVectorized))
     val (regular, shortcut) = result.unzip
 
     regular shouldBe shortcut

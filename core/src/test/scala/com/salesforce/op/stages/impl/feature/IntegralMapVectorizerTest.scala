@@ -84,10 +84,11 @@ class IntegralMapVectorizerTest
   it should "return a model that correctly transforms the data and produces metadata" in {
     val vector = estimator.getOutput()
     val transformed = model.transform(inputData)
+    val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expectedResult.head.value.size)(false))
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false), result)
 
-    transformed.collect(vector) shouldBe expectedResult
+    result shouldBe expectedResult
     transformed.schema.toOpVectorMetadata(estimator.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -97,6 +98,7 @@ class IntegralMapVectorizerTest
     val vectorizer = estimator.setTrackNulls(true).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.sparse(12, Array(0, 2, 5, 7, 9, 10), Array(1.0, 5.0, 1.0, 1.0, 1.0, 10.0)),
@@ -104,9 +106,9 @@ class IntegralMapVectorizerTest
       Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten, result)
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
@@ -116,6 +118,7 @@ class IntegralMapVectorizerTest
     val vectorizer = estimator.setDefaultValue(100).setTrackNulls(false).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.dense(Array(1.0, 5.0, 100.0, 100.0, 100.0, 10.0)),
@@ -123,9 +126,9 @@ class IntegralMapVectorizerTest
       Vectors.dense(Array(100.0, 100.0, 100.0, 100.0, 100.0, 100.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false), result)
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -135,6 +138,7 @@ class IntegralMapVectorizerTest
     val vectorizer = estimator.setDefaultValue(100).setTrackNulls(true).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.dense(Array(1.0, 0.0, 5.0, 0.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 10.0, 0.0)),
@@ -142,9 +146,9 @@ class IntegralMapVectorizerTest
       Vectors.dense(Array(100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0, 100.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(6)(Seq(false, true)).flatten, result)
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMetaTrackNulls
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMetaTrackNulls
@@ -156,6 +160,7 @@ class IntegralMapVectorizerTest
         .setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.dense(Array(1.0, 5.0, 10.0)),
@@ -163,14 +168,14 @@ class IntegralMapVectorizerTest
       Vectors.sparse(3, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false), result)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B")),
       m2 -> List(IndColWithGroup(None, "Z"))
     )
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -182,6 +187,7 @@ class IntegralMapVectorizerTest
         .setWhiteListKeys(Array("a", "b", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.sparse(6, Array(0, 2, 4), Array(1.0, 5.0, 10.0)),
@@ -189,7 +195,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(6, Array(1, 3, 5), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(3)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(3)(Seq(false, true)).flatten, result)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
@@ -197,7 +203,7 @@ class IntegralMapVectorizerTest
       m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
     )
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -208,6 +214,7 @@ class IntegralMapVectorizerTest
       .setInput(m1, m2).setCleanKeys(true).setTrackNulls(false).setBlackListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.sparse(4, Array(0), Array(5.0)),
@@ -215,14 +222,14 @@ class IntegralMapVectorizerTest
       Vectors.sparse(4, Array(), Array())
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(false))
+    assertNominal(field, Array.fill(expected.head.value.size)(false), result)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
       m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "Y"))
     )
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
@@ -233,6 +240,7 @@ class IntegralMapVectorizerTest
       .setInput(m1, m2).setCleanKeys(true).setTrackNulls(true).setBlackListKeys(Array("a", "z")).fit(inputData)
     val vector = vectorizer.getOutput()
     val transformed = vectorizer.transform(inputData)
+    val result = transformed.collect(vector)
 
     val expected = Array(
       Vectors.sparse(8, Array(0, 3, 5, 7), Array(5.0, 1.0, 1.0, 1.0)),
@@ -240,7 +248,7 @@ class IntegralMapVectorizerTest
       Vectors.sparse(8, Array(1, 3, 5, 7), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(4)(Seq(false, true)).flatten)
+    assertNominal(field, Array.fill(4)(Seq(false, true)).flatten, result)
     val expectedMeta = TestOpVectorMetadataBuilder(
       vectorizer,
       m1 -> List(IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
@@ -249,7 +257,7 @@ class IntegralMapVectorizerTest
         IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"))
     )
 
-    transformed.collect(vector) shouldBe expected
+    result shouldBe expected
     transformed.schema.toOpVectorMetadata(vectorizer.getOutputFeatureName) shouldEqual expectedMeta
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta

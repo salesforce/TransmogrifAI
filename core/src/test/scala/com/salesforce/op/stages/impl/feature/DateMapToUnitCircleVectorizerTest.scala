@@ -79,7 +79,7 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
       .fit(inputData).transform(inputData)
     val field = transformed.schema(output.name)
     val actual = transformed.collect(output)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
     all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 
@@ -92,7 +92,7 @@ class DateMapToUnitCircleVectorizerTest extends OpEstimatorSpec[OPVector, Sequen
       .fit(inputData).transform(inputData)
     val field = transformed.schema(output.name)
     val actual = transformed.collect(output)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
     all (actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }
 

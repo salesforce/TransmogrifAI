@@ -84,8 +84,9 @@ class TextListNullTransformerTest extends FlatSpec with TestSparkContext with At
       Array(1.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
 
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
