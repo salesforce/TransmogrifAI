@@ -69,7 +69,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val vector = vectorizer.getOutput()
     val actual = transformed.collect(vector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
     actual
   }
 
@@ -86,7 +86,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val actual = transformed.collect(output)
     all(actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
     val field = transformed.schema(output.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "work with its DateTime shortcut" in {
@@ -97,7 +97,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     val actual = transformed.collect(output)
     all(actual.zip(expectedResult).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
     val field = transformed.schema(output.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "store the proper meta data" in {
@@ -127,7 +127,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
     ).map(Vectors.dense(_).toOPVector)
     all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(actual.head.value.size)(false))
+    assertNominal(field, Array.fill(actual.head.value.size)(false), actual)
   }
 
   it should "transform the data correctly when the timePeriod is HourOfDay" in {

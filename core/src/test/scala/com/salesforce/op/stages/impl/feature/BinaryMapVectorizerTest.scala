@@ -71,10 +71,10 @@ class BinaryMapVectorizerTest
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
       m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Z"))
     )
-
-    transformed.collect(vector) shouldBe expectedResult
+    val result = transformed.collect(vector)
+    result shouldBe expectedResult
     val field = transformed.schema(estimator.getOutputFeatureName)
-    assertNominal(field, Array.fill(expectedResult.head.value.size)(true))
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
@@ -99,10 +99,10 @@ class BinaryMapVectorizerTest
         IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
         IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
     )
-
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    result shouldBe expected
     val field = transformed.schema(estimator.getOutputFeatureName)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta

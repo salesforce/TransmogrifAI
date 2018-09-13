@@ -119,8 +119,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -136,8 +137,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(20, Array(0, 3, 9, 12, 15, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -153,8 +155,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(17, Array(1, 3, 14), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
@@ -183,8 +186,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(23, Array(1, 4, 10, 14, 18, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
@@ -215,8 +219,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(12, Array(0, 2, 10), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls the specified number of elements when top K is set" in {
@@ -231,8 +236,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(18, Array(0, 3, 8, 11, 14, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "return only the elements that exceed the minimum support requirement when minSupport is set" in {
@@ -245,8 +251,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(10, Array(0, 2, 9), Array(1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls the elements that exceed the minimum support requirement when minSupport is set" in {
@@ -259,8 +266,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(16, Array(0, 3, 7, 10, 13, 14), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "behave correctly when passed empty maps and not throw errors when passed data it was not trained with" in {
@@ -274,8 +282,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.dense(0.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(vector)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
 
     val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
@@ -285,8 +294,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0)
     ).map(_.toOPVector)
     val field2 = transformed2.schema(vector.name)
-    assertNominal(field2, Array.fill(expected.head.value.size)(true))
-    transformed2.collect(fitted.getOutput()) shouldBe expected2
+    val result2 = transformed2.collect(fitted.getOutput())
+    assertNominal(field2, Array.fill(expected.head.value.size)(true), result2)
+    result2 shouldBe expected2
   }
 
   it should "track nulls when passed empty maps and not throw errors when passed data it was not trained with" in {
@@ -300,8 +310,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.dense(0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
 
     val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
@@ -311,8 +322,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
     ).map(_.toOPVector)
     val field2 = transformed2.schema(vector.name)
-    assertNominal(field2, Array.fill(expected.head.value.size)(true))
-    transformed2.collect(fitted.getOutput()) shouldBe expected2
+    val result2 = transformed2.collect(fitted.getOutput())
+    assertNominal(field2, Array.fill(expected.head.value.size)(true), result2)
+    result2 shouldBe expected2
   }
 
 
@@ -325,8 +337,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.dense(Array.empty[Double])
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "correctly whitelist keys" in {
@@ -341,8 +354,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(5, Array(0), Array(1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls with whitelist keys" in {
@@ -357,8 +371,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(7, Array(0, 6), Array(1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "correctly blacklist keys" in {
@@ -374,8 +389,9 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(9, Array(0, 4), Array(1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 
   it should "track nulls with blacklist keys" in {
@@ -391,7 +407,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
       Vectors.sparse(13, Array(0, 5, 6, 12), Array(1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
-    transformed.collect(fitted.getOutput()) shouldBe expected
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
   }
 }

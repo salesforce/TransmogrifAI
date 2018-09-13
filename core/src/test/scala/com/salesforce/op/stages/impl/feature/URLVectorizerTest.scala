@@ -84,7 +84,7 @@ class URLVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val results = transformed.collect(feature)
     val field = transformed.schema(feature.name)
-    assertNominal(field, Array.fill(results.head.value.size)(true))
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
     results
   }
 
