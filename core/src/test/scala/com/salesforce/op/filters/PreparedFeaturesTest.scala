@@ -77,6 +77,11 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
   val allPredictorKeys1 = Array(predictorKey1, predictorKey2A, predictorKey2B)
   val allPredictorKeys2 = Array(predictorKey1)
 
+  val dateMap =
+    FeatureBuilder.DateMap[Passenger].extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
+  val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
+  lazy val dateDataFrame: DataFrame = dataReader.generateDataFrame(dateFeatures)
+
   Spec[PreparedFeatures] should "produce correct summaries" in {
     val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
     val (responseSummaries2, predictorSummaries2) = preparedFeatures2.summaries
@@ -197,18 +202,13 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     expected3: Double,
     expected4: Double,
     expected5: Double): Unit = {
-    val dateMap =
-      FeatureBuilder.DateMap[Passenger].extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
-    val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
-    val df: DataFrame = dataReader.generateDataFrame(dateFeatures)
-
     def createExpectedDateMap(d: Double, aggregates: Int): Map[FeatureKey, ProcessedSeq] = Map(
       (boarded.name, None) -> Right((0 until aggregates).map(_ => d).toList),
       (boardedTime.name, None) -> Right(List(d)),
       (boardedTimeAsDateTime.name, None) -> Right(List(d)),
       (dateMap.name, Option("DTMap")) -> Right(List(d)))
 
-    val ppRDD: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+    val ppRDD: RDD[Map[FeatureKey, ProcessedSeq]] = dateDataFrame.rdd
       .map(PreparedFeatures(
         _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(period)))
       .map(_.predictors.mapValues(_.right.map(_.toList)))

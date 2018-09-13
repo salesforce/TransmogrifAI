@@ -115,7 +115,7 @@ object DateToUnitCircle {
     }.getOrElse(Array(0.0, 0.0))
 
   private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
-    val dt = new JDateTime(timestamp)
+    val dt = new JDateTime(timestamp).withZone(DateTimeZone.UTC)
     timePeriod match {
       case TimePeriod.DayOfMonth => (dt.dayOfMonth.get.toDouble - 1, 31)
       case TimePeriod.DayOfWeek => (dt.dayOfWeek.get.toDouble - 1, 7)
