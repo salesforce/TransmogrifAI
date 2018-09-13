@@ -126,6 +126,8 @@ private[filters] object PreparedFeatures {
    * @param row data frame row
    * @param responses transient features derived from responses
    * @param predictors transient features derived from predictors
+   * @param timePeriod optional time period to use raw feature binning, otherwise standard numeric transformation
+   *                   is applied
    * @return set of prepared features
    */
   def apply(
@@ -161,16 +163,12 @@ private[filters] object PreparedFeatures {
     value: T,
     timePeriod: Option[TimePeriod]): Map[FeatureKey, ProcessedSeq] =
     value match {
-      case v: Text => v.value
-        .map(s => Map[FeatureKey, ProcessedSeq]((name, None) -> Left(tokenize(s)))).getOrElse(Map.empty)
-      case v: Date => v.value.map { timestamp =>
-        Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(prepareDateValue(timestamp, timePeriod))))
-      }.getOrElse(Map.empty)
-      case v: OPNumeric[_] => v.toDouble
-        .map(d => Map[FeatureKey, ProcessedSeq]((name, None) -> Right(Seq(d)))).getOrElse(Map.empty)
       case SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
       case SomeValue(v: SparseVector) => Map((name, None) -> Right(v.indices.map(_.toDouble).toSeq))
       case ft@SomeValue(_) => ft match {
+        case v: Text => Map((name, None) -> Left(v.value.toSeq.flatMap(tokenize)))
+        case v: Date => Map((name, None) -> Right(v.value.map(prepareDateValue(_, timePeriod)).toSeq))
+        case v: OPNumeric[_] => Map((name, None) -> Right(v.toDouble.toSeq))
         case v: Geolocation => Map((name, None) -> Right(v.value))
         case v: TextList => Map((name, None) -> Left(v.value))
         case v: DateList => Map((name, None) -> Right(v.value.map(prepareDateValue(_, timePeriod))))
