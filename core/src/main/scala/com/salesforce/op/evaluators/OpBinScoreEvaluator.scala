@@ -83,10 +83,14 @@ private[op] class OpBinScoreEvaluator
         case Row(prob: Double, label: Double) => (prob, label)
       }
 
+      val minScore = math.min(0.0, scoreAndLabels.keys.min())
+      val maxScore = math.max(1.0, scoreAndLabels.keys.max())
+
       // Finding stats per bin -> avg score, avg conv rate,
       // total num of data points and overall brier score.
       val stats = scoreAndLabels.map {
-        case (score, label) => (getBinIndex(score), (score, label, 1L, math.pow((score - label), 2)))
+        case (score, label) =>
+          (getBinIndex(score, minScore, maxScore), (score, label, 1L, math.pow((score - label), 2)))
       }.reduceByKey(_ + _).map {
         case (bin, (scoreSum, labelSum, count, squaredError)) =>
           (bin, scoreSum / count, labelSum / count, count, squaredError)
@@ -107,7 +111,8 @@ private[op] class OpBinScoreEvaluator
 
       // binCenters is the center point in each bin.
       // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
-      val binCenters = (for {i <- 0 to numBins} yield ((i + 0.5) / numBins)).dropRight(1)
+      val diff = maxScore - minScore
+      val binCenters = (for {i <- 0 to numBins-1} yield (minScore + ((diff * i) / numBins) + (diff / (2 * numBins))))
 
       val metrics = BinaryClassificationBinMetrics(
         brierScore = brierScoreSum / numberOfPoints,
@@ -123,9 +128,9 @@ private[op] class OpBinScoreEvaluator
   }
 
   // getBinIndex finds which bin the score associates with.
-  private def getBinIndex(score: Double): Int = {
-    val binIndex = math.min(numBins - 1, (score * numBins).toInt)
-    math.max(binIndex, 0) // if score is negative, assign it to bin 0.
+  private def getBinIndex(score: Double, minScore: Double, maxScore: Double): Int = {
+    val binIndex = (numBins * (score - minScore) / (maxScore - minScore)).toInt
+    math.min(numBins - 1, binIndex)
   }
 }
 

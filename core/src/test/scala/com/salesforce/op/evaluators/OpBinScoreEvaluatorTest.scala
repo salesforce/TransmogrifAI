@@ -63,8 +63,9 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
   val (outOfBoundScoreDataset, outOfBoundScoreprediction, outOfBoundScorelabel) = TestFeatureBuilder(
     Seq (
-      Prediction(1.0, Array(10.0, 10.0), Array(0.0001, -0.99999)) -> 1.0.toRealNN,
-      Prediction(1.0, Array(10.0, 10.0), Array(0.0001, 1.99999)) -> 1.0.toRealNN
+      Prediction(1.0, Array(0.0001, -0.99999), Array.emptyDoubleArray) -> 0.0.toRealNN,
+      Prediction(1.0, Array(0.0001, 1.99999), Array.emptyDoubleArray) -> 1.0.toRealNN,
+      Prediction(1.0, Array(0.0001, 12.0), Array.emptyDoubleArray) -> 1.0.toRealNN
     )
   )
 
@@ -86,11 +87,11 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
       .evaluateAll(outOfBoundScoreDataset)
 
     metrics shouldBe BinaryClassificationBinMetrics(
-      2.4999700001,
-      Seq(0.125, 0.375, 0.625, 0.875),
-      Seq(1, 0, 0, 1),
-      Seq(-0.99999, 0.0, 0.0, 1.99999),
-      Seq(1.0, 0.0, 0.0, 1.0))
+      40.999986666733335,
+      Seq(0.62500875, 3.87500625, 7.125003749999999, 10.37500125),
+      Seq(2, 0, 0, 1),
+      Seq(0.49999999999999994, 0.0, 0.0, 12.0),
+      Seq(0.5, 0.0, 0.0, 1.0))
   }
 
   it should "error on invalid number of bins" in {
@@ -113,7 +114,7 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
     metrics shouldBe BinaryClassificationBinMetrics(
       7.294225500000013E-4,
-      Seq(0.1, 0.3, 0.5, 0.7, 0.9),
+      Seq(0.1, 0.30000000000000004, 0.5, 0.7, 0.9),
       Seq(0, 0, 0, 0, 4),
       Seq(0.0, 0.0, 0.0, 0.0, 0.98617),
       Seq(0.0, 0.0, 0.0, 0.0, 1.0))
