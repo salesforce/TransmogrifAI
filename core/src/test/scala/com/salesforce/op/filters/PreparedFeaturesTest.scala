@@ -163,13 +163,13 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly transform date features when time period is specified" in {
-    runDateToUnitCircleTest(TimePeriod.DayOfMonth, 17.0, 17.0, 17.0, 17.0, 17.0)
-    runDateToUnitCircleTest(TimePeriod.DayOfWeek, 6.0, 6.0, 6.0, 6.0, 6.0)
-    runDateToUnitCircleTest(TimePeriod.DayOfYear, 17.0, 17.0, 17.0, 17.0, 17.0)
+    runDateToUnitCircleTest(TimePeriod.DayOfMonth, 16.0, 16.0, 16.0, 16.0, 16.0)
+    runDateToUnitCircleTest(TimePeriod.DayOfWeek, 5.0, 5.0, 5.0, 5.0, 5.0)
+    runDateToUnitCircleTest(TimePeriod.DayOfYear, 16.0, 16.0, 16.0, 16.0, 16.0)
     runDateToUnitCircleTest(TimePeriod.HourOfDay, 16.0, 16.0, 16.0, 16.0, 16.0)
-    runDateToUnitCircleTest(TimePeriod.MonthOfYear, 1.0, 1.0, 1.0, 1.0, 1.0)
+    runDateToUnitCircleTest(TimePeriod.MonthOfYear, 0.0, 0.0, 0.0, 0.0, 0.0)
     runDateToUnitCircleTest(TimePeriod.WeekOfMonth, 2.0, 2.0, 2.0, 2.0, 2.0)
-    runDateToUnitCircleTest(TimePeriod.WeekOfYear, 3.0, 3.0, 3.0, 3.0, 3.0)
+    runDateToUnitCircleTest(TimePeriod.WeekOfYear, 2.0, 2.0, 2.0, 2.0, 2.0)
   }
 
   def runDateToUnitCircleTest(

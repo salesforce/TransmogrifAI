@@ -117,14 +117,14 @@ object DateToUnitCircle {
   private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
     val dt = new JDateTime(timestamp)
     timePeriod match {
-      case TimePeriod.DayOfMonth => (dt.dayOfMonth.get.toDouble % 31, 31)
-      case TimePeriod.DayOfWeek => (dt.dayOfWeek.get.toDouble % 7, 7)
-      case TimePeriod.DayOfYear => (dt.dayOfYear.get.toDouble % 366, 366)
-      case TimePeriod.HourOfDay => (dt.hourOfDay.get.toDouble % 24, 24)
-      case TimePeriod.MonthOfYear => (dt.monthOfYear.get.toDouble % 12, 12)
+      case TimePeriod.DayOfMonth => (dt.dayOfMonth.get.toDouble - 1, 31)
+      case TimePeriod.DayOfWeek => (dt.dayOfWeek.get.toDouble - 1, 7)
+      case TimePeriod.DayOfYear => (dt.dayOfYear.get.toDouble - 1, 366)
+      case TimePeriod.HourOfDay => (dt.hourOfDay.get.toDouble, 24)
+      case TimePeriod.MonthOfYear => (dt.monthOfYear.get.toDouble - 1, 12)
       case TimePeriod.WeekOfMonth =>
-        ((dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get).toDouble % 6, 6)
-      case TimePeriod.WeekOfYear => (dt.weekOfWeekyear.get.toDouble % 53, 53)
+        ((dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get).toDouble, 6)
+      case TimePeriod.WeekOfYear => (dt.weekOfWeekyear.get.toDouble - 1, 53)
     }
   }
 }
