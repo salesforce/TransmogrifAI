@@ -139,7 +139,10 @@ final class GeolocationVectorizerModel private[op]
   def transformFn: Seq[Geolocation] => OPVector = row => {
     val replaced =
       if (!trackNulls) {
-        row.zip(fillValues).flatMap { case (r, m) => if (r.isEmpty) m else r.value }
+        row.zip(fillValues).flatMap { case (r, m) =>
+          val meanToUse: Seq[Double] = if (m.isEmpty) RepresentationOfEmpty else m
+          if (r.isEmpty) meanToUse else r.value
+        }
       }
       else {
         row.zip(fillValues).flatMap { case (r, m) =>
