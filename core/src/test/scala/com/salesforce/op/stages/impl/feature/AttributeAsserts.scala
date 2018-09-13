@@ -37,19 +37,27 @@ import org.scalatest.{Assertion, Matchers}
 
 trait AttributeAsserts {
   self: Matchers =>
+
   /**
    * Assert if attributes are nominal or not
    *
-   * @param schema
+   * @param schema field schema with attributes attached
    * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
    * @param output the output OPVector associated with the column
    */
   final def assertNominal(schema: StructField, expectedNominal: Array[Boolean], output: Array[OPVector]): Assertion = {
-    val attributes = AttributeGroup.fromStructField(schema).attributes
     for {
-      x <- output
+      (x, i) <- output.zipWithIndex
+      _ = withClue(s"Output vector $i and expectedNominal arrays are not of the same length:") {
+        x.value.size shouldBe expectedNominal.length
+      }
       (value, nominal) <- x.value.toArray.zip(expectedNominal)
-    } if (nominal) value should (be (0.0) or be (1.0))
-    attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
+    } if (nominal) value should (be(0.0) or be(1.0))
+
+    val attributes = AttributeGroup.fromStructField(schema).attributes
+    withClue("Field attributes were not set or not as expected:") {
+      attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
+    }
   }
+
 }
