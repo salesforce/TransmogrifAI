@@ -151,6 +151,8 @@ private[filters] object PreparedFeatures {
    *
    * @param name feature name
    * @param value feature value
+   * @param timePeriod optional time period to use raw feature binning, otherwise standard numeric transformation
+   *                   is applied
    * @tparam T type of the feature
    * @return tuple containing whether the feature was empty and a sequence of either doubles or strings
    */
