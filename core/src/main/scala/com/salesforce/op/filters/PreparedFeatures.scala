@@ -31,13 +31,9 @@
 package com.salesforce.op.filters
 
 
-import java.time.{Instant, OffsetDateTime, ZoneOffset}
-import java.time.temporal.WeekFields
-import java.util.Locale
-
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.{TextTokenizer, TimePeriod}
+import com.salesforce.op.stages.impl.feature.{DateToUnitCircle, TextTokenizer, TimePeriod}
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
@@ -203,35 +199,7 @@ private[filters] object PreparedFeatures {
 
   private def prepareDateValue(timestamp: Long, timePeriod: Option[TimePeriod]): Double =
     timePeriod match {
-      case Some(period) =>
-        val dt = Instant.ofEpochMilli(timestamp).atZone(ZoneOffset.UTC).toOffsetDateTime
-        val unproj = period match {
-          case TimePeriod.DayOfMonth => dt.getDayOfMonth.toDouble
-          case TimePeriod.DayOfWeek => dt.getDayOfWeek.getValue.toDouble
-          case TimePeriod.DayOfYear => dt.getDayOfYear.toDouble
-          case TimePeriod.HourOfDay => dt.getHour.toDouble
-          case TimePeriod.MonthOfYear => dt.getMonthValue.toDouble
-          case TimePeriod.WeekOfMonth => dt.get(WeekFields.of(Locale.US).weekOfMonth).toDouble
-          case TimePeriod.WeekOfYear => dt.get(WeekFields.of(Locale.US).weekOfYear).toDouble
-        }
-
-        unproj % getTimePeriodMaxBins(period)
+      case Some(period) => DateToUnitCircle.convertToBin(timestamp, period)
       case None => timestamp.toDouble
     }
-
-  /**
-   * Utility for getting maximum number of bins to use given an input time period.
-   *
-   * @param period input time period
-   * @return maximum number of bins associated to input time period
-   */
-  private def getTimePeriodMaxBins(period: TimePeriod): Int = period match {
-    case TimePeriod.DayOfMonth => 31
-    case TimePeriod.DayOfWeek => 7
-    case TimePeriod.DayOfYear => 366
-    case TimePeriod.HourOfDay => 24
-    case TimePeriod.MonthOfYear => 12
-    case TimePeriod.WeekOfMonth => 5
-    case TimePeriod.WeekOfYear => 53
-  }
 }

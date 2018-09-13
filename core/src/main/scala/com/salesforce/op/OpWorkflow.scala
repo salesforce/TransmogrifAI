@@ -34,6 +34,7 @@ import com.salesforce.op.features.OPFeature
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
@@ -488,24 +489,27 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Add a raw features filter to the workflow to look at fill rates and distributions of raw features and exclude
    * features that do not meet specifications from modeling DAG
    *
-   * @param trainingReader    training reader to use in filter if not supplied will fall back to reader specified for
-   *                          workflow (note that this reader will take precedence over readers directly input to the
-   *                          workflow if both are supplied)
-   * @param scoringReader     scoring reader to use in filter if not supplied will do the checks possible with only
-   *                          training data available
-   * @param bins              number of bins to use in estimating feature distributions
-   * @param minFillRate       minimum non-null fraction of instances that a feature should contain
-   * @param maxFillDifference maximum absolute difference in fill rate between scoring and training data for a feature
-   * @param maxFillRatioDiff  maximum difference in fill ratio (symmetric) between scoring and training data for
-   *                          a feature
-   * @param maxJSDivergence   maximum Jensen-Shannon divergence between the training and scoring distributions
-   *                          for a feature
-   * @param protectedFeatures list of features that should never be removed (features that are used to create them will
-   *                          also be protected)
-   * @param textBinsFormula   formula to compute the text features bin size.
-   *                          Input arguments are [[Summary]] and number of bins to use in computing
-   *                          feature distributions (histograms for numerics, hashes for strings).
-   *                          Output is the bins for the text features.
+   * @param trainingReader     training reader to use in filter if not supplied will fall back to reader specified for
+   *                           workflow (note that this reader will take precedence over readers directly input to the
+   *                           workflow if both are supplied)
+   * @param scoringReader      scoring reader to use in filter if not supplied will do the checks possible with only
+   *                           training data available
+   * @param bins               number of bins to use in estimating feature distributions
+   * @param minFillRate        minimum non-null fraction of instances that a feature should contain
+   * @param maxFillDifference  maximum absolute difference in fill rate between scoring and training data for a feature
+   * @param maxFillRatioDiff   maximum difference in fill ratio (symmetric) between scoring and training data for
+   *                           a feature
+   * @param maxJSDivergence    maximum Jensen-Shannon divergence between the training and scoring distributions
+   *                           for a feature
+   * @param protectedFeatures  list of features that should never be removed (features that are used to create them will
+   *                           also be protected)
+   * @param protectedJSFeatures features that are protected from removal by JS divergence check
+   * @param textBinsFormula    formula to compute the text features bin size.
+   *                           Input arguments are [[Summary]] and number of bins to use in computing
+   *                           feature distributions (histograms for numerics, hashes for strings).
+   *                           Output is the bins for the text features.
+   * @param timePeriod         Time period used to apply circulate date transformation for date features, if not
+   *                           specified will use numeric feature transformation
    * @tparam T Type of the data read in
    */
   @Experimental
@@ -521,12 +525,15 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     maxCorrelation: Double = 0.95,
     correlationType: CorrelationType = CorrelationType.Pearson,
     protectedFeatures: Array[OPFeature] = Array.empty,
-    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula
+    protectedJSFeatures: Array[OPFeature] = Array.empty,
+    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
+    timePeriod: Option[TimePeriod] = None
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
       "as the reader for the workflow")
     val protectedRawFeatures = protectedFeatures.flatMap(_.rawFeatures).map(_.name).toSet
+    val protectedRawJSFeatures = protectedJSFeatures.flatMap(_.rawFeatures).map(_.name).toSet
     rawFeatureFilter = Option {
       new RawFeatureFilter(
         trainingReader = training.get,
@@ -539,8 +546,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         maxCorrelation = maxCorrelation,
         correlationType = correlationType,
         protectedFeatures = protectedRawFeatures,
-        textBinsFormula = textBinsFormula
-      )
+        jsDivergenceProtectedFeatures = protectedRawJSFeatures,
+        textBinsFormula = textBinsFormula)
     }
     this
   }

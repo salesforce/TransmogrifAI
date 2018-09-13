@@ -163,65 +163,45 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly transform date features when time period is specified" in {
+    runDateToUnitCircleTest(TimePeriod.DayOfMonth, 17.0, 17.0, 17.0, 17.0, 17.0)
+    runDateToUnitCircleTest(TimePeriod.DayOfWeek, 6.0, 6.0, 6.0, 6.0, 6.0)
+    runDateToUnitCircleTest(TimePeriod.DayOfYear, 17.0, 17.0, 17.0, 17.0, 17.0)
+    runDateToUnitCircleTest(TimePeriod.HourOfDay, 16.0, 16.0, 16.0, 16.0, 16.0)
+    runDateToUnitCircleTest(TimePeriod.MonthOfYear, 1.0, 1.0, 1.0, 1.0, 1.0)
+    runDateToUnitCircleTest(TimePeriod.WeekOfMonth, 2.0, 2.0, 2.0, 2.0, 2.0)
+    runDateToUnitCircleTest(TimePeriod.WeekOfYear, 3.0, 3.0, 3.0, 3.0, 3.0)
+  }
+
+  def runDateToUnitCircleTest(
+    period: TimePeriod,
+    expected1: Double,
+    expected2: Double,
+    expected3: Double,
+    expected4: Double,
+    expected5: Double): Unit = {
     val dateMap =
       FeatureBuilder.DateMap[Passenger].extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
     val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
     val df: DataFrame = dataReader.generateDataFrame(dateFeatures)
 
-    val ppRDD5: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.WeekOfMonth)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD7: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfWeek)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD12: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.MonthOfYear)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD24: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.HourOfDay)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD31: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfMonth)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD53: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.WeekOfYear)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDD366: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(TimePeriod.DayOfYear)))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-    val ppRDDNone: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
-      .map(PreparedFeatures(
-        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), None))
-      .map(_.predictors.mapValues(_.right.map(_.toList)))
-
-    def createExpected(d: Double): Seq[(FeatureKey, ProcessedSeq)] = Seq(
-      (boarded.name, None) -> Right(List(d, d)),
-      (boarded.name, None) -> Right(List(d)),
+    def createExpectedDateMap(d: Double, aggregates: Int): Map[FeatureKey, ProcessedSeq] = Map(
+      (boarded.name, None) -> Right((0 until aggregates).map(_ => d).toList),
       (boardedTime.name, None) -> Right(List(d)),
       (boardedTimeAsDateTime.name, None) -> Right(List(d)),
       (dateMap.name, Option("DTMap")) -> Right(List(d)))
 
-    val expected5 = Seq(4.0).map(createExpected)
-    val expected7 = Seq(0.0).map(createExpected)
-    val expected12 = Seq(1.0).map(createExpected)
-    val expected24 = Seq(0.0).map(createExpected)
-    val expected31 = Seq(18.0).map(createExpected)
-    val expected53 = Seq(4.0).map(createExpected)
-    val expected366 = Seq(18.0).map(createExpected)
+    val ppRDD: RDD[Map[FeatureKey, ProcessedSeq]] = df.rdd
+      .map(PreparedFeatures(
+        _, Array.empty[TransientFeature], dateFeatures.map(TransientFeature(_)), Option(period)))
+      .map(_.predictors.mapValues(_.right.map(_.toList)))
 
-    ppRDD5.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected5.flatMap(identity(_))
-    ppRDD7.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected7.flatMap(identity(_))
-    ppRDD12.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected12.flatMap(identity(_))
-    ppRDD24.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected24.flatMap(identity(_))
-    ppRDD53.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected53.flatMap(identity(_))
-    ppRDD366.collect.flatMap(identity(_)).toSet should contain theSameElementsAs expected366.flatMap(identity(_))
+    val expected: Seq[Map[FeatureKey, ProcessedSeq]] =
+      // The first observation is expected to be aggregated twice
+      Seq(createExpectedDateMap(expected1, 2)) ++
+      Seq(expected2, expected3, expected4, expected5).map(createExpectedDateMap(_, 1)) ++
+        Seq(Map[FeatureKey, ProcessedSeq]())
+
+    ppRDD.collect should contain theSameElementsAs expected
   }
 
   def testCorrMatrix(

@@ -79,6 +79,8 @@ import scala.util.Failure
  *                                      Input arguments are [[Summary]] and number of bins to use in computing feature
  *                                      distributions (histograms for numerics, hashes for strings).
  *                                      Output is the bins for the text features.
+ * @param timePeriod                    Time period used to apply circulate date transformation for date features, if
+ *                                      not specified will use regular numeric feature transformation
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
