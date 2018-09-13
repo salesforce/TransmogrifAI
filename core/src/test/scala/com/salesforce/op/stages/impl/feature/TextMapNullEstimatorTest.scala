@@ -73,9 +73,10 @@ class TextMapNullEstimatorTest extends FlatSpec with TestSparkContext with Attri
       Array(1.0, 0.0, 1.0, 1.0),
       Array(1.0, 1.0, 0.0, 1.0)
     ).map(Vectors.dense(_).toOPVector)
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    result shouldBe expected
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(true))
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,

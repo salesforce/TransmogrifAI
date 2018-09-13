@@ -92,7 +92,7 @@ class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with Attr
         List(1.0, 0.0, 186.0, 0.0, 96.0, 0.0)
       )
     val field = transformed.schema(feature.name)
-    assertNominal(field, Array(true, true, false, true, false, true))
+    assertNominal(field, Array(false, true, false, true, false, true), collected)
   }
 
 }

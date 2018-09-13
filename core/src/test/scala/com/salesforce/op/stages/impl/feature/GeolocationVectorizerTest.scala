@@ -33,8 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.{DenseVector, Vectors}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -101,7 +100,9 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext with Attr
     val output = testModelConstant.getOutputFeatureName
     val field = testDataTransformedConstant.schema(output)
     assertNominal(
-      field, Array.fill(expectedConstant.head._5.size)(false))
+      field, Array.fill(expectedConstant.head._5.size)(false),
+      testDataTransformedConstant.collect(testModelConstant.getOutput())
+    )
 
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedConstant.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedConstant.map(_._2)
@@ -136,8 +137,8 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext with Attr
     )
     val output = testModelMean.getOutputFeatureName
     val field = testDataTransformedMean.schema(output)
-    assertNominal(
-      field, Array.fill(expectedMean.head._5.size)(false))
+    assertNominal(field, Array.fill(expectedMean.head._5.size)(false),
+      testDataTransformedMean.collect(testModelMean.getOutput()))
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)
@@ -180,7 +181,9 @@ class GeolocationVectorizerTest extends FlatSpec with TestSparkContext with Attr
     val output = testModelMean.getOutputFeatureName
     val field = testDataTransformedMean.schema(output)
     assertNominal(
-      field, Array.fill(expectedMean.head._5.size / 4)(Seq(false, false, false, true)).flatten)
+      field, Array.fill(expectedMean.head._5.size / 4)(Seq(false, false, false, true)).flatten,
+      testDataTransformedMean.collect(testModelMean.getOutput())
+    )
     transformedValuesMean.map(_.get(0)) shouldEqual expectedMean.map(_._1)
     transformedValuesMean.map(_.get(1)) shouldEqual expectedMean.map(_._2)
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)
