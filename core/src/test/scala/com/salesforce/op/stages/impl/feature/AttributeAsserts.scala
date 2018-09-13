@@ -42,12 +42,14 @@ trait AttributeAsserts {
    *
    * @param schema
    * @param expectedNominal Expected array of booleans. True if the field is nominal, false if not.
+   * @param output the output OPVector associated with the column
    */
   final def assertNominal(schema: StructField, expectedNominal: Array[Boolean], output: Array[OPVector]): Assertion = {
     val attributes = AttributeGroup.fromStructField(schema).attributes
-    output.foreach{
-      x => x.value.toArray.zip(expectedNominal).foreach{ case (v , n) => if (n) (v == 0.0 || v == 1.0) shouldBe true }
-    }
+    for {
+      x <- output
+      (value, nominal) <- x.value.toArray.zip(expectedNominal)
+    } if (nominal) value should (be (0.0) or be (1.0))
     attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
   }
 }
