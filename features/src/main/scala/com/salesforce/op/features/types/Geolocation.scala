@@ -97,8 +97,8 @@ object Geolocation {
   private[types] def geolocationData(
     lat: Double,
     lon: Double,
-    accuracy: GeolocationAccuracy): Seq[Double] =
-    geolocationData(lat, lon, accuracy.value)
+    accuracy: GeolocationAccuracy
+  ): Seq[Double] = geolocationData(lat, lon, accuracy.value)
 
   private[types] def geolocationData(
     lat: Double,

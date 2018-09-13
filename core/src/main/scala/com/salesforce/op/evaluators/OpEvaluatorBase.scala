@@ -369,9 +369,9 @@ sealed abstract class OpEvaluatorNames
  */
 object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   val values: Seq[OpEvaluatorNames] = findValues
-  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metics")
-  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metics")
-  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metics")
+  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metrics")
+  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
+  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
   case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
     override def entryName: String = name.toLowerCase
   }
