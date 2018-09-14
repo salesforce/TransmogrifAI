@@ -83,12 +83,11 @@ private[op] class OpBinScoreEvaluator
         case Row(prob: Double, label: Double) => (prob, label)
       }
 
-      val (minScore, maxScore) = scoreAndLabels.keys.collect().foldLeft(0.0, 1.0) {
-        case((minVal, maxVal), (scores)) => {
-          val min = math.min(minVal, scores)
-          val max = math.max(maxVal, scores)
-
-          (math.min(0.0, min), math.max(1.0, max))
+      val (maxScore, minScore) = scoreAndLabels.map {
+        case (score , _) => (score, score)
+      }.fold(1.0, 0.0) {
+        case((maxVal, minVal), (scoreMax, scoreMin)) => {
+          (math.max(maxVal, scoreMax), math.min(minVal, scoreMin))
         }
       }
 
