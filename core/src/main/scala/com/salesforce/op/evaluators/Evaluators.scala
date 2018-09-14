@@ -56,8 +56,7 @@ object Evaluators {
      * Brier Score for the prediction
      */
     def brierScore(): OpBinScoreEvaluator =
-      new OpBinScoreEvaluator(
-        name = BinaryClassEvalMetrics.brierScore, isLargerBetter = true)
+      new OpBinScoreEvaluator(name = BinaryClassEvalMetrics.brierScore, isLargerBetter = true)
 
     /**
      * Area under ROC

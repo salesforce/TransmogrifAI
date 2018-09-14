@@ -71,7 +71,7 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
   Spec[OpBinScoreEvaluator] should "return the bin metrics" in {
     val metrics = new OpBinScoreEvaluator(numBins = 4)
-          .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
+      .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
 
     metrics shouldBe BinaryClassificationBinMetrics(
       0.09800605366,
