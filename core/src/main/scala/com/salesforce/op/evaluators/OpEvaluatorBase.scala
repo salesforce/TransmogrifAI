@@ -319,6 +319,7 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object TN extends ClassificationEvalMetric("TN", "true negative")
   case object FP extends ClassificationEvalMetric("FP", "false positive")
   case object FN extends ClassificationEvalMetric("FN", "false negative")
+  case object brierScore extends ClassificationEvalMetric("brierscore", "brier score")
 }
 
 /**
@@ -369,19 +370,14 @@ sealed abstract class OpEvaluatorNames
  */
 object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   val values: Seq[OpEvaluatorNames] = findValues
-
-  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metics")
-
-  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metics")
-
-  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metics")
-
+  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metrics")
+  case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
+  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
+  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
   case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
     override def entryName: String = name.toLowerCase
   }
-
   override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
-
   override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
     .getOrElse(Custom(name, name))
 }
