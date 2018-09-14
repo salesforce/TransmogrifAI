@@ -152,7 +152,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(cv, splitter = splitter,
-      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
+      trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
   }
 
