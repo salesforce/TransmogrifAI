@@ -83,8 +83,14 @@ private[op] class OpBinScoreEvaluator
         case Row(prob: Double, label: Double) => (prob, label)
       }
 
-      val minScore = math.min(0.0, scoreAndLabels.keys.min())
-      val maxScore = math.max(1.0, scoreAndLabels.keys.max())
+      val (minScore, maxScore) = scoreAndLabels.keys.collect().foldLeft(0.0, 1.0) {
+        case((minVal, maxVal), (scores)) => {
+          val min = math.min(minVal, scores)
+          val max = math.max(maxVal, scores)
+
+          (math.min(0.0, min), math.max(1.0, max))
+        }
+      }
 
       // Finding stats per bin -> avg score, avg conv rate,
       // total num of data points and overall brier score.
