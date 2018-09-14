@@ -21,6 +21,9 @@ New features and bug fixes:
 - OS-neutral filesystem path creation [#51](https://github.com/salesforce/TransmogrifAI/pull/51)
 - Make Feature class public instead hide it's ctor [#45](https://github.com/salesforce/TransmogrifAI/pull/45)
 - Specify categorical variables in metadata [#120](https://github.com/salesforce/TransmogrifAI/pull/120)
+- Fix fill geo location vectorizer values [#132](https://github.com/salesforce/TransmogrifAI/pull/132)
+- Adding feature importance for new model types [#128](https://github.com/salesforce/TransmogrifAI/pull/128)
+- Adding binaryclassification bin score evaluator [#119](https://github.com/salesforce/TransmogrifAI/pull/119)
 
 Breaking changes:
 - Made case class to deal with model selector metadata [#39](https://github.com/salesforce/TransmogrifAI/pull/39)
