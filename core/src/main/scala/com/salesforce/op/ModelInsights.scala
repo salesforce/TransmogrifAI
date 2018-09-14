@@ -387,7 +387,8 @@ case object ModelInsights {
     val typeHints = FullTypeHints(List(
       classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
-      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics], classOf[ThresholdMetrics],
+      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
+      classOf[BinaryClassificationBinMetrics], classOf[ThresholdMetrics],
       classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
     ))
     val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>

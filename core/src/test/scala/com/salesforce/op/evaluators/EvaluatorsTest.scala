@@ -97,6 +97,9 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   val opBinaryMetrics = new OpBinaryClassificationEvaluator().setLabelCol(test_label)
     .setPredictionCol(pred).evaluateAll(transformedData)
 
+  val opBinScoreMetrics = new OpBinScoreEvaluator().setLabelCol(test_label)
+    .setPredictionCol(pred).evaluateAll(transformedData)
+
   val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(test_label.name)
     .setPredictionCol(predValue.name)
 
@@ -115,6 +118,8 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     evaluateBinaryMetric(Evaluators.BinaryClassification.recall()) shouldBe opBinaryMetrics.Recall
     evaluateBinaryMetric(Evaluators.BinaryClassification.f1()) shouldBe opBinaryMetrics.F1
     evaluateBinaryMetric(Evaluators.BinaryClassification.error()) shouldBe opBinaryMetrics.Error
+
+    evaluateBinScoreMetric(Evaluators.BinaryClassification.brierScore()) shouldBe opBinScoreMetrics.brierScore
   }
 
   it should "have a multi classification factory" in {
@@ -146,6 +151,9 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
   }
 
   def evaluateBinaryMetric(binEval: OpBinaryClassificationEvaluator): Double = binEval.setLabelCol(test_label)
+    .setPredictionCol(pred).evaluate(transformedData3)
+
+  def evaluateBinScoreMetric(binEval: OpBinScoreEvaluator): Double = binEval.setLabelCol(test_label)
     .setPredictionCol(pred).evaluate(transformedData3)
 
   def evaluateSparkBinaryMetric(metricName: String): Double = sparkBinaryEvaluator.setMetricName(metricName)
