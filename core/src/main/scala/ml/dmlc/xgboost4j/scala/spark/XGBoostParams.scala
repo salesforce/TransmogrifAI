@@ -64,10 +64,8 @@ case object OpXGBoost {
      * for prediction.
      */
     def asXGB: LabeledPoint = v match {
-      case v: DenseVector =>
-        LabeledPoint(0.0f, null, v.values.map(_.toFloat))
-      case v: SparseVector =>
-        LabeledPoint(0.0f, v.indices, v.values.map(_.toFloat))
+      case v: DenseVector => LabeledPoint(0.0f, null, v.values.map(_.toFloat))
+      case v: SparseVector => LabeledPoint(0.0f, v.indices, v.values.map(_.toFloat))
     }
   }
 

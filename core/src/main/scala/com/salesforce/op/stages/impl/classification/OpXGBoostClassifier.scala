@@ -177,7 +177,6 @@ class OpXGBoostClassificationModel
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
     val data = removeMissingValues(Iterator(features.value.asXGB), model.getMissing)
     val dm = new DMatrix(dataIter = data)
-    // TODO: can we avoid two booster.predict calls here?
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
     val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
