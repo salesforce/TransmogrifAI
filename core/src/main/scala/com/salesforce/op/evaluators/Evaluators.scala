@@ -54,10 +54,11 @@ object Evaluators {
 
     /*
      * Brier Score for the prediction
+     *
+     * @param numOfBins number of bins to produce
      */
-    def brierScore(): OpBinScoreEvaluator =
-      new OpBinScoreEvaluator(
-        name = BinaryClassEvalMetrics.brierScore, isLargerBetter = true)
+    def brierScore(numOfBins: Int = 100): OpBinScoreEvaluator =
+      new OpBinScoreEvaluator(numOfBins = numOfBins)
 
     /**
      * Area under ROC
