@@ -43,32 +43,25 @@ import org.slf4j.LoggerFactory
  *
  * Evaluator for Binary Classification which provides statistics about the predicted scores.
  * This evaluator creates the specified number of bins and computes the statistics for each bin
- * and returns BinaryClassificationBinMetrics, which contains
+ * and returns [[BinaryClassificationBinMetrics]].
  *
- * Total number of data points per bin
- * Average Score per bin
- * Average Conversion rate per bin
- * Bin Centers for each bin
- * BrierScore for the overall dataset is also computed, which is a default metric as well.
- *
- * @param name            name of default metric
- * @param isLargerBetter  is metric better if larger
- * @param uid             uid for instance
+ * @param numOfBins number of bins to produce
+ * @param uid       uid for instance
  */
 private[op] class OpBinScoreEvaluator
 (
-  override val name: EvalMetric = OpEvaluatorNames.BinScore,
-  override val isLargerBetter: Boolean = true,
-  override val uid: String = UID[OpBinScoreEvaluator],
-  val numBins: Int = 100
+  val numOfBins: Int = 100,
+  uid: String = UID[OpBinScoreEvaluator]
 ) extends OpBinaryClassificationEvaluatorBase[BinaryClassificationBinMetrics](uid = uid) {
 
-  require(numBins > 0, "numBins must be positive")
+  override val name: EvalMetric = OpEvaluatorNames.BinScore
+
+  require(numOfBins > 0, "numOfBins must be positive")
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.brierScore
 
-  override def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
+  def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
     val labelColumnName = getLabelCol
     val dataProcessed = makeDataToUse(data, labelColumnName)
 
@@ -83,7 +76,7 @@ private[op] class OpBinScoreEvaluator
       }
 
       val (maxScore, minScore) = scoreAndLabels.map {
-        case (score , _) => (score, score)
+        case (score, _) => (score, score)
       }.fold(1.0, 0.0) {
         case ((maxVal, minVal), (scoreMax, scoreMin)) =>
           (math.max(maxVal, scoreMax), math.min(minVal, scoreMin))
@@ -100,8 +93,9 @@ private[op] class OpBinScoreEvaluator
           (bin, scoreSum / count, labelSum / count, count, squaredError)
       }.collect()
 
+      val zero = (new Array[Double](numOfBins), new Array[Double](numOfBins), new Array[Long](numOfBins), 0.0, 0L)
       val (averageScore, averageConversionRate, numberOfDataPoints, brierScoreSum, numberOfPoints) =
-        stats.foldLeft((new Array[Double](numBins), new Array[Double](numBins), new Array[Long](numBins), 0.0, 0L)) {
+        stats.foldLeft(zero) {
           case ((score, convRate, dataPoints, brierScoreSum, totalPoints),
           (binIndex, avgScore, avgConvRate, counts, squaredError)) =>
             score(binIndex) = avgScore
@@ -113,7 +107,7 @@ private[op] class OpBinScoreEvaluator
       // binCenters is the center point in each bin.
       // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
       val diff = maxScore - minScore
-      val binCenters = for {i <- 0 until numBins} yield minScore + ((diff * i) / numBins) + (diff / (2 * numBins))
+      val binCenters = for {i <- 0 until numOfBins} yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
 
       val metrics = BinaryClassificationBinMetrics(
         brierScore = brierScoreSum / numberOfPoints,
@@ -130,8 +124,8 @@ private[op] class OpBinScoreEvaluator
 
   // getBinIndex finds which bin the score associates with.
   private def getBinIndex(score: Double, minScore: Double, maxScore: Double): Int = {
-    val binIndex = (numBins * (score - minScore) / (maxScore - minScore)).toInt
-    math.min(numBins - 1, binIndex)
+    val binIndex = numOfBins * (score - minScore) / (maxScore - minScore)
+    math.min(numOfBins - 1, binIndex.toInt)
   }
 }
 
