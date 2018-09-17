@@ -70,19 +70,20 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
   )
 
   Spec[OpBinScoreEvaluator] should "return the bin metrics" in {
-    val metrics = new OpBinScoreEvaluator(numBins = 4)
-          .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
+    val metrics = new OpBinScoreEvaluator(numOfBins = 4)
+      .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
 
     metrics shouldBe BinaryClassificationBinMetrics(
       0.09800605366,
       Seq(0.125, 0.375, 0.625, 0.875),
       Seq(2, 0, 1, 2),
       Seq(0.003205, 0.0, 0.7, 0.99999),
-      Seq(0.0, 0.0, 0.0, 1.0))
+      Seq(0.0, 0.0, 0.0, 1.0)
+    )
   }
 
   it should "evaluate bin metrics for scores not between 0 and 1" in {
-    val metrics = new OpBinScoreEvaluator(numBins = 4)
+    val metrics = new OpBinScoreEvaluator(numOfBins = 4)
       .setLabelCol(outOfBoundScorelabel.name).setPredictionCol(outOfBoundScoreprediction.name)
       .evaluateAll(outOfBoundScoreDataset)
 
@@ -91,25 +92,26 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
       Seq(0.62500875, 3.87500625, 7.125003749999999, 10.37500125),
       Seq(2, 0, 0, 1),
       Seq(0.49999999999999994, 0.0, 0.0, 12.0),
-      Seq(0.5, 0.0, 0.0, 1.0))
+      Seq(0.5, 0.0, 0.0, 1.0)
+    )
   }
 
   it should "error on invalid number of bins" in {
     assertThrows[IllegalArgumentException] {
-      new OpBinScoreEvaluator(numBins = 0)
+      new OpBinScoreEvaluator(numOfBins = 0)
         .setLabelCol(label.name).setPredictionCol(prediction.name).evaluateAll(dataset)
     }
   }
 
   it should "evaluate the empty data" in {
-    val metrics = new OpBinScoreEvaluator(numBins = 10)
+    val metrics = new OpBinScoreEvaluator(numOfBins = 10)
       .setLabelCol(labelEmptyData.name).setPredictionCol(predictionEmptyData.name).evaluateAll(emptyData)
 
     metrics shouldBe BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
   }
 
   it should "evaluate bin metrics for skewed data" in {
-    val metrics = new OpBinScoreEvaluator(numBins = 5)
+    val metrics = new OpBinScoreEvaluator(numOfBins = 5)
       .setLabelCol(labelSkewedData.name).setPredictionCol(predictionSkewedData.name).evaluateAll(dataSkewed)
 
     metrics shouldBe BinaryClassificationBinMetrics(
@@ -117,13 +119,15 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
       Seq(0.1, 0.30000000000000004, 0.5, 0.7, 0.9),
       Seq(0, 0, 0, 0, 4),
       Seq(0.0, 0.0, 0.0, 0.0, 0.98617),
-      Seq(0.0, 0.0, 0.0, 0.0, 1.0))
+      Seq(0.0, 0.0, 0.0, 0.0, 1.0)
+    )
   }
 
   it should "evaluate the default metric as BrierScore" in {
-    val evaluator = new OpBinScoreEvaluator(numBins = 4)
+    val evaluator = new OpBinScoreEvaluator(numOfBins = 4)
       .setLabelCol(label.name).setPredictionCol(prediction.name)
 
     evaluator.getDefaultMetric(evaluator.evaluateAll(dataset)) shouldBe 0.09800605366
+    evaluator.evaluate(dataset) shouldBe 0.09800605366
   }
 }
