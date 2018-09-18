@@ -29,4 +29,7 @@ dependencies {
     compile "joda-time:joda-time:$jodaTimeVersion"
     compile "org.joda:joda-convert:$jodaConvertVersion"
 
+    // Breeze
+    compile 'org.scalanlp:breeze_2.11:0.13.2'
+
 }

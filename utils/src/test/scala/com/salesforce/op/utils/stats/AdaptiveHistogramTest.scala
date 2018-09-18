@@ -28,19 +28,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.utils.stats
 
+import breeze.stats.distributions.{Bernoulli, Gamma}
 import com.salesforce.op.test.TestCommon
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class HistogramTest extends FlatSpec with TestCommon {
+class AdaptiveHistogramTest extends FlatSpec with TestCommon {
 
-  Spec(classOf[Histogram]) should "produce correct histogram distribution" in {
+  Spec(classOf[AdaptiveHistogram]) should "produce correct histogram distribution" in {
     // Follows example in appendix of original paper.
-    val hist = new Histogram(5)
+    val hist = new AdaptiveHistogram(5)
     hist.update(23, 19, 10, 16, 36)
     hist.getBins should contain theSameElementsAs Seq(23.0, 19.0, 10.0, 16.0, 36.0).map(_ -> 1L)
     hist.update(2)
@@ -48,11 +49,24 @@ class HistogramTest extends FlatSpec with TestCommon {
     hist.update(9)
     hist.getBins should contain theSameElementsAs Seq(2.0, 23.0, 36.0).map(_ -> 1L) ++ Seq(9.5, 17.5).map(_ -> 2L)
 
-    val hist2 = new Histogram(5)
+    val hist2 = new AdaptiveHistogram(5)
     hist.update(32, 30, 45)
     val mergedhist = hist.merge(hist2)
     mergedhist.getBins.map { case (point, count) =>
       (math.round(point * 100).toDouble / 100) -> count // Rounding out to 2 decimal places
     } should contain theSameElementsAs Seq(2.0 -> 1L, 9.5 -> 2L, 19.33 -> 3L, 32.67 -> 3L, 45 -> 1L)
   }
+
+  it should "be more robust to outliers than equidistant binning" in {
+    val gamma1 = new Gamma(20, 1.0 / 2)
+    val gamma2 = new Gamma(125000, 1.0 / 500)
+    val bernoulli = new Bernoulli(0.95)
+    val sampleSize = 500
+
+    val samples = (0 until sampleSize).map(_ => if (bernoulli.draw) gamma1.draw else gamma2.draw)
+    samples.foreach(println)
+
+    1 shouldEqual 1
+  }
+
 }

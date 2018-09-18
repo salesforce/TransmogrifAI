@@ -28,7 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters
+package com.salesforce.op.utils.stats
 
 import java.util.TreeMap
 
@@ -42,10 +42,10 @@ import scala.collection.JavaConverters._
  *
  * @param maxBins maximum number of allowed bins in histogram
  */
-class Histogram(val maxBins: Int) {
+class AdaptiveHistogram(val maxBins: Int) {
 
   protected[this] val points: TreeMap[Double, Long] =
-    HistogramUtils.getTreeMap.asInstanceOf[TreeMap[Double, Long]]
+    AdaptiveHistogramUtils.getTreeMap.asInstanceOf[TreeMap[Double, Long]]
 
   /**
    * @return histogram bins
@@ -58,7 +58,7 @@ class Histogram(val maxBins: Int) {
    * @param dist input value
    * @return merged distribution
    */
-  final def merge(dist: Histogram): this.type = {
+  final def merge(dist: AdaptiveHistogram): this.type = {
     updatePoints(dist.getBins.toSeq: _*)
 
     this

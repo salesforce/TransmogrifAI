@@ -28,19 +28,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.filters;
+package com.salesforce.op.utils.stats;
 
 import java.io.Serializable;
 import java.util.Comparator;
 import java.util.TreeMap;
 import java.util.function.Function;
 
-final public class HistogramUtils {
+final public class AdaptiveHistogramUtils {
     final public static TreeMap<Double, Long> getTreeMap() {
         return new TreeMap<Double, Long>(getComparator());
     }
 
     final private static Comparator<Double> getComparator() {
-        return Comparator.comparing((Function<Double, Double>&Serializable)Double::valueOf);
+        return Comparator.comparing((Function<Double, Double> & Serializable) Double::valueOf);
     }
 }
