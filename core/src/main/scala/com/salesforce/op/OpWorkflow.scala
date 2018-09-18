@@ -547,7 +547,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         correlationType = correlationType,
         protectedFeatures = protectedRawFeatures,
         jsDivergenceProtectedFeatures = protectedRawJSFeatures,
-        textBinsFormula = textBinsFormula)
+        textBinsFormula = textBinsFormula,
+        timePeriod = timePeriod)
     }
     this
   }
