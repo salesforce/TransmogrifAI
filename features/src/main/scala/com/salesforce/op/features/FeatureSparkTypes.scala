@@ -200,7 +200,13 @@ case object FeatureSparkTypes {
   def featureTypeTagOf(sparkType: DataType, isNullable: Boolean): WeakTypeTag[_ <: FeatureType] = sparkType match {
     case DoubleType if !isNullable => weakTypeTag[types.RealNN]
     case DoubleType => weakTypeTag[types.Real]
+    case FloatType if !isNullable => weakTypeTag[types.RealNN]
+    case FloatType => weakTypeTag[types.Real]
     case LongType => weakTypeTag[types.Integral]
+    case IntegerType => weakTypeTag[types.Integral]
+    case ShortType => weakTypeTag[types.Integral]
+    case DateType => weakTypeTag[types.Date]
+    case TimestampType => weakTypeTag[types.DateTime]
     case ArrayType(StringType, _) => weakTypeTag[types.TextList]
     case StringType => weakTypeTag[types.Text]
     case BooleanType => weakTypeTag[types.Binary]

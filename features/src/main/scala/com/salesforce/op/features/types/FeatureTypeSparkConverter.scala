@@ -147,13 +147,35 @@ case object FeatureTypeSparkConverter {
 
       // Numerics
       case wt if wt <:< weakTypeOf[t.RealNN] => (value: Any) =>
-        if (value == null) None else Some(value.asInstanceOf[Double])
+        value match {
+          case null => None
+          case _: Float => Some(value.asInstanceOf[Float].toDouble)
+          case _: Double => Some(value.asInstanceOf[Double])
+          case _ => throw new IllegalArgumentException(s"RealNN type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Real] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Real.value else Some(value.asInstanceOf[Double])
+        value match {
+          case null => FeatureTypeDefaults.Real.value
+          case _: Float => Some(value.asInstanceOf[Float].toDouble)
+          case _: Double => Some(value.asInstanceOf[Double])
+          case _ => throw new IllegalArgumentException(s"Real type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Integral.value else Some(value.asInstanceOf[Long])
+        value match {
+          case null => FeatureTypeDefaults.Integral.value
+          case _: Short => Some(value.asInstanceOf[Short].toLong)
+          case _: Int => Some(value.asInstanceOf[Int].toLong)
+          case _: Long => Some(value.asInstanceOf[Long])
+          case _ => throw new IllegalArgumentException(s"Integral type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Binary] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Binary.value else Some(value.asInstanceOf[Boolean])
+
+      // Date & Time
+      case wt if wt <:< weakTypeOf[t.Date] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.Date.value else Some(value.asInstanceOf[Int].toLong)
+      case wt if wt <:< weakTypeOf[t.DateTime] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.DateTime.value else Some(value.asInstanceOf[Long])
 
       // Maps
       case wt if wt <:< weakTypeOf[t.MultiPickListMap] => (value: Any) =>
