@@ -200,11 +200,7 @@ case object FeatureSparkTypes {
   def featureTypeTagOf(sparkType: DataType, isNullable: Boolean): WeakTypeTag[_ <: FeatureType] = sparkType match {
     case DoubleType if !isNullable => weakTypeTag[types.RealNN]
     case DoubleType => weakTypeTag[types.Real]
-    case FloatType if !isNullable => weakTypeTag[types.RealNN]
-    case FloatType => weakTypeTag[types.Real]
     case LongType => weakTypeTag[types.Integral]
-    case IntegerType => weakTypeTag[types.Integral]
-    case ShortType => weakTypeTag[types.Integral]
     case DateType => weakTypeTag[types.Date]
     case TimestampType => weakTypeTag[types.DateTime]
     case ArrayType(StringType, _) => weakTypeTag[types.TextList]
@@ -219,6 +215,16 @@ case object FeatureSparkTypes {
     case MapType(StringType, ArrayType(StringType, _), _) => weakTypeTag[types.MultiPickListMap]
     case MapType(StringType, ArrayType(DoubleType, _), _) => weakTypeTag[types.GeolocationMap]
     case VectorType => weakTypeTag[types.OPVector]
+    case BinaryType =>
+      throw new IllegalArgumentException("Spark BinaryType is currently not supported.")
+    case ByteType =>
+      throw new IllegalArgumentException("Spark ByteType is currently not supported.")
+    case ShortType =>
+      throw new IllegalArgumentException("Spark ShortType is currently not supported. Please use LongType instead.")
+    case IntegerType =>
+      throw new IllegalArgumentException("Spark IntegerType is currently not supported. Please use LongType instead.")
+    case FloatType =>
+      throw new IllegalArgumentException("Spark FloatType is currently not supported. Please use DoubleType instead.")
     case _ => throw new IllegalArgumentException(s"No feature type tag mapping for Spark type $sparkType")
   }
 
