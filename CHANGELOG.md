@@ -24,6 +24,7 @@ New features and bug fixes:
 - Fix fill geo location vectorizer values [#132](https://github.com/salesforce/TransmogrifAI/pull/132)
 - Adding feature importance for new model types [#128](https://github.com/salesforce/TransmogrifAI/pull/128)
 - Adding binaryclassification bin score evaluator [#119](https://github.com/salesforce/TransmogrifAI/pull/119)
+- Apply DateToUnitCircleTransformer logic in raw feature filter transformations [130#](https://github.com/salesforce/TransmogrifAI/pull/130)
 
 Breaking changes:
 - Made case class to deal with model selector metadata [#39](https://github.com/salesforce/TransmogrifAI/pull/39)
