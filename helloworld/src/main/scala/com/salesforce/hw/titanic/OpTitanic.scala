@@ -86,6 +86,7 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
     .setLabelCol(survived)
     .setPredictionCol(pred)
     .setRawPredictionCol(raw)
+    .setProbabilityCol(prob)
 
   ////////////////////////////////////////////////////////////////////////////////
   // APPLICATION RUNNER DEFINITION
