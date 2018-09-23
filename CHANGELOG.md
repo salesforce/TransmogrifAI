@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.4.0
+
+New features and bug fixes:
+
+- Allow to specify the formula to compute the text features bin size for `RawFeatureFilter` (see `RawFeatureFilter.textBinsFormula` argument) [#99](https://github.com/salesforce/TransmogrifAI/pull/99)
+- Fixed metadata on `Geolocation` and `GeolocationMap` so that keep the name of the column in descriptorValue. [#100](https://github.com/salesforce/TransmogrifAI/pull/100)
+- Local scoring (aka Sparkless) using Aardpfark. This enables loading and scoring models without Spark context but locally using Aardpfark (PFA for Spark) and Hadrian libraries instead. This allows orders of magnitude faster scoring times compared to Spark. [#41](https://github.com/salesforce/TransmogrifAI/pull/41)
+- Add distributions calculated in `RawFeatureFilter` to `ModelInsights` [#103](https://github.com/salesforce/TransmogrifAI/pull/103)
+- Added binary sequence transformer & estimator: `BinarySequenceTransformer` and `BinarySequenceEstimator` + plus the associated base traits [#84](https://github.com/salesforce/TransmogrifAI/pull/84)
+- Added `StringIndexerHandleInvalid.Keep` option into `OpStringIndexer` (same as in underlying Spark estimator) [#93](https://github.com/salesforce/TransmogrifAI/pull/93)
+- Allow numbers and underscores in feature names [#92](https://github.com/salesforce/TransmogrifAI/pull/92)
+- Stable key order for map vectorizers [#88](https://github.com/salesforce/TransmogrifAI/pull/88)
+- Keep raw feature distributions calculated in raw feature filter [#76](https://github.com/salesforce/TransmogrifAI/pull/76)
+- Transmogrify to use smart text vectorizer for text types: `Text`, `TextArea`, `TextMap` and `TextAreaMap` [#63](https://github.com/salesforce/TransmogrifAI/pull/63)
+- Transmogrify circular date representations for date feature types: `Date`, `DateTime`, `DateMap` and `DateTimeMap` [#100](https://github.com/salesforce/TransmogrifAI/pull/100)
+- Improved test coverage for utils and other modules [#50](https://github.com/salesforce/TransmogrifAI/pull/50), [#53](https://github.com/salesforce/TransmogrifAI/pull/53), [#67](https://github.com/salesforce/TransmogrifAI/pull/67), [#69](https://github.com/salesforce/TransmogrifAI/pull/69), [#70](https://github.com/salesforce/TransmogrifAI/pull/70), [#71](https://github.com/salesforce/TransmogrifAI/pull/71), [#72](https://github.com/salesforce/TransmogrifAI/pull/72), [#73](https://github.com/salesforce/TransmogrifAI/pull/73)
+- Match feature type map hierarchy with regular feature types [#49](https://github.com/salesforce/TransmogrifAI/pull/49)
+- Redundant and deadlock-prone end listener removal [#52](https://github.com/salesforce/TransmogrifAI/pull/52)
+- OS-neutral filesystem path creation [#51](https://github.com/salesforce/TransmogrifAI/pull/51)
+- Make Feature class public instead hide it's ctor [#45](https://github.com/salesforce/TransmogrifAI/pull/45)
+- Specify categorical variables in metadata [#120](https://github.com/salesforce/TransmogrifAI/pull/120)
+- Fix fill geo location vectorizer values [#132](https://github.com/salesforce/TransmogrifAI/pull/132)
+- Adding feature importance for new model types [#128](https://github.com/salesforce/TransmogrifAI/pull/128)
+- Adding binaryclassification bin score evaluator [#119](https://github.com/salesforce/TransmogrifAI/pull/119)
+- Apply DateToUnitCircleTransformer logic in raw feature filter transformations [130#](https://github.com/salesforce/TransmogrifAI/pull/130)
+
+Breaking changes:
+- Made case class to deal with model selector metadata [#39](https://github.com/salesforce/TransmogrifAI/pull/39)
+- Made `FileOutputCommiter` a default and got rid of `DirectMapreduceOutputCommitter` and `DirectOutputCommitter` [#86](https://github.com/salesforce/TransmogrifAI/pull/86)
+- Refactored `OpVectorColumnMetadata` to allow numeric column descriptors [#89](https://github.com/salesforce/TransmogrifAI/pull/89)
+- Renaming `JaccardDistance` to `JaccardSimilarity` [#80](https://github.com/salesforce/TransmogrifAI/pull/80)
+- New model selector interface [#55](https://github.com/salesforce/TransmogrifAI/pull/55). The breaking changes are related to return type and the way the parameters are passed into model selectors. Starting this version model selectors would return a single result feature of type `Prediction` (instead of a variable number of feature - `(pred, raw, prob)`). Example:
+```scala
+val (pred, raw, prob) = MultiClassificationModelSelector() // won't compile anymore
+val prediction = MultiClassificationModelSelector() // ok!
+```
+Another change is the way parameters are passed into model selectors. Example:
+```scala
+BinaryClassificationModelSelector
+  .withCrossValidation()
+  .setLogisticRegressionRegParam(0.05, 0.1) // won't compile anymore
+```
+Instead one should do:
+```scala
+val lr = new OpLogisticRegression()
+val models = Seq(lr -> new ParamGridBuilder().addGrid(lr.regParam, Array(0.05, 0.1)).build())
+BinaryClassificationModelSelector
+  .withCrossValidation(modelsAndParameters = models)
+```
+For more example on how to use new model selectors please refer to our documentation and helloworld examples.
+
+
+Dependency upgrades & misc:
+- CI/CD runtime improvements for CircleCI and TravisCI
+- Updated Gradle to 4.10
+- Updated `scala-graph` to `1.12.5`
+- Updated `scalafmt` to `1.5.1`
+- New `transmogrifai-local` subproject [#41](https://github.com/salesforce/TransmogrifAI/pull/41) introduces `aardpfark` and `hadrian` dependencies.
+
+
 ## 0.3.4
 Performance improvements:
 - Added featureLabelCorrOnly parameter in SanityChecker to only compute correlations between features and label (defaults to false)
@@ -17,7 +77,7 @@ New features and bug fixes:
 - Pretty print model summaries
 - Ensure OP Models are portable across environments
 - Ignore _ in simple streaming avro file reader
-- Updated evaluators so they can work with either Prediction type feature or three input featues 
+- Updated evaluators so they can work with either Prediction type feature or three input features 
 - Added Algebird kryo registrar
 - Make Sure that SmartTextVectorizerModel can be serialized to/from json
 
