@@ -39,7 +39,7 @@ To train your project, run
 
 ```
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic /* << README_MAIN_CLASS */ \
--Dargs="--run-type=train --model-location /tmp/titanic-model /* << README_MODEL_LOCATION */ \
+-Dargs="--run-type=train --model-location /tmp/titanic-model /* << README_MODEL_LOCATION */ \\
 --read-location Passenger=\$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv /* << README_READ_LOCATION */"
 ```
 
@@ -48,8 +48,8 @@ To score your project, run
 
 ```
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic /* << README_MAIN_CLASS */ \
--Dargs="--run-type=score --model-location /tmp/titanic-model /* << README_MODEL_LOCATION */ \
---read-location Passenger=\$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv /* << README_READ_LOCATION */
+-Dargs="--run-type=score --model-location /tmp/titanic-model /* << README_MODEL_LOCATION */ \\
+--read-location Passenger=\$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv /* << README_READ_LOCATION */ \\
 --write-location /tmp/titanic-scores /* << README_SCORE_LOCATION */"
 ```
 
@@ -60,9 +60,9 @@ To evaluate your project, run
 
 ```
 ./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic /* << README_MAIN_CLASS */ \
--Dargs="--run-type=evaluate --model-location /tmp/titanic-mode /* << README_MODEL_LOCATION */
- --read-location Passenger=\$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv /* << README_READ_LOCATION */
- --write-location /tmp/titanic-eval /* << README_EVAL_LOCATION */
+-Dargs="--run-type=evaluate --model-location /tmp/titanic-mode /* << README_MODEL_LOCATION */ \\
+ --read-location Passenger=\$ophw/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv /* << README_READ_LOCATION */ \\
+ --write-location /tmp/titanic-eval /* << README_EVAL_LOCATION */ \\
  --metrics-location /tmp/titanic-metrics /* << README_METRICS_LOCATION */"
 ```
 
