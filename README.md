@@ -1,6 +1,6 @@
 # TransmogrifAI
 
- [ ![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg?version=0.3.4) ](https://bintray.com/salesforce/maven/TransmogrifAI/0.3.4/link) [![Javadocs](https://www.javadoc.io/badge/com.salesforce.transmogrifai/transmogrifai-core_2.11.svg?color=blue)](https://www.javadoc.io/doc/com.salesforce.transmogrifai/transmogrifai-core_2.11) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE) [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+ [![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg)](https://bintray.com/salesforce/maven/TransmogrifAI/_latestVersion) [![Javadocs](https://www.javadoc.io/badge/com.salesforce.transmogrifai/transmogrifai-core_2.11/0.4.0.svg?color=blue)](https://www.javadoc.io/doc/com.salesforce.transmogrifai/transmogrifai-core_2.11/0.4.0) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE) [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 
 [![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg)](https://codecov.io/gh/salesforce/TransmogrifAI) [![CodeFactor](https://www.codefactor.io/repository/github/salesforce/transmogrifai/badge)](https://www.codefactor.io/repository/github/salesforce/transmogrifai)
@@ -124,15 +124,15 @@ You can simply add TransmogrifAI as a regular dependency to an existing project.
 For Gradle in `build.gradle` add:
 ```gradle
 repositories {
+    jcenter()
     mavenCentral()
-    maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
 dependencies {
     // TransmogrifAI core dependency
-    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.3.4'
+    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.4.0'
 
     // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.3.4'
+    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.4.0'
 }
 ```
 
@@ -140,13 +140,13 @@ For SBT in `build.sbt` add:
 ```sbt
 scalaVersion := "2.11.12"
 
-resolvers += Resolver.bintrayRepo("salesforce", "maven")
+resolvers += Resolver.jcenterRepo
 
 // TransmogrifAI core dependency
-libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.3.4"
+libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.4.0"
 
 // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-// libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.3.4"
+// libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.4.0"
 ```
 
 Then import TransmogrifAI into your code:
