@@ -11,8 +11,8 @@ buildscript {
 }
 
 repositories {
+    jcenter()
     mavenCentral()
-    maven { url 'https://dl.bintray.com/salesforce/maven' }
 }
 
 apply plugin: 'application'

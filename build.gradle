@@ -284,6 +284,9 @@ configure(subProjs) {
 
     jar.baseName = "$rootProject.name-$project.name"
 
+    // ignore link warning in scaladoc
+    scaladoc.scalaDocOptions.additionalParameters = ['-no-link-warnings']
+
     task scaladocJar(type: Jar, dependsOn: scaladoc) {
         classifier = 'javadoc'
         from scaladoc.destinationDir
