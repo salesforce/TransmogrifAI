@@ -2,8 +2,7 @@ version: 2
 
 jobs:
   scala_style_check:
-    docker:
-      - image: circleci/openjdk:8-jdk
+    machine: true
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -11,11 +10,16 @@ jobs:
     steps:
       - checkout
       - run:
+          name: Update Java to OpenJDK
+          command: |
+            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
+      - run:
           name: Scala style check
           command: ./gradlew -v && ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
-    docker:
-      - image: circleci/openjdk:8-jdk
+    machine: true
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -26,6 +30,12 @@ jobs:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
+          name: Update Java to OpenJDK
+          command: |
+            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
+      - run:
           name: Clone repo & compile project
           command: ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - save_cache:
@@ -34,8 +44,7 @@ jobs:
             - ~/.gradle
             - ~/.m2
   build:
-    docker:
-      - image: circleci/openjdk:8-jdk
+    machine: true
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -46,6 +55,12 @@ jobs:
       - restore_cache:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - run:
+          name: Update Java to OpenJDK
+          command: |
+            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
       - run:
           name: Build project
           command: |
