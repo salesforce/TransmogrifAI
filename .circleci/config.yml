@@ -3,6 +3,12 @@ version: 2
 jobs:
   scala_style_check:
     machine: true
+    dependencies:
+      pre:
+        - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+        - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+        - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
+        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -14,6 +20,12 @@ jobs:
           command: ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
     machine: true
+    dependencies:
+      pre:
+        - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+        - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+        - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
+        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -24,9 +36,6 @@ jobs:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
-          name: Java version
-          command: java -version
-      - run:
           name: Clone repo & compile project
           command: ./gradlew --parallel testScoverageClasses
       - save_cache:
@@ -36,6 +45,12 @@ jobs:
             - ~/.m2
   build:
     machine: true
+    dependencies:
+      pre:
+        - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+        - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+        - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
+        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
