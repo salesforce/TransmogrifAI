@@ -12,7 +12,6 @@ jobs:
       - run:
           name: Update Java to OpenJDK
           command: |
-            java -version
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
             export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -34,7 +33,6 @@ jobs:
       - run:
           name: Update Java to OpenJDK
           command: |
-            java -version 
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
             export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
@@ -75,7 +73,7 @@ jobs:
             TEST_FILES=$(echo "$TEST_FILES" | circleci tests split --split-by=timings --timings-type=classname --index=$CIRCLE_NODE_INDEX | tr ' ' '\n' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g')
             echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
             export TEST_FILES=$(echo "$TEST_FILES" | sed 's/\\n$//' )
-            ./gradlew -v && ./gradlew reportScoverage
+            java -version && ./gradlew -v && ./gradlew reportScoverage
       - run:
           name: Collect test results
           command: |
