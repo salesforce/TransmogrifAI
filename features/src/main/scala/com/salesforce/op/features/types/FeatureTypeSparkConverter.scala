@@ -149,15 +149,37 @@ case object FeatureTypeSparkConverter {
       case wt if wt <:< weakTypeOf[t.DateTime] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.DateTime.value else Some(value.asInstanceOf[Long])
       case wt if wt <:< weakTypeOf[t.Date] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Date.value else Some(value.asInstanceOf[Long])
+        value match {
+          case null => FeatureTypeDefaults.Date.value
+          case v: Int => Some(v.toLong)
+          case v: Long => Some(v)
+          case _ => throw new IllegalArgumentException(s"Date type mapping is not defined for ${value.getClass}")
+        }
 
       // Numerals
       case wt if wt <:< weakTypeOf[t.RealNN] => (value: Any) =>
-        if (value == null) None else Some(value.asInstanceOf[Double])
+        value match {
+          case null => None
+          case v: Float => Some(v.toDouble)
+          case v: Double => Some(v)
+          case _ => throw new IllegalArgumentException(s"RealNN type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Real] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Real.value else Some(value.asInstanceOf[Double])
+        value match {
+          case null => FeatureTypeDefaults.Real.value
+          case v: Float => Some(v.toDouble)
+          case v: Double => Some(v)
+          case _ => throw new IllegalArgumentException(s"Real type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.Integral.value else Some(value.asInstanceOf[Long])
+        value match {
+          case null => FeatureTypeDefaults.Integral.value
+          case v: Byte => Some(v.toLong)
+          case v: Short => Some(v.toLong)
+          case v: Int => Some(v.toLong)
+          case v: Long => Some(v)
+          case _ => throw new IllegalArgumentException(s"Integral type mapping is not defined for ${value.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Binary] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Binary.value else Some(value.asInstanceOf[Boolean])
 
