@@ -30,70 +30,84 @@
 
 package com.salesforce.op.features
 
+import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.sql.types._
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 
 import scala.reflect.runtime.universe._
 
 @RunWith(classOf[JUnitRunner])
 class FeatureSparkTypeTest extends FlatSpec with TestSparkContext {
-  val sparkTypeToTypeTagMappings = Seq(
-    (DoubleType, weakTypeTag[types.RealNN]), (FloatType, weakTypeTag[types.RealNN]),
-    (LongType, weakTypeTag[types.Integral]), (IntegerType, weakTypeTag[types.Integral]),
-    (ShortType, weakTypeTag[types.Integral]), (ByteType, weakTypeTag[types.Integral]),
-    (DateType, weakTypeTag[types.Date]), (TimestampType, weakTypeTag[types.DateTime]),
-    (StringType, weakTypeTag[types.Text]), (BooleanType, weakTypeTag[types.Binary]),
-    (VectorType, weakTypeTag[types.OPVector])
+  val primitiveTypes = Seq(
+    (DoubleType, weakTypeTag[types.Real], DoubleType),
+    (FloatType, weakTypeTag[types.Real], DoubleType),
+    (LongType, weakTypeTag[types.Integral], LongType),
+    (IntegerType, weakTypeTag[types.Integral], LongType),
+    (ShortType, weakTypeTag[types.Integral], LongType),
+    (ByteType, weakTypeTag[types.Integral], LongType),
+    (DateType, weakTypeTag[types.Date], LongType),
+    (TimestampType, weakTypeTag[types.DateTime], LongType),
+    (StringType, weakTypeTag[types.Text], StringType),
+    (BooleanType, weakTypeTag[types.Binary], BooleanType),
+    (VectorType, weakTypeTag[types.OPVector], VectorType)
   )
 
-  val sparkCollectionTypeToTypeTagMappings = Seq(
-    (ArrayType(LongType, containsNull = true), weakTypeTag[types.DateList]),
-    (ArrayType(DoubleType, containsNull = true), weakTypeTag[types.Geolocation]),
-    (MapType(StringType, StringType, valueContainsNull = true), weakTypeTag[types.TextMap]),
-    (MapType(StringType, DoubleType, valueContainsNull = true), weakTypeTag[types.RealMap]),
-    (MapType(StringType, LongType, valueContainsNull = true), weakTypeTag[types.IntegralMap]),
-    (MapType(StringType, BooleanType, valueContainsNull = true), weakTypeTag[types.BinaryMap]),
-    (MapType(StringType, ArrayType(StringType, containsNull = true), valueContainsNull = true),
-      weakTypeTag[types.MultiPickListMap]),
-    (MapType(StringType, ArrayType(DoubleType, containsNull = true), valueContainsNull = true),
-      weakTypeTag[types.GeolocationMap])
+  val nonNullable = Seq(
+    (DoubleType, weakTypeTag[types.RealNN], DoubleType),
+    (FloatType, weakTypeTag[types.RealNN], DoubleType)
   )
 
-  val sparkNonNullableTypeToTypeTagMappings = Seq(
-    (DoubleType, weakTypeTag[types.Real]), (FloatType, weakTypeTag[types.Real])
+  private def mapType(v: DataType) = MapType(StringType, v, valueContainsNull = true)
+  private def arrType(v: DataType) = ArrayType(v, containsNull = true)
+
+  val collectionTypes = Seq(
+    (arrType(LongType), weakTypeTag[types.DateList], arrType(LongType)),
+    (arrType(DoubleType), weakTypeTag[types.Geolocation], arrType(DoubleType)),
+    (arrType(StringType), weakTypeTag[types.TextList], arrType(StringType)),
+    (mapType(StringType), weakTypeTag[types.TextMap], mapType(StringType)),
+    (mapType(DoubleType), weakTypeTag[types.RealMap], mapType(DoubleType)),
+    (mapType(LongType), weakTypeTag[types.IntegralMap], mapType(LongType)),
+    (mapType(BooleanType), weakTypeTag[types.BinaryMap], mapType(BooleanType)),
+    (mapType(arrType(StringType)), weakTypeTag[types.MultiPickListMap], mapType(arrType(StringType))),
+    (mapType(arrType(DoubleType)), weakTypeTag[types.GeolocationMap], mapType(arrType(DoubleType)))
   )
 
-  Spec(FeatureSparkTypes.getClass) should "assign appropriate feature type tags for valid types" in {
-    sparkTypeToTypeTagMappings.foreach(mapping =>
-      FeatureSparkTypes.featureTypeTagOf(mapping._1, isNullable = false) shouldBe mapping._2
-    )
+  Spec(FeatureSparkTypes.getClass) should "assign appropriate feature type tags for valid types and versa" in {
+    primitiveTypes.map(scala.Function.tupled(assertTypes()))
   }
 
-  it should "assign appropriate feature type tags for valid non-nullable types" in {
-    sparkNonNullableTypeToTypeTagMappings.foreach(mapping =>
-      FeatureSparkTypes.featureTypeTagOf(mapping._1, isNullable = true) shouldBe mapping._2
-    )
+  it should "assign appropriate feature type tags for valid non-nullable types and versa" in {
+    nonNullable.map(scala.Function.tupled(assertTypes(isNullable = false)))
   }
 
-  it should "assign appropriate feature type tags for collection types" in {
-    sparkCollectionTypeToTypeTagMappings.foreach(mapping =>
-      FeatureSparkTypes.featureTypeTagOf(mapping._1, isNullable = true) shouldBe mapping._2
-    )
+  it should "assign appropriate feature type tags for collection types and versa" in {
+    collectionTypes.map(scala.Function.tupled(assertTypes()))
   }
 
-  it should "throw error for unsupported types" in {
+  it should "error for unsupported types" in {
     val error = intercept[IllegalArgumentException](FeatureSparkTypes.featureTypeTagOf(BinaryType, isNullable = false))
     error.getMessage shouldBe "Spark BinaryType is currently not supported."
   }
 
-  it should "throw error for unknown types" in {
+  it should "error for unknown types" in {
     val unknownType = NullType
     val error = intercept[IllegalArgumentException](FeatureSparkTypes.featureTypeTagOf(unknownType, isNullable = false))
     error.getMessage shouldBe s"No feature type tag mapping for Spark type $unknownType"
+  }
+
+  def assertTypes(
+    isNullable: Boolean = true
+  )(
+    sparkType: DataType,
+    featureType: WeakTypeTag[_ <: FeatureType],
+    expectedSparkType: DataType
+  ): Assertion = {
+    FeatureSparkTypes.featureTypeTagOf(sparkType, isNullable) shouldBe featureType
+    FeatureSparkTypes.sparkTypeOf(featureType) shouldBe expectedSparkType
   }
 
 }
