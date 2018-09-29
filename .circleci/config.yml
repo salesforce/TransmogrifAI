@@ -8,7 +8,6 @@ jobs:
         - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
         - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
         - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
-        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -17,7 +16,7 @@ jobs:
       - checkout
       - run:
           name: Scala style check
-          command: ./gradlew --parallel scalaStyle
+          command: ./gradlew -v && ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
     machine: true
     dependencies:
@@ -25,7 +24,6 @@ jobs:
         - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
         - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
         - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
-        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -37,7 +35,7 @@ jobs:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       - run:
           name: Clone repo & compile project
-          command: ./gradlew --parallel testScoverageClasses
+          command: ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
@@ -50,7 +48,6 @@ jobs:
         - sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
         - sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
         - echo 'export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64' >> ~/.circlerc
-        - java -version
     working_directory: ~/repo
     environment:
       TERM: dumb
@@ -70,7 +67,7 @@ jobs:
             TEST_FILES=$(echo "$TEST_FILES" | circleci tests split --split-by=timings --timings-type=classname --index=$CIRCLE_NODE_INDEX | tr ' ' '\n' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g')
             echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
             export TEST_FILES=$(echo "$TEST_FILES" | sed 's/\\n$//' )
-            ./gradlew reportScoverage
+            ./gradlew -v && ./gradlew reportScoverage
       - run:
           name: Collect test results
           command: |
