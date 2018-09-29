@@ -14,7 +14,8 @@ jobs:
           command: |
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
+            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+            java -version
       - run:
           name: Scala style check
           command: ./gradlew -v && ./gradlew --parallel scalaStyle
@@ -34,7 +35,8 @@ jobs:
           command: |
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
+            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+            java -version
       - run:
           name: Clone repo & compile project
           command: ./gradlew -v && ./gradlew --parallel testScoverageClasses
@@ -60,7 +62,8 @@ jobs:
           command: |
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            echo -e "export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64" >> $BASH_ENV
+            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+            java -version
       - run:
           name: Build project
           command: |
