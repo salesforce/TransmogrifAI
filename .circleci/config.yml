@@ -12,13 +12,14 @@ jobs:
       - run:
           name: Update Java to OpenJDK
           command: |
+            java -version
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
             export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
             java -version
       - run:
           name: Scala style check
-          command: ./gradlew -v && ./gradlew --parallel scalaStyle
+          command: java -version && ./gradlew -v && ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
     machine: true
     working_directory: ~/repo
@@ -33,13 +34,14 @@ jobs:
       - run:
           name: Update Java to OpenJDK
           command: |
+            java -version 
             sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
             sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
             export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
             java -version
       - run:
           name: Clone repo & compile project
-          command: ./gradlew -v && ./gradlew --parallel testScoverageClasses
+          command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - save_cache:
           key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
           paths:
