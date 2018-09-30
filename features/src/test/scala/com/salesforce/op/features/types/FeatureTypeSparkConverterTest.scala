@@ -31,11 +31,14 @@
 package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
+import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
+import scala.collection.mutable.{WrappedArray => MWrappedArray}
+
 
 import scala.concurrent.duration._
 
@@ -52,7 +55,7 @@ class FeatureTypeSparkConverterTest
   )
   val bogusNames = Gen.alphaNumStr
 
-  val naturalNumbers = Gen.chooseNum(100000000L, 100000000L,
+  val naturalNumbers = Gen.chooseNum(-100000000L, 100000000L,
     Byte.MaxValue, Short.MaxValue, Int.MaxValue, Long.MinValue, Long.MaxValue)
 
   val realNumbers = Gen.chooseNum(-100000000.0, 100000000.0,
@@ -61,6 +64,26 @@ class FeatureTypeSparkConverterTest
   val dateTimeValues = Gen.chooseNum(0L, 100000000L)
 
   val booleans = Table("booleans", true, false)
+
+  val featureTypeValues = Table("ft",
+    Real.empty -> null,
+    Text("abc") -> "abc",
+    Real(0.1) -> 0.1,
+    Integral(123) -> 123,
+    Array(1.0, 2.0).toOPVector -> Vectors.dense(Array(1.0, 2.0)),
+    Vectors.sparse(2, Array(0), Array(3.0)).toOPVector -> Vectors.sparse(2, Array(0), Array(3.0)),
+    Seq(1L, 2L, 3L).toDateList -> Array(1L, 2L, 3L),
+    Set("a", "b").toMultiPickList -> Array("a", "b")
+  )
+
+  val featureTypeMapsValues = Table("ftm",
+    TextMap.empty -> null,
+    Map("1" -> 1.0, "2" -> 2.0).toRealMap -> Map("1" -> 1.0, "2" -> 2.0),
+    Map("1" -> 3L, "2" -> 4L).toIntegralMap -> Map("1" -> 3L, "2" -> 4L),
+    Map("1" -> "one", "2" -> "two").toTextMap -> Map("1" -> "one", "2" -> "two"),
+    Map("1" -> Set("a", "b")).toMultiPickListMap -> Map("1" -> MWrappedArray.make(Array("a", "b"))),
+    Map("1" -> Seq(1.0, 5.0, 6.0)).toGeolocationMap -> Map("1" -> MWrappedArray.make(Array(1.0, 5.0, 6.0)))
+  )
 
   property("is a feature type converter") {
     forAll(featureTypeConverters) { ft => ft shouldBe a[FeatureTypeSparkConverter[_]] }
@@ -123,10 +146,12 @@ class FeatureTypeSparkConverterTest
     }
   }
   property("raises error on invalid real numbers") {
-    forAll(naturalNumbers)(rn =>
+    forAll(naturalNumbers) { rn =>
       intercept[IllegalArgumentException](FeatureTypeSparkConverter[Real]().fromSpark(rn))
         .getMessage startsWith "Real type mapping is not defined"
-    )
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[RealNN]().fromSpark(rn))
+        .getMessage startsWith "RealNN type mapping is not defined"
+    }
   }
   property("convert real numbers in Float/Double ranges to RealNN feature type") {
     forAll(realNumbers) { rn =>
@@ -166,6 +191,16 @@ class FeatureTypeSparkConverterTest
     forAll(booleans) { b =>
       FeatureTypeSparkConverter[Binary]().fromSpark(b) shouldBe b.toBinary
       FeatureTypeSparkConverter.toSpark(b.toBinary) shouldEqual b
+    }
+  }
+  property("convert feature type values to spark values") {
+    forAll(featureTypeValues) { case (featureValue, sparkValue) =>
+      FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
+    }
+  }
+  property("convert feature type map values to spark values") {
+    forAll(featureTypeMapsValues) { case (featureValue, sparkValue) =>
+      FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
     }
   }
 }
