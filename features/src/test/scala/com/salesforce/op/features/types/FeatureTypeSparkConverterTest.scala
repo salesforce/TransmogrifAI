@@ -76,7 +76,7 @@ class FeatureTypeSparkConverterTest
     Set("a", "b").toMultiPickList -> Array("a", "b")
   )
 
-  val featureTypeMapsValues = Table("ftm",
+  val featureTypeMapValues = Table("ftm",
     TextMap.empty -> null,
     Map("1" -> 1.0, "2" -> 2.0).toRealMap -> Map("1" -> 1.0, "2" -> 2.0),
     Map("1" -> 3L, "2" -> 4L).toIntegralMap -> Map("1" -> 3L, "2" -> 4L),
@@ -199,7 +199,7 @@ class FeatureTypeSparkConverterTest
     }
   }
   property("convert feature type map values to spark values") {
-    forAll(featureTypeMapsValues) { case (featureValue, sparkValue) =>
+    forAll(featureTypeMapValues) { case (featureValue, sparkValue) =>
       FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
     }
   }
