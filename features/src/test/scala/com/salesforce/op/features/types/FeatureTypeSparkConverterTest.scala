@@ -39,7 +39,6 @@ import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
 import scala.collection.mutable.{WrappedArray => MWrappedArray}
 
-
 import scala.concurrent.duration._
 
 
