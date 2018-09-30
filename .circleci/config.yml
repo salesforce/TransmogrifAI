@@ -1,42 +1,39 @@
 version: 2
 
+machine-config: &machine-config
+  machine: true
+  working_directory: ~/repo
+  environment:
+    TERM: dumb
+    GRADLE_OPTS: -Xmx256m
+
+shared-steps:
+  open-jdk: &open-jdk
+    run:
+      name: Update Java to OpenJDK
+      command: |
+        sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+        sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+        export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+        java -version
+
 jobs:
   scala_style_check:
-    machine: true
-    working_directory: ~/repo
-    environment:
-      TERM: dumb
-      GRADLE_OPTS: -Xmx256m
+    <<: *machine-config
     steps:
       - checkout
-      - run:
-          name: Update Java to OpenJDK
-          command: |
-            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
-            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-            java -version
+      - *open-jdk
       - run:
           name: Scala style check
           command: java -version && ./gradlew -v && ./gradlew --parallel scalaStyle
   clone_repo_and_compile_project:
-    machine: true
-    working_directory: ~/repo
-    environment:
-      TERM: dumb
-      GRADLE_OPTS: -Xmx256m
+    <<: *machine-config
     steps:
       - checkout
+      - *open-jdk
       - restore_cache:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-      - run:
-          name: Update Java to OpenJDK
-          command: |
-            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
-            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-            java -version
       - run:
           name: Clone repo & compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
@@ -46,24 +43,14 @@ jobs:
             - ~/.gradle
             - ~/.m2
   build:
-    machine: true
-    working_directory: ~/repo
-    environment:
-      TERM: dumb
-      GRADLE_OPTS: -Xmx256m
+    <<: *machine-config
     parallelism: 4
     steps:
       - checkout
+      - *open-jdk
       - restore_cache:
           keys:
             - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-      - run:
-          name: Update Java to OpenJDK
-          command: |
-            sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
-            sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
-            export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
-            java -version
       - run:
           name: Build project
           command: |
