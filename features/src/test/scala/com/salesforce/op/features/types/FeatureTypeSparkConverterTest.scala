@@ -34,11 +34,12 @@ import com.salesforce.op.test.TestCommon
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
+import org.scalacheck.Arbitrary._
 import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
-import scala.collection.mutable.{WrappedArray => MWrappedArray}
 
+import scala.collection.mutable.{WrappedArray => MWrappedArray}
 import scala.concurrent.duration._
 
 
@@ -52,15 +53,16 @@ class FeatureTypeSparkConverterTest
   val featureTypeNames: TableFor1[String] = Table("ftnames",
     FeatureTypeSparkConverter.featureTypeSparkConverters.keys.toSeq: _*
   )
-  val bogusNames = Gen.alphaNumStr
+  val strings = Gen.alphaNumStr
 
-  val naturalNumbers = Gen.chooseNum(-100000000L, 100000000L,
-    Byte.MaxValue, Short.MaxValue, Int.MaxValue, Long.MinValue, Long.MaxValue)
+  val naturalNumbers = Gen.oneOf(
+    arbitrary[Long], arbitrary[Int], arbitrary[Short], arbitrary[Byte]
+  ).map(_.asInstanceOf[Number])
 
-  val realNumbers = Gen.chooseNum(-100000000.0, 100000000.0,
-    Float.MaxValue, Double.MinValue, Double.MaxValue)
+  val realNumbers = Gen.oneOf(arbitrary[Float], arbitrary[Double]).map(_.asInstanceOf[Number])
 
-  val dateTimeValues = Gen.chooseNum(0L, 100000000L)
+  val dateValues = Gen.oneOf(Gen.posNum[Int], Gen.posNum[Long]).map(_.asInstanceOf[Number])
+  val dateTimeValues = Gen.posNum[Long]
 
   val booleans = Table("booleans", true, false)
 
@@ -98,7 +100,7 @@ class FeatureTypeSparkConverterTest
     }
   }
   property("error on making a converter on no existent feature type name") {
-    forAll(bogusNames) { bogusName =>
+    forAll(strings) { bogusName =>
       intercept[IllegalArgumentException](
         FeatureTypeSparkConverter.fromFeatureTypeName(bogusName)
       ).getMessage shouldBe s"Unknown feature type '$bogusName'"
@@ -128,8 +130,8 @@ class FeatureTypeSparkConverterTest
   }
   property("converts natural number of Byte/Short/Int/Long ranges to Integral feature type") {
     forAll(naturalNumbers) { nn =>
-      FeatureTypeSparkConverter[Integral]().fromSpark(nn) shouldBe nn.toIntegral
-      FeatureTypeSparkConverter.toSpark(nn.toIntegral) shouldEqual nn
+      FeatureTypeSparkConverter[Integral]().fromSpark(nn) shouldBe nn.longValue().toIntegral
+      FeatureTypeSparkConverter.toSpark(nn.longValue().toIntegral) shouldEqual nn
     }
   }
   property("raises error on invalid natural numbers") {
@@ -140,8 +142,8 @@ class FeatureTypeSparkConverterTest
   }
   property("converts real numbers in Float/Double ranges to Real feature type") {
     forAll(realNumbers) { rn =>
-      FeatureTypeSparkConverter[Real]().fromSpark(rn) shouldBe rn.toReal
-      FeatureTypeSparkConverter.toSpark(rn.toReal) shouldEqual rn
+      FeatureTypeSparkConverter[Real]().fromSpark(rn) shouldBe rn.doubleValue().toReal
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toReal) shouldEqual rn
     }
   }
   property("raises error on invalid real numbers") {
@@ -154,8 +156,8 @@ class FeatureTypeSparkConverterTest
   }
   property("convert real numbers in Float/Double ranges to RealNN feature type") {
     forAll(realNumbers) { rn =>
-      FeatureTypeSparkConverter[RealNN]().fromSpark(rn) shouldBe rn.toRealNN
-      FeatureTypeSparkConverter.toSpark(rn.toRealNN) shouldEqual rn
+      FeatureTypeSparkConverter[RealNN]().fromSpark(rn) shouldBe rn.doubleValue().toRealNN
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toRealNN) shouldEqual rn
     }
   }
   property("error for an empty RealNN value") {
@@ -163,9 +165,9 @@ class FeatureTypeSparkConverterTest
       .getMessage shouldBe "RealNN cannot be empty"
   }
   property("convert date denoted using Int/Long ranges to Date feature type") {
-    forAll(dateTimeValues) { dt =>
-      FeatureTypeSparkConverter[Date]().fromSpark(dt) shouldBe dt.toDate
-      FeatureTypeSparkConverter.toSpark(dt.toDate) shouldEqual dt
+    forAll(dateValues) { dt =>
+      FeatureTypeSparkConverter[Date]().fromSpark(dt) shouldBe dt.longValue().toDate
+      FeatureTypeSparkConverter.toSpark(dt.longValue().toDate) shouldEqual dt
     }
   }
   property("error on invalid date values") {
@@ -181,7 +183,7 @@ class FeatureTypeSparkConverterTest
     }
   }
   property("convert string to text feature type") {
-    forAll(bogusNames) { s =>
+    forAll(strings) { s =>
       FeatureTypeSparkConverter[Text]().fromSpark(s) shouldBe s.toText
       FeatureTypeSparkConverter.toSpark(s.toText) shouldEqual s
     }
