@@ -16,9 +16,19 @@ shared-steps:
         sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
         export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
         java -version
+  save-build-cache: &save-build-cache
+    save_cache:
+      key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      paths:
+        - ~/.gradle
+        - ~/.m2
+  restore-build-cache: &restore-build-cache
+    restore_cache:
+      keys:
+        - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
 
 jobs:
-  scala_style_check:
+  scala-style:
     <<: *machine-config
     steps:
       - checkout
@@ -26,31 +36,23 @@ jobs:
       - run:
           name: Scala style check
           command: java -version && ./gradlew -v && ./gradlew --parallel scalaStyle
-  clone_repo_and_compile_project:
+  compile:
     <<: *machine-config
     steps:
       - checkout
       - *open-jdk
-      - restore_cache:
-          keys:
-            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - *restore-build-cache
       - run:
           name: Clone repo & compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
-      - save_cache:
-          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle
-            - ~/.m2
-  build:
+      - *save-build-cache
+  test:
     <<: *machine-config
     parallelism: 4
     steps:
       - checkout
       - *open-jdk
-      - restore_cache:
-          keys:
-            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - *restore-build-cache
       - run:
           name: Build project
           command: |
@@ -81,9 +83,9 @@ workflows:
   version: 2
   build:
     jobs:
-      - scala_style_check
-      - clone_repo_and_compile_project
-      - build:
+      - scala-style
+      - compile
+      - test:
           requires:
-            - scala_style_check
-            - clone_repo_and_compile_project
+            - scala-style
+            - compile
