@@ -16,13 +16,13 @@ shared-steps:
         sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
         export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
         java -version
-  save-build-cache: &save-build-cache
+  save-gradle-cache: &save-gradle-cache
     save_cache:
       key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
       paths:
         - ~/.gradle
         - ~/.m2
-  restore-build-cache: &restore-build-cache
+  restore-gradle-cache: &restore-gradle-cache
     restore_cache:
       keys:
         - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
@@ -41,18 +41,18 @@ jobs:
     steps:
       - checkout
       - *open-jdk
-      - *restore-build-cache
+      - *restore-gradle-cache
       - run:
           name: Clone repo & compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
-      - *save-build-cache
+      - *save-gradle-cache
   test:
     <<: *machine-config
     parallelism: 4
     steps:
       - checkout
       - *open-jdk
-      - *restore-build-cache
+      - *restore-gradle-cache
       - run:
           name: Build project
           command: |
