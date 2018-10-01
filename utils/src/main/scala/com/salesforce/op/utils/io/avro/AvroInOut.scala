@@ -155,12 +155,12 @@ object AvroInOut {
   implicit class AvroWriter[T <: GenericRecord](rdd: RDD[T]) {
 
     /**
-      * This method writes out RDDs of generic records as avro files to path.
-      *
-      * @param path Input directory where avro records should be written.
-      * @param job  Job instance
-      * @return
-      */
+     * This method writes out RDDs of generic records as avro files to path.
+     *
+     * @param path Input directory where avro records should be written.
+     * @param job  Job instance
+     * @return
+     */
     def writeAvro(path: String)(implicit job: Job): Unit = {
       val avroData = rdd.map(ar => (new AvroKey(ar), NullWritable.get))
       avroData.saveAsNewAPIHadoopFile(
@@ -173,12 +173,12 @@ object AvroInOut {
     }
 
     /**
-      * This method writes out RDDs of generic records as avro files to path.
-      *
-      * @param path   Input directory where avro records should be written.
-      * @param schema Avro schema string for records being written out.
-      * @return
-      */
+     * This method writes out RDDs of generic records as avro files to path.
+     *
+     * @param path   Input directory where avro records should be written.
+     * @param schema Avro schema string for records being written out.
+     * @return
+     */
     def writeAvro(path: String, schema: String): Unit = {
       val job: Job = Job.getInstance()
       AvroJob.setOutputKeySchema(job, new Schema.Parser().parse(schema))
