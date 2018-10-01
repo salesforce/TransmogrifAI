@@ -153,23 +153,23 @@ case object FeatureTypeSparkConverter {
           case null => FeatureTypeDefaults.Date.value
           case v: Int => Some(v.toLong)
           case v: Long => Some(v)
-          case _ => throw new IllegalArgumentException(s"Date type mapping is not defined for ${value.getClass}")
+          case v => throw new IllegalArgumentException(s"Date type mapping is not defined for ${v.getClass}")
         }
 
-      // Numerals
+      // Numerics
       case wt if wt <:< weakTypeOf[t.RealNN] => (value: Any) =>
         value match {
           case null => None
           case v: Float => Some(v.toDouble)
           case v: Double => Some(v)
-          case _ => throw new IllegalArgumentException(s"RealNN type mapping is not defined for ${value.getClass}")
+          case v => throw new IllegalArgumentException(s"RealNN type mapping is not defined for ${v.getClass}")
         }
       case wt if wt <:< weakTypeOf[t.Real] => (value: Any) =>
         value match {
           case null => FeatureTypeDefaults.Real.value
           case v: Float => Some(v.toDouble)
           case v: Double => Some(v)
-          case _ => throw new IllegalArgumentException(s"Real type mapping is not defined for ${value.getClass}")
+          case v => throw new IllegalArgumentException(s"Real type mapping is not defined for ${v.getClass}")
         }
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>
         value match {
@@ -178,7 +178,7 @@ case object FeatureTypeSparkConverter {
           case v: Short => Some(v.toLong)
           case v: Int => Some(v.toLong)
           case v: Long => Some(v)
-          case _ => throw new IllegalArgumentException(s"Integral type mapping is not defined for ${value.getClass}")
+          case v => throw new IllegalArgumentException(s"Integral type mapping is not defined for ${v.getClass}")
         }
       case wt if wt <:< weakTypeOf[t.Binary] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Binary.value else Some(value.asInstanceOf[Boolean])
@@ -190,8 +190,7 @@ case object FeatureTypeSparkConverter {
 
       // Sets
       case wt if wt <:< weakTypeOf[t.MultiPickList] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.MultiPickList.value
-        else value.asInstanceOf[MWrappedArray[String]].toSet
+        if (value == null) FeatureTypeDefaults.MultiPickList.value else value.asInstanceOf[MWrappedArray[String]].toSet
 
       // Everything else
       case _ => identity
