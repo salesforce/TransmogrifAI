@@ -31,12 +31,15 @@
 package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
+import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalacheck.Gen
+import org.scalacheck.Arbitrary._
 import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
 
+import scala.collection.mutable.{WrappedArray => MWrappedArray}
 import scala.concurrent.duration._
 
 
@@ -50,13 +53,38 @@ class FeatureTypeSparkConverterTest
   val featureTypeNames: TableFor1[String] = Table("ftnames",
     FeatureTypeSparkConverter.featureTypeSparkConverters.keys.toSeq: _*
   )
-  val bogusNames = Gen.alphaNumStr
+  val strings = Gen.alphaNumStr
 
-  val naturalNumbers = Table("NaturalNumbers", Byte.MaxValue, Short.MaxValue, Int.MaxValue, Long.MaxValue)
+  val naturalNumbers = Gen.oneOf(
+    arbitrary[Long], arbitrary[Int], arbitrary[Short], arbitrary[Byte]
+  ).map(_.asInstanceOf[Number])
 
-  val realNumbers = Table("NaturalNumbers", Float.MaxValue, Double.MaxValue)
+  val realNumbers = Gen.oneOf(arbitrary[Float], arbitrary[Double]).map(_.asInstanceOf[Number])
 
-  val dateTimeValues = Table("DateTimeVals", 300, 300L)
+  val dateValues = Gen.oneOf(Gen.posNum[Int], Gen.posNum[Long]).map(_.asInstanceOf[Number])
+  val dateTimeValues = Gen.posNum[Long]
+
+  val booleans = Table("booleans", true, false)
+
+  val featureTypeValues = Table("ft",
+    Real.empty -> null,
+    Text("abc") -> "abc",
+    Real(0.1) -> 0.1,
+    Integral(123) -> 123,
+    Array(1.0, 2.0).toOPVector -> Vectors.dense(Array(1.0, 2.0)),
+    Vectors.sparse(2, Array(0), Array(3.0)).toOPVector -> Vectors.sparse(2, Array(0), Array(3.0)),
+    Seq(1L, 2L, 3L).toDateList -> Array(1L, 2L, 3L),
+    Set("a", "b").toMultiPickList -> Array("a", "b")
+  )
+
+  val featureTypeMapValues = Table("ftm",
+    TextMap.empty -> null,
+    Map("1" -> 1.0, "2" -> 2.0).toRealMap -> Map("1" -> 1.0, "2" -> 2.0),
+    Map("1" -> 3L, "2" -> 4L).toIntegralMap -> Map("1" -> 3L, "2" -> 4L),
+    Map("1" -> "one", "2" -> "two").toTextMap -> Map("1" -> "one", "2" -> "two"),
+    Map("1" -> Set("a", "b")).toMultiPickListMap -> Map("1" -> MWrappedArray.make(Array("a", "b"))),
+    Map("1" -> Seq(1.0, 5.0, 6.0)).toGeolocationMap -> Map("1" -> MWrappedArray.make(Array(1.0, 5.0, 6.0)))
+  )
 
   property("is a feature type converter") {
     forAll(featureTypeConverters) { ft => ft shouldBe a[FeatureTypeSparkConverter[_]] }
@@ -72,7 +100,7 @@ class FeatureTypeSparkConverterTest
     }
   }
   property("error on making a converter on no existent feature type name") {
-    forAll(bogusNames) { bogusName =>
+    forAll(strings) { bogusName =>
       intercept[IllegalArgumentException](
         FeatureTypeSparkConverter.fromFeatureTypeName(bogusName)
       ).getMessage shouldBe s"Unknown feature type '$bogusName'"
@@ -100,100 +128,80 @@ class FeatureTypeSparkConverterTest
       }
     )
   }
-
-  property("converts Natural Number of Byte/Short/Int/Long ranges to Integral valued feature type") {
-    forAll(naturalNumbers)(nn =>
-      FeatureTypeSparkConverter[Integral]().fromSpark(nn) shouldBe a[Integral]
-    )
+  property("converts natural number of Byte/Short/Int/Long ranges to Integral feature type") {
+    forAll(naturalNumbers) { nn =>
+      FeatureTypeSparkConverter[Integral]().fromSpark(nn) shouldBe nn.longValue().toIntegral
+      FeatureTypeSparkConverter.toSpark(nn.longValue().toIntegral) shouldEqual nn
+    }
   }
-  property("converts Natural Number of Byte/Short/Int/Long ranges to Long range Integral feature") {
-    forAll(naturalNumbers)(nn =>
-      FeatureTypeSparkConverter[Integral]().fromSpark(nn).value.get shouldBe a[java.lang.Long]
-    )
-  }
-  property("raises error for bad Natural Number") {
+  property("raises error on invalid natural numbers") {
     forAll(realNumbers)(nn =>
-      intercept[IllegalArgumentException](FeatureTypeSparkConverter[Integral]().fromSpark(nn)).getMessage
-        shouldBe s"Integral type mapping is not defined for class java.lang.${nn.getClass.toString.capitalize}"
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[Integral]().fromSpark(nn))
+        .getMessage startsWith "Integral type mapping is not defined"
     )
   }
-
-  property("converts Real Numbers in float/double ranges to Real valued feature type") {
-    forAll(realNumbers)(rn =>
-      FeatureTypeSparkConverter[Real]().fromSpark(rn) shouldBe a[Real]
-    )
+  property("converts real numbers in Float/Double ranges to Real feature type") {
+    forAll(realNumbers) { rn =>
+      FeatureTypeSparkConverter[Real]().fromSpark(rn) shouldBe rn.doubleValue().toReal
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toReal) shouldEqual rn
+    }
   }
-  property("converts Real Numbers in float/double ranges to Double range Real feature") {
-    forAll(realNumbers)(rn =>
-      FeatureTypeSparkConverter[Real]().fromSpark(rn).value.get shouldBe a[java.lang.Double]
-    )
-  }
-  property("raises error for bad Real Number") {
-    forAll(naturalNumbers)(rn =>
+  property("raises error on invalid real numbers") {
+    forAll(naturalNumbers) { rn =>
       intercept[IllegalArgumentException](FeatureTypeSparkConverter[Real]().fromSpark(rn))
-        .getMessage shouldBe s"Real type mapping is not defined for class java.lang.${rn.getClass.toString.capitalize}"
-    )
+        .getMessage startsWith "Real type mapping is not defined"
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[RealNN]().fromSpark(rn))
+        .getMessage startsWith "RealNN type mapping is not defined"
+    }
   }
-
-  property("converts Real Numbers in float/double ranges to RealNN valued feature type") {
+  property("convert real numbers in Float/Double ranges to RealNN feature type") {
+    forAll(realNumbers) { rn =>
+      FeatureTypeSparkConverter[RealNN]().fromSpark(rn) shouldBe rn.doubleValue().toRealNN
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toRealNN) shouldEqual rn
+    }
+  }
+  property("error for an empty RealNN value") {
+    intercept[NonNullableEmptyException](FeatureTypeSparkConverter[RealNN]().fromSpark(null))
+      .getMessage shouldBe "RealNN cannot be empty"
+  }
+  property("convert date denoted using Int/Long ranges to Date feature type") {
+    forAll(dateValues) { dt =>
+      FeatureTypeSparkConverter[Date]().fromSpark(dt) shouldBe dt.longValue().toDate
+      FeatureTypeSparkConverter.toSpark(dt.longValue().toDate) shouldEqual dt
+    }
+  }
+  property("error on invalid date values") {
     forAll(realNumbers)(rn =>
-      FeatureTypeSparkConverter[RealNN]().fromSpark(rn) shouldBe a[RealNN]
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[Date]().fromSpark(rn))
+        .getMessage startsWith "Date type mapping is not defined"
     )
   }
-  property("converts Real Numbers in float/double ranges Double range RealNN feature") {
-    forAll(realNumbers)(rn =>
-      FeatureTypeSparkConverter[RealNN]().fromSpark(rn).value.get shouldBe a[java.lang.Double]
-    )
+  property("convert timestamp denoted using Long range to Datetime feature type") {
+    forAll(dateTimeValues) { dt =>
+      FeatureTypeSparkConverter[DateTime]().fromSpark(dt) shouldBe dt.toDateTime
+      FeatureTypeSparkConverter.toSpark(dt.toDateTime) shouldEqual dt
+    }
   }
-  property("raises error for empty RealNN Number") {
-    forAll(naturalNumbers)(rn =>
-      intercept[NonNullableEmptyException](FeatureTypeSparkConverter[RealNN]().fromSpark(null))
-        .getMessage shouldBe "RealNN cannot be empty"
-    )
+  property("convert string to text feature type") {
+    forAll(strings) { s =>
+      FeatureTypeSparkConverter[Text]().fromSpark(s) shouldBe s.toText
+      FeatureTypeSparkConverter.toSpark(s.toText) shouldEqual s
+    }
   }
-
-  property("converts date denoted using int/long ranges to date feature types") {
-    forAll(dateTimeValues)(dt =>
-      FeatureTypeSparkConverter[Date]().fromSpark(dt) shouldBe a[Date]
-    )
+  property("convert boolean to Binary feature type") {
+    forAll(booleans) { b =>
+      FeatureTypeSparkConverter[Binary]().fromSpark(b) shouldBe b.toBinary
+      FeatureTypeSparkConverter.toSpark(b.toBinary) shouldEqual b
+    }
   }
-  property("converts date denoted using int/long ranges to Long range date feature") {
-    forAll(dateTimeValues)(dt =>
-      FeatureTypeSparkConverter[Date]().fromSpark(dt).value.get shouldBe a[java.lang.Long]
-    )
+  property("convert feature type values to spark values") {
+    forAll(featureTypeValues) { case (featureValue, sparkValue) =>
+      FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
+    }
   }
-  property("raises error for bad date values") {
-    forAll(realNumbers)(rn =>
-    intercept[IllegalArgumentException](FeatureTypeSparkConverter[Date]().fromSpark(rn))
-      .getMessage shouldBe s"Date type mapping is not defined for class java.lang.${rn.getClass.toString.capitalize}"
-    )
-  }
-
-  property("converts timestamp denoted using long range to datetime feature type") {
-    forAll(dateTimeValues)(dt =>
-      FeatureTypeSparkConverter[DateTime]().fromSpark(dt) shouldBe a[DateTime]
-    )
-  }
-  property("converts timestamp denoted using long range to date super feature type") {
-    forAll(dateTimeValues)(dt =>
-      FeatureTypeSparkConverter[DateTime]().fromSpark(dt) shouldBe a[Date]
-    )
-  }
-  property("converts timestamp denoted using long ranges to long range datetime feature") {
-    forAll(dateTimeValues)(dt =>
-      FeatureTypeSparkConverter[DateTime]().fromSpark(dt).value.get shouldBe a[java.lang.Long]
-    )
-  }
-
-  property("converts string to text feature type") {
-    val text = FeatureTypeSparkConverter[Text]().fromSpark("Simple")
-    text shouldBe a[Text]
-    text.value.get shouldBe a[String]
-  }
-
-  property("converts a Boolean to Binary feature type") {
-    val bool = FeatureTypeSparkConverter[Binary]().fromSpark(false)
-    bool shouldBe a[Binary]
-    bool.value.get shouldBe a[java.lang.Boolean]
+  property("convert feature type map values to spark values") {
+    forAll(featureTypeMapValues) { case (featureValue, sparkValue) =>
+      FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
+    }
   }
 }
