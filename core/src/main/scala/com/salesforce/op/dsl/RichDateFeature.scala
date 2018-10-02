@@ -91,8 +91,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
-     * @param circularDateReps list of all the circular date representations that should be included
-     *                                    feature vector
+     * @param circularDateReps list of all the circular date representations that should be included in feature vector
      * @return result feature of type Vector
      */
     def vectorize
@@ -164,8 +163,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
-     * @param circularDateReps list of all the circular date representations that should be included
-     *                                    feature vector
+     * @param circularDateReps list of all the circular date representations that should be included in feature vector
      * @return result feature of type Vector
      */
     def vectorize

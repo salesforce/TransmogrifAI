@@ -34,6 +34,7 @@ import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
 import com.twitter.algebird.Monoid._
@@ -78,6 +79,8 @@ import scala.util.Failure
  *                                      Input arguments are [[Summary]] and number of bins to use in computing feature
  *                                      distributions (histograms for numerics, hashes for strings).
  *                                      Output is the bins for the text features.
+ * @param timePeriod                    Time period used to apply circulate date transformation for date features, if
+ *                                      not specified will use regular numeric feature transformation
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
@@ -93,7 +96,8 @@ class RawFeatureFilter[T]
   val correlationType: CorrelationType = CorrelationType.Pearson,
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
-  val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula
+  val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
+  val timePeriod: Option[TimePeriod] = None
 ) extends Serializable {
 
   assert(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -139,7 +143,7 @@ class RawFeatureFilter[T]
       (respOut, predOut)
     }
     val preparedFeatures: RDD[PreparedFeatures] =
-      data.rdd.map(PreparedFeatures(_, responses, predictors))
+      data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
     // Have to use the training summaries do process scoring for comparison
     val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
       allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
