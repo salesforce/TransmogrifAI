@@ -120,7 +120,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
       numFolds = 3, seed = seed, Evaluators.BinaryClassification.auPR(), stratify = false, parallelism = 1),
     splitter = Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
     models = Seq(lr -> Array.empty[ParamMap]),
-    evaluators = Seq(new OpBinaryClassificationEvaluator)
+    evaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator)
   ).setInput(feature1, feature2)
 
   val expectedResult = Seq(
@@ -144,7 +144,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
       validator = validatorCV,
       splitter = Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
       models = Seq(lr -> lrParams, rf -> rfParams),
-      evaluators = Seq(new OpBinaryClassificationEvaluator)
+      evaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator())
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
@@ -229,7 +229,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
       validator = validatorCV,
       splitter = Option(DataBalancer(sampleFraction = 0.5, seed = 11L)),
       models = Seq(test -> testParams),
-      evaluators = Seq(new OpBinaryClassificationEvaluator)
+      evaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator())
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)

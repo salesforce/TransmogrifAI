@@ -94,7 +94,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   }
 
   @transient private[op] var bestEstimator: Option[BestEstimator[E]] = None
-  @transient private val modelsUse = models.map{case (e, p) =>
+  @transient private lazy val modelsUse = models.map{case (e, p) =>
     val est = e.setOutputFeatureName(getOutputFeatureName)
     val par = if (p.isEmpty) Array(new ParamMap) else p
     est -> par

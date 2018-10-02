@@ -35,7 +35,7 @@ import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.{FeatureHistory, UID}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{Param, Params}
-import org.joda.time.{DateTime => JDateTime}
+import org.joda.time.{DateTime => JDateTime, DateTimeZone}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -104,19 +104,27 @@ private[op] object DateToUnitCircle {
 
   def metadataValues(timePeriod: TimePeriod): Seq[String] = Seq(s"x_$timePeriod", s"y_$timePeriod")
 
-  def convertToRandians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] = {
-    val datetime: Option[JDateTime] = timestamp.map(new JDateTime(_))
-    val (timePeriod, periodSize) = timePeriodDesired match {
-      case TimePeriod.DayOfMonth => (datetime.map(_.dayOfMonth().get() - 1), 31)
-      case TimePeriod.DayOfWeek => (datetime.map(_.dayOfWeek().get() - 1), 7)
-      case TimePeriod.DayOfYear => (datetime.map(_.dayOfYear().get() - 1), 366)
-      case TimePeriod.HourOfDay => (datetime.map(_.hourOfDay().get()), 24)
-      case TimePeriod.MonthOfYear => (datetime.map(_.monthOfYear().get() - 1), 12)
-      case TimePeriod.WeekOfMonth => (
-        datetime.map(x => x.weekOfWeekyear().get() - x.withDayOfMonth(1).weekOfWeekyear().get()), 6)
-      case TimePeriod.WeekOfYear => (datetime.map(_.weekOfWeekyear().get() - 1), 53)
+  def convertToBin(timestamp: Long, timePeriodDesired: TimePeriod): Double =
+    getPeriodWithSize(timestamp, timePeriodDesired)._1
+
+  def convertToRandians(timestamp: Option[Long], timePeriodDesired: TimePeriod): Array[Double] =
+    timestamp.map { ts =>
+      val (timePeriod, periodSize) = getPeriodWithSize(ts, timePeriodDesired)
+      val radians = (2 * math.Pi * timePeriod) / periodSize
+      Array(math.cos(radians), math.sin(radians))
+    }.getOrElse(Array(0.0, 0.0))
+
+  private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
+    val dt = new JDateTime(timestamp).withZone(DateTimeZone.UTC)
+    timePeriod match {
+      case TimePeriod.DayOfMonth => (dt.dayOfMonth.get.toDouble - 1, 31)
+      case TimePeriod.DayOfWeek => (dt.dayOfWeek.get.toDouble - 1, 7)
+      case TimePeriod.DayOfYear => (dt.dayOfYear.get.toDouble - 1, 366)
+      case TimePeriod.HourOfDay => (dt.hourOfDay.get.toDouble, 24)
+      case TimePeriod.MonthOfYear => (dt.monthOfYear.get.toDouble - 1, 12)
+      case TimePeriod.WeekOfMonth =>
+        ((dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get).toDouble, 6)
+      case TimePeriod.WeekOfYear => (dt.weekOfWeekyear.get.toDouble - 1, 53)
     }
-    val radians = timePeriod.map(2 * math.Pi * _ / periodSize)
-    radians.map(r => Array(math.cos(r), math.sin(r))).getOrElse(Array(0.0, 0.0))
   }
 }
