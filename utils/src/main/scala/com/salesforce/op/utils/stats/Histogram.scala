@@ -32,7 +32,68 @@ package com.salesforce.op.utils.stats
 
 import java.util.TreeMap
 
+import com.salesforce.op.utils.stats.Histogram._
+import com.salesforce.op.utils.stats.HistogramBase._
+
 import scala.collection.JavaConverters._
+
+/**
+ * A bin is defined to be a point (p, m) where p, m are real numbers such that m > 0. We call p a binning point,
+ * and m a point count.
+ *
+ * Given a non-negative integer B, a histogram of size B is a set of bins H_B = {(p_1, m_1), ..., (p_B, m_B)}
+ * such that p_1 < ... < p_B, where H_0 is defined to be the empty set. The size of B is |H_B| = B.
+ *
+ * The total count of H_B is defined to be m_1 + ... + m_B if B > 0, and 0 otherwise.
+ *
+ * If H_B is non-empty, then the minimum of H_B is p_1, i.e. its smallest binning point,
+ * and the maximum, p_B, i.e. its largest binning point.
+ *
+ * If H_B is non-empty, then we define [[sum]] and [[uniform]]  operations on H_B per:
+ *
+ * http://www.jmlr.org/papers/volume11/ben-haim10a/ben-haim10a.pdf
+ *
+ */
+sealed trait HistogramBase {
+
+  /**
+   * @eturn an array of bins (in ascending order per binning points [if non-empty]) representing this histogram
+   */
+  def bins: Array[Bin]
+
+  /**
+   * @return the maximum of this histogram, if it is defined.
+   */
+  def maximum: Option[Double]
+
+  /**
+   * @return the minimum of this histogram, if it is defined.
+   */
+  def minimum: Option[Double]
+
+  /**
+   * @return the size of this histogram
+   */
+  def size: Int
+
+  /**
+   * @return the total count of this histogram.
+   */
+  def totalCount: Double
+
+  /**
+   * @param bins input histogram bins
+   * @param f    non-negative functional defined on set of all possible bins
+   * @param cond deciding condition for binary search algorithm
+   * @returns index minimizing f given constraints set by cond
+   */
+  private def binarySearch(bins: Array[Bin], f: Bin => Double, cond: Double => Boolean): Int = 0
+
+}
+
+object HistogramBase {
+  private type Bin = (Double, Double)
+}
 
 /**
  * By default this provides a dynamic histogram representation of size no larger
@@ -42,15 +103,15 @@ import scala.collection.JavaConverters._
  *
  * @param maxBins maximum number of allowed bins in histogram
  */
-class AdaptiveHistogram(val maxBins: Int) {
+class Histogram(val maxBins: Int) {
 
-  protected[this] val points: TreeMap[Double, Long] =
-    AdaptiveHistogramUtils.getTreeMap.asInstanceOf[TreeMap[Double, Long]]
+  protected[this] val points: TreeMap[Double, Double] =
+    getTreeMap[Double].asInstanceOf[TreeMap[Double, Double]]
 
   /**
    * @return histogram bins
    */
-  final def getBins(): Map[Double, Long] = points.asScala.toMap
+  final def getBins(): Map[Double, Double] = points.asScala.toMap
 
   /**
    * Merges this distribution with the input distribution.
@@ -58,7 +119,7 @@ class AdaptiveHistogram(val maxBins: Int) {
    * @param dist input value
    * @return merged distribution
    */
-  final def merge(dist: AdaptiveHistogram): this.type = {
+  final def merge(dist: Histogram): this.type = {
     updatePoints(dist.getBins.toSeq: _*)
 
     this
@@ -71,7 +132,7 @@ class AdaptiveHistogram(val maxBins: Int) {
    * @return updated feature distribution
    */
   final def update(values: Double*): this.type = {
-    updatePoints(values.map(_ -> 1L): _*)
+    updatePoints(values.map(_ -> 1.0): _*)
 
     this
   }
@@ -94,11 +155,16 @@ class AdaptiveHistogram(val maxBins: Int) {
     points.put((q1 * k1 + q2 * k2) / (k1 + k2), k1 + k2)
   }
 
-  private def updatePoints(updates: (Double, Long)*): Unit = {
+  private def updatePoints(updates: (Double, Double)*): Unit = {
     updates.foreach { case (point, ct) =>
-      points.put(point, Option(points.get(point)).getOrElse(0L) + ct)
+      points.put(point, Option(points.get(point)).getOrElse(0.0) + ct)
     }
 
     (0 until math.max(0, points.size - maxBins)).foreach(_ => mergePoints())
   }
+}
+
+object Histogram {
+  def getTreeMap[T](): TreeMap[Double, T] =
+    HistogramJavaUtils.getTreeMap[T].asInstanceOf[TreeMap[Double, T]]
 }

@@ -35,9 +35,9 @@ import java.util.Comparator;
 import java.util.TreeMap;
 import java.util.function.Function;
 
-final public class AdaptiveHistogramUtils {
-    final public static TreeMap<Double, Long> getTreeMap() {
-        return new TreeMap<Double, Long>(getComparator());
+final public class HistogramJavaUtils {
+    final public static <T> TreeMap<Double, T> getTreeMap() {
+        return new TreeMap<Double, T>(getComparator());
     }
 
     final private static Comparator<Double> getComparator() {

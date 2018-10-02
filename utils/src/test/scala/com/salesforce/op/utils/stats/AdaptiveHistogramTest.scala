@@ -37,11 +37,11 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class AdaptiveHistogramTest extends FlatSpec with TestCommon {
+class HistogramTest extends FlatSpec with TestCommon {
 
-  Spec(classOf[AdaptiveHistogram]) should "produce correct histogram distribution" in {
+  Spec(classOf[Histogram]) should "produce correct histogram distribution" in {
     // Follows example in appendix of original paper.
-    val hist = new AdaptiveHistogram(5)
+    val hist = new Histogram(5)
     hist.update(23, 19, 10, 16, 36)
     hist.getBins should contain theSameElementsAs Seq(23.0, 19.0, 10.0, 16.0, 36.0).map(_ -> 1L)
     hist.update(2)
@@ -49,7 +49,7 @@ class AdaptiveHistogramTest extends FlatSpec with TestCommon {
     hist.update(9)
     hist.getBins should contain theSameElementsAs Seq(2.0, 23.0, 36.0).map(_ -> 1L) ++ Seq(9.5, 17.5).map(_ -> 2L)
 
-    val hist2 = new AdaptiveHistogram(5)
+    val hist2 = new Histogram(5)
     hist.update(32, 30, 45)
     val mergedhist = hist.merge(hist2)
     mergedhist.getBins.map { case (point, count) =>
