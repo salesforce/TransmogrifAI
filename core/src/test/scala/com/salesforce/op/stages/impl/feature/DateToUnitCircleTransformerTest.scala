@@ -38,13 +38,16 @@ import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.Transformer
-import org.joda.time.{DateTime => JDateTime}
+import org.joda.time.{DateTimeZone, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateToUnitCircleTransformer[Date]]
   with AttributeAsserts {
+
+  // Setting default timezone to UTC for standardization
+  DateTimeZone.setDefault(DateTimeZone.UTC)
 
   val eps = 1E-4
   val sampleDateTimes = Seq[JDateTime](
