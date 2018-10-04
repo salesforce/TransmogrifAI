@@ -154,8 +154,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "return model insights even when correlation is turned off for some features" in {
-    val featuresFinal = Seq(description.vectorize(10, false, 1, true),
-      stringMap.vectorize(true, numHashes = 10)).combine()
+    val featuresFinal = Seq(description.vectorize(numHashes = 10, autoDetectLanguage = false, minTokenLength = 1,
+      toLowercase = true),
+      stringMap.vectorize(cleanText = true, numHashes = 10)).combine()
     val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
     val prediction = MultiClassificationModelSelector
       .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
