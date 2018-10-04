@@ -32,15 +32,16 @@ package com.salesforce.op
 
 import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
+import com.salesforce.op._
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataSplitter, SplitterSummary}
+import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter, SplitterSummary}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -150,6 +151,21 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
     insights.stageInfo.keys.size shouldEqual 8
+  }
+
+  it should "return model insights even when correlation is turned off for some features" in {
+    val featuresFinal = Seq(description.vectorize(10, false, 1, true),
+      stringMap.vectorize(true)).combine()
+    val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
+    val prediction = MultiClassificationModelSelector
+      .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, featuresChecked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    println(insights.toJson(true))
   }
 
   it should "return feature insights with selector info and label info even when no models are found" in {
