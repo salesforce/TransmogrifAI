@@ -155,7 +155,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "return model insights even when correlation is turned off for some features" in {
     val featuresFinal = Seq(description.vectorize(10, false, 1, true),
-      stringMap.vectorize(true)).combine()
+      stringMap.vectorize(true, numHashes = 10)).combine()
     val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
     val prediction = MultiClassificationModelSelector
       .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
@@ -165,7 +165,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
     val workflowModel = workflow.train()
     val insights = workflowModel.modelInsights(prediction)
-    println(insights.toJson(true))
+    insights.features.size shouldBe 20
   }
 
   it should "return feature insights with selector info and label info even when no models are found" in {
