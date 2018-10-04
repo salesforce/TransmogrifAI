@@ -32,68 +32,10 @@ package com.salesforce.op.utils.stats
 
 import java.util.TreeMap
 
-import com.salesforce.op.utils.stats.Histogram._
-import com.salesforce.op.utils.stats.HistogramBase._
+import com.salesforce.op.utils.stats.StreamingHistogram._
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
-
-/**
- * A bin is defined to be a point (p, m) where p, m are real numbers such that m > 0. We call p a binning point,
- * and m a point count.
- *
- * Given a non-negative integer B, a histogram of size B is a set of bins H_B = {(p_1, m_1), ..., (p_B, m_B)}
- * such that p_1 < ... < p_B, where H_0 is defined to be the empty set. The size of B is |H_B| = B.
- *
- * The total count of H_B is defined to be m_1 + ... + m_B if B > 0, and 0 otherwise.
- *
- * If H_B is non-empty, then the minimum of H_B is p_1, i.e. its smallest binning point,
- * and the maximum, p_B, i.e. its largest binning point.
- *
- * If H_B is non-empty, then we define [[sum]] and [[uniform]]  operations on H_B per:
- *
- * http://www.jmlr.org/papers/volume11/ben-haim10a/ben-haim10a.pdf
- *
- */
-sealed trait HistogramBase {
-
-  /**
-   * @eturn an array of bins (in ascending order per binning points [if non-empty]) representing this histogram
-   */
-  def bins: Array[Bin]
-
-  /**
-   * @return the maximum of this histogram, if it is defined.
-   */
-  def maximum: Option[Double]
-
-  /**
-   * @return the minimum of this histogram, if it is defined.
-   */
-  def minimum: Option[Double]
-
-  /**
-   * @return the size of this histogram
-   */
-  def size: Int
-
-  /**
-   * @return the total count of this histogram.
-   */
-  def totalCount: Double
-
-  /**
-   * @param bins input histogram bins
-   * @param f    non-negative functional defined on set of all possible bins
-   * @param cond deciding condition for binary search algorithm
-   * @returns index minimizing f given constraints set by cond
-   */
-  private def binarySearch(bins: Array[Bin], f: Bin => Double, cond: Double => Boolean): Int = 0
-
-}
-
-object HistogramBase {
-  private type Bin = (Double, Double)
-}
 
 /**
  * By default this provides a dynamic histogram representation of size no larger
@@ -103,7 +45,7 @@ object HistogramBase {
  *
  * @param maxBins maximum number of allowed bins in histogram
  */
-class Histogram(val maxBins: Int) {
+class StreamingHistogram(val maxBins: Int) extends Serializable {
 
   protected[this] val points: TreeMap[Double, Double] =
     getTreeMap[Double].asInstanceOf[TreeMap[Double, Double]]
@@ -111,7 +53,7 @@ class Histogram(val maxBins: Int) {
   /**
    * @return histogram bins
    */
-  final def getBins(): Map[Double, Double] = points.asScala.toMap
+  final def getBins(): Array[Bin] = points.asScala.toArray
 
   /**
    * Merges this distribution with the input distribution.
@@ -119,7 +61,7 @@ class Histogram(val maxBins: Int) {
    * @param dist input value
    * @return merged distribution
    */
-  final def merge(dist: Histogram): this.type = {
+  final def merge(dist: StreamingHistogram): this.type = {
     updatePoints(dist.getBins.toSeq: _*)
 
     this
@@ -136,6 +78,25 @@ class Histogram(val maxBins: Int) {
 
     this
   }
+
+  /**
+   * Performs sum algorithm outlined in paper evaluated at some input point, which approximates the number of
+   * points less than or equal to the input point.
+   *
+   * @param x input point
+   * @return approximate number of points that are less than or equal to the input point
+   */
+  final def sum(x: Double): Double = StreamingHistogram.sum(getBins, x)
+
+  /**
+   * @return CDF estimate using the histogram sum algorithm
+   */
+  final def sumCDF(x: Double): Double = StreamingHistogram.sumCDF(getBins, x)
+
+  /**
+   * @return empirical CDF estimate
+   */
+  final def empiricalCDF(x: Double): Double = StreamingHistogram.empiricalCDF(getBins, x)
 
   private def mergePoints(): Unit = if (points.size > math.max(maxBins, 2)) {
     val (q1, q2) = points.descendingKeySet.descendingIterator.asScala.sliding(2).map(_ match {
@@ -164,7 +125,57 @@ class Histogram(val maxBins: Int) {
   }
 }
 
-object Histogram {
-  def getTreeMap[T](): TreeMap[Double, T] =
+object StreamingHistogram {
+
+  private[stats] type Bin = (Double, Double)
+
+  /**
+   * Performs sum algorithm outlined in paper evaluated at some input point, which approximates the number of
+   * points less than or equal to the input point.
+   *
+   * @param x input point
+   * @return approximate number of points that are less than or equal to the input point
+   */
+  private[stats] def sum(bins: Array[Bin], x: Double): Double =
+    bins match {
+      case b if b.length >= 2 =>
+        val pairedb = b.sliding(2).map(_ match {
+          case Array(b1, b2) => (b1, b2)
+        })
+
+        pairedb.foldLeft((0.0, (0.0, 0.0), false)) { case ((s, _, done), ((p1, m1), (p2, m2))) =>
+          if (x >= p1 && x < p2 && !done) {
+            val mx = m1 + ((m2 - m1) / (p2 - p1)) * (x - p1)
+            val newS = s + (m1 / 2) + ((m1 + mx) / 2) * ((x - p1) / (p2 - p1))
+
+            (newS, (p2, m2), true)
+          } else {
+            if (done) (s, (p2, m2), done)
+            else {
+              // It must be the case that (x < p1 || x >= p2)
+              if (x >= p2) (s + m1, (p2, m2), false)
+              else (s, (p2, m2), true)
+            }
+          }
+        } match {
+          case (s, (p, m), true) => s
+          case (s, (p, m), false) =>
+            s + { if (x == p) m / 2 else m }
+        }
+      case b if b.isEmpty => 0.0
+      case b =>
+        val (p, m) = b(0) // We must have exactly one element
+        if (x == p) m / 2
+        else if (x > m) m
+        else 0.0
+    }
+
+  private[stats] def sumCDF(bins: Array[Bin], x: Double): Double =
+    sum(bins, x) / bins.map(_._2).sum
+
+  private[stats] def empiricalCDF(bins: Array[Bin], x: Double): Double =
+    bins.collect { case (p, m) if p <= x => m }.sum / bins.map(_._2).sum
+
+  private def getTreeMap[T](): TreeMap[Double, T] =
     HistogramJavaUtils.getTreeMap[T].asInstanceOf[TreeMap[Double, T]]
 }
