@@ -165,7 +165,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
     val workflowModel = workflow.train()
     val insights = workflowModel.modelInsights(prediction)
-    insights.features.size shouldBe 20
+    insights.features.size shouldBe 2
+    insights.features.flatMap(_.derivedFeatures).size shouldBe 23
   }
 
   it should "return feature insights with selector info and label info even when no models are found" in {
