@@ -161,7 +161,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(4.0)
+    insights.label.sampleSize shouldBe Some(5.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -213,12 +213,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(4.0)
+    insights.label.sampleSize shouldBe Some(5.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures(0).contribution.size shouldBe 1
+    ageInsights.derivedFeatures(1).contribution.size shouldBe 0
     ageInsights.derivedFeatures.foreach { f =>
-      f.contribution.size shouldBe 1
       f.corr.nonEmpty shouldBe true
       f.variance.nonEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
@@ -304,11 +305,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         pretty should not include(m.modelName)
       }
     }
-    pretty should include("area under precision-recall | 0.0")
+    pretty should include("area under precision-recall | 1.0")
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
     pretty should include("Top Positive Correlations")
-    pretty should include("Top Negative Correlations")
     pretty should include("Top Contributions")
   }
 
