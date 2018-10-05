@@ -283,7 +283,10 @@ class RawFeatureFilter[T]
     assert(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
     val trainingSummary = computeFeatureStats(trainData, rawFeatures)
     log.info("Computed summary stats for training features")
-    log.debug(trainingSummary.predictorDistributions.mkString("\n"))
+    if (log.isDebugEnabled) {
+      log.debug(trainingSummary.responseDistributions.mkString("\n"))
+      log.debug(trainingSummary.predictorDistributions.mkString("\n"))
+    }
 
     val scoreData = scoreReader.flatMap{ s =>
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
@@ -298,7 +301,10 @@ class RawFeatureFilter[T]
     val scoringSummary = scoreData.map{ sd =>
       val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary))
       log.info("Computed summary stats for scoring features")
-      log.debug(ss.predictorDistributions.mkString("\n"))
+      if (log.isDebugEnabled) {
+        log.debug(ss.responseDistributions.mkString("\n"))
+        log.debug(ss.predictorDistributions.mkString("\n"))
+      }
       ss
     }
 
