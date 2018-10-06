@@ -137,7 +137,8 @@ object AvroInOut {
     val records = sc.sparkContext.newAPIHadoopFile(path,
       classOf[AvroKeyInputFormat[T]],
       classOf[AvroKey[T]],
-      classOf[NullWritable]
+      classOf[NullWritable],
+      sc.sparkContext.hadoopConfiguration
     )
 
     val results =
@@ -153,6 +154,8 @@ object AvroInOut {
   }
 
   implicit class AvroWriter[T <: GenericRecord](rdd: RDD[T]) {
+
+    private implicit val job = Job.getInstance(rdd.sparkContext.hadoopConfiguration)
 
     /**
      * This method writes out RDDs of generic records as avro files to path.
@@ -180,7 +183,6 @@ object AvroInOut {
      * @return
      */
     def writeAvro(path: String, schema: String): Unit = {
-      val job: Job = Job.getInstance()
       AvroJob.setOutputKeySchema(job, new Schema.Parser().parse(schema))
       writeAvro(path)(job)
     }
