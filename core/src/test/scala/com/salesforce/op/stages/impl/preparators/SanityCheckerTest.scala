@@ -611,6 +611,19 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
+  it should "not fail when maps have the same keys" in {
+    val mapData = textRawData.map{
+      case (i, t, tm) => (i, t, tm, tm, tm.value.map{ case (k, v) => k -> math.random }.toRealMap)
+    }
+    val (mapDataFrame, id, target, textMap1, textMap2, doubleMap) = TestFeatureBuilder(
+      "id", "target", "textMap1", "textMap2", "doubleMap", mapData)
+    val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
+    val features = Seq(id, target, textMap1, textMap2, doubleMap).transmogrify()
+    val checked = targetResponse.sanityCheck(features)
+    val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
+    output.show()
+  }
+
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
     expectedFeaturesToDrop: Seq[String], label: String): Unit = {
     val metadata = model.getMetadata()

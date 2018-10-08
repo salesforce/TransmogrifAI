@@ -274,18 +274,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
       .toMap[String, Double]
     val numCorrIndices = corrIndices.length
 
-    // build map from indicator group name to any null indicator it may have
-    val nullGroups = for {
-      col <- metaCols
-      if col.isNullIndicator
-        grouping <- col.grouping
-      } yield (grouping, (col, col.index))
-
-    nullGroups.groupBy(_._1).foreach {
-      case (group, cols) =>
-        require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
-    }
-
     def maxByParent(seq: Seq[(String, Double)]) = seq.groupBy(_._1).map{ case(k, v) =>
       // Filter out the NaNs because max(3.4, NaN) = NaN, and we still want the keep the largest correlation
       k -> v.filterNot(_._2.isNaN).foldLeft(0.0)((a, b) => math.max(a, math.abs(b._2)))
