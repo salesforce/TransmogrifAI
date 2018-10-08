@@ -608,8 +608,8 @@ case object ModelInsights {
       .map {
         case (fname, seq) =>
           val ftype = allFeatures.find(_.name == fname)
-            .getOrElse(throw new RuntimeException(s"No raw feature with name $fname found in raw features"))
-            .typeName
+            .map(_.typeName)
+            .getOrElse("")
           val distributions = rawFeatureDistributions.filter(_.name == fname)
           FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
             distributions = distributions)
@@ -626,7 +626,7 @@ case object ModelInsights {
     getIfExists(corr.featuresIn.indexOf(name), corr.values).orElse {
       val j = corr.nanCorrs.indexOf(name)
       if (j >= 0) Option(Double.NaN)
-      else throw new RuntimeException(s"Column name $name does not exist in summary correlations")
+      else None
     }
   }
 
