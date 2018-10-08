@@ -161,10 +161,9 @@ object AvroInOut {
      * This method writes out RDDs of generic records as avro files to path.
      *
      * @param path Input directory where avro records should be written.
-     * @param job  Job instance
      * @return
      */
-    def writeAvro(path: String)(implicit job: Job): Unit = {
+    def writeAvro(path: String): Unit = {
       val avroData = rdd.map(ar => (new AvroKey(ar), NullWritable.get))
       avroData.saveAsNewAPIHadoopFile(
         path,
@@ -184,7 +183,7 @@ object AvroInOut {
      */
     def writeAvro(path: String, schema: String): Unit = {
       AvroJob.setOutputKeySchema(job, new Schema.Parser().parse(schema))
-      writeAvro(path)(job)
+      writeAvro(path)
     }
 
   }
