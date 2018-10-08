@@ -621,7 +621,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val features = Seq(id, target, textMap1, textMap2, doubleMap).transmogrify()
     val checked = targetResponse.sanityCheck(features)
     val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
-    output.show()
+    output.select(checked.name).count() shouldBe 12
   }
 
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
