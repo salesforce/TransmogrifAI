@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.log4j.Level
@@ -622,6 +623,8 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val checked = targetResponse.sanityCheck(features)
     val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
     output.select(checked.name).count() shouldBe 12
+    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    meta.dropped.size shouldBe 0
   }
 
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
