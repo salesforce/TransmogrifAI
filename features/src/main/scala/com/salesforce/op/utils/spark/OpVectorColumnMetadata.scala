@@ -151,6 +151,12 @@ case class OpVectorColumnMetadata // TODO make separate case classes extending t
     if (hasParentOfSubType[OPMap[_]]) parentFeatureName.map(p => grouping.map(p + "_" + _).getOrElse(p))
     else parentFeatureName
 
+  /**
+   * Get the feature grouping qualified by the parent feature name
+   * @return Optional string of feature grouping
+   */
+  def featureGroup(): Option[String] = grouping.map(g => s"${parentFeatureName.mkString}${g}")
+
 }
 
 object OpVectorColumnMetadata {

@@ -317,7 +317,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     // inside cramersVParent first and then check without keys for removal. This will over-remove features (eg.
     // an entire map), but should only affect custom map vectorizers that don't set indicator groups on columns.
     def getParentValue(col: OpVectorColumnMetadata, check1: Map[String, Double], check2: Map[String, Double]) =
-    col.parentNamesWithMapKeys().flatMap( k => check1.get(k).orElse(check2.get(k)) ).reduceOption(_ max _)
+      col.parentNamesWithMapKeys().flatMap( k => check1.get(k).orElse(check2.get(k)) ).reduceOption(_ max _)
 
     val featuresStats = metaCols.map {
       col =>
@@ -375,7 +375,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
     // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
     // to remove a feature from a single column stats (eg. associate rule confidence/support check)
-    val groupByGroups = stats.groupBy(_.column.flatMap(_.grouping))
+    val groupByGroups = stats.groupBy(_.column.flatMap(_.featureGroup()))
     val ruleConfGroupsToDrop = groupByGroups.toSeq.flatMap{
       case (Some(group), colStats) =>
         val colsToRemove = colStats.filter(f =>
@@ -445,63 +445,71 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val distinctLabels = contingencyData.count()
     val stats =
       if (isDefined(categoricalLabel) && $(categoricalLabel) || distinctLabels < min(100.0, sampleSize * 0.1)) {
-      val contingencyWithKeys = contingencyData.collect()
-      val contingency = contingencyWithKeys.sortBy(_._1).map { case (_, vector) => vector }
+        val contingencyWithKeys = contingencyData.collect()
+        val contingency = contingencyWithKeys.sortBy(_._1).map { case (_, vector) => vector }
 
-      logInfo("Label is assumed to be categorical since either categoricalLabel = true or " +
-        "number of distinct labels < count * 0.1")
+        logInfo("Label is assumed to be categorical since either categoricalLabel = true or " +
+          "number of distinct labels < count * 0.1")
 
-      // Only perform Cramer's V calculation on columns that have an grouping and indicatorValue defined (right
-      // now, the only things that will have indicatorValue defined and grouping be None is numeric maps)
-      val columnsWithIndicator = columnMeta.filter(f => f.grouping.isDefined && f.indicatorValue.isDefined)
-      val colIndicesByGrouping =
-        columnsWithIndicator
-          .map { meta => meta.grouping.get -> meta }
-          .groupBy(_._1)
-          // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
-          .map { case (group, cols) => (group, cols.map(_._2.makeColName()), cols.map(_._2.index),
-            cols.exists(_._2.hasParentOfSubType[MultiPickList]))
+        // Only perform Cramer's V calculation on columns that have an grouping and indicatorValue defined (right
+        // now, the only things that will have indicatorValue defined and grouping be None is numeric maps)
+        val columnsWithIndicator = columnMeta.filter(f => f.grouping.isDefined && f.indicatorValue.isDefined)
+        val colIndicesByGrouping =
+          columnsWithIndicator
+            .map { meta => meta.featureGroup().get -> meta }
+            .groupBy(_._1)
+            // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
+            .map{ case (group, cols) =>
+              val repeats = cols.map(c => (c._2.indicatorValue, c._2.index)).groupBy(_._1)
+                .collect{ case (_, seq) if seq.length > 1 => seq.map(_._2) }.flatten // TODO should these be dropped?
+              val colsCleaned = repeats.foldLeft(cols.map(_._2))(_.drop(_))
+              (group, colsCleaned.map(_.makeColName()), colsCleaned.map(_.index),
+                colsCleaned.exists(_.hasParentOfSubType[MultiPickList]))
           }
 
-      colIndicesByGrouping.map {
-        case (group, colNames, valueIndices, isMpl) =>
-          val groupContingency =
-            if (valueIndices.length == 1) {
-              // parentFeatureNames only has a single indicator column, construct the other from label sums
-              contingency.flatMap(features => {
-                val indicatorSum = valueIndices.map(features.apply)
-                indicatorSum ++ indicatorSum.map(features.last - _)
-              })
-            } else contingency.flatMap { features => valueIndices.map(features.apply) }
+        colIndicesByGrouping.map {
+          case (group, colNames, valueIndices, isMpl) =>
+            val groupContingency =
+              if (valueIndices.length == 1) {
+                // parentFeatureNames only has a single indicator column, construct the other from label sums
+                contingency.flatMap(features => {
+                  val indicatorSum = valueIndices.map(features.apply)
+                  indicatorSum ++ indicatorSum.map(features.last - _)
+                })
+              } else {
+                contingency.flatMap { features => valueIndices.map(features.apply) }
+              }
 
-          // columns are label value, rows are feature value
-          val contingencyMatrix = if (valueIndices.length == 1) {
-            new DenseMatrix(2, groupContingency.length / 2, groupContingency)
-          }
-          else new DenseMatrix(valueIndices.length, groupContingency.length / valueIndices.length, groupContingency)
+            // columns are label value, rows are feature value
+            val contingencyMatrix =
+              if (valueIndices.length == 1) {
+                new DenseMatrix(2, groupContingency.length / 2, groupContingency)
+              } else {
+                new DenseMatrix(valueIndices.length, groupContingency.length / valueIndices.length, groupContingency)
+              }
 
-          val cStats =
-            if (isMpl) {
-              val labelCounts = contingency.map(_.last)
-              OpStatistics.contingencyStatsFromMultiPickList(contingencyMatrix, labelCounts)
-            } else OpStatistics.contingencyStats(contingencyMatrix)
+            val cStats =
+              if (isMpl) {
+                val labelCounts = contingency.map(_.last)
+                OpStatistics.contingencyStatsFromMultiPickList(contingencyMatrix, labelCounts)
+              } else OpStatistics.contingencyStats(contingencyMatrix)
 
-          CategoricalGroupStats(
-            group = group,
-            categoricalFeatures = colNames.toArray,
-            contingencyMatrix = cStats.contingencyMatrix,
-            pointwiseMutualInfo = cStats.pointwiseMutualInfo,
-            cramersV = cStats.chiSquaredResults.cramersV,
-            mutualInfo = cStats.mutualInfo,
-            maxRuleConfidences = cStats.confidenceResults.maxConfidences,
-            supports = cStats.confidenceResults.supports
-          )
-      }.toArray
-    } else {
-      logInfo(s"Label is assumed to be continuous since number of distinct labels = $distinctLabels" +
-        s"which is greater than 10% the size of the sample $sampleSize skipping calculation of Cramer's V")
-      Array.empty[CategoricalGroupStats]
-    }
+            CategoricalGroupStats(
+              group = group,
+              categoricalFeatures = colNames.toArray,
+              contingencyMatrix = cStats.contingencyMatrix,
+              pointwiseMutualInfo = cStats.pointwiseMutualInfo,
+              cramersV = cStats.chiSquaredResults.cramersV,
+              mutualInfo = cStats.mutualInfo,
+              maxRuleConfidences = cStats.confidenceResults.maxConfidences,
+              supports = cStats.confidenceResults.supports
+            )
+        }.toArray
+      } else {
+        logInfo(s"Label is assumed to be continuous since number of distinct labels = $distinctLabels" +
+          s"which is greater than 10% the size of the sample $sampleSize skipping calculation of Cramer's V")
+        Array.empty[CategoricalGroupStats]
+      }
     contingencyData.unpersist(blocking = false)
     stats
   }
@@ -604,10 +612,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
       // Exclude feature vector entries coming from hashed text features if requested
       val localVectorRowsForCorr = vectorRows.map {
-        case (v: OldDenseVector) =>
+        case v: OldDenseVector =>
           val res = localCorrIndices.map(v.apply)
           OldVectors.dense(res)
-        case (v: OldSparseVector) => {
+        case v: OldSparseVector => {
           val res = new ArrayBuffer[(Int, Double)]()
           v.foreachActive((i, v) => if (localCorrIndices.contains(i)) res += localCorrIndices.indexOf(i) -> v)
           OldVectors.sparse(localCorrIndices.length, res).compressed
@@ -800,9 +808,9 @@ private[op] case class ColumnStatistics
         maxRuleConfidences.zip(supports).collectFirst {
           case (conf, sup) if (conf > maxRuleConfidence && sup > minRequiredRuleSupport) =>
             s"Max association rule confidence $conf is above threshold of $maxRuleConfidence and support $sup is " +
-            s"above the required support threshold of $minRequiredRuleSupport"
+              s"above the required support threshold of $minRequiredRuleSupport"
         },
-        column.flatMap(_.grouping).filter(removedGroups.contains(_)).map(ig =>
+        column.flatMap(_.featureGroup()).filter(removedGroups.contains(_)).map(ig =>
           s"other feature in indicator group $ig flagged for removal via rule confidence checks"
         )
       ).flatten
