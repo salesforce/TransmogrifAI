@@ -47,7 +47,7 @@ import scala.collection.JavaConverters._
  */
 class StreamingHistogram(val maxBins: Int) extends Serializable {
 
-  protected[this] val points: TreeMap[Double, Double] =
+  private[this] val points: TreeMap[Double, Double] =
     getTreeMap[Double].asInstanceOf[TreeMap[Double, Double]]
 
   /**
@@ -56,7 +56,7 @@ class StreamingHistogram(val maxBins: Int) extends Serializable {
   final def getBins(): Array[Bin] = points.asScala.toArray
 
   /**
-   * Merges this distribution with the input distribution.
+   * Merges this histogram with the input histogram.
    *
    * @param dist input value
    * @return merged distribution
@@ -79,6 +79,8 @@ class StreamingHistogram(val maxBins: Int) extends Serializable {
     this
   }
 
+  private[stats] final def density(x: Double): Double = StreamingHistogram.density(getBins, x)
+
   /**
    * Performs sum algorithm outlined in paper evaluated at some input point, which approximates the number of
    * points less than or equal to the input point.
@@ -98,7 +100,7 @@ class StreamingHistogram(val maxBins: Int) extends Serializable {
    */
   final def empiricalCDF(x: Double): Double = StreamingHistogram.empiricalCDF(getBins, x)
 
-  private def mergePoints(): Unit = if (points.size > math.max(maxBins, 2)) {
+  private[this] def mergePoints(): Unit = if (points.size > math.max(maxBins, 2)) {
     val (q1, q2) = points.descendingKeySet.descendingIterator.asScala.sliding(2).map(_ match {
       case List(a, b) => (a, b)
     }).reduce { (p1, p2) =>
@@ -116,7 +118,7 @@ class StreamingHistogram(val maxBins: Int) extends Serializable {
     points.put((q1 * k1 + q2 * k2) / (k1 + k2), k1 + k2)
   }
 
-  private def updatePoints(updates: (Double, Double)*): Unit = {
+  private[this] def updatePoints(updates: (Double, Double)*): Unit = {
     updates.foreach { case (point, ct) =>
       points.put(point, Option(points.get(point)).getOrElse(0.0) + ct)
     }
@@ -128,6 +130,27 @@ class StreamingHistogram(val maxBins: Int) extends Serializable {
 object StreamingHistogram {
 
   private[stats] type Bin = (Double, Double)
+  private val EmptyBin: Bin = (0.0, 0.0)
+
+  private[stats] def density(bins: Array[Bin], x: Double): Double = {
+    val epsilon = 0.01
+    val binsMin: Option[Bin] = if (bins.nonEmpty) Option((bins.map(_._1).min - epsilon) -> 0.0) else None
+    val binsMax: Option[Bin] = if (bins.nonEmpty) Option((bins.map(_._1).max + epsilon) -> 0.0) else None
+    val finalBins = binsMin ++ bins ++ binsMax
+    finalBins.sliding(2).foldLeft(EmptyBin) { case ((prob, sum), arr) =>
+      arr match {
+        case List((p, m)) => (prob + m, sum + m)
+        case List((p1, m1), (p2, m2)) =>
+          val sumTerm = (m1 + m2) / 2
+          val newProb = prob + { if (x >= p1 && x < p2) sumTerm else 0.0 }
+
+          (newProb, sum + sumTerm)
+      }
+    } match {
+      case (_, 0.0) => 0.0
+      case (p, s) => p / s
+    }
+  }
 
   /**
    * Performs sum algorithm outlined in paper evaluated at some input point, which approximates the number of
@@ -137,42 +160,44 @@ object StreamingHistogram {
    * @return approximate number of points that are less than or equal to the input point
    */
   private[stats] def sum(bins: Array[Bin], x: Double): Double =
-    bins match {
-      case b if b.length >= 2 =>
-        val pairedb = b.sliding(2).map(_ match {
-          case Array(b1, b2) => (b1, b2)
-        })
+    bins.sliding(2).foldLeft((0.0, EmptyBin, false)) { case ((s, _, done), arr) =>
+      arr match {
+        case Array((p, m)) =>
+          val newS = if (x == p) m / 2
+            else if (x > m) m
+            else 0.0
 
-        pairedb.foldLeft((0.0, (0.0, 0.0), false)) { case ((s, _, done), ((p1, m1), (p2, m2))) =>
+          (newS, EmptyBin, true)
+
+        case Array((p1, m1), (p2, m2)) =>
           if (x >= p1 && x < p2 && !done) {
             val mx = m1 + ((m2 - m1) / (p2 - p1)) * (x - p1)
             val newS = s + (m1 / 2) + ((m1 + mx) / 2) * ((x - p1) / (p2 - p1))
 
             (newS, (p2, m2), true)
+          } else if (done) {
+            (s, (p2, m2), done)
+          // It must be the case that (x < p1 || x >= p2)
+          } else if (x >= p2) {
+            (s + m1, (p2, m2), false)
           } else {
-            if (done) (s, (p2, m2), done)
-            else {
-              // It must be the case that (x < p1 || x >= p2)
-              if (x >= p2) (s + m1, (p2, m2), false)
-              else (s, (p2, m2), true)
-            }
+            (s, (p2, m2), true)
           }
-        } match {
-          case (s, (p, m), true) => s
-          case (s, (p, m), false) =>
-            s + { if (x == p) m / 2 else m }
-        }
-      case b if b.isEmpty => 0.0
-      case b =>
-        val (p, m) = b(0) // We must have exactly one element
-        if (x == p) m / 2
-        else if (x > m) m
-        else 0.0
+      }
+    } match {
+      case (s, (p, m), true) => s
+      case (s, (p, m), false) => s + { if (x == p) m / 2 else m }
     }
 
+  /**
+   * @return CDF estimate using the histogram sum algorithm
+   */
   private[stats] def sumCDF(bins: Array[Bin], x: Double): Double =
     sum(bins, x) / bins.map(_._2).sum
 
+  /**
+   * @return empirical CDF estimate
+   */
   private[stats] def empiricalCDF(bins: Array[Bin], x: Double): Double =
     bins.collect { case (p, m) if p <= x => m }.sum / bins.map(_._2).sum
 

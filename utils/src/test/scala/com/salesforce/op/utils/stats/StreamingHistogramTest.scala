@@ -42,6 +42,9 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class StreamingHistogramTest extends FlatSpec with TestCommon {
 
+  val histogramSampleSize = 500
+  val mcSampleSize = 1000
+
   Spec(classOf[StreamingHistogram]) should "produce correct histogram distribution" in {
     referenceHistogram.getBins.map {
       case (point, count) => round(point) -> count
@@ -61,142 +64,127 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
     round(hist.sum(46)) shouldEqual 10.0
   }
 
-  it should "approximate Gaussian distribution CDF" in {
-    val grid1 = linspace(-3, 3, 25)
-    val grid2 = linspace(-1, 11, 25)
-    val grid3 = grid1 ++ grid2
+  it should "compute the correct density" in {
+    val hist = referenceHistogram
+
+    round(hist.density(1)) shouldEqual 0.0
+    round(hist.density(1.999)) shouldEqual 0.05
+    round(hist.density(5)) shouldEqual 0.15
+    round(hist.density(12)) shouldEqual 0.25
+    round(hist.density(25)) shouldEqual 0.3
+    round(hist.density(35)) shouldEqual 0.2
+    round(hist.density(45.001)) shouldEqual 0.05
+    round(hist.density(46)) shouldEqual 0.0
+  }
+
+  it should "correctly approximate standard normal distribution" in {
+    val sampleSize = 500
     val gaussian1 = Gaussian(0, 1)
     val gaussian2 = Gaussian(5, 5)
-    val mixture = MixtureDistribution(gaussian1, gaussian2, 0.8)
-    val sampleSize = 500
+    val mixture = MixtureDistribution(gaussian1, gaussian2, 0.8, sampleSize)
 
-    cdfTest("Gaussian(0, 1)", gaussian1, grid1, sampleSize, 100, 50)
-    cdfTest("Gaussian(0, 1)", gaussian1, grid1, sampleSize, 200, 50)
-    cdfTest("Gaussian(0, 1)", gaussian1, grid1, sampleSize, 400, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, grid2, sampleSize, 100, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, grid2, sampleSize, 200, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, grid2, sampleSize, 400, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, grid3, sampleSize, 100, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, grid3, sampleSize, 200, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, grid3, sampleSize, 400, 50)
+    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
   }
 
   it should "approximate Gamma distribution CDF" in {
-    val grid1 = linspace(0.0001, 4, 25)
-    val grid2 = linspace(950, 1050, 25)
-    val grid3 = grid1 ++ linspace(4, 950, 25) ++ grid2
+    val sampleSize = 500
     val gamma1 = new Gamma(20, 1.0 / 2)
     val gamma2 = new Gamma(1000000, 1.0 / 1000)
-    val mixture = MixtureDistribution(gamma1, gamma2, 0.95)
-    val sampleSize = 500
+    val mixture = MixtureDistribution(gamma1, gamma2, 0.95, sampleSize)
 
-    cdfTest("Gamma(20, 0.5)", gamma1, grid1, sampleSize, 100, 50)
-    cdfTest("Gamma(20, 0.5)", gamma1, grid1, sampleSize, 200, 50)
-    cdfTest("Gamma(20, 0.5)", gamma1, grid1, sampleSize, 400, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, grid2, sampleSize, 100, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, grid2, sampleSize, 200, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, grid2, sampleSize, 400, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, grid3, sampleSize, 100, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, grid3, sampleSize, 200, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, grid3, sampleSize, 400, 50)
+    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
   }
 
   it should "approximate Beta distribution CDF" in {
-    val grid = linspace(0.0001, 0.999, 25)
+    val sampleSize = 500
     val beta1 = new Beta(5, 1)
     val beta2 = new Beta(1, 5)
-    val mixture = MixtureDistribution(beta1, beta2, 0.5)
-    val sampleSize = 500
+    val mixture = MixtureDistribution(beta1, beta2, 0.5, sampleSize)
 
-    cdfTest("Beta(5, 1)", beta1, grid, sampleSize, 100, 50)
-    cdfTest("Beta(5, 1)", beta1, grid, sampleSize, 200, 50)
-    cdfTest("Beta(5, 1)", beta1, grid, sampleSize, 400, 50)
-    cdfTest("Beta(1, 5)", beta2, grid, sampleSize, 100, 50)
-    cdfTest("Beta(1, 5)", beta2, grid, sampleSize, 200, 50)
-    cdfTest("Beta(1, 5)", beta2, grid, sampleSize, 400, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, grid, sampleSize, 100, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, grid, sampleSize, 200, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, grid, sampleSize, 400, 50)
+    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 400, mcSampleSize, 50)
+    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
+    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
+    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
   }
+
 
   private def cdfTest(
     distributionName: String,
-    dist: Distribution[Double] with HasCdf,
-    grid: Array[Double],
-    sampleSize: Int,
+    dist: ContinuousDistr[Double] with HasCdf,
+    histogramSampleSize: Int,
     maxBins: Int,
-    numResults: Int): Unit = {
+    mcSampleSize: Int,
+    numResults: Int): MSEDistributionResult = {
+    val sample = dist.sample(histogramSampleSize).toArray
+    val hist = new StreamingHistogram(maxBins)
+    val equiDist = equiDistBins(sample, maxBins)
 
-    def getResults(sampleSize: Int, maxBins: Int): Array[DistributionTestResult] = {
-      val sample = (0 until sampleSize).map(_ => dist.draw()).toArray
-      val hist = new StreamingHistogram(maxBins)
-      val equiDist = equiDistBins(sample, maxBins)
+    hist.update(sample: _*)
 
-      hist.update(sample: _*)
+    val mses: Array[MSEResult] = (0 until numResults).map { _ =>
+      val mcSample = dist.sample(mcSampleSize)
+      val trueDensities = mcSample.map(dist.pdf).toArray
+      val trueCDFs = mcSample.map(dist.cdf).toArray
 
-      grid.map { gridPoint =>
-        DistributionTestResult(
-          point = gridPoint,
-          trueCDF = dist.cdf(gridPoint),
-          streamingSumCDF = hist.sumCDF(gridPoint),
-          streamingEmpiricalCDF = hist.empiricalCDF(gridPoint),
-          equiDistSumCDF = StreamingHistogram.sumCDF(equiDist, gridPoint),
-          equiDistEmpiricalCDF = StreamingHistogram.empiricalCDF(equiDist, gridPoint))
-      }
-    }
+      def computeMSE(f: Double => Double, trueValues: Array[Double]): Double =
+        mcSample.map(f).zip(trueValues).map { case (a, b) => math.pow(a - b, 2) }.sum / mcSampleSize
 
-    def cdfMSE(allResults: Array[Array[DistributionTestResult]]): Array[MSEResult] = {
-      val points = allResults.flatMap(_.map(_.point)).distinct.sorted
+      MSEResult(
+        streamingDensityMSE = computeMSE(hist.density(_), trueDensities),
+        streamingSumCDFMSE = computeMSE(hist.sumCDF(_), trueCDFs),
+        streamingEmpiricalCDFMSE = computeMSE(hist.empiricalCDF(_), trueCDFs),
+        equiDistDensityMSE = computeMSE(StreamingHistogram.density(equiDist, _), trueDensities),
+        equiDistSumCDFMSE = computeMSE(StreamingHistogram.sumCDF(equiDist, _), trueCDFs),
+        equiDistEmpiricalCDFMSE = computeMSE(StreamingHistogram.empiricalCDF(equiDist, _), trueCDFs))
+    }.toArray
 
-      def computeMSE(results: Array[DistributionTestResult], f: DistributionTestResult => Double): Double = {
-        val bias = breeze.stats.mean(results.map(r => r.trueCDF - f(r)))
-        val variance = breeze.stats.variance(results.map(f))
-
-        math.pow(bias, 2) + variance
-      }
-
-      points.map { pt =>
-        val results = allResults.map(_.filter(_.point == pt)(0))
-
-        MSEResult(
-          streamingSumCDFMSE = computeMSE(results, _.streamingSumCDF),
-          streamingEmpiricalCDFMSE = computeMSE(results, _.streamingEmpiricalCDF),
-          equiDistSumCDFMSE = computeMSE(results, _.equiDistSumCDF),
-          equiDistEmpiricalCDFMSE = computeMSE(results, _.equiDistEmpiricalCDF))
-      }
-    }
-
-    val mses = cdfMSE((0 until numResults).map(_ => getResults(sampleSize, maxBins)).toArray)
-
-    val MeanAndVariance(streamingSumCDFMSEMean, streamingSumCDFMSEVar, _) =
-      meanAndVariance(mses.map(_.streamingSumCDFMSE))
-    val MeanAndVariance(streamingEmpiricalCDFMSEMean, streamingEmpiricalCDFMSEVar, _) =
-      meanAndVariance(mses.map(_.streamingEmpiricalCDFMSE))
-    val MeanAndVariance(equiDistSumCDFMSEMean, equiDistSumCDFMSEVar, _) =
-      meanAndVariance(mses.map(_.equiDistSumCDFMSE))
-    val MeanAndVariance(equiDistEmpiricalCDFMSEMean, equiDistEmpiricalCDFMSEVar, _) =
-      meanAndVariance(mses.map(_.equiDistEmpiricalCDFMSE))
+    val result = MSEDistributionResult(
+      streamingDensityMSE = meanAndVariance(mses.map(_.streamingDensityMSE)),
+      streamingSumCDFMSE = meanAndVariance(mses.map(_.streamingSumCDFMSE)),
+      streamingEmpiricalCDFMSE = meanAndVariance(mses.map(_.streamingEmpiricalCDFMSE)),
+      equiDistDensityMSE = meanAndVariance(mses.map(_.equiDistDensityMSE)),
+      equiDistSumCDFMSE = meanAndVariance(mses.map(_.equiDistSumCDFMSE)),
+      equiDistEmpiricalCDFMSE = meanAndVariance(mses.map(_.equiDistEmpiricalCDFMSE)))
 
     println("-" * 50)
     println(s"Checking distribution $distributionName " +
-      s"[bins = $maxBins, sample size = $sampleSize, iterations = $numResults]")
+      s"[bins = $maxBins, sample size = $histogramSampleSize, iterations = $numResults]")
     println("-" * 50)
-    println(s"Streaming histogram sum CDF MSE mean and variance: $streamingSumCDFMSEMean, $streamingSumCDFMSEVar")
+    println("Streaming histogram density MSE mean and variance: " +
+      s"${result.streamingDensityMSE.mean}, ${result.streamingDensityMSE.variance}")
+    println("Streaming histogram sum CDF MSE mean and variance: " +
+      s"${result.streamingSumCDFMSE.mean}, ${result.streamingSumCDFMSE.variance}")
     println("Streaming histogram empirical CDF MSE mean and variance: " +
-      s"$streamingEmpiricalCDFMSEMean, $streamingEmpiricalCDFMSEVar")
-    println(s"Equidistant histogram sum CDF MSE mean and variance: $equiDistSumCDFMSEMean, $equiDistSumCDFMSEVar")
+      s"${result.streamingEmpiricalCDFMSE.mean}, ${result.streamingEmpiricalCDFMSE.variance}")
+    println(s"Equidistant histogram density MSE mean and variance: " +
+      s"${result.equiDistDensityMSE.mean}, ${result.equiDistDensityMSE.variance}")
+    println(s"Equidistant histogram sum CDF MSE mean and variance: " +
+      s"${result.equiDistSumCDFMSE.mean}, ${result.equiDistSumCDFMSE.variance}")
     println("Equidistant histogram empirical CDF MSE mean and variance: " +
-      s"$equiDistEmpiricalCDFMSEMean, $equiDistEmpiricalCDFMSEVar")
+      s"${result.equiDistEmpiricalCDFMSE.mean}, ${result.equiDistEmpiricalCDFMSE.variance}")
 
-    val mseMeans = Array(
-      streamingSumCDFMSEMean, streamingEmpiricalCDFMSEMean, equiDistSumCDFMSEMean, equiDistEmpiricalCDFMSEMean)
-
-    for {
-      x1 <- mseMeans
-      x2 <- mseMeans
-    } yield {
-      math.abs(x1 - x2) <= 0.001 shouldBe true
-    }
+    result
   }
 
   private def equiDistBins(points: Array[Double], numBins: Int): Array[(Double, Double)] = {
@@ -231,32 +219,43 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
 
 object StreamingHistogramTest {
 
-  type Distribution[T] = Density[T] with Rand[T]
-
   case class MixtureDistribution(
-      d1: Distribution[Double] with HasCdf,
-      d2: Distribution[Double]with HasCdf,
-      p: Double) extends Density[Double] with Rand[Double] with HasCdf {
+      d1: ContinuousDistr[Double] with HasCdf,
+      d2: ContinuousDistr[Double]with HasCdf,
+      p: Double,
+      mcSampleSize: Int) extends ContinuousDistr[Double] with HasCdf {
       val bernoulli = new Bernoulli(p)
-      def apply(x: Double): Double = mixture(d1(x), d2(x))
-      def cdf(x: Double): Double = mixture(d1.cdf(x), d2.cdf(x))
-      def draw(): Double = if (bernoulli.draw) d1.draw else d2.draw
-      def probability(x: Double, y: Double): Double = mixture(d1.probability(x, y), d2.probability(x, y))
+
+      // Required for defining class, but don't use for test purposes
+      def logNormalizer: Double = 0.0
+      def unnormalizedLogPdf(x: Double): Double = 0.0
+      def probability(x: Double,y: Double): Double = 0.0
+
+      override def cdf(x: Double): Double = mixture(d1.cdf(x), d2.cdf(x))
+      override def pdf(x: Double): Double = mixture(d1.pdf(x), d2.pdf(x))
+      override def draw(): Double = if (bernoulli.draw) d1.draw else d2.draw
+
+      def entropy: Double = (0 until mcSampleSize).map { _ =>
+        val samp = draw()
+        apply(samp) * math.log(samp)
+      }.sum / mcSampleSize
 
       private def mixture(x: Double, y: Double): Double = p * x + (1 - p) * x
   }
 
-  case class DistributionTestResult(
-      point: Double,
-      trueCDF: Double,
-      streamingSumCDF: Double,
-      streamingEmpiricalCDF: Double,
-      equiDistSumCDF: Double,
-      equiDistEmpiricalCDF: Double)
-
   case class MSEResult(
+      streamingDensityMSE: Double,
       streamingSumCDFMSE: Double,
       streamingEmpiricalCDFMSE: Double,
+      equiDistDensityMSE: Double,
       equiDistSumCDFMSE: Double,
       equiDistEmpiricalCDFMSE: Double)
+
+  case class MSEDistributionResult(
+      streamingDensityMSE: MeanAndVariance,
+      streamingSumCDFMSE: MeanAndVariance,
+      streamingEmpiricalCDFMSE: MeanAndVariance,
+      equiDistDensityMSE: MeanAndVariance,
+      equiDistSumCDFMSE: MeanAndVariance,
+      equiDistEmpiricalCDFMSE: MeanAndVariance)
 }
