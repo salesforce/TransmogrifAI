@@ -30,13 +30,16 @@
 
 package com.salesforce.op.utils.kryo
 
+import java.util.TreeMap
 
 import com.esotericsoftware.kryo.{Kryo, Registration}
+import com.salesforce.op.utils.stats.StreamingHistogram
+import com.salesforce.op.utils.stats.StreamingHistogram.{StreamingHistogramBuilder, StreamingHistogramComparator}
+import com.twitter.chill.algebird.AlgebirdRegistrar
 import com.twitter.chill.avro.AvroSerializer
 import org.apache.avro.generic.GenericData
 import org.apache.avro.specific.SpecificRecordBase
 import org.apache.spark.serializer.KryoRegistrator
-import com.twitter.chill.algebird.AlgebirdRegistrar
 
 import scala.reflect._
 
@@ -67,6 +70,15 @@ class OpKryoRegistrator extends KryoRegistrator {
       classOf[GenericData.Array[_]],
       new GenericJavaCollectionSerializer(classOf[java.util.ArrayList[_]])
     )
+
+    // Streaming histogram registration
+    doClassRegistration(kryo)(
+      classOf[StreamingHistogram],
+      classOf[StreamingHistogramBuilder],
+      classOf[StreamingHistogramComparator],
+      classOf[TreeMap[_, _]],
+      classOf[scala.collection.mutable.WrappedArray.ofDouble])
+
     new AlgebirdRegistrar().apply(kryo)
     registerCustomClasses(kryo)
   }

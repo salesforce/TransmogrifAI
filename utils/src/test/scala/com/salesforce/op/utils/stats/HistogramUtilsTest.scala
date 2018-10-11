@@ -28,19 +28,45 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.stats;
+package com.salesforce.op.utils.stats
 
-import java.io.Serializable;
-import java.util.Comparator;
-import java.util.TreeMap;
-import java.util.function.Function;
+import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-final public class HistogramJavaUtils {
-    final public static <T> TreeMap<Double, T> getTreeMap() {
-        return new TreeMap<Double, T>(getComparator());
-    }
+@RunWith(classOf[JUnitRunner])
+class HistogramUtilsTest extends FlatSpec with TestCommon {
 
-    final private static Comparator<Double> getComparator() {
-        return Comparator.comparing((Function<Double, Double> & Serializable) Double::valueOf);
-    }
+  val testBins: Array[(Double, Double)] = Array(0.0 -> 1.0, 2.0 -> 3.0, 3.0 -> 3.0, 4.0 -> 1.0)
+
+  Spec(HistogramUtils.getClass) should "compute correct empirical CDF given a set of bins" in {
+    val cdf = HistogramUtils.cdf(testBins)
+
+    cdf(-0.5) shouldEqual 0.0
+    cdf(0.0) shouldEqual 0.125
+    cdf(1.0) shouldEqual 0.125
+    cdf(2.0) shouldEqual 0.5
+    cdf(2.5) shouldEqual 0.5
+    cdf(3.0) shouldEqual 0.875
+    cdf(3.5) shouldEqual 0.875
+    cdf(4.0) shouldEqual 1.0
+    cdf(4.5) shouldEqual 1.0
+  }
+
+  it should "compute histogram density estimator correctly given a set of bins" in {
+    val pdf = HistogramUtils.density(testBins, 0.5)
+
+    pdf(-1.0) shouldEqual 0.0
+    pdf(-0.5) shouldEqual 0.0625
+    pdf(0.0) shouldEqual 0.25
+    pdf(1.0) shouldEqual 0.25
+    pdf(2.0) shouldEqual 0.375
+    pdf(2.5) shouldEqual 0.375
+    pdf(3.0) shouldEqual 0.25
+    pdf(3.5) shouldEqual 0.25
+    pdf(4.0) shouldEqual 0.0625
+    pdf(4.5) shouldEqual 0.0
+    pdf(5.0) shouldEqual 0.0
+  }
 }

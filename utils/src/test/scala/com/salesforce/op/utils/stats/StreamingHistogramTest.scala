@@ -33,20 +33,25 @@ package com.salesforce.op.utils.stats
 import breeze.integrate
 import breeze.stats.{meanAndVariance, MeanAndVariance}
 import breeze.stats.distributions._
-import com.salesforce.op.test.TestCommon
+import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.utils.stats.StreamingHistogram.StreamingHistogramBuilder
 import com.salesforce.op.utils.stats.StreamingHistogramTest._
+import org.apache.spark.SparkConf
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class StreamingHistogramTest extends FlatSpec with TestCommon {
+class StreamingHistogramTest extends FlatSpec with TestSparkContext {
 
   val histogramSampleSize = 500
   val mcSampleSize = 1000
 
+  // Enforce Kryo serialization check
+  conf.set("spark.kryo.registrationRequired", "true")
+
   Spec(classOf[StreamingHistogram]) should "produce correct histogram distribution" in {
-    referenceHistogram.getBins.map {
+    HistogramUtils.streamingHistogramBins(referenceHistogram).map {
       case (point, count) => round(point) -> count
     } should contain theSameElementsAs Seq(2.0 -> 1L, 9.5 -> 2L, 19.33 -> 3L, 32.67 -> 3L, 45 -> 1L)
   }
@@ -60,21 +65,27 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
     round(hist.sum(15)) shouldEqual 3.28
     round(hist.sum(20)) shouldEqual 4.65
     round(hist.sum(35)) shouldEqual 8.03
-    round(hist.sum(45)) shouldEqual 9.5
+    round(hist.sum(45)) shouldEqual 10.0
     round(hist.sum(46)) shouldEqual 10.0
   }
 
-  it should "compute the correct density" in {
-    val hist = referenceHistogram
+  it should "work with spark" in {
+    val data = sc.parallelize((0 to 10).map(_.toDouble), 2)
+    val histogram = {
+      val seqOp = (bldr: StreamingHistogramBuilder, point: Double) => {
+        bldr.update(point)
+        bldr
+      }
+      val combOp = (bldr1: StreamingHistogramBuilder, bldr2: StreamingHistogramBuilder) => {
+        bldr1.merge(bldr2.build)
+        bldr1
+      }
 
-    round(hist.density(1)) shouldEqual 0.0
-    round(hist.density(1.999)) shouldEqual 0.05
-    round(hist.density(5)) shouldEqual 0.15
-    round(hist.density(12)) shouldEqual 0.25
-    round(hist.density(25)) shouldEqual 0.3
-    round(hist.density(35)) shouldEqual 0.2
-    round(hist.density(45.001)) shouldEqual 0.05
-    round(hist.density(46)) shouldEqual 0.0
+      data.aggregate(new StreamingHistogramBuilder(15, 500, 1))(seqOp, combOp).build
+    }
+
+    HistogramUtils.streamingHistogramBins(histogram) should contain theSameElementsAs
+      (0 to 10).map(k => (k.toDouble, 1.0))
   }
 
   it should "correctly approximate standard normal distribution" in {
@@ -131,16 +142,18 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
 
   private def cdfTest(
     distributionName: String,
-    dist: ContinuousDistr[Double] with HasCdf,
+    dist: TestDistribution,
     histogramSampleSize: Int,
     maxBins: Int,
     mcSampleSize: Int,
     numResults: Int): MSEDistributionResult = {
     val sample = dist.sample(histogramSampleSize).toArray
-    val hist = new StreamingHistogram(maxBins)
-    val equiDist = equiDistBins(sample, maxBins)
+    val hist = new StreamingHistogramBuilder(maxBins, 100, 1)
 
-    hist.update(sample: _*)
+    sample.foreach(hist.update(_))
+
+    val equiDistBins = HistogramUtils.equiDistantBins(sample, maxBins)
+    val streamingBins = HistogramUtils.streamingHistogramBins(hist.build)
 
     val mses: Array[MSEResult] = (0 until numResults).map { _ =>
       val mcSample = dist.sample(mcSampleSize)
@@ -151,21 +164,17 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
         mcSample.map(f).zip(trueValues).map { case (a, b) => math.pow(a - b, 2) }.sum / mcSampleSize
 
       MSEResult(
-        streamingDensityMSE = computeMSE(hist.density(_), trueDensities),
-        streamingSumCDFMSE = computeMSE(hist.sumCDF(_), trueCDFs),
-        streamingEmpiricalCDFMSE = computeMSE(hist.empiricalCDF(_), trueCDFs),
-        equiDistDensityMSE = computeMSE(StreamingHistogram.density(equiDist, _), trueDensities),
-        equiDistSumCDFMSE = computeMSE(StreamingHistogram.sumCDF(equiDist, _), trueCDFs),
-        equiDistEmpiricalCDFMSE = computeMSE(StreamingHistogram.empiricalCDF(equiDist, _), trueCDFs))
+        streamingDensityMSE = computeMSE(HistogramUtils.density(streamingBins), trueDensities),
+        streamingCdfMSE = computeMSE(HistogramUtils.cdf(streamingBins), trueCDFs),
+        equiDistDensityMSE = computeMSE(HistogramUtils.density(equiDistBins), trueDensities),
+        equiDistCdfMSE = computeMSE(HistogramUtils.cdf(equiDistBins), trueCDFs))
     }.toArray
 
     val result = MSEDistributionResult(
       streamingDensityMSE = meanAndVariance(mses.map(_.streamingDensityMSE)),
-      streamingSumCDFMSE = meanAndVariance(mses.map(_.streamingSumCDFMSE)),
-      streamingEmpiricalCDFMSE = meanAndVariance(mses.map(_.streamingEmpiricalCDFMSE)),
+      streamingCdfMSE = meanAndVariance(mses.map(_.streamingCdfMSE)),
       equiDistDensityMSE = meanAndVariance(mses.map(_.equiDistDensityMSE)),
-      equiDistSumCDFMSE = meanAndVariance(mses.map(_.equiDistSumCDFMSE)),
-      equiDistEmpiricalCDFMSE = meanAndVariance(mses.map(_.equiDistEmpiricalCDFMSE)))
+      equiDistCdfMSE = meanAndVariance(mses.map(_.equiDistCdfMSE)))
 
     println("-" * 50)
     println(s"Checking distribution $distributionName " +
@@ -173,45 +182,27 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
     println("-" * 50)
     println("Streaming histogram density MSE mean and variance: " +
       s"${result.streamingDensityMSE.mean}, ${result.streamingDensityMSE.variance}")
-    println("Streaming histogram sum CDF MSE mean and variance: " +
-      s"${result.streamingSumCDFMSE.mean}, ${result.streamingSumCDFMSE.variance}")
-    println("Streaming histogram empirical CDF MSE mean and variance: " +
-      s"${result.streamingEmpiricalCDFMSE.mean}, ${result.streamingEmpiricalCDFMSE.variance}")
-    println(s"Equidistant histogram density MSE mean and variance: " +
+    println("Streaming histogram cdf MSE mean and variance: " +
+      s"${result.streamingCdfMSE.mean}, ${result.streamingCdfMSE.variance}")
+    println("Equidistant histogram density MSE mean and variance: " +
       s"${result.equiDistDensityMSE.mean}, ${result.equiDistDensityMSE.variance}")
-    println(s"Equidistant histogram sum CDF MSE mean and variance: " +
-      s"${result.equiDistSumCDFMSE.mean}, ${result.equiDistSumCDFMSE.variance}")
-    println("Equidistant histogram empirical CDF MSE mean and variance: " +
-      s"${result.equiDistEmpiricalCDFMSE.mean}, ${result.equiDistEmpiricalCDFMSE.variance}")
+    println("Equidistant histogram cdf MSE mean and variance: " +
+      s"${result.equiDistCdfMSE.mean}, ${result.equiDistCdfMSE.variance}")
 
     result
   }
 
-  private def equiDistBins(points: Array[Double], numBins: Int): Array[(Double, Double)] = {
-    val a = points.min - 0.001
-    val b = points.max + 0.001
-
-    linspace(a, b, numBins).sliding(2).map(_ match {
-      case Array(p, q) => ((p + q) / 2, points.filter(d => d >= p && d < q).length.toDouble)
-    }).toArray
-  }
-
-  private def linspace(a: Double, b: Double, n: Int): Array[Double] =
-    (0 to n).map(k => a + ((b - a) * k) / n).toArray
-
   private def referenceHistogram: StreamingHistogram = {
-    val hist = new StreamingHistogram(5)
-    hist.update(23, 19, 10, 16, 36)
-    hist.getBins should contain theSameElementsAs Seq(23.0, 19.0, 10.0, 16.0, 36.0).map(_ -> 1L)
-    hist.update(2)
-    hist.getBins should contain theSameElementsAs Seq(2.0, 10.0, 23.0, 36.0).map(_ -> 1L) ++ Seq(17.5 -> 2L)
-    hist.update(9)
-    hist.getBins should contain theSameElementsAs Seq(2.0, 23.0, 36.0).map(_ -> 1L) ++ Seq(9.5, 17.5).map(_ -> 2L)
+    val hist = new StreamingHistogramBuilder(5, 0, 1)
 
-    val hist2 = new StreamingHistogram(5)
-    hist.update(32, 30, 45)
+    Seq(23, 19, 10, 16, 36, 2, 9).foreach(hist.update(_))
 
-    hist.merge(hist2)
+    val hist2 = new StreamingHistogramBuilder(5, 0, 1)
+    Seq(32, 30, 45).foreach(hist2.update(_))
+
+    hist.merge(hist2.build)
+
+    hist.build
   }
 
   private def round(x: Double): Double = math.round(x * 100).toDouble / 100
@@ -219,9 +210,11 @@ class StreamingHistogramTest extends FlatSpec with TestCommon {
 
 object StreamingHistogramTest {
 
+  type TestDistribution = ContinuousDistr[Double] with HasCdf
+
   case class MixtureDistribution(
-      d1: ContinuousDistr[Double] with HasCdf,
-      d2: ContinuousDistr[Double]with HasCdf,
+      d1: TestDistribution,
+      d2: TestDistribution,
       p: Double,
       mcSampleSize: Int) extends ContinuousDistr[Double] with HasCdf {
       val bernoulli = new Bernoulli(p)
@@ -229,7 +222,7 @@ object StreamingHistogramTest {
       // Required for defining class, but don't use for test purposes
       def logNormalizer: Double = 0.0
       def unnormalizedLogPdf(x: Double): Double = 0.0
-      def probability(x: Double,y: Double): Double = 0.0
+      def probability(x: Double, y: Double): Double = 0.0
 
       override def cdf(x: Double): Double = mixture(d1.cdf(x), d2.cdf(x))
       override def pdf(x: Double): Double = mixture(d1.pdf(x), d2.pdf(x))
@@ -245,17 +238,13 @@ object StreamingHistogramTest {
 
   case class MSEResult(
       streamingDensityMSE: Double,
-      streamingSumCDFMSE: Double,
-      streamingEmpiricalCDFMSE: Double,
+      streamingCdfMSE: Double,
       equiDistDensityMSE: Double,
-      equiDistSumCDFMSE: Double,
-      equiDistEmpiricalCDFMSE: Double)
+      equiDistCdfMSE: Double)
 
   case class MSEDistributionResult(
       streamingDensityMSE: MeanAndVariance,
-      streamingSumCDFMSE: MeanAndVariance,
-      streamingEmpiricalCDFMSE: MeanAndVariance,
+      streamingCdfMSE: MeanAndVariance,
       equiDistDensityMSE: MeanAndVariance,
-      equiDistSumCDFMSE: MeanAndVariance,
-      equiDistEmpiricalCDFMSE: MeanAndVariance)
+      equiDistCdfMSE: MeanAndVariance)
 }
