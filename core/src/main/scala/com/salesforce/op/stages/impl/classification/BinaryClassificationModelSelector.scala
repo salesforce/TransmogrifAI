@@ -212,7 +212,6 @@ object BinaryClassificationModelsToTry extends Enum[BinaryClassificationModelsTo
   case object OpLinearSVC extends BinaryClassificationModelsToTry
   case object OpDecisionTreeClassifier extends BinaryClassificationModelsToTry
   case object OpNaiveBayes extends BinaryClassificationModelsToTry
-  case object OpXGBoostClassifier extends BinaryClassificationModelsToTry
   case class Custom(private val modeType: Class[_ <: EstimatorType]) extends BinaryClassificationModelsToTry {
     override val entryName: String = modeType.getSimpleName
   }
