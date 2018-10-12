@@ -33,6 +33,7 @@ package com.salesforce.op.utils.kryo
 import java.util.TreeMap
 
 import com.esotericsoftware.kryo.{Kryo, Registration}
+import com.esotericsoftware.kryo.serializers.DefaultSerializers.TreeMapSerializer
 import com.salesforce.op.utils.stats.StreamingHistogram
 import com.salesforce.op.utils.stats.StreamingHistogram.{StreamingHistogramBuilder, StreamingHistogramComparator}
 import com.twitter.chill.algebird.AlgebirdRegistrar
@@ -41,6 +42,7 @@ import org.apache.avro.generic.GenericData
 import org.apache.avro.specific.SpecificRecordBase
 import org.apache.spark.serializer.KryoRegistrator
 
+import scala.collection.mutable.{WrappedArray => MWrappedArray}
 import scala.reflect._
 
 
@@ -71,16 +73,18 @@ class OpKryoRegistrator extends KryoRegistrator {
       new GenericJavaCollectionSerializer(classOf[java.util.ArrayList[_]])
     )
 
-    // Streaming histogram registration
-    doClassRegistration(kryo)(
-      classOf[StreamingHistogram],
-      classOf[StreamingHistogramBuilder],
-      classOf[StreamingHistogramComparator],
-      classOf[TreeMap[_, _]],
-      classOf[scala.collection.mutable.WrappedArray.ofDouble])
-
     new AlgebirdRegistrar().apply(kryo)
     registerCustomClasses(kryo)
+
+    // Streaming histogram registration
+    kryo.register(classOf[StreamingHistogram])
+    kryo.register(classOf[StreamingHistogramBuilder])
+    kryo.register(classOf[StreamingHistogramComparator])
+    kryo.register(classOf[TreeMap[_, _]], new TreeMapSerializer())
+
+    // Mutable wrapped arrays
+    OpKryoClasses.WrappedArrays.foreach(kryo.register)
+
   }
 
   /**
@@ -88,12 +92,11 @@ class OpKryoRegistrator extends KryoRegistrator {
    *
    * @param kryo
    */
-  protected def registerCustomClasses(kryo: Kryo): Unit = {}
+  protected def registerCustomClasses(kryo: Kryo): Unit = ()
 
 }
 
 private[op] case object OpKryoClasses {
-
   lazy val ArraysOfPrimitives: Seq[Class[_]] = Seq(
     Class.forName("[Z") /* boolean[] */,
     Class.forName("[B") /* byte[] */,
@@ -105,4 +108,15 @@ private[op] case object OpKryoClasses {
     Class.forName("[S") /* short[] */
   )
 
+  lazy val WrappedArrays: Seq[Class[_]] = Seq(
+    MWrappedArray.make(Array[Boolean]()).getClass,
+    MWrappedArray.make(Array[Byte]()).getClass,
+    MWrappedArray.make(Array[Char]()).getClass,
+    MWrappedArray.make(Array[Double]()).getClass,
+    MWrappedArray.make(Array[Float]()).getClass,
+    MWrappedArray.make(Array[Int]()).getClass,
+    MWrappedArray.make(Array[Long]()).getClass,
+    MWrappedArray.make(Array[Short]()).getClass,
+    MWrappedArray.make(Array[String]()).getClass
+  )
 }

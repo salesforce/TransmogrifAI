@@ -19,7 +19,6 @@
  */
 package com.salesforce.op.utils.stats;
 
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 
@@ -32,7 +31,7 @@ import com.google.common.base.Objects;
  * Yael Ben-Haim and Elad Tom-Tov, "A Streaming Parallel Decision Tree Algorithm" (2010)
  * http://jmlr.csail.mit.edu/papers/volume11/ben-haim10a/ben-haim10a.pdf
  *
- * This implementation is from Apache Cassandra roject, release 3.11.
+ * This implementation is from Apache Cassandra project, release 3.11.
  */
 public class StreamingHistogram implements Serializable
 {
