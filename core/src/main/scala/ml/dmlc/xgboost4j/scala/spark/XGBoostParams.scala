@@ -37,19 +37,31 @@ import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
 
 import scala.collection.mutable.ArrayBuffer
 
-
+/**
+ * Hack to access [[XGBoostClassifierParams]]
+ */
 trait OpXGBoostClassifierParams extends XGBoostClassifierParams with OpXGBoostGeneralParamsDefaults
 
+/**
+ * Hack to access [[XGBoostRegressorParams]]
+ */
 trait OpXGBoostRegressorParams extends XGBoostRegressorParams with OpXGBoostGeneralParamsDefaults
 
+/**
+ * XGBoost [[GeneralParams]] defaults
+ */
 trait OpXGBoostGeneralParamsDefaults {
   self: GeneralParams =>
   setDefault(trackerConf -> OpXGBoost.DefaultTrackerConf)
 }
 
+/**
+ * Helper trait to hush XGBoost annoying logging
+ */
 trait OpXGBoostQuietLogging {
   Logger.getLogger("akka").setLevel(Level.WARN)
   Logger.getLogger("XGBoostSpark").setLevel(Level.WARN)
+  Logger.getLogger(classOf[XGBoostClassifier]).setLevel(Level.WARN)
   Logger.getLogger(classOf[XGBoostRegressor]).setLevel(Level.WARN)
 }
 
