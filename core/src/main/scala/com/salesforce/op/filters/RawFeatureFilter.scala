@@ -33,12 +33,15 @@ package com.salesforce.op.filters
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
+import com.salesforce.op.filters.FeatureDistribution._
+import com.salesforce.op.filters.Summary._
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.Tuple2Semigroup
 import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
@@ -139,17 +142,19 @@ class RawFeatureFilter[T]
           None
       }
       val predOut = allPredictors.map(TransientFeature(_))
-
       (respOut, predOut)
     }
-    val preparedFeatures: RDD[PreparedFeatures] =
-      data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+    val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+
+    implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
     // Have to use the training summaries do process scoring for comparison
     val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
       allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
         .getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
     val (responseSummariesArr, predictorSummariesArr): (Array[(FeatureKey, Summary)], Array[(FeatureKey, Summary)]) =
       (responseSummaries.toArray, predictorSummaries.toArray)
+
+    implicit val sgTuple2Feats = new Tuple2Semigroup[Array[FeatureDistribution], Array[FeatureDistribution]]()
     val (responseDistributions, predictorDistributions): (Array[FeatureDistribution], Array[FeatureDistribution]) =
       preparedFeatures
         .map(_.getFeatureDistributions(
@@ -157,8 +162,7 @@ class RawFeatureFilter[T]
           predictorSummaries = predictorSummariesArr,
           bins = bins,
           textBinsFormula = textBinsFormula
-        ))
-        .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
+        )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
         val responseKeys: Array[FeatureKey] = responseSummariesArr.map(_._1)

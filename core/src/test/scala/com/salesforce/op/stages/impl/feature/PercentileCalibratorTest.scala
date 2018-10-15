@@ -75,9 +75,10 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     val splits = trans.getMetadata().getSummaryMetadata().getStringArray(PercentileCalibrator.OrigSplitsKey)
     val scaled = trans.getMetadata().getSummaryMetadata().getStringArray(PercentileCalibrator.ScaledSplitsKey)
 
-    splits should contain theSameElementsAs
-      Array(Double.NegativeInfinity, 0.7231742029971469, 0.9908988967772393, Double.PositiveInfinity).map(_.toString)
-    scaled should contain theSameElementsAs Array(0.0, 50.0, 99.0, 99.0).map(_.toString)
+    splits shouldEqual Array(
+      Double.NegativeInfinity, 0.25329310557439133, 0.7231742029971469, 0.9908988967772393,
+      Double.PositiveInfinity).map(_.toString)
+    scaled shouldEqual Array(0.0, 33.0, 66.0, 99.0, 99.0).map(_.toString)
   }
 
   it should "return a maximum calibrated score of 99" in {

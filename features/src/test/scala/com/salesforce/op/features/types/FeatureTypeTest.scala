@@ -211,12 +211,16 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
   property("toString should return a valid string") {
     forAll(featureTypesVals) { ft =>
       val actual = ft.toString
-      val v = ft.value match {
+      val v = ft match {
         case _ if ft.isEmpty => ""
-        case Seq(lat: Double, lon: Double, acc: Double) if ft.isInstanceOf[Geolocation] =>
-          f"$lat%.5f, $lon%.5f, ${GeolocationAccuracy.withValue(acc.toInt)}"
-        case t: TraversableOnce[_] => t.mkString(", ")
-        case x => x.toString
+        case g: Geolocation =>
+          f"${g.lat}%.5f, ${g.lon}%.5f, ${g.accuracy}"
+        case p: Prediction =>
+          val rawPred = p.rawPrediction.mkString("Array(", ", ", ")")
+          val prob = p.probability.mkString("Array(", ", ", ")")
+          s"prediction = ${p.prediction}, rawPrediction = $rawPred, probability = $prob"
+        case SomeValue(v: TraversableOnce[_]) => v.mkString(", ")
+        case t => t.value.toString
       }
       val expected = s"${ft.getClass.getSimpleName}($v)"
 
