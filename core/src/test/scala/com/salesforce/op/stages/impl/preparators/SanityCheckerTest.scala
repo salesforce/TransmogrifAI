@@ -35,14 +35,8 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-<<<<<<< HEAD
-import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.json.JsonUtils
-=======
 import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer, _}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
->>>>>>> b1aec920a49cd43a7b8fb03b3db1a90ff79881fb
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.SparkException
