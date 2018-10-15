@@ -34,50 +34,46 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import com.salesforce.op.test._
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostQuietLogging, XGBoostRegressionModel, XGBoostRegressor}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, DecisionTreeRegressor}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+
 @RunWith(classOf[JUnitRunner])
-class OpDecisionTreeRegressorTest extends OpEstimatorSpec[Prediction,
-  OpPredictorWrapperModel[DecisionTreeRegressionModel],
-  OpPredictorWrapper[DecisionTreeRegressor, DecisionTreeRegressionModel]] with PredictionEquality {
+class OpXGBoostRegressorTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[XGBoostRegressionModel],
+  OpPredictorWrapper[XGBoostRegressor, XGBoostRegressionModel]]
+  with PredictionEquality with OpXGBoostQuietLogging {
 
-  override def specName: String = Spec[OpDecisionTreeRegressor]
+  override def specName: String = Spec[OpXGBoostRegressor]
 
-  val (inputData, rawLabel, features) = TestFeatureBuilder(
-    Seq[(RealNN, OPVector)](
-      (10.0.toRealNN, Vectors.dense(1.0, 4.3, 1.3).toOPVector),
-      (20.0.toRealNN, Vectors.dense(2.0, 0.3, 0.1).toOPVector),
-      (30.0.toRealNN, Vectors.dense(3.0, 3.9, 4.3).toOPVector),
-      (40.0.toRealNN, Vectors.dense(4.0, 1.3, 0.9).toOPVector),
-      (50.0.toRealNN, Vectors.dense(5.0, 4.7, 1.3).toOPVector)
-    )
-  )
-  val label = rawLabel.copy(isResponse = true)
-  val estimator = new OpDecisionTreeRegressor().setInput(label, features)
+  val rawData = Seq(
+    (10.0, Vectors.dense(1.0, 4.3, 1.3)),
+    (20.0, Vectors.dense(2.0, 0.3, 0.1)),
+    (30.0, Vectors.dense(3.0, 3.9, 4.3)),
+    (40.0, Vectors.dense(4.0, 1.3, 0.9)),
+    (50.0, Vectors.dense(5.0, 4.7, 1.3))
+  ).map { case (l, v) => l.toRealNN -> v.toOPVector }
+
+  val (inputData, label, features) = TestFeatureBuilder("label", "features", rawData)
+
+  val estimator = new OpXGBoostRegressor().setInput(label.copy(isResponse = true), features)
+  estimator.setSilent(1)
 
   val expectedResult = Seq(
-    Prediction(10.0),
-    Prediction(20.0),
-    Prediction(30.0),
-    Prediction(40.0),
-    Prediction(50.0)
+    Prediction(1.9250000715255737),
+    Prediction(8.780000686645508),
+    Prediction(8.780000686645508),
+    Prediction(8.780000686645508),
+    Prediction(8.780000686645508)
   )
 
   it should "allow the user to set the desired spark parameters" in {
-    estimator
-      .setMaxDepth(6)
-      .setMaxBins(2)
-      .setMinInstancesPerNode(2)
-      .setMinInfoGain(0.1)
+    estimator.setMaxDepth(18).setBaseScore(0.12345).setSkipDrop(0.6234)
     estimator.fit(inputData)
-
-    estimator.predictor.getMaxDepth shouldBe 6
-    estimator.predictor.getMaxBins shouldBe 2
-    estimator.predictor.getMinInstancesPerNode shouldBe 2
-    estimator.predictor.getMinInfoGain shouldBe 0.1
+    estimator.predictor.getMaxDepth shouldBe 18
+    estimator.predictor.getBaseScore shouldBe 0.12345
+    estimator.predictor.getSkipDrop shouldBe 0.6234
 
   }
 }

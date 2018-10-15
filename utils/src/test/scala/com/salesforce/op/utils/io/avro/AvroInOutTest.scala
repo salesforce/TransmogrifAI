@@ -47,7 +47,7 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
   val avroSchemaPath = s"$testDataDir/PassengerDataAll.avsc"
   val avroFilePath = s"$testDataDir/PassengerDataAll.avro"
   val avroFileRecordCount = 891
-  val hdfs: FileSystem = FileSystem.get(spark.sparkContext.hadoopConfiguration)
+  val hdfs: FileSystem = FileSystem.get(sc.hadoopConfiguration)
   lazy val avroTemp: String = tempDir + "/avro-inout-test"
 
   Spec(AvroInOut.getClass) should "creates RDD from an avro file" in {

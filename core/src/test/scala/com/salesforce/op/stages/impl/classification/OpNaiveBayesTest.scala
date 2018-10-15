@@ -44,6 +44,8 @@ import org.scalatest.junit.JUnitRunner
 class OpNaiveBayesTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[NaiveBayesModel],
   OpPredictorWrapper[NaiveBayes, NaiveBayesModel]] with PredictionEquality {
 
+  override def specName: String = Spec[OpNaiveBayes]
+
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](
       1.0.toRealNN -> Vectors.dense(12.0, 4.3, 1.3).toOPVector,
@@ -70,12 +72,9 @@ class OpNaiveBayesTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperMod
     Prediction(0.0, Array(-4.54, -6.32), Array(0.85, 0.14))
   )
 
-
   it should "allow the user to set the desired spark parameters" in {
-    estimator
-      .setSmoothing(2)
+    estimator.setSmoothing(2)
     estimator.fit(inputData)
-
     estimator.predictor.getSmoothing shouldBe 2
   }
 }

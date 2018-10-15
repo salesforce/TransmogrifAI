@@ -211,7 +211,7 @@ object StageMetrics {
     def toMillis(ns: Long): Long = ns / 1000000 // some time values are in nanoseconds so we convert those
     StageMetrics(
       stageId = si.stageId,
-      attemptId = si.attemptId,
+      attemptId = si.attemptNumber,
       name = si.name,
       numTasks = si.numTasks,
       parentIds = si.parentIds,
@@ -221,7 +221,7 @@ object StageMetrics {
         else if (si.completionTime.isDefined) "succeeded"
         else "running"
       },
-      // TODO: consider also collection all the accumilables - might be costly
+      // TODO: consider also collecting all the accumilables - might be costly
       numAccumulables = si.accumulables.size,
       failureReason = si.failureReason,
       submissionTime = si.submissionTime,
