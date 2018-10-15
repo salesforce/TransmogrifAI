@@ -34,18 +34,21 @@ import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
-import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
+<<<<<<< HEAD
 import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.json.JsonUtils
+=======
+import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer, _}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+>>>>>>> b1aec920a49cd43a7b8fb03b3db1a90ff79881fb
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.log4j.Level
+import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Row}
-import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -71,7 +74,9 @@ case class TextRawData
 
 @RunWith(classOf[JUnitRunner])
 class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
-  BinaryEstimator[RealNN, OPVector, OPVector]] with TestSparkContext {
+  BinaryEstimator[RealNN, OPVector, OPVector]] {
+
+  override def specName: String = Spec[SanityChecker]
 
   // loggingLevel(Level.INFO)
 
@@ -88,13 +93,11 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     TextRawData("9", 0.0, Map("beverage" -> "tea")),
     TextRawData("10", 0.0, Map("beverage" -> "coffee")),
     TextRawData("11", 0.0, Map("beverage" -> "water"))
-  ).map( textRawData =>
-    (
-      textRawData.id.toText,
-      textRawData.target.toRealNN,
-      textRawData.textMap.toTextMap
-    )
-  )
+  ).map( textRawData => (
+    textRawData.id.toText,
+    textRawData.target.toRealNN,
+    textRawData.textMap.toTextMap
+  ))
 
   val (textData, id, target, textMap) = TestFeatureBuilder("id", "target", "textMap", textRawData)
   val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)

@@ -34,16 +34,18 @@ import com.salesforce.op.features.types.{Prediction, RealNN}
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoost, OpXGBoostQuietLogging, XGBoostClassifier}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
+import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpClassifierModelTest extends FlatSpec with TestSparkContext {
+class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoostQuietLogging {
 
   private val label = RandomIntegral.integrals(0, 2).limit(1000)
     .map{ v => RealNN(v.value.map(_.toDouble).getOrElse(0.0)) }
@@ -51,9 +53,7 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
 
   private val data = label.zip(fv)
 
-  private val (rawDF, labelF, featureV) =
-    TestFeatureBuilder("label", "features", data)
-
+  private val (rawDF, labelF, featureV) = TestFeatureBuilder("label", "features", data)
 
   Spec[OpDecisionTreeClassificationModel] should "produce the same values as the spark version" in {
     val spk = new DecisionTreeClassifier()
@@ -62,10 +62,8 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
-
 
   Spec[OpLogisticRegressionModel] should "produce the same values as the spark version" in {
     val spk = new LogisticRegression()
@@ -75,7 +73,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -87,7 +84,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, uid = spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -98,7 +94,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -118,7 +113,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .setLabelCol(labelF.name)
       .fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 3)
   }
 
@@ -130,11 +124,37 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .setLabelCol(labelF.name)
       .fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-    compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 2)
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-  def compareOutputs(df1: DataFrame, df2: DataFrame): Unit = {
+  Spec[OpXGBoostClassifier] should "produce the same values as the spark version" in {
+    val cl = new XGBoostClassifier()
+    cl.set(cl.trackerConf, OpXGBoost.DefaultTrackerConf)
+      .setFeaturesCol(featureV.name)
+      .setLabelCol(labelF.name)
+    val spk = cl.fit(rawDF)
+    val op = toOP(spk, spk.uid).setInput(labelF, featureV)
 
+    // ******************************************************
+    // TODO: remove equality tolerance once XGBoost rounding bug in XGBoostClassifier.transform(probabilityUDF) is fixed
+    // TODO: ETA - will be added in XGBoost version 0.81
+    implicit val doubleEquality = new Equality[Double] {
+      def areEqual(a: Double, b: Any): Boolean = b match {
+        case s: Double => (a.isNaN && s.isNaN) || math.abs(a - s) < 0.0000001
+        case _ => false
+      }
+    }
+    implicit val doubleArrayEquality = new Equality[Array[Double]] {
+      def areEqual(a: Array[Double], b: Any): Boolean = b match {
+        case s: Array[_] if a.length == s.length => a.zip(s).forall(v => doubleEquality.areEqual(v._1, v._2))
+        case _ => false
+      }
+    }
+    // ******************************************************
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
+  }
+
+  def compareOutputs(df1: DataFrame, df2: DataFrame)(implicit arrayEquality: Equality[Array[Double]]): Unit = {
     def keysStartsWith(name: String, value: Map[String, Double]): Array[Double] = {
       val names = value.keys.filter(_.startsWith(name)).toArray.sorted
       names.map(value)

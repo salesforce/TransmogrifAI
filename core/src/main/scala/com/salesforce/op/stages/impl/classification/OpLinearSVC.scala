@@ -151,15 +151,15 @@ class OpLinearSVCModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictorWrapperModel[LinearSVCModel](uid = uid, operationName = operationName, sparkModel = sparkModel) {
 
-  @transient private lazy val predictRaw = reflectMethod(getSparkMlStage().get, "predictRaw")
-  @transient private lazy val predict = reflectMethod(getSparkMlStage().get, "predict")
+  @transient lazy private val predictRaw = reflectMethod(getSparkMlStage().get, "predictRaw")
+  @transient lazy private val predict = reflectMethod(getSparkMlStage().get, "predict")
 
   /**
    * Function used to convert input to output
    */
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    val raw = predictRaw.apply(features.value).asInstanceOf[Vector]
-    val pred = predict.apply(features.value).asInstanceOf[Double]
+    val raw = predictRaw(features.value).asInstanceOf[Vector]
+    val pred = predict(features.value).asInstanceOf[Double]
 
     Prediction(rawPrediction = raw, prediction = pred)
   }

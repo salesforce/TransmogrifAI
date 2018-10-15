@@ -66,12 +66,12 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
   // Generate positive observations following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val positiveData =
-    normalVectorRDD(spark.sparkContext, bigCount, 3, seed = seed)
+    normalVectorRDD(sc, bigCount, 3, seed = seed)
       .map(v => 1.0 -> Vectors.dense(v.toArray))
 
   // Generate negative observations following a distribution ~ N((10.0, 10.0, 10.0), I_3)
   val negativeData =
-    normalVectorRDD(spark.sparkContext, smallCount, 3, seed = seed)
+    normalVectorRDD(sc, smallCount, 3, seed = seed)
       .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ + 10.0)))
 
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")

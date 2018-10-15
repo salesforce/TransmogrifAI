@@ -72,7 +72,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
     .addGrid(lr.elasticNetParam, Array(0.0, 0.5, 1.0))
     .addGrid(lr.maxIter, Array(10, 100))
     .addGrid(lr.regParam, Array(0.0))
-    .addGrid(lr.solver, Array("lbfgs"))
+    .addGrid(lr.solver, Array("l-bfgs"))
     .build()
 
   val rf = new OpRandomForestRegressor()

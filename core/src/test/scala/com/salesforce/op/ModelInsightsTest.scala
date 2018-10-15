@@ -30,7 +30,6 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
 import com.salesforce.op._
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
@@ -39,6 +38,7 @@ import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSe
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter, SplitterSummary}
@@ -66,8 +66,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   implicit val doubleOptEquality = new Equality[Option[Double]] {
     def areEqual(a: Option[Double], b: Any): Boolean = b match {
       case None => a.isEmpty
-      case Some(s: Double) => (a.exists(_.isNaN) && s.isNaN) ||
-        (a.nonEmpty && a.contains(s))
+      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
       case _ => false
     }
   }

@@ -61,6 +61,7 @@ class PercentileCalibrator(uid: String = UID[PercentileCalibrator])
       .setNumBuckets($(expectedNumBuckets))
       .setRelativeError(0)
       .setInputCol(dataset.columns(0))
+      .setOutputCol(dataset.columns(0) + "-out")
 
     val bucketizerModel = estimator.fit(dataset)
 

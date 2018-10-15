@@ -184,16 +184,15 @@ class OpGeneralizedLinearRegressionModel
   sparkModel = sparkModel) {
 
   @transient lazy private val predictLink = reflectMethod(getSparkMlStage().get, "predictLink")
-  @transient lazy private val predict = reflectMethod(getSparkMlStage().get, "predict")
+  @transient lazy private val predict = reflectMethod(getSparkMlStage().get, "predict", argsCount = Some(2))
 
   /**
    * Function used to convert input to output
    */
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    val raw = predictLink.apply(features.value).asInstanceOf[Double]
-    val pred = predict.apply(features.value).asInstanceOf[Double]
+    val offset = 0.0
+    val raw = predictLink(features.value, offset).asInstanceOf[Double]
+    val pred = predict(features.value, offset).asInstanceOf[Double]
     Prediction(prediction = pred, rawPrediction = raw)
   }
 }
-
-
