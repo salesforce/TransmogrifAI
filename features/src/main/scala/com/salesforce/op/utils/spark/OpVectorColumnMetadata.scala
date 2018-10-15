@@ -155,7 +155,7 @@ case class OpVectorColumnMetadata // TODO make separate case classes extending t
    * Get the feature grouping qualified by the parent feature name
    * @return Optional string of feature grouping
    */
-  def featureGroup(): Option[String] = grouping.map(g => s"${parentFeatureName.mkString}${g}")
+  def featureGroup(): Option[String] = grouping.map(g => s"${parentFeatureName.mkString("_")}_$g")
 
 }
 

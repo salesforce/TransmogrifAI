@@ -461,8 +461,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
             // Keep track of the group, column name, column index, and whether the parent was a MultiPickList or not
             .map{ case (group, cols) =>
               val repeats = cols.map(c => (c._2.indicatorValue, c._2.index)).groupBy(_._1)
-                .collect{ case (_, seq) if seq.length > 1 => seq.map(_._2) }.flatten // TODO should these be dropped?
-              val colsCleaned = repeats.foldLeft(cols.map(_._2))(_.drop(_))
+                .collect{ case (_, seq) if seq.length > 1 => seq.tail.map(_._2) } // only first used in stats
+                .flatten.toSet
+              val colsCleaned = cols.map(_._2).filterNot(c => repeats.contains(c.index))
               (group, colsCleaned.map(_.makeColName()), colsCleaned.map(_.index),
                 colsCleaned.exists(_.hasParentOfSubType[MultiPickList]))
           }
