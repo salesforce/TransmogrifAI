@@ -47,7 +47,7 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     sparkAppender.setName("spark-appender")
     sparkAppender.setThreshold(Level.INFO)
     sparkAppender.setLayout(new org.apache.log4j.PatternLayout)
-    LogManager.getLogger("com.salesforce.op.utils.spark.OpSparkListener").setLevel(Level.INFO)
+    LogManager.getLogger(classOf[OpSparkListener]).setLevel(Level.INFO)
     Logger.getRootLogger.addAppender(sparkAppender)
     sparkAppender
   }
@@ -84,18 +84,15 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
   it should "log messages for listener initialization, stage completion, app completion" in {
     val firstStage = listener.metrics.stageMetrics.head
     val logPrefix = listener.logPrefix
-    val logs = sparkLogAppender.logs
+    val logs = sparkLogAppender.logs.map(_.getMessage.toString)
     val messages = Table("Spark Log Messages",
-      "Instantiated spark listener: com.salesforce.op.utils.spark.OpSparkListener. Log Prefix %s".format(logPrefix),
+      "Instantiated spark listener: %s. Log Prefix %s".format(classOf[OpSparkListener].getName, logPrefix),
       "%s,APP_TIME_MS:%s".format(logPrefix, listener.metrics.appEndTime - listener.metrics.appStartTime),
       "%s,STAGE:%s,MEMORY_SPILLED_BYTES:%s,GC_TIME_MS:%s,STAGE_TIME_MS:%s".format(
         logPrefix, firstStage.name, firstStage.memoryBytesSpilled, firstStage.jvmGCTime, firstStage.executorRunTime
       )
     )
-
-    forAll(messages) { m =>
-      logs.map(x => x.getMessage.toString).contains(m) shouldBe true
-    }
+    forAll(messages) { m => logs.contains(m) shouldBe true }
   }
 }
 

@@ -136,43 +136,57 @@ object ReflectionUtils {
 
   /**
    * Find setter methods for the provided method name
-   * @param instance     class to find method for
-   * @param setterName   name of method to find
-   * @param classLoader  class loader to use
-   * @tparam T  type of instance to copy
-   * @return    reflected method to set type
+   * @param instance    class to find method for
+   * @param setterName  name of method to find
+   * @param args        argument values
+   * @param argsCount   optional number of arguments to match
+   * @param classLoader class loader to use
+   * @tparam T type of instance to copy
+   * @return reflected method to set type
    */
   def reflectSetterMethod[T: ClassTag](
     instance: T,
     setterName: String,
-    inputs: Seq[Any],
+    args: Seq[Any],
+    argsCount: Option[Int] = None,
     classLoader: ClassLoader = defaultClassLoader
   ): Any = {
-    reflectMethod(instance, s"set$setterName", classLoader).apply(inputs: _*)
+    reflectMethod(instance, s"set$setterName", argsCount, classLoader).apply(args: _*)
   }
 
   /**
    * Find setter methods for the provided method name
-   * @param instance     class to find method for
-   * @param methodName   name of method to find
-   * @param classLoader  class loader to use
-   * @tparam T  type of instance to copy
-   * @return    reflected method to set type
+   * @param instance    class to find method for
+   * @param methodName  name of method to find
+   * @param argsCount   optional number of arguments to match
+   * @param classLoader class loader to use
+   * @tparam T type of instance to copy
+   * @return reflected method to set type
    */
   def reflectMethod[T: ClassTag](
     instance: T,
     methodName: String,
+    argsCount: Option[Int] = None,
     classLoader: ClassLoader = defaultClassLoader
   ): MethodMirror = {
     val klazz = instance.getClass
     val (runtimeMirror, classMirror) = mirrors(klazz, classLoader)
     val classType = runtimeMirror.classSymbol(klazz).toType
     val tMembers = classType.members
-    val methods = tMembers.collect { case m: MethodSymbol if m.isMethod &&
-      termNameStr(m.name).compareToIgnoreCase(methodName) == 0 => m
+    val methodsWithParams = tMembers.collect { case m: MethodSymbol => m -> m.paramLists.flatten }
+    val methods = methodsWithParams.collect {
+      case (m: MethodSymbol, params) if m.isMethod &&
+        termNameStr(m.name).compareToIgnoreCase(methodName) == 0 &&
+        (argsCount.isEmpty || argsCount.contains(params.length)) => m -> params
+    }.toList.sortBy(-_._2.length).map(_._1)
+
+    methods match {
+      case method :: _ =>
+        val instanceMirror = runtimeMirror.reflect(instance)
+        instanceMirror.reflectMethod(method)
+      case Nil =>
+        throw new RuntimeException(s"Method with name '$methodName' was not found on instance of type: $klazz")
     }
-    val instanceMirror = runtimeMirror.reflect(instance)
-    instanceMirror.reflectMethod(methods.head)
   }
 
   /**
