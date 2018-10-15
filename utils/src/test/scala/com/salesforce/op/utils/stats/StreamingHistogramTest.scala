@@ -30,13 +30,13 @@
 
 package com.salesforce.op.utils.stats
 
-import breeze.integrate
 import breeze.stats.{meanAndVariance, MeanAndVariance}
 import breeze.stats.distributions._
 import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.utils.stats.RichStreamingHistogram._
 import com.salesforce.op.utils.stats.StreamingHistogram.StreamingHistogramBuilder
 import com.salesforce.op.utils.stats.StreamingHistogramTest._
-import org.apache.spark.SparkConf
+import org.apache.log4j.Logger
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -44,16 +44,19 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class StreamingHistogramTest extends FlatSpec with TestSparkContext {
 
-  val histogramSampleSize = 500
+  val testPadding = 0.5
+  val logger = Logger.getLogger(getClass)
+  val histogramSampleSize = 1000
   val mcSampleSize = 1000
 
   // Enforce Kryo serialization check
   conf.set("spark.kryo.registrationRequired", "true")
 
   Spec(classOf[StreamingHistogram]) should "produce correct histogram distribution" in {
-    HistogramUtils.streamingHistogramBins(referenceHistogram).map {
+    referenceHistogram.getBins(testPadding).map {
       case (point, count) => round(point) -> count
-    } should contain theSameElementsAs Seq(2.0 -> 1L, 9.5 -> 2L, 19.33 -> 3L, 32.67 -> 3L, 45 -> 1L)
+    } should contain theSameElementsAs
+      Seq(1.5 -> 0.0, 2.0 -> 1L, 9.5 -> 2L, 19.33 -> 3L, 32.67 -> 3L, 45 -> 1L, 45.5 -> 0.0)
   }
 
   it should "compute sum algorithm correctly" in {
@@ -84,110 +87,108 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
       data.aggregate(new StreamingHistogramBuilder(15, 500, 1))(seqOp, combOp).build
     }
 
-    HistogramUtils.streamingHistogramBins(histogram) should contain theSameElementsAs
-      (0 to 10).map(k => (k.toDouble, 1.0))
+    histogram.getBins(testPadding) should contain theSameElementsAs
+      (0 to 10).map(k => (k.toDouble, 1.0)) ++ Array(-0.5 -> 0.0, 10.5 -> 0.0)
   }
 
+  it should "yield correct histogram density estimator" in {
+    val builder = new StreamingHistogramBuilder(10, 500, 1)
+
+    Array(0.0 -> 1L, 2.0 -> 3L, 3.0 -> 3L, 4.0 -> 1L).foreach { case (pt, ct) => builder.update(pt, ct) }
+
+    val pdf = builder.build.density(testPadding)
+
+    pdf(-1.0) shouldEqual 0.0
+    pdf(-0.5) shouldEqual 0.0625
+    pdf(0.0) shouldEqual 0.25
+    pdf(1.0) shouldEqual 0.25
+    pdf(2.0) shouldEqual 0.375
+    pdf(2.5) shouldEqual 0.375
+    pdf(3.0) shouldEqual 0.25
+    pdf(3.5) shouldEqual 0.25
+    pdf(4.0) shouldEqual 0.0625
+    pdf(4.5) shouldEqual 0.0
+    pdf(5.0) shouldEqual 0.0
+  }
+
+  // Checks that it does well for well-behaved distributions
   it should "correctly approximate standard normal distribution" in {
     val sampleSize = 500
-    val gaussian1 = Gaussian(0, 1)
-    val gaussian2 = Gaussian(5, 5)
-    val mixture = MixtureDistribution(gaussian1, gaussian2, 0.8, sampleSize)
+    val gaussian = Gaussian(0, 1)(RandBasis.mt0)
+    val distributionName = "Gaussian(0, 1)"
 
-    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Gaussian(0, 1)", gaussian1, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Gaussian(5, 5)", gaussian2, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("0.8 * Gaussian(0, 1) + 0.2 * Gaussian(5, 5)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
+    val result75 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 75, mcSampleSize, 5)
+    val result125 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 125, mcSampleSize, 5)
+    val result250 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 250, mcSampleSize, 5)
+
+    result75.streamingDensityMSE.mean should be >= result75.equiDistDensityMSE.mean
+    result75.absoluteMeanDiff should be < 0.01
+    result125.streamingDensityMSE.mean should be >= result125.equiDistDensityMSE.mean
+    result125.absoluteMeanDiff should be < 0.01
+    result250.streamingDensityMSE.mean should be >= result250.equiDistDensityMSE.mean
+    result250.absoluteMeanDiff should be < 0.01
   }
 
-  it should "approximate Gamma distribution CDF" in {
+  // Check that it does better for distributions with outliers
+  it should "better approximate distribution with large outliers" in {
     val sampleSize = 500
-    val gamma1 = new Gamma(20, 1.0 / 2)
-    val gamma2 = new Gamma(1000000, 1.0 / 1000)
+    val gamma1 = new Gamma(20, 1.0 / 2)(RandBasis.mt0)
+    val gamma2 = new Gamma(1000000, 1.0 / 1000)(RandBasis.mt0)
     val mixture = MixtureDistribution(gamma1, gamma2, 0.95, sampleSize)
+    val distributionName = "0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)"
 
-    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Gamma(20, 0.5)", gamma1, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Gamma(1000000, 0.001)", gamma2, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
+    val result75 = distributionTestResult(distributionName, mixture, histogramSampleSize, 75, mcSampleSize, 5)
+    val result125 = distributionTestResult(distributionName, mixture, histogramSampleSize, 125, mcSampleSize, 5)
+    val result250 = distributionTestResult(distributionName, mixture, histogramSampleSize, 250, mcSampleSize, 5)
+
+    result75.streamingDensityMSE.mean should be <= result75.equiDistDensityMSE.mean
+    result75.absoluteMeanDiff should be > 0.05
+    result75.absoluteMeanDiff should be < 0.06
+    result125.streamingDensityMSE.mean should be <= result125.equiDistDensityMSE.mean
+    result125.absoluteMeanDiff should be > 0.06
+    result125.absoluteMeanDiff should be < 0.07
+    result250.streamingDensityMSE.mean should be <= result250.equiDistDensityMSE.mean
+    result250.absoluteMeanDiff should be > 0.04
+    result250.absoluteMeanDiff should be < 0.05
   }
 
-  it should "approximate Beta distribution CDF" in {
-    val sampleSize = 500
-    val beta1 = new Beta(5, 1)
-    val beta2 = new Beta(1, 5)
-    val mixture = MixtureDistribution(beta1, beta2, 0.5, sampleSize)
-
-    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Beta(5, 1)", beta1, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("Beta(1, 5)", beta2, histogramSampleSize, 400, mcSampleSize, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 100, mcSampleSize, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 200, mcSampleSize, 50)
-    cdfTest("0.5 * Beta(5, 1) + 0.5 * Beta(1, 5)", mixture, histogramSampleSize, 400, mcSampleSize, 50)
-  }
-
-
-  private def cdfTest(
+  private def distributionTestResult(
     distributionName: String,
-    dist: TestDistribution,
+    dist: ContinuousDistr[Double],
     histogramSampleSize: Int,
     maxBins: Int,
     mcSampleSize: Int,
     numResults: Int): MSEDistributionResult = {
+
     val sample = dist.sample(histogramSampleSize).toArray
     val hist = new StreamingHistogramBuilder(maxBins, 100, 1)
 
     sample.foreach(hist.update(_))
 
-    val equiDistBins = HistogramUtils.equiDistantBins(sample, maxBins)
-    val streamingBins = HistogramUtils.streamingHistogramBins(hist.build)
+    val equiDistBins = equiDistantBins(sample, maxBins)
 
     val mses: Array[MSEResult] = (0 until numResults).map { _ =>
       val mcSample = dist.sample(mcSampleSize)
       val trueDensities = mcSample.map(dist.pdf).toArray
-      val trueCDFs = mcSample.map(dist.cdf).toArray
 
       def computeMSE(f: Double => Double, trueValues: Array[Double]): Double =
         mcSample.map(f).zip(trueValues).map { case (a, b) => math.pow(a - b, 2) }.sum / mcSampleSize
 
       MSEResult(
-        streamingDensityMSE = computeMSE(HistogramUtils.density(streamingBins), trueDensities),
-        streamingCdfMSE = computeMSE(HistogramUtils.cdf(streamingBins), trueCDFs),
-        equiDistDensityMSE = computeMSE(HistogramUtils.density(equiDistBins), trueDensities),
-        equiDistCdfMSE = computeMSE(HistogramUtils.cdf(equiDistBins), trueCDFs))
+        streamingDensityMSE = computeMSE(hist.build.density(testPadding), trueDensities),
+        equiDistDensityMSE = computeMSE(RichStreamingHistogram.density(equiDistBins), trueDensities))
     }.toArray
 
     val result = MSEDistributionResult(
       streamingDensityMSE = meanAndVariance(mses.map(_.streamingDensityMSE)),
-      streamingCdfMSE = meanAndVariance(mses.map(_.streamingCdfMSE)),
-      equiDistDensityMSE = meanAndVariance(mses.map(_.equiDistDensityMSE)),
-      equiDistCdfMSE = meanAndVariance(mses.map(_.equiDistCdfMSE)))
+      equiDistDensityMSE = meanAndVariance(mses.map(_.equiDistDensityMSE)))
 
-    println("-" * 50)
-    println(s"Checking distribution $distributionName " +
-      s"[bins = $maxBins, sample size = $histogramSampleSize, iterations = $numResults]")
-    println("-" * 50)
-    println("Streaming histogram density MSE mean and variance: " +
-      s"${result.streamingDensityMSE.mean}, ${result.streamingDensityMSE.variance}")
-    println("Streaming histogram cdf MSE mean and variance: " +
-      s"${result.streamingCdfMSE.mean}, ${result.streamingCdfMSE.variance}")
-    println("Equidistant histogram density MSE mean and variance: " +
-      s"${result.equiDistDensityMSE.mean}, ${result.equiDistDensityMSE.variance}")
-    println("Equidistant histogram cdf MSE mean and variance: " +
-      s"${result.equiDistCdfMSE.mean}, ${result.equiDistCdfMSE.variance}")
+    logger.info(s"\n${
+      ("-" * 50)  + "\n" +
+        s"Checking distribution $distributionName " +
+        s"[bins = $maxBins, sample size = $histogramSampleSize, iterations = $numResults]\n" +
+        ("-" * 50) + s"\n$result"
+    }")
 
     result
   }
@@ -205,46 +206,62 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
     hist.build
   }
 
+  private def equiDistantBins(points: Array[Double], numBins: Int): Array[(Double, Double)] =
+    if (points.isEmpty) Array()
+    else {
+      val mainBins = points match {
+        case Array(p) => Array((p, 1.0))
+        case arr =>
+          val (min, max) = (arr.min, arr.max)
+
+          linspace(min, max, numBins).sliding(2).map {
+            case Array(p, q) =>
+              (p + q) / 2 -> points.filter(x => x >= p && x < q).length.toDouble
+          }.toArray
+        }
+
+      RichStreamingHistogram.paddedBins(mainBins, 0.1)
+    }
+
+  private def linspace(a: Double, b: Double, n: Int): Array[Double] =
+    (0 to n).map(k => a + (b - a) * k / n).toArray
+
   private def round(x: Double): Double = math.round(x * 100).toDouble / 100
 }
 
 object StreamingHistogramTest {
 
-  type TestDistribution = ContinuousDistr[Double] with HasCdf
-
   case class MixtureDistribution(
-      d1: TestDistribution,
-      d2: TestDistribution,
+      d1: ContinuousDistr[Double],
+      d2: ContinuousDistr[Double],
       p: Double,
-      mcSampleSize: Int) extends ContinuousDistr[Double] with HasCdf {
-      val bernoulli = new Bernoulli(p)
+      mcSampleSize: Int) extends ContinuousDistr[Double] {
+      val bernoulli = new Bernoulli(p)(RandBasis.mt0)
 
       // Required for defining class, but don't use for test purposes
       def logNormalizer: Double = 0.0
       def unnormalizedLogPdf(x: Double): Double = 0.0
       def probability(x: Double, y: Double): Double = 0.0
 
-      override def cdf(x: Double): Double = mixture(d1.cdf(x), d2.cdf(x))
       override def pdf(x: Double): Double = mixture(d1.pdf(x), d2.pdf(x))
       override def draw(): Double = if (bernoulli.draw) d1.draw else d2.draw
-
-      def entropy: Double = (0 until mcSampleSize).map { _ =>
-        val samp = draw()
-        apply(samp) * math.log(samp)
-      }.sum / mcSampleSize
 
       private def mixture(x: Double, y: Double): Double = p * x + (1 - p) * x
   }
 
   case class MSEResult(
       streamingDensityMSE: Double,
-      streamingCdfMSE: Double,
-      equiDistDensityMSE: Double,
-      equiDistCdfMSE: Double)
+      equiDistDensityMSE: Double)
 
   case class MSEDistributionResult(
       streamingDensityMSE: MeanAndVariance,
-      streamingCdfMSE: MeanAndVariance,
-      equiDistDensityMSE: MeanAndVariance,
-      equiDistCdfMSE: MeanAndVariance)
+      equiDistDensityMSE: MeanAndVariance) {
+    override def toString(): String =
+      "Streaming histogram density MSE mean and variance: " +
+        s"${streamingDensityMSE.mean}, ${streamingDensityMSE.variance}\n" +
+        "Equidistant histogram density MSE mean and variance: " +
+        s"${equiDistDensityMSE.mean}, ${equiDistDensityMSE.variance}"
+
+    def absoluteMeanDiff: Double = math.abs(streamingDensityMSE.mean - equiDistDensityMSE.mean)
+  }
 }

@@ -32,35 +32,52 @@ package com.salesforce.op.utils.stats
 
 import scala.collection.JavaConverters._
 
-object HistogramUtils {
+/**
+ * Provides implicit methods for [[StreamingHistogram]] to be used for distribution estimation.
+ */
+object RichStreamingHistogram {
+  final implicit class RichStreamingHistogramImpl(val hist: StreamingHistogram) extends AnyVal {
 
-  type Bin = (Double, Double)
+    /**
+     * Yields set of bins describing streaming histogram. The size of the resulting array will
+     * be [[(_: StreamingHistogram).getAsMap.size + 2]] (if it is non-empty, otherwise 0) where
+     * the boundary points will be [[padding]] values away from the minimum and maximum points, respectively.
+     *
+     * @param padding boundary padding to add to histogram bins
+     * @return padded bins
+     */
+    def getBins(padding: Double = 0.1): Array[(Double, Double)] = {
+      val mainBins = hist.getAsMap.asScala.toArray.flatMap {
+        case (a, b) => b.headOption.map(d => (a.doubleValue, d.toDouble))
+      }
 
-  def equiDistantBins(points: Array[Double], numBins: Int): Array[Bin] =
-    if (points.isEmpty) Array()
-    else points match {
-      case Array(p) => Array((p, 1.0))
-      case arr =>
-        val (min, max) = (arr.min, arr.max)
-
-        linspace(min, max, numBins).sliding(2).map {
-          case Array(p, q) =>
-            (p + q) / 2 -> points.filter(x => x >= p && x < q).length.toDouble
-        }.toArray
+      RichStreamingHistogram.paddedBins(mainBins, padding)
     }
 
+    /**
+     * Produces standard histogram density estimator for this streaming histogram where the bins are constructed
+     * given the input padding.
+     *
+     * @param padding boundary padding to add to histogram bins
+     * @return standard histogram density estimator
+     */
+    def density(padding: Double = 0.1): Double => Double =
+      RichStreamingHistogram.density(getBins(padding))
+  }
 
-  def streamingHistogramBins(hist: StreamingHistogram): Array[Bin] =
-    hist.getAsMap.asScala.toArray.flatMap {
-      case (a, b) => b.headOption.map(d => (a.doubleValue, d.toDouble))
+  // The following are exposed for test comparisons
+  private[stats] def paddedBins(bins: Array[(Double, Double)], padding: Double): Array[(Double, Double)] =
+    if (bins.isEmpty) bins
+    else {
+      val points = bins.map(_._1)
+      val (min, max) = (points.min, points.max)
+
+      Array((points.min - padding) -> 0.0) ++ bins ++ Array((points.max + padding) -> 0.0)
     }
 
-  def cdf(bins: Array[Bin]): Double => Double =
-    (x: Double) => bins.collect { case (p, m) if p <= x => m }.sum / bins.map(_._2).sum
-
-  def density(bins: Array[Bin], padding: Double = 0.1): Double => Double =
+  private[stats] def density(bins: Array[(Double, Double)]): Double => Double =
     (x: Double) =>
-      paddedBins(bins, padding).sliding(2).foldLeft((0.0, 0.0)) { case ((prob, sum), arr) =>
+      bins.sliding(2).foldLeft((0.0, 0.0)) { case ((prob, sum), arr) =>
         arr match {
           case Array((p, m)) => (prob + m, sum + m)
           case Array((p1, m1), (p2, m2)) =>
@@ -73,22 +90,4 @@ object HistogramUtils {
         case (_, 0.0) => 0.0
         case (p, s) => p / s
       }
-
-  private def paddedBins(bins: Array[Bin], padding: Double): Array[Bin] =
-    if (bins.isEmpty) bins
-    else {
-      val points = bins.map(_._1)
-      val (min, max) = (points.min, points.max)
-
-      Array((points.min - padding) -> 0.0) ++ bins ++ Array((points.max + padding) -> 0.0)
-    }
-
-  /**
-   * @param a lower bound
-   * @param b upper bound
-   * @param n desired number of points
-   * @return a sequence of n + 1 points a = x_0 < ... < x_n = b with |x_i - x_{i + 1}| = (b - a) / n
-   */
-  private def linspace(a: Double, b: Double, n: Int): Array[Double] =
-    (0 to n).map(k => a + (b - a) * k / n).toArray
 }
