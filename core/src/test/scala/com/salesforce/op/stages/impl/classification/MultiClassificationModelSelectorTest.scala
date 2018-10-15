@@ -66,17 +66,17 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   // Generate observations of label 1 following a distribution ~ N((-100.0, -100.0, -100.0), I_3)
   val label0Data =
-    normalVectorRDD(spark.sparkContext, label0Count, 3, seed = seed)
+    normalVectorRDD(sc, label0Count, 3, seed = seed)
       .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ - 100.0)))
 
   // Generate  observations of label 0 following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val label1Data =
-    normalVectorRDD(spark.sparkContext, label1Count, 3, seed = seed)
+    normalVectorRDD(sc, label1Count, 3, seed = seed)
       .map(v => 1.0 -> Vectors.dense(v.toArray))
 
   // Generate observations of label 2 following a distribution ~ N((100.0, 100.0, 100.0), I_3)
   val label2Data =
-    normalVectorRDD(spark.sparkContext, label2Count, 3, seed = seed)
+    normalVectorRDD(sc, label2Count, 3, seed = seed)
       .map(v => 2.0 -> Vectors.dense(v.toArray.map(_ + 100.0)))
 
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")

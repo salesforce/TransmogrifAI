@@ -28,56 +28,56 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.regression
+package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
-import com.salesforce.op.test._
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoostQuietLogging, XGBoostClassificationModel, XGBoostClassifier}
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, DecisionTreeRegressor}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+
 @RunWith(classOf[JUnitRunner])
-class OpDecisionTreeRegressorTest extends OpEstimatorSpec[Prediction,
-  OpPredictorWrapperModel[DecisionTreeRegressionModel],
-  OpPredictorWrapper[DecisionTreeRegressor, DecisionTreeRegressionModel]] with PredictionEquality {
+class OpXGBoostClassifierTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[XGBoostClassificationModel],
+  OpPredictorWrapper[XGBoostClassifier, XGBoostClassificationModel]]
+  with PredictionEquality with OpXGBoostQuietLogging {
 
-  override def specName: String = Spec[OpDecisionTreeRegressor]
+  override def specName: String = Spec[OpXGBoostClassifier]
 
-  val (inputData, rawLabel, features) = TestFeatureBuilder(
-    Seq[(RealNN, OPVector)](
-      (10.0.toRealNN, Vectors.dense(1.0, 4.3, 1.3).toOPVector),
-      (20.0.toRealNN, Vectors.dense(2.0, 0.3, 0.1).toOPVector),
-      (30.0.toRealNN, Vectors.dense(3.0, 3.9, 4.3).toOPVector),
-      (40.0.toRealNN, Vectors.dense(4.0, 1.3, 0.9).toOPVector),
-      (50.0.toRealNN, Vectors.dense(5.0, 4.7, 1.3).toOPVector)
-    )
-  )
-  val label = rawLabel.copy(isResponse = true)
-  val estimator = new OpDecisionTreeRegressor().setInput(label, features)
+  val rawData = Seq(
+    1.0 -> Vectors.dense(12.0, 4.3, 1.3),
+    0.0 -> Vectors.dense(0.0, 0.3, 0.1),
+    0.0 -> Vectors.dense(1.0, 3.9, 4.3),
+    1.0 -> Vectors.dense(10.0, 1.3, 0.9),
+    1.0 -> Vectors.dense(15.0, 4.7, 1.3),
+    0.0 -> Vectors.dense(0.5, 0.9, 10.1),
+    1.0 -> Vectors.dense(11.5, 2.3, 1.3),
+    0.0 -> Vectors.dense(0.1, 3.3, 0.1)
+  ).map { case (l, v) => l.toRealNN -> v.toOPVector }
+
+  val (inputData, label, features) = TestFeatureBuilder("label", "features", rawData)
+
+  val estimator = new OpXGBoostClassifier().setInput(label.copy(isResponse = true), features)
+  estimator.setSilent(1)
 
   val expectedResult = Seq(
-    Prediction(10.0),
-    Prediction(20.0),
-    Prediction(30.0),
-    Prediction(40.0),
-    Prediction(50.0)
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284)),
+    Prediction(1.0, Array(0.6200000047683716), Array(0.3799999952316284, 0.6200000047683716)),
+    Prediction(0.0, Array(0.3799999952316284), Array(0.6200000047683716, 0.3799999952316284))
   )
 
   it should "allow the user to set the desired spark parameters" in {
-    estimator
-      .setMaxDepth(6)
-      .setMaxBins(2)
-      .setMinInstancesPerNode(2)
-      .setMinInfoGain(0.1)
+    estimator.setAlpha(0.872).setEta(0.99912)
     estimator.fit(inputData)
-
-    estimator.predictor.getMaxDepth shouldBe 6
-    estimator.predictor.getMaxBins shouldBe 2
-    estimator.predictor.getMinInstancesPerNode shouldBe 2
-    estimator.predictor.getMinInfoGain shouldBe 0.1
-
+    estimator.predictor.getAlpha shouldBe 0.872
+    estimator.predictor.getEta shouldBe 0.99912
   }
 }

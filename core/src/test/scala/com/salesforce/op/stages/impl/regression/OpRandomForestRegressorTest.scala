@@ -44,6 +44,8 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[RandomForestRegressionModel],
   OpPredictorWrapper[RandomForestRegressor, RandomForestRegressionModel]] with PredictionEquality {
 
+  override def specName: String = Spec[OpRandomForestRegressor]
+
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](
       (10.0.toRealNN, Vectors.dense(1.0, 4.3, 1.3).toOPVector),
