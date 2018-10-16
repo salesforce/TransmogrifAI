@@ -609,6 +609,36 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
+  it should "not fail when maps have the same keys" in {
+    val mapData = textRawData.map{
+      case (i, t, tm) => (i, t, tm.value.toPickListMap, tm.value.toPickListMap,
+        tm.value.map{ case (k, v) => k -> math.random }.toRealMap)
+    }
+    val (mapDataFrame, id, target, plMap1, plMap2, doubleMap) = TestFeatureBuilder(
+      "id", "target", "textMap1", "textMap2", "doubleMap", mapData)
+    val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
+    val features = Seq(id, target, plMap1, plMap2, doubleMap).transmogrify()
+    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
+    val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
+    output.select(checked.name).count() shouldBe 12
+    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    meta.dropped.size shouldBe 0
+    meta.categoricalStats.size shouldBe 10
+    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
+  }
+
+  it should "produce the same statistics if the same transformation is applied twice" in {
+    val plMap = textMap.map[PickListMap](_.value.toPickListMap)
+    val features = Seq(id, target, plMap, plMap).transmogrify()
+    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
+    val output = new OpWorkflow().setResultFeatures(checked).transform(textData)
+    output.select(checked.name).count() shouldBe 12
+    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    meta.dropped.size shouldBe 0
+    meta.categoricalStats.size shouldBe 4
+    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
+  }
+
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
     expectedFeaturesToDrop: Seq[String], label: String): Unit = {
     val metadata = model.getMetadata()
