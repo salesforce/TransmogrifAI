@@ -209,6 +209,7 @@ configure(allProjs) {
                 '**/com/salesforce/op/stages/impl/tuning/OpTrainValidationSplit.scala',
                 '**/com/salesforce/op/test/*.java',
                 '**/com/fasterxml/jackson/module/scala/**',
+                '**/com/salesforce/op/utils/stats/StreamingHistogram.java',
                 '**/templates/**', '**/resources/**'
     }
     scoverage {
