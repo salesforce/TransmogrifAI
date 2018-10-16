@@ -48,6 +48,7 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
   val logger = Logger.getLogger(getClass)
   val histogramSampleSize = 1000
   val mcSampleSize = 1000
+  val numResults = 5
 
   // Enforce Kryo serialization check
   conf.set("spark.kryo.registrationRequired", "true")
@@ -117,9 +118,12 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
     val gaussian = Gaussian(0, 1)(RandBasis.mt0)
     val distributionName = "Gaussian(0, 1)"
 
-    val result75 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 75, mcSampleSize, 5)
-    val result125 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 125, mcSampleSize, 5)
-    val result250 = distributionTestResult(distributionName, gaussian, histogramSampleSize, 250, mcSampleSize, 5)
+    val result75 =
+      distributionTestResult(distributionName, gaussian, histogramSampleSize, 75, mcSampleSize, numResults)
+    val result125 =
+      distributionTestResult(distributionName, gaussian, histogramSampleSize, 125, mcSampleSize, numResults)
+    val result250 =
+      distributionTestResult(distributionName, gaussian, histogramSampleSize, 250, mcSampleSize, numResults)
 
     result75.streamingDensityMSE.mean should be >= result75.equiDistDensityMSE.mean
     result75.absoluteMeanDiff should be < 0.01
@@ -137,9 +141,12 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
     val mixture = MixtureDistribution(gamma1, gamma2, 0.95, sampleSize)
     val distributionName = "0.95 * Gamma(20, 0.5) + 0.05 * Gamma(1000000, 0.001)"
 
-    val result75 = distributionTestResult(distributionName, mixture, histogramSampleSize, 75, mcSampleSize, 5)
-    val result125 = distributionTestResult(distributionName, mixture, histogramSampleSize, 125, mcSampleSize, 5)
-    val result250 = distributionTestResult(distributionName, mixture, histogramSampleSize, 250, mcSampleSize, 5)
+    val result75 =
+      distributionTestResult(distributionName, mixture, histogramSampleSize, 75, mcSampleSize, numResults)
+    val result125 =
+      distributionTestResult(distributionName, mixture, histogramSampleSize, 125, mcSampleSize, numResults)
+    val result250 =
+      distributionTestResult(distributionName, mixture, histogramSampleSize, 250, mcSampleSize, numResults)
 
     result75.streamingDensityMSE.mean should be <= result75.equiDistDensityMSE.mean
     result75.absoluteMeanDiff should be > 0.05
