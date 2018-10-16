@@ -39,9 +39,11 @@ import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
+import com.salesforce.op.utils.stats.StreamingHistogram
+import com.salesforce.op.utils.stats.StreamingHistogram.{StreamingHistogramBuilder => HistogramBuilder}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Tuple2Semigroup
+import com.twitter.algebird.{Semigroup, Tuple2Semigroup}
 import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
@@ -145,14 +147,68 @@ class RawFeatureFilter[T]
       (respOut, predOut)
     }
     val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+    val allSummaries = preparedFeatures.map(_.allSummaries)
+    val textSummaries: Map[FeatureKey, Summary] =
+      allFeatureInfo.map(_.textSummaries)
+        .getOrElse(allSummaries.map { case (_, pred) =>
+          // Only need to worry about predictors here since non-numeric responses are filtered
+          pred.collect { case (key, value) if value.isLeft => key -> value.left.get }.toMap
+        }.reduce(_ + _))
+    val numericPoints: RDD[(Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[Double]])] =
+      allSummaries.map { case (resp, pred) =>
+        resp.collect { case (key, value) if value.isRight => key -> value.right.get } ->
+          pred.collect { case (key, value) if value.isRight => key -> value.right.get }
+      }.persist()
 
-    implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
+    implicit val builderSg = new Semigroup[HistogramBuilder] {
+      def combine(x: HistogramBuilder, y: HistogramBuilder): HistogramBuilder = {
+        x.merge(y.build)
+        x
+      }
+    }
+    implicit val sgTuple2Maps =
+      new Tuple2Semigroup[Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]]()
+    val (respHistograms, predHistograms): (Map[FeatureKey, StreamingHistogram], Map[FeatureKey, StreamingHistogram]) = {
+
+      def merge(
+        x: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]),
+        y: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder])
+      ): (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]) = x + y
+
+      def apply(
+        allHists: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]),
+        allPoints: (Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[Double]])
+      ): (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]) = {
+        def processMaps(
+          hists: Map[FeatureKey, HistogramBuilder],
+          points: Map[FeatureKey, Seq[Double]]): Map[FeatureKey, HistogramBuilder] = {
+          val allKeys = hists.keySet.union(points.keySet)
+          allKeys.map { key =>
+            val builder = hists.get(key) match {
+              case Some(oldBuilder) => oldBuilder
+              case None => new HistogramBuilder(bins, bins * 10, 1)
+            }
+
+            builder.update(points.get(key).map(_.asInstanceOf[Seq[Number]]).getOrElse(Seq()): _*)
+
+            key -> builder
+          }.toMap
+        }
+
+        processMaps(allHists._1, allPoints._1) -> processMaps(allHists._2, allPoints._2)
+      }
+
+      def emptyHistMap: Map[FeatureKey, HistogramBuilder] = Map()
+
+      numericPoints.aggregate((emptyHistMap, emptyHistMap))(apply, merge) match {
+        case (map1, map2) => (map1.mapValues(_.build), map2.mapValues(_.build))
+      }
+    }
+
     // Have to use the training summaries do process scoring for comparison
-    val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
-      allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
-        .getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
-    val (responseSummariesArr, predictorSummariesArr): (Array[(FeatureKey, Summary)], Array[(FeatureKey, Summary)]) =
-      (responseSummaries.toArray, predictorSummaries.toArray)
+    val textSummariesArr: Array[(FeatureKey, Summary)] = textSummaries.toArray
+    val respHistogramsArr: Array[(FeatureKey, StreamingHistogram)] = respHistograms.toArray
+    val predHistogramsArr: Array[(FeatureKey, StreamingHistogram)] = predHistograms.toArray
 
     implicit val sgTuple2Feats = new Tuple2Semigroup[Array[FeatureDistribution], Array[FeatureDistribution]]()
     val (responseDistributions, predictorDistributions): (Array[FeatureDistribution], Array[FeatureDistribution]) =
@@ -178,10 +234,10 @@ class RawFeatureFilter[T]
       }
 
     AllFeatureInformation(
-      responseSummaries = responseSummaries,
       responseDistributions = responseDistributions,
-      predictorSummaries = predictorSummaries,
       predictorDistributions = predictorDistributions,
+      textDistributions = textDistributions,
+      textSummaries = textSummaries,
       correlationInfo = correlationInfo)
   }
 
