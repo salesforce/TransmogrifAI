@@ -104,40 +104,6 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
       retrieved.names.length - 2
   }
 
-  ignore should "Group groupings separately for transformations computed on same feature" in {
-    val ageData: Seq[Real] = RandomReal.uniform[Real](minValue = 0.0, maxValue = 20.0)
-      .withProbabilityOfEmpty(0.5).limit(200) ++ RandomReal.uniform[Real](minValue = 40.0, maxValue = 70.0)
-      .withProbabilityOfEmpty(0.0).limit(100)
-    val (rawDF, rawAge) = TestFeatureBuilder("age", ageData)
-    val labelTransformer = new UnaryLambdaTransformer[Real, RealNN](operationName = "labelFunc",
-      transformFn = p => p.value match {
-        case Some(x) if Some(x).get > 30.0 => RealNN(1.0)
-        case _ => RealNN(0.0)
-      }
-    )
-    val labelData = labelTransformer.setInput(rawAge).getOutput().asInstanceOf[Feature[RealNN]]
-      .copy(isResponse = true)
-    rawAge.bucketize(trackNulls = true,
-      splits = Array(Double.NegativeInfinity, 30.0, Double.PositiveInfinity),
-      splitInclusion = Inclusion.Right
-    )
-    val ageBuckets = rawAge.autoBucketize(labelData, trackNulls = true)
-    val genFeatureVector = Seq(ageBuckets,
-      rawAge.vectorize(fillValue = 0.0, fillWithMean = true, trackNulls = true)
-    ).transmogrify()
-    val transformed = new OpWorkflow().setResultFeatures(genFeatureVector).transform(rawDF)
-    val metaCols = OpVectorMetadata(transformed.schema(genFeatureVector.name)).columns
-    val nullGroups = for {
-      col <- metaCols
-      if col.isNullIndicator
-      group <- col.grouping
-    } yield (group, (col, col.index))
-    nullGroups.groupBy(_._1).foreach {
-      case (group, cols) =>
-        require(cols.length == 1, s"Vector column $group has multiple null indicator fields: $cols")
-    }
-  }
-
   ignore should "Compute The same Cramer's V value a categorical feature whether or not other categorical " +
     "features are derived from the same parent feature" in {
     /* Generate an age feature for which young ages imply label is 1, old ages imply label is 0 and an empty age
