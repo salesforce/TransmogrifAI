@@ -367,44 +367,44 @@ object RawFeatureFilter {
   }
 
   private def getAllSummaries(bins: Int, allFeatures: RDD[AllFeatures]): AllSummaries = {
-      def apply(sum: AllSummaries, feat: AllFeatures): AllSummaries = {
-        val (totalCount, responseSummaries, numericSummaries, textSummaries) = sum
-        val (responseFeatures, numericFeatures, textFeatures) = feat
+    def apply(sum: AllSummaries, feat: AllFeatures): AllSummaries = {
+      val (totalCount, responseSummaries, numericSummaries, textSummaries) = sum
+      val (responseFeatures, numericFeatures, textFeatures) = feat
 
-        def updateNumericSummaries(
-          summaries: Map[FeatureKey, HistogramSummary],
-          features: Map[FeatureKey, Seq[Double]]): Map[FeatureKey, HistogramSummary] =
-          features.map { case (key, points) =>
-            val summary = summaries.get(key).getOrElse(new HistogramSummary(bins, bins * 10))
+      def updateNumericSummaries(
+        summaries: Map[FeatureKey, HistogramSummary],
+        features: Map[FeatureKey, Seq[Double]]): Map[FeatureKey, HistogramSummary] =
+        features.map { case (key, points) =>
+          val summary = summaries.get(key).getOrElse(new HistogramSummary(bins, bins * 10))
 
-            summary.update(points)
+          summary.update(points)
 
-            key -> summary
-          }.toMap
+          key -> summary
+        }.toMap
 
-        def updateTextSummaries(
-          summaries: Map[FeatureKey, TextSummary],
-          features: Map[FeatureKey, Seq[String]]): Map[FeatureKey, TextSummary] =
-          features.map { case (key, text) =>
-            val summary = summaries.get(key).getOrElse(new TextSummary(_ => bins))
+      def updateTextSummaries(
+        summaries: Map[FeatureKey, TextSummary],
+        features: Map[FeatureKey, Seq[String]]): Map[FeatureKey, TextSummary] =
+        features.map { case (key, text) =>
+          val summary = summaries.get(key).getOrElse(new TextSummary(_ => bins))
 
-            summary.update(text)
+          summary.update(text)
 
-            key -> summary
-          }.toMap
+          key -> summary
+        }.toMap
 
-          val newResponseSummaries = updateNumericSummaries(responseSummaries, responseFeatures)
-          val newNumericSummaries = updateNumericSummaries(numericSummaries, numericFeatures)
-          val newTextSummaries = updateTextSummaries(textSummaries, textFeatures)
+        val newResponseSummaries = updateNumericSummaries(responseSummaries, responseFeatures)
+        val newNumericSummaries = updateNumericSummaries(numericSummaries, numericFeatures)
+        val newTextSummaries = updateTextSummaries(textSummaries, textFeatures)
 
-        (totalCount + 1.0, newResponseSummaries, newNumericSummaries, newTextSummaries)
-      }
+      (totalCount + 1.0, newResponseSummaries, newNumericSummaries, newTextSummaries)
+    }
 
-      def merge(sum1: AllSummaries, sum2: AllSummaries): AllSummaries = sum1 + sum2
+    def merge(sum1: AllSummaries, sum2: AllSummaries): AllSummaries = sum1 + sum2
 
-      def empty: AllSummaries = (0.0, Map(), Map(), Map())
+    def empty: AllSummaries = (0.0, Map(), Map(), Map())
 
-      allFeatures.aggregate(empty)(apply, merge)
+    allFeatures.aggregate(empty)(apply, merge)
   }
 
   def getTextDistributions(

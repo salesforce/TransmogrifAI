@@ -44,10 +44,8 @@ package object filters {
   private[filters] type FeatureKey = (String, Option[String])
   private[filters] type ProcessedSeq = Either[Seq[String], Seq[Double]]
 
-  implicit val allSummariesSg = new Tuple4Semigroup[
-    Double,
+  implicit val allSummariesSg = new Tuple4Semigroup[Double,
     Map[FeatureKey, HistogramSummary],
     Map[FeatureKey, HistogramSummary],
-    Map[FeatureKey, TextSummary]
-  ]
+    Map[FeatureKey, TextSummary]]
 }

@@ -54,7 +54,7 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
   conf.set("spark.kryo.registrationRequired", "true")
 
   Spec(classOf[StreamingHistogram]) should "produce correct histogram distribution" in {
-    referenceHistogram.getBins(testPadding).map {
+    referenceHistogram.getPaddedBins(testPadding).map {
       case (point, count) => round(point) -> count
     } should contain theSameElementsAs
       Seq(1.5 -> 0.0, 2.0 -> 1L, 9.5 -> 2L, 19.33 -> 3L, 32.67 -> 3L, 45 -> 1L, 45.5 -> 0.0)
@@ -88,7 +88,7 @@ class StreamingHistogramTest extends FlatSpec with TestSparkContext {
       data.aggregate(new StreamingHistogramBuilder(15, 500, 1))(seqOp, combOp).build
     }
 
-    histogram.getBins(testPadding) should contain theSameElementsAs
+    histogram.getPaddedBins(testPadding) should contain theSameElementsAs
       (0 to 10).map(k => (k.toDouble, 1.0)) ++ Array(-0.5 -> 0.0, 10.5 -> 0.0)
   }
 

@@ -172,7 +172,7 @@ configure(allProjs) {
     }
 
     if (System.getenv("CI") != 'true') {
-        // compileScala.dependsOn(scalaStyle)
+        compileScala.dependsOn(scalaStyle)
     }
 
     avro {
