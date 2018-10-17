@@ -34,6 +34,7 @@ import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
 import com.salesforce.op.filters.FeatureDistribution._
+import com.salesforce.op.filters.RawFeatureFilter._
 import com.salesforce.op.filters.Summary._
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -146,83 +147,25 @@ class RawFeatureFilter[T]
       val predOut = allPredictors.map(TransientFeature(_))
       (respOut, predOut)
     }
-    val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
-    val allSummaries = preparedFeatures.map(_.allSummaries)
-    val textSummaries: Map[FeatureKey, Summary] =
-      allFeatureInfo.map(_.textSummaries)
-        .getOrElse(allSummaries.map { case (_, pred) =>
-          // Only need to worry about predictors here since non-numeric responses are filtered
-          pred.collect { case (key, value) if value.isLeft => key -> value.left.get }.toMap
-        }.reduce(_ + _))
-    val numericPoints: RDD[(Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[Double]])] =
-      allSummaries.map { case (resp, pred) =>
-        resp.collect { case (key, value) if value.isRight => key -> value.right.get } ->
-          pred.collect { case (key, value) if value.isRight => key -> value.right.get }
-      }.persist()
-
-    implicit val builderSg = new Semigroup[HistogramBuilder] {
-      def combine(x: HistogramBuilder, y: HistogramBuilder): HistogramBuilder = {
-        x.merge(y.build)
-        x
-      }
-    }
-    implicit val sgTuple2Maps =
-      new Tuple2Semigroup[Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]]()
-    val (respHistograms, predHistograms): (Map[FeatureKey, StreamingHistogram], Map[FeatureKey, StreamingHistogram]) = {
-
-      def merge(
-        x: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]),
-        y: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder])
-      ): (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]) = x + y
-
-      def apply(
-        allHists: (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]),
-        allPoints: (Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[Double]])
-      ): (Map[FeatureKey, HistogramBuilder], Map[FeatureKey, HistogramBuilder]) = {
-        def processMaps(
-          hists: Map[FeatureKey, HistogramBuilder],
-          points: Map[FeatureKey, Seq[Double]]): Map[FeatureKey, HistogramBuilder] = {
-          val allKeys = hists.keySet.union(points.keySet)
-          allKeys.map { key =>
-            val builder = hists.get(key) match {
-              case Some(oldBuilder) => oldBuilder
-              case None => new HistogramBuilder(bins, bins * 10, 1)
-            }
-
-            builder.update(points.get(key).map(_.asInstanceOf[Seq[Number]]).getOrElse(Seq()): _*)
-
-            key -> builder
-          }.toMap
-        }
-
-        processMaps(allHists._1, allPoints._1) -> processMaps(allHists._2, allPoints._2)
-      }
-
-      def emptyHistMap: Map[FeatureKey, HistogramBuilder] = Map()
-
-      numericPoints.aggregate((emptyHistMap, emptyHistMap))(apply, merge) match {
-        case (map1, map2) => (map1.mapValues(_.build), map2.mapValues(_.build))
-      }
-    }
-
+    val preparedFeatures: RDD[PreparedFeatures] =
+      data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+    val allFeatures: RDD[AllFeatures] = preparedFeatures.map(_.allFeatures)
+    val textFeatures: RDD[Map[FeatureKey, Seq[String]]] = allFeatures.map(_._3)
+    val (totalCount, responseSummaries, numericSummaries, textSummaries) =
+      RawFeatureFilter.getAllSummaries(bins, allFeatures)
     // Have to use the training summaries do process scoring for comparison
-    val textSummariesArr: Array[(FeatureKey, Summary)] = textSummaries.toArray
-    val respHistogramsArr: Array[(FeatureKey, StreamingHistogram)] = respHistograms.toArray
-    val predHistogramsArr: Array[(FeatureKey, StreamingHistogram)] = predHistograms.toArray
+    val responseDistributions: Array[FeatureDistribution] =
+      responseSummaries.map { case (key, sum) => sum.getFeatureDistribution(key, totalCount) }.toArray
+    val numericDistributions: Array[FeatureDistribution] =
+      numericSummaries.map { case (key, sum) => sum.getFeatureDistribution(key, totalCount) }.toArray
+    val textDistributions: Array[FeatureDistribution] =
+      RawFeatureFilter.getTextDistributions(textSummaries, textFeatures, totalCount)
+    val predictorDistributions = numericDistributions ++ textDistributions
 
-    implicit val sgTuple2Feats = new Tuple2Semigroup[Array[FeatureDistribution], Array[FeatureDistribution]]()
-    val (responseDistributions, predictorDistributions): (Array[FeatureDistribution], Array[FeatureDistribution]) =
-      preparedFeatures
-        .map(_.getFeatureDistributions(
-          responseSummaries = responseSummariesArr,
-          predictorSummaries = predictorSummariesArr,
-          bins = bins,
-          textBinsFormula = textBinsFormula
-        )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
-        val responseKeys: Array[FeatureKey] = responseSummariesArr.map(_._1)
-        val predictorKeys: Array[FeatureKey] = predictorSummariesArr.map(_._1)
+        val responseKeys: Array[FeatureKey] = responseDistributions.map(_.featureKey)
+        val predictorKeys: Array[FeatureKey] = predictorDistributions.map(_.featureKey)
         val corrRDD: RDD[Vector] = preparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, predictorKeys))
         val corrMatrix: Matrix = Statistics.corr(corrRDD, correlationType.sparkName)
 
@@ -234,10 +177,10 @@ class RawFeatureFilter[T]
       }
 
     AllFeatureInformation(
+      responseSummaries = responseSummaries.mapValues(_.toSummary),
       responseDistributions = responseDistributions,
+      predictorSummaries = numericSummaries.mapValues(_.toSummary) ++ textSummaries.mapValues(_.toSummary),
       predictorDistributions = predictorDistributions,
-      textDistributions = textDistributions,
-      textSummaries = textSummaries,
       correlationInfo = correlationInfo)
   }
 
@@ -401,6 +344,11 @@ class RawFeatureFilter[T]
 
 object RawFeatureFilter {
 
+  private type HistogramAggResult = (
+    Double,
+    (Map[FeatureKey, (Double, HistogramBuilder)], Map[FeatureKey, (Double, HistogramBuilder)])
+  )
+
   /**
    * Default calculation for the hashing size for RFF (compare js distance) for text features
    *
@@ -416,6 +364,76 @@ object RawFeatureFilter {
     //  if (max < MaxTokenLowerLimit) bins
     //  else math.min(math.max(bins, sum / AvgBinValue), MaxBins).toInt()
     bins
+  }
+
+  private def getAllSummaries(bins: Int, allFeatures: RDD[AllFeatures]): AllSummaries = {
+      def apply(sum: AllSummaries, feat: AllFeatures): AllSummaries = {
+        val (totalCount, responseSummaries, numericSummaries, textSummaries) = sum
+        val (responseFeatures, numericFeatures, textFeatures) = feat
+
+        def updateNumericSummaries(
+          summaries: Map[FeatureKey, HistogramSummary],
+          features: Map[FeatureKey, Seq[Double]]): Map[FeatureKey, HistogramSummary] =
+          features.map { case (key, points) =>
+            val summary = summaries.get(key).getOrElse(new HistogramSummary(bins, bins * 10))
+
+            summary.update(points)
+
+            key -> summary
+          }.toMap
+
+        def updateTextSummaries(
+          summaries: Map[FeatureKey, TextSummary],
+          features: Map[FeatureKey, Seq[String]]): Map[FeatureKey, TextSummary] =
+          features.map { case (key, text) =>
+            val summary = summaries.get(key).getOrElse(new TextSummary(_ => bins))
+
+            summary.update(text)
+
+            key -> summary
+          }.toMap
+
+          val newResponseSummaries = updateNumericSummaries(responseSummaries, responseFeatures)
+          val newNumericSummaries = updateNumericSummaries(numericSummaries, numericFeatures)
+          val newTextSummaries = updateTextSummaries(textSummaries, textFeatures)
+
+        (totalCount + 1.0, newResponseSummaries, newNumericSummaries, newTextSummaries)
+      }
+
+      def merge(sum1: AllSummaries, sum2: AllSummaries): AllSummaries = sum1 + sum2
+
+      def empty: AllSummaries = (0.0, Map(), Map(), Map())
+
+      allFeatures.aggregate(empty)(apply, merge)
+  }
+
+  def getTextDistributions(
+    textSummaries: Map[FeatureKey, TextSummary],
+    textFeatures: RDD[Map[FeatureKey, Seq[String]]],
+    totalCount: Double): Array[FeatureDistribution] = {
+    // This will initialize existing text summary hashing TFs
+    textSummaries.foreach { case (_, textSum) => textSum.setHashingTF() }
+    def apply(sum: Map[FeatureKey, TextSummary], feat: Map[FeatureKey, Seq[String]]): Map[FeatureKey, TextSummary] =
+      sum.map { case (key, s) => key -> s.updateDistribution(feat.get(key).getOrElse(Seq())) }
+
+    def merge(
+      sum1: Map[FeatureKey, TextSummary],
+      sum2: Map[FeatureKey, TextSummary]): Map[FeatureKey, TextSummary] =
+      sum1.keySet.union(sum2.keySet).map { key =>
+        val updatedSum = (sum1.get(key), sum2.get(key)) match {
+          case (Some(s1), Some(s2)) => s1.mergeDistribution(s2)
+          case (Some(s1), _) => s1
+          case (_, Some(s2)) => s2
+          // This should never happen
+          case _ => throw new RuntimeException(s"Unable to find text summary for feature key: $key")
+        }
+
+        key -> updatedSum
+      }.toMap
+
+      textFeatures.aggregate(textSummaries)(apply, merge)
+        .map { case (key, sum) => sum.getFeatureDistribution(key, totalCount) }
+        .toArray
   }
 
 }

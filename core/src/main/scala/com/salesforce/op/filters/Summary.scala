@@ -30,7 +30,17 @@
 
 package com.salesforce.op.filters
 
-import com.twitter.algebird.Monoid
+import java.util.concurrent.atomic.AtomicReference
+import java.util.function.BinaryOperator
+
+import com.salesforce.op.stages.impl.feature.HashAlgorithm
+import com.salesforce.op.utils.stats.RichStreamingHistogram._
+import com.salesforce.op.utils.stats.StreamingHistogram.StreamingHistogramBuilder
+import com.twitter.algebird.{Monoid, Semigroup}
+import org.apache.spark.mllib.feature.HashingTF
+
+import scala.collection.JavaConverters._
+import scala.collection.mutable.HashMap
 
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
@@ -62,5 +72,192 @@ case object Summary {
       case Left(v) => Summary(v.size, v.size, v.size, 1.0)
       case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
     }
+  }
+}
+
+class TextSummary(textFormula: TextSummary => Int) {
+
+  private[this] val count: AtomicReference[Double] = new AtomicReference(0)
+  private[this] val distribution: HashMap[Double, Double] = HashMap()
+  private[this] var hashingTFOpt: Option[HashingTF] = None
+  private[this] val maxTokens: AtomicReference[Double] = new AtomicReference(Double.NegativeInfinity)
+  private[this] val minTokens: AtomicReference[Double] = new AtomicReference(Double.PositiveInfinity)
+  private[this] val numTokens: AtomicReference[Double] = new AtomicReference(0)
+  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = math.max(s, t)
+  }
+  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = math.min(s, t)
+  }
+  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = s + t
+  }
+
+  final def getCount(): Double = count.get
+
+  final def getDistribution(): Array[(Double, Double)] = distribution.toArray.sortBy(_._1)
+
+  final def getFeatureDistribution(featureKey: FeatureKey, totalCount: Double): FeatureDistribution = {
+    val thisCount = getCount
+    val nullCount = totalCount - thisCount
+    val dist = getDistribution
+
+    FeatureDistribution(
+      name = featureKey._1,
+      key = featureKey._2,
+      count = thisCount.toLong,
+      nulls = nullCount.toLong,
+      distribution = dist.map(_._2),
+      summaryInfo = dist.map(_._1))
+  }
+
+  final def getNumTokens(): Double = numTokens.get
+
+  final def getMinTokens(): Double = minTokens.get
+
+  final def getMaxTokens(): Double = maxTokens.get
+
+  final def merge(other: TextSummary): this.type = synchronized {
+    count.accumulateAndGet(other.getCount, sumOp)
+    maxTokens.accumulateAndGet(other.getMaxTokens, maxOp)
+    minTokens.accumulateAndGet(other.getMinTokens, minOp)
+    numTokens.accumulateAndGet(other.getNumTokens, sumOp)
+
+    this
+  }
+
+  final def mergeDistribution(other: TextSummary): this.type = {
+    other.getDistribution.foreach { case (point, count) =>
+      val newCount = distribution.get(point).getOrElse(0.0) + count
+      distribution += (point -> newCount)
+    }
+
+    this
+  }
+
+  final def setHashingTF(): this.type = synchronized {
+    hashingTFOpt = Option {
+      new HashingTF(numFeatures = textFormula(this)).setBinary(false)
+        .setHashAlgorithm(HashAlgorithm.MurMur3.entryName.toLowerCase)
+    }
+
+    this
+  }
+
+  final def toSummary: Summary = Summary(
+    min = getMinTokens,
+    max = getMaxTokens,
+    sum = getNumTokens,
+    count = getCount)
+
+  final def update(text: Seq[String]): this.type = synchronized {
+    val size: Double = text.length
+    count.accumulateAndGet(1.0, sumOp)
+    maxTokens.accumulateAndGet(size, maxOp)
+    minTokens.accumulateAndGet(size, minOp)
+    numTokens.accumulateAndGet(size, sumOp)
+
+    this
+  }
+
+  final def updateDistribution(text: Seq[String]): this.type = synchronized {
+    hashingTFOpt match {
+      case Some(hashingTF) =>
+        val points: Array[Double] = hashingTF.transform(text).toArray
+        val currentCounts: Seq[Double] = points.map(distribution.get(_).getOrElse(0.0))
+
+        points.zip(currentCounts).foreach { case (point, count) =>
+          distribution += point -> (count + 1.0)
+        }
+      case None =>
+        throw new RuntimeException("HashingTF must be set in order to update text summary distribution")
+
+    }
+
+    this
+  }
+}
+
+object TextSummary {
+  implicit val semigroup = new Semigroup[TextSummary] {
+    def plus(l: TextSummary, r: TextSummary): TextSummary = l.merge(r)
+  }
+}
+
+class HistogramSummary(maxBins: Int, maxSpoolSize: Int) {
+
+  private[this] val builder: StreamingHistogramBuilder = new StreamingHistogramBuilder(maxBins, maxSpoolSize, 1)
+  private[this] val count: AtomicReference[Double] = new AtomicReference(0)
+  private[this] val maximum: AtomicReference[Double] = new AtomicReference(Double.NegativeInfinity)
+  private[this] val minimum: AtomicReference[Double] = new AtomicReference(Double.PositiveInfinity)
+  private[this] val valueSum: AtomicReference[Double] = new AtomicReference(0)
+  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = math.max(s, t)
+  }
+  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = math.min(s, t)
+  }
+  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+    def apply(s: Double, t: Double): Double = s + t
+  }
+
+  final def getCount(): Double = count.get
+
+  final def getDistribution(): Array[(Double, Double)] = builder.build.getBins
+
+  final def getFeatureDistribution(featureKey: FeatureKey, totalCount: Double): FeatureDistribution = {
+    val thisCount = getCount
+    val nullCount = totalCount - thisCount
+    val dist = getDistribution
+
+    FeatureDistribution(
+      name = featureKey._1,
+      key = featureKey._2,
+      count = thisCount.toLong,
+      nulls = nullCount.toLong,
+      distribution = dist.map(_._2),
+      summaryInfo = dist.map(_._1))
+  }
+
+  final def getMaximum(): Double = maximum.get
+
+  final def getMinimum(): Double = minimum.get
+
+  final def getValueSum(): Double = valueSum.get
+
+  final def merge(other: HistogramSummary): this.type = synchronized {
+    maximum.accumulateAndGet(other.getMaximum, maxOp)
+    minimum.accumulateAndGet(other.getMinimum, minOp)
+    count.accumulateAndGet(other.getCount, sumOp)
+    other.getDistribution.foreach { case (pt, count) =>
+      valueSum.accumulateAndGet(pt, sumOp)
+      builder.update(pt, count.toLong)
+    }
+
+    this
+  }
+
+  final def toSummary: Summary = Summary(
+    min = getMinimum,
+    max = getMaximum,
+    sum = getValueSum,
+    count = getCount)
+
+  final def update(points: Seq[Double]): this.type = synchronized {
+    points.foreach { pt =>
+      maximum.accumulateAndGet(pt, maxOp)
+      minimum.accumulateAndGet(pt, minOp)
+      valueSum.accumulateAndGet(pt, sumOp)
+      builder.update(pt)
+    }
+    count.accumulateAndGet(1.0, sumOp)
+
+    this
+  }
+}
+
+object HistogramSummary {
+  implicit val semigroup = new Semigroup[HistogramSummary] {
+    def plus(l: HistogramSummary, r: HistogramSummary): HistogramSummary = l.merge(r)
   }
 }

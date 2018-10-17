@@ -30,7 +30,24 @@
 
 package com.salesforce.op
 
+import com.twitter.algebird.Tuple4Semigroup
+
 package object filters {
+  private[filters] type AllFeatures =
+    (Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[Double]], Map[FeatureKey, Seq[String]])
+  private[filters] type AllSummaries = (
+    Double,
+    Map[FeatureKey, HistogramSummary],
+    Map[FeatureKey, HistogramSummary],
+    Map[FeatureKey, TextSummary]
+  )
   private[filters] type FeatureKey = (String, Option[String])
   private[filters] type ProcessedSeq = Either[Seq[String], Seq[Double]]
+
+  implicit val allSummariesSg = new Tuple4Semigroup[
+    Double,
+    Map[FeatureKey, HistogramSummary],
+    Map[FeatureKey, HistogramSummary],
+    Map[FeatureKey, TextSummary]
+  ]
 }

@@ -38,6 +38,12 @@ import scala.collection.JavaConverters._
 object RichStreamingHistogram {
   final implicit class RichStreamingHistogramImpl(val hist: StreamingHistogram) extends AnyVal {
 
+    def getBins(): Array[(Double, Double)] =
+      hist.getAsMap.asScala.toArray.flatMap {
+        case (a, b) => b.headOption.map(d => (a.doubleValue, d.toDouble))
+      }
+
+
     /**
      * Yields set of bins describing streaming histogram. The size of the resulting array will
      * be [[(_: StreamingHistogram).getAsMap.size + 2]] (if it is non-empty, otherwise 0) where
@@ -46,13 +52,8 @@ object RichStreamingHistogram {
      * @param padding boundary padding to add to histogram bins
      * @return padded bins
      */
-    def getBins(padding: Double = 0.1): Array[(Double, Double)] = {
-      val mainBins = hist.getAsMap.asScala.toArray.flatMap {
-        case (a, b) => b.headOption.map(d => (a.doubleValue, d.toDouble))
-      }
-
-      RichStreamingHistogram.paddedBins(mainBins, padding)
-    }
+    def getPaddedBins(padding: Double = 0.1): Array[(Double, Double)] =
+      RichStreamingHistogram.paddedBins(getBins, padding)
 
     /**
      * Produces standard histogram density estimator for this streaming histogram where the bins are constructed
@@ -62,7 +63,7 @@ object RichStreamingHistogram {
      * @return standard histogram density estimator
      */
     def density(padding: Double = 0.1): Double => Double =
-      RichStreamingHistogram.density(getBins(padding))
+      RichStreamingHistogram.density(getPaddedBins(padding))
   }
 
   // The following are exposed for test comparisons
