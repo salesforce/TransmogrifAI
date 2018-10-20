@@ -103,14 +103,14 @@ class RawFeatureFilter[T]
   val timePeriod: Option[TimePeriod] = None
 ) extends Serializable {
 
-  assert(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
+  require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
     s" bins must be between 1 and ${FeatureDistribution.MaxBins}")
-  assert(minFill >= 0.0 && minFill <= 1.0, s"Invalid minFill size $minFill, minFill must be between 0 and 1")
-  assert(maxFillDifference >= 0.0 && maxFillDifference <= 1.0, s"Invalid maxFillDifference size $maxFillDifference," +
+  require(minFill >= 0.0 && minFill <= 1.0, s"Invalid minFill size $minFill, minFill must be between 0 and 1")
+  require(maxFillDifference >= 0.0 && maxFillDifference <= 1.0, s"Invalid maxFillDifference size $maxFillDifference," +
     s" maxFillDifference must be between 0 and 1")
-  assert(maxFillRatioDiff >= 0.0, s"Invalid maxFillRatioDiff size $maxFillRatioDiff," +
+  require(maxFillRatioDiff >= 0.0, s"Invalid maxFillRatioDiff size $maxFillRatioDiff," +
     s" maxFillRatioDiff must be greater than 0.0")
-  assert(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
+  require(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
     s" maxJSDivergence must be between 0 and 1")
 
   ClosureUtils.checkSerializable(textBinsFormula) match {
@@ -229,7 +229,7 @@ class RawFeatureFilter[T]
 
     val scoringUnfilled =
       if (scoringDistribs.nonEmpty) {
-        assert(scoringDistribs.length == featureSize, "scoring and training features must match")
+        require(scoringDistribs.length == featureSize, "scoring and training features must match")
         val su = scoringDistribs.map(_.fillRate() < minFill)
         logExcluded(su, s"Features excluded because scoring fill rate did not meet min required ($minFill)")
         su
@@ -284,7 +284,7 @@ class RawFeatureFilter[T]
 
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
-    assert(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
+    require(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
     val trainingSummary = computeFeatureStats(trainData, rawFeatures)
     log.info("Computed summary stats for training features")
     if (log.isDebugEnabled) {

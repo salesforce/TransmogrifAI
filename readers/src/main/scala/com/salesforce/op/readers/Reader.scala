@@ -150,7 +150,7 @@ trait Reader[T] extends ReaderType[T] {
   ): JoinedDataReader[T, U] = {
     val joinedReader =
       new JoinedDataReader[T, U](leftReader = this, rightReader = other, joinKeys = joinKeys, joinType = joinType)
-    assert(joinedReader.leftReader.subReaders
+    require(joinedReader.leftReader.subReaders
       .forall(r => r.fullTypeName != joinedReader.rightReader.fullTypeName),
       "All joins must be for readers of different objects - self joins are not supported"
     )
