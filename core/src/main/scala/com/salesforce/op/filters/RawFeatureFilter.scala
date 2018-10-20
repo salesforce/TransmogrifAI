@@ -114,7 +114,7 @@ class RawFeatureFilter[T]
     s" maxJSDivergence must be between 0 and 1")
 
   ClosureUtils.checkSerializable(textBinsFormula) match {
-    case Failure(e) => throw new AssertionError("The argument textBinsFormula must be serializable", e)
+    case Failure(e) => throw new IllegalArgumentException("The argument textBinsFormula must be serializable", e)
     case ok => ok
   }
 
