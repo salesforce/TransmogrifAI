@@ -57,7 +57,7 @@ class OpStringIndexerTest extends FlatSpec with TestSparkContext{
 
   it should "throw an error if you try to set noFilter as the indexer" in {
     val indexer = new OpStringIndexer[Text]()
-    intercept[AssertionError](indexer.setHandleInvalid(StringIndexerHandleInvalid.NoFilter))
+    intercept[IllegalArgumentException](indexer.setHandleInvalid(StringIndexerHandleInvalid.NoFilter))
   }
 
   it should "correctly index a text column" in {

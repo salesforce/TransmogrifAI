@@ -100,7 +100,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   property("column metadata cannot be created with empty parents or feature types") {
     forAll(vecColTupleGen) { (vct: OpVectorColumnTuple) =>
       if (!checkTuples(vct)) {
-        assertThrows[AssertionError] { OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5) }
+        assertThrows[IllegalArgumentException] { OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5) }
       }
     }
   }

@@ -170,17 +170,17 @@ class SmartTextVectorizerTest
     regular shouldBe shortcut
   }
 
-  it should "fail with an assertion error" in {
+  it should "fail with an error" in {
     val emptyDF = inputData.filter(inputData("text1") === "").toDF()
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
 
-    val thrown = intercept[AssertionError] {
+    val thrown = intercept[IllegalArgumentException] {
       new OpWorkflow().setResultFeatures(smartVectorized).transform(emptyDF)
     }
-    assert(thrown.getMessage.contains("assertion failed"))
+    assert(thrown.getMessage.contains("requirement failed"))
   }
 
   it should "generate metadata correctly" in {
