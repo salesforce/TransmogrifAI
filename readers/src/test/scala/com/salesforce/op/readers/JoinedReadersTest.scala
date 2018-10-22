@@ -84,19 +84,19 @@ class JoinedReadersTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "throw an error if you try to perform a self join" in {
-    a[AssertionError] should be thrownBy {
+    a[IllegalArgumentException] should be thrownBy {
       dataReader.innerJoin(dataReader)
     }
   }
 
   it should "throw an error if you try to use the same reader twice" in {
-    a[AssertionError] should be thrownBy {
+    a[IllegalArgumentException] should be thrownBy {
       dataReader.innerJoin(sparkReader).innerJoin(dataReader)
     }
   }
 
   it should "throw an error if you try to read the same data type twice with different readers" in {
-    a[AssertionError] should be thrownBy {
+    a[IllegalArgumentException] should be thrownBy {
       passengerReader.innerJoin(sparkReader).outerJoin(dataReader)
     }
   }

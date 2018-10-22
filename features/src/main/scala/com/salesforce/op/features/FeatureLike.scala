@@ -353,7 +353,7 @@ trait FeatureLike[O <: FeatureType] {
         if (acc.contains(f.uid)) acc else acc + (f.uid -> f)
       )
 
-    assert(checkFeatureOriginStageMatch(featuresByUid.values), "Some of your features had parent features that did" +
+    require(checkFeatureOriginStageMatch(featuresByUid.values), "Some of your features had parent features that did" +
       " not match the inputs to their origin stage. All stages must be a new instance when used to transform features")
 
     def logDebug(msg: String) = log.debug(s"[${this.uid}]: $msg")

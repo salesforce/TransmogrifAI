@@ -63,7 +63,7 @@ class OpStringIndexer[T <: Text]
    * @return this stage
    */
   def setHandleInvalid(value: StringIndexerHandleInvalid): this.type = {
-    assert(Seq(Inv.Skip, Inv.Error, Inv.Keep).contains(value),
+    require(Seq(Inv.Skip, Inv.Error, Inv.Keep).contains(value),
       "OpStringIndexer only supports Skip, Error, and Keep for handle invalid")
     getSparkMlStage().get.setHandleInvalid(value.entryName.toLowerCase)
     this

@@ -89,7 +89,7 @@ abstract class SequenceEstimator[I <: FeatureType, O <: FeatureType]
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): SequenceModel[I, O] = {
-    assert(inN.nonEmpty, "Inputs cannot be empty")
+    require(inN.nonEmpty, "Inputs cannot be empty")
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val columns = inN.map(feature => col(feature.name))
