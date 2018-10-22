@@ -149,7 +149,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   }
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-    assert(!dataset.isEmpty, "Input dataset cannot be empty")
+    require(!dataset.isEmpty, "Input dataset cannot be empty")
 
     val maxCard = $(maxCardinality)
     val shouldCleanKeys = $(cleanKeys)

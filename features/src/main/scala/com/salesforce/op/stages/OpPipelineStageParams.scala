@@ -67,7 +67,7 @@ trait InputParams extends Params {
    * @return this stage
    */
   final protected def setInputFeatures[S <: OPFeature](features: Array[S]): this.type = {
-    assert(
+    require(
       checkInputLength(features),
       "Number of input features must match the number expected by this type of pipeline stage"
     )
