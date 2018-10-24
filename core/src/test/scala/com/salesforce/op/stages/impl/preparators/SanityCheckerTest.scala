@@ -532,37 +532,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  // TODO: Not sure if we should do this test since it may not fail if spark settings are changed
-  it should "fail (due to a Kryo buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
-    val numHashes = 5000
-
-    val vectorized = textMap.vectorize(
-      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
-      cleanText = false,
-      cleanKeys = TransmogrifierDefaults.CleanKeys,
-      others = Array.empty,
-      trackNulls = TransmogrifierDefaults.TrackNulls,
-      numHashes = numHashes
-    )
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(false)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, vectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    intercept[SparkException](new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData))
-  }
-
-  it should "not fail when calculating feature-label correlations on that same 5k element feature vector" in {
+  it should "not fail when calculating feature-label correlations on a 5k element feature vector" in {
     val numHashes = 5000
 
     val vectorized = textMap.vectorize(
