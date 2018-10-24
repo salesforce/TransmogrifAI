@@ -33,12 +33,15 @@ package com.salesforce.op.filters
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
+import com.salesforce.op.filters.FeatureDistribution._
+import com.salesforce.op.filters.Summary._
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.spark.RichRow._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.Tuple2Semigroup
 import org.apache.spark.mllib.linalg.{Matrix, Vector}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
@@ -100,18 +103,18 @@ class RawFeatureFilter[T]
   val timePeriod: Option[TimePeriod] = None
 ) extends Serializable {
 
-  assert(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
+  require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
     s" bins must be between 1 and ${FeatureDistribution.MaxBins}")
-  assert(minFill >= 0.0 && minFill <= 1.0, s"Invalid minFill size $minFill, minFill must be between 0 and 1")
-  assert(maxFillDifference >= 0.0 && maxFillDifference <= 1.0, s"Invalid maxFillDifference size $maxFillDifference," +
+  require(minFill >= 0.0 && minFill <= 1.0, s"Invalid minFill size $minFill, minFill must be between 0 and 1")
+  require(maxFillDifference >= 0.0 && maxFillDifference <= 1.0, s"Invalid maxFillDifference size $maxFillDifference," +
     s" maxFillDifference must be between 0 and 1")
-  assert(maxFillRatioDiff >= 0.0, s"Invalid maxFillRatioDiff size $maxFillRatioDiff," +
+  require(maxFillRatioDiff >= 0.0, s"Invalid maxFillRatioDiff size $maxFillRatioDiff," +
     s" maxFillRatioDiff must be greater than 0.0")
-  assert(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
+  require(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
     s" maxJSDivergence must be between 0 and 1")
 
   ClosureUtils.checkSerializable(textBinsFormula) match {
-    case Failure(e) => throw new AssertionError("The argument textBinsFormula must be serializable", e)
+    case Failure(e) => throw new IllegalArgumentException("The argument textBinsFormula must be serializable", e)
     case ok => ok
   }
 
@@ -139,17 +142,19 @@ class RawFeatureFilter[T]
           None
       }
       val predOut = allPredictors.map(TransientFeature(_))
-
       (respOut, predOut)
     }
-    val preparedFeatures: RDD[PreparedFeatures] =
-      data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+    val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+
+    implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
     // Have to use the training summaries do process scoring for comparison
     val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
       allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
         .getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
     val (responseSummariesArr, predictorSummariesArr): (Array[(FeatureKey, Summary)], Array[(FeatureKey, Summary)]) =
       (responseSummaries.toArray, predictorSummaries.toArray)
+
+    implicit val sgTuple2Feats = new Tuple2Semigroup[Array[FeatureDistribution], Array[FeatureDistribution]]()
     val (responseDistributions, predictorDistributions): (Array[FeatureDistribution], Array[FeatureDistribution]) =
       preparedFeatures
         .map(_.getFeatureDistributions(
@@ -157,8 +162,7 @@ class RawFeatureFilter[T]
           predictorSummaries = predictorSummariesArr,
           bins = bins,
           textBinsFormula = textBinsFormula
-        ))
-        .reduce(_ + _) // NOTE: resolved semigroup is IndexedSeqSemigroup
+        )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
         val responseKeys: Array[FeatureKey] = responseSummariesArr.map(_._1)
@@ -225,7 +229,7 @@ class RawFeatureFilter[T]
 
     val scoringUnfilled =
       if (scoringDistribs.nonEmpty) {
-        assert(scoringDistribs.length == featureSize, "scoring and training features must match")
+        require(scoringDistribs.length == featureSize, "scoring and training features must match")
         val su = scoringDistribs.map(_.fillRate() < minFill)
         logExcluded(su, s"Features excluded because scoring fill rate did not meet min required ($minFill)")
         su
@@ -280,10 +284,13 @@ class RawFeatureFilter[T]
 
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
-    assert(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
+    require(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
     val trainingSummary = computeFeatureStats(trainData, rawFeatures)
     log.info("Computed summary stats for training features")
-    log.debug(trainingSummary.predictorDistributions.mkString("\n"))
+    if (log.isDebugEnabled) {
+      log.debug(trainingSummary.responseDistributions.mkString("\n"))
+      log.debug(trainingSummary.predictorDistributions.mkString("\n"))
+    }
 
     val scoreData = scoreReader.flatMap{ s =>
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
@@ -298,7 +305,10 @@ class RawFeatureFilter[T]
     val scoringSummary = scoreData.map{ sd =>
       val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary))
       log.info("Computed summary stats for scoring features")
-      log.debug(ss.predictorDistributions.mkString("\n"))
+      if (log.isDebugEnabled) {
+        log.debug(ss.responseDistributions.mkString("\n"))
+        log.debug(ss.predictorDistributions.mkString("\n"))
+      }
       ss
     }
 

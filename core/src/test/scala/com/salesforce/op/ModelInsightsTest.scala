@@ -30,17 +30,18 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{EvalMetric, EvaluationMetrics}
 import com.salesforce.op.features.Feature
+import com.salesforce.op._
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
+import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataSplitter, SplitterSummary}
+import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter, SplitterSummary}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -65,8 +66,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   implicit val doubleOptEquality = new Equality[Option[Double]] {
     def areEqual(a: Option[Double], b: Any): Boolean = b match {
       case None => a.isEmpty
-      case Some(s: Double) => (a.exists(_.isNaN) && s.isNaN) ||
-        (a.nonEmpty && a.contains(s))
+      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
       case _ => false
     }
   }
@@ -150,6 +150,24 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
     insights.stageInfo.keys.size shouldEqual 8
+  }
+
+  it should "return model insights even when correlation is turned off for some features" in {
+    val featuresFinal = Seq(
+      description.vectorize(numHashes = 10, autoDetectLanguage = false, minTokenLength = 1, toLowercase = true),
+      stringMap.vectorize(cleanText = true, numHashes = 10)
+    ).combine()
+    val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
+    val prediction = MultiClassificationModelSelector
+      .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, featuresChecked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    insights.features.size shouldBe 2
+    insights.features.flatMap(_.derivedFeatures).size shouldBe 23
   }
 
   it should "return feature insights with selector info and label info even when no models are found" in {

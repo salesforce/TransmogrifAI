@@ -52,7 +52,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
   import VectorGenerators._
   import com.salesforce.op.utils.spark.RichVector._
 
-  lazy val sparseVevtorsRDDGen = RDDGenerator.genRDD[Vector](spark.sparkContext)(sparseVectorGen)
+  lazy val sparseVevtorsRDDGen = RDDGenerator.genRDD[Vector](sc)(sparseVectorGen)
 
   property("Vectors should error on size mismatch") {
     forAll(sparseVectorGen) { sparse: SparseVector =>

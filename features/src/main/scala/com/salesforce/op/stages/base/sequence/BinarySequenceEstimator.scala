@@ -100,7 +100,7 @@ abstract class BinarySequenceEstimator[I1 <: FeatureType, I2 <: FeatureType, O <
    * @return a fitted model that will perform the transformation specified by the function defined in constructor fit
    */
   override def fit(dataset: Dataset[_]): BinarySequenceModel[I1, I2, O] = {
-    assert(getTransientFeatures.size > 1, "Inputs cannot be empty")
+    require(getTransientFeatures.size > 1, "Inputs cannot be empty")
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
 
     val seqColumns = inN.map(feature => col(feature.name))

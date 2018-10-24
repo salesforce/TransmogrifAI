@@ -44,6 +44,8 @@ import org.scalatest.junit.JUnitRunner
 class OpLogisticRegressionTest extends OpEstimatorSpec[Prediction, OpPredictorWrapperModel[LogisticRegressionModel],
   OpPredictorWrapper[LogisticRegression, LogisticRegressionModel]] with PredictionEquality {
 
+  override def specName: String = Spec[OpLogisticRegression]
+
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](
       1.0.toRealNN -> Vectors.dense(12.0, 4.3, 1.3).toOPVector,

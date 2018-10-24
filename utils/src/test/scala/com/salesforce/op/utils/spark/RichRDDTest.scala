@@ -48,7 +48,7 @@ import org.scalatest.prop.PropertyChecks
 class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
   import com.salesforce.op.utils.spark.RichRDD._
 
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
+  val data = RDDGenerator.genRDD[(Int, Int)](sc)(Arbitrary.arbitrary[(Int, Int)])
 
   property("save as a text file") {
     forAll(data) { rdd =>

@@ -31,8 +31,8 @@ package com.salesforce.op.evaluators
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
-import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.Tuple4Semigroup
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
@@ -84,6 +84,7 @@ private[op] class OpBinScoreEvaluator
 
       // Finding stats per bin -> avg score, avg conv rate,
       // total num of data points and overall brier score.
+      implicit val sg = new Tuple4Semigroup[Double, Double, Long, Double]()
       val stats = scoreAndLabels.map {
         case (score, label) =>
           (getBinIndex(score, minScore, maxScore), (score, label, 1L, math.pow(score - label, 2)))
