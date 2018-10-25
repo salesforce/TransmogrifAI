@@ -62,6 +62,8 @@ class OpKryoRegistrator extends KryoRegistrator {
   final override def registerClasses(kryo: Kryo): Unit = {
     doClassRegistration(kryo)(
       classOf[org.apache.avro.generic.GenericData],
+      classOf[org.apache.spark.mllib.linalg.Vector],
+      classOf[org.apache.spark.mllib.stat.MultivariateOnlineSummarizer],
       scala.collection.immutable.Map.empty[Any, Any].getClass
     )
     doClassRegistration(kryo)(
@@ -80,7 +82,11 @@ class OpKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[StreamingHistogram])
     kryo.register(classOf[StreamingHistogramBuilder])
     kryo.register(classOf[StreamingHistogramComparator])
+    kryo.register(classOf[java.util.HashMap[_, _]])
+    // kryo.register(classOf[java.util.TreeMap[_, _]])
+    kryo.register(classOf[java.util.concurrent.atomic.AtomicReference[_]])
     kryo.register(classOf[TreeMap[_, _]], new TreeMapSerializer())
+    kryo.register(Class.forName("breeze.linalg.DenseVector$mcD$sp"))
 
     // Mutable wrapped arrays
     OpKryoClasses.WrappedArrays.foreach(kryo.register)

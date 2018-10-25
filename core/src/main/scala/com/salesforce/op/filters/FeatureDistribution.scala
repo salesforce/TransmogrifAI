@@ -32,6 +32,7 @@ package com.salesforce.op.filters
 
 import com.salesforce.op.features.FeatureDistributionLike
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
+import com.salesforce.op.utils.stats.RichStreamingHistogram
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
@@ -77,6 +78,17 @@ case class FeatureDistribution
    * @return fraction of data that is non empty
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
+
+  def density(padding: Double = 0.5): Double => Double = {
+    val paddedBins = RichStreamingHistogram.paddedBins(summaryInfo.zip(distribution), padding)
+
+    RichStreamingHistogram.density(paddedBins)
+  }
+
+  def mass(): Double => Double = (d: Double) => summaryInfo.indexOf(d) match {
+    case k if k >= 0 => distribution(k) / count
+    case _ => 0.0
+  }
 
   /**
    * Combine feature distributions
@@ -143,10 +155,6 @@ private[op] object FeatureDistribution {
 
   val MaxBins = 100000
 
-  implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
-    override def plus(l: FeatureDistribution, r: FeatureDistribution) = l.reduce(r)
-  }
-
   /**
    * Facilitates feature distribution retrieval from computed feature summaries
    *
@@ -179,6 +187,24 @@ private[op] object FeatureDistribution {
       summaryInfo = summaryInfo,
       distribution = distribution)
   }
+
+  def densityJSDivergence(dist1: FeatureDistribution, dist2: FeatureDistribution): Double =
+    jsDivergenceFunc(dist1.density(), dist2.density())(dist1.summaryInfo, dist2.summaryInfo)
+
+  def massJSDivergence(dist1: FeatureDistribution, dist2: FeatureDistribution): Double =
+    jsDivergenceFunc(dist1.mass(), dist2.mass())(dist1.summaryInfo, dist2.summaryInfo)
+
+  def jsDivergenceFunc(f1: Double => Double, f2: Double => Double): (Array[Double], Array[Double]) => Double =
+    (bins1: Array[Double], bins2: Array[Double]) => {
+      val meanF: Double => Double = (d: Double) => 0.5 * (f1(d) + f2(d))
+      def log2(x: Double) = math.log10(x) / math.log10(2.0)
+      def klDivergence(a: Double, b: Double) = if (a == 0.0) 0.0 else a * log2(a / b)
+
+      math.sqrt(0.5 * {
+        bins1.map { d => klDivergence(f1(d), meanF(d)) }.sum +
+          bins2.map { d => klDivergence(f2(d), meanF(d)) }.sum
+      })
+    }
 
   /**
    * Function to put data into histogram of counts

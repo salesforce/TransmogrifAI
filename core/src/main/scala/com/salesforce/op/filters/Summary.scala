@@ -75,7 +75,7 @@ case object Summary {
   }
 }
 
-class TextSummary(textFormula: TextSummary => Int) {
+class TextSummary(textFormula: TextSummary => Int) extends Serializable {
 
   private[this] val count: AtomicReference[Double] = new AtomicReference(0)
   private[this] val distribution: HashMap[Double, Double] = HashMap()
@@ -83,13 +83,13 @@ class TextSummary(textFormula: TextSummary => Int) {
   private[this] val maxTokens: AtomicReference[Double] = new AtomicReference(Double.NegativeInfinity)
   private[this] val minTokens: AtomicReference[Double] = new AtomicReference(Double.PositiveInfinity)
   private[this] val numTokens: AtomicReference[Double] = new AtomicReference(0)
-  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = math.max(s, t)
   }
-  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = math.min(s, t)
   }
-  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = s + t
   }
 
@@ -105,7 +105,7 @@ class TextSummary(textFormula: TextSummary => Int) {
     FeatureDistribution(
       name = featureKey._1,
       key = featureKey._2,
-      count = thisCount.toLong,
+      count = totalCount.toLong,
       nulls = nullCount.toLong,
       distribution = dist.map(_._2),
       summaryInfo = dist.map(_._1))
@@ -144,12 +144,6 @@ class TextSummary(textFormula: TextSummary => Int) {
     this
   }
 
-  final def toSummary: Summary = Summary(
-    min = getMinTokens,
-    max = getMaxTokens,
-    sum = getNumTokens,
-    count = getCount)
-
   final def update(text: Seq[String]): this.type = synchronized {
     val size: Double = text.length
     count.accumulateAndGet(1.0, sumOp)
@@ -163,15 +157,12 @@ class TextSummary(textFormula: TextSummary => Int) {
   final def updateDistribution(text: Seq[String]): this.type = synchronized {
     hashingTFOpt match {
       case Some(hashingTF) =>
-        val points: Array[Double] = hashingTF.transform(text).toArray
-        val currentCounts: Seq[Double] = points.map(distribution.get(_).getOrElse(0.0))
-
-        points.zip(currentCounts).foreach { case (point, count) =>
-          distribution += point -> (count + 1.0)
+        hashingTF.transform(text).toArray.zipWithIndex.foldLeft(()) { case (_, (count, idx)) =>
+          val newCount = distribution.get(idx).getOrElse(1.0) + count
+          distribution += (idx.toDouble -> newCount)
         }
       case None =>
         throw new RuntimeException("HashingTF must be set in order to update text summary distribution")
-
     }
 
     this
@@ -184,20 +175,20 @@ object TextSummary {
   }
 }
 
-class HistogramSummary(maxBins: Int, maxSpoolSize: Int) {
+class HistogramSummary(maxBins: Int, maxSpoolSize: Int) extends Serializable {
 
   private[this] val builder: StreamingHistogramBuilder = new StreamingHistogramBuilder(maxBins, maxSpoolSize, 1)
   private[this] val count: AtomicReference[Double] = new AtomicReference(0)
   private[this] val maximum: AtomicReference[Double] = new AtomicReference(Double.NegativeInfinity)
   private[this] val minimum: AtomicReference[Double] = new AtomicReference(Double.PositiveInfinity)
   private[this] val valueSum: AtomicReference[Double] = new AtomicReference(0)
-  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = math.max(s, t)
   }
-  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = math.min(s, t)
   }
-  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] {
+  private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = s + t
   }
 
@@ -213,7 +204,7 @@ class HistogramSummary(maxBins: Int, maxSpoolSize: Int) {
     FeatureDistribution(
       name = featureKey._1,
       key = featureKey._2,
-      count = thisCount.toLong,
+      count = totalCount.toLong,
       nulls = nullCount.toLong,
       distribution = dist.map(_._2),
       summaryInfo = dist.map(_._1))

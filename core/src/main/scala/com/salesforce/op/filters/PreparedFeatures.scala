@@ -49,25 +49,17 @@ private[filters] case class PreparedFeatures(
     responses: Map[FeatureKey, ProcessedSeq],
     predictors: Map[FeatureKey, ProcessedSeq]) {
 
-  def allFeatures: AllFeatures =
+  final def allFeatures: AllFeatures =
     (responseFeatures, numericFeatures, textFeatures)
 
-  def responseFeatures: Map[FeatureKey, Seq[Double]] =
+  final def responseFeatures: Map[FeatureKey, Seq[Double]] =
     responses.collect { case (key, Right(seq)) => key -> seq }.toMap
 
-  def numericFeatures: Map[FeatureKey, Seq[Double]] =
+  final def numericFeatures: Map[FeatureKey, Seq[Double]] =
     predictors.collect { case (key, Right(seq)) => key -> seq }.toMap
 
-  def textFeatures: Map[FeatureKey, Seq[String]] =
+  final def textFeatures: Map[FeatureKey, Seq[String]] =
     predictors.collect { case (key, Left(seq)) => key -> seq }.toMap
-
-  /**
-   * Computes summaries keyed by feature keys for this observation.
-   *
-   * @return pair consisting of response and predictor summaries (in this order)
-   */
-  def summaries: (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
-    responses.mapValues(Summary(_)) -> predictors.mapValues(Summary(_))
 
   /**
    * Computes vector of size responseKeys.length + predictorKeys.length. The first responses.length
@@ -78,7 +70,7 @@ private[filters] case class PreparedFeatures(
    * @param predictorKeys set of all predictor keys needed for constructing binary vector
    * @return null label-leakage correlation vector
    */
-  def getNullLabelLeakageVector(responseKeys: Array[FeatureKey], predictorKeys: Array[FeatureKey]): Vector = {
+  final def getNullLabelLeakageVector(responseKeys: Array[FeatureKey], predictorKeys: Array[FeatureKey]): Vector = {
     val responseValues = responseKeys.map(responses.get(_).collect {
       case Right(Seq(d)) => d
     }.getOrElse(0.0))
@@ -87,46 +79,6 @@ private[filters] case class PreparedFeatures(
     Vectors.dense(responseValues ++ predictorNullIndicatorValues)
   }
 
-  /*
-   * Generates a pair of feature distribution arrays. The first element is associated to responses,
-   * and the second to predictors.
-   *
-   * @param responseSummaries global feature metadata
-   * @param predictorSummaries set of feature summary statistics (derived from metadata)
-   * @param bins number of bins to put numerics into
-   * @param textBinsFormula formula to compute the text features bin size.
-   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
-   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
-   * @return a pair consisting of response and predictor feature distributions (in this order)
-   */
-  def getFeatureDistributions(
-    responseSummaries: Array[(FeatureKey, Summary)],
-    predictorSummaries: Array[(FeatureKey, Summary)],
-    bins: Int,
-    textBinsFormula: (Summary, Int) => Int
-  ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
-    val responseFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(responses, responseSummaries, bins, textBinsFormula)
-    val predictorFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(predictors, predictorSummaries, bins, textBinsFormula)
-
-    responseFeatureDistributions -> predictorFeatureDistributions
-  }
-
-  private def getFeatureDistributions(
-    features: Map[FeatureKey, ProcessedSeq],
-    summaries: Array[(FeatureKey, Summary)],
-    bins: Int,
-    textBinsFormula: (Summary, Int) => Int
-  ): Array[FeatureDistribution] = summaries.map { case (featureKey, summary) =>
-    FeatureDistribution(
-      featureKey = featureKey,
-      summary = summary,
-      value = features.get(featureKey),
-      bins = bins,
-      textBinsFormula = textBinsFormula
-    )
-  }
 }
 
 private[filters] object PreparedFeatures {

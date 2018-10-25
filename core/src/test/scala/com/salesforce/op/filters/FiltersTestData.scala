@@ -34,21 +34,23 @@ trait FiltersTestData {
 
   protected val eps = 1E-2
 
+  private val testSummaryInfo = (0 until 5).map(_.toDouble).toArray
+
   protected val trainSummaries = Seq(
-    FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty),
-    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("C", Some("1"), 10, 1, Array(1, 4, 0, 0, 6), Array.empty),
-    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("D", Some("1"), 10, 9, Array(1, 4, 0, 0, 6), Array.empty),
-    FeatureDistribution("D", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty)
-  )
+    FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), testSummaryInfo),
+    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), testSummaryInfo),
+    FeatureDistribution("C", Option("1"), 10, 1, Array(1, 4, 0, 0, 6), testSummaryInfo),
+    FeatureDistribution("C", Option("2"), 20, 19, Array(2, 8, 0, 0, 12), testSummaryInfo),
+    FeatureDistribution("D", Option("1"), 10, 9, Array(1, 4, 0, 0, 6), testSummaryInfo),
+    FeatureDistribution("D", Option("2"), 20, 19, Array(2, 8, 0, 0, 12), testSummaryInfo)
+  ).map(fd => fd.featureKey -> fd).toMap
 
   protected val scoreSummaries = Seq(
-    FeatureDistribution("A", None, 10, 8, Array(1, 4, 0, 0, 6), Array.empty),
-    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("C", Some("1"), 10, 1, Array(0, 0, 10, 10, 0), Array.empty),
-    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("D", Some("1"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty),
-    FeatureDistribution("D", Some("2"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty)
-  )
+    FeatureDistribution("A", None, 10, 8, Array(1, 4, 0, 0, 6), testSummaryInfo),
+    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), testSummaryInfo),
+    FeatureDistribution("C", Option("1"), 10, 1, Array(0, 0, 10, 10, 0), testSummaryInfo),
+    FeatureDistribution("C", Option("2"), 20, 19, Array(2, 8, 0, 0, 12), testSummaryInfo),
+    FeatureDistribution("D", Option("1"), 0, 0, Array(0, 0, 0, 0, 0), testSummaryInfo),
+    FeatureDistribution("D", Option("2"), 0, 0, Array(0, 0, 0, 0, 0), testSummaryInfo)
+  ).map(fd => fd.featureKey -> fd).toMap
 }

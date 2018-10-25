@@ -139,9 +139,29 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "correctly compare relative fill rates" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array.empty, Array.empty)
     val fd2 = FeatureDistribution("A", None, 20, 19, Array.empty, Array.empty)
-    trainSummaries(0).relativeFillRatio(scoreSummaries(0)) shouldBe 4.5
-    trainSummaries(2).relativeFillRatio(scoreSummaries(2)) shouldBe 1.0
+
     fd1.relativeFillRatio(fd2) shouldBe 18.0
+
+    val keyA = "A" -> None
+    val keyC = "C" -> Option("1")
+    val trainAOpt = trainSummaries.get(keyA)
+    val trainCOpt = trainSummaries.get(keyC)
+    val scoreAOpt = scoreSummaries.get(keyA)
+    val scoreCOpt = scoreSummaries.get(keyC)
+
+    Seq(trainAOpt, trainCOpt, scoreAOpt, scoreCOpt).foreach { fOpt =>
+      fOpt.nonEmpty shouldBe true
+    }
+
+    for {
+      trainA <- trainAOpt
+      trainC <- trainCOpt
+      scoreA <- scoreAOpt
+      scoreC <- scoreCOpt
+    } {
+      trainA.relativeFillRatio(scoreA) shouldBe 4.5
+      trainC.relativeFillRatio(scoreC) shouldBe 1.0
+    }
   }
 
   it should "correctly compute the DS divergence" in {

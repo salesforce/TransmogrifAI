@@ -123,6 +123,7 @@ configure(allProjs) {
         testCompile "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"
         compileOnly "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
         testCompile "org.scoverage:scalac-scoverage-plugin_$scalaVersion:$scoveragePluginVersion"
+        compile "com.esotericsoftware.kryo:kryo:2.24.0"
         testCompile "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
         testCompile "org.scalacheck:scalacheck_$scalaVersion:$scalaCheckVersion"
         testCompile ("com.holdenkarau:spark-testing-base_$scalaVersion:$sparkTestingBaseVersion") { transitive = false }

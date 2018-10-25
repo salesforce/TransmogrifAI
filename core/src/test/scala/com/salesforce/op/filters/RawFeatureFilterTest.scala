@@ -37,6 +37,7 @@ import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.twitter.algebird.Operators._
+import org.apache.log4j.Level
 import org.apache.spark.mllib.feature.HashingTF
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -45,53 +46,100 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
+
+  // loggingLevel(Level.INFO)
+  conf.set("spark.kryo.registrationRequired", "true")
+  conf.registerKryoClasses(Array(
+    classOf[HistogramSummary],
+    classOf[TextSummary],
+    classOf[Array[scala.collection.immutable.Map[_, _]]],
+    classOf[org.apache.spark.mllib.feature.HashingTF],
+    Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$7"),
+    Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$8"),
+    Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$9"),
+    Class.forName("com.salesforce.op.filters.TextSummary$$anon$4"),
+    Class.forName("com.salesforce.op.filters.TextSummary$$anon$5"),
+    Class.forName("com.salesforce.op.filters.TextSummary$$anon$6"),
+    Class.forName(
+      "com.salesforce.op.filters.RawFeatureFilter$$anonfun$updateTextSummaries$1$1$$anonfun$41$$anonfun$apply$5"),
+    Class.forName("com.salesforce.op.filters.RawFeatureFilter$$anonfun$updateTextSummaries$1$1$$anonfun$41"),
+    Class.forName("com.salesforce.op.filters.RawFeatureFilter$$anonfun$updateTextSummaries$1$1")
+  ))
+
+  val trainAllDistributions = AllDistributions(
+    responseDistributions = Map.empty,
+    numericDistributions = trainSummaries,
+    textDistributions = Map.empty)
+  val scoreAllDistributions = Option(AllDistributions(
+    responseDistributions = Map.empty,
+    numericDistributions = scoreSummaries,
+    textDistributions = Map.empty))
+
   Spec[RawFeatureFilter[_]] should "compute feature stats correctly" in {
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.8, Double.PositiveInfinity, 0.7, 1.0)
     val allFeatureInfo = filter.computeFeatureStats(passengersDataSet, features)
+    val responseDistributions = allFeatureInfo.allDistributions.responseDistributions
+    val predictorDistributions = allFeatureInfo.allDistributions.predictorDistributions
 
-    allFeatureInfo.responseSummaries.size shouldBe 1
-    allFeatureInfo.responseSummaries.headOption.map(_._2) shouldEqual Option(Summary(0, 1, 1, 2))
-    allFeatureInfo.responseDistributions.size shouldBe 1
-    allFeatureInfo.predictorSummaries.size shouldBe 12
-    allFeatureInfo.predictorDistributions.size shouldBe 12
+    // allFeatureInfo.responseSummaries.size shouldBe 1
+    // allFeatureInfo.responseSummaries.headOption.map(_._2) shouldEqual Option(Summary(0, 1, 1, 2))
+    responseDistributions.size shouldBe 1
+    // allFeatureInfo.predictorSummaries.size shouldBe 12
+    predictorDistributions.size shouldBe 12
 
-    val surv = allFeatureInfo.responseDistributions(0)
-    surv.name shouldBe survived.name
-    surv.key shouldBe None
-    surv.count shouldBe 6
-    surv.nulls shouldBe 4
-    surv.distribution.sum shouldBe 2
+    val survOpt = responseDistributions.get(survived.name -> None)
+    val ageFOpt = predictorDistributions.get(age.name -> None)
+    val strMapFOpt = predictorDistributions.get(stringMap.name -> Option("Female"))
+    val strMapMOpt = predictorDistributions.get(stringMap.name -> Option("Male"))
 
-    val ageF = allFeatureInfo.predictorDistributions.filter(_.name == age.name)(0)
-    ageF.name shouldBe age.name
-    ageF.key shouldBe None
-    ageF.count shouldBe 6
-    ageF.nulls shouldBe 2
-    ageF.distribution.sum shouldBe 4
+    survOpt.nonEmpty shouldBe true
+    ageFOpt.nonEmpty shouldBe true
+    strMapFOpt.nonEmpty shouldBe true
+    strMapMOpt.nonEmpty shouldBe true
 
-    val strMapF =
-      allFeatureInfo.predictorDistributions.filter(d => d.name == stringMap.name && d.key == Option("Female"))(0)
+    for {
+      surv <- survOpt
+      ageF <- ageFOpt
+      strMapF <- strMapFOpt
+      strMapM <- strMapMOpt
+    } {
+      withClue(s"Checking name for ${survived.name}") { surv.name shouldBe survived.name }
+      withClue(s"Checking map key for ${survived.name}") { surv.key shouldBe None }
+      withClue(s"Checking count for ${survived.name}") { surv.count shouldBe 6 }
+      withClue(s"Checking nulls for ${survived.name}") { surv.nulls shouldBe 4 }
+      withClue(s"Checking distribution sum for ${survived.name}") { surv.distribution.sum shouldBe 2 }
 
-    strMapF.name shouldBe stringMap.name
-    if (strMapF.key.contains("Female")) strMapF.nulls shouldBe 3 else strMapF.nulls shouldBe 4
+      withClue(s"Checking name for ${ageF.name}") { ageF.name shouldBe age.name }
+      withClue(s"Checking map key for ${ageF.name}") { ageF.key shouldBe None }
+      withClue(s"Checking count for ${ageF.name}") { ageF.count shouldBe 6 }
+      withClue(s"Checking nulls for ${ageF.name}") { ageF.nulls shouldBe 2 }
+      withClue(s"Checking distribution sum for ${ageF.name}") { ageF.distribution.sum shouldBe 4 }
 
-    val strMapM =
-      allFeatureInfo.predictorDistributions.filter(d => d.name == stringMap.name && d.key == Option("Male"))(0)
+      strMapF.name shouldBe stringMap.name
+      if (strMapF.key.contains("Female")) strMapF.nulls shouldBe 3 else strMapF.nulls shouldBe 4
 
-    strMapM.name shouldBe stringMap.name
-    if (strMapM.key.contains("Male")) strMapM.nulls shouldBe 4 else strMapM.nulls shouldBe 3
+      strMapM.name shouldBe stringMap.name
+      if (strMapM.key.contains("Male")) strMapM.nulls shouldBe 4 else strMapM.nulls shouldBe 3
+    }
   }
 
   it should "correctly determine which features to exclude based on the stats of training fill rate" in {
     // only fill rate matters
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
     val (excludedTrainF, excludedTrainMK) =
-      filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
-    excludedTrainF.toSet shouldEqual Set("B", "D")
-    excludedTrainMK.keySet shouldEqual Set("C")
-    excludedTrainMK.head._2 shouldEqual Set("2")
+      filter.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
+
+    withClue("Checking training fill rate dropped feature names") {
+      excludedTrainF.toSet shouldEqual Set("B", "D")
+    }
+    withClue("Checking training fill rate dropped feature map keys") {
+      excludedTrainMK.keySet shouldEqual Set("C")
+    }
+    withClue("Checking training fill rate dropped feature map key values") {
+      excludedTrainMK.head._2 shouldEqual Set("2")
+    }
   }
 
   it should "correctly determine which features to exclude based on the stats of training and scoring fill rate" in {
@@ -99,45 +147,70 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
     val (excludedBothF, excludedBothMK) =
-      filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
-    excludedBothF.toSet shouldEqual Set("B", "D")
-    excludedBothMK.keySet shouldEqual Set("C")
-    excludedBothMK.head._2 shouldEqual Set("2")
+      filter.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
+
+    withClue("Checking training and scoring fill rate dropped feature names") {
+      excludedBothF.toSet shouldEqual Set("B", "D")
+    }
+    withClue("Checking training and scoring fill rate dropped feature map keys") {
+      excludedBothMK.keySet shouldEqual Set("C")
+    }
+    withClue("Checking training and scoring fill rate dropped feature map key values") {
+      excludedBothMK.head._2 shouldEqual Set("2")
+    }
   }
 
   it should "correctly determine which features to exclude based on the stats of relative fill rate" in {
     // relative fill rate matters
     val filter2 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 0.5, Double.PositiveInfinity, 1.0, 1.0)
     val (excludedBothRelF, excludedBothRelMK) =
-      filter2.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
-    excludedBothRelF.toSet shouldEqual Set("A")
-    excludedBothRelMK.isEmpty shouldBe true
+      filter2.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
+
+    withClue("Checking relative fill rate dropped feature names") {
+      excludedBothRelF.toSet shouldEqual Set("A")
+    }
+    withClue("Checking relative fill rate dropped feature map keys") {
+      excludedBothRelMK.isEmpty shouldBe true
+    }
   }
 
   it should "correctly determine which features to exclude based on the stats of fill rate ratio" in {
     // relative fill ratio matters
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 1.0, 2.0, 1.0, 1.0)
     val (excludedBothRelFR, excludedBothRelMKR) =
-      filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
-    excludedBothRelFR.toSet shouldEqual Set("D", "A", "B")
-    excludedBothRelMKR.isEmpty shouldBe true
+      filter4.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
+
+    withClue("Checking fill rate ratio dropped feature names") {
+      excludedBothRelFR.toSet shouldEqual Set("D", "A", "B")
+    }
+    withClue("Checking fill rate ratio dropped feature map keys") {
+      excludedBothRelMKR.isEmpty shouldBe true
+    }
+
   }
 
   it should "correctly determine which features to exclude based on the stats of js distance" in {
     // js distance
     val filter3 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 1.0, Double.PositiveInfinity, 0.5, 1.0)
     val (excludedBothDistF, excludedBothDistMK) =
-      filter3.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
-    excludedBothDistF.isEmpty shouldEqual true
-    excludedBothDistMK.keySet shouldEqual Set("C")
-    excludedBothDistMK.head._2 shouldEqual Set("1")
+      filter3.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
+
+    withClue("Checking JS divergence dropped feature names") {
+      excludedBothDistF.toSet shouldEqual Set("D")
+    }
+    withClue("Checking JS divergence dropped feature map keys") {
+      excludedBothDistMK.keySet shouldEqual Set("C")
+    }
+    withClue("Checking JS divergence dropped feature map key values") {
+      excludedBothDistMK.head._2 shouldEqual Set("1")
+    }
   }
 
   it should "correctly determine which features to exclude based on all the stats" in {
     // all
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.5, Double.PositiveInfinity, 0.5, 1.0)
     val (excludedBothAllF, excludedBothAllMK) =
-      filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+      filter4.getFeaturesToExclude(trainAllDistributions, scoreAllDistributions, Map.empty)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
     excludedBothAllMK.isEmpty shouldBe true
   }
@@ -210,9 +283,9 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name))
 
     val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
-      Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
+      Seq(DataFrameFieldNames.KeyFieldName, survived.name, age.name, boardedTime.name, boardedTimeAsDateTime.name)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.9" in {

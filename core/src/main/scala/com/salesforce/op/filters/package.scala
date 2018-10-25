@@ -48,4 +48,14 @@ package object filters {
     Map[FeatureKey, HistogramSummary],
     Map[FeatureKey, HistogramSummary],
     Map[FeatureKey, TextSummary]]
+
+  case class AllDistributions(
+      responseDistributions: Map[FeatureKey, FeatureDistribution],
+      numericDistributions: Map[FeatureKey, FeatureDistribution],
+      textDistributions: Map[FeatureKey, FeatureDistribution]) {
+    def predictorDistributions: Map[FeatureKey, FeatureDistribution] =
+      numericDistributions ++ textDistributions
+
+    def predictorKeySet: Set[FeatureKey] = predictorDistributions.keySet
+  }
 }

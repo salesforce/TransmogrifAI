@@ -67,7 +67,7 @@ object RichStreamingHistogram {
   }
 
   // The following are exposed for test comparisons
-  private[stats] def paddedBins(bins: Array[(Double, Double)], padding: Double): Array[(Double, Double)] =
+  private[op] def paddedBins(bins: Array[(Double, Double)], padding: Double): Array[(Double, Double)] =
     if (bins.isEmpty) bins
     else {
       val points = bins.map(_._1)
@@ -76,7 +76,7 @@ object RichStreamingHistogram {
       Array((points.min - padding) -> 0.0) ++ bins ++ Array((points.max + padding) -> 0.0)
     }
 
-  private[stats] def density(bins: Array[(Double, Double)]): Double => Double =
+  private[op] def density(bins: Array[(Double, Double)]): Double => Double =
     (x: Double) =>
       bins.sliding(2).foldLeft((0.0, 0.0)) { case ((prob, sum), arr) =>
         arr match {
