@@ -142,10 +142,10 @@ scalaVersion := "2.11.12"
 resolvers += Resolver.jcenterRepo
 
 // TransmogrifAI core dependency
-libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.4.0"
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.4.0"
 
 // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
-// libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.4.0"
+// libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.4.0"
 ```
 
 Then import TransmogrifAI into your code:
