@@ -173,7 +173,8 @@ object AvroInOut {
      * @param schema Avro schema string for records being written out.
      * @return
      */
-    def writeAvro(path: String, schema: String)(implicit job: Job = Job.getInstance(rdd.sparkContext.hadoopConfiguration)): Unit = {
+    def writeAvro(path: String, schema: String)
+                 (implicit job: Job = Job.getInstance(rdd.sparkContext.hadoopConfiguration)): Unit = {
       AvroJob.setOutputKeySchema(job, new Schema.Parser().parse(schema))
       writeAvro(path)(job)
     }
