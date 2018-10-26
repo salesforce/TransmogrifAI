@@ -4,7 +4,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
+        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
     }
 }
 
@@ -49,8 +49,8 @@ configure(allProjs) {
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
 
-    // Max: Set this to the main class for cli.
-    // Could not figure out how to configure it just for the cli subproject
+    // Set this to the main class for cli.
+    // Could not figure out how to configure it just for the cli subproject.
     mainClassName = "com.salesforce.op.cli.CLI"
 
     ext {
