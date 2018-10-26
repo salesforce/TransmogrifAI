@@ -55,8 +55,6 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     classOf[Array[scala.collection.immutable.Map[_, _]]],
     classOf[org.apache.spark.mllib.feature.HashingTF],
     Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$7"),
-    Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$8"),
-    Class.forName("com.salesforce.op.filters.HistogramSummary$$anon$9"),
     Class.forName("com.salesforce.op.filters.TextSummary$$anon$4"),
     Class.forName("com.salesforce.op.filters.TextSummary$$anon$5"),
     Class.forName("com.salesforce.op.filters.TextSummary$$anon$6"),

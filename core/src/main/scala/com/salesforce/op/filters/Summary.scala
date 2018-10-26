@@ -179,15 +179,6 @@ class HistogramSummary(maxBins: Int, maxSpoolSize: Int) extends Serializable {
 
   private[this] val builder: StreamingHistogramBuilder = new StreamingHistogramBuilder(maxBins, maxSpoolSize, 1)
   private[this] val count: AtomicReference[Double] = new AtomicReference(0)
-  private[this] val maximum: AtomicReference[Double] = new AtomicReference(Double.NegativeInfinity)
-  private[this] val minimum: AtomicReference[Double] = new AtomicReference(Double.PositiveInfinity)
-  private[this] val valueSum: AtomicReference[Double] = new AtomicReference(0)
-  private[this] val maxOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
-    def apply(s: Double, t: Double): Double = math.max(s, t)
-  }
-  private[this] val minOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
-    def apply(s: Double, t: Double): Double = math.min(s, t)
-  }
   private[this] val sumOp: BinaryOperator[Double] = new BinaryOperator[Double] with Serializable {
     def apply(s: Double, t: Double): Double = s + t
   }
@@ -210,35 +201,17 @@ class HistogramSummary(maxBins: Int, maxSpoolSize: Int) extends Serializable {
       summaryInfo = dist.map(_._1))
   }
 
-  final def getMaximum(): Double = maximum.get
-
-  final def getMinimum(): Double = minimum.get
-
-  final def getValueSum(): Double = valueSum.get
-
   final def merge(other: HistogramSummary): this.type = synchronized {
-    maximum.accumulateAndGet(other.getMaximum, maxOp)
-    minimum.accumulateAndGet(other.getMinimum, minOp)
     count.accumulateAndGet(other.getCount, sumOp)
     other.getDistribution.foreach { case (pt, count) =>
-      valueSum.accumulateAndGet(pt, sumOp)
       builder.update(pt, count.toLong)
     }
 
     this
   }
 
-  final def toSummary: Summary = Summary(
-    min = getMinimum,
-    max = getMaximum,
-    sum = getValueSum,
-    count = getCount)
-
   final def update(points: Seq[Double]): this.type = synchronized {
     points.foreach { pt =>
-      maximum.accumulateAndGet(pt, maxOp)
-      minimum.accumulateAndGet(pt, minOp)
-      valueSum.accumulateAndGet(pt, sumOp)
       builder.update(pt)
     }
     count.accumulateAndGet(1.0, sumOp)

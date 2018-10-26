@@ -83,7 +83,6 @@ class OpKryoRegistrator extends KryoRegistrator {
     kryo.register(classOf[StreamingHistogramBuilder])
     kryo.register(classOf[StreamingHistogramComparator])
     kryo.register(classOf[java.util.HashMap[_, _]])
-    // kryo.register(classOf[java.util.TreeMap[_, _]])
     kryo.register(classOf[java.util.concurrent.atomic.AtomicReference[_]])
     kryo.register(classOf[TreeMap[_, _]], new TreeMapSerializer())
     kryo.register(Class.forName("breeze.linalg.DenseVector$mcD$sp"))

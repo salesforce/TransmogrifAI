@@ -150,23 +150,12 @@ class RawFeatureFilter[T]
     val preparedFeatures: RDD[PreparedFeatures] =
       data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
     val allFeatures: RDD[AllFeatures] = preparedFeatures.map(_.allFeatures)
-
-    allFeatures.collect.foreach(f => log.info(s">>>>>> Response features: ${f._1}"))
-
     val textFeatures: RDD[Map[FeatureKey, Seq[String]]] = allFeatures.map(_._3)
-
-    textFeatures.collect.foreach { ft =>
-      log.info(s">>>>>> Text feature: $ft")
-    }
-
     val (totalCount, responseSummaries, numericSummaries, textSummaries) =
       RawFeatureFilter.getAllSummaries(bins, allFeatures)
     // Have to use the training summaries do process scoring for comparison
     val responseDistributions: Map[FeatureKey, FeatureDistribution] =
       responseSummaries.map { case (key, sum) => key -> sum.getFeatureDistribution(key, totalCount) }
-
-    log.info(s">>>>>> Response summaries size: ${responseSummaries.size}")
-
     val numericDistributions: Map[FeatureKey, FeatureDistribution] =
       numericSummaries.map { case (key, sum) => key -> sum.getFeatureDistribution(key, totalCount) }
 
@@ -252,9 +241,6 @@ class RawFeatureFilter[T]
       .union(scoringDistribs.map(_.predictorKeySet).getOrElse(Set()))
       .diff(toDropKeySet)
       .groupBy(_._1)
-
-    log.info(s">>>>>> Features to drop: $toDropFeatures")
-    log.info(s">>>>>> Features to keep: $toKeepFeatures")
 
     val mapKeys = toKeepFeatures.keySet.intersect(toDropFeatures.keySet)
     val toDropNames = toDropFeatures.collect { case (k, _) if !mapKeys.contains(k) => k }.toSeq
