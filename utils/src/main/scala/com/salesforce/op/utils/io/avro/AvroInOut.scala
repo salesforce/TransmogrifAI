@@ -157,13 +157,7 @@ object AvroInOut {
 
     private implicit val job = Job.getInstance(rdd.sparkContext.hadoopConfiguration)
 
-    /**
-     * This method writes out RDDs of generic records as avro files to path.
-     *
-     * @param path Input directory where avro records should be written.
-     * @return
-     */
-    def writeAvro(path: String): Unit = {
+    private def writeAvro(path: String): Unit = {
       val avroData = rdd.map(ar => (new AvroKey(ar), NullWritable.get))
       avroData.saveAsNewAPIHadoopFile(
         path,
