@@ -1,3 +1,33 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.salesforce.op.aggregators
 
 import com.salesforce.op.features.types._
@@ -7,7 +37,9 @@ import scala.reflect.runtime.universe.WeakTypeTag
 
 private[op] abstract class TimeBasedAggregator[T <: FeatureType]
 (
-  val compareFun: (Long, Long) => Boolean
+  val compareFun: (Long, Long) => Boolean,
+  val timeZero: Long,
+  val emptyValue: T#Value
 )(
   implicit val ttag: WeakTypeTag[T],
   val ttvag: WeakTypeTag[T#Value]
@@ -15,10 +47,8 @@ private[op] abstract class TimeBasedAggregator[T <: FeatureType]
   extends MonoidAggregator[Event[T], (Long, T#Value), T] {
   val ftFactory = FeatureTypeFactory[T]()
 
-  def zeroValue: T#Value
-
   val monoid: Monoid[(Long, T#Value)] = new Monoid[(Long, T#Value)] {
-    val zero = 0L -> zeroValue
+    val zero = timeZero -> emptyValue
     def plus(l: (Long, T#Value), r: (Long, T#Value)): (Long, T#Value) = if (compareFun(l._1, r._1)) r else l
   }
   def prepare(input: Event[T]): (Long, T#Value) = input.date -> input.value.v
@@ -35,11 +65,14 @@ private[op] abstract class TimeBasedAggregator[T <: FeatureType]
  */
 abstract class MostRecentAggregator[T <: FeatureType]
 (
-  val zeroValue: T#Value
+  emptyValue: T#Value
 )(
   implicit ttag: WeakTypeTag[T],
   ttvag: WeakTypeTag[T#Value]
-) extends TimeBasedAggregator(compareFun = (l: Long, r: Long) => l < r)(ttag = ttag, ttvag = ttvag)
+) extends TimeBasedAggregator(
+  compareFun = (l: Long, r: Long) => l < r, timeZero = 0L, emptyValue = emptyValue
+)(ttag = ttag, ttvag = ttvag
+)
 
 
 /**
@@ -51,11 +84,13 @@ abstract class MostRecentAggregator[T <: FeatureType]
  */
 abstract class FirstAggregator[T <: FeatureType]
 (
-  val zeroValue: T#Value
+  emptyValue: T#Value
 )(
   implicit ttag: WeakTypeTag[T],
   ttvag: WeakTypeTag[T#Value]
-) extends TimeBasedAggregator(compareFun = (l: Long, r: Long) => l > r)(ttag = ttag, ttvag = ttvag)
+) extends TimeBasedAggregator(
+  compareFun = (l: Long, r: Long) => l >= r, timeZero = Long.MaxValue, emptyValue = emptyValue
+)(ttag = ttag, ttvag = ttvag)
 
 
 case object MostRecentVector extends MostRecentAggregator[OPVector](OPVector.empty.value)
