@@ -127,8 +127,8 @@ class RichMetadataTest extends FlatSpec with TestCommon {
 
   it should "ignore empty values in maps" in {
     Map("None" -> None, "NULL" -> null).toMetadata shouldBe new MetadataBuilder().build()
-    Map("None" -> None, "NULL" -> null, "OKKey" -> "ok!", "SomeKey" -> Some("ok")).toMetadata shouldBe
-      new MetadataBuilder().putString("OKKey", "ok!").putString("SomeKey", "ok").build()
+    Map("None" -> None, "NULL" -> null, "a" -> "b", "c" -> Some("d")).toMetadata shouldBe
+      new MetadataBuilder().putString("a", "b").putString("c", "d").build()
   }
 }
 
