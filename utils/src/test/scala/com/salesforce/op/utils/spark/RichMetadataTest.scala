@@ -31,7 +31,7 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestCommon
-import org.apache.spark.sql.types.MetadataWrapper
+import org.apache.spark.sql.types.{MetadataBuilder, MetadataWrapper}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
@@ -53,7 +53,7 @@ class RichMetadataTest extends FlatSpec with TestCommon {
   private val map2 = Map(
     "1" -> 1L, "2" -> 1.0, "3" -> false, "4" -> "2",
     "5" -> Array(1L, 2L), "6" -> Array(x = true), "7" -> Array("1"), "8" -> Seq(1L), "9" -> Seq(1.0),
-    "10" -> Seq(true), "12" -> "12"
+    "10" -> Seq(true), "12" -> "12", "13" -> 11.5f
   )
 
   private val meta1 = map1.toMetadata
@@ -65,12 +65,13 @@ class RichMetadataTest extends FlatSpec with TestCommon {
   }
 
   it should "throw an error on unsupported type in a map" in {
-    the[RuntimeException] thrownBy Map("a" -> TestClass("test")).toMetadata
+    intercept[RuntimeException](Map("a" -> TestClass("test")).toMetadata).getMessage shouldBe
+      "Key 'a' has unsupported value TestClass(test) of type com.salesforce.op.utils.spark.TestClass"
   }
 
   it should "create a MetaDataWrapper with non empty map from a metadata " in {
     val wrap = meta1.wrapped
-
+    meta1.underlyingMap shouldBe wrap.underlyingMap
     wrap shouldBe a[MetadataWrapper]
     meta1.isEmpty shouldBe false
   }
@@ -79,11 +80,13 @@ class RichMetadataTest extends FlatSpec with TestCommon {
     val mergedMap = Map(
       "1" -> 2L, "2" -> 2.0, "3" -> true, "4" -> "12",
       "5" -> Array(1L, 1L, 2L), "6" -> Array(true, true), "7" -> Array("1", "1"),
-      "8" -> Seq(1L, 1L), "9" -> Seq(1.0, 1.0), "10" -> Seq(true, true), "11" -> Seq("1"), "12" -> "12"
+      "8" -> Seq(1L, 1), "9" -> Seq(1.0, 1.0f), "10" -> Seq(true, true), "11" -> Seq("1"), "12" -> "12",
+      "13" -> 11.5f
     )
 
     val mergedMetadata = meta1.deepMerge(map2.toMetadata)
     mergedMetadata.json shouldBe Serialization.write(mergedMap)
+    mergedMetadata.prettyJson shouldBe Serialization.writePretty(mergedMap)
   }
 
   it should "deep merge the Array of metadata" in {
@@ -98,7 +101,11 @@ class RichMetadataTest extends FlatSpec with TestCommon {
     the[RuntimeException] thrownBy meta1.deepMerge(Map("1" -> "test").toMetadata)
   }
 
-  it should "be false on different maps when compared using deep equals " in {
+  it should "be true on the same map when compared using deep equals" in {
+    meta1.deepEquals(meta1) shouldBe true
+  }
+
+  it should "be false on different maps when compared using deep equals" in {
     meta1.deepEquals(map2.toMetadata) shouldBe false
   }
 
@@ -116,6 +123,12 @@ class RichMetadataTest extends FlatSpec with TestCommon {
 
     richMetaDataWithSummary.getSummaryMetadata() shouldBe expectedSummaryMetadata
     richMetaDataWithSummary.containsSummaryMetadata() shouldBe true
+  }
+
+  it should "ignore empty values in maps" in {
+    Map("None" -> None, "NULL" -> null).toMetadata shouldBe new MetadataBuilder().build()
+    Map("None" -> None, "NULL" -> null, "OKKey" -> "ok!", "SomeKey" -> Some("ok")).toMetadata shouldBe
+      new MetadataBuilder().putString("OKKey", "ok!").putString("SomeKey", "ok").build()
   }
 }
 
