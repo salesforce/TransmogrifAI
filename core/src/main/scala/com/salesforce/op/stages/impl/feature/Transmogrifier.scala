@@ -439,7 +439,7 @@ case object VectorizerUtils {
    * @return one-hot vector with 1.0 in position value
    */
   def oneHot(pos: Int, size: Int): Array[Double] = {
-    assert(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
+    require(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
     val arr = new Array[Double](size)
     arr(pos) = 1.0
     arr

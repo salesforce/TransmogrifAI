@@ -74,12 +74,12 @@ case class OpVectorColumnMetadata // TODO make separate case classes extending t
   index: Int = 0
 ) extends JsonLike {
 
-  assert(parentFeatureName.nonEmpty, "must provide parent feature name")
-  assert(parentFeatureType.nonEmpty, "must provide parent type name")
-  assert(parentFeatureName.length == parentFeatureType.length,
+  require(parentFeatureName.nonEmpty, "must provide parent feature name")
+  require(parentFeatureType.nonEmpty, "must provide parent type name")
+  require(parentFeatureName.length == parentFeatureType.length,
     s"must provide both type and name for every parent feature," +
       s" names: $parentFeatureName and types: $parentFeatureType do not have the same length")
-  assert(indicatorValue.isEmpty || descriptorValue.isEmpty, "cannot have both indicatorValue and descriptorValue")
+  require(indicatorValue.isEmpty || descriptorValue.isEmpty, "cannot have both indicatorValue and descriptorValue")
 
   /**
    * Convert this column into Spark metadata.

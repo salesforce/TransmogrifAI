@@ -70,7 +70,7 @@ case class FeatureDistribution
    * @param fd distribution to compare to
    */
   def checkMatch(fd: FeatureDistribution): Unit =
-    assert(name == fd.name && key == fd.key, "Name and key must match to compare or combine FeatureDistribution")
+    require(name == fd.name && key == fd.key, "Name and key must match to compare or combine FeatureDistribution")
 
   /**
    * Get fill rate of feature
