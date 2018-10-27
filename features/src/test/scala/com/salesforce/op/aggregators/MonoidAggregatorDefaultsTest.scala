@@ -519,7 +519,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     assertDefaultAggr(multiPickListMapTestSeq, expectedRes)
   }
 
-  Spec(UnionVector.getClass) should "work" in {
+  Spec(CombineVector.getClass) should "work" in {
     assertDefaultAggr(vectorTestSeq, Vectors.dense(Array(0.1, 0.2, 1.0, 0.2)))
   }
 

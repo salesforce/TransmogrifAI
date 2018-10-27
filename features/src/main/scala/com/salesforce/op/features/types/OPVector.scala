@@ -30,6 +30,7 @@
 
 package com.salesforce.op.features.types
 
+import com.salesforce.op.utils.spark.RichVector._
 import org.apache.spark.ml.linalg._
 
 /**
@@ -39,8 +40,37 @@ import org.apache.spark.ml.linalg._
  */
 class OPVector(val value: Vector) extends OPCollection {
   type Value = Vector
+
   final def isEmpty: Boolean = value.size == 0
+
+  /**
+   * Add vectors
+   *
+   * @param that another vector
+   * @throws IllegalArgumentException if the vectors have different sizes
+   * @return vector addition
+   */
+  def +(that: OPVector): OPVector = (value + that.value).toOPVector
+
+  /**
+   * Subtract vectors
+   *
+   * @param that another vector
+   * @throws IllegalArgumentException if the vectors have different sizes
+   * @return vector subtraction
+   */
+  def -(that: OPVector): OPVector = (value - that.value).toOPVector
+
+  /**
+   * Combine multiple vectors into one
+   *
+   * @param that  another vector
+   * @param other other vectors
+   * @return result vector
+   */
+  def combine(that: OPVector, other: OPVector*): OPVector = value.combine(that.value, other.map(_.value): _*).toOPVector
 }
+
 object OPVector {
   def apply(value: Vector): OPVector = new OPVector(value)
   def empty: OPVector = FeatureTypeDefaults.OPVector

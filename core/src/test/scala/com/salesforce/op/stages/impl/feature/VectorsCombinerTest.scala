@@ -31,31 +31,42 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.types.Text
-import com.salesforce.op.features.{FeatureLike, TransientFeature}
-import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.features.TransientFeature
+import com.salesforce.op.features.types.{Text, _}
+import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.test.{OpEstimatorSpec, PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.testkit.{RandomReal, RandomVector}
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.utils.spark.RichMetadata._
+
 
 @RunWith(classOf[JUnitRunner])
-class VectorsCombinerTest extends FlatSpec with PassengerSparkFixtureTest {
+class VectorsCombinerTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[OPVector, OPVector], VectorsCombiner]
+    with PassengerSparkFixtureTest {
 
-  val vectors = Seq(
-    Vectors.sparse(4, Array(0, 3), Array(1.0, 1.0)),
-    Vectors.dense(Array(2.0, 3.0, 4.0)),
-    Vectors.sparse(4, Array(1), Array(777.0))
+  override def specName = classOf[VectorsCombiner].getSimpleName
+
+  val (inputData, f1, f2) = TestFeatureBuilder(Seq(
+    Vectors.sparse(4, Array(0, 3), Array(1.0, 1.0)).toOPVector ->
+      Vectors.sparse(4, Array(0, 3), Array(2.0, 3.0)).toOPVector,
+    Vectors.dense(Array(2.0, 3.0, 4.0)).toOPVector ->
+      Vectors.dense(Array(12.0, 13.0, 14.0)).toOPVector,
+    // Purposely added some very large sparse vectors to verify the efficiency
+    Vectors.sparse(100000000, Array(1), Array(777.0)).toOPVector ->
+      Vectors.sparse(500000000, Array(0), Array(888.0)).toOPVector
+  ))
+
+  val estimator = new VectorsCombiner().setInput(f1, f2)
+
+  val expectedResult = Seq(
+    Vectors.sparse(8, Array(0, 3, 4, 7), Array(1.0, 1.0, 2.0, 3.0)).toOPVector,
+    Vectors.dense(Array(2.0, 3.0, 4.0, 12.0, 13.0, 14.0)).toOPVector,
+    Vectors.sparse(600000000, Array(1, 100000000), Array(777.0, 888.0)).toOPVector
   )
-  val expected = Vectors.sparse(11, Array(0, 3, 4, 5, 6, 8), Array(1.0, 1.0, 2.0, 3.0, 4.0, 777.0))
-
-  Spec[VectorsCombiner] should "combine vectors correctly" in {
-    val combined = VectorsCombiner.combine(vectors)
-    assert(combined.compressed == combined, "combined is expected to be compressed")
-    combined shouldBe expected
-  }
 
   it should "combine metadata correctly" in {
     val vector = Seq(height, description, stringMap).transmogrify()
@@ -69,12 +80,11 @@ class VectorsCombinerTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "create metadata correctly" in {
-    val descVect = description.map[Text]{
-      t =>
-        Text(t.value match {
-          case Some(text) => "this is dumb " + text
-          case None => "some STUFF to tokenize"
-        })
+    val descVect = description.map[Text] { t =>
+      Text(t.value match {
+        case Some(text) => "this is dumb " + text
+        case None => "some STUFF to tokenize"
+      })
     }.tokenize().tf(numTerms = 5)
     val vector = Seq(height, stringMap, descVect).transmogrify()
     val Seq(inputs1, inputs2, inputs3) = vector.parents
