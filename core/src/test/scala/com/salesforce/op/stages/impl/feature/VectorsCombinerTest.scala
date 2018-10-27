@@ -48,7 +48,7 @@ class VectorsCombinerTest
   extends OpEstimatorSpec[OPVector, SequenceModel[OPVector, OPVector], VectorsCombiner]
     with PassengerSparkFixtureTest {
 
-  override def specName = classOf[VectorsCombiner].getSimpleName
+  override def specName: String = classOf[VectorsCombiner].getSimpleName
 
   val (inputData, f1, f2) = TestFeatureBuilder(Seq(
     Vectors.sparse(4, Array(0, 3), Array(1.0, 1.0)).toOPVector ->

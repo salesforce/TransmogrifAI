@@ -49,7 +49,7 @@ class OPVectorTest extends FlatSpec with TestCommon {
   )
 
   Spec[OPVector] should "be empty" in {
-    val zero =  Vectors.zeros(0)
+    val zero = Vectors.zeros(0)
     new OPVector(zero).isEmpty shouldBe true
     new OPVector(zero).nonEmpty shouldBe false
     zero.toOPVector shouldBe a[OPVector]
