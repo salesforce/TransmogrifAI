@@ -45,5 +45,16 @@ case object CombineVector
     with AggregatorDefaults[OPVector] {
   implicit val ttag = weakTypeTag[OPVector]
   val ftFactory = FeatureTypeFactory[OPVector]()
-  val monoid: Monoid[Vector] = Monoid.from(Vectors.zeros(0))((v1: Vector, v2: Vector) => v1.combine(v2))
+  val monoid: Monoid[Vector] = Monoid.from(Vectors.zeros(0))(_ combine _)
+}
+
+/**
+* Aggregator that gives the sum of Vector data
+*/
+case object SumVector
+  extends MonoidAggregator[Event[OPVector], Vector, OPVector]
+    with AggregatorDefaults[OPVector] {
+  implicit val ttag = weakTypeTag[OPVector]
+  val ftFactory = FeatureTypeFactory[OPVector]()
+  val monoid: Monoid[Vector] = Monoid.from(Vectors.zeros(0))(_ + _)
 }

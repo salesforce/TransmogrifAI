@@ -523,6 +523,16 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     assertDefaultAggr(vectorTestSeq, Vectors.dense(Array(0.1, 0.2, 1.0, 0.2)))
   }
 
+  Spec(SumVector.getClass) should "work" in {
+    val vectors = Seq(Array(0.1, 0.2), Array(1.0, -1.5), Array(0.2, 0.0)).map(Vectors.dense(_).toOPVector)
+    assertAggr(SumVector, vectors, Vectors.dense(Array(1.3, -1.3)))
+  }
+  it should "error on vectors of invalid sizes" in {
+    val vectors = Seq(Array(0.1, 0.2), Array(1.0)).map(Vectors.dense(_).toOPVector)
+    intercept[IllegalArgumentException](assertAggr(SumVector, vectors, Vectors.zeros(0))).getMessage shouldBe
+      "requirement failed: Vectors must have same length: x.length == y.length (1 != 2)"
+  }
+
   Spec[CustomMonoidAggregator[_]] should "work" in {
     val customAgg = new CustomMonoidAggregator[Real](zero = None, associativeFn = (r1, r2) => (r1 -> r2).map(_ + _))
     assertAggr(customAgg, realTestSeq, Option(doubleBase.flatten.sum))
