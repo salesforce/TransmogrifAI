@@ -18,9 +18,9 @@ dependencies {
 ```
 For SBT in `build.sbt` add:
 ```sbt
-libraryDependencies ++= "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.4.0"
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.4.0"
 
-libraryDependencies ++= libraryDependencies += "com.opendatagroup" % "hadrian" % "0.8.5" % Runtime
+libraryDependencies += libraryDependencies += "com.opendatagroup" % "hadrian" % "0.8.5" % Runtime
 ```
 
 Then in your code you may load and score models as follows:
