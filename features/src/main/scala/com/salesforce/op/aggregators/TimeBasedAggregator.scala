@@ -37,214 +37,191 @@ import scala.reflect.runtime.universe.WeakTypeTag
 
 private[op] abstract class TimeBasedAggregator[T <: FeatureType]
 (
-  val compareFun: (Long, Long) => Boolean,
-  val timeZero: Long,
-  val emptyValue: T#Value
-)(
-  implicit val ttag: WeakTypeTag[T],
-  val ttvag: WeakTypeTag[T#Value]
-)
-  extends MonoidAggregator[Event[T], (Long, T#Value), T] {
+  compareFun: (Long, Long) => Boolean,
+  val timeZero: Long
+)(implicit val ttag: WeakTypeTag[T]) extends MonoidAggregator[Event[T], (Long, T#Value), T] {
+
   val ftFactory = FeatureTypeFactory[T]()
 
   val monoid: Monoid[(Long, T#Value)] = new Monoid[(Long, T#Value)] {
-    val zero = timeZero -> emptyValue
+    val zero = timeZero -> FeatureTypeDefaults.default[T].value
     def plus(l: (Long, T#Value), r: (Long, T#Value)): (Long, T#Value) = if (compareFun(l._1, r._1)) r else l
   }
+
   def prepare(input: Event[T]): (Long, T#Value) = input.date -> input.value.v
 
   def present(reduction: (Long, T#Value)): T = ftFactory.newInstance(reduction._2)
 }
 
 /**
- * Gives most recent value of feature
+ * Gives last (most recent) value of feature
  * @param zeroValue zero for feature type
  * @param ttag feature type tag
- * @param ttvag feature value type tag
  * @tparam T type of feature
  */
-abstract class MostRecentAggregator[T <: FeatureType]
-(
-  emptyValue: T#Value
-)(
-  implicit ttag: WeakTypeTag[T],
-  ttvag: WeakTypeTag[T#Value]
-) extends TimeBasedAggregator(
-  compareFun = (l: Long, r: Long) => l < r, timeZero = 0L, emptyValue = emptyValue
-)(ttag = ttag, ttvag = ttvag
-)
+abstract class LastAggregator[T <: FeatureType](implicit ttag: WeakTypeTag[T]) extends
+  TimeBasedAggregator(compareFun = (l: Long, r: Long) => l < r, timeZero = 0L)(ttag = ttag)
 
 
 /**
  * Gives the first value of feature
  * @param zeroValue zero for feature type
  * @param ttag feature type tag
- * @param ttvag feature value type tag
  * @tparam T type of feature
  */
-abstract class FirstAggregator[T <: FeatureType]
-(
-  emptyValue: T#Value
-)(
-  implicit ttag: WeakTypeTag[T],
-  ttvag: WeakTypeTag[T#Value]
-) extends TimeBasedAggregator(
-  compareFun = (l: Long, r: Long) => l >= r, timeZero = Long.MaxValue, emptyValue = emptyValue
-)(ttag = ttag, ttvag = ttvag)
+abstract class FirstAggregator[T <: FeatureType](implicit ttag: WeakTypeTag[T]) extends
+  TimeBasedAggregator(compareFun = (l: Long, r: Long) => l >= r, timeZero = Long.MaxValue)(ttag = ttag)
 
 
-case object MostRecentVector extends MostRecentAggregator[OPVector](OPVector.empty.value)
-case object FirstVector extends FirstAggregator[OPVector](OPVector.empty.value)
+case object LastVector extends LastAggregator[OPVector]
+case object FirstVector extends FirstAggregator[OPVector]
 
-case object MostRecentTextList extends MostRecentAggregator[TextList](TextList.empty.value)
-case object FirstTextList extends FirstAggregator[TextList](TextList.empty.value)
+case object LastTextList extends LastAggregator[TextList]
+case object FirstTextList extends FirstAggregator[TextList]
 
-case object MostRecentDateList extends MostRecentAggregator[DateList](DateList.empty.value)
-case object FirstDateList extends FirstAggregator[DateList](DateList.empty.value)
+case object LastDateList extends LastAggregator[DateList]
+case object FirstDateList extends FirstAggregator[DateList]
 
-case object MostRecentDateTimeList extends MostRecentAggregator[DateTimeList](DateTimeList.empty.value)
-case object FirstDateTimeList extends FirstAggregator[DateTimeList](DateTimeList.empty.value)
+case object LastDateTimeList extends LastAggregator[DateTimeList]
+case object FirstDateTimeList extends FirstAggregator[DateTimeList]
 
-case object MostRecentGeolocation extends MostRecentAggregator[Geolocation](Geolocation.empty.value)
-case object FirstGeolocation extends FirstAggregator[Geolocation](Geolocation.empty.value)
+case object LastGeolocation extends LastAggregator[Geolocation]
+case object FirstGeolocation extends FirstAggregator[Geolocation]
 
-case object MostRecentBase64Map extends MostRecentAggregator[Base64Map](Base64Map.empty.value)
-case object FirstBase64Map extends FirstAggregator[Base64Map](Base64Map.empty.value)
+case object LastBase64Map extends LastAggregator[Base64Map]
+case object FirstBase64Map extends FirstAggregator[Base64Map]
 
-case object MostRecentBinaryMap extends MostRecentAggregator[BinaryMap](BinaryMap.empty.value)
-case object FirstBinaryMap extends FirstAggregator[BinaryMap](BinaryMap.empty.value)
+case object LastBinaryMap extends LastAggregator[BinaryMap]
+case object FirstBinaryMap extends FirstAggregator[BinaryMap]
 
-case object MostRecentComboBoxMap extends MostRecentAggregator[ComboBoxMap](ComboBoxMap.empty.value)
-case object FirstComboBoxMap extends FirstAggregator[ComboBoxMap](ComboBoxMap.empty.value)
+case object LastComboBoxMap extends LastAggregator[ComboBoxMap]
+case object FirstComboBoxMap extends FirstAggregator[ComboBoxMap]
 
-case object MostRecentCurrencyMap extends MostRecentAggregator[CurrencyMap](CurrencyMap.empty.value)
-case object FirstCurrencyMap extends FirstAggregator[CurrencyMap](CurrencyMap.empty.value)
+case object LastCurrencyMap extends LastAggregator[CurrencyMap]
+case object FirstCurrencyMap extends FirstAggregator[CurrencyMap]
 
-case object MostRecentDateMap extends MostRecentAggregator[DateMap](DateMap.empty.value)
-case object FirstDateMap extends FirstAggregator[DateMap](DateMap.empty.value)
+case object LastDateMap extends LastAggregator[DateMap]
+case object FirstDateMap extends FirstAggregator[DateMap]
 
-case object MostRecentDateTimeMap extends MostRecentAggregator[DateTimeMap](DateTimeMap.empty.value)
-case object FirstDateTimeMap extends FirstAggregator[DateTimeMap](DateTimeMap.empty.value)
+case object LastDateTimeMap extends LastAggregator[DateTimeMap]
+case object FirstDateTimeMap extends FirstAggregator[DateTimeMap]
 
-case object MostRecentEmailMap extends MostRecentAggregator[EmailMap](EmailMap.empty.value)
-case object FirstEmailMap extends FirstAggregator[EmailMap](EmailMap.empty.value)
+case object LastEmailMap extends LastAggregator[EmailMap]
+case object FirstEmailMap extends FirstAggregator[EmailMap]
 
-case object MostRecentIDMap extends MostRecentAggregator[IDMap](IDMap.empty.value)
-case object FirstIDMap extends FirstAggregator[IDMap](IDMap.empty.value)
+case object LastIDMap extends LastAggregator[IDMap]
+case object FirstIDMap extends FirstAggregator[IDMap]
 
-case object MostRecentIntegralMap extends MostRecentAggregator[IntegralMap](IntegralMap.empty.value)
-case object FirstIntegralMap extends FirstAggregator[IntegralMap](IntegralMap.empty.value)
+case object LastIntegralMap extends LastAggregator[IntegralMap]
+case object FirstIntegralMap extends FirstAggregator[IntegralMap]
 
-case object MostRecentMultiPickListMap extends MostRecentAggregator[MultiPickListMap](MultiPickListMap.empty.value)
-case object FirstMultiPickListMap extends FirstAggregator[MultiPickListMap](MultiPickListMap.empty.value)
+case object LastMultiPickListMap extends LastAggregator[MultiPickListMap]
+case object FirstMultiPickListMap extends FirstAggregator[MultiPickListMap]
 
-case object MostRecentPercentMap extends MostRecentAggregator[PercentMap](PercentMap.empty.value)
-case object FirstPercentMap extends FirstAggregator[PercentMap](PercentMap.empty.value)
+case object LastPercentMap extends LastAggregator[PercentMap]
+case object FirstPercentMap extends FirstAggregator[PercentMap]
 
-case object MostRecentPhoneMap extends MostRecentAggregator[PhoneMap](PhoneMap.empty.value)
-case object FirstPhoneMap extends FirstAggregator[PhoneMap](PhoneMap.empty.value)
+case object LastPhoneMap extends LastAggregator[PhoneMap]
+case object FirstPhoneMap extends FirstAggregator[PhoneMap]
 
-case object MostRecentPickListMap extends MostRecentAggregator[PickListMap](PickListMap.empty.value)
-case object FirstPickListMap extends FirstAggregator[PickListMap](PickListMap.empty.value)
+case object LastPickListMap extends LastAggregator[PickListMap]
+case object FirstPickListMap extends FirstAggregator[PickListMap]
 
-case object MostRecentRealMap extends MostRecentAggregator[RealMap](RealMap.empty.value)
-case object FirstRealMap extends FirstAggregator[RealMap](RealMap.empty.value)
+case object LastRealMap extends LastAggregator[RealMap]
+case object FirstRealMap extends FirstAggregator[RealMap]
 
-case object MostRecentTextAreaMap extends MostRecentAggregator[TextAreaMap](TextAreaMap.empty.value)
-case object FirstTextAreaMap extends FirstAggregator[TextAreaMap](TextAreaMap.empty.value)
+case object LastTextAreaMap extends LastAggregator[TextAreaMap]
+case object FirstTextAreaMap extends FirstAggregator[TextAreaMap]
 
-case object MostRecentTextMap extends MostRecentAggregator[TextMap](TextMap.empty.value)
-case object FirstTextMap extends FirstAggregator[TextMap](TextMap.empty.value)
+case object LastTextMap extends LastAggregator[TextMap]
+case object FirstTextMap extends FirstAggregator[TextMap]
 
-case object MostRecentURLMap extends MostRecentAggregator[URLMap](URLMap.empty.value)
-case object FirstURLMap extends FirstAggregator[URLMap](URLMap.empty.value)
+case object LastURLMap extends LastAggregator[URLMap]
+case object FirstURLMap extends FirstAggregator[URLMap]
 
-case object MostRecentCountryMap extends MostRecentAggregator[CountryMap](CountryMap.empty.value)
-case object FirstCountryMap extends FirstAggregator[CountryMap](CountryMap.empty.value)
+case object LastCountryMap extends LastAggregator[CountryMap]
+case object FirstCountryMap extends FirstAggregator[CountryMap]
 
-case object MostRecentStateMap extends MostRecentAggregator[StateMap](StateMap.empty.value)
-case object FirstStateMap extends FirstAggregator[StateMap](StateMap.empty.value)
+case object LastStateMap extends LastAggregator[StateMap]
+case object FirstStateMap extends FirstAggregator[StateMap]
 
-case object MostRecentCityMap extends MostRecentAggregator[CityMap](CityMap.empty.value)
-case object FirstCityMap extends FirstAggregator[CityMap](CityMap.empty.value)
+case object LastCityMap extends LastAggregator[CityMap]
+case object FirstCityMap extends FirstAggregator[CityMap]
 
-case object MostRecentPostalCodeMap extends MostRecentAggregator[PostalCodeMap](PostalCodeMap.empty.value)
-case object FirstPostalCodeMap extends FirstAggregator[PostalCodeMap](PostalCodeMap.empty.value)
+case object LastPostalCodeMap extends LastAggregator[PostalCodeMap]
+case object FirstPostalCodeMap extends FirstAggregator[PostalCodeMap]
 
-case object MostRecentStreetMap extends MostRecentAggregator[StreetMap](StreetMap.empty.value)
-case object FirstStreetMap extends FirstAggregator[StreetMap](StreetMap.empty.value)
+case object LastStreetMap extends LastAggregator[StreetMap]
+case object FirstStreetMap extends FirstAggregator[StreetMap]
 
-case object MostRecentGeolocationMap extends MostRecentAggregator[GeolocationMap](GeolocationMap.empty.value)
-case object FirstGeolocationMap extends FirstAggregator[GeolocationMap](GeolocationMap.empty.value)
+case object LastGeolocationMap extends LastAggregator[GeolocationMap]
+case object FirstGeolocationMap extends FirstAggregator[GeolocationMap]
 
-case object MostRecentBinary extends MostRecentAggregator[Binary](Binary.empty.value)
-case object FirstBinary extends FirstAggregator[Binary](Binary.empty.value)
+case object LastBinary extends LastAggregator[Binary]
+case object FirstBinary extends FirstAggregator[Binary]
 
-case object MostRecentCurrency extends MostRecentAggregator[Currency](Currency.empty.value)
-case object FirstCurrency extends FirstAggregator[Currency](Currency.empty.value)
+case object LastCurrency extends LastAggregator[Currency]
+case object FirstCurrency extends FirstAggregator[Currency]
 
-case object MostRecentDate extends MostRecentAggregator[Date](Date.empty.value)
-case object FirstDate extends FirstAggregator[Date](Date.empty.value)
+case object LastDate extends LastAggregator[Date]
+case object FirstDate extends FirstAggregator[Date]
 
-case object MostRecentDateTime extends MostRecentAggregator[DateTime](DateTime.empty.value)
-case object FirstDateTime extends FirstAggregator[DateTime](DateTime.empty.value)
+case object LastDateTime extends LastAggregator[DateTime]
+case object FirstDateTime extends FirstAggregator[DateTime]
 
-case object MostRecentIntegral extends MostRecentAggregator[Integral](Integral.empty.value)
-case object FirstIntegral extends FirstAggregator[Integral](Integral.empty.value)
+case object LastIntegral extends LastAggregator[Integral]
+case object FirstIntegral extends FirstAggregator[Integral]
 
-case object MostRecentPercent extends MostRecentAggregator[Percent](Percent.empty.value)
-case object FirstPercent extends FirstAggregator[Percent](Percent.empty.value)
+case object LastPercent extends LastAggregator[Percent]
+case object FirstPercent extends FirstAggregator[Percent]
 
-case object MostRecentReal extends MostRecentAggregator[Real](Real.empty.value)
-case object FirstReal extends FirstAggregator[Real](Real.empty.value)
+case object LastReal extends LastAggregator[Real]
+case object FirstReal extends FirstAggregator[Real]
 
-case object MostRecentRealNN extends MostRecentAggregator[RealNN](RealNN(0.0).value)
-case object FirstRealNN extends FirstAggregator[RealNN](RealNN(0.0).value)
+case object LastMultiPickList extends LastAggregator[MultiPickList]
+case object FirstMultiPickList extends FirstAggregator[MultiPickList]
 
-case object MostRecentMultiPickList extends MostRecentAggregator[MultiPickList](MultiPickList.empty.value)
-case object FirstMultiPickList extends FirstAggregator[MultiPickList](MultiPickList.empty.value)
+case object LastBase64 extends LastAggregator[Base64]
+case object FirstBase64 extends FirstAggregator[Base64]
 
-case object MostRecentBase64 extends MostRecentAggregator[Base64](Base64.empty.value)
-case object FirstBase64 extends FirstAggregator[Base64](Base64.empty.value)
+case object LastComboBox extends LastAggregator[ComboBox]
+case object FirstComboBox extends FirstAggregator[ComboBox]
 
-case object MostRecentComboBox extends MostRecentAggregator[ComboBox](ComboBox.empty.value)
-case object FirstComboBox extends FirstAggregator[ComboBox](ComboBox.empty.value)
+case object LastEmail extends LastAggregator[Email]
+case object FirstEmail extends FirstAggregator[Email]
 
-case object MostRecentEmail extends MostRecentAggregator[Email](Email.empty.value)
-case object FirstEmail extends FirstAggregator[Email](Email.empty.value)
+case object LastID extends LastAggregator[ID]
+case object FirstID extends FirstAggregator[ID]
 
-case object MostRecentID extends MostRecentAggregator[ID](ID.empty.value)
-case object FirstID extends FirstAggregator[ID](ID.empty.value)
+case object LastPhone extends LastAggregator[Phone]
+case object FirstPhone extends FirstAggregator[Phone]
 
-case object MostRecentPhone extends MostRecentAggregator[Phone](Phone.empty.value)
-case object FirstPhone extends FirstAggregator[Phone](Phone.empty.value)
+case object LastPickList extends LastAggregator[PickList]
+case object FirstPickList extends FirstAggregator[Phone]
 
-case object MostRecentPickList extends MostRecentAggregator[PickList](PickList.empty.value)
-case object FirstPickList extends FirstAggregator[Phone](PickList.empty.value)
+case object LastText extends LastAggregator[Text]
+case object FirstText extends FirstAggregator[Text]
 
-case object MostRecentText extends MostRecentAggregator[Text](Text.empty.value)
-case object FirstText extends FirstAggregator[Text](Text.empty.value)
+case object LastTextArea extends LastAggregator[TextArea]
+case object FirstTextArea extends FirstAggregator[TextArea]
 
-case object MostRecentTextArea extends MostRecentAggregator[TextArea](TextArea.empty.value)
-case object FirstTextArea extends FirstAggregator[TextArea](TextArea.empty.value)
+case object LastURL extends LastAggregator[URL]
+case object FirstURL extends FirstAggregator[URL]
 
-case object MostRecentURL extends MostRecentAggregator[URL](URL.empty.value)
-case object FirstURL extends FirstAggregator[URL](URL.empty.value)
+case object LastCountry extends LastAggregator[Country]
+case object FirstCountry extends FirstAggregator[Country]
 
-case object MostRecentCountry extends MostRecentAggregator[Country](Country.empty.value)
-case object FirstCountry extends FirstAggregator[Country](Country.empty.value)
+case object LastState extends LastAggregator[State]
+case object FirstState extends FirstAggregator[State]
 
-case object MostRecentState extends MostRecentAggregator[State](State.empty.value)
-case object FirstState extends FirstAggregator[State](State.empty.value)
+case object LastCity extends LastAggregator[City]
+case object FirstCity extends FirstAggregator[City]
 
-case object MostRecentCity extends MostRecentAggregator[City](City.empty.value)
-case object FirstCity extends FirstAggregator[City](City.empty.value)
+case object LastPostalCode extends LastAggregator[PostalCode]
+case object FirstPostalCode extends FirstAggregator[PostalCode]
 
-case object MostRecentPostalCode extends MostRecentAggregator[PostalCode](PostalCode.empty.value)
-case object FirstPostalCode extends FirstAggregator[PostalCode](PostalCode.empty.value)
-
-case object MostRecentStreet extends MostRecentAggregator[Street](Street.empty.value)
-case object FirstStreet extends FirstAggregator[Street](Street.empty.value)
+case object LastStreet extends LastAggregator[Street]
+case object FirstStreet extends FirstAggregator[Street]
 
 
 

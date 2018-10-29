@@ -52,9 +52,9 @@ class TimeBasedAggregatorTest extends FlatSpec with TestCommon {
 
   private val timeExt = Option((d: TimeBasedTest) => d.time)
 
-  Spec[MostRecentAggregator[_]] should "return the most recent event" in {
-    val feature = FeatureBuilder.Real[TimeBasedTest].extract(_.real.toReal)
-      .aggregate(MostRecentReal).asPredictor
+  Spec[LastAggregator[_]] should "return the most recent event" in {
+    val feature = FeatureBuilder.Real[TimeBasedTest].extract(_.real.toRealNN)
+      .aggregate(LastReal).asPredictor
     val aggregator = feature.originStage.asInstanceOf[FeatureGeneratorStage[TimeBasedTest, _]].featureAggregator
     val extracted = aggregator.extract(data, timeExt, CutOffTime.NoCutoff())
     extracted shouldBe Real(Some(6.0))
@@ -62,7 +62,7 @@ class TimeBasedAggregatorTest extends FlatSpec with TestCommon {
 
   it should "return the most recent event within the time window" in {
     val feature = FeatureBuilder.Text[TimeBasedTest].extract(_.string.toText)
-      .aggregate(MostRecentText).asResponse
+      .aggregate(LastText).asResponse
     val aggregator = feature.originStage.asInstanceOf[FeatureGeneratorStage[TimeBasedTest, _]].featureAggregator
     val extracted = aggregator.extract(data, timeExt, CutOffTime.UnixEpoch(300L),
       responseWindow = Option(new Duration(201L)))
@@ -71,7 +71,7 @@ class TimeBasedAggregatorTest extends FlatSpec with TestCommon {
 
   it should "return the feature type empty value when no events are passed in" in {
     val feature = FeatureBuilder.TextMap[TimeBasedTest].extract(_.map.toTextMap)
-      .aggregate(MostRecentTextMap).asPredictor
+      .aggregate(LastTextMap).asPredictor
     val aggregator = feature.originStage.asInstanceOf[FeatureGeneratorStage[TimeBasedTest, _]].featureAggregator
     val extracted = aggregator.extract(Seq(), timeExt, CutOffTime.NoCutoff())
     extracted shouldBe TextMap.empty
