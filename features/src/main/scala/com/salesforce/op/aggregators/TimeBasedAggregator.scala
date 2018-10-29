@@ -55,7 +55,6 @@ private[op] abstract class TimeBasedAggregator[T <: FeatureType]
 
 /**
  * Gives last (most recent) value of feature
- * @param zeroValue zero for feature type
  * @param ttag feature type tag
  * @tparam T type of feature
  */
@@ -65,7 +64,6 @@ abstract class LastAggregator[T <: FeatureType](implicit ttag: WeakTypeTag[T]) e
 
 /**
  * Gives the first value of feature
- * @param zeroValue zero for feature type
  * @param ttag feature type tag
  * @tparam T type of feature
  */
