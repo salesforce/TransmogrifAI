@@ -62,10 +62,13 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
         res <- Seq(
           () => sparse + wrongSize,
           () => sparse - wrongSize,
+          () => sparse dot wrongSize,
           () => dense + wrongSize,
           () => dense - wrongSize,
+          () => dense dot wrongSize,
           () => dense + wrongSize.toDense,
-          () => dense - wrongSize.toDense
+          () => dense - wrongSize.toDense,
+          () => dense dot wrongSize.toDense
         )
       } {
         intercept[IllegalArgumentException](res()).getMessage should {
@@ -75,7 +78,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors should '+' add correctly") {
+  property("Vectors should '+' add") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       val expected = dense.values.map(_ * 2)
@@ -86,7 +89,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors should '-' subtract correctly") {
+  property("Vectors should '-' subtract") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       for {res <- Seq(sparse - sparse, dense - sparse, sparse - dense, dense - dense)} {
@@ -96,7 +99,17 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors should combine correctly") {
+  property("Vectors should compute dot product") {
+    forAll(sparseVectorGen) { sparse: SparseVector =>
+      val dense = sparse.toDense
+      val expected = dense.values.zip(dense.values).map { case (v1, v2) => v1 * v2 }.sum
+      for {res <- Seq(sparse dot sparse, dense dot sparse, sparse dot dense, dense dot dense)} {
+        res shouldBe expected +- 1e-4
+      }
+    }
+  }
+
+  property("Vectors should combine") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       val expected = dense.values ++ dense.values
@@ -110,7 +123,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors convert to breeze vectors correctly") {
+  property("Vectors convert to breeze vectors") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       sparse.toBreeze.toArray should contain theSameElementsAs dense.toBreeze.toArray

@@ -62,6 +62,15 @@ class OPVector(val value: Vector) extends OPCollection {
   def -(that: OPVector): OPVector = (value - that.value).toOPVector
 
   /**
+   * Dot product between vectors
+   *
+   * @param that another vector
+   * @throws IllegalArgumentException if the vectors have different sizes
+   * @return dot product
+   */
+  def dot(that: OPVector): Double = value dot that.value
+
+  /**
    * Combine multiple vectors into one
    *
    * @param that  another vector

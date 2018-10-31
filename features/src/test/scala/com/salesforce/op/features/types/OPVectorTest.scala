@@ -55,7 +55,17 @@ class OPVectorTest extends FlatSpec with TestCommon {
     zero.toOPVector shouldBe a[OPVector]
   }
 
-  it should "compare values correctly" in {
+  it should "error on size mismatch" in {
+    val ones = Array.fill(vectors.size)(Vectors.sparse(1, Array(0), Array(1.0)).toOPVector)
+    for {
+      (v1, v2) <- vectors.zip(ones)
+      res <- Seq(() => v1 + v2, () => v1 - v2, () => v1 dot v2)
+    } intercept[IllegalArgumentException](res()).getMessage should {
+      startWith("requirement failed: Vectors must") and include("same length")
+    }
+  }
+
+  it should "compare values" in {
     val zero = Vectors.zeros(0)
     new OPVector(zero) shouldBe new OPVector(zero)
     new OPVector(zero).value shouldBe zero
@@ -68,19 +78,25 @@ class OPVectorTest extends FlatSpec with TestCommon {
     OPVector.empty shouldBe new OPVector(zero)
   }
 
-  it should "'+' add correctly" in {
+  it should "'+' add" in {
     for {(v1, v2) <- vectors.zip(vectors)} {
       (v1 + v2) shouldBe (v1.value + v2.value).toOPVector
     }
   }
 
-  it should "'-' subtract correctly" in {
+  it should "'-' subtract" in {
     for {(v1, v2) <- vectors.zip(vectors)} {
       (v1 - v2) shouldBe (v1.value - v2.value).toOPVector
     }
   }
 
-  it should "combine correctly" in {
+  it should "compute dot product" in {
+    for {(v1, v2) <- vectors.zip(vectors)} {
+      (v1 dot v2) shouldBe (v1.value dot v2.value)
+    }
+  }
+
+  it should "combine" in {
     for {(v1, v2) <- vectors.zip(vectors)} {
       v1.combine(v2) shouldBe v1.value.combine(v2.value).toOPVector
       v1.combine(v2, v2, v1) shouldBe v1.value.combine(v2.value, v2.value, v1.value).toOPVector

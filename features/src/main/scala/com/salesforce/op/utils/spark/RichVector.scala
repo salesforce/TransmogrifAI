@@ -67,6 +67,20 @@ object RichVector {
     }
 
     /**
+     * Dot product between vectors
+     *
+     * @param that another vector
+     * @throws IllegalArgumentException if the vectors have different sizes
+     * @return dot product
+     */
+    def dot(that: Vector): Double = {
+      require(v.size == that.size,
+        s"Vectors must have the same length: a.length == b.length (${v.size} != ${that.size})"
+      )
+      v.toBreeze dot that.toBreeze
+    }
+
+    /**
      * Combine multiple vectors into one
      *
      * @param that  another vector
