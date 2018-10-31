@@ -104,3 +104,5 @@ class TimeBasedAggregatorTest extends FlatSpec with TestCommon {
 }
 
 case class TimeBasedTest(time: Long, real: Double, string: String, map: Map[String, String])
+
+
