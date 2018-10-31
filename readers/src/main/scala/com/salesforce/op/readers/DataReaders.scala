@@ -91,6 +91,23 @@ object DataReaders {
       key: T => String = randomKey _
     ): CSVProductReader[T] = csvProduct(path, key)
 
+    /**
+     * Creates a [[ParquetProductReader]]
+     */
+    def parquetProduct[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _
+    ): ParquetProductReader[T] = new ParquetProductReader[T](readPath = path, key = key)
+
+    /**
+     * Creates a [[ParquetProductReader]].
+     * This method does the same thing as [[parquetProduct]], but is called "parquetCase" so it is easier to understand.
+     */
+    def parquetCase[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _
+    ): ParquetProductReader[T] = parquetProduct(path, key)
+
   }
 
   /**
