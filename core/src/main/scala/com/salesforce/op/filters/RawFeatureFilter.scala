@@ -320,7 +320,7 @@ class RawFeatureFilter[T]
     FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, (
       trainingSummary.allDistributions.responseDistributions ++
         trainingSummary.allDistributions.predictorDistributions
-    ).values.toSeq)
+    ).values.toArray)
   }
 }
 
@@ -508,5 +508,5 @@ case class FilteredRawData
   cleanedData: DataFrame,
   featuresToDrop: Array[OPFeature],
   mapKeysToDrop: Map[String, Set[String]],
-  featureDistributions: Seq[FeatureDistribution]
+  featureDistributions: Array[FeatureDistribution]
 )

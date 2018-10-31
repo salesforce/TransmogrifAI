@@ -128,6 +128,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       // for each stage remove anything blacklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
+
         val blacklistRemoved = inFeatures
           .filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
           .map{ f => if (f.isRaw) f.withDistributions(distributions.collect{ case d if d.name == f.name => d }) else f }
@@ -235,7 +236,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         checkReadersAndFeatures()
         val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
         setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
-        setBlacklist(filteredRawData.featuresToDrop, filteredRawData.featureDistributions)
+        setBlacklist(filteredRawData.featuresToDrop, getRawFeatureDistributions)
         setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
         filteredRawData.cleanedData
     }

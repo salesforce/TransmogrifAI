@@ -95,6 +95,7 @@ private[op] trait OpWorkflowCore {
 
   private[op] final def setRawFeatureDistributions(distributions: Array[FeatureDistribution]): this.type = {
     rawFeatureDistributions = distributions
+    rawFeatures = rawFeatures.map(f => f.withDistributions(distributions.filter(_.name == f.name)))
     this
   }
 

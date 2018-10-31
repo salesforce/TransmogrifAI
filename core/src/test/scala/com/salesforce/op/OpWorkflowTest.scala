@@ -44,6 +44,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.log4j.Level
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
@@ -168,11 +169,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val wfM = wf.train()
     wf.rawFeatures.foreach{ f =>
       f.distributions.nonEmpty shouldBe true
-      f.name shouldEqual f.distributions.head.name
+      Set(f.name) shouldEqual f.distributions.map(_.name).toSet
     }
     wfM.rawFeatures.foreach{ f =>
       f.distributions.nonEmpty shouldBe true
-      f.name shouldEqual f.distributions.head.name
+      Set(f.name) shouldEqual f.distributions.map(_.name).toSet
     }
     wf.getRawFeatureDistributions().length shouldBe 13
     val data = wfM.score()
