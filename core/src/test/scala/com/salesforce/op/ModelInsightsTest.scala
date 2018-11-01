@@ -34,9 +34,9 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op._
 import com.salesforce.op.features.types.{PickList, Real, RealNN}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
@@ -537,4 +537,15 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.features.foreach(f => f.distributions shouldBe empty)
   }
 
+  it should "return model insights for xgboost classification" in {
+    val prediction = new OpXGBoostClassifier().setInput(label, features).setSilent(1).getOutput()
+    val model = new OpWorkflow().setResultFeatures(prediction).setReader(dataReader).train()
+    noException should be thrownBy model.modelInsights(prediction)
+  }
+
+  it should "return model insights for xgboost regression" in {
+    val prediction = new OpXGBoostRegressor().setInput(label, features).setSilent(1).getOutput()
+    val model = new OpWorkflow().setResultFeatures(prediction).setReader(dataReader).train()
+    noException should be thrownBy model.modelInsights(prediction)
+  }
 }

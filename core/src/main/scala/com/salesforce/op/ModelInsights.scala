@@ -46,6 +46,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoost.RichBooster
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
@@ -170,8 +171,10 @@ case class ModelInsights
       val params = e.modelParameters.filterKeys(!excludedParams.contains(_))
       Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++ params
     }).flatten.sortBy(_._1)
-    val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
-    table.prettyString()
+    if (validationResults.nonEmpty) {
+      val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
+      table.prettyString()
+    } else "No validation results found"
   }
 
   private def modelEvaluationMetrics: String = {
@@ -527,10 +530,9 @@ case object ModelInsights {
     blacklistedMapKeys: Map[String, Set[String]],
     rawFeatureDistributions: Array[FeatureDistribution]
   ): Seq[FeatureInsights] = {
-    val contributions = getModelContributions(model)
-
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
+        val contributions = getModelContributions(model, Option(v.getColumnHistory().length))
         val droppedSet = s.dropped.toSet
         val indexInToIndexKept = v.columns
           .collect { case c if !droppedSet.contains(c.makeColName()) => c.index }
@@ -567,7 +569,8 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution = keptIndex.map(i => contributions.map(_.applyOrElse(i, Seq.empty))).getOrElse(Seq.empty),
+              contribution =
+                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -575,13 +578,15 @@ case object ModelInsights {
             )
         }
       case (Some(v), None) => v.getColumnHistory().map { h =>
+        val contributions = getModelContributions(model, Option(v.getColumnHistory().length))
         h.parentFeatureOrigins ->
           Insights(
             derivedFeatureName = h.columnName,
             stagesApplied = h.parentFeatureStages,
             derivedFeatureGroup = h.grouping,
             derivedFeatureValue = h.indicatorValue,
-            contribution = contributions.map(_.applyOrElse(h.index, Seq.empty)) // nothing dropped without sanity check
+            contribution =
+              contributions.map(_.applyOrElse(h.index, (_: Int) => 0.0)) // nothing dropped without sanity check
           )
       }
       case (None, _) => Seq.empty
@@ -631,7 +636,8 @@ case object ModelInsights {
     }
   }
 
-  private[op] def getModelContributions(model: Option[Model[_]]): Seq[Seq[Double]] = {
+  private[op] def getModelContributions
+  (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
     val stage = model.flatMap {
       case m: SparkWrapperParams[_] => m.getSparkMlStage()
       case _ => None
@@ -648,8 +654,8 @@ case object ModelInsights {
       case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
       case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
-      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScore().values.map(_.toDouble).toSeq)
+      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
     }
     contributions.getOrElse(Seq.empty)
   }
@@ -668,7 +674,8 @@ case object ModelInsights {
         case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
           p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
         case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
-          p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value.toString
+          p.param.name != OpPipelineStageParamsNames.InputSchema =>
+          p.param.name -> Option(p.value).map(_.toString).getOrElse("null")
       }.toMap
     }
     stages.map { s =>
