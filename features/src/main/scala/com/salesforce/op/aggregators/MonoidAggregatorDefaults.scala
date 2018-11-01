@@ -53,7 +53,7 @@ object MonoidAggregatorDefaults {
 
     val aggregator = weakTypeOf[O] match {
       // Vector
-      case wt if wt =:= weakTypeOf[OPVector] => UnionVector
+      case wt if wt =:= weakTypeOf[OPVector] => CombineVector
 
       // Lists
       case wt if wt =:= weakTypeOf[TextList] => ConcatTextList
