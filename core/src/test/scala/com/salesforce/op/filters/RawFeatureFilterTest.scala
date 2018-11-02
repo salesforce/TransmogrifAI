@@ -37,7 +37,7 @@ import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.twitter.algebird.Operators._
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
@@ -147,14 +147,17 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     filteredRawData.mapKeysToDrop shouldBe empty
     filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
 
+    assert(filteredRawData.featureDistributions, total = 26)
+
     val filter1 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0)
     val filteredRawData1 = filter1.generateFilteredRaw(features, params)
     filteredRawData1.featuresToDrop should contain theSameElementsAs Array(survPred)
-    filteredRawData1.mapKeysToDrop should contain theSameElementsAs Map("numericMap" -> Set("Male"),
-      "booleanMap" -> Set("Male"), "stringMap" -> Set("Male"))
+    filteredRawData1.mapKeysToDrop should contain theSameElementsAs Map(
+      "numericMap" -> Set("Male"), "booleanMap" -> Set("Male"), "stringMap" -> Set("Male"))
     filteredRawData1.cleanedData.schema.fields.exists(_.name == survPred.name) shouldBe false
-    filteredRawData1.cleanedData.collect(stringMap).
-      foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    filteredRawData1.cleanedData.collect(stringMap).foreach(m =>
+      if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    assert(filteredRawData.featureDistributions, total = 26)
   }
 
   it should "not drop response features" in {
@@ -167,8 +170,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
     filteredRawData.cleanedData.collect(stringMap)
       .foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    assert(filteredRawData.featureDistributions, total = 26)
   }
-
 
   it should "not drop protected features" in {
     val params = new OpParams()
@@ -179,6 +182,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Array(DataFrameFieldNames.KeyFieldName, survived.name)
+    assert(filteredRawData.featureDistributions, total = 14)
 
     val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1, 2, 0.2, 0.9,
       protectedFeatures = Set(age.name, gender.name))
@@ -186,6 +190,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     filteredRawData2.featuresToDrop.toSet shouldEqual Set(height, weight, description, boarded)
     filteredRawData2.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Array(DataFrameFieldNames.KeyFieldName, survived.name, age.name, gender.name)
+    assert(filteredRawData.featureDistributions, total = 14)
   }
 
   it should "not drop JS divergence-protected features based on JS divergence check" in {
@@ -208,6 +213,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
+    assert(filteredRawData.featureDistributions, total = 18)
   }
 
   it should "correctly drop features based on null-label leakage correlation greater than 0.9" in {
@@ -239,6 +245,14 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     nullLabelCorrelationTest(0.3, expectedDropped, Seq(), expectedDroppedMapKeys)
   }
 
+  private def assert(
+    featureDistributions: Seq[FeatureDistribution], total: Int
+  ): Assertion = {
+    featureDistributions.length shouldBe total
+    featureDistributions.count(_.`type` == FeatureDistributionType.Training) shouldBe total / 2
+    featureDistributions.count(_.`type` == FeatureDistributionType.Scoring) shouldBe total / 2
+  }
+
   private def nullLabelCorrelationTest(
     maxCorrelation: Double,
     expectedDropped: Seq[OPFeature],
@@ -261,6 +275,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val FilteredRawData(df, dropped, droppedKeyValue, featureDistributions) =
       getFilter(maxCorrelation).generateFilteredRaw(features, params)
 
+    assert(featureDistributions, total = 26)
     dropped should contain theSameElementsAs expectedDropped
     droppedKeyValue should contain theSameElementsAs expectedDroppedMapKeys
 

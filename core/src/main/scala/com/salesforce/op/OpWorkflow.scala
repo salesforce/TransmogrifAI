@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
+import com.salesforce.op.filters.{FeatureDistribution, FilteredRawData, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -221,23 +221,25 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
     (reader, rawFeatureFilter) match {
-      case (None, None) => throw new IllegalArgumentException("Data reader must be set either directly on the" +
-        " workflow or through the RawFeatureFilter")
+      case (None, None) => throw new IllegalArgumentException(
+        "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
       case (Some(r), None) =>
         checkReadersAndFeatures()
         r.generateDataFrame(rawFeatures, parameters).persist()
       case (rd, Some(rf)) =>
         rd match {
           case None => setReader(rf.trainingReader)
-          case Some(r) => if (r != rf.trainingReader) log.warn("Workflow data reader and RawFeatureFilter training" +
-            " reader do not match! The RawFeatureFilter training reader will be used to generate the data for training")
+          case Some(r) => if (r != rf.trainingReader) log.warn(
+            "Workflow data reader and RawFeatureFilter training reader do not match! " +
+              "The RawFeatureFilter training reader will be used to generate the data for training")
         }
         checkReadersAndFeatures()
-        val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
-        setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
-        setBlacklist(filteredRawData.featuresToDrop, filteredRawData.featureDistributions)
-        setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
-        filteredRawData.cleanedData
+        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, featureDistributions) =
+          rf.generateFilteredRaw(rawFeatures, parameters)
+        setRawFeatureDistributions(featureDistributions.toArray)
+        setBlacklist(featuresToDrop, featureDistributions)
+        setBlacklistMapKeys(mapKeysToDrop)
+        cleanedData
     }
   }
 

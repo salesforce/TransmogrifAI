@@ -379,7 +379,7 @@ object RawFeatureFilter {
  * @param cleanedData          RFF cleaned data
  * @param featuresToDrop       raw features dropped by RFF
  * @param mapKeysToDrop        keys in map features dropped by RFF
- * @param featureDistributions the feature distributions calculated from the training data
+ * @param featureDistributions the feature distributions calculated from the training and scoring data
  */
 case class FilteredRawData
 (
