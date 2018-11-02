@@ -129,13 +129,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
         val blacklistRemoved = inFeatures
-          .filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
-          .map{ f => if (f.isRaw) f.withDistributions(distributions.collect{ case d if d.name == f.name => d }) else f }
+          .filterNot { f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+          .map { f =>
+            if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
+          }
         val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
-        Try{
-          stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()
-        } match {
+        Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             if (initialResultFeatures.contains(oldOutput)) throw new RuntimeException(

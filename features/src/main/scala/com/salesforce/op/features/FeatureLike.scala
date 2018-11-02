@@ -154,7 +154,7 @@ trait FeatureLike[O <: FeatureType] {
    * and input parameters may not be commutative
    */
   final def sameOrigin(in: Any): Boolean = in match {
-    case f: FeatureLike[O] => {
+    case f: FeatureLike[O] =>
       isResponse == f.isResponse &&
         wtt.tpe =:= f.wtt.tpe && {
         originStage -> f.originStage match {
@@ -164,7 +164,6 @@ trait FeatureLike[O <: FeatureType] {
           case (os, fos) => os.uid == fos.uid
         }
       }
-    }
     case _ => false
   }
 
