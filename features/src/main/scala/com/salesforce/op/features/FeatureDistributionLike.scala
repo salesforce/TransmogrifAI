@@ -75,8 +75,6 @@ trait FeatureDistributionLike {
 
 }
 
-
-
 /**
  *Feature Distribution Type
  */

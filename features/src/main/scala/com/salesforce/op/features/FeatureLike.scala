@@ -73,11 +73,6 @@ trait FeatureLike[O <: FeatureType] {
   val parents: Seq[OPFeature]
 
   /**
-   * The distribution information of the feature (is a sequence because map features have distribution for each key)
-   */
-  val distributions: Seq[FeatureDistributionLike]
-
-  /**
    * Weak type tag of the feature type O
    */
   implicit val wtt: WeakTypeTag[O]
@@ -86,6 +81,26 @@ trait FeatureLike[O <: FeatureType] {
    * A handy logger instance
    */
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
+
+  /**
+   * The distribution information of the feature
+   * (is a sequence because map features have distribution for each key)
+   */
+  val distributions: Seq[FeatureDistributionLike]
+
+  /**
+   * The distribution information of the feature computed during training
+   * (is a sequence because map features have distribution for each key)
+   */
+  final def trainingDistributions: Seq[FeatureDistributionLike] =
+    distributions.filter(_.`type` == FeatureDistributionType.Training)
+
+  /**
+   * The distribution information of the feature computed during scoring
+   * (is a sequence because map features have distribution for each key)
+   */
+  final def scoringDistributions: Seq[FeatureDistributionLike] =
+    distributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
   /**
    * Check whether this feature's type [[O]] is a subtype of the given feature type [[T]]

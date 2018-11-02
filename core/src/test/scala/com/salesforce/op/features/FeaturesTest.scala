@@ -169,7 +169,7 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
     }
     "with distributions" should {
       "make a copy of the feature containing the specified distributions" in {
-        val distrib = new FeatureDistributionLike {
+        val distrib1 = new FeatureDistributionLike {
           val count: Long = 1L
           val nulls: Long = 1L
           val distribution: Array[Double] = Array(0.5)
@@ -178,14 +178,25 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
           val key: Option[String] = None
           val `type` = FeatureDistributionType.Training
         }
+        val distrib2 = new FeatureDistributionLike {
+          val count: Long = 1L
+          val nulls: Long = 1L
+          val distribution: Array[Double] = Array(0.5)
+          val summaryInfo: Array[Double] = Array(0.5)
+          val name: String = age.name
+          val key: Option[String] = None
+          val `type` = FeatureDistributionType.Scoring
+        }
         age.distributions shouldBe Nil
-        val newAge = age.withDistributions(Seq(distrib))
+        val newAge = age.withDistributions(Seq(distrib1, distrib2))
         newAge.name shouldEqual age.name
         newAge.isResponse shouldEqual age.isResponse
         newAge.originStage shouldEqual age.originStage
         newAge.parents shouldEqual age.parents
         newAge.uid shouldEqual age.uid
-        newAge.distributions shouldBe Seq(distrib)
+        newAge.distributions shouldBe Seq(distrib1, distrib2)
+        newAge.trainingDistributions shouldBe Seq(distrib1)
+        newAge.scoringDistributions shouldBe Seq(distrib2)
       }
     }
     // TODO: test other feature methods

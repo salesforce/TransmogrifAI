@@ -163,20 +163,23 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
         trainingReader = Option(dataReader),
         scoringReader = None,
         minFillRate = 0.7,
-        protectedFeatures = Array(height, weight))
+        protectedFeatures = Array(height, weight)
+      )
 
     val wfM = wf.train()
-    wf.rawFeatures.foreach{ f =>
+    wf.rawFeatures.foreach { f =>
       f.distributions.nonEmpty shouldBe true
       f.name shouldEqual f.distributions.head.name
     }
-    wfM.rawFeatures.foreach{ f =>
+    wfM.rawFeatures.foreach { f =>
       f.distributions.nonEmpty shouldBe true
       f.name shouldEqual f.distributions.head.name
     }
     wf.getRawFeatureDistributions().length shouldBe 13
+    wf.getRawTrainingFeatureDistributions() shouldBe wf.getRawFeatureDistributions()
+    wf.getRawScoringFeatureDistributions().length shouldBe 0 // since the scoringReader is not set
     val data = wfM.score()
-    data.schema.fields.size shouldBe 3
+    data.schema.fields.length shouldBe 3
     val Array(whyNotNormed2, prob2) = wfM.getUpdatedFeatures(Array(whyNotNormed, pred))
     data.select(whyNotNormed2.name, prob2.name).count() shouldBe 6
   }
@@ -240,8 +243,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
     val wf = new OpWorkflow()
       .setResultFeatures(pred)
-      .withRawFeatureFilter( Option(dataReader), Option(simpleReader),
-        maxFillRatioDiff = 1.0 ) // only height and the female key of maps should meet this criteria
+      .withRawFeatureFilter(Option(dataReader), Option(simpleReader),
+        maxFillRatioDiff = 1.0) // only height and the female key of maps should meet this criteria
     val data = wf.computeDataUpTo(weight)
 
     data.schema.fields.map(_.name).toSet shouldEqual
