@@ -31,14 +31,11 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.OpParams
-import com.salesforce.op.features.{FeatureDistributionType, OPFeature, TransientFeature}
+import com.salesforce.op.features.{FeatureDistributionType, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames
-import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.feature.HashingTF
-import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -88,8 +85,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on the stats of training fill rate" in {
     // only fill rate matters
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val (excludedTrainF, excludedTrainMK) =
-      filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
+    val (excludedTrainF, excludedTrainMK) = filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
     excludedTrainF.toSet shouldEqual Set("B", "D")
     excludedTrainMK.keySet shouldEqual Set("C")
     excludedTrainMK.head._2 shouldEqual Set("2")
@@ -99,8 +95,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // only fill rate matters
 
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val (excludedBothF, excludedBothMK) =
-      filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (excludedBothF, excludedBothMK) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothF.toSet shouldEqual Set("B", "D")
     excludedBothMK.keySet shouldEqual Set("C")
     excludedBothMK.head._2 shouldEqual Set("2")
@@ -109,8 +104,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on the stats of relative fill rate" in {
     // relative fill rate matters
     val filter2 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val (excludedBothRelF, excludedBothRelMK) =
-      filter2.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (excludedBothRelF, excludedBothRelMK) = filter2.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothRelF.toSet shouldEqual Set("A")
     excludedBothRelMK.isEmpty shouldBe true
   }
@@ -137,8 +131,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on all the stats" in {
     // all
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.5, Double.PositiveInfinity, 0.5, 1.0)
-    val (excludedBothAllF, excludedBothAllMK) =
-      filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (excludedBothAllF, excludedBothAllMK) = filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
     excludedBothAllMK.isEmpty shouldBe true
   }
@@ -208,7 +201,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       maxFillRatioDiff = Double.PositiveInfinity,
       maxJSDivergence = 0.0,
       maxCorrelation = 1.0,
-      jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name))
+      jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name)
+    )
 
     val filteredRawData = filter.generateFilteredRaw(features, params)
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
