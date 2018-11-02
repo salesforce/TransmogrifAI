@@ -45,7 +45,7 @@ class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest 
   val stage: OpPipelineStageBase = minMax.fit(passengersDataSet)
 
   val expected =
-    Array(1.0.toReal, Real.empty, 0.10476190476190476.toReal, 0.0.toReal, 0.2761904761904762.toReal, 0.0.toReal)
+    Array(1.0.toReal, 0.0.toReal, Real.empty, 0.10476190476190476.toReal, 0.2761904761904762.toReal, 0.0.toReal)
 }
 
 
