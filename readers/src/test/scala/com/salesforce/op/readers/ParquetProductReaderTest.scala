@@ -32,7 +32,7 @@ package com.salesforce.op.readers
 
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{TestCommon, TestSparkContext}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -42,7 +42,7 @@ import org.scalatest.junit.JUnitRunner
 case class PassengerType
 (
   PassengerId: Int,
-  Survived: Int,
+  Survived: Option[Int],
   Pclass: Option[Int],
   Name: Option[String],
   Sex: Option[String],
@@ -56,10 +56,8 @@ case class PassengerType
 )
 
 @RunWith(classOf[JUnitRunner])
-class ParquetProductReaderTest extends FlatSpec with TestSparkContext {
-  def testDataPath: String = "../test-data"
-
-  def parquetFilePath: String = s"$testDataPath/PassengerDataAll.parquet"
+class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestCommon {
+  def parquetFilePath: String = s"$testDataDir/PassengerDataAll.parquet"
 
   val parquetRecordCount = 891
 
@@ -81,8 +79,8 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext {
       key = _.PassengerId.toString
     )
 
-    val record = caseReader.readDataset().collect().take(1)(0)
-    record.Name shouldBe Some("Braund, Mr. Owen Harris")
+    val records = caseReader.readDataset().collect()
+    records.collect { case r if r.PassengerId == 1 => r.Ticket } shouldBe Array(Some("A/5 21171"))
   }
 
   it should "generate a dataframe" in {

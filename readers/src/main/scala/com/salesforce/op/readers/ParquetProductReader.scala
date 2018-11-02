@@ -32,7 +32,7 @@ package com.salesforce.op.readers
 
 import com.salesforce.op.OpParams
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe.WeakTypeTag
 
@@ -52,10 +52,7 @@ class ParquetProductReader[T <: Product : Encoder]
 
   override def read(params: OpParams = new OpParams())(implicit sc: SparkSession): Either[RDD[T], Dataset[T]] = Right {
     val finalPath = getFinalReadPath(params)
-    val data: Dataset[T] = sc.read
-      .schema(implicitly[Encoder[T]].schema) // without this, every value gets read in as a string
-      .parquet(finalPath)
-      .as[T]
+    val data: Dataset[T] = sc.read.parquet(finalPath).as[T]
     maybeRepartition(data, params)
   }
 }
