@@ -379,7 +379,7 @@ object RawFeatureFilter {
  * @param cleanedData          RFF cleaned data
  * @param featuresToDrop       raw features dropped by RFF
  * @param mapKeysToDrop        keys in map features dropped by RFF
- * @param featureDistributions the feature distributions calculated from the training and scoring data
+ * @param featureDistributions feature distributions calculated from the training and scoring data
  */
 case class FilteredRawData
 (
@@ -387,4 +387,18 @@ case class FilteredRawData
   featuresToDrop: Array[OPFeature],
   mapKeysToDrop: Map[String, Set[String]],
   featureDistributions: Seq[FeatureDistribution]
-)
+) {
+
+  /**
+   * Feature distributions calculated from the training data
+   */
+  def trainingFeatureDistributions: Seq[FeatureDistribution] =
+    featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+
+  /**
+   * Feature distributions calculated from the scoring data
+   */
+  def scoringFeatureDistributions: Seq[FeatureDistribution] =
+    featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+
+}

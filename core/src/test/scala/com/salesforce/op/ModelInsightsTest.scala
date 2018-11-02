@@ -519,10 +519,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
     val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
-    trainingDistributions.foreach(d => d.`type` shouldBe FeatureDistributionType.Training)
+    trainingDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
 
     val scoringDistributions = modelWithRFF.getRawScoringFeatureDistributions()
-    scoringDistributions.foreach(d => d.`type` shouldBe FeatureDistributionType.Scoring)
+    scoringDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
 
     trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
 
