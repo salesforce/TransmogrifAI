@@ -151,7 +151,17 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
             stages.get(div.originStage) shouldBe Some(0)
         }
       }
-
+    }
+    "toString" should {
+      "produce a nice string" in {
+        val f = (height / 2) * weight + 1
+        f.toString shouldBe
+          s"Feature(name = ${f.name}, uid = ${f.uid}, " +
+            s"isResponse = ${f.isResponse}, " +
+            s"originStage = ${f.originStage.uid}, " +
+            s"parents = ${f.parents.map(_.uid).mkString("[", ",", "]")}, " +
+            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")})"
+      }
     }
     "pretty parent stages" should {
       "print a single stage tree" in {
@@ -199,7 +209,6 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         newAge.scoringDistributions shouldBe Seq(distrib2)
       }
     }
-    // TODO: test other feature methods
   }
 
 }

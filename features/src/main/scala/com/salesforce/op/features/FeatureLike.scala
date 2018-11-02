@@ -179,7 +179,7 @@ trait FeatureLike[O <: FeatureType] {
     val valStr = Seq(
       "name" -> name,
       "uid" -> uid,
-      "isResponse" -> name,
+      "isResponse" -> isResponse,
       "originStage" -> Option(originStage).map(_.uid).orNull,
       "parents" -> parents.map(_.uid).mkString("[", ",", "]"),
       "distributions" -> distributions.map(_.toString).mkString("[", ",", "]")
