@@ -43,7 +43,8 @@ package com.salesforce.op.filters
  *                               2nd level keys correspond to predictor keys with values being
  *                               null-label leakage corr. value
  */
-private[op] case class AllFeatureInformation(
+private[op] case class AllFeatureInformation
+(
   responseSummaries: Map[FeatureKey, Summary],
   responseDistributions: Array[FeatureDistribution],
   predictorSummaries: Map[FeatureKey, Summary],

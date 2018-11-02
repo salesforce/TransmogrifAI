@@ -45,7 +45,8 @@ import org.apache.spark.sql.Row
  * @param responses prepared responses
  * @param predictors prepared predictors
  */
-private[filters] case class PreparedFeatures(
+private[filters] case class PreparedFeatures
+(
   responses: Map[FeatureKey, ProcessedSeq],
   predictors: Map[FeatureKey, ProcessedSeq]
 ) {
