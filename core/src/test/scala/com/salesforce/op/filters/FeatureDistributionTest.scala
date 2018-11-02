@@ -223,8 +223,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       "requirement failed: Name must match to compare or combine feature distributions: A != boo"
 
     intercept[IllegalArgumentException](
-      fd1.relativeFillRatio(fd1.copy(`type` = FeatureDistributionType.Scoring))) should have message
-      "requirement failed: Type must match to compare or combine feature distributions: Training != Scoring"
+      fd1.relativeFillRatio(fd1.copy(key = Some("zz")))) should have message
+      "requirement failed: Key must match to compare or combine feature distributions: A != zz"
 
     intercept[IllegalArgumentException](fd1.relativeFillRate(fd1.copy(key = Some("k")))) should have message
       "requirement failed: Key must match to compare or combine feature distributions: None != Some(k)"

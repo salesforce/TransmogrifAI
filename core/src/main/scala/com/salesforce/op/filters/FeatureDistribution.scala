@@ -82,7 +82,6 @@ case class FeatureDistribution
     )
     check("Name", name, fd.name)
     check("Key", key, fd.key)
-    check("Type", `type`, fd.`type`)
   }
 
   /**
@@ -103,7 +102,7 @@ case class FeatureDistribution
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary)
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary, `type`)
   }
 
   /**
@@ -150,13 +149,13 @@ case class FeatureDistribution
 
   override def toString(): String = {
     val valStr = Seq(
+      "type" -> `type`.toString,
       "name" -> name,
       "key" -> key,
       "count" -> count.toString,
       "nulls" -> nulls.toString,
       "distribution" -> distribution.mkString("[", ",", "]"),
-      "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
-      "type" -> `type`.toString
+      "summaryInfo" -> summaryInfo.mkString("[", ",", "]")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
@@ -226,7 +225,7 @@ object FeatureDistribution {
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
-    new FeatureDistribution(
+    FeatureDistribution(
       name = name,
       key = key,
       count = 1L,
