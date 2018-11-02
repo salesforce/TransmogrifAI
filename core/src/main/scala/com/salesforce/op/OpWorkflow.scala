@@ -537,7 +537,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     rawFeatureFilter = Option {
       new RawFeatureFilter(
         trainingReader = training.get,
-        scoreReader = scoringReader,
+        scoringReader = scoringReader,
         bins = bins,
         minFill = minFillRate,
         maxFillDifference = maxFillDifference,

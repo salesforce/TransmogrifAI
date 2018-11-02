@@ -72,13 +72,18 @@ case class FeatureDistribution
   def featureKey: FeatureKey = (name, key)
 
   /**
-   * Check that feature distributions belong to the same feature and key.
+   * Check that feature distributions belong to the same feature, key and type.
    *
    * @param fd distribution to compare to
    */
-  private def checkMatch(fd: FeatureDistribution): Unit =
-    require(name == fd.name && key == fd.key && `type` == fd.`type`,
-      "Name, key and type must match to compare or combine FeatureDistribution")
+  private def checkMatch(fd: FeatureDistribution): Unit = {
+    def check[T](field: String, v1: T, v2: T): Unit = require(v1 == v2,
+      s"$field must match to compare or combine feature distributions: $v1 != $v2"
+    )
+    check("Name", name, fd.name)
+    check("Key", key, fd.key)
+    check("Type", `type`, fd.`type`)
+  }
 
   /**
    * Get fill rate of feature
@@ -171,7 +176,7 @@ object FeatureDistribution {
   val MaxBins = 100000
 
   implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
-    override def plus(l: FeatureDistribution, r: FeatureDistribution) = l.reduce(r)
+    override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
   }
 
   implicit val formats: Formats = DefaultFormats +
@@ -208,25 +213,27 @@ object FeatureDistribution {
    * @param `type`          feature distribution type: training or scoring
    * @return feature distribution given the provided information
    */
-  private[op] def apply(
+  private[op] def fromSummary(
     featureKey: FeatureKey,
     summary: Summary,
     value: Option[ProcessedSeq],
     bins: Int,
-    textBinsFormula: (Summary, Int) => Int
+    textBinsFormula: (Summary, Int) => Int,
+    `type`: FeatureDistributionType
   ): FeatureDistribution = {
     val (name, key) = featureKey
     val (nullCount, (summaryInfo, distribution)) =
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
-    FeatureDistribution(
+    new FeatureDistribution(
       name = name,
       key = key,
       count = 1L,
       nulls = nullCount,
       summaryInfo = summaryInfo,
-      distribution = distribution
+      distribution = distribution,
+      `type` = `type`
     )
   }
 

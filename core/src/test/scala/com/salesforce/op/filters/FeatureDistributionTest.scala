@@ -33,8 +33,6 @@ package com.salesforce.op.filters
 import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.json.JsonUtils
-import org.json4s.JsonAST.JValue
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -60,7 +58,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       if (isEmpty) None else Option(processed)
     }
     val distribs = featureKeys.zip(summaries).zip(processedSeqs).map { case ((key, summary), seq) =>
-      FeatureDistribution(key, summary, seq, bins, (_, bins) => bins)
+      FeatureDistribution.fromSummary(key, summary, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
     }
     distribs.foreach{ d =>
       d.key shouldBe None
@@ -89,7 +87,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       if (isEmpty) None else Option(processed)
     }
     val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution(key, summ, seq, bins, (_, bins) => bins)
+      FeatureDistribution.fromSummary(key, summ, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
     }
 
     distribs(0).distribution.length shouldBe 100
@@ -111,7 +109,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val distribs = features.map(_.name).zip(summaries).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
-        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins, (_, bins) => bins)
+        FeatureDistribution.fromSummary(featureKey, summary, valueMaps.get(key),
+          bins, (_, bins) => bins, FeatureDistributionType.Scoring)
       }
     }
 
@@ -215,5 +214,22 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       case Success(r) => r.deep shouldBe Seq(fd1, fd2)
       case Failure(e) => fail(e)
     }
+  }
+
+  it should "error on mismatching feature name, key or type" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+
+    intercept[IllegalArgumentException](fd1.reduce(fd1.copy(name = "boo"))) should have message
+      "requirement failed: Name must match to compare or combine feature distributions: A != boo"
+
+    intercept[IllegalArgumentException](
+      fd1.relativeFillRatio(fd1.copy(`type` = FeatureDistributionType.Scoring))) should have message
+      "requirement failed: Type must match to compare or combine feature distributions: Training != Scoring"
+
+    intercept[IllegalArgumentException](fd1.relativeFillRate(fd1.copy(key = Some("k")))) should have message
+      "requirement failed: Key must match to compare or combine feature distributions: None != Some(k)"
+
+    intercept[IllegalArgumentException](fd1.jsDivergence(fd1.copy(name = "boo"))) should have message
+      "requirement failed: Name must match to compare or combine feature distributions: A != boo"
   }
 }

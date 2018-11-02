@@ -31,8 +31,8 @@
 package com.salesforce.op.filters
 
 
-import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
 import com.salesforce.op.stages.impl.feature.{DateToUnitCircle, TextTokenizer, TimePeriod}
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
@@ -46,8 +46,8 @@ import org.apache.spark.sql.Row
  * @param predictors prepared predictors
  */
 private[filters] case class PreparedFeatures(
-    responses: Map[FeatureKey, ProcessedSeq],
-    predictors: Map[FeatureKey, ProcessedSeq]
+  responses: Map[FeatureKey, ProcessedSeq],
+  predictors: Map[FeatureKey, ProcessedSeq]
 ) {
 
   /**
@@ -63,7 +63,7 @@ private[filters] case class PreparedFeatures(
    * values are the actual response values (nulls replaced with 0.0). Its (i + responses.length)th value
    * is 1 iff. the predictor associated to ith feature key is null, for i >= 0.
    *
-   * @param responseKeys response feature keys
+   * @param responseKeys  response feature keys
    * @param predictorKeys set of all predictor keys needed for constructing binary vector
    * @return null label-leakage correlation vector
    */
@@ -76,45 +76,45 @@ private[filters] case class PreparedFeatures(
     Vectors.dense(responseValues ++ predictorNullIndicatorValues)
   }
 
-  /*
+  /**
    * Generates a pair of feature distribution arrays. The first element is associated to responses,
    * and the second to predictors.
    *
-   * @param responseSummaries global feature metadata
-   * @param predictorSummaries set of feature summary statistics (derived from metadata)
-   * @param bins number of bins to put numerics into
-   * @param textBinsFormula formula to compute the text features bin size.
-   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
-   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
+   * @param responseSummaries       global feature metadata
+   * @param predictorSummaries      set of feature summary statistics (derived from metadata)
+   * @param bins                    number of bins to put numerics into
+   * @param textBinsFormula         formula to compute the text features bin size.
+   *                                Input arguments are [[Summary]] and number of bins to use in
+   *                                computing feature distributions (histograms for numerics, hashes for strings).
+   *                                Output is the bins for the text features.
+   * @param featureDistributionType feature distribution type: training or scoring
    * @return a pair consisting of response and predictor feature distributions (in this order)
    */
   def getFeatureDistributions(
     responseSummaries: Array[(FeatureKey, Summary)],
     predictorSummaries: Array[(FeatureKey, Summary)],
     bins: Int,
-    textBinsFormula: (Summary, Int) => Int
+    textBinsFormula: (Summary, Int) => Int,
+    featureDistributionType: FeatureDistributionType
   ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
-    val responseFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(responses, responseSummaries, bins, textBinsFormula)
-    val predictorFeatureDistributions: Array[FeatureDistribution] =
-      getFeatureDistributions(predictors, predictorSummaries, bins, textBinsFormula)
 
+    def featureDistributions(
+      features: Map[FeatureKey, ProcessedSeq],
+      summaries: Array[(FeatureKey, Summary)]
+    ): Array[FeatureDistribution] = summaries.map { case (featureKey, summary) =>
+      FeatureDistribution.fromSummary(
+        summary = summary,
+        featureKey = featureKey,
+        value = features.get(featureKey),
+        bins = bins,
+        textBinsFormula = textBinsFormula,
+        `type` = featureDistributionType
+      )
+    }
+
+    val responseFeatureDistributions = featureDistributions(responses, responseSummaries)
+    val predictorFeatureDistributions = featureDistributions(predictors, predictorSummaries)
     responseFeatureDistributions -> predictorFeatureDistributions
-  }
-
-  private def getFeatureDistributions(
-    features: Map[FeatureKey, ProcessedSeq],
-    summaries: Array[(FeatureKey, Summary)],
-    bins: Int,
-    textBinsFormula: (Summary, Int) => Int
-  ): Array[FeatureDistribution] = summaries.map { case (featureKey, summary) =>
-    FeatureDistribution(
-      featureKey = featureKey,
-      summary = summary,
-      value = features.get(featureKey),
-      bins = bins,
-      textBinsFormula = textBinsFormula
-    )
   }
 }
 
@@ -135,7 +135,8 @@ private[filters] object PreparedFeatures {
     row: Row,
     responses: Array[TransientFeature],
     predictors: Array[TransientFeature],
-    timePeriod: Option[TimePeriod]): PreparedFeatures = {
+    timePeriod: Option[TimePeriod]
+  ): PreparedFeatures = {
     val empty: Map[FeatureKey, ProcessedSeq] = Map.empty
     val preparedResponses = responses.foldLeft(empty) { case (map, feature) =>
       val converter = FeatureTypeSparkConverter.fromFeatureTypeName(feature.typeName)

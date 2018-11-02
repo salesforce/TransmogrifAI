@@ -31,7 +31,7 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.OpParams
-import com.salesforce.op.features.{OPFeature, TransientFeature}
+import com.salesforce.op.features.{FeatureDistributionType, OPFeature, TransientFeature}
 import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
@@ -45,11 +45,12 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
+
   Spec[RawFeatureFilter[_]] should "compute feature stats correctly" in {
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.8, Double.PositiveInfinity, 0.7, 1.0)
-    val allFeatureInfo = filter.computeFeatureStats(passengersDataSet, features)
+    val allFeatureInfo = filter.computeFeatureStats(passengersDataSet, features, FeatureDistributionType.Training)
 
     allFeatureInfo.responseSummaries.size shouldBe 1
     allFeatureInfo.responseSummaries.headOption.map(_._2) shouldEqual Option(Summary(0, 1, 1, 2))
@@ -200,7 +201,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       Array(survived, age, gender, height, weight, description, boarded, boardedTime, boardedTimeAsDateTime)
     val filter = new RawFeatureFilter(
       trainingReader = dataReader,
-      scoreReader = Some(simpleReader),
+      scoringReader = Some(simpleReader),
       bins = 10,
       minFill = 0.0,
       maxFillDifference = 1.0,
@@ -252,7 +253,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   ): Unit = {
     def getFilter(maxCorrelation: Double): RawFeatureFilter[Passenger] = new RawFeatureFilter(
       trainingReader = dataReader,
-      scoreReader = Some(simpleReader),
+      scoringReader = Some(simpleReader),
       bins = 10,
       minFill = 0.0,
       maxFillDifference = 1.0,

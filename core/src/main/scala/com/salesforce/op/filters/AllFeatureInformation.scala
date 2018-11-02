@@ -34,17 +34,19 @@ package com.salesforce.op.filters
  * Contains all feature distribution summaries and null label-leakage correlations used to
  * determine dropped features in [[RawFeatureFilter]].
  *
- * @param responseSummaries response summaries
- * @param responseDistributions response distributions
- * @param predictorSummaries predictor summaries
+ * @param responseSummaries      response summaries
+ * @param responseDistributions  response distributions
+ * @param predictorSummaries     predictor summaries
  * @param predictorDistributions predictor distributions
- * @param correlationInfo null label-leakage correlation map
- *                        1st level keys correspond to response keys
- *                        2nd level keys correspond to predictor keys with values being null-label leakage corr. value
+ * @param correlationInfo        null label-leakage correlation map
+ *                               1st level keys correspond to response keys
+ *                               2nd level keys correspond to predictor keys with values being
+ *                               null-label leakage corr. value
  */
 private[op] case class AllFeatureInformation(
-    responseSummaries: Map[FeatureKey, Summary],
-    responseDistributions: Array[FeatureDistribution],
-    predictorSummaries: Map[FeatureKey, Summary],
-    predictorDistributions: Array[FeatureDistribution],
-    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]])
+  responseSummaries: Map[FeatureKey, Summary],
+  responseDistributions: Array[FeatureDistribution],
+  predictorSummaries: Map[FeatureKey, Summary],
+  predictorDistributions: Array[FeatureDistribution],
+  correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
+)

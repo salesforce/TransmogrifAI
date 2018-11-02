@@ -32,7 +32,7 @@ package com.salesforce.op.filters
 
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{OPFeature, TransientFeature}
+import com.salesforce.op.features.{FeatureDistributionType, OPFeature, TransientFeature}
 import com.salesforce.op.filters.Summary._
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -60,9 +60,8 @@ import scala.util.Failure
  * are accessible from an OpWorkflowModel via getRawFeatureDistributions().
  *
  * @param trainingReader                reader to get the training data
- * @param scoreReader                   reader to get the scoring data for comparison (optional - if not present will
- *                                      exclude based on
- *                                      training data features only)
+ * @param scoringReader                 reader to get the scoring data for comparison
+ *                                      (optional - if not present will exclude based on training data features only)
  * @param bins                          number of bins to use in computing feature distributions
  *                                      (histograms for numerics, hashes for strings)
  * @param minFill                       minimum fill rate a feature must have in the training dataset and
@@ -88,7 +87,7 @@ import scala.util.Failure
 class RawFeatureFilter[T]
 (
   val trainingReader: Reader[T],
-  val scoreReader: Option[Reader[T]],
+  val scoringReader: Option[Reader[T]],
   val bins: Int,
   val minFill: Double,
   val maxFillDifference: Double,
@@ -121,14 +120,17 @@ class RawFeatureFilter[T]
 
   /**
    * Get binned counts of the feature distribution and empty count for each raw feature
-   * @param data data frame to compute counts on
-   * @param features list of raw, non-protected, features contained in the dataframe
-   * @param allFeatureInfo existing feature info to use
+   *
+   * @param data                    data frame to compute counts on
+   * @param features                list of raw, non-protected, features contained in the dataframe
+   * @param featureDistributionType feature distribution type: training or scoring
+   * @param allFeatureInfo          existing feature info to use
    * @return a sequence of distribution summaries for each raw feature
    */
   private[op] def computeFeatureStats(
     data: DataFrame,
     features: Array[OPFeature],
+    featureDistributionType: FeatureDistributionType,
     allFeatureInfo: Option[AllFeatureInformation] = None
   ): AllFeatureInformation = {
     val (responses, predictors): (Array[TransientFeature], Array[TransientFeature]) = {
@@ -149,8 +151,9 @@ class RawFeatureFilter[T]
     implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
     // Have to use the training summaries do process scoring for comparison
     val (responseSummaries, predictorSummaries): (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
-      allFeatureInfo.map(info => info.responseSummaries -> info.predictorSummaries)
-        .getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
+      allFeatureInfo.map { info =>
+        info.responseSummaries -> info.predictorSummaries
+      }.getOrElse(preparedFeatures.map(_.summaries).reduce(_ + _))
     val (responseSummariesArr, predictorSummariesArr): (Array[(FeatureKey, Summary)], Array[(FeatureKey, Summary)]) =
       (responseSummaries.toArray, predictorSummaries.toArray)
 
@@ -161,7 +164,8 @@ class RawFeatureFilter[T]
           responseSummaries = responseSummariesArr,
           predictorSummaries = predictorSummariesArr,
           bins = bins,
-          textBinsFormula = textBinsFormula
+          textBinsFormula = textBinsFormula,
+          featureDistributionType
         )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
       allFeatureInfo.map(_.correlationInfo).getOrElse {
@@ -286,14 +290,14 @@ class RawFeatureFilter[T]
     val trainData = trainingReader.generateDataFrame(rawFeatures, parameters).persist()
     log.info("Loaded training data")
     require(trainData.count() > 0, "RawFeatureFilter cannot work with empty training data")
-    val trainingSummary = computeFeatureStats(trainData, rawFeatures)
+    val trainingSummary = computeFeatureStats(trainData, rawFeatures, FeatureDistributionType.Training)
     log.info("Computed summary stats for training features")
     if (log.isDebugEnabled) {
       log.debug(trainingSummary.responseDistributions.mkString("\n"))
       log.debug(trainingSummary.predictorDistributions.mkString("\n"))
     }
 
-    val scoreData = scoreReader.flatMap{ s =>
+    val scoreData = scoringReader.flatMap { s =>
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
       log.info("Loaded scoring data")
       if (sd.count() > 0) Some(sd)
@@ -303,8 +307,8 @@ class RawFeatureFilter[T]
       }
     }
 
-    val scoringSummary = scoreData.map{ sd =>
-      val ss = computeFeatureStats(sd, rawFeatures, Some(trainingSummary))
+    val scoringSummary = scoreData.map { sd =>
+      val ss = computeFeatureStats(sd, rawFeatures, FeatureDistributionType.Scoring, Some(trainingSummary))
       log.info("Computed summary stats for scoring features")
       if (log.isDebugEnabled) {
         log.debug(ss.responseDistributions.mkString("\n"))
@@ -321,13 +325,11 @@ class RawFeatureFilter[T]
     val featuresToKeepNames = Array(DataFrameFieldNames.KeyFieldName) ++ featuresToKeep.map(_.name)
 
     val featuresDropped = trainData.drop(featuresToDropNames: _*)
-    val mapsCleaned = featuresDropped.rdd.map{ row =>
-      val kept = featuresToKeepNames.map{ fn =>
-        if (mapKeysToDrop.contains(fn)) {
-          val map = row.getMapAny(fn)
-          if (map != null) map.filterNot{ case (k, _) => mapKeysToDrop(fn).contains(k) } else map
-        } else {
-          row.getAny(fn)
+    val mapsCleaned = featuresDropped.rdd.map { row =>
+      val kept = featuresToKeepNames.map { fn =>
+        mapKeysToDrop.get(fn) match {
+          case Some(keysToDrop) => Option(row.getMapAny(fn)).map(_.filterKeys(k => !keysToDrop.contains(k))).orNull
+          case None => row.getAny(fn)
         }
       }
       Row.fromSeq(kept)
@@ -338,8 +340,14 @@ class RawFeatureFilter[T]
     trainData.unpersist()
     scoreData.map(_.unpersist())
 
-    FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop,
-      trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions)
+    val featureDistributions =
+      trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions ++
+      scoringSummary.map(s => s.responseDistributions ++ s.predictorDistributions).getOrElse(Array.empty)
+
+    FilteredRawData(
+      cleanedData = cleanedData, featuresToDrop = featuresToDrop,
+      mapKeysToDrop = mapKeysToDrop, featureDistributions = featureDistributions
+    )
   }
 }
 
