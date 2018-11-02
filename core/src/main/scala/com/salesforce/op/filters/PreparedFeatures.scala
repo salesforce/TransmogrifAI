@@ -40,14 +40,15 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 import org.apache.spark.sql.Row
 
 /**
- * Class representing processed reponses and predictors keyed by their respective feature key
+ * Class representing processed responses and predictors keyed by their respective feature key
  *
  * @param responses prepared responses
  * @param predictors prepared predictors
  */
 private[filters] case class PreparedFeatures(
     responses: Map[FeatureKey, ProcessedSeq],
-    predictors: Map[FeatureKey, ProcessedSeq]) {
+    predictors: Map[FeatureKey, ProcessedSeq]
+) {
 
   /**
    * Computes summaries keyed by feature keys for this observation.

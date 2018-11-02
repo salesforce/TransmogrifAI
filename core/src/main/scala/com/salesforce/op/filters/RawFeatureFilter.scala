@@ -33,7 +33,6 @@ package com.salesforce.op.filters
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{OPFeature, TransientFeature}
-import com.salesforce.op.filters.FeatureDistribution._
 import com.salesforce.op.filters.Summary._
 import com.salesforce.op.readers.{DataFrameFieldNames, Reader}
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -130,7 +129,8 @@ class RawFeatureFilter[T]
   private[op] def computeFeatureStats(
     data: DataFrame,
     features: Array[OPFeature],
-    allFeatureInfo: Option[AllFeatureInformation] = None): AllFeatureInformation = {
+    allFeatureInfo: Option[AllFeatureInformation] = None
+  ): AllFeatureInformation = {
     val (responses, predictors): (Array[TransientFeature], Array[TransientFeature]) = {
       val (allResponses, allPredictors) = features.partition(_.isResponse)
       val respOut = allResponses.map(TransientFeature(_)).flatMap {
@@ -182,7 +182,8 @@ class RawFeatureFilter[T]
       responseDistributions = responseDistributions,
       predictorSummaries = predictorSummaries,
       predictorDistributions = predictorDistributions,
-      correlationInfo = correlationInfo)
+      correlationInfo = correlationInfo
+    )
   }
 
   /**

@@ -40,7 +40,7 @@ import org.scalatest.junit.JUnitRunner
 import scala.util.{Failure, Success}
 
 
-// scalastyle:off
+// scalastyle:off indentation
 @RunWith(classOf[JUnitRunner])
 class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
 
@@ -85,30 +85,6 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         numericMap.name shouldBe "numericMap"
         booleanMap.name shouldBe "booleanMap"
         survived.name shouldBe "survived"
-
-        /* The features below are the outputs of estimators or transformers which will not actually be fit until fit method
-       * is called somewhere in the pipeline
-       */
-        // simple interaction transformation syntax
-        // Full transformer would look like:
-        // val density = DivideTransformer.setNumerator(weight).setDenominator(height).getOutput
-        //  val density = weight / height
-        //
-        //  // Full transformer would look like:
-        //  // pivotedGender = PivotEstimator.setPivotSize(2).setInputCol(gender) // gender.pivot()
-        //  val pivotedGender = new PivotEstimator.setPivotSize(2).setInputCol(gender)
-        //
-        //  val boardedDaysAgo = new DaysAgoTransformer.setInputCol(boarded)
-        //
-        //  // have all normalizations be part of one transformer
-        //  val normedAge = new NormEstimator.setNormType(NormTypes.range).setInputCol(age)
-        //
-        //  // allow pivots into bins by correlation with label
-        //  val stringMapPivot = new PivotEstimator.setPivotSize(3).setCorrelatedWith(survived).setInputCol(stringMap)
-        //
-        //  val descriptionHash = new HashTransformer.setNumberHashes(5).setInputCol(description)
-        //
-        //  val survivedNumeric = new NumericTransformer.setInputCol(survived)
       }
       "can be changed" in {
         val foo = (age + height).alias
@@ -200,19 +176,19 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
           val summaryInfo: Array[Double] = Array(0.5)
           val name: String = age.name
           val key: Option[String] = None
+          val `type` = FeatureDistributionType.Training
         }
+        age.distributions shouldBe Nil
         val newAge = age.withDistributions(Seq(distrib))
         newAge.name shouldEqual age.name
         newAge.isResponse shouldEqual age.isResponse
         newAge.originStage shouldEqual age.originStage
         newAge.parents shouldEqual age.parents
         newAge.uid shouldEqual age.uid
-        newAge.distributions.length shouldEqual 1
-        newAge.distributions.head shouldEqual distrib
+        newAge.distributions shouldBe Seq(distrib)
       }
     }
     // TODO: test other feature methods
-
   }
 
 }

@@ -161,11 +161,16 @@ trait FeatureLike[O <: FeatureType] {
   final override def hashCode: Int = uid.hashCode
 
   final override def toString: String = {
-    val oid = Option(originStage).map(_.uid).orNull
-    val pids = parents.map(_.uid).mkString("[", ",", "]")
-    s"${this.getClass.getSimpleName}(" +
-      s"name = $name, uid = $uid, isResponse = $isResponse, originStage = $oid, parents = $pids," +
-      s" distributions = ${distributions})"
+    val valStr = Seq(
+      "name" -> name,
+      "uid" -> uid,
+      "isResponse" -> name,
+      "originStage" -> Option(originStage).map(_.uid).orNull,
+      "parents" -> parents.map(_.uid).mkString("[", ",", "]"),
+      "distributions" -> distributions.map(_.toString).mkString("[", ",", "]")
+    ).map { case (n, v) => s"$n = $v" }.mkString(", ")
+
+    s"${getClass.getSimpleName}($valStr)"
   }
 
   /**
