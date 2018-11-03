@@ -32,10 +32,9 @@ package com.salesforce.op
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
-import com.salesforce.op.stages.{OpPipelineStageReader, _}
-import OpPipelineStageReadWriteShared._
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.utils.json.JsonUtils
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.{OpPipelineStageReader, _}
 import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
@@ -158,7 +157,7 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
   private def resolveRawFeatureDistributions(json: JValue): Try[Array[FeatureDistribution]] = {
     if ((json \ RawFeatureDistributions.entryName) != JNothing) { // for backwards compatibility
       val distString = (json \ RawFeatureDistributions.entryName).extract[String]
-      JsonUtils.fromString[Array[FeatureDistribution]](distString)
+      FeatureDistribution.fromJson(distString)
     } else {
       Success(Array.empty[FeatureDistribution])
     }
