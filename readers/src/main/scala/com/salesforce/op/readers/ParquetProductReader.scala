@@ -28,33 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.aggregators
+package com.salesforce.op.readers
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.utils.spark.RichVector._
-import com.twitter.algebird._
-import org.apache.spark.ml.linalg.{Vector, Vectors}
+import com.salesforce.op.OpParams
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql._
 
-import scala.reflect.runtime.universe._
-
-/**
- * Aggregator that gives the union of Vector data
- */
-case object CombineVector
-  extends MonoidAggregator[Event[OPVector], Vector, OPVector]
-    with AggregatorDefaults[OPVector] {
-  implicit val ttag = weakTypeTag[OPVector]
-  val ftFactory = FeatureTypeFactory[OPVector]()
-  val monoid: Monoid[Vector] = Monoid.from(Vectors.zeros(0))(_ combine _)
-}
+import scala.reflect.runtime.universe.WeakTypeTag
 
 /**
- * Aggregator that gives the sum of Vector data
+ * ParquetReader for any type that defines an [[Encoder]].
+ * Scala case classes and tuples/products included automatically.
+ *
+ * @param readPath default path to data
+ * @param key      function for extracting key from record
+ * @tparam T
  */
-case object SumVector
-  extends MonoidAggregator[Event[OPVector], Vector, OPVector]
-    with AggregatorDefaults[OPVector] {
-  implicit val ttag = weakTypeTag[OPVector]
-  val ftFactory = FeatureTypeFactory[OPVector]()
-  val monoid: Monoid[Vector] = Monoid.from(Vectors.zeros(0))(_ + _)
+class ParquetProductReader[T <: Product : Encoder]
+(
+  val readPath: Option[String],
+  val key: T => String
+)(implicit val wtt: WeakTypeTag[T]) extends DataReader[T] {
+
+  override def read(params: OpParams = new OpParams())(implicit sc: SparkSession): Either[RDD[T], Dataset[T]] = Right {
+    val finalPath = getFinalReadPath(params)
+    val data: Dataset[T] = sc.read.parquet(finalPath).as[T]
+    maybeRepartition(data, params)
+  }
 }
