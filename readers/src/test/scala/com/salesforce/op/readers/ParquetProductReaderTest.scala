@@ -42,15 +42,15 @@ import org.scalatest.junit.JUnitRunner
 case class PassengerType
 (
   PassengerId: Int,
-  Survived: Option[Int],
+  Survived: Int,
   Pclass: Option[Int],
   Name: Option[String],
-  Sex: Option[String],
+  Sex: String,
   Age: Option[Double],
   SibSp: Option[Int],
   Parch: Option[Int],
-  Ticket: Option[String],
-  Fare: Option[Double],
+  Ticket: String,
+  Fare: Double,
   Cabin: Option[String],
   Embarked: Option[String]
 )
@@ -80,7 +80,20 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestC
     )
 
     val records = caseReader.readDataset().collect()
-    records.collect { case r if r.PassengerId == 1 => r.Ticket } shouldBe Array(Some("A/5 21171"))
+    records.collect { case r if r.PassengerId == 1 => r.Ticket } shouldBe Array("A/5 21171")
+  }
+
+  it should "map the columns of data to types defined in schema" in {
+    val caseReader = DataReaders.Simple.parquetCase[PassengerType](
+      path = Some(parquetFilePath),
+      key = _.PassengerId.toString
+    )
+
+    val records = caseReader.readDataset().collect()
+    records(0).Survived shouldBe a[java.lang.Integer]
+    records(0).Fare shouldBe a[java.lang.Double]
+    records(0).Ticket shouldBe a[java.lang.String]
+    records.collect { case r if r.PassengerId == 1 => r.Age } shouldBe Array(Some(22.0))
   }
 
   it should "generate a dataframe" in {
