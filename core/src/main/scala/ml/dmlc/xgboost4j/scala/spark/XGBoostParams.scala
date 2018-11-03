@@ -86,17 +86,19 @@ case object OpXGBoost {
     /**
      * Converts feature score map into a vector
      *
-     * @param featureVectorSize
-     * @return
+     * @param featureVectorSize   size of feature vectors the xgboost model is trained on
+     * @return vector containing feature scores
      */
-    def getFeatureScoreVector(featureVectorSize: Option[Int]): Vector = {
+    def getFeatureScoreVector(featureVectorSize: Option[Int] = None): Vector = {
       val featureScore = booster.getFeatureScore()
-      require(featureScore.nonEmpty, "FeatureScore map is empty")
+      require(featureScore.nonEmpty, "Feature score map is empty")
       val indexScore = featureScore.map { case (fid, score) =>
         val index = fid.tail.toInt
         index -> score.toDouble
       }.toSeq
-      val size = featureVectorSize.getOrElse(indexScore.map(_._1).max)
+      val maxIndex = indexScore.map(_._1).max
+      require(featureVectorSize.forall(_ > maxIndex), "Feature vector size must be larger than max feature index")
+      val size = featureVectorSize.getOrElse(maxIndex + 1)
       Vectors.sparse(size, indexScore)
     }
   }

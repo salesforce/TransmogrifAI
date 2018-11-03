@@ -100,7 +100,7 @@ case class ModelInsights
   def prettyPrint(topK: Int = 15): String = {
     val res = new ArrayBuffer[String]()
     res ++= prettyValidationResults
-    res += prettySelectedModelInfo
+    res ++= prettySelectedModelInfo
     res += modelEvaluationMetrics
     res ++= topKCorrelations(topK)
     res ++= topKContributions(topK)
@@ -152,7 +152,7 @@ case class ModelInsights
     Seq(evalSummary, modelEvalRes.mkString("\n"))
   }
 
-  private def prettySelectedModelInfo: String = {
+  private def prettySelectedModelInfo: Seq[String] = {
     val excludedParams = Set(
       SparkWrapperParams.SparkStageParamName,
       ModelSelectorNames.outputParamName, ModelSelectorNames.inputParam1Name,
@@ -173,8 +173,8 @@ case class ModelInsights
     }).flatten.sortBy(_._1)
     if (validationResults.nonEmpty) {
       val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
-      table.prettyString()
-    } else "No validation results found"
+      Seq(table.prettyString())
+    } else Seq.empty
   }
 
   private def modelEvaluationMetrics: String = {
@@ -532,7 +532,7 @@ case object ModelInsights {
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
-        val contributions = getModelContributions(model, Option(v.getColumnHistory().length))
+        val contributions = getModelContributions(model, Option(v.columns.length))
         val droppedSet = s.dropped.toSet
         val indexInToIndexKept = v.columns
           .collect { case c if !droppedSet.contains(c.makeColName()) => c.index }
@@ -577,10 +577,10 @@ case object ModelInsights {
               variance = getIfExists(h.index, s.featuresStatistics.variance)
             )
         }
-      case (Some(v), None) => v.getColumnHistory().map { h =>
-        val contributions = getModelContributions(model, Option(v.getColumnHistory().length))
-        h.parentFeatureOrigins ->
-          Insights(
+      case (Some(v), None) =>
+        val contributions = getModelContributions(model, Option(v.columns.length))
+        v.getColumnHistory().map { h =>
+          h.parentFeatureOrigins -> Insights(
             derivedFeatureName = h.columnName,
             stagesApplied = h.parentFeatureStages,
             derivedFeatureGroup = h.grouping,
@@ -674,8 +674,8 @@ case object ModelInsights {
         case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
           p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
         case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
-          p.param.name != OpPipelineStageParamsNames.InputSchema =>
-          p.param.name -> Option(p.value).map(_.toString).getOrElse("null")
+          p.param.name != OpPipelineStageParamsNames.InputSchema && Option(p.value).nonEmpty =>
+          p.param.name -> p.value.toString
       }.toMap
     }
     stages.map { s =>
