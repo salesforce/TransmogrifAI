@@ -188,8 +188,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
 
   it should "have toString" in {
     FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty).toString() shouldBe
-      "FeatureDistribution(name = A, key = None, count = 10, nulls = 1, " +
-        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [], type = Training)"
+      "FeatureDistribution(type = Training, name = A, key = None, count = 10, nulls = 1, " +
+        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [])"
   }
 
   it should "marshall to/from json" in {
@@ -222,9 +222,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     intercept[IllegalArgumentException](fd1.reduce(fd1.copy(name = "boo"))) should have message
       "requirement failed: Name must match to compare or combine feature distributions: A != boo"
 
-    intercept[IllegalArgumentException](
-      fd1.relativeFillRatio(fd1.copy(key = Some("zz")))) should have message
-      "requirement failed: Key must match to compare or combine feature distributions: A != zz"
+    intercept[IllegalArgumentException](fd1.relativeFillRatio(fd1.copy(key = Some("zz")))) should have message
+      "requirement failed: Key must match to compare or combine feature distributions: None != Some(zz)"
 
     intercept[IllegalArgumentException](fd1.relativeFillRate(fd1.copy(key = Some("k")))) should have message
       "requirement failed: Key must match to compare or combine feature distributions: None != Some(k)"
