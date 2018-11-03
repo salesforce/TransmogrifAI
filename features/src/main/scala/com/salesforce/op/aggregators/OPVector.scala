@@ -31,8 +31,8 @@
 package com.salesforce.op.aggregators
 
 import com.salesforce.op.features.types._
-import com.twitter.algebird._
 import com.salesforce.op.utils.spark.RichVector._
+import com.twitter.algebird._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 import scala.reflect.runtime.universe._
@@ -49,8 +49,8 @@ case object CombineVector
 }
 
 /**
-* Aggregator that gives the sum of Vector data
-*/
+ * Aggregator that gives the sum of Vector data
+ */
 case object SumVector
   extends MonoidAggregator[Event[OPVector], Vector, OPVector]
     with AggregatorDefaults[OPVector] {

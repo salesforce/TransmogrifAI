@@ -104,7 +104,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
       val dense = sparse.toDense
       val expected = dense.values.zip(dense.values).map { case (v1, v2) => v1 * v2 }.sum
       for {res <- Seq(sparse dot sparse, dense dot sparse, sparse dot dense, dense dot dense)} {
-        res shouldBe expected +- 1e-4
+        res shouldBe expected +- 1e-3
       }
     }
   }

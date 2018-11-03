@@ -37,13 +37,13 @@ import org.apache.spark.sql._
 import scala.reflect.runtime.universe.WeakTypeTag
 
 /**
-  * ParquetReader for any type that defines an [[Encoder]].
-  * Scala case classes and tuples/products included automatically.
-  *
-  * @param readPath default path to data
-  * @param key      function for extracting key from record
-  * @tparam T
-  */
+ * ParquetReader for any type that defines an [[Encoder]].
+ * Scala case classes and tuples/products included automatically.
+ *
+ * @param readPath default path to data
+ * @param key      function for extracting key from record
+ * @tparam T
+ */
 class ParquetProductReader[T <: Product : Encoder]
 (
   val readPath: Option[String],
