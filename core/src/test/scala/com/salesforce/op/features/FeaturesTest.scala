@@ -40,7 +40,7 @@ import org.scalatest.junit.JUnitRunner
 import scala.util.{Failure, Success}
 
 
-// scalastyle:off
+// scalastyle:off indentation
 @RunWith(classOf[JUnitRunner])
 class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
 
@@ -85,30 +85,6 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
         numericMap.name shouldBe "numericMap"
         booleanMap.name shouldBe "booleanMap"
         survived.name shouldBe "survived"
-
-        /* The features below are the outputs of estimators or transformers which will not actually be fit until fit method
-       * is called somewhere in the pipeline
-       */
-        // simple interaction transformation syntax
-        // Full transformer would look like:
-        // val density = DivideTransformer.setNumerator(weight).setDenominator(height).getOutput
-        //  val density = weight / height
-        //
-        //  // Full transformer would look like:
-        //  // pivotedGender = PivotEstimator.setPivotSize(2).setInputCol(gender) // gender.pivot()
-        //  val pivotedGender = new PivotEstimator.setPivotSize(2).setInputCol(gender)
-        //
-        //  val boardedDaysAgo = new DaysAgoTransformer.setInputCol(boarded)
-        //
-        //  // have all normalizations be part of one transformer
-        //  val normedAge = new NormEstimator.setNormType(NormTypes.range).setInputCol(age)
-        //
-        //  // allow pivots into bins by correlation with label
-        //  val stringMapPivot = new PivotEstimator.setPivotSize(3).setCorrelatedWith(survived).setInputCol(stringMap)
-        //
-        //  val descriptionHash = new HashTransformer.setNumberHashes(5).setInputCol(description)
-        //
-        //  val survivedNumeric = new NumericTransformer.setInputCol(survived)
       }
       "can be changed" in {
         val foo = (age + height).alias
@@ -175,7 +151,17 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
             stages.get(div.originStage) shouldBe Some(0)
         }
       }
-
+    }
+    "toString" should {
+      "produce a nice string" in {
+        val f = (height / 2) * weight + 1
+        f.toString shouldBe
+          s"Feature(name = ${f.name}, uid = ${f.uid}, " +
+            s"isResponse = ${f.isResponse}, " +
+            s"originStage = ${f.originStage.uid}, " +
+            s"parents = ${f.parents.map(_.uid).mkString("[", ",", "]")}, " +
+            s"distributions = ${f.distributions.map(_.toString).mkString("[", ",", "]")})"
+      }
     }
     "pretty parent stages" should {
       "print a single stage tree" in {
@@ -193,26 +179,36 @@ class FeaturesTest extends WordSpec with PassengerFeaturesTest with TestCommon {
     }
     "with distributions" should {
       "make a copy of the feature containing the specified distributions" in {
-        val distrib = new FeatureDistributionLike {
+        val distrib1 = new FeatureDistributionLike {
           val count: Long = 1L
           val nulls: Long = 1L
           val distribution: Array[Double] = Array(0.5)
           val summaryInfo: Array[Double] = Array(0.5)
           val name: String = age.name
           val key: Option[String] = None
+          val `type` = FeatureDistributionType.Training
         }
-        val newAge = age.withDistributions(Seq(distrib))
+        val distrib2 = new FeatureDistributionLike {
+          val count: Long = 1L
+          val nulls: Long = 1L
+          val distribution: Array[Double] = Array(0.5)
+          val summaryInfo: Array[Double] = Array(0.5)
+          val name: String = age.name
+          val key: Option[String] = None
+          val `type` = FeatureDistributionType.Scoring
+        }
+        age.distributions shouldBe Nil
+        val newAge = age.withDistributions(Seq(distrib1, distrib2))
         newAge.name shouldEqual age.name
         newAge.isResponse shouldEqual age.isResponse
         newAge.originStage shouldEqual age.originStage
         newAge.parents shouldEqual age.parents
         newAge.uid shouldEqual age.uid
-        newAge.distributions.length shouldEqual 1
-        newAge.distributions.head shouldEqual distrib
+        newAge.distributions shouldBe Seq(distrib1, distrib2)
+        newAge.trainingDistributions shouldBe Seq(distrib1)
+        newAge.scoringDistributions shouldBe Seq(distrib2)
       }
     }
-    // TODO: test other feature methods
-
   }
 
 }

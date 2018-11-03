@@ -31,8 +31,8 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.FeatureJsonHelper
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageWriter}
-import com.salesforce.op.utils.json.JsonUtils
 import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.util.MLWriter
@@ -81,8 +81,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.parameters.toJson(pretty = false)) ~
       (FN.TrainParameters.entryName -> model.trainingParams.toJson(pretty = false)) ~
-      (FN.RawFeatureDistributions.entryName -> JsonUtils.toJsonString(model.getRawFeatureDistributions(),
-        pretty = false))
+      (FN.RawFeatureDistributions.entryName -> FeatureDistribution.toJson(model.getRawFeatureDistributions()))
   }
 
   private def resultFeaturesJArray(): JArray =

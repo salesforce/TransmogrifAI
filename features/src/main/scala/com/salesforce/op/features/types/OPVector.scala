@@ -41,6 +41,11 @@ import org.apache.spark.ml.linalg._
 class OPVector(val value: Vector) extends OPCollection {
   type Value = Vector
 
+  /**
+   * Is vector empty
+   *
+   * @return true if empty, false otherwise
+   */
   final def isEmpty: Boolean = value.size == 0
 
   /**

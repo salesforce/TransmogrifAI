@@ -30,9 +30,8 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.features.Feature
-import com.salesforce.op._
-import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureDistributionType}
 import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.preparators._
@@ -40,8 +39,7 @@ import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionM
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter, SplitterSummary}
+import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -520,11 +518,19 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
-    /*
-    Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-    explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-    weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-    it's not explicitly blacklisted itself.
+    val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
+    trainingDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
+
+    val scoringDistributions = modelWithRFF.getRawScoringFeatureDistributions()
+    scoringDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
+
+    trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
+
+    /**
+     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blacklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
     insights.features.foreach(f =>
