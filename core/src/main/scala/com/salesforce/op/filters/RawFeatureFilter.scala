@@ -223,7 +223,7 @@ class RawFeatureFilter[T]
       maxFillRatioDiff = maxFillRatioDiff,
       maxJSDivergence = maxJSDivergence,
       jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures,
-      jsDivergenceF = FeatureDistribution.massJSDivergence)
+      jsDivergenceF = FeatureDistribution.densityJSDivergence)
 
     val toDrop: Map[FeatureKey, (String, List[String])] = (allNumericReasons ++ allTextReasons).filter {
       case ((name, _), (featureDescription, reasons)) =>
