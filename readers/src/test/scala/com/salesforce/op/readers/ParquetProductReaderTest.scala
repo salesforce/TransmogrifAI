@@ -30,16 +30,12 @@
 
 package com.salesforce.op.readers
 
-import com.salesforce.op.aggregators.CutOffTime
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestCommon, TestSparkContext}
-import org.apache.spark.sql.Row
-import org.joda.time.Duration
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import scala.reflect.runtime.universe._
 
 // Need this case class to be external to (not nested in) ParquetProductReaderTest for spark sql to work correctly.
 // Fields in the case class are case-sensitive and should exactly match the parquet column names.
@@ -62,8 +58,6 @@ case class PassengerType
 @RunWith(classOf[JUnitRunner])
 class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestCommon {
   def passengerFilePath: String = s"$testDataDir/PassengerDataAll.parquet"
-
-  def bigPassengerFilePath: String = s"$testDataDir/BigPassengerWithHeader.parquet"
 
   val parquetRecordCount = 891
 
@@ -119,52 +113,5 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestC
 
     data.collect { case r if r.get(0) == "3" => r.get(1) } shouldBe Array(Array("Heikkinen,", "Miss.", "Laina"))
     data.length shouldBe parquetRecordCount
-  }
-
-
-  Spec[AggregateParquetProductReader[_]] should "read and aggregate data correctly" in {
-    val dataReader = DataReaders.Aggregate.parquetCase[PassengerCaseClass](
-      path = Some(bigPassengerFilePath),
-      key = _.passengerId.toString,
-      aggregateParams = AggregateParams(
-        timeStampFn = Some[PassengerCaseClass => Long](_.recordDate.getOrElse(0L)),
-        cutOffTime = CutOffTime.UnixEpoch(1471046600)
-      )
-    )
-
-    val data = dataReader.readDataset().collect()
-    data.foreach(_ shouldBe a[PassengerCaseClass])
-    data.length shouldBe 8
-
-    val aggregatedData = dataReader.generateDataFrame(rawFeatures = Array(age, survived)).collect()
-    aggregatedData.length shouldBe 6
-    aggregatedData.collect { case r if r.get(0) == "4" => r} shouldEqual Array(Row("4", 60, false))
-
-    dataReader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
-  }
-
-  Spec[ConditionalParquetProductReader[_]] should "read and conditionally aggregate data correctly" in {
-    val dataReader = DataReaders.Conditional.parquetCase[PassengerCaseClass](
-      path = Some(bigPassengerFilePath),
-      key = _.passengerId.toString,
-      conditionalParams = ConditionalParams(
-        timeStampFn = _.recordDate.getOrElse(0L),
-        targetCondition = _.height.contains(186), // Function to figure out if target event has occurred
-        responseWindow = Some(Duration.millis(800)), // How many days after target event to aggregate for response
-        predictorWindow = None, // How many days before target event to include in predictor aggregation
-        timeStampToKeep = TimeStampToKeep.Min,
-        dropIfTargetConditionNotMet = true
-      )
-    )
-
-    val data = dataReader.readDataset().collect()
-    data.foreach(_ shouldBe a[PassengerCaseClass])
-    data.length shouldBe 8
-
-    val aggregatedData = dataReader.generateDataFrame(rawFeatures = Array(age, survived)).collect()
-    aggregatedData.length shouldBe 2
-    aggregatedData shouldEqual Array(Row("3", null, true), Row("4", 10, false))
-
-    dataReader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
   }
 }
