@@ -135,7 +135,7 @@ object DataReaders {
       headers: Seq[String] = Seq.empty,
       key: T => String = randomKey _,
       aggregateParams: AggregateParams[T]
-    ): CSVAutoReader[T] = new AggregateCSVAutoReader[T](
+    ): AggregateCSVAutoReader[T] = new AggregateCSVAutoReader[T](
       readPath = path, key = key, headers = headers, aggregateParams = aggregateParams
     )
 
@@ -188,7 +188,7 @@ object DataReaders {
       path: Option[String] = None,
       key: T => String = randomKey _,
       aggregateParams: AggregateParams[T]
-   ): AggregateParquetProductReader[T] = parquetProduct(path, key, aggregateParams)
+    ): AggregateParquetProductReader[T] = parquetProduct(path, key, aggregateParams)
 
   }
 
@@ -271,7 +271,7 @@ object DataReaders {
       path: Option[String] = None,
       key: T => String = randomKey _,
       conditionalParams: ConditionalParams[T]
-   ): ConditionalParquetProductReader[T] = parquetProduct(path, key, conditionalParams)
+    ): ConditionalParquetProductReader[T] = parquetProduct(path, key, conditionalParams)
 
   }
 

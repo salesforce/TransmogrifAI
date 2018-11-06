@@ -58,31 +58,33 @@ class ParquetProductReader[T <: Product : Encoder]
 }
 
 /**
-  * Data Reader for Parquet events, where there may be multiple records for a given key. Each parquet record
-  * will be automatically converted to type T that defines an [[Encoder]].
-  * @param readPath default path to data
-  * @param key      function for extracting key from record
-  * @param aggregateParams params for time-based aggregation
-  * @tparam T
-  */
+ * Data Reader for Parquet events, where there may be multiple records for a given key. Each parquet record
+ * will be automatically converted to type T that defines an [[Encoder]].
+ *
+ * @param readPath        default path to data
+ * @param key             function for extracting key from record
+ * @param aggregateParams params for time-based aggregation
+ * @tparam T
+ */
 class AggregateParquetProductReader[T <: Product : Encoder : WeakTypeTag]
 (
   readPath: Option[String],
   key: T => String,
   val aggregateParams: AggregateParams[T]
-)extends ParquetProductReader[T](readPath, key) with AggregateDataReader[T]
+) extends ParquetProductReader[T](readPath, key) with AggregateDataReader[T]
 
 /**
-  * Data Reader for Parquet events, when computing conditional probabilities. There may be multiple records for
-  * a given key. Each parquet record will be automatically converted to type T that defines an [[Encoder]].
-  * @param readPath default path to data
-  * @param key      function for extracting key from record
-  * @param conditionalParams params for conditional aggregation
-  * @tparam T
-  */
+ * Data Reader for Parquet events, when computing conditional probabilities. There may be multiple records for
+ * a given key. Each parquet record will be automatically converted to type T that defines an [[Encoder]].
+ *
+ * @param readPath          default path to data
+ * @param key               function for extracting key from record
+ * @param conditionalParams params for conditional aggregation
+ * @tparam T
+ */
 class ConditionalParquetProductReader[T <: Product : Encoder : WeakTypeTag]
 (
   readPath: Option[String],
   key: T => String,
   val conditionalParams: ConditionalParams[T]
-)extends ParquetProductReader[T](readPath, key) with ConditionalDataReader[T]
+) extends ParquetProductReader[T](readPath, key) with ConditionalDataReader[T]
