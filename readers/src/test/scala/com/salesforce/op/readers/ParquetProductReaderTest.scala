@@ -57,13 +57,13 @@ case class PassengerType
 
 @RunWith(classOf[JUnitRunner])
 class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestCommon {
-  def parquetFilePath: String = s"$testDataDir/PassengerDataAll.parquet"
+  def passengerFilePath: String = s"$testDataDir/PassengerDataAll.parquet"
 
   val parquetRecordCount = 891
 
   import spark.implicits._
   val dataReader = new ParquetProductReader[PassengerType](
-    readPath = Some(parquetFilePath),
+    readPath = Some(passengerFilePath),
     key = _.PassengerId.toString
   )
 
@@ -75,7 +75,7 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestC
 
   it should "read in byte arrays as valid strings" in {
     val caseReader = DataReaders.Simple.parquetCase[PassengerType](
-      path = Some(parquetFilePath),
+      path = Some(passengerFilePath),
       key = _.PassengerId.toString
     )
 
@@ -85,7 +85,7 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestC
 
   it should "map the columns of data to types defined in schema" in {
     val caseReader = DataReaders.Simple.parquetCase[PassengerType](
-      path = Some(parquetFilePath),
+      path = Some(passengerFilePath),
       key = _.PassengerId.toString
     )
 
