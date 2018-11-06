@@ -67,15 +67,6 @@ class ParquetProductReaderTest extends FlatSpec with TestSparkContext with TestC
     key = _.PassengerId.toString
   )
 
-  val age = FeatureBuilder.Integral[PassengerCaseClass]
-    .extract(_.age.toIntegral)
-    .asPredictor
-
-  val survived = FeatureBuilder.Binary[PassengerCaseClass]
-    .extract(_.survived.toBinary)
-    .aggregate(zero = Some(true), (l, r) => Some(l.getOrElse(false) && r.getOrElse(false)))
-    .asResponse
-
   Spec[ParquetProductReader[_]] should "read in data correctly" in {
     val data = dataReader.readDataset().collect()
     data.foreach(_ shouldBe a[PassengerType])
