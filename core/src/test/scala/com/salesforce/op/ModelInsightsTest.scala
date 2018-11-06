@@ -33,9 +33,9 @@ package com.salesforce.op
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
@@ -84,6 +84,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
+  val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
+  val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
+  val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
+  val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
+  lazy val xgbWorkflow =
+    new OpWorkflow().setResultFeatures(xgbClassifierPred, xgbRegressorPred).setReader(dataReader)
+  lazy val xgbWorkflowModel = xgbWorkflow.train()
 
   val pred = BinaryClassificationModelSelector
     .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
@@ -543,4 +550,49 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.features.foreach(f => f.distributions shouldBe empty)
   }
 
+  it should "return model insights for xgboost classification" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
+
+  it should "return model insights for xgboost regression" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
 }
