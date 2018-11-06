@@ -207,6 +207,7 @@ object RegressionModelsToTry extends Enum[RegressionModelsToTry] {
   case object OpRandomForestRegressor extends RegressionModelsToTry
   case object OpGBTRegressor extends RegressionModelsToTry
   case object OpGeneralizedLinearRegression extends RegressionModelsToTry
+  case object OpXGBoostRegressor extends RegressionModelsToTry
   case class Custom(private val modeType: Class[_ <: EstimatorType]) extends RegressionModelsToTry {
     override val entryName: String = modeType.getSimpleName
   }

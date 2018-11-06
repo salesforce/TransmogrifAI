@@ -99,12 +99,15 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
 
   it should "properly select models to try" in {
     val modelSelector = RegressionModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(RMT.OpLinearRegression, RMT.OpRandomForestRegressor))
+      .withCrossValidation(
+        modelTypesToUse = Seq(RMT.OpLinearRegression, RMT.OpRandomForestRegressor, RMT.OpXGBoostRegressor)
+      )
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpLinearRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpRandomForestRegressor.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpGBTRegressor.entryName) shouldBe false
+    modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpXGBoostRegressor.entryName) shouldBe true
   }
 
   it should "set the data splitting params correctly" in {

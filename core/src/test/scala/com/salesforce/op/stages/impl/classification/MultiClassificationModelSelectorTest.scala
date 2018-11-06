@@ -106,13 +106,14 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
     val modelSelector = MultiClassificationModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes))
+      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
       .setInput(label.asInstanceOf[Feature[RealNN]], features)
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpLogisticRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpRandomForestClassifier.entryName) shouldBe false
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpNaiveBayes.entryName) shouldBe true
+    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
   }
 
   it should "split into training and test" in {

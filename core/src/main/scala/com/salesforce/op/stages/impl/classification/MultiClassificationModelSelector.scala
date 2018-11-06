@@ -195,6 +195,7 @@ object MultiClassClassificationModelsToTry extends Enum[MultiClassClassification
   case object OpRandomForestClassifier extends MultiClassClassificationModelsToTry
   case object OpDecisionTreeClassifier extends MultiClassClassificationModelsToTry
   case object OpNaiveBayes extends MultiClassClassificationModelsToTry
+  case object OpXGBoostClassifier extends MultiClassClassificationModelsToTry
   case class Custom(private val modeType: Class[_ <: EstimatorType]) extends MultiClassClassificationModelsToTry {
     override val entryName: String = modeType.getSimpleName
   }

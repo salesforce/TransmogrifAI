@@ -101,13 +101,15 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
   Spec(BinaryClassificationModelSelector.getClass) should  "properly select models to try" in {
     val modelSelector = BinaryClassificationModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(BMT.OpLogisticRegression, BMT.OpRandomForestClassifier))
-      .setInput(label.asInstanceOf[Feature[RealNN]], features)
+      .withCrossValidation(
+        modelTypesToUse = Seq(BMT.OpLogisticRegression, BMT.OpRandomForestClassifier, BMT.OpXGBoostClassifier)
+      ).setInput(label.asInstanceOf[Feature[RealNN]], features)
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpLogisticRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpRandomForestClassifier.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpNaiveBayes.entryName) shouldBe false
+    modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpXGBoostClassifier.entryName) shouldBe true
   }
 
   it should "split into training and test even if the balancing is not desired" in {
