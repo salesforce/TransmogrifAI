@@ -42,7 +42,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -56,7 +56,8 @@ import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
-class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext
+  with CompareParamGrid with OpXGBoostQuietLogging {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
