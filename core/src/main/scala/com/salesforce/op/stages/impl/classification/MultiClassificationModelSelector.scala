@@ -85,7 +85,15 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
       .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
       .build()
 
-    Seq(lr -> lrParams, rf -> rfParams, nb -> nbParams, dt -> dtParams)
+    val xgb = new OpXGBoostClassifier()
+    val xgbParams = new ParamGridBuilder()
+      .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+      .addGrid(xgb.eta, DefaultSelectorParams.Eta)
+      .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+      .build()
+
+    Seq(lr -> lrParams, rf -> rfParams, nb -> nbParams, dt -> dtParams, xgb -> xgbParams)
   }
 
   /**
