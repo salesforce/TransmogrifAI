@@ -31,9 +31,10 @@
 package ml.dmlc.xgboost4j.scala.spark
 
 import ml.dmlc.xgboost4j.LabeledPoint
+import ml.dmlc.xgboost4j.scala.Booster
 import ml.dmlc.xgboost4j.scala.spark.params.GeneralParams
 import org.apache.log4j.{Level, Logger}
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -78,6 +79,27 @@ case object OpXGBoost {
     def asXGB: LabeledPoint = v match {
       case v: DenseVector => LabeledPoint(0.0f, null, v.values.map(_.toFloat))
       case v: SparseVector => LabeledPoint(0.0f, v.indices, v.values.map(_.toFloat))
+    }
+  }
+
+  implicit class RichBooster(val booster: Booster) extends AnyVal {
+    /**
+     * Converts feature score map into a vector
+     *
+     * @param featureVectorSize   size of feature vectors the xgboost model is trained on
+     * @return vector containing feature scores
+     */
+    def getFeatureScoreVector(featureVectorSize: Option[Int] = None): Vector = {
+      val featureScore = booster.getFeatureScore()
+      require(featureScore.nonEmpty, "Feature score map is empty")
+      val indexScore = featureScore.map { case (fid, score) =>
+        val index = fid.tail.toInt
+        index -> score.toDouble
+      }.toSeq
+      val maxIndex = indexScore.map(_._1).max
+      require(featureVectorSize.forall(_ > maxIndex), "Feature vector size must be larger than max feature index")
+      val size = featureVectorSize.getOrElse(maxIndex + 1)
+      Vectors.sparse(size, indexScore)
     }
   }
 
