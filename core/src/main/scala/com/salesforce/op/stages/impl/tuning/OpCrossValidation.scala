@@ -143,8 +143,6 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     splitter: Option[Splitter]
   ): Array[(RDD[Row], RDD[Row])] = {
 
-    // TODO: Implement our own kFold method for better performance in a separate PR
-
     // get param that stores the label column
     val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)
     evaluator.set(labelCol, label)

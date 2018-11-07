@@ -63,14 +63,14 @@ private[op] class OpBinScoreEvaluator
 
   def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
     val labelColumnName = getLabelCol
-    val dataProcessed = makeDataToUse(data, labelColumnName)
+    val dataToUse = makeDataToUse(data, labelColumnName)
+      .select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd
 
-    val rdd = dataProcessed.select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd
-    if (rdd.isEmpty()) {
-      log.error("The dataset is empty. Returning empty metrics")
+    if (dataToUse.isEmpty()) {
+      log.warn("The dataset is empty. Returning empty metrics.")
       BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
     } else {
-      val scoreAndLabels = rdd.map {
+      val scoreAndLabels = dataToUse.map {
         case Row(prob: Vector, label: Double) => (prob(1), label)
         case Row(prob: Double, label: Double) => (prob, label)
       }

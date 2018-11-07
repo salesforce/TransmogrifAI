@@ -32,7 +32,8 @@ package com.salesforce.op.evaluators
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
-import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
+import com.salesforce.op.utils.spark.RichEvaluator._
+import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, Evaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
@@ -64,12 +65,12 @@ private[op] class OpBinaryClassificationEvaluator
   def getDefaultMetric: BinaryClassificationMetrics => Double = _.AuROC
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationMetrics = {
-
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(data, labelColName)
 
     val (rawPredictionColName, predictionColName, probabilityColName) =
       (getRawPredictionCol, getPredictionValueCol, getProbabilityCol)
+
     log.debug(
       "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
       labelColName, rawPredictionColName, predictionColName, probabilityColName
@@ -79,9 +80,8 @@ private[op] class OpBinaryClassificationEvaluator
     val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
     if (rdd.isEmpty()) {
-      log.error("The dataset is empty")
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Seq(), Seq(), Seq(), Seq())
+      log.warn("The dataset is empty. Returning empty metrics.")
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Seq(), Seq(), Seq(), Seq())
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -122,24 +122,32 @@ private[op] class OpBinaryClassificationEvaluator
     }
   }
 
-  final protected def getBinaryEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getBinaryEvaluatorMetric(
+    metricName: ClassificationEvalMetric,
+    dataset: Dataset[_],
+    default: => Double
+  ): Double = {
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
     new BinaryClassificationEvaluator()
       .setLabelCol(labelColName)
       .setRawPredictionCol(getRawPredictionCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataUse)
+      .evaluateOrDefault(dataUse, default = default)
   }
 
-  final protected def getMultiEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getMultiEvaluatorMetric(
+    metricName: ClassificationEvalMetric,
+    dataset: Dataset[_],
+    default: => Double
+  ): Double = {
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
     new MulticlassClassificationEvaluator()
       .setLabelCol(labelColName)
       .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataUse)
+      .evaluateOrDefault(dataUse, default = default)
   }
 }
 
