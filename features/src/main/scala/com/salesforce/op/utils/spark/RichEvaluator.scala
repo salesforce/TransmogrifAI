@@ -60,7 +60,7 @@ case object RichEvaluator {
     def evaluateOrDefault(dataset: Dataset[_], default: => Double): Double = {
       if (dataset.isEmpty) {
         val defaultValue = default
-        log.warn("The dataset is empty. Returning default metric value: {}.", v)
+        log.warn("The dataset is empty. Returning default metric value: {}.", defaultValue)
         defaultValue
       }
       else evaluator.evaluate(dataset)
