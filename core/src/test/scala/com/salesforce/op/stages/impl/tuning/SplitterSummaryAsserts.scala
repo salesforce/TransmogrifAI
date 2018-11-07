@@ -39,7 +39,9 @@ import org.scalatest.{Assertion, Matchers}
 trait SplitterSummaryAsserts {
   self: Matchers =>
 
-  def assertDataBalancerSummary: Option[SplitterSummary] => Assertion = {
+  def assertDataBalancerSummary(summary: Option[SplitterSummary])(
+    assert: DataBalancerSummary => Assertion
+  ): Assertion = summary match {
     case Some(s: DataBalancerSummary) =>
       val meta = s.toMetadata()
       meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataBalancerSummary].getName
@@ -48,50 +50,33 @@ trait SplitterSummaryAsserts {
       meta.getDouble(ModelSelectorNames.Desired) should be > 0.0
       meta.getDouble(ModelSelectorNames.UpSample) should be >= 0.0
       meta.getDouble(ModelSelectorNames.DownSample) should be > 0.0
+      assert(s)
     case x =>
       fail(s"Unexpected data balancer summary: $x")
   }
 
-  def assertDataBalancerSummary(summary: Option[SplitterSummary], expected: DataBalancerSummary): Assertion = {
-    assertDataBalancerSummary(summary)
-    summary match {
-      case Some(s: DataBalancerSummary) => s shouldBe expected
-      case x => fail(s"Unexpected data balancer summary: $x")
-    }
-  }
-
-  def assertDataCutterSummary: Option[SplitterSummary] => Assertion = {
+  def assertDataCutterSummary(summary: Option[SplitterSummary])(
+    assert: DataCutterSummary => Assertion
+  ): Assertion = summary match {
     case Some(s: DataCutterSummary) =>
       val meta = s.toMetadata()
+      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
       meta.getDoubleArray(ModelSelectorNames.LabelsKept).foreach(_ should be >= 0.0)
       meta.getDoubleArray(ModelSelectorNames.LabelsDropped).foreach(_ should be >= 0.0)
-      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
+      assert(s)
     case x =>
       fail(s"Unexpected data cutter summary: $x")
   }
 
-  def assertDataCutterSummary(summary: Option[SplitterSummary], expected: DataCutterSummary): Assertion = {
-    assertDataCutterSummary(summary)
-    summary match {
-      case Some(s: DataCutterSummary) => s shouldBe expected
-      case x => fail(s"Unexpected data cutter summary: $x")
-    }
-  }
-
-  def assertDataSplitterSummary: Option[SplitterSummary] => Assertion = {
+  def assertDataSplitterSummary(summary: Option[SplitterSummary])(
+    assert: DataSplitterSummary => Assertion
+  ): Assertion = summary match {
     case Some(s: DataSplitterSummary) =>
       val meta = s.toMetadata()
       meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataSplitterSummary].getName
+      assert(s)
     case x =>
       fail(s"Unexpected data splitter summary: $x")
-  }
-
-  def assertDataSplitterSummary(summary: Option[SplitterSummary], expected: DataSplitterSummary): Assertion = {
-    assertDataSplitterSummary(summary)
-    summary match {
-      case Some(s: DataSplitterSummary) => s shouldBe expected
-      case x => fail(s"Unexpected data splitter summary: $x")
-    }
   }
 
 }
