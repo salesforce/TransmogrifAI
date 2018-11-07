@@ -30,7 +30,6 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
 import org.apache.spark.sql.Dataset
@@ -61,6 +60,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
     val dataCutter = DataCutter(seed = seed).setMinLabelFraction(0.0).setMaxLabelCategories(100000)
     val split = dataCutter.prepare(randDF)
     split.train.count() shouldBe dataSize
+
     val keptMeta = split.summary.get.asInstanceOf[DataCutterSummary].labelsKept
     keptMeta.length shouldBe 1000
     keptMeta should contain theSameElementsAs dataCutter.getLabelsToKeep
@@ -78,11 +78,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext {
   }
 
   it should "throw an error when all the data is filtered out" in {
-    val dataCutter = DataCutter(seed = seed)
-      .setMinLabelFraction(0.4)
-    assertThrows[RuntimeException] {
-      dataCutter.prepare(randDF)
-    }
+    val dataCutter = DataCutter(seed = seed).setMinLabelFraction(0.4)
+    assertThrows[RuntimeException](dataCutter.prepare(randDF))
   }
 
   it should "filter out all but the top N label categories" in {

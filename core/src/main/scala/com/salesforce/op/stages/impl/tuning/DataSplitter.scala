@@ -68,7 +68,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData = ModelData(data, Option(DataSplitterSummary()))
+  def prepare(data: Dataset[Row]): ModelData = ModelData(data, Some(DataSplitterSummary()))
 
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)

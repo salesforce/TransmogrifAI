@@ -40,11 +40,11 @@ import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
-import org.scalatest.{Assertion, FlatSpec}
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class OpValidatorTest extends FlatSpec with TestSparkContext {
+class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummaryAsserts {
   // Random Data
   val count = 1000
   val sizeOfVector = 2
@@ -134,29 +134,5 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       math.abs(expected - actual) should be < 0.065
     }
   }
-
-  private def assertDataBalancerSummary: Option[SplitterSummary] => Assertion = {
-    case Some(s: DataBalancerSummary) =>
-      val meta = s.toMetadata()
-      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataBalancerSummary].getName
-      meta.getLong(ModelSelectorNames.Positive) should be > 0L
-      meta.getLong(ModelSelectorNames.Negative) should be > 0L
-      meta.getDouble(ModelSelectorNames.Desired) should be > 0.0
-      meta.getDouble(ModelSelectorNames.UpSample) should be >= 0.0
-      meta.getDouble(ModelSelectorNames.DownSample) should be > 0.0
-    case x =>
-      fail(s"Unexpected data balancer summary: $x")
-  }
-
-  private def assertDataCutterSummary: Option[SplitterSummary] => Assertion = {
-    case Some(s: DataCutterSummary) =>
-      val meta = s.toMetadata()
-      meta.getDoubleArray(ModelSelectorNames.LabelsKept).foreach(_ should be >= 0.0)
-      meta.getDoubleArray(ModelSelectorNames.LabelsDropped).foreach(_ should be >= 0.0)
-      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
-    case x =>
-      fail(s"Unexpected data cutter summary: $x")
-  }
-
 
 }

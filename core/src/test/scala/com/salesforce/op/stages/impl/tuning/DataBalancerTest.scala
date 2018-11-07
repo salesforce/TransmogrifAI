@@ -106,11 +106,10 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     balancer.getDownSampleFraction shouldBe downSample
     balancer.getIsPositiveSmall shouldBe false
 
-
     // Rerun balancer with set params
     val metadata = balancer.summary
     val ModelData(expected2, _) = balancer.prepare(data)
-    withClue("Data balancer should no update the metadata"){
+    withClue("Data balancer should not update the metadata"){
       balancer.summary shouldBe metadata
     }
     expected.collect() shouldBe expected2.collect()
@@ -135,9 +134,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
       balancer.summary shouldBe metadata
     }
     expected.collect() shouldBe expected2.collect()
-
   }
-
 
   it should "remember that data is already balanced, but needs to be sample because too big" in {
     val fraction = 0.01
