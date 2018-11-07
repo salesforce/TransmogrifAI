@@ -42,6 +42,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -56,7 +57,8 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext
+  with CompareParamGrid with OpXGBoostQuietLogging {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -106,13 +108,14 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
     val modelSelector = MultiClassificationModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes))
+      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
       .setInput(label.asInstanceOf[Feature[RealNN]], features)
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpLogisticRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpRandomForestClassifier.entryName) shouldBe false
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpNaiveBayes.entryName) shouldBe true
+    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
   }
 
   it should "split into training and test" in {

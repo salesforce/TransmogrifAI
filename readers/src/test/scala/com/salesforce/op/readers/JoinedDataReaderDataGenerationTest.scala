@@ -289,9 +289,9 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
         MultiPickList(Set("Male")), MultiPickList(Set("Male")))
 
     aggregatedData.collect(description) should contain theSameElementsAs
-      Array(Text.empty, Text.empty, Text.empty, Text(""),
-        Text("stuff this is a description stuff this is a description stuff this is a description"),
-        Text("this is a description"))
+      Array(Text("this is a description"), Text.empty, Text.empty, Text.empty,
+        Text("this is a description stuff this is a description stuff this is a description stuff"),
+        Text(""))
 
     aggregatedData.collect(stringMap) should contain theSameElementsAs
       Array(TextMap.empty, TextMap.empty, TextMap(Map("Female" -> "string")),
@@ -299,9 +299,9 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
         TextMap(Map("Male" -> "string string string string string string")))
 
     aggregatedData.collect(boarded) should contain theSameElementsAs
-      Array(DateList.empty, DateList.empty, DateList(Array(1471046100L)), DateList(Array(1471046400L)),
-        DateList(Array(1471046300L, 1471046400L, 1471046300L, 1471046400L, 1471046300L, 1471046400L)),
-        DateList(Array(1471046600L)))
+      Array(DateList(Array(1471046600L)), DateList(Array(1471046100L)), DateList.empty, DateList.empty,
+        DateList(Array(1471046400L, 1471046300L, 1471046400L, 1471046300L, 1471046400L, 1471046300L)),
+        DateList(Array(1471046400L)))
 
     // height has a special integration window so this features tests that things included in other
     // features are excluded here

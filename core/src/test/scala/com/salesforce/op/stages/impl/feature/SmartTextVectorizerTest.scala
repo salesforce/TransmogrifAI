@@ -91,7 +91,7 @@ class SmartTextVectorizerTest
     val textRes = transformed.collect(textVectorized)
     assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
-      val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
+      val combined = categoricalVector.combine(textVector, nullVector)
       smartVector -> combined
     }.unzip
 
@@ -139,7 +139,7 @@ class SmartTextVectorizerTest
     val textRes = transformed.collect(textVectorized)
     assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
-      val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
+      val combined = textVector.combine(nullVector)
       smartVector -> combined
     }.unzip
 

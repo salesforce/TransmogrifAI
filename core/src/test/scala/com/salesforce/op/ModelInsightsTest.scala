@@ -30,18 +30,16 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.features.Feature
-import com.salesforce.op._
-import com.salesforce.op.features.types.{PickList, Real, RealNN}
+import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureDistributionType}
 import com.salesforce.op.filters.FeatureDistribution
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, BinaryClassificationModelsToTry, MultiClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.{OpLinearRegression, RegressionModelSelector}
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
-import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ProblemType, SelectedModel, ValidationType}
-import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter, SplitterSummary}
+import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
@@ -86,6 +84,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
+  val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
+  val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
+  val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
+  val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
+  lazy val xgbWorkflow =
+    new OpWorkflow().setResultFeatures(xgbClassifierPred, xgbRegressorPred).setReader(dataReader)
+  lazy val xgbWorkflowModel = xgbWorkflow.train()
 
   val pred = BinaryClassificationModelSelector
     .withCrossValidation(seed = 42, splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
@@ -179,7 +184,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(4.0)
+    insights.label.sampleSize shouldBe Some(5.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -231,12 +236,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(4.0)
+    insights.label.sampleSize shouldBe Some(5.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures(0).contribution.size shouldBe 1
+    ageInsights.derivedFeatures(1).contribution.size shouldBe 0
     ageInsights.derivedFeatures.foreach { f =>
-      f.contribution.size shouldBe 1
       f.corr.nonEmpty shouldBe true
       f.variance.nonEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
@@ -322,11 +328,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         pretty should not include(m.modelName)
       }
     }
-    pretty should include("area under precision-recall | 0.0")
+    pretty should include("area under precision-recall | 1.0")
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
     pretty should include("Top Positive Correlations")
-    pretty should include("Top Negative Correlations")
     pretty should include("Top Contributions")
   }
 
@@ -520,11 +525,19 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
-    /*
-    Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-    explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-    weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-    it's not explicitly blacklisted itself.
+    val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
+    trainingDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
+
+    val scoringDistributions = modelWithRFF.getRawScoringFeatureDistributions()
+    scoringDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
+
+    trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
+
+    /**
+     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blacklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
     insights.features.foreach(f =>
@@ -537,4 +550,49 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.features.foreach(f => f.distributions shouldBe empty)
   }
 
+  it should "return model insights for xgboost classification" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
+
+  it should "return model insights for xgboost regression" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
 }

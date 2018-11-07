@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
+import com.salesforce.op.filters.{FeatureDistribution, FilteredRawData, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -130,13 +130,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         val inFeatures = stg.getInputFeatures()
 
         val blacklistRemoved = inFeatures
-          .filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
-          .map{ f => if (f.isRaw) f.withDistributions(distributions.collect{ case d if d.name == f.name => d }) else f }
+          .filterNot { f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+          .map { f =>
+            if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
+          }
         val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
-        Try{
-          stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()
-        } match {
+        Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             if (initialResultFeatures.contains(oldOutput)) throw new RuntimeException(
@@ -222,23 +222,29 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
     (reader, rawFeatureFilter) match {
-      case (None, None) => throw new IllegalArgumentException("Data reader must be set either directly on the" +
-        " workflow or through the RawFeatureFilter")
+      case (None, None) => throw new IllegalArgumentException(
+        "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
       case (Some(r), None) =>
         checkReadersAndFeatures()
         r.generateDataFrame(rawFeatures, parameters).persist()
       case (rd, Some(rf)) =>
         rd match {
           case None => setReader(rf.trainingReader)
-          case Some(r) => if (r != rf.trainingReader) log.warn("Workflow data reader and RawFeatureFilter training" +
-            " reader do not match! The RawFeatureFilter training reader will be used to generate the data for training")
+          case Some(r) => if (r != rf.trainingReader) log.warn(
+            "Workflow data reader and RawFeatureFilter training reader do not match! " +
+              "The RawFeatureFilter training reader will be used to generate the data for training")
         }
+
         checkReadersAndFeatures()
-        val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
-        setRawFeatureDistributions(filteredRawData.featureDistributions.toArray)
-        setBlacklist(filteredRawData.featuresToDrop, getRawFeatureDistributions)
-        setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
-        filteredRawData.cleanedData
+
+        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, featureDistributions) =
+          rf.generateFilteredRaw(rawFeatures, parameters)
+
+        setRawFeatureDistributions(featureDistributions.toArray)
+        setBlacklist(featuresToDrop, getRawFeatureDistributions)
+        setBlacklistMapKeys(mapKeysToDrop)
+
+        cleanedData
     }
   }
 
@@ -538,7 +544,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     rawFeatureFilter = Option {
       new RawFeatureFilter(
         trainingReader = training.get,
-        scoreReader = scoringReader,
+        scoringReader = scoringReader,
         bins = bins,
         minFill = minFillRate,
         maxFillDifference = maxFillDifference,

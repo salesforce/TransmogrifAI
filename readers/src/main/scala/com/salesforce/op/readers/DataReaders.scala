@@ -91,6 +91,23 @@ object DataReaders {
       key: T => String = randomKey _
     ): CSVProductReader[T] = csvProduct(path, key)
 
+    /**
+     * Creates a [[ParquetProductReader]]
+     */
+    def parquetProduct[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _
+    ): ParquetProductReader[T] = new ParquetProductReader[T](readPath = path, key = key)
+
+    /**
+     * Creates a [[ParquetProductReader]].
+     * This method does the same thing as [[parquetProduct]], but is called "parquetCase" so it is easier to understand.
+     */
+    def parquetCase[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _
+    ): ParquetProductReader[T] = parquetProduct(path, key)
+
   }
 
   /**
@@ -118,7 +135,7 @@ object DataReaders {
       headers: Seq[String] = Seq.empty,
       key: T => String = randomKey _,
       aggregateParams: AggregateParams[T]
-    ): CSVAutoReader[T] = new AggregateCSVAutoReader[T](
+    ): AggregateCSVAutoReader[T] = new AggregateCSVAutoReader[T](
       readPath = path, key = key, headers = headers, aggregateParams = aggregateParams
     )
 
@@ -152,6 +169,26 @@ object DataReaders {
       key: T => String = randomKey _,
       aggregateParams: AggregateParams[T]
     ): AggregateCSVProductReader[T] = csvProduct(path, key, aggregateParams)
+
+    /**
+     * Creates a [[AggregateParquetProductReader]]
+     */
+    def parquetProduct[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _,
+      aggregateParams: AggregateParams[T]
+    ): AggregateParquetProductReader[T] = new AggregateParquetProductReader[T](
+      readPath = path, key = key, aggregateParams = aggregateParams
+    )
+
+    /**
+     * Creates a [[AggregateParquetProductReader]], but is called parquetCase so it's easier to understand
+     */
+    def parquetCase[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _,
+      aggregateParams: AggregateParams[T]
+    ): AggregateParquetProductReader[T] = parquetProduct(path, key, aggregateParams)
 
   }
 
@@ -214,6 +251,27 @@ object DataReaders {
       key: T => String = randomKey _,
       conditionalParams: ConditionalParams[T]
     ): ConditionalCSVProductReader[T] = csvProduct(path, key, conditionalParams)
+
+    /**
+     * Creates a [[ConditionalParquetProductReader]]
+     */
+    def parquetProduct[T <: Product : Encoder : WeakTypeTag]
+    (
+      path: Option[String] = None,
+      key: T => String = randomKey _,
+      conditionalParams: ConditionalParams[T]
+    ): ConditionalParquetProductReader[T] = new ConditionalParquetProductReader[T](
+      readPath = path, key = key, conditionalParams = conditionalParams
+    )
+
+    /**
+     * Creates a [[ConditionalParquetProductReader]], but is called parquetCase so is easier to understand
+     */
+    def parquetCase[T <: Product : Encoder : WeakTypeTag](
+      path: Option[String] = None,
+      key: T => String = randomKey _,
+      conditionalParams: ConditionalParams[T]
+    ): ConditionalParquetProductReader[T] = parquetProduct(path, key, conditionalParams)
 
   }
 

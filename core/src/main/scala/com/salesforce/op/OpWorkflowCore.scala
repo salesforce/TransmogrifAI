@@ -32,7 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.utils.stages.FitStagesUtil
-import com.salesforce.op.features.OPFeature
+import com.salesforce.op.features.{FeatureDistributionType, OPFeature}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
@@ -196,10 +196,24 @@ private[op] trait OpWorkflowCore {
   final def getParameters(): OpParams = parameters
 
   /**
-   * Get raw feature distribution information computed during raw feature filter
+   * Get raw feature distribution information computed on training and scoring data during raw feature filter
    * @return sequence of feature distribution information
    */
   final def getRawFeatureDistributions(): Array[FeatureDistribution] = rawFeatureDistributions
+
+  /**
+   * Get raw feature distribution information computed on training data during raw feature filter
+   * @return sequence of feature distribution information
+   */
+  final def getRawTrainingFeatureDistributions(): Array[FeatureDistribution] =
+    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+
+  /**
+   * Get raw feature distribution information computed on scoring data during raw feature filter
+   * @return sequence of feature distribution information
+   */
+  final def getRawScoringFeatureDistributions(): Array[FeatureDistribution] =
+    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
   /**
    * Determine if any of the raw features do not have a matching reader

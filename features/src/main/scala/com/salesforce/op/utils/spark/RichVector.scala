@@ -31,7 +31,9 @@
 package com.salesforce.op.utils.spark
 
 import breeze.linalg.{DenseVector => BreezeDenseVector, SparseVector => BreezeSparseVector, Vector => BreezeVector}
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector, Vectors}
+
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * [[org.apache.spark.ml.linalg.Vector]] enrichment functions
@@ -65,6 +67,30 @@ object RichVector {
     }
 
     /**
+     * Dot product between vectors
+     *
+     * @param that another vector
+     * @throws IllegalArgumentException if the vectors have different sizes
+     * @return dot product
+     */
+    def dot(that: Vector): Double = {
+      require(v.size == that.size,
+        s"Vectors must have the same length: a.length == b.length (${v.size} != ${that.size})"
+      )
+      v.toBreeze dot that.toBreeze
+    }
+
+    /**
+     * Combine multiple vectors into one
+     *
+     * @param that  another vector
+     * @param other other vectors
+     * @return result vector
+     */
+    def combine(that: Vector, other: Vector*): Vector =
+      com.salesforce.op.utils.spark.RichVector.combine(v +: that +: other)
+
+    /**
      * Convert to [[breeze.linalg.Vector]]
      *
      * @return [[breeze.linalg.Vector]]
@@ -83,6 +109,28 @@ object RichVector {
       case d: BreezeDenseVector[Double]@unchecked => new DenseVector(d.data)
     }
 
+  }
+
+  /**
+   * Combine multiple vectors into one
+   *
+   * @param vectors input vectors
+   * @return result vector
+   */
+  def combine(vectors: Seq[Vector]): Vector = {
+    val indices = ArrayBuffer.empty[Int]
+    val values = ArrayBuffer.empty[Double]
+
+    val size = vectors.foldLeft(0)((size, vector) => {
+      vector.foreachActive { case (i, v) =>
+        if (v != 0.0) {
+          indices += size + i
+          values += v
+        }
+      }
+      size + vector.size
+    })
+    Vectors.sparse(size, indices.toArray, values.toArray).compressed
   }
 
 }

@@ -54,5 +54,7 @@ object DefaultSelectorParams {
   val FitIntercept = Array(true) // fit intercept spark default true
   val NbSmoothing = Array(1.0) // spark default 1.0
   val DistFamily = Array("gaussian", "poisson") // generalized linear model link family
-
+  val NumRound = Array(100) // number of rounds for xgboost (default 1)
+  val Eta = Array(0.1 , 0.3) // step size shrinkage for xgboost (default 0.3)
+  val MinChildWeight = Array(1.0, 5.0, 10.0) // minimum sum of instance weight needed in a child for xgboost (default 1)
 }

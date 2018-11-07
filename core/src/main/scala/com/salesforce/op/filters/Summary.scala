@@ -33,6 +33,7 @@ package com.salesforce.op.filters
 import java.util.concurrent.atomic.AtomicReference
 import java.util.function.BinaryOperator
 
+import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.feature.HashAlgorithm
 import com.salesforce.op.utils.stats.RichStreamingHistogram._
 import com.salesforce.op.utils.stats.StreamingHistogram.StreamingHistogramBuilder
@@ -97,7 +98,10 @@ class TextSummary(textFormula: TextSummary => Int) extends Serializable {
 
   final def getDistribution(): Array[(Double, Double)] = distribution.toArray.sortBy(_._1)
 
-  final def getFeatureDistribution(featureKey: FeatureKey, totalCount: Double): FeatureDistribution = {
+  final def getFeatureDistribution(
+    featureKey: FeatureKey,
+    totalCount: Double,
+    featureDistributionType: FeatureDistributionType): FeatureDistribution = {
     val thisCount = getCount
     val nullCount = totalCount - thisCount
     val dist = getDistribution
@@ -108,7 +112,8 @@ class TextSummary(textFormula: TextSummary => Int) extends Serializable {
       count = totalCount.toLong,
       nulls = nullCount.toLong,
       distribution = dist.map(_._2),
-      summaryInfo = dist.map(_._1))
+      summaryInfo = dist.map(_._1),
+      `type` = featureDistributionType)
   }
 
   final def getNumTokens(): Double = numTokens.get
@@ -187,7 +192,10 @@ class HistogramSummary(maxBins: Int, maxSpoolSize: Int) extends Serializable {
 
   final def getDistribution(): Array[(Double, Double)] = builder.build.getBins
 
-  final def getFeatureDistribution(featureKey: FeatureKey, totalCount: Double): FeatureDistribution = {
+  final def getFeatureDistribution(
+    featureKey: FeatureKey,
+    totalCount: Double,
+    featureDistributionType: FeatureDistributionType): FeatureDistribution = {
     val thisCount = getCount
     val nullCount = totalCount - thisCount
     val dist = getDistribution
@@ -198,7 +206,8 @@ class HistogramSummary(maxBins: Int, maxSpoolSize: Int) extends Serializable {
       count = totalCount.toLong,
       nulls = nullCount.toLong,
       distribution = dist.map(_._2),
-      summaryInfo = dist.map(_._1))
+      summaryInfo = dist.map(_._1),
+      `type` = featureDistributionType)
   }
 
   final def merge(other: HistogramSummary): this.type = synchronized {

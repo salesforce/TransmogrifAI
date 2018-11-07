@@ -31,8 +31,8 @@
 package com.salesforce.op.filters
 
 
-import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
 import com.salesforce.op.stages.impl.feature.{DateToUnitCircle, TextTokenizer, TimePeriod}
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.utils.text.Language
@@ -40,14 +40,16 @@ import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors
 import org.apache.spark.sql.Row
 
 /**
- * Class representing processed reponses and predictors keyed by their respective feature key
+ * Class representing processed responses and predictors keyed by their respective feature key
  *
  * @param responses prepared responses
  * @param predictors prepared predictors
  */
-private[filters] case class PreparedFeatures(
-    responses: Map[FeatureKey, ProcessedSeq],
-    predictors: Map[FeatureKey, ProcessedSeq]) {
+private[filters] case class PreparedFeatures
+(
+  responses: Map[FeatureKey, ProcessedSeq],
+  predictors: Map[FeatureKey, ProcessedSeq]
+) {
 
   final def allFeatures: AllFeatures =
     (responseFeatures, numericFeatures, textFeatures)
@@ -66,7 +68,7 @@ private[filters] case class PreparedFeatures(
    * values are the actual response values (nulls replaced with 0.0). Its (i + responses.length)th value
    * is 1 iff. the predictor associated to ith feature key is null, for i >= 0.
    *
-   * @param responseKeys response feature keys
+   * @param responseKeys  response feature keys
    * @param predictorKeys set of all predictor keys needed for constructing binary vector
    * @return null label-leakage correlation vector
    */
@@ -78,7 +80,6 @@ private[filters] case class PreparedFeatures(
 
     Vectors.dense(responseValues ++ predictorNullIndicatorValues)
   }
-
 }
 
 private[filters] object PreparedFeatures {
@@ -98,7 +99,8 @@ private[filters] object PreparedFeatures {
     row: Row,
     responses: Array[TransientFeature],
     predictors: Array[TransientFeature],
-    timePeriod: Option[TimePeriod]): PreparedFeatures = {
+    timePeriod: Option[TimePeriod]
+  ): PreparedFeatures = {
     val empty: Map[FeatureKey, ProcessedSeq] = Map.empty
     val preparedResponses = responses.foldLeft(empty) { case (map, feature) =>
       val converter = FeatureTypeSparkConverter.fromFeatureTypeName(feature.typeName)

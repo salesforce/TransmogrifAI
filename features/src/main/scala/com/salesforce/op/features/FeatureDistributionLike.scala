@@ -30,6 +30,8 @@
 
 package com.salesforce.op.features
 
+import enumeratum._
+
 
 /**
  * Keeps the distribution information for features
@@ -62,7 +64,24 @@ trait FeatureDistributionLike {
   val distribution: Array[Double]
 
   /**
-   *  either min and max number of tokens for text data, or number of splits used for bins for numeric data
+   * either min and max number of tokens for text data, or number of splits used for bins for numeric data
    */
   val summaryInfo: Array[Double]
+
+  /**
+   * feature distribution type: training or scoring
+   */
+  val `type`: FeatureDistributionType
+
+}
+
+/**
+ *Feature Distribution Type
+ */
+sealed trait FeatureDistributionType extends EnumEntry with Serializable
+
+object FeatureDistributionType extends Enum[FeatureDistributionType] {
+  val values = findValues
+  case object Training extends FeatureDistributionType
+  case object Scoring extends FeatureDistributionType
 }

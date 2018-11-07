@@ -216,7 +216,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
 
-      VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
+      categoricalVector.combine(textVector, textNullIndicatorsVector: _*)
     }
   }
 
