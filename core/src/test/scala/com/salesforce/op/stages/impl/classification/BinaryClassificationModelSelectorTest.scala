@@ -42,7 +42,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
-
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -56,7 +56,8 @@ import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
-class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkContext
+  with CompareParamGrid with OpXGBoostQuietLogging {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -101,13 +102,15 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
   Spec(BinaryClassificationModelSelector.getClass) should  "properly select models to try" in {
     val modelSelector = BinaryClassificationModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(BMT.OpLogisticRegression, BMT.OpRandomForestClassifier))
-      .setInput(label.asInstanceOf[Feature[RealNN]], features)
+      .withCrossValidation(
+        modelTypesToUse = Seq(BMT.OpLogisticRegression, BMT.OpRandomForestClassifier, BMT.OpXGBoostClassifier)
+      ).setInput(label.asInstanceOf[Feature[RealNN]], features)
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpLogisticRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpRandomForestClassifier.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpNaiveBayes.entryName) shouldBe false
+    modelSelector.models.exists(_._1.getClass.getSimpleName == BMT.OpXGBoostClassifier.entryName) shouldBe true
   }
 
   it should "split into training and test even if the balancing is not desired" in {

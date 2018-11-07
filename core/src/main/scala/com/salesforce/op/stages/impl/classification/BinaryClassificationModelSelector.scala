@@ -107,7 +107,16 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
       .build()
 
-    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams)
+    val xgb = new OpXGBoostClassifier()
+    val xgbParams = new ParamGridBuilder()
+      .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+      .addGrid(xgb.eta, DefaultSelectorParams.Eta)
+      .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+      .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+      .build()
+
+    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams,
+      xgb -> xgbParams)
   }
 
   /**
@@ -212,6 +221,7 @@ object BinaryClassificationModelsToTry extends Enum[BinaryClassificationModelsTo
   case object OpLinearSVC extends BinaryClassificationModelsToTry
   case object OpDecisionTreeClassifier extends BinaryClassificationModelsToTry
   case object OpNaiveBayes extends BinaryClassificationModelsToTry
+  case object OpXGBoostClassifier extends BinaryClassificationModelsToTry
   case class Custom(private val modeType: Class[_ <: EstimatorType]) extends BinaryClassificationModelsToTry {
     override val entryName: String = modeType.getSimpleName
   }
