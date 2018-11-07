@@ -91,16 +91,16 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
    * Creates Train Validation Splits For TS
    *
    * @param stratifyCondition condition to do stratify ts
-   * @param dataset dataset to split
-   * @param label name of label in dataset
-   * @param splitter  used to estimate splitter params prior to ts
+   * @param dataset           dataset to split
+   * @param label             name of label in dataset
+   * @param splitter          used to estimate splitter params prior to ts
    * @return Array[(Train, Test)]
    */
   private[op] override def createTrainValidationSplits[T](
     stratifyCondition: Boolean,
     dataset: Dataset[T],
     label: String,
-    splitter: Option[Splitter] = None
+    splitter: Option[Splitter]
   ): Array[(RDD[Row], RDD[Row])] = {
 
     // get param that stores the label column
