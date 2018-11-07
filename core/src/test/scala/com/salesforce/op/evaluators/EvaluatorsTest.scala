@@ -113,7 +113,7 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     .setPredictionCol(predValue.name)
 
 
-  Spec(Evaluators.getClass) should "have a binary classification factory" in {
+  Spec(Evaluators.getClass) should "have binary classification evaluators evaluate metrics correctly" in {
     val binaryEvaluators = Table(
       ("evaluator", "expectedValue", "expectedDefault"),
       (Evaluators.BinaryClassification(), evalSparkBinary(BinaryClassEvalMetrics.AuROC.sparkEntryName), 0.0),
@@ -134,7 +134,7 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     }
   }
 
-  it should "have a multi classification factory" in {
+  it should "have multi classification evaluators evaluate metrics correctly" in {
     val multiEvaluators = Table(
       ("evaluator", "expectedValue", "expectedDefault"),
       (Evaluators.MultiClassification(), evalSparkMulti(MultiClassEvalMetrics.F1.sparkEntryName), 0.0),
@@ -152,7 +152,7 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     }
   }
 
-  it should "have a regression factory" in {
+  it should "have regression evaluators evaluate metrics correctly" in {
     val regrEvaluators = Table(
       ("evaluator", "expectedValue", "expectedDefault"),
       (Evaluators.Regression(), evalSparkRegr(RegressionEvalMetrics.RootMeanSquaredError.sparkEntryName), 0.0),
