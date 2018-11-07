@@ -105,11 +105,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
   it should "balance and remember the fractions" in {
     val fraction = 0.4
     val maxSize = 2000
-    val balancer = new DataBalancer()
-      .setSampleFraction(fraction)
-      .setMaxTrainingSample(maxSize)
-      .setSeed(11L)
-
+    val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
     val res1 = balancer.prepare(data)
     val (downSample, upSample) = balancer.getProportions(smallCount, bigCount, fraction, maxSize)
 
@@ -122,10 +118,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
   it should "remember that data is already balanced" in {
     val fraction = 0.01
     val maxSize = 20000
-    val balancer = new DataBalancer()
-      .setSampleFraction(0.01)
-      .setMaxTrainingSample(maxSize)
-      .setSeed(11L)
+    val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
     val res1 = balancer.prepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe 1.0
@@ -135,10 +128,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
   it should "remember that data is already balanced, but needs to be sample because too big" in {
     val fraction = 0.01
     val maxSize = 100
-    val balancer = new DataBalancer()
-      .setSampleFraction(fraction)
-      .setMaxTrainingSample(maxSize)
-      .setSeed(11L)
+    val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
     val res1 = balancer.prepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
