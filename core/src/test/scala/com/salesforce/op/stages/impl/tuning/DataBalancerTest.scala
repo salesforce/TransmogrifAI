@@ -61,7 +61,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
 
   val data = positiveData.union(negativeData)
 
-  val dataBalancer = new DataBalancer().setSeed(seed)
+  val dataBalancer = DataBalancer(seed = seed)
 
   Spec[DataBalancer] should "compute the sample proportions" in {
     dataBalancer.getProportions(100, 9900, 0.5, 100000) shouldEqual(50.0 / 99.0, 50.0)
@@ -74,7 +74,6 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
 
   it should "set the data balancing params correctly" in {
     dataBalancer
-      .setSeed(seed)
       .setSampleFraction(0.4)
       .setMaxTrainingSample(80)
       .setSeed(11L)

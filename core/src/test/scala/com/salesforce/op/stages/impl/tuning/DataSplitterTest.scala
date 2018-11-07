@@ -48,7 +48,7 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
     RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
       .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
 
-  val dataSplitter = new DataSplitter().setSeed(seed)
+  val dataSplitter = DataSplitter(seed = seed)
 
   Spec[DataSplitter] should "split the data in the appropriate proportion - 0.0" in {
     val (train, test) = dataSplitter.setReserveTestFraction(0.0).split(data)
