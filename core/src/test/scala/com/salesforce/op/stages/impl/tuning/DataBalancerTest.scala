@@ -34,12 +34,12 @@ import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.mllib.random.RandomRDDs
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{Assertion, FlatSpec}
 
 
 @RunWith(classOf[JUnitRunner])
-class DataBalancerTest extends FlatSpec with TestSparkContext {
+class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSummaryAsserts {
   import spark.implicits._
 
   val seed = 1234L
@@ -72,6 +72,19 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
     dataBalancer.getProportions(200, 300, 0.5, 1000) shouldEqual(2.0 / 3.0, 1.0)
   }
 
+  it should "set the data balancing params correctly" in {
+    dataBalancer
+      .setSeed(seed)
+      .setSampleFraction(0.4)
+      .setMaxTrainingSample(80)
+      .setSeed(11L)
+      .setReserveTestFraction(0.0)
+
+    dataBalancer.getSampleFraction shouldBe 0.4
+    dataBalancer.getMaxTrainingSample shouldBe 80
+    dataBalancer.getSeed shouldBe 11L
+  }
+
   it should "rebalance the dataset correctly" in {
     val (downSample, upSample) = dataBalancer.getProportions(smallCount, bigCount, sampleFraction, maxTrainingSample)
     val reSampled = dataBalancer.rebalance(negativeData, upSample, positiveData, downSample, seed)
@@ -92,82 +105,69 @@ class DataBalancerTest extends FlatSpec with TestSparkContext {
   it should "balance and remember the fractions" in {
     val fraction = 0.4
     val maxSize = 2000
-
     val balancer = new DataBalancer()
       .setSampleFraction(fraction)
       .setMaxTrainingSample(maxSize)
       .setSeed(11L)
 
-    val ModelData(expected, _) = balancer.prepare(data)
-
+    val res1 = balancer.prepare(data)
     val (downSample, upSample) = balancer.getProportions(smallCount, bigCount, fraction, maxSize)
 
     balancer.getUpSampleFraction shouldBe upSample
     balancer.getDownSampleFraction shouldBe downSample
     balancer.getIsPositiveSmall shouldBe false
-
-    // Rerun balancer with set params
-    val metadata = balancer.summary
-    val ModelData(expected2, _) = balancer.prepare(data)
-    withClue("Data balancer should not update the metadata"){
-      balancer.summary shouldBe metadata
-    }
-    expected.collect() shouldBe expected2.collect()
+    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.4, 2.0, 0.75))
   }
 
   it should "remember that data is already balanced" in {
     val fraction = 0.01
     val maxSize = 20000
-
     val balancer = new DataBalancer()
-      .setSampleFraction(fraction)
+      .setSampleFraction(0.01)
       .setMaxTrainingSample(maxSize)
       .setSeed(11L)
+    val res1 = balancer.prepare(data)
 
-    val ModelData(expected, _) = balancer.prepare(data)
     balancer.getAlreadyBalancedFraction shouldBe 1.0
-
-    // Rerun balancer with set params
-    val metadata = balancer.summary
-    val ModelData(expected2, _) = balancer.prepare(data)
-    withClue("Data balancer should no update the metadata"){
-      balancer.summary shouldBe metadata
-    }
-    expected.collect() shouldBe expected2.collect()
+    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
   }
 
   it should "remember that data is already balanced, but needs to be sample because too big" in {
     val fraction = 0.01
     val maxSize = 100
-
     val balancer = new DataBalancer()
       .setSampleFraction(fraction)
       .setMaxTrainingSample(maxSize)
       .setSeed(11L)
+    val res1 = balancer.prepare(data)
 
-    val ModelData(expected, _) = balancer.prepare(data)
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
-
-    // Rerun balancer with set params
-    val metadata = balancer.summary
-    val ModelData(expected2, _) = balancer.prepare(data)
-    withClue("Data balancer should no update the metadata"){
-      balancer.summary shouldBe metadata
-    }
-    expected.collect() shouldBe expected2.collect()
-
+    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
   }
 
-  it should "set the data balancing params correctly" in {
-    dataBalancer
-      .setSampleFraction(0.4)
-      .setMaxTrainingSample(80)
-      .setSeed(11L)
-      .setReserveTestFraction(0.0)
+  private def checkRecurringPrepare(
+    balancer: DataBalancer,
+    previousResult: ModelData,
+    expectedSummary: DataBalancerSummary
+  ): Assertion = {
+    assertDataBalancerSummary(previousResult.summary) { s =>
+      s shouldBe expectedSummary
+      balancer.summary shouldBe Some(expectedSummary)
+    }
 
-    dataBalancer.getSampleFraction shouldBe 0.4
-    dataBalancer.getMaxTrainingSample shouldBe 80
-    dataBalancer.getSeed shouldBe 11L
+    // Rerun balancer with set params
+    withClue("Data balancer should not update the summary") {
+      val ModelData(train, s) = balancer.prepare(spark.emptyDataFrame)
+      train.count() shouldBe 0
+      s shouldBe Some(expectedSummary)
+      balancer.summary shouldBe Some(expectedSummary)
+    }
+
+    // Rerun balancer again and expect the same data & summary
+    val res2 = balancer.prepare(data)
+    res2.train.collect() shouldBe previousResult.train.collect()
+    res2.summary shouldBe previousResult.summary
+    balancer.summary shouldBe Some(expectedSummary)
   }
 
 }
