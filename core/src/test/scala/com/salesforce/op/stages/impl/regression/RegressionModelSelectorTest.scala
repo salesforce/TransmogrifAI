@@ -41,6 +41,7 @@ import com.salesforce.op.stages.impl.tuning.BestEstimator
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -52,7 +53,8 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with CompareParamGrid {
+class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
+  with CompareParamGrid with OpXGBoostQuietLogging {
   val seed = 1234L
   val stageNames = "label_prediction"
 
@@ -99,12 +101,15 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext with Co
 
   it should "properly select models to try" in {
     val modelSelector = RegressionModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(RMT.OpLinearRegression, RMT.OpRandomForestRegressor))
+      .withCrossValidation(
+        modelTypesToUse = Seq(RMT.OpLinearRegression, RMT.OpRandomForestRegressor, RMT.OpXGBoostRegressor)
+      )
 
-    modelSelector.models.size shouldBe 2
+    modelSelector.models.size shouldBe 3
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpLinearRegression.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpRandomForestRegressor.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpGBTRegressor.entryName) shouldBe false
+    modelSelector.models.exists(_._1.getClass.getSimpleName == RMT.OpXGBoostRegressor.entryName) shouldBe true
   }
 
   it should "set the data splitting params correctly" in {
