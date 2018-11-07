@@ -45,11 +45,11 @@ trait SplitterSummaryAsserts {
     case Some(s: DataBalancerSummary) =>
       val meta = s.toMetadata()
       meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataBalancerSummary].getName
-      meta.getLong(ModelSelectorNames.Positive) should be > 0L
-      meta.getLong(ModelSelectorNames.Negative) should be > 0L
-      meta.getDouble(ModelSelectorNames.Desired) should be > 0.0
+      meta.getLong(ModelSelectorNames.Positive) should be >= 0L
+      meta.getLong(ModelSelectorNames.Negative) should be >= 0L
+      meta.getDouble(ModelSelectorNames.Desired) should be >= 0.0
       meta.getDouble(ModelSelectorNames.UpSample) should be >= 0.0
-      meta.getDouble(ModelSelectorNames.DownSample) should be > 0.0
+      meta.getDouble(ModelSelectorNames.DownSample) should be >= 0.0
       assert(s)
     case x =>
       fail(s"Unexpected data balancer summary: $x")
