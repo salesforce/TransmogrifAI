@@ -85,7 +85,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   def prepare(data: Dataset[Row]): ModelData = {
     import data.sparkSession.implicits._
 
-    val keep =
+    val keep: Set[Double] =
       if (!isSet(labelsToKeep) || !isSet(labelsToDrop)) {
         val labels = data.map(r => r.getDouble(0) -> 1L)
         val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
@@ -96,9 +96,9 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       } else getLabelsToKeep.toSet
 
     val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
+    val summary = DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop)
 
-    val labelsMeta = DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop)
-    new ModelData(dataUse, Option(labelsMeta))
+    ModelData(dataUse, Some(summary))
   }
 
   /**
@@ -146,9 +146,7 @@ private[impl] trait DataCutterParams extends Params {
   )
   setDefault(maxLabelCategories, SplitterParamsDefault.MaxLabelCategoriesDefault)
 
-  def setMaxLabelCategories(value: Int): this.type = {
-    set(maxLabelCategories, value)
-  }
+  def setMaxLabelCategories(value: Int): this.type = set(maxLabelCategories, value)
 
   def getMaxLabelCategories: Int = $(maxLabelCategories)
 
@@ -159,9 +157,7 @@ private[impl] trait DataCutterParams extends Params {
   )
   setDefault(minLabelFraction, SplitterParamsDefault.MinLabelFractionDefault)
 
-  def setMinLabelFraction(value: Double): this.type = {
-    set(minLabelFraction, value)
-  }
+  def setMinLabelFraction(value: Double): this.type = set(minLabelFraction, value)
 
   def getMinLabelFraction: Double = $(minLabelFraction)
 
@@ -185,18 +181,18 @@ private[impl] trait DataCutterParams extends Params {
 /**
  * Summary of results for data cutter
  * @param labelsKept labels retained
- * @param labelsDropped labels dropped by datacutter
+ * @param labelsDropped labels dropped by data cutter
  */
 case class DataCutterSummary
 (
-  labelsKept: Array[Double],
-  labelsDropped: Array[Double]
+  labelsKept: Seq[Double],
+  labelsDropped: Seq[Double]
 ) extends SplitterSummary {
   override def toMetadata(): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
-      .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept)
-      .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped)
+      .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept.toArray)
+      .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped.toArray)
       .build()
   }
 }

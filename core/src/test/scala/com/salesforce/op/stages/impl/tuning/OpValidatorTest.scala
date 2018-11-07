@@ -35,14 +35,13 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomBinary, RandomIntegral, RandomReal, RandomVector}
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.types.MetadataBuilder
-import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
 class OpValidatorTest extends FlatSpec with TestSparkContext {
@@ -54,9 +53,10 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
   val multiClassProbabilities = Array(0.21, 0.29, 0.5)
   val vectors = RandomVector.sparse(RandomReal.uniform[Real](-1.0, 1.0), sizeOfVector).take(count)
   val response = RandomBinary(p).withProbabilityOfEmpty(0.0).take(count).map(_.toDouble.toRealNN(0.0))
-  val multiResponse = multiClassProbabilities.zipWithIndex
-    .flatMap { case (p, index) => RandomIntegral.integrals(index, index + 1).withProbabilityOfEmpty(0.0)
-      .take((p * count).toInt).map(_.toDouble.toRealNN(0.0))
+  val multiResponse =
+    multiClassProbabilities.zipWithIndex.flatMap { case (prob, index) =>
+      RandomIntegral.integrals(index, index + 1).withProbabilityOfEmpty(0.0)
+        .take((prob * count).toInt).map(_.toDouble.toRealNN(0.0))
     }.toIterator
   val (data, rawLabel, features, rawMultiLabel) = TestFeatureBuilder[RealNN, OPVector, RealNN]("label",
     "features", "multiLabel", response.zip(vectors).zip(multiResponse)
@@ -73,46 +73,49 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
   val binaryDS = data.select(label, features)
   val multiDS = data.select(multiLabel, features)
 
-  val condition = cv.isClassification && cv.stratify
-  val balancer = Option(new DataBalancer())
-  val cutter = Option(new DataCutter())
-
+  val cvStratifyCondition = cv.isClassification && cv.stratify
+  val tsStratifyCondition = ts.isClassification && ts.stratify
 
   Spec[OpCrossValidation[_, _]] should "stratify binary class data" in {
-    val splits = cv.createTrainValidationSplits(condition, binaryDS, label.name, balancer)
+    val balancer = new DataBalancer()
+    val splits = cv.createTrainValidationSplits(cvStratifyCondition, binaryDS, label.name, Some(balancer))
     splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
+    assertDataBalancerSummary(balancer.summary)
+    new DataBalancer().prepare(binaryDS).summary shouldBe balancer.summary
   }
 
   it should "stratify multi class data" in {
-    val splits = cv.createTrainValidationSplits(condition, multiDS, multiLabel.name, cutter)
+    val splits = cv.createTrainValidationSplits(cvStratifyCondition, multiDS, multiLabel.name, Some(new DataCutter()))
     splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
+    assertDataCutterSummary(new DataCutter().prepare(multiDS).summary)
   }
-
 
   Spec[OpTrainValidationSplit[_, _]] should "stratify binary class data" in {
-    val splits = ts.createTrainValidationSplits(condition, binaryDS, label.name, balancer)
+    val balancer = new DataBalancer()
+    val splits = ts.createTrainValidationSplits(tsStratifyCondition, binaryDS, label.name, Some(balancer))
     splits.foreach { case (train, validate) =>
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
-    balancer.get.summary.get.toMetadata() should not be new MetadataBuilder().build()
+    assertDataBalancerSummary(balancer.summary)
+    new DataBalancer().prepare(binaryDS).summary shouldBe balancer.summary
   }
 
   it should "stratify multi class data" in {
-    val splits = ts.createTrainValidationSplits(condition, multiDS, multiLabel.name, cutter)
+    val splits = ts.createTrainValidationSplits(tsStratifyCondition, multiDS, multiLabel.name, Some(new DataCutter()))
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
+    assertDataCutterSummary(new DataCutter().prepare(multiDS).summary)
   }
 
   /**
@@ -131,5 +134,29 @@ class OpValidatorTest extends FlatSpec with TestSparkContext {
       math.abs(expected - actual) should be < 0.065
     }
   }
+
+  private def assertDataBalancerSummary: Option[SplitterSummary] => Assertion = {
+    case Some(s: DataBalancerSummary) =>
+      val meta = s.toMetadata()
+      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataBalancerSummary].getName
+      meta.getLong(ModelSelectorNames.Positive) should be > 0L
+      meta.getLong(ModelSelectorNames.Negative) should be > 0L
+      meta.getDouble(ModelSelectorNames.Desired) should be > 0.0
+      meta.getDouble(ModelSelectorNames.UpSample) should be >= 0.0
+      meta.getDouble(ModelSelectorNames.DownSample) should be > 0.0
+    case x =>
+      fail(s"Unexpected data balancer summary: $x")
+  }
+
+  private def assertDataCutterSummary: Option[SplitterSummary] => Assertion = {
+    case Some(s: DataCutterSummary) =>
+      val meta = s.toMetadata()
+      meta.getDoubleArray(ModelSelectorNames.LabelsKept).foreach(_ should be >= 0.0)
+      meta.getDoubleArray(ModelSelectorNames.LabelsDropped).foreach(_ should be >= 0.0)
+      meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
+    case x =>
+      fail(s"Unexpected data cutter summary: $x")
+  }
+
 
 }
