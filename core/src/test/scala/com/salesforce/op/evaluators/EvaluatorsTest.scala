@@ -128,9 +128,11 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     )
 
     forAll(binaryEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
-      evaluator shouldBe a[OpBinaryClassificationEvaluatorBase[_]]
-      evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
-      evaluator.evaluate(emptyData) shouldBe expectedDefault
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpBinaryClassificationEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
     }
   }
 
@@ -146,9 +148,11 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     )
 
     forAll(multiEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
-      evaluator shouldBe a[OpMultiClassificationEvaluatorBase[_]]
-      evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
-      evaluator.evaluate(emptyData) shouldBe expectedDefault
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpMultiClassificationEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
     }
   }
 
@@ -164,9 +168,11 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
     )
 
     forAll(regrEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
-      evaluator shouldBe a[OpRegressionEvaluatorBase[_]]
-      evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
-      evaluator.evaluate(emptyData) shouldBe expectedDefault
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpRegressionEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
     }
   }
 

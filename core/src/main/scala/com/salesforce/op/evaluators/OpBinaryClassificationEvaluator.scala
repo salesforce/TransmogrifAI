@@ -33,7 +33,8 @@ package com.salesforce.op.evaluators
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichEvaluator._
-import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, Evaluator, MulticlassClassificationEvaluator}
+import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
+import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
 import org.apache.spark.sql.functions.col
@@ -127,28 +128,37 @@ private[op] class OpBinaryClassificationEvaluator
     dataset: Dataset[_],
     default: => Double
   ): Double = {
+    import dataset.sparkSession.implicits._
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
-    new BinaryClassificationEvaluator()
-      .setLabelCol(labelColName)
-      .setRawPredictionCol(getRawPredictionCol)
-      .setMetricName(metricName.sparkEntryName)
-      .evaluateOrDefault(dataUse, default = default)
+    lazy val rdd = dataUse.select(getPredictionValueCol, labelColName).as[(Double, Double)].rdd
+    lazy val noData = rdd.isEmpty()
+
+    metricName match {
+      case AuPR | AuROC =>
+        new BinaryClassificationEvaluator()
+          .setLabelCol(labelColName)
+          .setRawPredictionCol(getRawPredictionCol)
+          .setMetricName(metricName.sparkEntryName)
+          .evaluateOrDefault(dataUse, default = default)
+
+      case Error =>
+        new MulticlassClassificationEvaluator()
+          .setLabelCol(labelColName)
+          .setPredictionCol(getPredictionValueCol)
+          .setMetricName(metricName.sparkEntryName)
+          .evaluateOrDefault(dataUse, default = default)
+
+      case Precision | Recall | F1 if noData => default
+      case Precision => new MulticlassMetrics(rdd).precision(1.0)
+      case Recall => new MulticlassMetrics(rdd).recall(1.0)
+      case F1 => new MulticlassMetrics(rdd).fMeasure(1.0)
+
+      case m =>
+        throw new IllegalArgumentException(s"Unsupported binary evaluation metric $m")
+    }
   }
 
-  final protected def getMultiEvaluatorMetric(
-    metricName: ClassificationEvalMetric,
-    dataset: Dataset[_],
-    default: => Double
-  ): Double = {
-    val labelColName = getLabelCol
-    val dataUse = makeDataToUse(dataset, labelColName)
-    new MulticlassClassificationEvaluator()
-      .setLabelCol(labelColName)
-      .setPredictionCol(getPredictionValueCol)
-      .setMetricName(metricName.sparkEntryName)
-      .evaluateOrDefault(dataUse, default = default)
-  }
 }
 
 
