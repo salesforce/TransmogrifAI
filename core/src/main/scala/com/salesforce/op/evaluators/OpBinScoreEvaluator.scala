@@ -59,7 +59,7 @@ private[op] class OpBinScoreEvaluator
   require(numOfBins > 0, "numOfBins must be positive")
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.brierScore
+  def getDefaultMetric: BinaryClassificationBinMetrics => Double = _.BrierScore
 
   def evaluateAll(data: Dataset[_]): BinaryClassificationBinMetrics = {
     val labelColumnName = getLabelCol
@@ -110,7 +110,7 @@ private[op] class OpBinScoreEvaluator
       val binCenters = for {i <- 0 until numOfBins} yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
 
       val metrics = BinaryClassificationBinMetrics(
-        brierScore = brierScoreSum / numberOfPoints,
+        BrierScore = brierScoreSum / numberOfPoints,
         binCenters = binCenters,
         numberOfDataPoints = numberOfDataPoints,
         averageScore = averageScore,
@@ -132,15 +132,15 @@ private[op] class OpBinScoreEvaluator
 /**
  * Metrics of BinaryClassificationBinMetrics
  *
+ * @param BrierScore            brier score for overall dataset
  * @param binCenters            center of each bin
  * @param numberOfDataPoints    total number of data points in each bin
  * @param averageScore          average score in each bin
  * @param averageConversionRate average conversion rate in each bin
- * @param brierScore            brier score for overall dataset
  */
 case class BinaryClassificationBinMetrics
 (
-  brierScore: Double,
+  BrierScore: Double,
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   binCenters: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Long])

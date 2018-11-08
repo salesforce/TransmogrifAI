@@ -101,7 +101,7 @@ case class ModelInsights
     val res = new ArrayBuffer[String]()
     res ++= prettyValidationResults
     res ++= prettySelectedModelInfo
-    res += modelEvaluationMetrics
+    res ++= modelEvaluationMetrics
     res ++= topKCorrelations(topK)
     res ++= topKContributions(topK)
     res ++= topKCramersV(topK)
@@ -177,27 +177,27 @@ case class ModelInsights
     } else Seq.empty
   }
 
-  private def modelEvaluationMetrics: String = {
+  private def modelEvaluationMetrics: Seq[String] = {
     val name = "Model Evaluation Metrics"
     val niceMetricsNames = (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
-      RegressionEvalMetrics.values ++ OpEvaluatorNames.values)
-      .map(m => m.entryName -> m.humanFriendlyName).toMap
-    def niceName(nm: String): String = nm.split("_").lastOption.flatMap(n => niceMetricsNames.get(n)).getOrElse(nm)
+        RegressionEvalMetrics.values ++ OpEvaluatorNames.values
+      ).map(m => m.entryName -> m.humanFriendlyName).toMap
+    def niceName(nm: String): String = nm.split('_').lastOption.flatMap(niceMetricsNames.get).getOrElse(nm)
     val trainEvalMetrics = selectedModelInfo.map(_.trainEvaluation)
     val testEvalMetrics = selectedModelInfo.flatMap(_.holdoutEvaluation)
     val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
     (trainEvalMetrics, testEvalMetrics) match {
       case (Some(trainMetrics), Some(testMetrics)) =>
-        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
+        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }
         val testMetricsMap = testMetrics.toMap
         val rows = trainMetricsMap
-          .map { case (k, v) => (niceName(k), v, testMetricsMap(k).toString) }
-        Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows).prettyString()
+          .map { case (k, v) => (niceName(k), v, testMetricsMap(k).toString) }.toSeq.sortBy(_._1)
+        Seq(Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows).prettyString())
       case (Some(trainMetrics), None) =>
-        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) =>
-          niceName(k) -> v.toString }.toSeq.sortBy(_._1)
-        Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetricsMap).prettyString()
-      case (None, _) => "No metrics found"
+        val rows = trainMetrics.toMap.collect { case (k, v: Double) => niceName(k) -> v.toString }.toSeq.sortBy(_._1)
+        Seq(Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = rows).prettyString())
+      case _ =>
+        Seq.empty
     }
   }
 

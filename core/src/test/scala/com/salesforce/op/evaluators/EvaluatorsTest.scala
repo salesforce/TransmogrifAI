@@ -118,7 +118,7 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
       ("evaluator", "expectedValue", "expectedDefault"),
       (Evaluators.BinaryClassification(), evalSparkBinary(BinaryClassEvalMetrics.AuROC.sparkEntryName), 0.0),
       (Evaluators.BinaryClassification.auROC(), evalSparkBinary(BinaryClassEvalMetrics.AuROC.sparkEntryName), 0.0),
-      (Evaluators.BinaryClassification.brierScore(), opBinScoreMetrics.brierScore, 0.0),
+      (Evaluators.BinaryClassification.brierScore(), opBinScoreMetrics.BrierScore, 0.0),
       (Evaluators.BinaryClassification.auPR(), evalSparkBinary(BinaryClassEvalMetrics.AuPR.sparkEntryName), 0.0),
       (Evaluators.BinaryClassification.precision(), opBinaryMetrics.Precision, 0.0),
       (Evaluators.BinaryClassification.recall(), opBinaryMetrics.Recall, 0.0),
