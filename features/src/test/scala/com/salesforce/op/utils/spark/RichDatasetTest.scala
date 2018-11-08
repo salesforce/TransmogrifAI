@@ -51,8 +51,6 @@ import scala.language.postfixOps
 
 @RunWith(classOf[JUnitRunner])
 class RichDatasetTest extends FlatSpec with TestSparkContext {
-
-  // TODO: fix implicit scope conflicts with 'org.apache.spark.sql.functions._'
   import com.salesforce.op.utils.spark.RichDataType._
   import com.salesforce.op.utils.spark.RichDataset._
   import com.salesforce.op.utils.spark.RichMetadata._
