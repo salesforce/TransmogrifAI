@@ -179,9 +179,10 @@ case class ModelInsights
 
   private def modelEvaluationMetrics: Seq[String] = {
     val name = "Model Evaluation Metrics"
-    val niceMetricsNames = (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
+    val niceMetricsNames = {
+      BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
         RegressionEvalMetrics.values ++ OpEvaluatorNames.values
-      ).map(m => m.entryName -> m.humanFriendlyName).toMap
+    }.map(m => m.entryName -> m.humanFriendlyName).toMap
     def niceName(nm: String): String = nm.split('_').lastOption.flatMap(niceMetricsNames.get).getOrElse(nm)
     val trainEvalMetrics = selectedModelInfo.map(_.trainEvaluation)
     val testEvalMetrics = selectedModelInfo.flatMap(_.holdoutEvaluation)
