@@ -325,7 +325,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       )
       others.size shouldBe 1
       others.foreach { m =>
-        pretty should not include(m.modelName)
+        pretty should not include m.modelName
       }
     }
     pretty should include("area under precision-recall | 1.0")

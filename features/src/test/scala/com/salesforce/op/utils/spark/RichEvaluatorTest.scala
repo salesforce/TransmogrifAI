@@ -28,37 +28,30 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.evaluator
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.evaluators.{Evaluators, OpBinaryClassificationEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
-import com.twitter.algebird.AveragedValue
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.Dataset
-import com.salesforce.op.utils.spark.RichDataset.RichDataset
+import com.salesforce.op.test.TestSparkContext
+import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, Evaluator}
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-/**
- * Logarithmic Loss metric, implemented as both Binary and MultiClass evaluators
- */
-object LogLoss {
 
-  private def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
-    import ds.sparkSession.implicits._
-    require(!ds.isEmpty, "Dataset is empty, log loss cannot be calculated")
-    val avg = ds.map { case (lbl, _, prob, _) =>
-      new AveragedValue(count = 1L, value = -math.log(prob.toArray(lbl.toInt)))
-    }.reduce(_ + _)
-    avg.value
+@RunWith(classOf[JUnitRunner])
+class RichEvaluatorTest extends FlatSpec with TestSparkContext {
+
+  import com.salesforce.op.utils.spark.RichEvaluator._
+  import spark.implicits._
+
+  def evaluator: Evaluator = new BinaryClassificationEvaluator().setMetricName("areaUnderPR")
+
+  Spec(RichEvaluator.getClass) should "evaluate a dataset" in {
+    val data = spark.createDataset(Seq(0.0 -> 0.2, 0.0 -> 0.6, 1.0 -> 0.8)).toDF("label", "rawPrediction")
+    evaluator.evaluateOrDefault(data, default = 777.0) shouldBe 1.0
   }
 
-  def binaryLogLoss: OpBinaryClassificationEvaluatorBase[SingleMetric] = Evaluators.BinaryClassification.custom(
-    metricName = "BinarylogLoss",
-    isLargerBetter = false,
-    evaluateFn = logLossFun
-  )
+  it should "return default metric on an empty dataset" in {
+    evaluator.evaluateOrDefault(spark.emptyDataset[(Double, Double)], default = 777.0) shouldBe 777.0
+  }
 
-  def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
-    metricName = "MultiClasslogLoss",
-    isLargerBetter = false,
-    evaluateFn = logLossFun
-  )
 }

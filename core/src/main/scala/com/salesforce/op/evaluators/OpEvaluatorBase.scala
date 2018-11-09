@@ -32,17 +32,11 @@ package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.RichMetadata._
-import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.Metadata
-
-import scala.util.Try
 
 
 /**
@@ -112,31 +106,13 @@ trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   protected final def getProbabilityCol: String = $(probabilityCol)
 }
 
-
-/**
- * Trait for all different kinds of evaluation metrics
- */
-trait EvaluationMetrics extends JsonLike {
-  /**
-   * Convert metrics class to a map
-   * @return a map from metric name to metric value
-   */
-  def toMap: Map[String, Any] = JsonUtils.toMap(JsonUtils.toJsonTree(this))
-  /**
-   * Convert metrics into metadata for saving
-   * @return metadata
-   */
-  def toMetadata: Metadata = this.toMap.toMetadata
-}
-
 /**
  * Base Interface for OpEvaluator to be used in Evaluator creation. Can be used for both OP and spark
  * eval (so with workflows and cross validation).
  */
 abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
-  with OpHasLabelCol[RealNN]
-  with OpHasPredictionValueCol[RealNN]
-  with OpHasPredictionCol {
+  with OpHasLabelCol[RealNN] with OpHasPredictionValueCol[RealNN] with OpHasPredictionCol {
+
   /**
    * Name of evaluator
    */
@@ -174,15 +150,14 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_]
+
 }
 
 /**
  * Base Interface for OpClassificationEvaluator
  */
 private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
-  extends OpEvaluatorBase[T]
-    with OpHasRawPredictionCol[OPVector]
-    with OpHasProbabilityCol[OPVector] {
+  extends OpEvaluatorBase[T] with OpHasRawPredictionCol[OPVector] with OpHasProbabilityCol[OPVector] {
 
   /**
    * Prepare data with different input types so that it can be consumed by the evaluator
@@ -220,28 +195,22 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
 /**
  * Base Interface for OpBinaryClassificationEvaluator
  */
-abstract class OpBinaryClassificationEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpClassificationEvaluatorBase[T]
+abstract class OpBinaryClassificationEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpClassificationEvaluatorBase[T]
 
 
 /**
  * Base Interface for OpMultiClassificationEvaluator
  */
-abstract class OpMultiClassificationEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpClassificationEvaluatorBase[T]
+abstract class OpMultiClassificationEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpClassificationEvaluatorBase[T]
 
 
 /**
  * Base Interface for OpRegressionEvaluator
  */
-abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpEvaluatorBase[T] {
+abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpEvaluatorBase[T] {
 
   /**
    * Prepare data with different input types so that it can be consumed by the evaluator
@@ -263,121 +232,4 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 
     } else data
   }
-}
-
-/**
- * Eval metric
- */
-trait EvalMetric extends EnumEntry with Serializable {
-  /**
-   * Spark metric name
-   */
-  def sparkEntryName: String
-
-  /**
-   * Human friendly metric name
-   */
-  def humanFriendlyName: String
-
-}
-
-/**
- * Eval metric companion object
- */
-object EvalMetric {
-
-  def withNameInsensitive(name: String): EvalMetric = {
-    BinaryClassEvalMetrics.withNameInsensitiveOption(name)
-      .orElse(MultiClassEvalMetrics.withNameInsensitiveOption(name))
-      .orElse(RegressionEvalMetrics.withNameInsensitiveOption(name))
-      .orElse(OpEvaluatorNames.withNameInsensitiveOption(name))
-      .getOrElse(OpEvaluatorNames.Custom(name, name))
-  }
-}
-
-/**
- * Classification Metrics
- */
-sealed abstract class ClassificationEvalMetric
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Binary Classification Metrics
- */
-object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
-  val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under precision-recall")
-  case object TP extends ClassificationEvalMetric("TP", "true positive")
-  case object TN extends ClassificationEvalMetric("TN", "true negative")
-  case object FP extends ClassificationEvalMetric("FP", "false positive")
-  case object FN extends ClassificationEvalMetric("FN", "false negative")
-  case object brierScore extends ClassificationEvalMetric("brierscore", "brier score")
-}
-
-/**
- * Multi Classification Metrics
- */
-object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
-  val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
-}
-
-
-/**
- * Regression Metrics
- */
-sealed abstract class RegressionEvalMetric
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Regression Metrics
- */
-object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
-  val values: Seq[RegressionEvalMetric] = findValues
-  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")
-  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error")
-  case object R2 extends RegressionEvalMetric("r2", "r2")
-  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
-}
-
-
-/**
- * GeneralMetrics
- */
-sealed abstract class OpEvaluatorNames
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Contains evaluator names used in logging
- */
-object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
-  val values: Seq[OpEvaluatorNames] = findValues
-  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metrics")
-  case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
-  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
-  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
-  case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
-    override def entryName: String = name.toLowerCase
-  }
-  override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
-  override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
-    .getOrElse(Custom(name, name))
 }

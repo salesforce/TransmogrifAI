@@ -28,37 +28,44 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.evaluator
+package com.salesforce.op.utils.spark
 
-import com.salesforce.op.evaluators.{Evaluators, OpBinaryClassificationEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
-import com.twitter.algebird.AveragedValue
-import org.apache.spark.ml.linalg.Vector
+
+import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.sql.Dataset
-import com.salesforce.op.utils.spark.RichDataset.RichDataset
+import org.slf4j.LoggerFactory
 
 /**
- * Logarithmic Loss metric, implemented as both Binary and MultiClass evaluators
+ * Various [[Evaluator]] helpers functions
  */
-object LogLoss {
+case object RichEvaluator {
 
-  private def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
-    import ds.sparkSession.implicits._
-    require(!ds.isEmpty, "Dataset is empty, log loss cannot be calculated")
-    val avg = ds.map { case (lbl, _, prob, _) =>
-      new AveragedValue(count = 1L, value = -math.log(prob.toArray(lbl.toInt)))
-    }.reduce(_ + _)
-    avg.value
+  import com.salesforce.op.utils.spark.RichDataset._
+
+  private val log = LoggerFactory.getLogger(getClass.getName.stripSuffix("$"))
+
+  /**
+   * Various [[Evaluator]] helpers functions
+   */
+  implicit class RichEvaluator(val evaluator: Evaluator) extends AnyVal {
+
+    /**
+     * Safely evaluates model output and returns a scalar metric only if the dataset is not empty,
+     * otherwise returns the default metric value.
+     *
+     * @param dataset a dataset that contains labels/observations and predictions.
+     * @param default default metric value to return if dataset is empty
+     * @return evaluated metric or default
+     */
+    def evaluateOrDefault(dataset: Dataset[_], default: => Double): Double = {
+      if (dataset.isEmpty) {
+        val defaultValue = default
+        log.warn("The dataset is empty. Returning default metric value: {}.", defaultValue)
+        defaultValue
+      }
+      else evaluator.evaluate(dataset)
+    }
+
   }
 
-  def binaryLogLoss: OpBinaryClassificationEvaluatorBase[SingleMetric] = Evaluators.BinaryClassification.custom(
-    metricName = "BinarylogLoss",
-    isLargerBetter = false,
-    evaluateFn = logLossFun
-  )
-
-  def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
-    metricName = "MultiClasslogLoss",
-    isLargerBetter = false,
-    evaluateFn = logLossFun
-  )
 }
