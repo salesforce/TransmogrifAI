@@ -237,7 +237,7 @@ case object ModelSelectorSummary {
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
           val asMetrics = d.flatMap{ case (_, values) => values.map{
             case (nm: String, mp: Map[String, Any]@unchecked) =>
-              val valsJson = JsonUtils.toJsonString(mp) // gross but it works TODO try to find a better way
+              val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
               nm match {
                 case OpEvaluatorNames.Binary.humanFriendlyName =>
                   nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
