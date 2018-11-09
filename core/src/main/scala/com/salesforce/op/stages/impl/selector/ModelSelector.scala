@@ -146,7 +146,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
-    val ModelData(trainData, met) = splitter match {
+    val ModelData(trainData, splitterSummary) = splitter match {
       case Some(spltr) => spltr.prepare(datasetWithID)
       case None => ModelData(datasetWithID, None)
     }
@@ -174,7 +174,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       validationType = ValidationType.fromValidator(validator),
       validationParameters = validator.getParams(),
       dataPrepParameters = splitter.map(_.extractParamMap().getAsMap()).getOrElse(Map()),
-      dataPrepResults = met,
+      dataPrepResults = splitterSummary,
       evaluationMetric = validator.evaluator.name,
       problemType = ProblemType.fromEvalMetrics(trainingEval),
       bestModelUID = estimator.uid,
