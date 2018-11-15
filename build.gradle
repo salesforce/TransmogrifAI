@@ -90,7 +90,7 @@ configure(allProjs) {
         scoveragePluginVersion = '1.3.1'
         hadrianVersion = '0.8.5'
         aardpfarkVersion = '0.1.0-SNAPSHOT'
-        xgboostVersion = '0.80'
+        xgboostVersion = '0.81'
         akkaSlf4jVersion = '2.3.11'
 
         mainClassName = 'com.salesforce.Main'

@@ -136,10 +136,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
    * @param splitter  used to estimate splitter params prior to cv
    * @return Array((TrainRDD, ValidationRDD), Index)
    */
-  private[op] override def createTrainValidationSplits[T](stratifyCondition: Boolean,
-    dataset: Dataset[T], label: String, splitter: Option[Splitter] = None): Array[(RDD[Row], RDD[Row])] = {
-
-    // TODO : Implement our own kFold method for better performance in a separate PR
+  private[op] override def createTrainValidationSplits[T](
+    stratifyCondition: Boolean,
+    dataset: Dataset[T],
+    label: String,
+    splitter: Option[Splitter]
+  ): Array[(RDD[Row], RDD[Row])] = {
 
     // get param that stores the label column
     val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)
@@ -160,13 +162,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     }
   }
 
-
   private def stratifyKFolds(rddsByClass: Array[RDD[Row]]): Array[(RDD[Row], RDD[Row])] = {
     // Cross Validation's Train/Validation data for each class
     val foldsByClass = rddsByClass.map(rdd => MLUtils.kFold(rdd, numFolds, seed)).toSeq
 
     if (foldsByClass.isEmpty) {
-      throw new RuntimeException("Dataset is too small for CV forlds selected some empty datasets are created")
+      throw new RuntimeException("Dataset is too small for CV folds selected some empty datasets are created")
     }
     // Merging Train/Validation data one by one
     foldsByClass.reduce[Array[(RDD[Row], RDD[Row])]] {
