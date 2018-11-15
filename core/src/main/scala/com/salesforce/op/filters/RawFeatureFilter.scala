@@ -433,7 +433,7 @@ object RawFeatureFilter {
     jsDivergenceProtectedFeatures: Set[String],
     jsDivergenceF: (FeatureDistribution, FeatureDistribution) => Double): Map[FeatureKey, (String, List[String])] = {
 
-    val trainingReasons: Map[FeatureKey, List[String]] = for {
+    val trainingReasons: Map[FeatureKey, (String, List[String])] = for {
       trainingPair <- trainingDistribs
       (featureKey, trainingDistrib) = trainingPair
     } yield {
@@ -449,8 +449,10 @@ object RawFeatureFilter {
         } else {
           None
         }
+      val distribMetadata = s"\nTraining Data=$trainingDistrib\nTrain Fill=$trainingUnfilled, " +
+        s"Train Null Label Correlation=$trainingNullLabelLeaker\n"
 
-      featureKey -> List(trainingUnfilled, trainingNullLabelLeaker).flatten
+      featureKey -> (distribMetadata -> List(trainingUnfilled, trainingNullLabelLeaker).flatten)
     }
     val distribMismatches: Map[FeatureKey, (String, List[String])] = for {
       scoringPair <- scoringDistribs
@@ -463,8 +465,8 @@ object RawFeatureFilter {
       val fillRatioDiff = trainingDistrib.relativeFillRatio(scoringDistrib)
       val fillRateDiff = trainingDistrib.relativeFillRate(scoringDistrib)
 
-      val distribMetadata = s"\nTraining Data: $trainingDistrib\nScoring Data: $scoringDistrib\n" +
-        s"Train Fill=$trainingFillRate, Score Fill=$scoringFillRate, JS Divergence=$jsDivergence, " +
+      val distribMetadata = s"Scoring Data: $scoringDistrib\n" +
+        s"Score Fill=$scoringFillRate, JS Divergence=$jsDivergence, " +
         s"Fill Rate Difference=$fillRateDiff, Fill Ratio Difference=$fillRatioDiff\n"
 
       val scoringUnfilled =
@@ -496,12 +498,10 @@ object RawFeatureFilter {
         (distribMetadata -> List(scoringUnfilled, jsDivergenceCheck, fillRateCheck, fillRatioCheck).flatten)
     }
 
-    for {
-      reasonsPair <- trainingReasons
-      (featureKey, reasons) = reasonsPair
-      descriptionPair <- distribMismatches.get(featureKey)
-      (description, otherReasons) = descriptionPair
-    } yield featureKey -> (description -> (reasons ++ otherReasons))
+    implicit val sg = new Tuple2Semigroup[String, List[String]]()
+
+    trainingReasons + distribMismatches
+
   }
 
 
