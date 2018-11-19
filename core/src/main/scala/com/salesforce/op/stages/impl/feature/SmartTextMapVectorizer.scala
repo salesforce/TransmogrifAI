@@ -61,7 +61,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtMapVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams
+    with TrackNullsParam with TrackTextLenParam with MinSupportParam with TextTokenizerParams
     with HashingVectorizerParams with MapHashingFun with OneHotFun
     with MapStringPivotHelper with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams {
 
@@ -111,7 +111,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         features = mapFeatures.toArray,
         params = makeHashingParams(),
         allKeys = allKeys,
-        shouldTrackNulls = args.shouldTrackNulls
+        shouldTrackNulls = args.shouldTrackNulls,
+        shouldTrackTextLen = args.shouldTrackTextLen
       )
     } else Array.empty[OpVectorColumnMetadata]
 
@@ -125,6 +126,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
+    val shouldTrackTextLen = $(trackTextLen)
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
@@ -144,6 +146,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       shouldCleanKeys = shouldCleanKeys,
       shouldCleanValues = shouldCleanValues,
       shouldTrackNulls = shouldTrackNulls,
+      shouldTrackTextLen = shouldTrackTextLen,
       hashingParams = makeHashingParams()
     )
   }
@@ -215,6 +218,7 @@ case class SmartTextMapVectorizerModelArgs
   shouldCleanKeys: Boolean,
   shouldCleanValues: Boolean,
   shouldTrackNulls: Boolean,
+  shouldTrackTextLen: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
@@ -264,7 +268,8 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowTextTokenized)) else Nil
-    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
+    val textLen = if (args.shouldTrackTextLen) Seq(getTextLen(keysText, rowTextTokenized)) else Nil
+    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector ++ textLen)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
@@ -275,6 +280,18 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
       }
     }
     val reindexed = reindex(nullIndicators)
+    val vector = makeSparseVector(reindexed)
+    vector.toOPVector
+  }
+
+  private def getTextLen(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
+    val textLen = keysSeq.zip(inputs).flatMap{ case (keys, input) =>
+      keys.map{ k =>
+        val length = if (input.get(k).forall(_.isEmpty)) 0.0 else input.get(k).map(_.value.length).sum
+        Seq(0 -> length)
+      }
+    }
+    val reindexed = reindex(textLen)
     val vector = makeSparseVector(reindexed)
     vector.toOPVector
   }

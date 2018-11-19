@@ -478,6 +478,18 @@ trait TrackNullsParam extends Params {
   def setTrackNulls(v: Boolean): this.type = set(trackNulls, v)
 }
 
+trait TrackTextLenParam extends Params {
+  final val trackTextLen = new BooleanParam(
+    parent = this, name = "trackTexLen", doc = "option to keep track of values that were missing"
+  )
+  setDefault(trackTextLen, TransmogrifierDefaults.TrackTextLen)
+
+  /**
+   * Option to keep track of values that were missing
+   */
+  def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
+}
+
 /**
  * Param that decides whether or not the values that are considered invalid are tracked
  */
@@ -642,13 +654,15 @@ trait MapStringPivotHelper extends SaveOthersParams {
     topValues: SeqSeqTupArr,
     inputFeatures: Array[TransientFeature],
     unseenName: String,
-    trackNulls: Boolean = false
+    trackNulls: Boolean = false,
+    trackTextLen: Boolean = false
   ): Array[OpVectorColumnMetadata] = {
     for {
       (f, kvPairs) <- inputFeatures.zip(topValues)
       (key, values) <- kvPairs
       value <- values.view ++ Seq(unseenName) ++ // view here to avoid copying the array when appending the string
-        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil)
+        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil) ++
+        (if (trackTextLen) Seq(TransmogrifierDefaults.TextLenString) else Nil)
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),
@@ -664,10 +678,11 @@ trait MapStringPivotHelper extends SaveOthersParams {
     operationName: String,
     outputName: String,
     stageName: String,
-    trackNulls: Boolean = false // todo remove default and use this for other maps
+    trackNulls: Boolean = false, // todo remove default and use this for other maps
+    trackTextLen: Boolean = false
   ): OpVectorMetadata = {
     val otherValueString = $(unseenName)
-    val cols = makeVectorColumnMetadata(topValues, inputFeatures, otherValueString, trackNulls)
+    val cols = makeVectorColumnMetadata(topValues, inputFeatures, otherValueString, trackNulls, trackTextLen)
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
   }
 }

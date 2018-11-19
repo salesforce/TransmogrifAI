@@ -314,7 +314,7 @@ private[op] trait MapHashingFun extends HashingFun {
   protected def makeVectorColumnMetadata
   (
     features: Array[TransientFeature], params: HashingFunctionParams,
-    allKeys: Seq[Seq[String]], shouldTrackNulls: Boolean
+    allKeys: Seq[Seq[String]], shouldTrackNulls: Boolean, shouldTrackTextLen: Boolean
   ): Array[OpVectorColumnMetadata] = {
     val numHashes = params.numFeatures
     val numFeatures = allKeys.map(_.length).sum
@@ -342,7 +342,14 @@ private[op] trait MapHashingFun extends HashingFun {
       } yield f.toColumnMetaData(isNull = true).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
-    hashColumns ++ nullColumns
+    val textLenColumn = if (shouldTrackTextLen) {
+      for {
+        (keys, f) <- allKeys.toArray.zip(features)
+        key <- keys
+      } yield f.toColumnTextLenData
+    } else Array.empty[OpVectorColumnMetadata]
+
+    hashColumns ++ nullColumns ++ textLenColumn
   }
 
   protected def hash

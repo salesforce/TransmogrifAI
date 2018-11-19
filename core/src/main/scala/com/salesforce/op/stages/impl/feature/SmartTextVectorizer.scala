@@ -60,7 +60,7 @@ import scala.reflect.runtime.universe.TypeTag
 class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams
+    with TrackNullsParam with TrackTextLenParam with MinSupportParam with TextTokenizerParams
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
@@ -100,6 +100,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
+      shouldTrackTextLen = $(trackTextLen),
       hashingParams = makeHashingParams()
     )
 
@@ -136,7 +137,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, categoricalFeatures)
     } else Array.empty[OpVectorColumnMetadata]
     val textColumns = if (textFeatures.nonEmpty) {
-      makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++ textFeatures.map(_.toColumnMetaData(isNull = true))
+      makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
+        textFeatures.map(_.toColumnMetaData(isNull = true)) ++ textFeatures.map(_.toColumnTextLenData)
     } else Array.empty[OpVectorColumnMetadata]
 
     val columns = categoricalColumns ++ textColumns
@@ -187,6 +189,7 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
+  shouldTrackTextLen: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
@@ -215,8 +218,10 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
+      val textTextLenIndicatorsVector = if (args.shouldTrackTextLen) Seq(getTextLenVector(textTokens)) else Seq.empty
 
-      VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
+      VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector ++
+        textTextLenIndicatorsVector)
     }
   }
 
@@ -229,6 +234,16 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       Seq(0 -> nullVal)
     }
     val reindexed = reindex(nullIndicators)
+    val vector = makeSparseVector(reindexed)
+    vector.toOPVector
+  }
+
+  private def getTextLenVector(textTokens: Seq[TextList]): OPVector = {
+    val length = textTokens.map { tokens =>
+      val length = if (tokens.isEmpty) 0.0 else tokens.value.map(_.length).sum
+      Seq(0 -> length)
+    }
+    val reindexed = reindex(length)
     val vector = makeSparseVector(reindexed)
     vector.toOPVector
   }

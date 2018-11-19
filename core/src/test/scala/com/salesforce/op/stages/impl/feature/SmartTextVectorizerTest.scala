@@ -86,9 +86,7 @@ class SmartTextVectorizerTest
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator,
       textLenTransformer)
     val field = transformed.schema(smartVectorized.name)
-    println(s"Result: ${result(4)._1.value}")
-    println(s"Field: ${field.metadata}")
-    // assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
     val catRes = transformed.collect(categoricalVectorized)
     assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)

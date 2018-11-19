@@ -467,7 +467,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val retrieved = SanityCheckerSummary.fromMetadata(summary.getSummaryMetadata())
 
     // Check that all of the hashed text columns (and the null indicator column itself) are thrown away
-    retrieved.dropped.count(_.startsWith("text")) shouldBe TransmogrifierDefaults.DefaultNumOfFeatures + 1
+    retrieved.dropped.count(_.startsWith("text")) shouldBe (TransmogrifierDefaults.DefaultNumOfFeatures + 1
+    + (if (TransmogrifierDefaults.TrackTextLen) 1 else 0))
 
     // Now do the same thing with the map data
     val textMapData: Seq[TextMap] = RandomMap.of[Text, TextMap](RandomText.strings(1, 10), 0, 3).take(1000).toList

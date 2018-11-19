@@ -213,6 +213,7 @@ trait RichTextFeature {
       toLowercase: Boolean,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       unseenName: String = TransmogrifierDefaults.OtherString,
@@ -231,6 +232,7 @@ trait RichTextFeature {
         .setMaxCardinality(maxCategoricalCardinality)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
+        .setTrackTextLen(trackTextLen)
         .setAutoDetectLanguage(autoDetectLanguage)
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
@@ -570,12 +572,12 @@ trait RichTextFeature {
       cleanText: Boolean,
       minSupport: Int,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       others: Array[FeatureLike[Email]] = Array.empty
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](_.domain.toPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
-        trackNulls = trackNulls
-      )
+        trackNulls = trackNulls)
     }
 
   }
