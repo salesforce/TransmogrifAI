@@ -123,6 +123,14 @@ class TransientFeature
       indicatorValue = if (isNull) Some(OpVectorColumnMetadata.NullString) else None)
     }
 
+  def toColumnTextLenData: OpVectorColumnMetadata = {
+    new OpVectorColumnMetadata(
+      parentFeatureName = Seq(name),
+      parentFeatureType = Seq(typeName),
+      grouping = None,
+      indicatorValue = Some(OpVectorColumnMetadata.TextLen))
+  }
+
   /**
    * Transform transient feature into vector metadata for use vectors
    * (for when each feature creates multiple columns of a vector) assigns indicator group to feature name since

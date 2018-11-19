@@ -131,6 +131,7 @@ trait RichTextFeature {
       minTokenLength: Int,
       toLowercase: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLens: Boolean = TransmogrifierDefaults.TrackTextLen,
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
@@ -162,11 +163,17 @@ trait RichTextFeature {
         .setBinaryFreq(binaryFreq)
         .getOutput()
 
-      if (trackNulls) {
-        val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
-      }
-      else hashedFeatures
+      val inputFeatures = Array(hashedFeatures) ++ (if (trackNulls) {
+        Array(new TextListNullTransformer[TextList]().setInput(tokenized).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
+      }) ++ (if (trackTextLens) {
+        Array(new TextLenTransformer[TextList]().setInput(tokenized).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
+      })
+
+      new VectorsCombiner().setInput(inputFeatures).getOutput()
     }
 
     /**

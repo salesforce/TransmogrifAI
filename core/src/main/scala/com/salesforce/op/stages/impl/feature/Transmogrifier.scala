@@ -52,6 +52,7 @@ import scala.reflect.runtime.universe._
 private[op] trait TransmogrifierDefaults {
   val NullString: String = OpVectorColumnMetadata.NullString
   val OtherString: String = OpVectorColumnMetadata.OtherString
+  val TextLenString: String = OpVectorColumnMetadata.TextLen
   val DefaultNumOfFeatures: Int = 512
   val MaxNumOfFeatures: Int = 16384
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
@@ -70,6 +71,7 @@ private[op] trait TransmogrifierDefaults {
   val FillWithMode: Boolean = true
   val FillWithMean: Boolean = true
   val TrackNulls: Boolean = true
+  val TrackTextLen: Boolean = false
   val TrackInvalid: Boolean = false
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
