@@ -268,8 +268,9 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowTextTokenized)) else Nil
-    val textLen = if (args.shouldTrackTextLen) Seq(getTextLen(keysText, rowTextTokenized)) else Nil
-    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector ++ textLen)
+//    val textLen = if (args.shouldTrackTextLen) Seq(getTextLen(keysText, rowTextTokenized)) else Nil
+    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
+      // ++ textLen)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {

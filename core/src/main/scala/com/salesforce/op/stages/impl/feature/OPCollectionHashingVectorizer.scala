@@ -349,7 +349,7 @@ private[op] trait MapHashingFun extends HashingFun {
       } yield f.toColumnTextLenData
     } else Array.empty[OpVectorColumnMetadata]
 
-    hashColumns ++ nullColumns ++ textLenColumn
+    hashColumns ++ nullColumns // ++ textLenColumn
   }
 
   protected def hash

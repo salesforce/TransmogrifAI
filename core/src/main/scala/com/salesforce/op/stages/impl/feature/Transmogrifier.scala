@@ -71,7 +71,7 @@ private[op] trait TransmogrifierDefaults {
   val FillWithMode: Boolean = true
   val FillWithMean: Boolean = true
   val TrackNulls: Boolean = true
-  val TrackTextLen: Boolean = false
+  val TrackTextLen: Boolean = true
   val TrackInvalid: Boolean = false
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
