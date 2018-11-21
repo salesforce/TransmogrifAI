@@ -268,9 +268,8 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowTextTokenized)) else Nil
-//    val textLen = if (args.shouldTrackTextLen) Seq(getTextLen(keysText, rowTextTokenized)) else Nil
-    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector)
-      // ++ textLen)
+    val textLen = if (args.shouldTrackTextLen) Seq(getTextLen(keysText, rowTextTokenized)) else Nil
+    VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector ++ textLen)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
@@ -288,13 +287,12 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   private def getTextLen(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
     val textLen = keysSeq.zip(inputs).flatMap{ case (keys, input) =>
       keys.map{ k =>
-        val length = if (input.get(k).forall(_.isEmpty)) 0.0 else input.get(k).map(_.value.length).sum
+        val length = if (input.get(k).forall(_.isEmpty)) 0.0 else input.get(k).map(_.value.length).sum.toDouble
         Seq(0 -> length)
       }
     }
     val reindexed = reindex(textLen)
-    val vector = makeSparseVector(reindexed)
-    vector.toOPVector
+    makeSparseVector(reindexed).toOPVector
   }
 }
 

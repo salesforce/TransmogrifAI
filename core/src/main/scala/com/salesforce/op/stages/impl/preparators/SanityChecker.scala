@@ -590,7 +590,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         throw new IllegalArgumentException("Vector input metadata is malformed: ", e)
     }
 
-    println(s"Feature size: ${featureSize}, vevtor metadata size: ${vectorMeta.size}")
+    println(s"Feature size: ${featureSize}, vector metadata size: ${vectorMeta.size}")
 
     require(featureSize == vectorMeta.size,
       "Number of columns in vector metadata did not match number of columns in data, check your vectorizers")

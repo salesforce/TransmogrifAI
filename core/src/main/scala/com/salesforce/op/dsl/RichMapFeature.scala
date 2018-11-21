@@ -204,6 +204,7 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
@@ -224,11 +225,26 @@ trait RichMapFeature {
        * tracking on the original features so it's slightly different. Fortunately, tokenization for TextMaps is done
        * via the tokenize function directly, rather than with an entire stage, so things should still work here.
        */
-      if (trackNulls) {
-        val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+
+      val nullFeatures = if (trackNulls) {
+        Array(new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
       }
-      else hashedFeatures
+
+      val textFeatures = if (trackTextLen) {
+        Array(new TextLenMapTransformer[TextMap]().setInput(f +: others).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
+      }
+
+      new VectorsCombiner().setInput(Array(hashedFeatures) ++ nullFeatures ++ textFeatures).getOutput()
+
+//      if (trackNulls) {
+//        val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
+//        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+//      }
+//      else hashedFeatures
     }
 
     /**
@@ -339,6 +355,7 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
@@ -358,11 +375,24 @@ trait RichMapFeature {
         tracking on the original features so it's slightly different. Fortunately, tokenization for TextMaps is done
         via the tokenize function directly, rather than with an entire stage, so things should still work here.
        */
-      if (trackNulls) {
-        val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+      val nullFeatures = if (trackNulls) {
+        Array(new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
       }
-      else hashedFeatures
+
+      val textFeatures = if (trackTextLen) {
+        Array(new TextLenMapTransformer[TextAreaMap]().setInput(f +: others).getOutput())
+      } else {
+        Array.empty[FeatureLike[OPVector]]
+      }
+
+      new VectorsCombiner().setInput(Array(hashedFeatures) ++ nullFeatures ++ textFeatures).getOutput()
+//      if (trackNulls) {
+//        val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
+//        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+//      }
+//      else hashedFeatures
     }
 
     /**

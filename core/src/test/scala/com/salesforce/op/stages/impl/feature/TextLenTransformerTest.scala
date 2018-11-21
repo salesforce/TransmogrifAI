@@ -18,10 +18,10 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
       (TextList(Seq("A giraffe drinks by the watering hole")),
         TextList(Seq("A giraffe drinks by the watering hole"))),
       (TextList(Seq("A giraffe drinks by the watering hole")), TextList(Seq("Cheese"))),
-      (TextList(Seq("Cheese")), TextList(Seq("A giraffe drinks by the watering hole"))),
+      (TextList(Seq("Cheese", "cake")), TextList(Seq("A giraffe drinks by the watering hole"))),
       (TextList(Seq("Cheese")), TextList(Seq("Cheese"))),
       (TextList.empty, TextList(Seq("A giraffe drinks by the watering hole"))),
-      (TextList.empty, TextList(Seq("Cheese"))),
+      (TextList.empty, TextList(Seq("Cheese", "tart"))),
       (TextList(Seq("A giraffe drinks by the watering hole")), TextList.empty),
       (TextList(Seq("Cheese")), TextList.empty),
       (TextList.empty, TextList.empty)
@@ -45,10 +45,10 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
     val expected = Array(
       Array(37.0, 37.0),
       Array(37.0, 6.0),
-      Array(6.0, 37.0),
+      Array(10.0, 37.0),
       Array(6.0, 6.0),
       Array(0.0, 37.0),
-      Array(0.0, 6.0),
+      Array(0.0, 10.0),
       Array(37.0, 0.0),
       Array(6.0, 0.0),
       Array(0.0, 0.0)

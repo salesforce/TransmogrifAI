@@ -61,17 +61,16 @@ class SmartTextVectorizerTest
     .setInput(f1, f2)
 
   val expectedResult = Seq(
-    Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
-    Vectors.sparse(9, Array(1, 6), Array(1.0, 1.0)),
-    Vectors.sparse(9, Array(0, 6), Array(1.0, 2.0)),
-    Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
+    Vectors.sparse(10, Array(0, 4, 6, 9), Array(1.0, 1.0, 1.0, 10.0)),
+    Vectors.sparse(10, Array(0, 8), Array(1.0, 1.0)),
+    Vectors.sparse(10, Array(1, 6, 9), Array(1.0, 1.0, 6.0)),
+    Vectors.sparse(10, Array(0, 6, 9), Array(1.0, 2.0, 9.0)),
+    Vectors.sparse(10, Array(3, 8), Array(1.0, 1.0))
   ).map(_.toOPVector)
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
-      .setTrackTextLen(false)
       .setInput(f1, f2).getOutput()
 
     val categoricalVectorized = new OpTextPivotVectorizer[Text]().setMinSupport(1).setTopK(2).setInput(f1).getOutput()
@@ -79,23 +78,23 @@ class SmartTextVectorizerTest
     val textVectorized = new OPCollectionHashingVectorizer[TextList]()
       .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
-    val textLenTransformer = new TextLenTransformer[TextList]().setInput(tokenizedText).getOutput()
+    val textLen = new TextLenTransformer[TextList]().setInput(tokenizedText).getOutput()
 
     val transformed = new OpWorkflow()
-      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator, textLenTransformer)
+      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator, textLen)
       .transform(inputData)
-    val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator,
-      textLenTransformer)
+    val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator, textLen)
     val field = transformed.schema(smartVectorized.name)
-     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
+       transformed.collect(smartVectorized))
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
     val catRes = transformed.collect(categoricalVectorized)
     assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
     val fieldText = transformed.schema(textVectorized.name)
     val textRes = transformed.collect(textVectorized)
     assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
-    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector, textLen) =>
-      val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector, textLen))
+    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector, text) =>
+      val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector, text))
       smartVector -> combined
     }.unzip
 
@@ -105,6 +104,7 @@ class SmartTextVectorizerTest
   it should "detect two categorical text features" in {
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(10).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(false)
       .setInput(f1, f2).getOutput()
 
     val categoricalVectorized =
@@ -133,17 +133,18 @@ class SmartTextVectorizerTest
     val textVectorized = new OPCollectionHashingVectorizer[TextList]()
       .setNumFeatures(4).setPrependFeatureName(false).setInput(f1Tokenized, f2Tokenized).getOutput()
     val nullIndicator = new TextListNullTransformer[TextList]().setInput(f1Tokenized, f2Tokenized).getOutput()
+    val textLen = new TextLenTransformer[TextList]().setInput(f1Tokenized, f2Tokenized).getOutput()
 
     val transformed = new OpWorkflow()
-      .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
-    val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
+      .setResultFeatures(smartVectorized, textVectorized, nullIndicator, textLen).transform(inputData)
+    val result = transformed.collect(smartVectorized, textVectorized, nullIndicator, textLen)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartVectorized))
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true, false, false), transformed.collect(smartVectorized))
     val fieldText = transformed.schema(textVectorized.name)
     val textRes = transformed.collect(textVectorized)
     assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
-    val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
-      val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
+    val (smart, expected) = result.map { case (smartVector, textVector, nullVector, textLength) =>
+      val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector, textLength))
       smartVector -> combined
     }.unzip
 
@@ -165,9 +166,10 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
+      transformed.collect(smartVectorized))
     val fieldShortcut = transformed.schema(shortcutVectorized.name)
-    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
       transformed.collect(shortcutVectorized))
     val (regular, shortcut) = result.unzip
 
@@ -195,8 +197,9 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    // TODO: validate
     meta.history.keys shouldBe Set(f1.name, f2.name)
-    meta.columns.length shouldBe 9
+    meta.columns.length shouldBe 10
     meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
@@ -212,10 +215,14 @@ class SmartTextVectorizerTest
       } else if (col.index < 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
         col.grouping shouldBe None
-      } else {
+      } else if (col.index == 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
         col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
       }
     }
   }
@@ -223,6 +230,7 @@ class SmartTextVectorizerTest
   it should "generate categorical metadata correctly" in {
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(4).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(false)
       .setInput(f1, f2).getOutput()
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
@@ -266,7 +274,7 @@ class SmartTextVectorizerTest
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     meta.history.keys shouldBe Set(f1.name, f2.name)
-    meta.columns.length shouldBe 10
+    meta.columns.length shouldBe 12
     meta.columns.foreach { col =>
       if (col.index < 4) {
         col.parentFeatureName shouldBe Seq(f1.name)
@@ -278,10 +286,21 @@ class SmartTextVectorizerTest
         col.parentFeatureName shouldBe Seq(f1.name)
         col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
-      } else {
+      } else if (col.index == 9) {
         col.parentFeatureName shouldBe Seq(f2.name)
         col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      } else if (col.index == 10) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe None
+        // numeric
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
+        col.indicatorValue shouldBe None
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
+        col.indicatorValue shouldBe None
       }
     }
   }

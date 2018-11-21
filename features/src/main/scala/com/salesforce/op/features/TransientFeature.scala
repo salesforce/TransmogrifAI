@@ -128,7 +128,8 @@ class TransientFeature
       parentFeatureName = Seq(name),
       parentFeatureType = Seq(typeName),
       grouping = None,
-      indicatorValue = Some(OpVectorColumnMetadata.TextLen))
+      descriptorValue = Option(OpVectorColumnMetadata.TextLen)
+    )
   }
 
   /**

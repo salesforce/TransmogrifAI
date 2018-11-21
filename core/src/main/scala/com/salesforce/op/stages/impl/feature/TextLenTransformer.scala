@@ -19,7 +19,7 @@ class TextLenTransformer[T <: TextList]
   operationName = "textLen", uid = uid) with VectorizerDefaults {
   override def transformFn: Seq[T] => OPVector = in => {
     val output = in.flatMap { f =>
-      if (f.isEmpty) Seq(0.0) else f.value.map(_.length.toDouble)
+      if (f.isEmpty) Seq(0.0) else Seq(f.value.map(_.length.toDouble).sum)
     }
     Vectors.dense(output.toArray).toOPVector
   }

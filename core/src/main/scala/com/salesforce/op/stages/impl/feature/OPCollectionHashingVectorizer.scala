@@ -342,14 +342,14 @@ private[op] trait MapHashingFun extends HashingFun {
       } yield f.toColumnMetaData(isNull = true).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
-    val textLenColumn = if (shouldTrackTextLen) {
+    val textLenColumns = if (shouldTrackTextLen) {
       for {
         (keys, f) <- allKeys.toArray.zip(features)
         key <- keys
       } yield f.toColumnTextLenData
     } else Array.empty[OpVectorColumnMetadata]
 
-    hashColumns ++ nullColumns // ++ textLenColumn
+    hashColumns ++ nullColumns ++ textLenColumns
   }
 
   protected def hash

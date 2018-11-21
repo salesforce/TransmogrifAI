@@ -131,6 +131,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
+    val shouldTrackLen = $(trackTextLen)
     val unseen = Option($(unseenName))
 
     val categoricalColumns = if (categoricalFeatures.nonEmpty) {
@@ -138,10 +139,13 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     } else Array.empty[OpVectorColumnMetadata]
     val textColumns = if (textFeatures.nonEmpty) {
       makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
-        textFeatures.map(_.toColumnMetaData(isNull = true)) ++ textFeatures.map(_.toColumnTextLenData)
+        textFeatures.map(_.toColumnMetaData(isNull = true))
     } else Array.empty[OpVectorColumnMetadata]
 
-    val columns = categoricalColumns ++ textColumns
+    val lenColumns = if (shouldTrackLen) textFeatures.map(_.toColumnTextLenData)
+    else Array.empty[OpVectorColumnMetadata]
+
+    val columns = categoricalColumns ++ textColumns ++ lenColumns
     OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
   }
 }
@@ -218,7 +222,8 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
-      val textTextLenIndicatorsVector = if (args.shouldTrackTextLen) Seq(getTextLenVector(textTokens)) else Seq.empty
+      val textTextLenIndicatorsVector = if (args.shouldTrackTextLen) Seq(getTextLenVector(textTokens))
+      else Seq.empty
 
       VectorsCombiner.combineOP(Seq(categoricalVector, textVector) ++ textNullIndicatorsVector ++
         textTextLenIndicatorsVector)
@@ -239,13 +244,12 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   }
 
   private def getTextLenVector(textTokens: Seq[TextList]): OPVector = {
-    val length = textTokens.map { tokens =>
-      val length = if (tokens.isEmpty) 0.0 else tokens.value.map(_.length).sum
-      Seq(0 -> length)
+    val lengths = textTokens.map { tokens =>
+      val value = if (tokens.isEmpty) 0.0 else tokens.value.map(_.length).sum.toDouble
+      Seq(0 -> value)
     }
-    val reindexed = reindex(length)
-    val vector = makeSparseVector(reindexed)
-    vector.toOPVector
+    val reindexed = reindex(lengths)
+    makeSparseVector(reindexed).toOPVector
   }
 }
 
