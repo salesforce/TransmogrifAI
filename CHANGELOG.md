@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.5.0
+
+New features and bug fixes:
+
+- XGBoost classification & regression models - EXPERIMENTAL [#44](https://github.com/salesforce/TransmogrifAI/pull/44)
+- Add default param grid for xgboost [#175](https://github.com/salesforce/TransmogrifAI/pull/175)
+- Fix ModelInsights for xgboost [#170](https://github.com/salesforce/TransmogrifAI/pull/170)
+- Added Parquet reader [#169](https://github.com/salesforce/TransmogrifAI/pull/169)
+- Added aggregate & conditional readers for Parquet [#172](https://github.com/salesforce/TransmogrifAI/pull/172)
+- Evaluators check for empty data [#178](https://github.com/salesforce/TransmogrifAI/pull/178)
+- Refactored splitter tests [#176](https://github.com/salesforce/TransmogrifAI/pull/176)
+- Return scoring feature distributions from RawFeatureFilter [#171](https://github.com/salesforce/TransmogrifAI/pull/171)
+- Using MapReduce Api for Avro Read Write [#150](https://github.com/salesforce/TransmogrifAI/pull/150)
+- Improve test coverage for VectorsCombiner and make vector aggregator efficient [#168](https://github.com/salesforce/TransmogrifAI/pull/168)
+- Time based aggregators [#167](https://github.com/salesforce/TransmogrifAI/pull/167)
+- Ignore null values in meta + support floats [#166](https://github.com/salesforce/TransmogrifAI/pull/166)
+- CLI command name fix + bump shadow plugin version + cleanup [#164](https://github.com/salesforce/TransmogrifAI/pull/164)
+- Fix build.sbt example in readme [#165](https://github.com/salesforce/TransmogrifAI/pull/165)
+- Removed an old test I added to check if Spark ran out of memory when calculating a correlation matrix (this is unnecessary and unhelpful) [#160](https://github.com/salesforce/TransmogrifAI/pull/160)
+- Replace assert with require [#159](https://github.com/salesforce/TransmogrifAI/pull/159)
+- Streaming histogram implementation [#152](https://github.com/salesforce/TransmogrifAI/pull/152)
+- Added test and removed dead code for Sanity Checker dealing with map with same key [#153](https://github.com/salesforce/TransmogrifAI/pull/153)
+- Fixed model insights exception when features are excluded from sanity checker correlation calculations [#147](https://github.com/salesforce/TransmogrifAI/pull/147)
+- Added logging of response distribution to RFF [#146](https://github.com/salesforce/TransmogrifAI/pull/146)
+- Use proper test ranges in feature converter test [#143](https://github.com/salesforce/TransmogrifAI/pull/143)
+- Added support for DateType and TimestampType primitive spark types [#135](https://github.com/salesforce/TransmogrifAI/pull/135)
+- Standardizing timezone to UTC [#138](https://github.com/salesforce/TransmogrifAI/pull/138)
+
+Dependency upgrades & misc:
+- XGBoost 0.81 [#180](https://github.com/salesforce/TransmogrifAI/pull/180)
+- Spark 2.3.2 [#44](https://github.com/salesforce/TransmogrifAI/pull/44)
+- Gradle 4.10.2 [#142](https://github.com/salesforce/TransmogrifAI/pull/142)
+- Use OpenJDK8 for CircleCI builds + refactor build config [#140](https://github.com/salesforce/TransmogrifAI/pull/140)
+
 ## 0.4.0
 
 New features and bug fixes:
@@ -50,7 +84,6 @@ BinaryClassificationModelSelector
   .withCrossValidation(modelsAndParameters = models)
 ```
 For more example on how to use new model selectors please refer to our documentation and helloworld examples.
-
 
 Dependency upgrades & misc:
 - CI/CD runtime improvements for CircleCI and TravisCI

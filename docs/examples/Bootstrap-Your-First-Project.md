@@ -7,10 +7,10 @@ Clone the TransmogrifAI repo:
 ```bash
 git clone https://github.com/salesforce/TransmogrifAI.git
 ```
-Checkout the latest release branch (in this example `0.4.0`):
+Checkout the latest release branch (in this example `0.5.0`):
 ```bash
 cd ./TransmogrifAI
-git checkout 0.4.0
+git checkout 0.5.0
 ```
 Build the TransmogrifAI CLI by running:
 ```bash
