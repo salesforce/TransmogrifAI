@@ -12,13 +12,13 @@ Add the `transmogrifai-local` dependency into your project together with `hadria
 For Gradle in `build.gradle` add:
 ```gradle
 dependencies {
-    compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.4.0'
+    compile 'com.salesforce.transmogrifai:transmogrifai-local_2.11:0.5.0'
     runtime 'com.opendatagroup:hadrian:0.8.5'
 }
 ```
 For SBT in `build.sbt` add:
 ```sbt
-libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.4.0"
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-local" % "0.5.0"
 
 libraryDependencies += libraryDependencies += "com.opendatagroup" % "hadrian" % "0.8.5" % Runtime
 ```
