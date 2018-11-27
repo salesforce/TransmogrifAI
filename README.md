@@ -123,10 +123,10 @@ Start by picking TransmogrifAI version to match your project dependencies from t
 
 | TransmogrifAI Version      | Spark Version | Scala Version | Java Version |
 |----------------------------|:-------------:|:-------------:|:------------:|
-| 0.6.0 (unreleased, master) |     2.3.x     |      2.11     |      1.8     |
-| **0.5.0 (stable)**         |   **2.3.x**   |    **2.11**   |    **1.8**   |
-| 0.4.0                      |     2.2.x     |      2.11     |      1.8     |
-| 0.3.4                      |     2.2.x     |      2.11     |      1.8     |
+| 0.6.0 (unreleased, master) |      2.3      |      2.11     |      1.8     |
+| **0.5.0 (stable)**         |    **2.3**    |    **2.11**   |    **1.8**   |
+| 0.4.0                      |      2.2      |      2.11     |      1.8     |
+| 0.3.4                      |      2.2      |      2.11     |      1.8     |
 
 For Gradle in `build.gradle` add:
 ```gradle
