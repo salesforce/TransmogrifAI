@@ -4,6 +4,8 @@
 * [AutoML: The Assembly Line of Machine Learning](http://www.dataengconf.com/automl-the-assembly-line-of-machine-learning), Mayukh Bhaowal, DataEngConf
 * [The Black Swan of Perfectly Interpretable Models](https://www.infoq.com/presentations/salesforce-einstein-ml), Leah McGuire and Mayukh Bhaowal, QCon.ai
 * [Implementing AutoML Techniques at Salesforce Scale](https://vimeo.com/274420096), Matthew Tovbin, Spark+AI Summit, [Slides](https://www.slideshare.net/MatthewTovbin/implementing-automl-techniques-at-salesforce-scale)
+* [Building Tools for Enterprise Data Science](https://www.oreilly.com/ideas/building-tools-for-enterprise-data-science), Vitaly Gordon, The O’Reilly Data Show Podcast
+* [Making Spark ML Models Portable - Know Your Options](https://scalebythebay2018.sched.com/event/FmEk/making-spark-ml-models-portable-know-your-options), Matthew Tovbin, Scale By They Bay, [Slides](https://www.slideshare.net/MatthewTovbin/making-spark-ml-models-portable-know-your-options)
 
 **2017**
 * [Embracing a Taxonomy of Types to Simplify Machine Learning](https://databricks.com/session/embracing-a-taxonomy-of-types-to-simplify-machine-learning), Leah McGuire, Spark Summit, [Slides](https://www.slideshare.net/databricks/embracing-a-taxonomy-of-types-to-simplify-machine-learning-with-leah-mcguire)
