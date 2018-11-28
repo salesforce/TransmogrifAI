@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.{DescVal, IndVal}
+import com.salesforce.op.test.TestOpVectorColumnType.DescVal
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._

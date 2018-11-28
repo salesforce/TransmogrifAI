@@ -374,10 +374,12 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
         case f if f.isSubtypeOf[Date] => Array.fill(24)(false) ++ Array.fill(3)(Seq(false, true)).flatten
           .asInstanceOf[Array[Boolean]]
         case f if f.isSubtypeOf[TextArea] || f.isSubtypeOf[Text] => Array.fill(
-          result.head.value.size - 3)(false) ++ Array.fill(3)(true)
+          result.head.value.size - 6)(false) ++ Array.fill(3)(true) ++ Array.fill(3)(false)
         case f if f.isSubtypeOf[Geolocation] => Array.fill(result.head.value.size / 4)(
           Seq(false, false, false, true)).flatten
-        case f if f.isSubtypeOf[MultiPickList] => Array(true, true, true, true, true, false, true, true, true,
+        case f if f.isSubtypeOf[MultiPickList] =>
+          println(s"feature: ${f.name}")
+          Array(true, true, true, true, true, false, true, true, true,
           true, true, true, false, true, true, true, true, true, true, false, true)
         case _ => Array.fill(result.head.value.size / 2)(Seq(false, true)).flatten
       }

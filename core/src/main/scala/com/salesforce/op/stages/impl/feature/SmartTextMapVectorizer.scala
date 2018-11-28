@@ -288,7 +288,7 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   private def getTextLen(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
     val textLen = keysSeq.zip(inputs).flatMap{ case (keys, input) =>
       keys.map{ k =>
-        Seq(0 -> input.get(k).map(_.value.length).sum.toDouble)
+        Seq(0 -> input.get(k).map(_.value.map(_.length).sum).sum.toDouble)
       }
     }
     val reindexed = reindex(textLen)

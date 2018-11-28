@@ -106,9 +106,11 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    // last two columns are null indicator and text len tracker
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
+      transformed.collect(smartVectorized))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
       transformed.collect(smartMapVectorized))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
@@ -174,9 +176,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartVectorized))
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true, false, false), transformed.collect(smartVectorized))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    assertNominal(fieldMap, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartMapVectorized))
+    assertNominal(fieldMap, Array.fill(8)(false) ++ Array(true, true, false, false),
+      transformed.collect(smartMapVectorized))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
@@ -208,9 +211,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
-    assertNominal(field, Array.fill(4)(false) ++ Array(true, true), transformed.collect(smartVectorized))
+    assertNominal(field, Array.fill(4)(false) ++ Array(true, true, false, false), transformed.collect(smartVectorized))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    assertNominal(fieldMap, Array.fill(4)(false) ++ Array(true, true), transformed.collect(smartMapVectorized))
+    assertNominal(fieldMap, Array.fill(4)(false) ++ Array(true, true, false, false),
+      transformed.collect(smartMapVectorized))
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
@@ -246,10 +250,11 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     val rSmart = transformed.collect(smartVectorized)
-    assertNominal(field, Array.fill(rSmart.head.value.size - 2)(false) ++ Array(true, true), rSmart)
+    assertNominal(field, Array.fill(rSmart.head.value.size - 4)(false) ++ Array(true, true, false, false), rSmart)
     val fieldMap = transformed.schema(smartMapVectorized.name)
     val rSmartMp = transformed.collect(smartMapVectorized)
-    assertNominal(fieldMap, Array.fill(rSmartMp.head.value.size - 2)(false) ++ Array(true, true), rSmartMp)
+    assertNominal(fieldMap, Array.fill(rSmartMp.head.value.size - 4)(false) ++ Array(true, true, false, false),
+      rSmartMp)
     val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     mapMeta.history.keys shouldBe Set(m1.name, m2.name)
@@ -260,8 +265,12 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       m.parentFeatureType shouldBe Array(m1.typeName)
       if (m.index == TransmogrifierDefaults.MaxNumOfFeatures) {
         assert(m.grouping === Option(f1.name), s"first null indicator should be from ${f1.name}")
-      } else if (m.index > TransmogrifierDefaults.MaxNumOfFeatures) {
+      } else if (m.index == TransmogrifierDefaults.MaxNumOfFeatures + 1) {
         assert(m.grouping === Option(f2.name), s"second null indicator should be from ${f2.name}")
+      } else if (m.index == TransmogrifierDefaults.MaxNumOfFeatures + 2) {
+        assert(m.grouping === Option(f1.name), s"first text len tracker should be from ${f1.name}")
+      } else if (m.index == TransmogrifierDefaults.MaxNumOfFeatures + 3) {
+        assert(m.grouping === Option(f2.name), s"second text len tracker should be from ${f2.name}")
       }
       m.indicatorValue shouldBe f.indicatorValue
     }
@@ -285,10 +294,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, shortcutMapVectorized).transform(data)
     val result = transformed.collect(smartMapVectorized, shortcutMapVectorized)
     val field = transformed.schema(shortcutMapVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true :+ false,
       transformed.collect(shortcutMapVectorized))
     val fieldMap = transformed.schema(smartMapVectorized.name)
-    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true :+ false,
       transformed.collect(smartMapVectorized))
     val smartMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
     val shortcutMeta = OpVectorMetadata(transformed.schema(shortcutMapVectorized.name))
@@ -319,10 +328,10 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     val transformed = new OpWorkflow().setResultFeatures(textMapVectorized, textAreaMapVectorized).transform(data)
     val result = transformed.collect(textMapVectorized, textAreaMapVectorized)
     val field = transformed.schema(textMapVectorized.name)
-    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true :+ false,
       transformed.collect(textMapVectorized))
     val fieldMap = transformed.schema(textAreaMapVectorized.name)
-    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true :+ false,
       transformed.collect(textAreaMapVectorized))
     val textMapMeta = OpVectorMetadata(transformed.schema(textMapVectorized.name))
     val textareaMapMeta = OpVectorMetadata(transformed.schema(textAreaMapVectorized.name))

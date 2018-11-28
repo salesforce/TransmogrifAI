@@ -53,7 +53,6 @@ class TextMapNullEstimator[T <: OPMap[String]]
   protected val shouldCleanValues = true
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-
     val shouldCleanKeys = $(cleanKeys)
     val allKeys: Seq[Seq[String]] = getKeyValues(
       in = dataset,

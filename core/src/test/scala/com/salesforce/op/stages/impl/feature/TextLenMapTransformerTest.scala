@@ -54,8 +54,8 @@ class TextLenMapTransformerTest extends FlatSpec with TestSparkContext with Attr
     )
   )
 
-  Spec[TextLenMapTransformer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new TextLenMapTransformer[TextMap]().setInput(f1)
+  Spec[TextMapLenEstimator[_]] should "take an array of features as input and return a single vector feature" in {
+    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1)
     val vector = vectorizer.getOutput()
 
     vector.name shouldBe vectorizer.getOutputFeatureName
@@ -64,14 +64,14 @@ class TextLenMapTransformerTest extends FlatSpec with TestSparkContext with Attr
   }
 
   it should "transform the data correctly" in {
-    val vectorizer = new TextLenMapTransformer[TextMap]().setInput(f1)
+    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1)
     val transformed = vectorizer.fit(ds).transform(ds)
     val vector = vectorizer.getOutput()
 
     val expected = Array(
-      Array(37.0, 6.0, 5.0, 3.0),
-      Array(0.0, 12.0, 0.0, 5.0),
-      Array(0.0, 0.0, 16.0, 0.0)
+      Array(31.0, 6.0, 5.0, 3.0),
+      Array(0.0, 11.0, 0.0, 0.0),
+      Array(0.0, 0.0, 14.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)
     val result = transformed.collect(vector)
     result shouldBe expected

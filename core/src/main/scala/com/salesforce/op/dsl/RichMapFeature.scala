@@ -233,7 +233,7 @@ trait RichMapFeature {
       }
 
       val textFeatures = if (trackTextLen) {
-        Array(new TextLenMapTransformer[TextMap]().setInput(f +: others).getOutput())
+        Array(new TextMapLenEstimator[TextMap]().setInput(f +: others).getOutput())
       } else {
         Array.empty[FeatureLike[OPVector]]
       }
@@ -376,7 +376,7 @@ trait RichMapFeature {
       }
 
       val textFeatures = if (trackTextLen) {
-        Array(new TextLenMapTransformer[TextAreaMap]().setInput(f +: others).getOutput())
+        Array(new TextMapLenEstimator[TextAreaMap]().setInput(f +: others).getOutput())
       } else {
         Array.empty[FeatureLike[OPVector]]
       }
@@ -492,8 +492,7 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
     ): FeatureLike[OPVector] = {
       new MultiPickListMapVectorizer[T]()
         .setInput(f +: others)
@@ -504,7 +503,6 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
-        .setTrackTextLen(trackTextLen)
         .getOutput()
     }
   }

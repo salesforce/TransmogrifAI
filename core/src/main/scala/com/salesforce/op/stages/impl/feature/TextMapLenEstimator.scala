@@ -41,14 +41,15 @@ import scala.reflect.runtime.universe.TypeTag
 /**
  * Transformer for generating using text length per row
  */
-class TextLenMapTransformer[T <: OPMap[String]]
+class TextMapLenEstimator[T <: OPMap[String]]
 (
-  uid: String = UID[TextLenMapTransformer[_]]
+  uid: String = UID[TextMapLenEstimator[_]]
 )(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
   operationName = "textLenMap", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
 
+  protected val shouldCleanValues = true
+
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-    val shouldCleanValues = false
     val shouldCleanKeys = $(cleanKeys)
     val allKeys: Seq[Seq[String]] = getKeyValues(
       in = dataset,
@@ -93,11 +94,15 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
       case (map, i) =>
         val keys = allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = cleanKeys, shouldCleanValue = cleanValues)
-        // val tokenMap = cleaned.mapValues(tokenize(_).tokens)
+        val tokenMap = cleaned.mapValues { v => v.toText }.mapValues(tokenize(_).tokens)
 
         // Need to check if key is present, and also that our tokenizer will not remove the value
         keys.map { k =>
-          cleaned.get(k).map(_.length).getOrElse(0).toDouble
+          if (cleaned.contains(k) && tokenMap(k).nonEmpty) {
+            cleaned.get(k).map(_.length).getOrElse(0).toDouble
+          } else {
+            0.0
+          }
         }
     }.toOPVector
   }

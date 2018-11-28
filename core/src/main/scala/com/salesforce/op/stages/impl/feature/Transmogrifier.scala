@@ -668,14 +668,14 @@ trait MapStringPivotHelper extends SaveOthersParams {
           parentFeatureName = Seq(f.name),
           parentFeatureType = Seq(f.typeName),
           grouping = Option(key),
-          indicatorValue = Option(value)
+          descriptorValue = Option(value)
         )
       } else {
         OpVectorColumnMetadata(
           parentFeatureName = Seq(f.name),
           parentFeatureType = Seq(f.typeName),
           grouping = Option(key),
-          descriptorValue = Option(value)
+          indicatorValue = Option(value)
         )
       }
     }
