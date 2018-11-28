@@ -42,7 +42,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextLenMapTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (ds, f1) = TestFeatureBuilder(
     Seq[TextMap](

@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.DescVal
+import com.salesforce.op.test.TestOpVectorColumnType.DescColWithGroup
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
@@ -89,8 +89,8 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
-      f1 -> List(DescVal(Some(TransmogrifierDefaults.TextLenString))),
-      f2 -> List(DescVal(Some(TransmogrifierDefaults.TextLenString)))
+      f1 -> List(DescColWithGroup(Some(TransmogrifierDefaults.TextLenString), groupName = "f1")),
+      f2 -> List(DescColWithGroup(Some(TransmogrifierDefaults.TextLenString), groupName = "f2"))
     )
   }
 }
