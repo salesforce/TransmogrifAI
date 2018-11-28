@@ -377,10 +377,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
+    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8",
+      "textMap_color_TextLenValue_11")
     val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
       "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
+      "textMap_beverage_NullIndicatorValue_10", "textMap_color_TextLenValue_11", "textMap_fruit_TextLenValue_12",
+      "textMap_beverage_TextLenValue_13"
     )
     val featuresWithNaNCorr = Seq("textMap_7")
 
@@ -413,13 +415,16 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val featuresToDrop = Seq("textMap_color_0", "textMap_color_1", "textMap_color_2", "textMap_color_3",
       "textMap_fruit_4", "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
       "textMap_beverage_8", "textMap_beverage_9",
-      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13"
+      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13",
+      "textMap_color_TextLenValue_15", "textMap_fruit_TextLenValue_16"
     )
     val featuresWithCorr = Seq("textMap_color_0", "textMap_color_3",
       "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
       "textMap_beverage_10", "textMap_beverage_11",
       "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13",
-      "textMap_beverage_NullIndicatorValue_14"
+      "textMap_beverage_NullIndicatorValue_14",
+      "textMap_color_TextLenValue_15", "textMap_fruit_TextLenValue_16",
+      "textMap_beverage_TextLenValue_17"
     )
     val featuresWithNaNCorr = Seq("textMap_color_1", "textMap_color_2", "textMap_fruit_4",
       "textMap_beverage_8", "textMap_beverage_9"
@@ -452,13 +457,15 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_7", "textMap_color_NullIndicatorValue_8")
+    val featuresToDrop = Seq("textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_color_TextLenValue_11")
     val expectedFeatNames = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
       "textMap_6", "textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
+      "textMap_beverage_NullIndicatorValue_10", "textMap_color_TextLenValue_11",
+      "textMap_fruit_TextLenValue_12", "textMap_beverage_TextLenValue_13"
     )
     val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
+      "textMap_beverage_NullIndicatorValue_10", "textMap_color_TextLenValue_11",
+      "textMap_fruit_TextLenValue_12", "textMap_beverage_TextLenValue_13"
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
@@ -487,12 +494,14 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_513")
+    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_513", "textMap_color_TextLenValue_516")
     val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
       Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-        "textMap_fruit_NullIndicatorValue_514")
+        "textMap_fruit_NullIndicatorValue_514",
+        "textMap_beverage_TextLenValue_515", "textMap_color_TextLenValue_516", "textMap_fruit_TextLenValue_517")
     val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-      "textMap_fruit_NullIndicatorValue_514"
+      "textMap_fruit_NullIndicatorValue_514",
+      "textMap_beverage_TextLenValue_515", "textMap_color_TextLenValue_516", "textMap_fruit_TextLenValue_517"
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
@@ -522,10 +531,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
+    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8",
+      "textMap_color_TextLenValue_11")
     val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
       "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
+      "textMap_beverage_NullIndicatorValue_10",
+      "textMap_color_TextLenValue_11", "textMap_fruit_TextLenValue_12", "textMap_beverage_TextLenValue_13"
     )
     val featuresWithNaNCorr = Seq("textMap_7")
 
@@ -597,12 +608,18 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val totalFeatures = (0 until numHashes).map(i => "textMap_" + i.toString) ++
       Seq("textMap_beverage_NullIndicatorValue_" + numHashes.toString,
         "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
-        "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
+        "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString) ++
+      Seq("textMap_beverage_TextLenValue_" + (numHashes + 3).toString,
+        "textMap_color_TextLenValue_" + (numHashes + 4).toString,
+        "textMap_fruit_TextLenValue_" + (numHashes + 5).toString)
     val featuresWithCorr = Seq("textMap_8", "textMap_89", "textMap_294", "textMap_706", "textMap_971",
       "textMap_1364", "textMap_1633", "textMap_2382", "textMap_2527", "textMap_3159", "textMap_3491",
       "textMap_3804", "textMap_beverage_NullIndicatorValue_" + numHashes.toString,
       "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
-      "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
+      "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString,
+      "textMap_beverage_TextLenValue_" + (numHashes + 3).toString,
+      "textMap_color_TextLenValue_" + (numHashes + 4).toString,
+      "textMap_fruit_TextLenValue_" + (numHashes + 5).toString)
     val featuresWithNaNCorr = totalFeatures.filterNot(featuresWithCorr.contains)
 
 

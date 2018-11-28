@@ -73,13 +73,13 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
     val vector = vectorizer.getOutput()
 
     val expected = Array(
-      Array(37.0, 37.0),
-      Array(37.0, 6.0),
-      Array(10.0, 37.0),
+      Array(31.0, 31.0),
+      Array(31.0, 6.0),
+      Array(10.0, 31.0),
       Array(6.0, 6.0),
-      Array(0.0, 37.0),
+      Array(0.0, 31.0),
       Array(0.0, 10.0),
-      Array(37.0, 0.0),
+      Array(31.0, 0.0),
       Array(6.0, 0.0),
       Array(0.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)

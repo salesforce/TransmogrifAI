@@ -175,6 +175,7 @@
           "topValues" : [ [ ] ],
           "shouldCleanText" : true,
           "shouldTrackNulls" : true,
+          "shouldTrackTextLen" : false,
           "hashingParams" : {
             "hashWithIndex" : false,
             "prependFeatureName" : true,
@@ -259,6 +260,10 @@
         "value" : "com.salesforce.op.features.types.MultiPickList"
       },
       "shouldTrackNulls" : {
+        "type" : "Value",
+        "value" : true
+      },
+      "shouldTrackTextLen" : {
         "type" : "Value",
         "value" : true
       },

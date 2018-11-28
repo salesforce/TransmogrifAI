@@ -149,7 +149,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     genderInsights.derivedFeatures.size shouldBe 4
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 8
+    insights.stageInfo.keys.size shouldEqual 9
   }
 
   it should "return feature insights with selector info and label info even when no models are found" in {
@@ -180,7 +180,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 10
+    insights.stageInfo.keys.size shouldEqual 11
   }
 
   it should "find the sanity checker metadata even if the model has been serialized" in {
@@ -232,7 +232,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.get.validationType shouldBe CrossValidation
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 12
   }
 
   it should "return feature insights with label info and model info even when no sanity checker is found" in {
@@ -263,7 +263,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 10
+    insights.stageInfo.keys.size shouldEqual 11
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
@@ -274,7 +274,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
       Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
     )
     reg.size shouldBe 1
-    reg.head.size shouldBe 21
+    reg.head.size shouldBe 22
 
     lin.size shouldBe 1
     lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
