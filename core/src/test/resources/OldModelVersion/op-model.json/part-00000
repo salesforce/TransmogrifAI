@@ -265,7 +265,7 @@
       },
       "shouldTrackTextLen" : {
         "type" : "Value",
-        "value" : true
+        "value" : false
       },
       "shouldCleanText" : {
         "type" : "Value",

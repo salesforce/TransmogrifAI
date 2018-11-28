@@ -55,7 +55,6 @@ trait AttributeAsserts {
     } if (nominal) value should (be(0.0) or be(1.0))
 
     val attributes = AttributeGroup.fromStructField(schema).attributes
-
     withClue("Field attributes were not set or not as expected:") {
       attributes.map(_.map(_.isNominal).toSeq) shouldBe Some(expectedNominal.toSeq)
     }

@@ -63,8 +63,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
 
   protected def makeModel(topValues: Seq[Seq[String]], shouldCleanText: Boolean,
-    shouldTrackNulls: Boolean, operationName: String, uid: String):
-  SequenceModel[T, OPVector]
+    shouldTrackNulls: Boolean, operationName: String, uid: String): SequenceModel[T, OPVector]
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanText = $(cleanText)

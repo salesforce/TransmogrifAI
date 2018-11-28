@@ -787,11 +787,9 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     val inputColumns = OpVectorMetadata(transformed.schema(genFeatureVector.name))
     outputColumns.columns.length + 5 shouldEqual inputColumns.columns.length
 
-    val output = inputColumns.columns
+    retrieved.dropped should contain theSameElementsAs inputColumns.columns
       .filter(c => c.parentFeatureName.contains("currency") || c.indicatorValue.contains("OTHER")
-        || c.index == 7).map(_.makeColName())
-
-    output.toSet.subsetOf(retrieved.dropped.toSet)  // TODO : better match
+        || c.index == 7).map(_.makeColName()) // TODO : better match
     retrieved.categoricalStats.length shouldBe 0
   }
 
