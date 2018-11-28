@@ -48,6 +48,7 @@ class TextMapLenEstimator[T <: OPMap[String]]
   operationName = "textLenMap", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
 
   protected val shouldCleanValues = true
+  protected val shouldTokenizeValues = true
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
@@ -73,7 +74,7 @@ class TextMapLenEstimator[T <: OPMap[String]]
       Transmogrifier.inputFeaturesToHistory(transFeat, stageName))
       .toMetadata)
 
-    new TextLenMapModel[T](allKeys, shouldCleanKeys, shouldCleanValues,
+    new TextLenMapModel[T](allKeys, shouldCleanKeys, shouldCleanValues, shouldTokenizeValues,
       operationName = operationName, uid = uid)
   }
 }
@@ -83,6 +84,7 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
   val allKeys: Seq[Seq[String]],
   val cleanKeys: Boolean,
   val cleanValues: Boolean,
+  val tokenizeValues: Boolean,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
@@ -94,16 +96,23 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
       case (map, i) =>
         val keys = allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = cleanKeys, shouldCleanValue = cleanValues)
-        val tokenMap = cleaned.mapValues { v => v.toText }.mapValues(tokenize(_).tokens)
 
         // Need to check if key is present, and also that our tokenizer will not remove the value
-        keys.map { k =>
-          if (cleaned.contains(k) && tokenMap(k).nonEmpty) {
-            cleaned.get(k).map(_.length).getOrElse(0).toDouble
-          } else {
-            0.0
+        if (tokenizeValues) {
+          val tokenMap = cleaned.mapValues { v => v.toText }.mapValues(tokenize(_).tokens)
+          keys.map { k =>
+            if (cleaned.contains(k) && tokenMap(k).nonEmpty) {
+              cleaned.get(k).map(_.length).getOrElse(0).toDouble
+            } else {
+              0.0
+            }
+          }
+        } else {
+          keys.map { k =>
+              cleaned.get(k).map(_.length).getOrElse(0).toDouble
           }
         }
+
     }.toOPVector
   }
 
