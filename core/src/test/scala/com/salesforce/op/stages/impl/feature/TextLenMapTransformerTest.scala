@@ -30,8 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.{DescVal, IndVal}
+import com.salesforce.op.features.types.{TextMap, _}
+import com.salesforce.op.test.TestOpVectorColumnType.DescColWithGroup
 import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
@@ -42,24 +42,20 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextLenTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
-  val (ds, f1, f2) = TestFeatureBuilder(
-    Seq[(TextList, TextList)](
-      (TextList(Seq("A giraffe drinks by the watering hole")),
-        TextList(Seq("A giraffe drinks by the watering hole"))),
-      (TextList(Seq("A giraffe drinks by the watering hole")), TextList(Seq("Cheese"))),
-      (TextList(Seq("Cheese", "cake")), TextList(Seq("A giraffe drinks by the watering hole"))),
-      (TextList(Seq("Cheese")), TextList(Seq("Cheese"))),
-      (TextList.empty, TextList(Seq("A giraffe drinks by the watering hole"))),
-      (TextList.empty, TextList(Seq("Cheese", "tart"))),
-      (TextList(Seq("A giraffe drinks by the watering hole")), TextList.empty),
-      (TextList(Seq("Cheese")), TextList.empty),
-      (TextList.empty, TextList.empty)
+class TextLenMapTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+
+  val (ds, f1) = TestFeatureBuilder(
+    Seq[TextMap](
+      TextMap(Map("k1" -> "A giraffe drinks by the watering hole", "k2" -> "Cheese", "k3" -> "Hello", "k4" -> "Bye")),
+      // scalastyle:off
+      TextMap(Map("k2" -> "French Fries", "k4" -> "\uA7BC\u10C8\u2829\u29BA\u23E1")),
+      // scalastyle:on
+      TextMap(Map("k3" -> "Hip-hop Pottamus"))
     )
   )
 
-  Spec[TextLenTransformer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new TextLenTransformer().setInput(f1, f2)
+  Spec[TextLenMapTransformer[_]] should "take an array of features as input and return a single vector feature" in {
+    val vectorizer = new TextLenMapTransformer[TextMap]().setInput(f1)
     val vector = vectorizer.getOutput()
 
     vector.name shouldBe vectorizer.getOutputFeatureName
@@ -68,29 +64,28 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
   }
 
   it should "transform the data correctly" in {
-    val vectorizer = new TextLenTransformer().setInput(f1, f2)
-    val transformed = vectorizer.transform(ds)
+    val vectorizer = new TextLenMapTransformer[TextMap]().setInput(f1)
+    val transformed = vectorizer.fit(ds).transform(ds)
     val vector = vectorizer.getOutput()
 
     val expected = Array(
-      Array(37.0, 37.0),
-      Array(37.0, 6.0),
-      Array(10.0, 37.0),
-      Array(6.0, 6.0),
-      Array(0.0, 37.0),
-      Array(0.0, 10.0),
-      Array(37.0, 0.0),
-      Array(6.0, 0.0),
-      Array(0.0, 0.0)
+      Array(37.0, 6.0, 5.0, 3.0),
+      Array(0.0, 12.0, 0.0, 5.0),
+      Array(0.0, 0.0, 16.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)
     val result = transformed.collect(vector)
     result shouldBe expected
-
+    val field = transformed.schema(vector.name)
+    assertNominal(field, Array.fill(expected.head.value.size)(false), result)
     val vectorMetadata = vectorizer.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       vectorizer,
-      f1 -> List(DescVal(Some(TransmogrifierDefaults.TextLenString))),
-      f2 -> List(DescVal(Some(TransmogrifierDefaults.TextLenString)))
+      f1 -> List(
+        DescColWithGroup(name = Option(TransmogrifierDefaults.TextLenString), groupName = "k1"),
+        DescColWithGroup(name = Option(TransmogrifierDefaults.TextLenString), groupName = "k2"),
+        DescColWithGroup(name = Option(TransmogrifierDefaults.TextLenString), groupName = "k3"),
+        DescColWithGroup(name = Option(TransmogrifierDefaults.TextLenString), groupName = "k4")
+      )
     )
   }
 }

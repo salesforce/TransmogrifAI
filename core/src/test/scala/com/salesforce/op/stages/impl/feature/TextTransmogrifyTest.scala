@@ -97,10 +97,12 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(largeDS)
     val vectCollect = vectorized.collect(feature)
     val field = vectorized.schema(feature.name)
-    val array = Array.fill(vectCollect.head.value.size / 2 - 1)(false) :+ true
+    // last two columns are track null and track text lens fields
+    val array = Array.fill(vectCollect.head.value.size / 2 - 2)(false) :+ true :+ false
     assertNominal(field, array ++ array, vectCollect)
     for {vector <- vectCollect} {
-      vector.v.size shouldBe TransmogrifierDefaults.DefaultNumOfFeatures * 2 + 2
+      // track null and track text lens
+      vector.v.size shouldBe TransmogrifierDefaults.DefaultNumOfFeatures * 2 + 2 * 2
     }
   }
 

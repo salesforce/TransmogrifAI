@@ -85,8 +85,8 @@ class SmartTextVectorizerTest
       .transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator, textLen)
     val field = transformed.schema(smartVectorized.name)
-     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
-       transformed.collect(smartVectorized))
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) ++ Array(true, false),
+      transformed.collect(smartVectorized))
     val fieldCategorical = transformed.schema(categoricalVectorized.name)
     val catRes = transformed.collect(categoricalVectorized)
     assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
@@ -221,7 +221,7 @@ class SmartTextVectorizerTest
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.grouping shouldBe None
+        col.grouping shouldBe Option(f2.name)
         col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
       }
     }
@@ -292,13 +292,13 @@ class SmartTextVectorizerTest
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else if (col.index == 10) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.grouping shouldBe None
+        col.grouping shouldBe Some(f1.name)
         // numeric
         col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
         col.indicatorValue shouldBe None
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.grouping shouldBe None
+        col.grouping shouldBe Some(f2.name)
         col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLen)
         col.indicatorValue shouldBe None
       }

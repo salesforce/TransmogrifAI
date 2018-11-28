@@ -661,14 +661,24 @@ trait MapStringPivotHelper extends SaveOthersParams {
       (f, kvPairs) <- inputFeatures.zip(topValues)
       (key, values) <- kvPairs
       value <- values.view ++ Seq(unseenName) ++ // view here to avoid copying the array when appending the string
-        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil) ++
-        (if (trackTextLen) Seq(TransmogrifierDefaults.TextLenString) else Nil)
-    } yield OpVectorColumnMetadata(
-      parentFeatureName = Seq(f.name),
-      parentFeatureType = Seq(f.typeName),
-      grouping = Option(key),
-      indicatorValue = Option(value)
-    )
+        (if (trackNulls) Seq(TransmogrifierDefaults.NullString) else Nil)
+    } yield {
+      if (value.eq(TransmogrifierDefaults.TextLenString)) {
+        OpVectorColumnMetadata(
+          parentFeatureName = Seq(f.name),
+          parentFeatureType = Seq(f.typeName),
+          grouping = Option(key),
+          indicatorValue = Option(value)
+        )
+      } else {
+        OpVectorColumnMetadata(
+          parentFeatureName = Seq(f.name),
+          parentFeatureType = Seq(f.typeName),
+          grouping = Option(key),
+          descriptorValue = Option(value)
+        )
+      }
+    }
   }
 
   protected def makeOutputVectorMetadata

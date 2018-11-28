@@ -127,7 +127,7 @@ class TransientFeature
     new OpVectorColumnMetadata(
       parentFeatureName = Seq(name),
       parentFeatureType = Seq(typeName),
-      grouping = None,
+      grouping = Some(name),
       descriptorValue = Option(OpVectorColumnMetadata.TextLen)
     )
   }

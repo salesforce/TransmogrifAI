@@ -245,8 +245,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
 
   private def getTextLenVector(textTokens: Seq[TextList]): OPVector = {
     val lengths = textTokens.map { tokens =>
-      val value = if (tokens.isEmpty) 0.0 else tokens.value.map(_.length).sum.toDouble
-      Seq(0 -> value)
+      Seq(0 -> tokens.value.map(_.length).sum.toDouble)
     }
     val reindexed = reindex(lengths)
     makeSparseVector(reindexed).toOPVector

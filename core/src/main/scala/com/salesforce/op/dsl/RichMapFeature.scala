@@ -239,12 +239,6 @@ trait RichMapFeature {
       }
 
       new VectorsCombiner().setInput(Array(hashedFeatures) ++ nullFeatures ++ textFeatures).getOutput()
-
-//      if (trackNulls) {
-//        val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
-//        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
-//      }
-//      else hashedFeatures
     }
 
     /**
@@ -388,11 +382,6 @@ trait RichMapFeature {
       }
 
       new VectorsCombiner().setInput(Array(hashedFeatures) ++ nullFeatures ++ textFeatures).getOutput()
-//      if (trackNulls) {
-//        val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
-//        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
-//      }
-//      else hashedFeatures
     }
 
     /**

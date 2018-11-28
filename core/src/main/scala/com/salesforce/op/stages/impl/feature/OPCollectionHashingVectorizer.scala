@@ -346,7 +346,7 @@ private[op] trait MapHashingFun extends HashingFun {
       for {
         (keys, f) <- allKeys.toArray.zip(features)
         key <- keys
-      } yield f.toColumnTextLenData
+      } yield f.toColumnTextLenData.copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
     hashColumns ++ nullColumns ++ textLenColumns
