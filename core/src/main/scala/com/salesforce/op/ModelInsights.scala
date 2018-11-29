@@ -203,6 +203,7 @@ case class ModelInsights
         val insightValue = derived.derivedFeatureGroup -> derived.derivedFeatureValue match {
           case (Some(group), Some(OpVectorColumnMetadata.NullString)) => s"${feature.featureName}($group = null)"
           case (Some(group), Some(TransmogrifierDefaults.OtherString)) => s"${feature.featureName}($group = other)"
+          case (Some(group), Some(OpVectorColumnMetadata.TextLen)) => s"${feature.featureName}($group = textLen)"
           case (Some(group), Some(value)) => s"${feature.featureName}($group = $value)"
           case (Some(group), None) => s"${feature.featureName}(group = $group)" // should not happen
           case (None, Some(value)) => s"${feature.featureName}(value = $value)" // should not happen
@@ -546,12 +547,12 @@ case object ModelInsights {
           }
           val keptIndex = indexInToIndexKept.get(h.index)
 
-          h.parentFeatureOrigins ->
+            h.parentFeatureOrigins ->
             Insights(
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
               derivedFeatureGroup = h.grouping,
-              derivedFeatureValue = h.indicatorValue,
+              derivedFeatureValue = if (h.indicatorValue.isDefined) h.indicatorValue else h.descriptorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlationsWLabel, h.columnName),
               cramersV = catGroupIndex.map(i => s.categoricalStats(i).cramersV),
@@ -579,7 +580,7 @@ case object ModelInsights {
             derivedFeatureName = h.columnName,
             stagesApplied = h.parentFeatureStages,
             derivedFeatureGroup = h.grouping,
-            derivedFeatureValue = h.indicatorValue,
+            derivedFeatureValue = if (h.indicatorValue.isDefined) h.indicatorValue else h.descriptorValue,
             contribution = contributions.map(_.applyOrElse(h.index, Seq.empty)) // nothing dropped without sanity check
           )
       }
