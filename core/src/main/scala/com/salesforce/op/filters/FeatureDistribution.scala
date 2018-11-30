@@ -147,16 +147,9 @@ case class FeatureDistribution
    * @param fd other feature distribution
    * @return the KL divergence
    */
-  def jsDivergence(fd: FeatureDistribution): Double = {
+  def jsDistance(fd: FeatureDistribution): Double = {
     checkMatch(fd)
-    val combinedCounts = distribution.zip(fd.distribution).filterNot{ case (a, b) => a == 0.0 && b == 0.0 }
-    val (thisCount, thatCount) =
-      combinedCounts.fold[(Double, Double)]((0.0, 0.0)){ case ((a1, b1), (a2, b2)) => (a1 + a2, b1 + b2) }
-    val probs = combinedCounts.map{ case (a, b) => a / thisCount -> b / thatCount }
-    val meanProb = probs.map{ case (a, b) => (a + b) / 2}
-    def log2(x: Double) = math.log10(x) / math.log10(2.0)
-    def klDivergence(a: Double, b: Double) = if (a == 0.0) 0.0 else a * log2(a / b)
-    probs.zip(meanProb).map{ case ((a, b), m) => 0.5 * klDivergence(a, m) + 0.5 * klDivergence(b, m) }.sum
+    FeatureDistribution.jsDistance(this, fd)
   }
 
   override def toString(): String = {
@@ -248,13 +241,10 @@ object FeatureDistribution {
     )
   }
 
-  def densityJSDivergence(dist1: FeatureDistribution, dist2: FeatureDistribution): Double =
-    jsDivergenceFunc(dist1.density(), dist2.density())(dist1.summaryInfo, dist2.summaryInfo)
+  private def jsDistance(dist1: FeatureDistribution, dist2: FeatureDistribution): Double =
+    jsDistanceFunc(dist1.density(), dist2.density())(dist1.summaryInfo, dist2.summaryInfo)
 
-  def massJSDivergence(dist1: FeatureDistribution, dist2: FeatureDistribution): Double =
-    jsDivergenceFunc(dist1.mass(), dist2.mass())(dist1.summaryInfo, dist2.summaryInfo)
-
-  def jsDivergenceFunc(f1: Double => Double, f2: Double => Double): (Array[Double], Array[Double]) => Double =
+  private def jsDistanceFunc(f1: Double => Double, f2: Double => Double): (Array[Double], Array[Double]) => Double =
     (bins1: Array[Double], bins2: Array[Double]) => {
       val meanF: Double => Double = (d: Double) => 0.5 * (f1(d) + f2(d))
       def log2(x: Double) = math.log10(x) / math.log10(2.0)

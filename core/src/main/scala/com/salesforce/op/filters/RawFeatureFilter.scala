@@ -73,12 +73,12 @@ import scala.util.Failure
  * @param maxFillDifference             maximum acceptable fill rate difference between training
  *                                      and scoring data to be kept
  * @param maxFillRatioDiff              maximum acceptable fill ratio between training and scoring (larger / smaller)
- * @param maxJSDivergence               maximum Jensen-Shannon divergence between training
+ * @param maxJSDistance               maximum Jensen-Shannon divergence between training
  *                                      and scoring distributions to be kept
  * @param maxCorrelation                maximum absolute correlation allowed between
  *                                      raw predictor null indicator and label
  * @param correlationType               type of correlation metric to use
- * @param jsDivergenceProtectedFeatures features that are protected from removal by JS divergence check
+ * @param jsDistanceProtectedFeatures features that are protected from removal by JS divergence check
  * @param protectedFeatures             features that are protected from removal
  * @param textBinsFormula               formula to compute the text features bin size.
  *                                      Input arguments are [[Summary]] and number of bins to use in computing feature
@@ -96,10 +96,10 @@ class RawFeatureFilter[T]
   val minFill: Double,
   val maxFillDifference: Double,
   val maxFillRatioDiff: Double,
-  val maxJSDivergence: Double,
+  val maxJSDistance: Double,
   val maxCorrelation: Double,
   val correlationType: CorrelationType = CorrelationType.Pearson,
-  val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
+  val jsDistanceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None
@@ -112,8 +112,8 @@ class RawFeatureFilter[T]
     s" maxFillDifference must be between 0 and 1")
   require(maxFillRatioDiff >= 0.0, s"Invalid maxFillRatioDiff size $maxFillRatioDiff," +
     s" maxFillRatioDiff must be greater than 0.0")
-  require(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
-    s" maxJSDivergence must be between 0 and 1")
+  require(maxJSDistance >= 0.0 && maxJSDistance <= 1.0, s"Invalid maxJSDistance size $maxJSDistance," +
+    s" maxJSDistance must be between 0 and 1")
 
   ClosureUtils.checkSerializable(textBinsFormula) match {
     case Failure(e) => throw new IllegalArgumentException("The argument textBinsFormula must be serializable", e)
@@ -131,7 +131,7 @@ class RawFeatureFilter[T]
    * @param allFeatureInfo          existing feature info to use
    * @return a sequence of distribution summaries for each raw feature
    */
-  private[op] def computeFeatureStats(
+  def computeFeatureStats(
     data: DataFrame,
     features: Array[OPFeature],
     featureDistributionType: FeatureDistributionType,
@@ -204,7 +204,7 @@ class RawFeatureFilter[T]
    * @return a list of feature names that should be dropped and a map of map keys that should be dropped
    *         Map(featureName -> key)
    */
-  private[op] def getFeaturesToExclude(
+  def getFeaturesToExclude(
     trainingDistribs: AllDistributions,
     scoringDistribs: Option[AllDistributions],
     correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
@@ -212,36 +212,32 @@ class RawFeatureFilter[T]
     val allNumericReasons = getAllReasons(
       trainingDistribs = trainingDistribs.numericDistributions,
       scoringDistribs = scoringDistribs.map(_.numericDistributions).getOrElse(Map()),
-      correlationInfo = correlationInfo,
-      minFill = minFill,
-      maxCorrelation = maxCorrelation,
-      maxFillDifference = maxFillDifference,
-      maxFillRatioDiff = maxFillRatioDiff,
-      maxJSDivergence = maxJSDivergence,
-      jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures,
-      jsDivergenceF = FeatureDistribution.densityJSDivergence)
+      correlationInfo = correlationInfo)
     val allTextReasons = getAllReasons(
       trainingDistribs = trainingDistribs.textDistributions,
       scoringDistribs = scoringDistribs.map(_.textDistributions).getOrElse(Map()),
-      correlationInfo = correlationInfo,
-      minFill = minFill,
-      maxCorrelation = maxCorrelation,
-      maxFillDifference = maxFillDifference,
-      maxFillRatioDiff = maxFillRatioDiff,
-      maxJSDivergence = maxJSDivergence,
-      jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures,
-      jsDivergenceF = FeatureDistribution.densityJSDivergence)
+      correlationInfo = correlationInfo)
 
-    val toDrop: Map[FeatureKey, (String, List[String])] = (allNumericReasons ++ allTextReasons).filter {
-      case ((name, _), (featureDescription, reasons)) =>
-        log.info(featureDescription)
-        reasons.nonEmpty && !protectedFeatures(name)
+    val interpretedReasons: Map[FeatureKey, InterpretedReasons] = Seq(allNumericReasons, allTextReasons)
+      .map(_.mapValues(_.interpret(
+        minFill = minFill,
+        maxCorrelation = maxCorrelation,
+        maxFillDifference = maxFillDifference,
+        maxFillRatioDiff = maxFillRatioDiff,
+        maxJSDistance = maxJSDistance,
+        jsDistanceProtectedFeatures = jsDistanceProtectedFeatures)))
+      .reduce(_ ++ _)
+
+    interpretedReasons.foreach { case (featureKey, (description, reasons)) =>
+      log.info(s"\n$description\n${
+        if (reasons.isEmpty) "\n" else s"Dropping feature because:\n\t${reasons.mkString("\n\t")}\n"
+      }")
+    }
+    val toDrop: Map[FeatureKey, InterpretedReasons] = interpretedReasons.filter {
+      case ((name, _), (featureDescription, reasons)) => reasons.nonEmpty && !protectedFeatures(name)
     }
     val toDropKeySet: Set[FeatureKey] = toDrop.keySet
 
-    toDrop.foreach { case (featureKey, (_, reasons)) =>
-      log.info(s"Dropping feature $featureKey because:\n\t${reasons.mkString("\n\t")}\n")
-    }
 
     val toDropFeatures: Map[String, Set[FeatureKey]] = toDropKeySet.groupBy(_._1)
     val toKeepFeatures: Map[String, Set[FeatureKey]] = trainingDistribs.predictorKeySet
@@ -424,86 +420,29 @@ object RawFeatureFilter {
   def getAllReasons(
     trainingDistribs: Map[FeatureKey, FeatureDistribution],
     scoringDistribs: Map[FeatureKey, FeatureDistribution],
-    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]],
-    minFill: Double,
-    maxCorrelation: Double,
-    maxFillDifference: Double,
-    maxFillRatioDiff: Double,
-    maxJSDivergence: Double,
-    jsDivergenceProtectedFeatures: Set[String],
-    jsDivergenceF: (FeatureDistribution, FeatureDistribution) => Double): Map[FeatureKey, (String, List[String])] = {
-
-    val trainingReasons: Map[FeatureKey, (String, List[String])] = for {
+    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]): Map[FeatureKey, AllReasons] =
+    for {
       trainingPair <- trainingDistribs
       (featureKey, trainingDistrib) = trainingPair
     } yield {
-      val trainingUnfilled =
-        if (trainingDistrib.fillRate < minFill) {
-          Option(s"training fill rate did not meet min required ($minFill)")
-        } else {
-          None
-        }
-      val trainingNullLabelLeaker =
-        if (correlationInfo.map(_._2.get(featureKey).exists(_ > maxCorrelation)).exists(identity(_))) {
-          Option(s"null indicator correlation (absolute) exceeded max allowed ($maxCorrelation)")
-        } else {
-          None
-        }
-      val distribMetadata = s"\nTraining Data=$trainingDistrib\nTrain Fill=$trainingUnfilled, " +
-        s"Train Null Label Correlation=$trainingNullLabelLeaker\n"
-
-      featureKey -> (distribMetadata -> List(trainingUnfilled, trainingNullLabelLeaker).flatten)
-    }
-    val distribMismatches: Map[FeatureKey, (String, List[String])] = for {
-      scoringPair <- scoringDistribs
-      (featureKey, scoringDistrib) = scoringPair
-      trainingDistrib <- trainingDistribs.get(featureKey)
-    } yield {
       val trainingFillRate = trainingDistrib.fillRate
-      val scoringFillRate = scoringDistrib.fillRate
-      val jsDivergence = jsDivergenceF(trainingDistrib, scoringDistrib)
-      val fillRatioDiff = trainingDistrib.relativeFillRatio(scoringDistrib)
-      val fillRateDiff = trainingDistrib.relativeFillRate(scoringDistrib)
+      val trainingNullLabelCorrelations: Map[FeatureKey, Double] =
+        correlationInfo.flatMap { case (responseKey, nullCorrs) => nullCorrs.get(featureKey).map(responseKey -> _) }
+      val scoringDistrib = scoringDistribs.get(featureKey)
 
-      val distribMetadata = s"Scoring Data: $scoringDistrib\n" +
-        s"Score Fill=$scoringFillRate, JS Divergence=$jsDivergence, " +
-        s"Fill Rate Difference=$fillRateDiff, Fill Ratio Difference=$fillRatioDiff\n"
-
-      val scoringUnfilled =
-        if (scoringFillRate < minFill) {
-          Option(s"scoring fill rate did not meet min required ($minFill)")
-        } else {
-          None
-        }
-      val jsDivergenceCheck =
-        if (!jsDivergenceProtectedFeatures.contains(featureKey._1) && jsDivergence > maxJSDivergence) {
-          Option(s"JS Divergence exceeded max allowed ($maxJSDivergence)")
-        } else {
-          None
-        }
-      val fillRateCheck =
-        if (fillRateDiff > maxFillDifference) {
-          Option(s"fill rate difference exceeded max allowed ($maxFillDifference)")
-        } else {
-          None
-        }
-      val fillRatioCheck =
-        if (fillRatioDiff > maxFillRatioDiff) {
-          Option(s"fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
-        } else {
-          None
-        }
-
-      featureKey ->
-        (distribMetadata -> List(scoringUnfilled, jsDivergenceCheck, fillRateCheck, fillRatioCheck).flatten)
+      featureKey -> AllReasons(
+        featureKey = featureKey,
+        trainingDistributions = trainingDistrib.distribution,
+        trainingSummaryInfo = trainingDistrib.summaryInfo,
+        scoringDistributions = scoringDistrib.toArray.flatMap(_.distribution),
+        scoringSummaryInfo = scoringDistrib.toArray.flatMap(_.summaryInfo),
+        trainingFillRate = trainingFillRate,
+        trainingNullLabelCorrelations = trainingNullLabelCorrelations,
+        scoringFillRate = scoringDistrib.map(_.fillRate),
+        fillRateDifference = scoringDistrib.map(trainingDistrib.relativeFillRate),
+        fillRateRatio = scoringDistrib.map(trainingDistrib.relativeFillRatio),
+        jsDistance = scoringDistrib.map(trainingDistrib.jsDistance))
     }
-
-    implicit val sg = new Tuple2Semigroup[String, List[String]]()
-
-    trainingReasons + distribMismatches
-
-  }
-
 
 }
 
