@@ -45,13 +45,13 @@ class TextMapLenEstimator[T <: OPMap[String]]
 (
   uid: String = UID[TextMapLenEstimator[_]]
 )(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
-  operationName = "textLenMap", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
-
-  protected val shouldCleanValues = true
-  protected val shouldTokenizeValues = true
+  operationName = "textLenMap", uid = uid) with VectorizerDefaults with TokenizeTextParam with TextParams
+  with MapVectorizerFuns[String, T] {
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-    val shouldCleanKeys = false // $(cleanKeys)
+    val shouldCleanKeys = $(cleanKeys)
+    val shouldCleanValues = $(cleanText)
+    val shouldTokenizeValues = $(tokenizeText)
     val allKeys: Seq[Seq[String]] = getKeyValues(
       in = dataset,
       shouldCleanKeys = shouldCleanKeys,
@@ -109,7 +109,7 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
           }
         } else {
           keys.map { k =>
-              cleaned.get(k).map(_.length).getOrElse(0).toDouble
+            cleaned.get(k).map(_.length).getOrElse(0).toDouble
           }
         }
 

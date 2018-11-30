@@ -66,6 +66,7 @@ private[op] trait TransmogrifierDefaults {
   val HashSpaceStrategy: HashSpaceStrategy = com.salesforce.op.stages.impl.feature.HashSpaceStrategy.Auto
   val CleanText: Boolean = true
   val CleanKeys: Boolean = false
+  val tokenizeText: Boolean = true
   val HashAlgorithm: HashAlgorithm = com.salesforce.op.stages.impl.feature.HashAlgorithm.MurMur3
   val BinaryFreq: Boolean = false
   val FillWithMode: Boolean = true
@@ -480,12 +481,12 @@ trait TrackNullsParam extends Params {
 
 trait TrackTextLenParam extends Params {
   final val trackTextLen = new BooleanParam(
-    parent = this, name = "trackTexLen", doc = "option to keep track of values that were missing"
+    parent = this, name = "trackTexLen", doc = "option to keep track of text length"
   )
   setDefault(trackTextLen, TransmogrifierDefaults.TrackTextLen)
 
   /**
-   * Option to keep track of values that were missing
+   * Option to keep track of text length
    */
   def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
 }
@@ -503,6 +504,18 @@ trait TrackInvalidParam extends Params {
    * Option to keep track of invalid values
    */
   def setTrackInvalid(v: Boolean): this.type = set(trackInvalid, v)
+}
+
+trait TokenizeTextParam extends Params {
+  final val tokenizeText = new BooleanParam(
+    parent = this, name = "tokenizeText", doc = "option to tokenize the raw"
+  )
+  setDefault(tokenizeText, TransmogrifierDefaults.tokenizeText)
+
+  /**
+   * Option to keep track of values that were missing
+   */
+  def setTokenizeText(v: Boolean): this.type = set(tokenizeText, v)
 }
 
 trait CleanTextFun {

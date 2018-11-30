@@ -88,4 +88,32 @@ class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with Attrib
       )
     )
   }
+
+  it should "transform the data correctly when the text is not tokenized" in {
+    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1).setTokenizeText(false)
+    val transformed = vectorizer.fit(ds).transform(ds)
+    val vector = vectorizer.getOutput()
+
+    val expected = Array(
+      Array(31.0, 6.0, 5.0, 3.0),
+      Array(0.0, 11.0, 0.0, 5.0),
+      Array(0.0, 0.0, 14.0, 0.0)
+    ).map(Vectors.dense(_).toOPVector)
+    val result = transformed.collect(vector)
+    result shouldBe expected
+  }
+
+  it should "transform the data correctly when the text values is not cleaned" in {
+    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1).setCleanText(false).setTokenizeText(false)
+    val transformed = vectorizer.fit(ds).transform(ds)
+    val vector = vectorizer.getOutput()
+
+    val expected = Array(
+      Array(37.0, 6.0, 5.0, 3.0),
+      Array(0.0, 12.0, 0.0, 5.0),
+      Array(0.0, 0.0, 16.0, 0.0)
+    ).map(Vectors.dense(_).toOPVector)
+    val result = transformed.collect(vector)
+    result shouldBe expected
+  }
 }
