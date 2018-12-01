@@ -90,7 +90,7 @@ class FeatureSparkTypeTest extends FlatSpec with TestCommon {
 
   it should "error for unsupported types" in {
     val error = intercept[IllegalArgumentException](FeatureSparkTypes.featureTypeTagOf(BinaryType, isNullable = false))
-    error.getMessage shouldBe "Spark BinaryType is currently not supported."
+    error.getMessage shouldBe "Spark BinaryType is currently not supported"
   }
 
   it should "error for unknown types" in {
