@@ -147,12 +147,18 @@ case object FeatureTypeSparkConverter {
 
       // Date & Time
       case wt if wt <:< weakTypeOf[t.DateTime] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.DateTime.value else Some(value.asInstanceOf[Long])
+        value match {
+          case null => FeatureTypeDefaults.DateTime.value
+          case v: Long => Some(v)
+          case v: java.util.Date => Some(v.getTime)
+          case v => throw new IllegalArgumentException(s"DateTime type mapping is not defined for ${v.getClass}")
+        }
       case wt if wt <:< weakTypeOf[t.Date] => (value: Any) =>
         value match {
           case null => FeatureTypeDefaults.Date.value
           case v: Int => Some(v.toLong)
           case v: Long => Some(v)
+          case v: java.util.Date => Some(v.getTime)
           case v => throw new IllegalArgumentException(s"Date type mapping is not defined for ${v.getClass}")
         }
 

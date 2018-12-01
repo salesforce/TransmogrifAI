@@ -84,12 +84,26 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
     assertFeature[Row, Real](feature)(name = name, in = Row(1.0, "2"), out = 1.toReal, isResponse = true)
   }
 
-  it should "build features from a dataframe" in {
+  it should "build text & numeric features from a dataframe" in {
     val row = data.head()
     val (label, Array(fs, fl)) = FeatureBuilder.fromDataFrame[RealNN](data, response = "d")
     assertFeature(label)(name = "d", in = row, out = 2.0.toRealNN, isResponse = true)
     assertFeature(fs.asInstanceOf[Feature[Text]])(name = "s", in = row, out = "blah1".toText, isResponse = false)
     assertFeature(fl.asInstanceOf[Feature[Integral]])(name = "l", in = row, out = 10.toIntegral, isResponse = false)
+  }
+
+  it should "build time & date features from a dataframe" in {
+    val ts = java.sql.Timestamp.valueOf("2018-12-02 11:05:33.523")
+    val dt = java.sql.Date.valueOf("2018-12-1")
+    val df = spark.createDataFrame(Seq((1.0, ts, dt)))
+    val Array(lblName, tsName, dtName) = df.schema.fieldNames
+    val row = df.head()
+    val (label, Array(time, date)) = FeatureBuilder.fromDataFrame[RealNN](df, response = lblName)
+    assertFeature(label)(name = lblName, in = row, out = 1.0.toRealNN, isResponse = true)
+    assertFeature(time.asInstanceOf[Feature[DateTime]])(
+      name = tsName, in = row, out = ts.getTime.toDateTime, isResponse = false)
+    assertFeature(date.asInstanceOf[Feature[Date]])(
+      name = dtName, in = row, out = dt.getTime.toDate, isResponse = false)
   }
 
   it should "error on invalid response" in {
