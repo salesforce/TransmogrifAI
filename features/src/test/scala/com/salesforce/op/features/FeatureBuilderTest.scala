@@ -92,7 +92,7 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
     assertFeature(fl.asInstanceOf[Feature[Integral]])(name = "l", in = row, out = 10.toIntegral, isResponse = false)
   }
 
-  it should "build time & date features from a dataframe " in {
+  it should "build time & date features from a dataframe" in {
     val ts = java.sql.Timestamp.valueOf("2018-12-02 11:05:33.523")
     val dt = java.sql.Date.valueOf("2018-12-1")
     val df = spark.createDataFrame(Seq((1.0, ts, dt)))
