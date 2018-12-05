@@ -88,7 +88,7 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
       case (map, i) =>
         val keys = allKeys(i)
         val cleaned = cleanMap(map.v, shouldCleanKey = cleanKeys, shouldCleanValue = cleanValues)
-        val tokenMap = cleaned.mapValues { v => v.toText }.mapValues(tokenize(_).tokens)
+        val tokenMap = cleaned.mapValues(v => tokenize(v.toText).tokens)
 
         // Need to check if key is present and then compute text lengths
         keys.map(k => tokenMap.getOrElse(k, TextList.empty).value.map(_.length).sum.toDouble)
