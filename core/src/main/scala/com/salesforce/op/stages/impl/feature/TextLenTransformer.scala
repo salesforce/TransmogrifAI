@@ -47,13 +47,11 @@ class TextLenTransformer[T <: TextList]
 (
   uid: String = UID[TextLenTransformer[_]]
 )(implicit tti: TypeTag[T], val ttiv: TypeTag[T#Value]) extends SequenceTransformer[T, OPVector](
-  operationName = "textLen", uid = uid) with VectorizerDefaults with CleanTextFun with TextTokenizerParams
+  operationName = "textLen", uid = uid) with VectorizerDefaults with TextTokenizerParams
   with TextParams {
 
   override def transformFn: Seq[T] => OPVector = in => {
-    val shouldCleanValues = $(cleanText)
-    val output = in.map(_.value.map(t => cleanTextFn(t, shouldCleanValues).length).sum.toDouble)
-
+    val output = in.map(_.value.map(_.length).sum.toDouble)
     Vectors.dense(output.toArray).toOPVector
   }
 

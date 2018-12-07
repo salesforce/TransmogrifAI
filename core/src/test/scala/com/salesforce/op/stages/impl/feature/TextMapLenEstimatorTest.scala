@@ -56,20 +56,11 @@ class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with Attrib
 
   Spec[TextMapLenEstimator[_]] should "take an array of features as input and return a single vector feature" in {
     val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1)
-    val vector = vectorizer.getOutput()
-
-    vector.name shouldBe vectorizer.getOutputFeatureName
-    vector.typeName shouldBe FeatureType.typeName[OPVector]
-    vector.isResponse shouldBe false
-  }
-
-  it should "transform the data correctly" in {
-    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1)
     val transformed = vectorizer.fit(ds).transform(ds)
     val vector = vectorizer.getOutput()
 
     val expected = Array(
-      Array(31.0, 6.0, 5.0, 3.0),
+      Array(25.0, 6.0, 5.0, 3.0),
       Array(0.0, 11.0, 0.0, 0.0),
       Array(0.0, 0.0, 14.0, 0.0)
     ).map(Vectors.dense(_).toOPVector)
@@ -89,21 +80,5 @@ class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with Attrib
         DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k4")
       )
     )
-  }
-
-  // TODO: Not sure if we should actually allow this option since text will still be tokenized no matter what...
-  it should "transform the data correctly when the text values is not cleaned" in {
-    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1).setCleanText(false)
-    val transformed = vectorizer.fit(ds).transform(ds)
-    val vector = vectorizer.getOutput()
-
-    val expected = Array(
-      Array(25.0, 6.0, 5.0, 3.0),
-      Array(0.0, 11.0, 0.0, 0.0),
-      Array(0.0, 0.0, 14.0, 0.0)
-    ).map(Vectors.dense(_).toOPVector)
-
-    val result = transformed.collect(vector)
-    result shouldBe expected
   }
 }

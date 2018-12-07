@@ -27,7 +27,9 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
+
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, _}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
@@ -36,16 +38,16 @@ import org.apache.spark.sql.Dataset
 import scala.reflect.runtime.universe.TypeTag
 
 /**
- * Transformer for generating using text length per row
+ * Estimator for computing text lengths on fields stored in text maps. Note that because there are no maps from
+ * String to TextList, we need to do the tokenization here (unlike the TextLenTransformer).
  */
 class TextMapLenEstimator[T <: OPMap[String]](uid: String = UID[TextMapLenEstimator[_]])
   (implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
-  operationName = "textLenMap", uid = uid) with VectorizerDefaults with TextParams
-  with MapVectorizerFuns[String, T] {
+  operationName = "textLenMap", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
-    val shouldCleanValues = $(cleanText)
+    val shouldCleanValues = false // Don't clean text values since we're tokenizing instead
 
     val allKeys: Seq[Seq[String]] = getKeyValues(
       in = dataset,
@@ -68,11 +70,11 @@ class TextMapLenEstimator[T <: OPMap[String]](uid: String = UID[TextMapLenEstima
     setMetadata(
       OpVectorMetadata(vectorOutputName, colMeta, Transmogrifier.inputFeaturesToHistory(transFeat, stageName))
         .toMetadata)
-    new TextLenMapModel[T](allKeys, shouldCleanKeys, shouldCleanValues, operationName = operationName, uid = uid)
+    new TextMapLenModel[T](allKeys, shouldCleanKeys, shouldCleanValues, operationName = operationName, uid = uid)
   }
 }
 
-final class TextLenMapModel[T <: OPMap[String]] private[op]
+final class TextMapLenModel[T <: OPMap[String]] private[op]
 (
   val allKeys: Seq[Seq[String]],
   val cleanKeys: Boolean,
@@ -84,9 +86,8 @@ final class TextLenMapModel[T <: OPMap[String]] private[op]
     with VectorizerDefaults with CleanTextMapFun with TextTokenizerParams {
 
   def transformFn: Seq[T] => OPVector = row => {
-    row.zipWithIndex.flatMap {
-      case (map, i) =>
-        val keys = allKeys(i)
+    row.zip(allKeys).flatMap {
+      case (map, keys) =>
         val cleaned = cleanMap(map.v, shouldCleanKey = cleanKeys, shouldCleanValue = cleanValues)
         val tokenMap = cleaned.mapValues(v => tokenize(v.toText).tokens)
 
