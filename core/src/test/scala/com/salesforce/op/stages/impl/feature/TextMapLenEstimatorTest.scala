@@ -31,18 +31,20 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types.{TextMap, _}
+import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.DescColWithGroup
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextMapLenEstimatorTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], TextMapLenEstimator[TextMap]]
+    with TestSparkContext with AttributeAsserts {
 
   val (ds, f1) = TestFeatureBuilder(
     Seq[TextMap](
@@ -54,25 +56,28 @@ class TextMapLenEstimatorTest extends FlatSpec with TestSparkContext with Attrib
     )
   )
 
-  Spec[TextMapLenEstimator[_]] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new TextMapLenEstimator[TextMap]().setInput(f1)
-    val transformed = vectorizer.fit(ds).transform(ds)
-    val vector = vectorizer.getOutput()
+  val inputData = ds
 
-    val expected = Array(
-      Array(25.0, 6.0, 5.0, 3.0),
-      Array(0.0, 11.0, 0.0, 0.0),
-      Array(0.0, 0.0, 14.0, 0.0)
-    ).map(Vectors.dense(_).toOPVector)
+  val estimator = new TextMapLenEstimator[TextMap]().setInput(f1)
+
+  val expectedResult = Seq(
+    Array(25.0, 6.0, 5.0, 3.0),
+    Array(0.0, 11.0, 0.0, 0.0),
+    Array(0.0, 0.0, 14.0, 0.0)
+  ).map(Vectors.dense(_).toOPVector)
+
+  Spec[TextMapLenEstimator[_]] should "take an array of features as input and return a single vector feature" in {
+    val transformed = estimator.fit(ds).transform(ds)
+    val vector = estimator.getOutput()
 
     val result = transformed.collect(vector)
-    result shouldBe expected
+    result should contain theSameElementsAs expectedResult
 
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expected.head.value.size)(false), result)
-    val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
-      vectorizer,
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false), result)
+    val vectorMetadata = estimator.getMetadata()
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+      estimator,
       f1 -> List(
         DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k1"),
         DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k2"),

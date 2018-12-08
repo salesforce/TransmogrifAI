@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestOpVectorColumnType.DescColWithGroup
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
@@ -42,7 +42,9 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextLenTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextLenTransformerTest extends OpTransformerSpec[OPVector, TextLenTransformer[_]]
+  with TestSparkContext with AttributeAsserts {
+
   val (ds, f1, f2) = TestFeatureBuilder(
     Seq[(TextList, TextList)](
       (TextList(Seq("A", "giraffe", "drinks", "by", "the", "watering", "hole")),
@@ -58,32 +60,36 @@ class TextLenTransformerTest extends FlatSpec with TestSparkContext with Attribu
     )
   )
 
-  Spec[TextLenTransformer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new TextLenTransformer().setInput(f1, f2)
-    val vector = vectorizer.getOutput()
+  // Variables for OpTransformer base tests
+  val inputData = ds
 
-    vector.name shouldBe vectorizer.getOutputFeatureName
+  val transformer = new TextLenTransformer().setInput(f1, f2)
+
+  val expectedResult = Seq(
+    Array(31.0, 37.0),
+    Array(37.0, 6.0),
+    Array(10.0, 37.0),
+    Array(6.0, 6.0),
+    Array(0.0, 37.0),
+    Array(0.0, 10.0),
+    Array(37.0, 0.0),
+    Array(6.0, 0.0),
+    Array(0.0, 0.0)
+  ).map(Vectors.dense(_).toOPVector)
+
+  Spec[TextLenTransformer[_]] should "take an array of features as input and return a single vector feature" in {
+    val vector = transformer.getOutput()
+
+    vector.name shouldBe transformer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
 
   it should "transform the data correctly" in {
-    val vectorizer = new TextLenTransformer().setInput(f1, f2)
-    val transformed = vectorizer.transform(ds)
-    val vector = vectorizer.getOutput()
+    val transformed = transformer.transform(ds)
+    val vector = transformer.getOutput()
 
-    val expected = Array(
-      Array(31.0, 37.0),
-      Array(37.0, 6.0),
-      Array(10.0, 37.0),
-      Array(6.0, 6.0),
-      Array(0.0, 37.0),
-      Array(0.0, 10.0),
-      Array(37.0, 0.0),
-      Array(6.0, 0.0),
-      Array(0.0, 0.0)
-    ).map(Vectors.dense(_).toOPVector)
     val result = transformed.collect(vector)
-    result shouldBe expected
+    result should contain theSameElementsAs expectedResult
   }
 }
