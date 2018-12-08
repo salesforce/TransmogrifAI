@@ -43,12 +43,10 @@ import scala.reflect.runtime.universe.TypeTag
  * Sequence transformer for generating a sequence of text lengths from a sequence of TextList values (eg. tokenized
  * raw text)
  */
-class TextLenTransformer[T <: TextList]
-(
-  uid: String = UID[TextLenTransformer[_]]
-)(implicit tti: TypeTag[T], val ttiv: TypeTag[T#Value]) extends SequenceTransformer[T, OPVector](
-  operationName = "textLen", uid = uid) with VectorizerDefaults with TextTokenizerParams
-  with TextParams {
+class TextLenTransformer[T <: TextList](uid: String = UID[TextLenTransformer[_]])
+  (implicit tti: TypeTag[T], val ttiv: TypeTag[T#Value])
+  extends SequenceTransformer[T, OPVector](operationName = "textLen", uid = uid)
+    with VectorizerDefaults with TextTokenizerParams with TextParams {
 
   override def transformFn: Seq[T] => OPVector = in => {
     val output = in.map(_.value.map(_.length).sum.toDouble)
