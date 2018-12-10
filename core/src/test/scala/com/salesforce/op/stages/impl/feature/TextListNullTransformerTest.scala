@@ -31,18 +31,18 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.{IndCol, RootCol}
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.TestOpVectorColumnType.IndCol
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class TextListNullTransformerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextListNullTransformerTest
+  extends OpTransformerSpec[OPVector, TextListNullTransformer[_]] with TestSparkContext with AttributeAsserts {
 
   val (ds, f1, f2) = TestFeatureBuilder(
     Seq[(TextList, TextList)](
@@ -58,39 +58,42 @@ class TextListNullTransformerTest extends FlatSpec with TestSparkContext with At
     )
   )
 
-  Spec[TextListNullTransformer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vectorizer = new TextListNullTransformer().setInput(f1, f2)
-    val vector = vectorizer.getOutput()
+  val inputData = ds
 
-    vector.name shouldBe vectorizer.getOutputFeatureName
+  val transformer = new TextListNullTransformer().setInput(f1, f2)
+
+  val expectedResult = Seq(
+    Array(0.0, 0.0),
+    Array(0.0, 0.0),
+    Array(0.0, 0.0),
+    Array(0.0, 0.0),
+    Array(1.0, 0.0),
+    Array(1.0, 0.0),
+    Array(0.0, 1.0),
+    Array(0.0, 1.0),
+    Array(1.0, 1.0)
+  ).map(Vectors.dense(_).toOPVector)
+
+  Spec[TextListNullTransformer[_]] should "take an array of features as input and return a single vector feature" in {
+    val vector = transformer.getOutput()
+
+    vector.name shouldBe transformer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
 
   it should "transform the data correctly" in {
-    val vectorizer = new TextListNullTransformer().setInput(f1, f2)
-    val transformed = vectorizer.transform(ds)
-    val vector = vectorizer.getOutput()
+    val transformed = transformer.transform(ds)
+    val vector = transformer.getOutput()
 
-    val expected = Array(
-      Array(0.0, 0.0),
-      Array(0.0, 0.0),
-      Array(0.0, 0.0),
-      Array(0.0, 0.0),
-      Array(1.0, 0.0),
-      Array(1.0, 0.0),
-      Array(0.0, 1.0),
-      Array(0.0, 1.0),
-      Array(1.0, 1.0)
-    ).map(Vectors.dense(_).toOPVector)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(vector)
-    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
-    result shouldBe expected
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
+    result shouldBe expectedResult
 
-    val vectorMetadata = vectorizer.getMetadata()
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
-      vectorizer,
+    val vectorMetadata = transformer.getMetadata()
+    OpVectorMetadata(transformer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
+      transformer,
       f1 -> List(IndCol(Some(TransmogrifierDefaults.NullString))),
       f2 -> List(IndCol(Some(TransmogrifierDefaults.NullString)))
     )
