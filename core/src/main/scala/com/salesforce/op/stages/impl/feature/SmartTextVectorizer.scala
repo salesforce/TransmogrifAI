@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions}
+import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
@@ -60,7 +60,7 @@ import scala.reflect.runtime.universe.TypeTag
 class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams
+    with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
@@ -100,6 +100,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
+      shouldTrackLen = $(trackTextLen),
       hashingParams = makeHashingParams()
     )
 
@@ -130,13 +131,22 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
+    val shouldTrackLen = $(trackTextLen)
     val unseen = Option($(unseenName))
 
     val categoricalColumns = if (categoricalFeatures.nonEmpty) {
       makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, categoricalFeatures)
     } else Array.empty[OpVectorColumnMetadata]
     val textColumns = if (textFeatures.nonEmpty) {
-      makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++ textFeatures.map(_.toColumnMetaData(isNull = true))
+      if (shouldTrackLen) {
+        makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
+          textFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
+          textFeatures.map(_.toColumnMetaData(isNull = true))
+      }
+      else {
+        makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
+          textFeatures.map(_.toColumnMetaData(isNull = true))
+      }
     } else Array.empty[OpVectorColumnMetadata]
 
     val columns = categoricalColumns ++ textColumns
@@ -187,6 +197,7 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
+  shouldTrackLen: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
@@ -214,9 +225,10 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
-      val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
+      val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
+      val textLenVector = if (args.shouldTrackLen) getLenVector(textTokens) else OPVector.empty
 
-      categoricalVector.combine(textVector, textNullIndicatorsVector: _*)
+      categoricalVector.combine(textVector, Seq(textLenVector, textNullIndicatorsVector): _*)
     }
   }
 
@@ -231,6 +243,10 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     val reindexed = reindex(nullIndicators)
     val vector = makeSparseVector(reindexed)
     vector.toOPVector
+  }
+
+  private def getLenVector(textTokens: Seq[TextList]): OPVector = {
+    textTokens.map(f => f.value.map(_.length).sum.toDouble).toOPVector
   }
 }
 

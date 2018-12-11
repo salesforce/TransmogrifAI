@@ -282,6 +282,95 @@ class SmartTextVectorizerTest
     }
   }
 
+  it should "append the text lengths to the feature vector if one feature is determined to be text" in {
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(true).setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
+    val res = transformed.collect(smartVectorized)
+    val expected = Array(
+      Vectors.sparse(10, Array(0, 4, 6, 8), Array(1.0, 1.0, 1.0, 10.0)),
+      Vectors.sparse(10, Array(0, 9), Array(1.0, 1.0)),
+      Vectors.sparse(10, Array(1, 6, 8), Array(1.0, 1.0, 6.0)),
+      Vectors.sparse(10, Array(0, 6, 8), Array(1.0, 2.0, 9.0)),
+      Vectors.sparse(10, Array(3, 9), Array(1.0, 1.0))
+    ).map(_.toOPVector)
+
+    res shouldEqual expected
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.history.keys shouldBe Set(f1.name, f2.name)
+    meta.columns.length shouldBe 10
+    meta.columns.foreach { col =>
+      if (col.index < 4) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+      } else if (col.index < 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+      } else if (col.index == 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      }
+    }
+  }
+
+  it should "append one text lengths column to the feature vector for each feature determined to be text" in {
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(1).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(true).setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
+    val res = transformed.collect(smartVectorized)
+    val expected = Array(
+      Vectors.sparse(12, Array(0, 2, 4, 6, 8, 9), Array(1.0, 1.0, 1.0, 1.0, 10.0, 10.0)),
+      Vectors.sparse(12, Array(0, 2, 8, 11), Array(1.0, 1.0, 10.0, 1.0)),
+      Vectors.sparse(12, Array(0, 3, 6, 8, 9), Array(1.0, 1.0, 1.0, 11.0, 6.0)),
+      Vectors.sparse(12, Array(0, 2, 6, 8, 9), Array(1.0, 1.0, 2.0, 10.0, 9.0)),
+      Vectors.sparse(12, Array(10, 11), Array(1.0, 1.0))
+    ).map(_.toOPVector)
+
+    res shouldEqual expected
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.history.keys shouldBe Set(f1.name, f2.name)
+    meta.columns.length shouldBe 12
+    meta.columns.foreach { col =>
+      if (col.index < 4) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe None
+      } else if (col.index < 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+      } else if (col.index == 8) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else if (col.index == 9) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else if (col.index == 10) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      }
+    }
+  }
+
   Spec[TextStats] should "aggregate correctly" in {
     val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
     val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
