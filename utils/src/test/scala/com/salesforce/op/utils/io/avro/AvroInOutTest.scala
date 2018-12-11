@@ -68,7 +68,7 @@ class AvroInOutTest extends FlatSpec with TestSparkContext {
 
   it should "throw an error if passed in avro files are invalid" in {
     val error = intercept[IllegalArgumentException](readPathSeq("badfile/path1,badfile/path2"))
-    error.getMessage shouldBe "No valid directory found in the list of paths <<badfile/path1,badfile/path2>>"
+    error.getMessage shouldBe "No valid directory found in path 'badfile/path1,badfile/path2'"
   }
 
   it should "creates Some(RDD) from an avro file" in {
