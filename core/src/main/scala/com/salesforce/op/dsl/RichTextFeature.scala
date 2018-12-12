@@ -114,6 +114,9 @@ trait RichTextFeature {
      * @param trackNulls           indicates whether or not to track null values in a separate column.
      *                             Since features may be combined into a shared hash space here, the null value
      *                             should be tracked separately
+     * @param trackTextLen         indicates whether or not to track the lengths of the text features in a separate
+     *                             column. Like the null indicators, there is one length feature per text feature
+     *                             regardless of whether the hash space is a shared hash space or not.
      * @param toLowercase          indicates whether to convert all characters to lowercase before analyzing
      * @param numHashes            number of features (hashes) to generate
      * @param hashWithIndex        include indices when hashing a feature that has them (OPLists or OPVectors)
@@ -131,6 +134,7 @@ trait RichTextFeature {
       minTokenLength: Int,
       toLowercase: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       hashWithIndex: Boolean = TransmogrifierDefaults.HashWithIndex,
       binaryFreq: Boolean = TransmogrifierDefaults.BinaryFreq,
       prependFeatureName: Boolean = TransmogrifierDefaults.PrependFeatureName,
@@ -162,11 +166,19 @@ trait RichTextFeature {
         .setBinaryFreq(binaryFreq)
         .getOutput()
 
-      if (trackNulls) {
-        val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+      (trackTextLen, trackNulls) match {
+        case (true, true) =>
+          val textLengths = new TextLenTransformer[TextList]().setInput(tokenized).getOutput()
+          val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
+          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+        case (true, false) =>
+          val textLengths = new TextLenTransformer[TextList]().setInput(tokenized).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()
+        case (false, true) =>
+          val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+        case(false, false) => hashedFeatures
       }
-      else hashedFeatures
     }
 
     /**
@@ -180,6 +192,8 @@ trait RichTextFeature {
      * @param toLowercase               indicates whether to convert all characters to lowercase before analyzing
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param trackTextLen              indicates whether or not to track the length of columns determined to be text
+     *                                  in a separate column
      * @param topK                      number of most common elements to be used as categorical pivots
      * @param minSupport                minimum number of occurrences an element must have to appear in pivot
      * @param unseenName                name to give indexes which do not have a label name associated with them
@@ -206,6 +220,7 @@ trait RichTextFeature {
       toLowercase: Boolean,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       unseenName: String = TransmogrifierDefaults.OtherString,
@@ -224,6 +239,7 @@ trait RichTextFeature {
         .setMaxCardinality(maxCategoricalCardinality)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
+        .setTrackTextLen(trackTextLen)
         .setAutoDetectLanguage(autoDetectLanguage)
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)

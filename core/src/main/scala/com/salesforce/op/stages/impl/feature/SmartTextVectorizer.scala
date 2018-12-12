@@ -189,6 +189,7 @@ private[op] object TextStats {
  * @param topValues        top values to each feature
  * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
+ * @param shouldTrackLen   should track text length
  * @param hashingParams    hashing function params
  */
 case class SmartTextVectorizerModelArgs
