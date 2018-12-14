@@ -204,6 +204,7 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
@@ -224,11 +225,19 @@ trait RichMapFeature {
        * tracking on the original features so it's slightly different. Fortunately, tokenization for TextMaps is done
        * via the tokenize function directly, rather than with an entire stage, so things should still work here.
        */
-      if (trackNulls) {
-        val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+      (trackTextLen, trackNulls) match {
+        case (true, true) =>
+          val textLengths = new TextMapLenEstimator[TextMap]().setInput(f +: others).getOutput()
+          val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+        case (true, false) =>
+          val textLengths = new TextMapLenEstimator[TextMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()
+        case (false, true) =>
+          val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+        case(false, false) => hashedFeatures
       }
-      else hashedFeatures
     }
 
     /**
@@ -243,6 +252,7 @@ trait RichMapFeature {
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param cleanKeys                 clean map keys before pivoting
      * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param trackTextLen              indicates whether or not to track the length of the text in a separate column
      * @param topK                      number of most common elements to be used as categorical pivots
      * @param minSupport                minimum number of occurrences an element must have to appear in pivot
      * @param unseenName                name to give indexes which do not have a label name associated with them
@@ -270,6 +280,7 @@ trait RichMapFeature {
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       unseenName: String = TransmogrifierDefaults.OtherString,
@@ -289,6 +300,7 @@ trait RichMapFeature {
         .setCleanKeys(cleanKeys)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
+        .setTrackTextLen(trackTextLen)
         .setAutoDetectLanguage(autoDetectLanguage)
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
@@ -324,6 +336,7 @@ trait RichMapFeature {
      * @param whiteListKeys            keys to whitelist
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
+     * @param trackTextLen             option to keep track of text lengths
      * @param numHashes                size of hash space
      * @param hashSpaceStrategy        strategy to determine whether to use shared hash space for all included features
      *
@@ -337,6 +350,7 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[TextAreaMap]] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       numHashes: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy
     ): FeatureLike[OPVector] = {
@@ -356,11 +370,19 @@ trait RichMapFeature {
         tracking on the original features so it's slightly different. Fortunately, tokenization for TextMaps is done
         via the tokenize function directly, rather than with an entire stage, so things should still work here.
        */
-      if (trackNulls) {
-        val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
-        new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+      (trackTextLen, trackNulls) match {
+        case (true, true) =>
+          val textLengths = new TextMapLenEstimator[TextAreaMap]().setInput(f +: others).getOutput()
+          val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+        case (true, false) =>
+          val textLengths = new TextMapLenEstimator[TextAreaMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()
+        case (false, true) =>
+          val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
+        case(false, false) => hashedFeatures
       }
-      else hashedFeatures
     }
 
     /**
@@ -375,6 +397,7 @@ trait RichMapFeature {
      * @param cleanKeys                 clean map keys before pivoting
      * @param cleanText                 indicates whether to ignore capitalization and punctuation
      * @param trackNulls                indicates whether or not to track null values in a separate column.
+     * @param trackTextLen              indicates whether or not to track the length of the text in a separate column
      * @param topK                      number of most common elements to be used as categorical pivots
      * @param minSupport                minimum number of occurrences an element must have to appear in pivot
      * @param unseenName                name to give indexes which do not have a label name associated with them
@@ -402,6 +425,7 @@ trait RichMapFeature {
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       cleanKeys: Boolean = TransmogrifierDefaults.CleanKeys,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       unseenName: String = TransmogrifierDefaults.OtherString,
@@ -421,6 +445,7 @@ trait RichMapFeature {
         .setCleanKeys(cleanKeys)
         .setCleanText(cleanText)
         .setTrackNulls(trackNulls)
+        .setTrackTextLen(trackTextLen)
         .setAutoDetectLanguage(autoDetectLanguage)
         .setAutoDetectThreshold(autoDetectThreshold)
         .setDefaultLanguage(defaultLanguage)
