@@ -43,9 +43,10 @@ class GeolocationToCountryTransformerTest extends OpTransformerSpec[Text, Geoloc
     Geolocation((43.6, -79.3, 3.0)),
     Geolocation((31.2, 121.4, 3.0)),
     Geolocation((28.7, 77.1, 3.0)),
-    Geolocation((-22.9, -43.1, 3.0))
+    Geolocation((-22.9, -43.1, 3.0)),
+    Geolocation(Seq.empty[Double])
   )
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: GeolocationToCountryTransformer = new GeolocationToCountryTransformer().setInput(f1)
-  val expectedResult: Seq[Text] = Seq(Text("US"), Text("CA"), Text("CN"), Text("IN"), Text("BR"))
+  val expectedResult: Seq[Text] = Seq(Text("US"), Text("CA"), Text("CN"), Text("IN"), Text("BR"), Text(""))
 }

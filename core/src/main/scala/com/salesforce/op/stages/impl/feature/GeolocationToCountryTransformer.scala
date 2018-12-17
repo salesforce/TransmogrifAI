@@ -39,14 +39,12 @@ class GeolocationToCountryTransformer(uid: String = UID[GeolocationToCountryTran
   extends UnaryTransformer[Geolocation, Text](operationName = "geoToCountry", uid = uid) {
 
   override def transformFn: Geolocation => Text = (geolocation: Geolocation) => {
-    if (geolocation == null || geolocation.lat == null || geolocation.lon == null) {
-      new Text("")
+    geolocation match {
+      case gl if (gl.lat.equals(Double.NaN) || gl.lon.equals(Double.NaN)) => new Text("")
+      case gl => {
+        new Text(getCountryName(gl.lat, gl.lon))
+      }
     }
-
-    val lat: Double = geolocation.lat
-    val long: Double = geolocation.lon
-
-    new Text(getCountryName(lat, long))
   }
 
   private[op] def getCountryName(lat: Double, long: Double): String = {
