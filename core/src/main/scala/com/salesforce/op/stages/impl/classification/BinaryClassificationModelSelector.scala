@@ -34,7 +34,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector, ModelSelectorFactory}
 import com.salesforce.op.stages.impl.tuning.{DataSplitter, Splitter, _}
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
@@ -46,77 +46,93 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object BinaryClassificationModelSelector extends ModelSelectorFactory {
 
-  private[op] val modelNames: Seq[BinaryClassificationModelsToTry] = Seq(MTT.OpLogisticRegression,
-    MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC)
-  // OpNaiveBayes and OpDecisionTreeClassifier off by default
+  /**
+   * Default model types and model parameters for problem type
+   */
+  case object Defaults extends ModelDefaults[BinaryClassificationModelsToTry] {
 
-  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
-    val lr = new OpLogisticRegression()
-    val lrParams = new ParamGridBuilder()
-      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
-      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
-      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
-      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
-      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
-      .addGrid(lr.tol, DefaultSelectorParams.Tol)
-      .build()
+    /**
+     * Subset of models to use in model selector
+     *
+     * Note: [[OpNaiveBayes]], [[OpDecisionTreeClassifier]] and [[OpXGBoostClassifier]] are off by default
+     */
+    val modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Seq(
+      MTT.OpLogisticRegression, MTT.OpRandomForestClassifier, MTT.OpGBTClassifier, MTT.OpLinearSVC
+    )
 
-    val rf = new OpRandomForestClassifier()
-    val rfParams = new ParamGridBuilder()
-      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(rf.impurity, DefaultSelectorParams.ImpurityClass)
-      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
-      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-      .build()
+    /**
+     * Default models and parameters (must be a def) to use in model selector
+     *
+     * @return defaults for problem type
+     */
+    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+      val lr = new OpLogisticRegression()
+      val lrParams = new ParamGridBuilder()
+        .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+        .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+        .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+        .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+        .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+        .addGrid(lr.tol, DefaultSelectorParams.Tol)
+        .build()
 
-    val gbt = new OpGBTClassifier()
-    val gbtParams = new ParamGridBuilder()
-      .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(gbt.impurity, DefaultSelectorParams.ImpurityClass)
-      .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
-      .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-      .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
-      .build()
+      val rf = new OpRandomForestClassifier()
+      val rfParams = new ParamGridBuilder()
+        .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(rf.impurity, DefaultSelectorParams.ImpurityClass)
+        .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+        .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+        .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+        .build()
 
-    val svc = new OpLinearSVC()
-    val svcParams = new ParamGridBuilder()
-      .addGrid(svc.regParam, DefaultSelectorParams.Regularization)
-      .addGrid(svc.maxIter, DefaultSelectorParams.MaxIterLin)
-      .addGrid(svc.fitIntercept, DefaultSelectorParams.FitIntercept)
-      .addGrid(svc.tol, DefaultSelectorParams.Tol)
-      .addGrid(svc.standardization, DefaultSelectorParams.Standardized)
-      .build()
+      val gbt = new OpGBTClassifier()
+      val gbtParams = new ParamGridBuilder()
+        .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(gbt.impurity, DefaultSelectorParams.ImpurityClass)
+        .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+        .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
+        .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+        .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
+        .build()
 
-    val nb = new OpNaiveBayes()
-    val nbParams = new ParamGridBuilder()
-      .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
-      .build()
+      val svc = new OpLinearSVC()
+      val svcParams = new ParamGridBuilder()
+        .addGrid(svc.regParam, DefaultSelectorParams.Regularization)
+        .addGrid(svc.maxIter, DefaultSelectorParams.MaxIterLin)
+        .addGrid(svc.fitIntercept, DefaultSelectorParams.FitIntercept)
+        .addGrid(svc.tol, DefaultSelectorParams.Tol)
+        .addGrid(svc.standardization, DefaultSelectorParams.Standardized)
+        .build()
 
-    val dt = new OpDecisionTreeClassifier()
-    val dtParams = new ParamGridBuilder()
-      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(dt.impurity, DefaultSelectorParams.ImpurityClass)
-      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .build()
+      val nb = new OpNaiveBayes()
+      val nbParams = new ParamGridBuilder()
+        .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
+        .build()
 
-    val xgb = new OpXGBoostClassifier()
-    val xgbParams = new ParamGridBuilder()
-      .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
-      .addGrid(xgb.eta, DefaultSelectorParams.Eta)
-      .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
-      .build()
+      val dt = new OpDecisionTreeClassifier()
+      val dtParams = new ParamGridBuilder()
+        .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(dt.impurity, DefaultSelectorParams.ImpurityClass)
+        .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+        .build()
 
-    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams,
-      xgb -> xgbParams)
+      val xgb = new OpXGBoostClassifier()
+      val xgbParams = new ParamGridBuilder()
+        .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+        .addGrid(xgb.eta, DefaultSelectorParams.Eta)
+        .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
+        .build()
+
+      Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams,
+        xgb -> xgbParams)
+    }
   }
 
   /**
@@ -154,15 +170,19 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Defaults.modelTypesToUse,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
-    selector(cv, splitter = splitter,
+    selector(cv,
+      splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
+      modelTypesToUse = modelTypesToUse,
+      modelsAndParameters = modelsAndParameters,
+      defaults = Defaults
+    )
   }
 
   /**
@@ -195,15 +215,19 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = modelNames,
+    modelTypesToUse: Seq[BinaryClassificationModelsToTry] = Defaults.modelTypesToUse,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
-    selector(ts, splitter = splitter,
+    selector(ts,
+      splitter = splitter,
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
+      modelTypesToUse = modelTypesToUse,
+      modelsAndParameters = modelsAndParameters,
+      defaults = Defaults
+    )
   }
 
 }

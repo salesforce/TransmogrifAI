@@ -151,7 +151,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       case None => ModelData(datasetWithID, None)
     }
 
-    val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse{
+    val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
         .validate(modelInfo = modelsUse, dataset = trainData, label = in1.name, features = in2.name)
@@ -173,7 +173,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val metadataSummary = ModelSelectorSummary(
       validationType = ValidationType.fromValidator(validator),
       validationParameters = validator.getParams(),
-      dataPrepParameters = splitter.map(_.extractParamMap().getAsMap()).getOrElse(Map()),
+      dataPrepParameters = splitter.map(_.extractParamMap().getAsMap()).getOrElse(Map.empty),
       dataPrepResults = splitterSummary,
       evaluationMetric = validator.evaluator.name,
       problemType = ProblemType.fromEvalMetrics(trainingEval),
@@ -185,14 +185,12 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       holdoutEvaluation = None
     )
 
-    setMetadata(metadataSummary.toMetadata().toSummaryMetadata())
+    // We skip unsupported metadata values here so the model selector won't break
+    // when non standard model parameters are present in param maps
+    val meta = metadataSummary.toMetadata(skipUnsupported = true)
+    setMetadata(meta.toSummaryMetadata())
 
-    new SelectedModel(
-      bestModel.asInstanceOf[ModelType],
-      outputsColNamesMap,
-      uid,
-      operationName
-    )
+    new SelectedModel(bestModel.asInstanceOf[ModelType], outputsColNamesMap, uid = uid, operationName = operationName)
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setParent(this)
       .setMetadata(getMetadata())

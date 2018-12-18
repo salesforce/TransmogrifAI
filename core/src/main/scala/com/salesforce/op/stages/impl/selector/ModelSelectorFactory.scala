@@ -41,15 +41,23 @@ import org.apache.spark.ml.param.ParamMap
 private[op] trait ModelSelectorFactory {
 
   /**
-   * Subset of models to use
+   * Default model types and model parameters for problem type
    */
-  private[op] val modelNames: Seq[ModelsToTry]
+  trait ModelDefaults[M <: ModelsToTry] {
 
-  /**
-   * Default models and parameters
-   * @return defaults for problem type
-   */
-  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
+    /**
+     * Subset of models to use in model selector
+     */
+    val modelTypesToUse: Seq[M]
+
+    /**
+     * Default models and parameters (must be a def) to use in model selector
+     *
+     * @return defaults for problem type
+     */
+    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
+
+  }
 
   /**
    * Create the model selector for specified interface
@@ -58,6 +66,7 @@ private[op] trait ModelSelectorFactory {
    * @param trainTestEvaluators evaluation to do on data
    * @param modelTypesToUse list of models to use
    * @param modelsAndParameters sequence of models and parameters to explore
+   * @param defaults default model types and model parameters for problem type
    * @return model selector with these settings
    */
   protected def selector(
@@ -65,15 +74,16 @@ private[op] trait ModelSelectorFactory {
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]],
     modelTypesToUse: Seq[ModelsToTry],
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])],
+    defaults: ModelDefaults[_ <: ModelsToTry]
   ): ModelSelector[ModelType, EstimatorType] = {
     val modelStrings = modelTypesToUse.map(_.entryName)
     val modelsToUse =
     // if no models are specified use the defaults and filter by the named models to use
-      if (modelsAndParameters.isEmpty) defaultModelsAndParams
+      if (modelsAndParameters.isEmpty) defaults.modelsAndParams
         .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
       // if models to use has been specified and the models have been specified filter the models by the names
-      else if (modelTypesToUse != modelNames) modelsAndParameters
+      else if (modelTypesToUse != defaults.modelTypesToUse) modelsAndParameters
         .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
       // else just use the specified models
       else modelsAndParameters

@@ -178,7 +178,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "fit and predict for default models" in {
-    val modelToTry = MultiClassificationModelSelector.modelNames(scala.util.Random.nextInt(2))
+    val modelToTry = MultiClassificationModelSelector.Defaults.modelTypesToUse(scala.util.Random.nextInt(2))
 
     val testEstimator =
       MultiClassificationModelSelector
