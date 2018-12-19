@@ -61,10 +61,10 @@ class TextMapNullEstimatorTest
   val estimator = new TextMapNullEstimator[TextMap]().setInput(f1)
 
   val expectedResult = Seq(
-      Array(0.0, 0.0, 0.0, 0.0),
-      Array(1.0, 0.0, 1.0, 1.0),
-      Array(1.0, 1.0, 0.0, 1.0)
-    ).map(Vectors.dense(_).toOPVector)
+    Array(0.0, 0.0, 0.0, 0.0),
+    Array(1.0, 0.0, 1.0, 1.0),
+    Array(1.0, 1.0, 0.0, 1.0)
+  ).map(Vectors.dense(_).toOPVector)
 
   Spec[TextListNullTransformer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = estimator.getOutput()
