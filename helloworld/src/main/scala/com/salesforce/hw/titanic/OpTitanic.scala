@@ -32,8 +32,6 @@ package com.salesforce.hw.titanic
 
 import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
-import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.features.types.Text
 import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.tuning.DataSplitter
@@ -57,15 +55,6 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
   ////////////////////////////////////////////////////////////////////////////////
   // WORKFLOW DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
-
-  val familySize = (age + age).bucketize(trackNulls = true, trackInvalid = true)
-
-  val textIdfs = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).collect {
-    case f if f.isSubtypeOf[Text] => f.asInstanceOf[FeatureLike[Text]]
-  }.map(_.tokenize(autoDetectLanguage = true).tf(numTerms = 100).idf()).combine()
-
-  name.tokenize(autoDetectLanguage = true).tf(numTerms = 100).idf()
-
 
   // Automated feature engineering
   val featureVector = Seq(pClass, name, sex, age, sibSp, parch, ticket, cabin, embarked).transmogrify()

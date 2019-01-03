@@ -159,7 +159,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 
@@ -204,7 +204,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpMultiClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 }

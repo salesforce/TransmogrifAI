@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
-import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RTT}
+import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
@@ -57,7 +57,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
      * Note: [[OpDecisionTreeRegressor]] and [[OpXGBoostRegressor]] are off by default
      */
     val modelTypesToUse: Seq[RegressionModelsToTry] = Seq(
-      RTT.OpLinearRegression, RTT.OpRandomForestRegressor, RTT.OpGBTRegressor, RTT.OpGeneralizedLinearRegression
+      MTT.OpLinearRegression, MTT.OpRandomForestRegressor, MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression
     )
 
     /**
@@ -171,7 +171,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 
@@ -214,7 +214,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 

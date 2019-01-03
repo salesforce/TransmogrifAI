@@ -35,7 +35,7 @@ import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector, ModelSelectorFactory}
-import com.salesforce.op.stages.impl.tuning.{DataSplitter, Splitter, _}
+import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -130,8 +130,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
         .build()
 
-      Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams, nb -> nbParams, dt -> dtParams,
-        xgb -> xgbParams)
+      Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
+        nb -> nbParams, dt -> dtParams, xgb -> xgbParams)
     }
   }
 
@@ -181,7 +181,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator, new OpBinScoreEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 
@@ -226,7 +226,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator) ++ trainTestEvaluators,
       modelTypesToUse = modelTypesToUse,
       modelsAndParameters = modelsAndParameters,
-      defaults = Defaults
+      modelDefaults = Defaults
     )
   }
 
