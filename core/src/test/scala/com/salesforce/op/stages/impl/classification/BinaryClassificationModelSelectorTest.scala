@@ -172,8 +172,9 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
   }
 
   it should "fit and predict for default models" in {
-
-    val modelToTry = BinaryClassificationModelSelector.Defaults.modelTypesToUse(scala.util.Random.nextInt(4))
+    // Take one random model type each time
+    val defaultModels = BinaryClassificationModelSelector.Defaults.modelTypesToUse
+    val modelToTry = defaultModels(scala.util.Random.nextInt(defaultModels.size))
 
     val testEstimator =
       BinaryClassificationModelSelector

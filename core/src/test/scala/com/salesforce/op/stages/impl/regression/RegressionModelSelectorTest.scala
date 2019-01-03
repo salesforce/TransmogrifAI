@@ -175,8 +175,9 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
   }
 
   it should "fit and predict for default models" in {
-
-    val modelToTry = RegressionModelSelector.Defaults.modelTypesToUse(scala.util.Random.nextInt(4))
+    // Take one random model type each time
+    val defaultModels = RegressionModelSelector.Defaults.modelTypesToUse
+    val modelToTry = defaultModels(scala.util.Random.nextInt(defaultModels.size))
 
     val testEstimator = RegressionModelSelector
       .withCrossValidation(
