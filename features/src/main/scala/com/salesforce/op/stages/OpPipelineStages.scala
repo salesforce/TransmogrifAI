@@ -158,7 +158,7 @@ trait OpPipelineStageBase extends OpPipelineStageParams with MLWritable {
    * @param extra new parameters want to add to instance
    * @return a new instance with the same uid
    */
-  final override def copy(extra: ParamMap): this.type = {
+  override def copy(extra: ParamMap): this.type = {
     val copy = ReflectionUtils.copy(this).asInstanceOf[this.type]
     copyValues(copy, extra)
   }

@@ -35,9 +35,10 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
 import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
+import com.salesforce.op.stages.base.unary.{UnaryCondition, UnaryLambdaTransformer}
 import com.salesforce.op.stages.impl.feature.{AliasTransformer, ToOccurTransformer}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -51,6 +52,19 @@ trait RichFeature {
    */
   implicit class RichFeature[A <: FeatureType : TypeTag]
   (val feature: FeatureLike[A])(implicit val ftt: TypeTag[A#Value]) {
+
+    /**
+     * Create feature condition based on the condition function
+     *
+     * @param conditionFn condition function
+     * @return condition
+     */
+    def condition[B <: FeatureType : TypeTag, C <: FeatureType : TypeTag](
+      conditionFn: (FeatureLike[A], Dataset[A#Value]) => Either[FeatureLike[B], FeatureLike[C]],
+      operationName: String = "condition"
+    ): UnaryCondition[A, B, C] = {
+      new UnaryCondition[A, B, C](operationName = operationName, conditionFn = conditionFn).setInput(feature)
+    }
 
     /**
      * Unary transform feature[A] => feature[B]
