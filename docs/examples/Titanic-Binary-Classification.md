@@ -84,8 +84,8 @@ val estimatedCostOfTickets = familySize * fare
 // normalize the numeric feature age to create a new transformed feature
 val normedAge = age.zNormalize()
 
-// pivot the categorical feature, sex, into a 0-1 vector of (male, female)
-val pivotedSex = sex.pivot()
+// pivot the categorical feature, sex, into a 0-1 vector of (male, female) 
+val pivotedSex = sex.pivot() 
 
 // divide age into adult and child
 val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
@@ -143,7 +143,7 @@ val workflow =
       .setReader(trainDataReader)
 ```
 
-When we now call 'train' on this workflow, it automatically computes and executes the entire DAG of Stages needed to compute the features ```survived, prediction, rawPrediction```, and ```prob```, fitting all the estimators on the training data in the process. Calling ```score``` on the fitted workflow then transforms the underlying training data to produce a DataFrame with the all the features manifested. The ```score``` method can optionally be passed an evaluator that produces metrics.
+When we now call 'train' on this workflow, it automatically computes and executes the entire DAG of Stages needed to compute the features ```survived, prediction, rawPrediction```, and ```prob```, fitting all the estimators on the training data in the process. Calling ```score``` on the fitted workflow then transforms the underlying training data to produce a DataFrame with the all the features manifested. The ```score``` method can optionally be passed an evaluator that produces metrics. 
 
 ```scala
 import com.salesforce.op.evaluators.Evaluators
@@ -160,10 +160,12 @@ val evaluator = Evaluators.BinaryClassification()
 val (transformedTrainData, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator)
 ```
 
-The fitted workflow can now be saved, and loaded again to be applied to any new data set of type Passengers by changing the reader.
+The fitted workflow can now be saved, and loaded again to be applied to any new data set of type Passengers by changing the reader. 
 
 ```scala
 fittedWorkflow.save(saveWorkflowPath)
 
 val savedWorkflow = workflow.loadModel(saveWorkflowPath).setReader(testDataReader)
 ```
+
+
