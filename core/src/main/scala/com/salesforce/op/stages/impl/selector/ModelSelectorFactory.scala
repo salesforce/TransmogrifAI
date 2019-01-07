@@ -38,18 +38,26 @@ import org.apache.spark.ml.param.ParamMap
 /**
  * Creates the model selector class
  */
-private[op] trait ModelSelectorFactory {
+trait ModelSelectorFactory {
 
   /**
-   * Subset of models to use
+   * Default model types and model parameters for problem type
    */
-  private[op] val modelNames: Seq[ModelsToTry]
+  trait ModelDefaults[M <: ModelsToTry] {
 
-  /**
-   * Default models and parameters
-   * @return defaults for problem type
-   */
-  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
+    /**
+     * Subset of models to use in model selector
+     */
+    val modelTypesToUse: Seq[M]
+
+    /**
+     * Default models and parameters (must be a def) to use in model selector
+     *
+     * @return defaults for problem type
+     */
+    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])]
+
+  }
 
   /**
    * Create the model selector for specified interface
@@ -58,6 +66,7 @@ private[op] trait ModelSelectorFactory {
    * @param trainTestEvaluators evaluation to do on data
    * @param modelTypesToUse list of models to use
    * @param modelsAndParameters sequence of models and parameters to explore
+   * @param modelDefaults default model types and model parameters for problem type
    * @return model selector with these settings
    */
   protected def selector(
@@ -65,18 +74,25 @@ private[op] trait ModelSelectorFactory {
     splitter: Option[Splitter],
     trainTestEvaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]],
     modelTypesToUse: Seq[ModelsToTry],
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])]
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])],
+    modelDefaults: ModelDefaults[_ <: ModelsToTry]
   ): ModelSelector[ModelType, EstimatorType] = {
-    val modelStrings = modelTypesToUse.map(_.entryName)
-    val modelsToUse =
-    // if no models are specified use the defaults and filter by the named models to use
-      if (modelsAndParameters.isEmpty) defaultModelsAndParams
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
-      // if models to use has been specified and the models have been specified filter the models by the names
-      else if (modelTypesToUse != modelNames) modelsAndParameters
-        .filter{ case (e, p) => modelStrings.contains(e.getClass.getSimpleName) }
+    val modelTypeNames = modelTypesToUse.map(_.entryName).toSet
+    val modelsToUse = {
+      // if no models are specified use the defaults and filter by the named models to use
+      if (modelsAndParameters.isEmpty) {
+        modelDefaults.modelsAndParams.filter { case (e, p) => modelTypeNames(e.getClass.getSimpleName) }
+      }
+      // if models to use has been specified and the models have been specified - filter the models by the names
+      else if (
+        modelTypesToUse.distinct.sortBy(_.entryName) != modelDefaults.modelTypesToUse.distinct.sortBy(_.entryName)
+      ) {
+        modelsAndParameters.filter { case (e, p) => modelTypeNames(e.getClass.getSimpleName) }
+      }
       // else just use the specified models
       else modelsAndParameters
+    }
+
     new ModelSelector(
       validator = validator,
       splitter = splitter,

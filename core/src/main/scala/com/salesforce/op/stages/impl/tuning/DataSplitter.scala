@@ -80,8 +80,18 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
  * Empty class because no summary information for a data splitter
  */
 case class DataSplitterSummary() extends SplitterSummary {
-  override def toMetadata(): Metadata = new MetadataBuilder()
-    .putString(SplitterSummary.ClassName, this.getClass.getName)
-    .build()
-}
 
+  /**
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
+   */
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
+    new MetadataBuilder()
+      .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .build()
+  }
+
+}
