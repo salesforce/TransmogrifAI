@@ -30,14 +30,12 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import org.apache.spark.ml.param._
-import org.apache.spark.sql.{Dataset, Row}
 import com.salesforce.op.stages.impl.MetadataLike
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
-import com.salesforce.op.utils.reflection.ReflectionUtils
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.Metadata
+import org.apache.spark.sql.{Dataset, Row}
 
 import scala.util.Try
 

@@ -73,25 +73,27 @@ case class ModelSelectorSummary
 ) extends MetadataLike {
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
       .putString(ValidationTypeName, validationType.entryName)
-      .putMetadata(ValidationParameters, validationParameters.toMetadata)
-      .putMetadata(DataPrepParameters, dataPrepParameters.toMetadata)
+      .putMetadata(ValidationParameters, validationParameters.toMetadata(skipUnsupported))
+      .putMetadata(DataPrepParameters, dataPrepParameters.toMetadata(skipUnsupported))
       .putString(EvaluationMetric, evaluationMetric.entryName)
       .putString(ProblemTypeName, problemType.entryName)
       .putString(BestModelUID, bestModelUID)
       .putString(BestModelName, bestModelName)
       .putString(BestModelType, bestModelType)
-      .putMetadataArray(ValidationResults, validationResults.map(_.toMetadata()).toArray)
+      .putMetadataArray(ValidationResults, validationResults.map(_.toMetadata(skipUnsupported)).toArray)
       .putStringArray(TrainEvaluation,
         Array(trainEvaluation.getClass.getName, trainEvaluation.toJson(pretty = false)))
 
-    dataPrepResults.map(dp => meta.putMetadata(DataPrepResults, dp.toMetadata()))
+    dataPrepResults.map(dp => meta.putMetadata(DataPrepResults, dp.toMetadata(skipUnsupported)))
     holdoutEvaluation.map(he => meta.putStringArray(HoldoutEvaluation,
       Array(he.getClass.getName, he.toJson(pretty = false))))
     meta.build()
@@ -117,17 +119,19 @@ case class ModelEvaluation
 ) extends MetadataLike {
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(ModelUID, modelUID)
       .putString(ModelName, modelName)
       .putString(ModelTypeName, modelType)
       .putStringArray(MetricValues, Array(metricValues.getClass.getName, metricValues.toJson(pretty = false)))
-      .putMetadata(ModelParameters, modelParameters.toMetadata)
+      .putMetadata(ModelParameters, modelParameters.toMetadata(skipUnsupported))
       .build()
   }
 }

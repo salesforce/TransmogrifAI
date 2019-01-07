@@ -60,7 +60,7 @@ val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
 
 val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
 
-val age = FeatureBuilder.RealNN[Passenger].extract(_.age.toRealNN).asPredictor
+val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
 
 val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
 
@@ -101,9 +101,9 @@ See [“Creating Shortcuts for Transformers and Estimators”](../developer-guid
 We now define a Feature of type Vector, that is a vector representation of all the features we would like to use as predictors in our workflow.
 
 ```scala
-val passengerFeatures: FeatureLike[Vector] = Seq(
+val passengerFeatures: FeatureLike[OPVector] = Seq(
    pClass, name, sex, age, sibSp, parCh, ticket,
-   cabin, embarked, familySize, estimatedCostOfTickets, normedAge
+   cabin, embarked, familySize, estimatedCostOfTickets, normedAge,
    pivotedSex, ageGroup
 ).transmogrify()
 ```
@@ -146,6 +146,8 @@ val workflow =
 When we now call 'train' on this workflow, it automatically computes and executes the entire DAG of Stages needed to compute the features ```survived, prediction, rawPrediction```, and ```prob```, fitting all the estimators on the training data in the process. Calling ```score``` on the fitted workflow then transforms the underlying training data to produce a DataFrame with the all the features manifested. The ```score``` method can optionally be passed an evaluator that produces metrics. 
 
 ```scala
+import com.salesforce.op.evaluators.Evaluators
+
 // Fit the workflow to the data
 val fittedWorkflow = workflow.train()
 
