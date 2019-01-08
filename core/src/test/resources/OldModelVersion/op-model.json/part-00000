@@ -3,8 +3,8 @@
   "resultFeaturesUids" : [ "Real_000000000007" ],
   "blacklistedFeaturesUids" : [ ],
   "stages" : [ {
-    "timestamp" : 1544641166669,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865758,
+    "sparkVersion" : "2.2.1",
     "isModel" : false,
     "uid" : "DateListVectorizer_000000000001",
     "class" : "com.salesforce.op.stages.impl.feature.DateListVectorizer",
@@ -25,19 +25,6 @@
       },
       "fillWithPivotModeDay" : false,
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "numeric" : [ {
-              "idx" : 0,
-              "name" : "boarded_0"
-            } ],
-            "binary" : [ {
-              "idx" : 1,
-              "name" : "boarded_boarded_NullIndicatorValue_1"
-            } ]
-          },
-          "num_attrs" : 2
-        },
         "vector_history" : {
           "boarded" : {
             "stages" : [ "vecDateList_DateListVectorizer_000000000001" ],
@@ -50,15 +37,15 @@
           "parent_feature" : [ "boarded" ]
         }, {
           "indices" : [ 1 ],
-          "grouping" : "boarded",
           "parent_feature" : [ "boarded" ],
           "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "indicator_group" : "boarded"
         } ]
       },
       "withTimeSince" : true,
       "fillWithPivotModeMonth" : false,
-      "referenceDate" : 1544641163192,
+      "referenceDate" : 1534375862893,
       "inputFeatures" : [ {
         "stages" : [ ],
         "name" : "boarded",
@@ -73,8 +60,8 @@
       "fillValue" : 0.0
     }
   }, {
-    "timestamp" : 1544641166670,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865761,
+    "sparkVersion" : "2.2.1",
     "isModel" : false,
     "uid" : "RealNNVectorizer_000000000004",
     "class" : "com.salesforce.op.stages.impl.feature.RealNNVectorizer",
@@ -98,15 +85,6 @@
         "originFeatures" : [ "height" ]
       } ],
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "numeric" : [ {
-              "idx" : 0,
-              "name" : "height_0"
-            } ]
-          },
-          "num_attrs" : 1
-        },
         "vector_history" : {
           "height" : {
             "stages" : [ "vecNum_RealNNVectorizer_000000000004" ],
@@ -143,8 +121,8 @@
         "value" : "vecReal"
       }
     },
-    "timestamp" : 1544641166671,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865763,
+    "sparkVersion" : "2.2.1",
     "isModel" : true,
     "uid" : "RealVectorizer_000000000003",
     "class" : "com.salesforce.op.stages.impl.feature.RealVectorizerModel",
@@ -159,19 +137,6 @@
         } ]
       },
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "numeric" : [ {
-              "idx" : 0,
-              "name" : "age_0"
-            } ],
-            "binary" : [ {
-              "idx" : 1,
-              "name" : "age_age_NullIndicatorValue_1"
-            } ]
-          },
-          "num_attrs" : 2
-        },
         "vector_history" : {
           "age" : {
             "stages" : [ "vecReal_RealVectorizer_000000000003" ],
@@ -180,10 +145,10 @@
         },
         "vector_columns" : [ {
           "indices" : [ 1 ],
-          "grouping" : "age",
           "parent_feature" : [ "age" ],
           "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "indicator_group" : "age"
         }, {
           "indices" : [ 0 ],
           "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
@@ -210,7 +175,6 @@
           "topValues" : [ [ ] ],
           "shouldCleanText" : true,
           "shouldTrackNulls" : true,
-          "shouldTrackLen" : false,
           "hashingParams" : {
             "hashWithIndex" : false,
             "prependFeatureName" : true,
@@ -236,8 +200,8 @@
         "value" : "com.salesforce.op.features.types.Text"
       }
     },
-    "timestamp" : 1544641166675,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865928,
+    "sparkVersion" : "2.2.1",
     "isModel" : true,
     "uid" : "SmartTextVectorizer_000000000005",
     "class" : "com.salesforce.op.stages.impl.feature.SmartTextVectorizerModel",
@@ -255,18 +219,6 @@
       "toLowercase" : true,
       "autoDetectThreshold" : 0.99,
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "binary" : [ {
-              "idx" : 0,
-              "name" : "description_description_OTHER_0"
-            }, {
-              "idx" : 1,
-              "name" : "description_description_NullIndicatorValue_1"
-            } ]
-          },
-          "num_attrs" : 2
-        },
         "vector_history" : {
           "description" : {
             "stages" : [ "smartTxtVec_SmartTextVectorizer_000000000005" ],
@@ -274,17 +226,17 @@
           }
         },
         "vector_columns" : [ {
-          "indices" : [ 0 ],
-          "grouping" : "description",
-          "parent_feature" : [ "description" ],
-          "indicator_value" : "OTHER",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ]
-        }, {
           "indices" : [ 1 ],
-          "grouping" : "description",
           "parent_feature" : [ "description" ],
           "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ],
+          "indicator_group" : "description"
+        }, {
+          "indices" : [ 0 ],
+          "parent_feature" : [ "description" ],
+          "indicator_value" : "OTHER",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ],
+          "indicator_group" : "description"
         } ]
       },
       "minTokenLength" : 1,
@@ -327,8 +279,8 @@
         "value" : [ [ ] ]
       }
     },
-    "timestamp" : 1544641166679,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865946,
+    "sparkVersion" : "2.2.1",
     "isModel" : true,
     "uid" : "OpSetVectorizer_000000000002",
     "class" : "com.salesforce.op.stages.impl.feature.OpSetVectorizerModel",
@@ -347,19 +299,6 @@
         } ]
       },
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "numeric" : [ {
-              "idx" : 0,
-              "name" : "gender_gender_OTHER_0"
-            } ],
-            "binary" : [ {
-              "idx" : 1,
-              "name" : "gender_gender_NullIndicatorValue_1"
-            } ]
-          },
-          "num_attrs" : 2
-        },
         "vector_history" : {
           "gender" : {
             "stages" : [ "vecSet_OpSetVectorizer_000000000002" ],
@@ -368,16 +307,16 @@
         },
         "vector_columns" : [ {
           "indices" : [ 0 ],
-          "grouping" : "gender",
           "parent_feature" : [ "gender" ],
           "indicator_value" : "OTHER",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
         }, {
           "indices" : [ 1 ],
-          "grouping" : "gender",
           "parent_feature" : [ "gender" ],
           "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
         } ]
       },
       "inputFeatures" : [ {
@@ -402,48 +341,14 @@
         "value" : "VectorsCombiner_000000000006"
       }
     },
-    "timestamp" : 1544641166682,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865953,
+    "sparkVersion" : "2.2.1",
     "isModel" : true,
     "uid" : "VectorsCombiner_000000000006",
     "class" : "com.salesforce.op.stages.impl.feature.VectorsCombinerModel",
     "paramMap" : {
       "outputFeatureName" : "age-boarded-description-gender-height_6-stagesApplied_OPVector_000000000006",
       "outputMetadata" : {
-        "ml_attr" : {
-          "attrs" : {
-            "numeric" : [ {
-              "idx" : 0,
-              "name" : "boarded_0"
-            }, {
-              "idx" : 2,
-              "name" : "gender_gender_OTHER_2"
-            }, {
-              "idx" : 4,
-              "name" : "age_4"
-            }, {
-              "idx" : 6,
-              "name" : "height_6"
-            } ],
-            "binary" : [ {
-              "idx" : 1,
-              "name" : "boarded_boarded_NullIndicatorValue_1"
-            }, {
-              "idx" : 3,
-              "name" : "gender_gender_NullIndicatorValue_3"
-            }, {
-              "idx" : 5,
-              "name" : "age_age_NullIndicatorValue_5"
-            }, {
-              "idx" : 7,
-              "name" : "description_description_OTHER_7"
-            }, {
-              "idx" : 8,
-              "name" : "description_description_NullIndicatorValue_8"
-            } ]
-          },
-          "num_attrs" : 9
-        },
         "vector_history" : {
           "description" : {
             "stages" : [ "smartTxtVec_SmartTextVectorizer_000000000005" ],
@@ -471,49 +376,49 @@
           "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
           "parent_feature" : [ "age" ]
         }, {
+          "indices" : [ 0 ],
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "parent_feature" : [ "boarded" ]
+        }, {
+          "indices" : [ 1 ],
+          "parent_feature" : [ "boarded" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
+          "indicator_group" : "boarded"
+        }, {
           "indices" : [ 2 ],
-          "grouping" : "gender",
           "parent_feature" : [ "gender" ],
           "indicator_value" : "OTHER",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        }, {
+          "indices" : [ 7 ],
+          "parent_feature" : [ "description" ],
+          "indicator_value" : "OTHER",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ],
+          "indicator_group" : "description"
+        }, {
+          "indices" : [ 3 ],
+          "parent_feature" : [ "gender" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ],
+          "indicator_group" : "gender"
+        }, {
+          "indices" : [ 8 ],
+          "parent_feature" : [ "description" ],
+          "indicator_value" : "NullIndicatorValue",
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ],
+          "indicator_group" : "description"
         }, {
           "indices" : [ 6 ],
           "parent_feature_type" : [ "com.salesforce.op.features.types.RealNN" ],
           "parent_feature" : [ "height" ]
         }, {
-          "indices" : [ 3 ],
-          "grouping" : "gender",
-          "parent_feature" : [ "gender" ],
-          "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.MultiPickList" ]
-        }, {
-          "indices" : [ 1 ],
-          "grouping" : "boarded",
-          "parent_feature" : [ "boarded" ],
-          "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ]
-        }, {
-          "indices" : [ 8 ],
-          "grouping" : "description",
-          "parent_feature" : [ "description" ],
-          "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ]
-        }, {
-          "indices" : [ 0 ],
-          "parent_feature_type" : [ "com.salesforce.op.features.types.DateList" ],
-          "parent_feature" : [ "boarded" ]
-        }, {
           "indices" : [ 5 ],
-          "grouping" : "age",
           "parent_feature" : [ "age" ],
           "indicator_value" : "NullIndicatorValue",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ]
-        }, {
-          "indices" : [ 7 ],
-          "grouping" : "description",
-          "parent_feature" : [ "description" ],
-          "indicator_value" : "OTHER",
-          "parent_feature_type" : [ "com.salesforce.op.features.types.Text" ]
+          "parent_feature_type" : [ "com.salesforce.op.features.types.Real" ],
+          "indicator_group" : "age"
         } ]
       },
       "inputFeatures" : [ {
@@ -563,8 +468,8 @@
       }
     }
   }, {
-    "timestamp" : 1544641166686,
-    "sparkVersion" : "2.3.2",
+    "timestamp" : 1534375865958,
+    "sparkVersion" : "2.2.1",
     "isModel" : false,
     "uid" : "UnaryLambdaTransformer_000000000007",
     "class" : "com.salesforce.op.stages.base.unary.UnaryLambdaTransformer",
@@ -671,6 +576,5 @@
     "parents" : [ "OPVector_000000000006" ]
   } ],
   "parameters" : "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}",
-  "trainParameters" : "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}",
-  "rawFeatureDistributions" : "[]"
+  "trainParameters" : "{\"stageParams\":{\"a\":{\"aa\":1,\"aaa\":2},\"b\":{\"bb\":3,\"bbb\":4}},\"readerParams\":{\"test\":{\"path\":\"a\",\"partitions\":3,\"customParams\":{}}},\"customParams\":{},\"alternateReaderParams\":{}}"
 }

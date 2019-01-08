@@ -112,7 +112,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         params = makeHashingParams(),
         allKeys = allKeys,
         shouldTrackNulls = args.shouldTrackNulls,
-        shouldTrackLen = args.shouldTrackLen
+        shouldTrackLen = $(trackTextLen)
       )
     } else Array.empty[OpVectorColumnMetadata]
 
@@ -126,7 +126,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
-    val shouldTrackLen = $(trackTextLen)
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
@@ -146,7 +145,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       shouldCleanKeys = shouldCleanKeys,
       shouldCleanValues = shouldCleanValues,
       shouldTrackNulls = shouldTrackNulls,
-      shouldTrackLen = shouldTrackLen,
       hashingParams = makeHashingParams()
     )
   }
@@ -174,7 +172,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       .setAutoDetectThreshold(getAutoDetectThreshold)
       .setDefaultLanguage(getDefaultLanguage)
       .setMinTokenLength(getMinTokenLength)
-      .setToLowercase(getToLowercase)  }
+      .setToLowercase(getToLowercase)
+      .setTrackTextLen($(trackTextLen))
+  }
 }
 
 /**
@@ -210,7 +210,6 @@ case class SmartTextFeatureInfo(key: String, isCategorical: Boolean, topValues: 
  * @param shouldCleanKeys   should clean feature keys
  * @param shouldCleanValues should clean feature values
  * @param shouldTrackNulls  should track nulls
- * @param shouldTrackLen    whether or not to track the length of text
  * @param hashingParams     hashing function params
  */
 case class SmartTextMapVectorizerModelArgs
@@ -219,7 +218,6 @@ case class SmartTextMapVectorizerModelArgs
   shouldCleanKeys: Boolean,
   shouldCleanValues: Boolean,
   shouldTrackNulls: Boolean,
-  shouldTrackLen: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
@@ -236,7 +234,10 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-  with TextTokenizerParams with MapHashingFun with TextMapPivotVectorizerModelFun[OPMap[String]] {
+  with TextTokenizerParams
+  with TrackTextLenParam
+  with MapHashingFun
+  with TextMapPivotVectorizerModelFun[OPMap[String]] {
 
   private val categoricalPivotFn = pivotFn(
     topValues = args.categoricalFeatureInfo.filter(_.nonEmpty).map(_.map(info => info.key -> info.topValues)),
@@ -269,7 +270,7 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) getNullIndicatorsVector(keysText, rowTextTokenized) else OPVector.empty
-    val textLenVector = if (args.shouldTrackLen) getLenVector(keysText, rowTextTokenized) else OPVector.empty
+    val textLenVector = if ($(trackTextLen)) getLenVector(keysText, rowTextTokenized) else OPVector.empty
 
     categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
   }

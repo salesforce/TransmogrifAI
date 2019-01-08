@@ -100,7 +100,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
-      shouldTrackLen = $(trackTextLen),
       hashingParams = makeHashingParams()
     )
 
@@ -113,6 +112,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       .setDefaultLanguage(getDefaultLanguage)
       .setMinTokenLength(getMinTokenLength)
       .setToLowercase(getToLowercase)
+      .setTrackTextLen($(trackTextLen))
   }
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
@@ -189,7 +189,6 @@ private[op] object TextStats {
  * @param topValues        top values to each feature
  * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
- * @param shouldTrackLen   should track text length
  * @param hashingParams    hashing function params
  */
 case class SmartTextVectorizerModelArgs
@@ -198,7 +197,6 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  shouldTrackLen: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
@@ -211,7 +209,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-  with TextTokenizerParams with HashingFun with OneHotModelFun[Text] {
+  with TextTokenizerParams with TrackTextLenParam with HashingFun with OneHotModelFun[Text] {
 
   override protected def convertToSet(in: Text): Set[String] = in.value.toSet
 
@@ -227,7 +225,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
-      val textLenVector = if (args.shouldTrackLen) getLenVector(textTokens) else OPVector.empty
+      val textLenVector = if ($(trackTextLen)) getLenVector(textTokens) else OPVector.empty
 
       categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
     }
