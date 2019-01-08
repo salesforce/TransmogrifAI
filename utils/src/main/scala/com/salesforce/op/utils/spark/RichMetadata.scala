@@ -198,10 +198,11 @@ object RichMetadata {
     /**
      * Converts [[Map]] to [[Metadata]]
      *
+     * @param skipUnsupported skip unsupported values
      * @throws RuntimeException in case of unsupported value type
-     * @return [[Metadata]]
+     * @return [[Metadata]] metadata
      */
-    def toMetadata: Metadata = {
+    def toMetadata(skipUnsupported: Boolean = false): Metadata = {
       val builder = new MetadataBuilder()
       def unsupported(k: String, v: Any) =
         throw new RuntimeException(s"Key '$k' has unsupported value $v of type ${v.getClass.getName}")
@@ -213,6 +214,7 @@ object RichMetadata {
         case floatSeq(v) => m.putDoubleArray(key, v.map(_.toDouble).toArray)
         case stringSeq(v) => m.putStringArray(key, v.toArray)
         case metadataSeq(v) => m.putMetadataArray(key, v.toArray)
+        case _ if skipUnsupported => m
         case _ => unsupported(key, seq)
       }
       theMap.foldLeft(builder) {
@@ -228,13 +230,15 @@ object RichMetadata {
         case (m, (k, v: Metadata)) => m.putMetadata(k, v)
         case (m, (k, v: Seq[_])) => putCollection(m, k, v)
         case (m, (k, v: Array[_])) => putCollection(m, k, v)
-        case (m, (k, v: Map[_, _])) => m.putMetadata(k, v.map { case (key, vv) => key.toString -> vv }.toMetadata)
+        case (m, (k, v: Map[_, _])) =>
+          m.putMetadata(k, v.map { case (key, vv) => key.toString -> vv }.toMetadata(skipUnsupported))
         case (m, (k, Some(v: Boolean))) => m.putBoolean(k, v)
         case (m, (k, Some(v: Float))) => m.putDouble(k, v)
         case (m, (k, Some(v: Double))) => m.putDouble(k, v)
         case (m, (k, Some(v: Long))) => m.putLong(k, v)
         case (m, (k, Some(v: Int))) => m.putLong(k, v.toLong)
         case (m, (k, Some(v: String))) => m.putString(k, v)
+        case (m, _) if skipUnsupported => m
         case (_, (k, v)) => unsupported(k, v)
       }.build()
     }
