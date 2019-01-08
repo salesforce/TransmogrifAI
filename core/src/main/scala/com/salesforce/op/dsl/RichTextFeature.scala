@@ -170,7 +170,7 @@ trait RichTextFeature {
         case (true, true) =>
           val textLengths = new TextLenTransformer[TextList]().setInput(tokenized).getOutput()
           val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
-          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths, nullIndicators).getOutput()
         case (true, false) =>
           val textLengths = new TextLenTransformer[TextList]().setInput(tokenized).getOutput()
           new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()

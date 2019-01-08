@@ -229,7 +229,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
       val textLenVector = if (args.shouldTrackLen) getLenVector(textTokens) else OPVector.empty
 
-      categoricalVector.combine(textVector, Seq(textLenVector, textNullIndicatorsVector): _*)
+      categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
     }
   }
 

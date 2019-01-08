@@ -191,6 +191,7 @@ trait RichMapFeature {
      * @param whiteListKeys            keys to whitelist
      * @param blackListKeys            keys to blacklist
      * @param trackNulls               option to keep track of values that were missing
+     * @param trackTextLen             option to add a column containing the text length to the feature vector
      * @param numHashes                size of hash space
      * @param hashSpaceStrategy        strategy to determine whether to use shared hash space for all included features
      *
@@ -229,7 +230,7 @@ trait RichMapFeature {
         case (true, true) =>
           val textLengths = new TextMapLenEstimator[TextMap]().setInput(f +: others).getOutput()
           val nullIndicators = new TextMapNullEstimator[TextMap]().setInput(f +: others).getOutput()
-          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths, nullIndicators).getOutput()
         case (true, false) =>
           val textLengths = new TextMapLenEstimator[TextMap]().setInput(f +: others).getOutput()
           new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()
@@ -374,7 +375,7 @@ trait RichMapFeature {
         case (true, true) =>
           val textLengths = new TextMapLenEstimator[TextAreaMap]().setInput(f +: others).getOutput()
           val nullIndicators = new TextMapNullEstimator[TextAreaMap]().setInput(f +: others).getOutput()
-          new VectorsCombiner().setInput(Seq(hashedFeatures, textLengths, nullIndicators): _*).getOutput()
+          new VectorsCombiner().setInput(hashedFeatures, textLengths, nullIndicators).getOutput()
         case (true, false) =>
           val textLengths = new TextMapLenEstimator[TextAreaMap]().setInput(f +: others).getOutput()
           new VectorsCombiner().setInput(hashedFeatures, textLengths).getOutput()

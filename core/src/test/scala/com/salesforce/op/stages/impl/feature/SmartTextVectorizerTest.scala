@@ -342,6 +342,9 @@ class SmartTextVectorizerTest
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 12
+
+    meta.columns(1)
+
     meta.columns.foreach { col =>
       if (col.index < 4) {
         col.parentFeatureName shouldBe Seq(f1.name)

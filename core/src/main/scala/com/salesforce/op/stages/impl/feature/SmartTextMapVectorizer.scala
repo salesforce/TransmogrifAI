@@ -271,7 +271,7 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
       if (args.shouldTrackNulls) getNullIndicatorsVector(keysText, rowTextTokenized) else OPVector.empty
     val textLenVector = if (args.shouldTrackLen) getLenVector(keysText, rowTextTokenized) else OPVector.empty
 
-    categoricalVector.combine(textVector, Seq(textLenVector, textNullIndicatorsVector): _*)
+    categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
