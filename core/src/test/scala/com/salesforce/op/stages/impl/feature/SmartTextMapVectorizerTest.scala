@@ -339,4 +339,41 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
+
+  it should "append lengths of the true text features to the feature vector, if requested" in {
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setTrackTextLen(true)
+      .setInput(m1, m2).getOutput()
+
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setTrackTextLen(true)
+      .setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val result = transformed.collect(smartMapVectorized, smartVectorized)
+
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ false :+ true,
+      transformed.collect(smartVectorized))
+    val fieldMap = transformed.schema(smartMapVectorized.name)
+    assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ false :+ true,
+      transformed.collect(smartMapVectorized))
+    val mapMeta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    mapMeta.history.keys shouldBe Set(m1.name, m2.name)
+    mapMeta.columns.length shouldBe meta.columns.length
+
+    mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
+      m.parentFeatureName shouldBe Array(m1.name)
+      m.parentFeatureType shouldBe Array(m1.typeName)
+      if (m.index < 4) m.grouping shouldBe f.grouping
+      else m.grouping shouldBe Option(f2.name)
+      m.indicatorValue shouldBe f.indicatorValue
+    }
+
+    result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
+  }
 }
