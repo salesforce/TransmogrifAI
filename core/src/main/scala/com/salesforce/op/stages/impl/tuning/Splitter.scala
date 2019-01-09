@@ -123,20 +123,21 @@ private[op] object SplitterSummary {
   val ClassName: String = "className"
 
   def fromMetadata(metadata: Metadata): Try[SplitterSummary] = Try {
-    val map = metadata.wrapped.underlyingMap
-    map(ClassName) match {
-      case s if s == classOf[DataSplitterSummary].getCanonicalName => DataSplitterSummary()
-      case s if s == classOf[DataBalancerSummary].getCanonicalName => DataBalancerSummary(
-        positiveLabels = map(ModelSelectorNames.Positive).asInstanceOf[Long],
-        negativeLabels = map(ModelSelectorNames.Negative).asInstanceOf[Long],
-        desiredFraction = map(ModelSelectorNames.Desired).asInstanceOf[Double],
-        upSamplingFraction = map(ModelSelectorNames.UpSample).asInstanceOf[Double],
-        downSamplingFraction = map(ModelSelectorNames.DownSample).asInstanceOf[Double]
+    metadata.getString(ClassName) match {
+      case s if s == classOf[DataSplitterSummary].getName => DataSplitterSummary()
+      case s if s == classOf[DataBalancerSummary].getName => DataBalancerSummary(
+        positiveLabels = metadata.getLong(ModelSelectorNames.Positive),
+        negativeLabels = metadata.getLong(ModelSelectorNames.Negative),
+        desiredFraction = metadata.getDouble(ModelSelectorNames.Desired),
+        upSamplingFraction = metadata.getDouble(ModelSelectorNames.UpSample),
+        downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample)
       )
-      case s if s == classOf[DataCutterSummary].getCanonicalName => DataCutterSummary(
-        labelsKept = map(ModelSelectorNames.LabelsKept).asInstanceOf[Array[Double]],
-        labelsDropped = map(ModelSelectorNames.LabelsDropped).asInstanceOf[Array[Double]]
+      case s if s == classOf[DataCutterSummary].getName => DataCutterSummary(
+        labelsKept = metadata.getDoubleArray(ModelSelectorNames.LabelsKept),
+        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped)
       )
+      case s =>
+        throw new RuntimeException(s"Unknown splitter summary class '$s'")
     }
   }
 }
