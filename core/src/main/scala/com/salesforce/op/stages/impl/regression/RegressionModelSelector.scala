@@ -65,7 +65,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
      *
      * @return defaults for problem type
      */
-    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    def modelsAndParams: Seq[(EstimatorType, ParamGridBuilder)] = {
       val lr = new OpLinearRegression()
       val lrParams = new ParamGridBuilder()
         .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -75,7 +75,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(lr.solver, DefaultSelectorParams.RegSolver)
         .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
         .addGrid(lr.tol, DefaultSelectorParams.Tol)
-        .build()
 
       val rf = new OpRandomForestRegressor()
       val rfParams = new ParamGridBuilder()
@@ -85,7 +84,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
         .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
         .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-        .build()
 
       val gbt = new OpGBTRegressor()
       val gbtParams = new ParamGridBuilder()
@@ -97,7 +95,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
         .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
         .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
-        .build()
 
       val dt = new OpDecisionTreeRegressor()
       val dtParams = new ParamGridBuilder()
@@ -105,7 +102,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
         .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
         .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-        .build()
 
       val glr = new OpGeneralizedLinearRegression()
       val glrParams = new ParamGridBuilder()
@@ -114,7 +110,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
         .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
         .addGrid(glr.tol, DefaultSelectorParams.Tol)
-        .build()
 
       val xgb = new OpXGBoostRegressor()
       val xgbParams = new ParamGridBuilder()
@@ -122,7 +117,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
         .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
-        .build()
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, dt -> dtParams, glr -> glrParams, xgb -> xgbParams)
     }
