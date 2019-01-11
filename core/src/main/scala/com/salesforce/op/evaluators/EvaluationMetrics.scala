@@ -30,8 +30,8 @@
 
 package com.salesforce.op.evaluators
 
-import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.salesforce.op.utils.spark.RichMetadata._
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.sql.types.Metadata
 
@@ -50,10 +50,13 @@ trait EvaluationMetrics extends JsonLike {
   def toMap: Map[String, Any] = JsonUtils.toMap(JsonUtils.toJsonTree(this))
 
   /**
-   * Convert metrics into metadata for saving
-   * @return metadata
+   * Convert metrics into [[Metadata]] for saving
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata: Metadata = this.toMap.toMetadata
+  def toMetadata(skipUnsupported: Boolean = false): Metadata = this.toMap.toMetadata(skipUnsupported)
 
 }
 

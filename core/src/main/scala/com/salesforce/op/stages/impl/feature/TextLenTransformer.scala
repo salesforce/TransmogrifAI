@@ -31,8 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types._
-import com.salesforce.op.features.types.{OPVector, TextList}
+import com.salesforce.op.features.types.{OPVector, TextList, _}
 import com.salesforce.op.stages.base.sequence.SequenceTransformer
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
@@ -57,12 +56,11 @@ class TextLenTransformer[T <: TextList](uid: String = UID[TextLenTransformer[_]]
     super.onGetMetadata()
     val tf = getTransientFeatures()
     val colMeta = tf.map(f => new OpVectorColumnMetadata(
-        parentFeatureName = Seq(f.name),
-        parentFeatureType = Seq(f.typeName),
-        grouping = Some(f.name),
-        descriptorValue = Option(OpVectorColumnMetadata.TextLenString)
-      )
-    )
+      parentFeatureName = Seq(f.name),
+      parentFeatureType = Seq(f.typeName),
+      grouping = Some(f.name),
+      descriptorValue = Option(OpVectorColumnMetadata.TextLenString)
+    ))
 
     setMetadata(
       OpVectorMetadata(vectorOutputName, colMeta, Transmogrifier.inputFeaturesToHistory(tf, stageName)).toMetadata
