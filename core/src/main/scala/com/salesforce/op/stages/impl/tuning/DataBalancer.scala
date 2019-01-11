@@ -409,7 +409,15 @@ case class DataBalancerSummary
   upSamplingFraction: Double,
   downSamplingFraction: Double
 ) extends SplitterSummary {
-  override def toMetadata(): Metadata = {
+
+  /**
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
+   */
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
       .putLong(ModelSelectorNames.Positive, positiveLabels)
@@ -419,4 +427,5 @@ case class DataBalancerSummary
       .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
       .build()
   }
+
 }
