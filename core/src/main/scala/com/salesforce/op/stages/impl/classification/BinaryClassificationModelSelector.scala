@@ -65,7 +65,7 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
      *
      * @return defaults for problem type
      */
-    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    def modelsAndParams: Seq[(EstimatorType, ParamGridBuilder)] = {
       val lr = new OpLogisticRegression()
       val lrParams = new ParamGridBuilder()
         .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -74,7 +74,6 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
         .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
         .addGrid(lr.tol, DefaultSelectorParams.Tol)
-        .build()
 
       val rf = new OpRandomForestClassifier()
       val rfParams = new ParamGridBuilder()
@@ -85,7 +84,6 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
         .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
         .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-        .build()
 
       val gbt = new OpGBTClassifier()
       val gbtParams = new ParamGridBuilder()
@@ -97,7 +95,6 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
         .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
         .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
-        .build()
 
       val svc = new OpLinearSVC()
       val svcParams = new ParamGridBuilder()
@@ -106,12 +103,10 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(svc.fitIntercept, DefaultSelectorParams.FitIntercept)
         .addGrid(svc.tol, DefaultSelectorParams.Tol)
         .addGrid(svc.standardization, DefaultSelectorParams.Standardized)
-        .build()
 
       val nb = new OpNaiveBayes()
       val nbParams = new ParamGridBuilder()
         .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
-        .build()
 
       val dt = new OpDecisionTreeClassifier()
       val dtParams = new ParamGridBuilder()
@@ -120,7 +115,6 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
         .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
         .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-        .build()
 
       val xgb = new OpXGBoostClassifier()
       val xgbParams = new ParamGridBuilder()
@@ -128,7 +122,6 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
         .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
-        .build()
 
       Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, svc -> svcParams,
         nb -> nbParams, dt -> dtParams, xgb -> xgbParams)

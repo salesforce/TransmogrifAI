@@ -65,7 +65,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
      *
      * @return defaults for problem type
      */
-    def modelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    def modelsAndParams: Seq[(EstimatorType, ParamGridBuilder)] = {
       val lr = new OpLogisticRegression()
       val lrParams = new ParamGridBuilder()
         .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
@@ -74,7 +74,6 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
         .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
         .addGrid(lr.tol, DefaultSelectorParams.Tol)
-        .build()
 
       val rf = new OpRandomForestClassifier()
       val rfParams = new ParamGridBuilder()
@@ -85,12 +84,10 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
         .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
         .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-        .build()
 
       val nb = new OpNaiveBayes()
       val nbParams = new ParamGridBuilder()
         .addGrid(nb.smoothing, DefaultSelectorParams.NbSmoothing)
-        .build()
 
       val dt = new OpDecisionTreeClassifier()
       val dtParams = new ParamGridBuilder()
@@ -99,7 +96,6 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
         .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
         .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-        .build()
 
       val xgb = new OpXGBoostClassifier()
       val xgbParams = new ParamGridBuilder()
@@ -107,7 +103,6 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
         .addGrid(xgb.eta, DefaultSelectorParams.Eta)
         .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
         .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
-        .build()
 
       Seq(lr -> lrParams, rf -> rfParams, nb -> nbParams, dt -> dtParams, xgb -> xgbParams)
     }
