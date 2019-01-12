@@ -86,7 +86,7 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   it should "evaluate the metrics from a model selector" in {
     val model = testEstimator.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator.evaluateAll(transformedData).toMetadata
+    val metrics = testEvaluator.evaluateAll(transformedData).toMetadata()
 
     assert(metrics.getDouble(RegressionEvalMetrics.RootMeanSquaredError.toString) <= 1E-12, "rmse should be close to 0")
     assert(metrics.getDouble(RegressionEvalMetrics.MeanSquaredError.toString) <= 1E-24, "mse should be close to 0")
@@ -97,7 +97,7 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   it should "evaluate the metrics from a single model" in {
     val model = testEstimator2.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
-    val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata
+    val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata()
 
     assert(metrics.getDouble(RegressionEvalMetrics.RootMeanSquaredError.toString) <= 1E-12, "rmse should be close to 0")
     assert(metrics.getDouble(RegressionEvalMetrics.MeanSquaredError.toString) <= 1E-24, "mse should be close to 0")

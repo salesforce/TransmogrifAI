@@ -110,7 +110,7 @@ class TransientFeature
   def asFeatureLike[I <: FeatureType]: FeatureLike[I] = getFeature().asInstanceOf[FeatureLike[I]]
 
   /**
-   * Transform trasient feature into column metadata for use vectors
+   * Transform transient feature into column metadata for use vectors
    * (for when each feature creates one column of a vector)
    * @param isNull is the metadata created for a null indicator column
    * @return OpVectorColumnMetadata for vector feature
@@ -122,6 +122,21 @@ class TransientFeature
       grouping = if (isNull) Some(name) else None,
       indicatorValue = if (isNull) Some(OpVectorColumnMetadata.NullString) else None)
     }
+
+  /**
+   * Transform transient feature into column metadata with an explicit descriptor value specified. Descriptor values
+   * are used for groupings that are not one-hot encoded, eg. text lengths or x/y coords of circle transformed dates.
+   * @param descriptorValue   is the metadata created for descriptor column
+   * @return OpVectorColumnMetadata for vector feature
+   */
+  def toColumnMetaData(descriptorValue: String): OpVectorColumnMetadata = {
+    new OpVectorColumnMetadata(
+      parentFeatureName = Seq(name),
+      parentFeatureType = Seq(typeName),
+      grouping = Some(name),
+      indicatorValue = None,
+      descriptorValue = Some(descriptorValue))
+  }
 
   /**
    * Transform transient feature into vector metadata for use vectors

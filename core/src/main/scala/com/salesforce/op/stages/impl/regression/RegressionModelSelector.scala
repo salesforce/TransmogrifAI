@@ -46,72 +46,81 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
  */
 case object RegressionModelSelector extends ModelSelectorFactory {
 
-  private[op] val modelNames: Seq[RegressionModelsToTry] = Seq(MTT.OpLinearRegression, MTT.OpRandomForestRegressor,
-    MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression) // OpDecisionTreeRegressor off by default
+  /**
+   * Default model types and model parameters for problem type
+   */
+  case object Defaults extends ModelDefaults[RegressionModelsToTry] {
 
-  protected def defaultModelsAndParams: Seq[(EstimatorType, Array[ParamMap])] = {
+    /**
+     * Subset of models to use in model selector
+     *
+     * Note: [[OpDecisionTreeRegressor]] and [[OpXGBoostRegressor]] are off by default
+     */
+    val modelTypesToUse: Seq[RegressionModelsToTry] = Seq(
+      MTT.OpLinearRegression, MTT.OpRandomForestRegressor, MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression
+    )
 
-    val lr = new OpLinearRegression()
-    val lrParams = new ParamGridBuilder()
-      .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
-      .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
-      .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
-      .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
-      .addGrid(lr.solver, DefaultSelectorParams.RegSolver)
-      .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
-      .addGrid(lr.tol, DefaultSelectorParams.Tol)
-      .build()
+    /**
+     * Default models and parameters (must be a def) to use in model selector
+     *
+     * @return defaults for problem type
+     */
+    def modelsAndParams: Seq[(EstimatorType, ParamGridBuilder)] = {
+      val lr = new OpLinearRegression()
+      val lrParams = new ParamGridBuilder()
+        .addGrid(lr.fitIntercept, DefaultSelectorParams.FitIntercept)
+        .addGrid(lr.elasticNetParam, DefaultSelectorParams.ElasticNet)
+        .addGrid(lr.maxIter, DefaultSelectorParams.MaxIterLin)
+        .addGrid(lr.regParam, DefaultSelectorParams.Regularization)
+        .addGrid(lr.solver, DefaultSelectorParams.RegSolver)
+        .addGrid(lr.standardization, DefaultSelectorParams.Standardized)
+        .addGrid(lr.tol, DefaultSelectorParams.Tol)
 
-    val rf = new OpRandomForestRegressor()
-    val rfParams = new ParamGridBuilder()
-      .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
-      .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-      .build()
+      val rf = new OpRandomForestRegressor()
+      val rfParams = new ParamGridBuilder()
+        .addGrid(rf.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(rf.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(rf.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(rf.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+        .addGrid(rf.numTrees, DefaultSelectorParams.MaxTrees)
+        .addGrid(rf.subsamplingRate, DefaultSelectorParams.SubsampleRate)
 
-    val gbt = new OpGBTRegressor()
-    val gbtParams = new ParamGridBuilder()
-      .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
-      .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
-      .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
-      .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
-      .build()
+      val gbt = new OpGBTRegressor()
+      val gbtParams = new ParamGridBuilder()
+        .addGrid(gbt.lossType, DefaultSelectorParams.TreeLossType)
+        .addGrid(gbt.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(gbt.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(gbt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(gbt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
+        .addGrid(gbt.maxIter, DefaultSelectorParams.MaxIterTree)
+        .addGrid(gbt.subsamplingRate, DefaultSelectorParams.SubsampleRate)
+        .addGrid(gbt.stepSize, DefaultSelectorParams.StepSize)
 
-    val dt = new OpDecisionTreeRegressor()
-    val dtParams = new ParamGridBuilder()
-      .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
-      .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
-      .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
-      .build()
+      val dt = new OpDecisionTreeRegressor()
+      val dtParams = new ParamGridBuilder()
+        .addGrid(dt.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(dt.maxBins, DefaultSelectorParams.MaxBin)
+        .addGrid(dt.minInfoGain, DefaultSelectorParams.MinInfoGain)
+        .addGrid(dt.minInstancesPerNode, DefaultSelectorParams.MinInstancesPerNode)
 
-    val glr = new OpGeneralizedLinearRegression()
-    val glrParams = new ParamGridBuilder()
-      .addGrid(glr.fitIntercept, DefaultSelectorParams.FitIntercept)
-      .addGrid(glr.family, DefaultSelectorParams.DistFamily)
-      .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
-      .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
-      .addGrid(glr.tol, DefaultSelectorParams.Tol)
-      .build()
+      val glr = new OpGeneralizedLinearRegression()
+      val glrParams = new ParamGridBuilder()
+        .addGrid(glr.fitIntercept, DefaultSelectorParams.FitIntercept)
+        .addGrid(glr.family, DefaultSelectorParams.DistFamily)
+        .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
+        .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
+        .addGrid(glr.tol, DefaultSelectorParams.Tol)
 
-    val xgb = new OpXGBoostRegressor()
-    val xgbParams = new ParamGridBuilder()
-      .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
-      .addGrid(xgb.eta, DefaultSelectorParams.Eta)
-      .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
-      .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
-      .build()
+      val xgb = new OpXGBoostRegressor()
+      val xgbParams = new ParamGridBuilder()
+        .addGrid(xgb.numRound, DefaultSelectorParams.NumRound)
+        .addGrid(xgb.eta, DefaultSelectorParams.Eta)
+        .addGrid(xgb.maxDepth, DefaultSelectorParams.MaxDepth)
+        .addGrid(xgb.minChildWeight, DefaultSelectorParams.MinChildWeight)
 
-    Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, dt -> dtParams, glr -> glrParams, xgb -> xgbParams)
+      Seq(lr -> lrParams, rf -> rfParams, gbt -> gbtParams, dt -> dtParams, glr -> glrParams, xgb -> xgbParams)
+    }
   }
-
 
   /**
    * Creates a new Regression Model Selector with a Cross Validation
@@ -145,14 +154,19 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
       numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
     )
-    selector(cv, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
+    selector(cv,
+      splitter = dataSplitter,
+      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse,
+      modelsAndParameters = modelsAndParameters,
+      modelDefaults = Defaults
+    )
   }
 
 
@@ -183,14 +197,19 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
-    modelTypesToUse: Seq[RegressionModelsToTry] = modelNames,
+    modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
     modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
     )
-    selector(ts, splitter = dataSplitter, trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
-      modelTypesToUse = modelTypesToUse, modelsAndParameters = modelsAndParameters)
+    selector(ts,
+      splitter = dataSplitter,
+      trainTestEvaluators = Seq(new OpRegressionEvaluator) ++ trainTestEvaluators,
+      modelTypesToUse = modelTypesToUse,
+      modelsAndParameters = modelsAndParameters,
+      modelDefaults = Defaults
+    )
   }
 
 }
