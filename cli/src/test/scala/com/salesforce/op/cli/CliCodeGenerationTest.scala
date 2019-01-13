@@ -174,9 +174,7 @@ class CliCodeGenerationTest extends CliTestBase {
       "--overwrite")
 
     result.outcome shouldBe a[Crashed]
-    withClue(result.err) {
-      result.err should include("Bad data file: " + result.err)
-    }
+    result.err should include("Bad data file")
     val folder = new File(ProjectName.toLowerCase)
     folder.exists() shouldBe false
 
