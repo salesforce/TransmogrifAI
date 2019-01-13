@@ -30,7 +30,7 @@
 
 package com.salesforce.op.cli
 
-import java.io.{ByteArrayOutputStream, Console, File, StringReader}
+import java.io.{ByteArrayOutputStream, File, StringReader}
 import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType
