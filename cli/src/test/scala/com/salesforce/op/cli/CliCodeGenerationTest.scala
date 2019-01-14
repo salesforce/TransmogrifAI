@@ -177,7 +177,6 @@ class CliCodeGenerationTest extends CliTestBase {
     result.err should include("Bad data file")
     val folder = new File(ProjectName.toLowerCase)
     folder.exists() shouldBe false
-
   }
 
   it should "complain properly if neither avro nor auto is specified" in {
