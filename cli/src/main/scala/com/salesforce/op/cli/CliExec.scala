@@ -50,16 +50,21 @@ class CliExec {
   }
 
   def main(args: Array[String]): Unit = try {
-    val outcome = for {
+    val ops = for {
       arguments <- CommandParser.parse(args, CliParameters())
       if arguments.command == "gen"
       settings <- arguments.values
-    } yield Ops(settings).run()
+    } yield Ops(settings)
 
-    outcome getOrElse {
+    ops getOrElse {
       CommandParser.showUsage()
       quit("wrong arguments", 1)
     }
+
+    val outcome = ops.map (_.run())
+
+    outcome getOrElse quit("Generation failed; see error messages", 1)
+
   } catch {
     case x: Exception =>
       if (DEBUG) x.printStackTrace()

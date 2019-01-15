@@ -47,9 +47,12 @@ trait OpCli {
     else success
   }
 
+  private[cli] def tweak(file: File): File =
+    new File(file.getPath.replace("`pwd`/", ""))
+
   def fileExists(file: File): Either[String, Unit] = {
-    if (!file.exists()) failure(s"File '${file.getAbsolutePath}' not found")
-    else success
+    val f = tweak(file)
+    if (f.exists()) success else failure(s"File '${f.getAbsolutePath}' not found")
   }
 
   private val Identifier = "([a-zA-Z]\\w*)".r
@@ -80,7 +83,7 @@ object CommandParser extends scopt.OptionParser[CliParameters]("transmogrifai") 
     .text("Input file for the TransmogrifAI project [required]")
     .validate(fileExists)
     .required
-    .action((inputFile, cfg) => cfg.copy(inputFile = Option(inputFile))),
+    .action((inputFile, cfg) => cfg.copy(inputFile = Option(tweak(inputFile)))),
 
   opt[String]("id")
     .text("Name for the ID field [required]")
