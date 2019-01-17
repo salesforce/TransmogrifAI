@@ -33,9 +33,7 @@ package com.salesforce.op.cli.gen
 import java.io.File
 
 import com.salesforce.op.cli.SchemaSource
-import org.apache.avro.Schema
 
-import scala.collection.JavaConverters._
 import scala.io.Source
 import AvroField._
 
@@ -83,7 +81,7 @@ object ProblemSchema {
 
     val orf = MakeRawFeature(ops)
 
-    val (responseFeature :: features) = orderedFields.map { field =>
+    val responseFeature :: features = orderedFields.map { field =>
       orf.from(field, schemaSource.name, field == responseField)
     }
 
@@ -144,10 +142,15 @@ sealed trait OPRawFeature {
 
   /**
    * Gets the java method that Avro generates for this field. e.g. `getPassengerId` for field with name "passengerId"
+   * Note that variable names with underscores are converted to CamelCase
+   * by avro; so we should do the same
    *
    * @return The java getter as a string
    */
-  def avroGetter: String = s"get${avroField.name.capitalize}"
+  def avroGetter: String = {
+    val pieces = avroField.name.split("_").map(_.capitalize)
+    s"get${pieces.mkString("")}"
+  }
 
   /**
    * Gets a name corresponding to the scala `val` that will be generated for this feature builder, e.g.
