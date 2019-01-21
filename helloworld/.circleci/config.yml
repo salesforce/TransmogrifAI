@@ -46,25 +46,6 @@ jobs:
           name: Clone repo & compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - *save-gradle-cache
-  scala-style-hw:
-      <<: *machine-config
-      steps:
-        - checkout
-        - *open-jdk
-        - run:
-            name: Scala style check for HelloWorld
-            command: cd helloworld && ./gradlew --parallel scalaStyle && cd ..
-  compile-hw:
-      <<: *machine-config
-      steps:
-        - checkout
-        - *open-jdk
-        - *restore-gradle-cache
-        - run:
-            name: Clone repo & compile project
-            command: cd helloworld && ./gradlew --parallel testScoverageClasses && ..
-        - *save-gradle-cache
-
   test:
     <<: *machine-config
     parallelism: 4
