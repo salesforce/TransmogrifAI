@@ -62,7 +62,7 @@ jobs:
         - *restore-gradle-cache
         - run:
             name: Clone repo & compile project
-            command: cd helloworld && ./gradlew --parallel testScoverageClasses && ..
+            command: cd helloworld && ./gradlew --parallel testScoverageClasses && cd ..
         - *save-gradle-cache
 
   test:
