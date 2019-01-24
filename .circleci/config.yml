@@ -104,6 +104,8 @@ workflows:
     jobs:
       - scala-style
       - compile
+      - scala-style-hw
+      - compile-hw
       - test:
           requires:
             - scala-style
