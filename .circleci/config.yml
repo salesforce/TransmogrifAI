@@ -43,7 +43,7 @@ jobs:
       - *open-jdk
       - *restore-gradle-cache
       - run:
-          name: Clone repo & compile project
+          name: Compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - *save-gradle-cache
   scala-style-hw:
@@ -59,11 +59,9 @@ jobs:
       steps:
         - checkout
         - *open-jdk
-        - *restore-gradle-cache
         - run:
-            name: Clone repo & compile project
-            command: cd helloworld && ./gradlew --parallel testScoverageClasses && ..
-        - *save-gradle-cache
+            name: Compile Helloworld project
+            command: cd helloworld && ./gradlew --parallel testScoverageClasses && cd ..
 
   test:
     <<: *machine-config
