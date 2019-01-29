@@ -170,12 +170,12 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "correctly compute the DS divergence" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
     val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
-    fd1.jsDivergence(fd2) should be < eps
+    fd1.jsDistance(fd2) should be < eps
 
     val fd3 = FeatureDistribution("A", None, 10, 1, Array(0, 0, 1000, 1000, 0), Array.empty)
-    fd3.jsDivergence(fd3) should be < eps
+    fd3.jsDistance(fd3) should be < eps
     val fd4 = FeatureDistribution("A", None, 20, 20, Array(200, 800, 0, 0, 1200), Array.empty)
-    (fd3.jsDivergence(fd4) - 1.0) should be < eps
+    (fd3.jsDistance(fd4) - 1.0) should be < eps
   }
 
   it should "reduce correctly" in {
@@ -248,7 +248,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     intercept[IllegalArgumentException](fd1.relativeFillRate(fd1.copy(key = Some("k")))) should have message
       "requirement failed: Key must match to compare or combine feature distributions: None != Some(k)"
 
-    intercept[IllegalArgumentException](fd1.jsDivergence(fd1.copy(name = "boo"))) should have message
+    intercept[IllegalArgumentException](fd1.jsDistance(fd1.copy(name = "boo"))) should have message
       "requirement failed: Name must match to compare or combine feature distributions: A != boo"
   }
 }

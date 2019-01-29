@@ -549,11 +549,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         minFill = minFillRate,
         maxFillDifference = maxFillDifference,
         maxFillRatioDiff = maxFillRatioDiff,
-        maxJSDivergence = maxJSDivergence,
+        maxJSDistance = maxJSDivergence,
         maxCorrelation = maxCorrelation,
         correlationType = correlationType,
         protectedFeatures = protectedRawFeatures,
-        jsDivergenceProtectedFeatures = protectedRawJSFeatures,
+        jsDistanceProtectedFeatures = protectedRawJSFeatures,
         textBinsFormula = textBinsFormula,
         timePeriod = timePeriod)
     }

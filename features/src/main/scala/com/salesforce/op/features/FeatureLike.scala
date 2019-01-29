@@ -335,7 +335,7 @@ trait FeatureLike[O <: FeatureType] {
    *
    * @return all the raw features
    */
-  private[op] final def rawFeatures: List[OPFeature] = {
+  final def rawFeatures: List[OPFeature] = {
     traverse(List.empty[OPFeature])((acc, f) => if (f.isRaw) f :: acc else acc).distinct
   }
 

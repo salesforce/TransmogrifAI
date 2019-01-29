@@ -46,6 +46,8 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
 
+  // loggingLevel(Level.INFO)
+
   val trainAllDistributions = AllDistributions(
     responseDistributions = Map.empty,
     numericDistributions = trainSummaries,
@@ -194,6 +196,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedBothAllMK shouldBe empty
   }
 
+
   it should "correctly clean the dataframe returned and give the features to blacklist" in {
     val params = new OpParams()
     val survPred = survived.copy(isResponse = false)
@@ -262,9 +265,9 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       minFill = 0.0,
       maxFillDifference = 1.0,
       maxFillRatioDiff = Double.PositiveInfinity,
-      maxJSDivergence = 0.0,
+      maxJSDistance = 0.0,
       maxCorrelation = 1.0,
-      jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name)
+      jsDistanceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name)
     )
 
     val filteredRawData = filter.generateFilteredRaw(features, params)
@@ -325,7 +328,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       minFill = 0.0,
       maxFillDifference = 1.0,
       maxFillRatioDiff = Double.PositiveInfinity,
-      maxJSDivergence = 1.0,
+      maxJSDistance = 1.0,
       maxCorrelation = maxCorrelation)
 
     val params = new OpParams()
