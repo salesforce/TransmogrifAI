@@ -180,7 +180,8 @@ private[impl] trait DataCutterParams extends Params {
 
 /**
  * Summary of results for data cutter
- * @param labelsKept labels retained
+ *
+ * @param labelsKept    labels retained
  * @param labelsDropped labels dropped by data cutter
  */
 case class DataCutterSummary
@@ -188,12 +189,20 @@ case class DataCutterSummary
   labelsKept: Seq[Double],
   labelsDropped: Seq[Double]
 ) extends SplitterSummary {
-  override def toMetadata(): Metadata = {
+
+  /**
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
+   */
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
       .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept.toArray)
       .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped.toArray)
       .build()
   }
-}
 
+}

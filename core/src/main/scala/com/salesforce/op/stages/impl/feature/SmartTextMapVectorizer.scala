@@ -61,9 +61,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtMapVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams
-    with HashingVectorizerParams with MapHashingFun with OneHotFun
-    with MapStringPivotHelper with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams {
+    with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
+    with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
+    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams {
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 
@@ -111,7 +111,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         features = mapFeatures.toArray,
         params = makeHashingParams(),
         allKeys = allKeys,
-        shouldTrackNulls = args.shouldTrackNulls
+        shouldTrackNulls = args.shouldTrackNulls,
+        shouldTrackLen = $(trackTextLen)
       )
     } else Array.empty[OpVectorColumnMetadata]
 
@@ -171,7 +172,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       .setAutoDetectThreshold(getAutoDetectThreshold)
       .setDefaultLanguage(getDefaultLanguage)
       .setMinTokenLength(getMinTokenLength)
-      .setToLowercase(getToLowercase)  }
+      .setToLowercase(getToLowercase)
+      .setTrackTextLen($(trackTextLen))
+  }
 }
 
 /**
@@ -203,7 +206,7 @@ case class SmartTextFeatureInfo(key: String, isCategorical: Boolean, topValues: 
 /**
  * Arguments for [[SmartTextMapVectorizerModel]]
  *
- * @param allFeatureInfo       info about each feature with each text map
+ * @param allFeatureInfo    info about each feature with each text map
  * @param shouldCleanKeys   should clean feature keys
  * @param shouldCleanValues should clean feature values
  * @param shouldTrackNulls  should track nulls
@@ -231,7 +234,10 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-  with TextTokenizerParams with MapHashingFun with TextMapPivotVectorizerModelFun[OPMap[String]] {
+  with TextTokenizerParams
+  with TrackTextLenParam
+  with MapHashingFun
+  with TextMapPivotVectorizerModelFun[OPMap[String]] {
 
   private val categoricalPivotFn = pivotFn(
     topValues = args.categoricalFeatureInfo.filter(_.nonEmpty).map(_.map(info => info.key -> info.topValues)),
@@ -263,9 +269,10 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val rowTextTokenized = rowText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
     val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
     val textNullIndicatorsVector =
-      if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(keysText, rowTextTokenized)) else Nil
+      if (args.shouldTrackNulls) getNullIndicatorsVector(keysText, rowTextTokenized) else OPVector.empty
+    val textLenVector = if ($(trackTextLen)) getLenVector(keysText, rowTextTokenized) else OPVector.empty
 
-    categoricalVector.combine(textVector, textNullIndicatorsVector: _*)
+    categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
@@ -278,6 +285,12 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val reindexed = reindex(nullIndicators)
     val vector = makeSparseVector(reindexed)
     vector.toOPVector
+  }
+
+  private def getLenVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
+    keysSeq.zip(inputs).flatMap{ case (keys, input) =>
+      keys.map(k => input.getOrElse(k, TextList.empty).value.map(_.length).sum.toDouble)
+    }.toOPVector
   }
 }
 

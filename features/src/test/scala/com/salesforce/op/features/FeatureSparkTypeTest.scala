@@ -31,7 +31,7 @@
 package com.salesforce.op.features
 
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{TestCommon, TestSparkContext}
 import org.apache.spark.ml.linalg.SQLDataTypes.VectorType
 import org.apache.spark.sql.types._
 import org.junit.runner.RunWith
@@ -41,7 +41,7 @@ import org.scalatest.junit.JUnitRunner
 import scala.reflect.runtime.universe._
 
 @RunWith(classOf[JUnitRunner])
-class FeatureSparkTypeTest extends FlatSpec with TestSparkContext {
+class FeatureSparkTypeTest extends FlatSpec with TestCommon {
   val primitiveTypes = Seq(
     (DoubleType, weakTypeTag[types.Real], DoubleType),
     (FloatType, weakTypeTag[types.Real], DoubleType),
@@ -90,7 +90,7 @@ class FeatureSparkTypeTest extends FlatSpec with TestSparkContext {
 
   it should "error for unsupported types" in {
     val error = intercept[IllegalArgumentException](FeatureSparkTypes.featureTypeTagOf(BinaryType, isNullable = false))
-    error.getMessage shouldBe "Spark BinaryType is currently not supported."
+    error.getMessage shouldBe "Spark BinaryType is currently not supported"
   }
 
   it should "error for unknown types" in {

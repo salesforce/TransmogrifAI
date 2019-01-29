@@ -32,9 +32,9 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types.{TextMap, _}
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.test.TestOpVectorColumnType.DescColWithGroup
+import com.salesforce.op.test._
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
@@ -42,12 +42,12 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapNullEstimatorTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], TextMapNullEstimator[TextMap]]
+class TextMapLenEstimatorTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], TextMapLenEstimator[TextMap]]
     with TestSparkContext with AttributeAsserts {
 
   val (ds, f1) = TestFeatureBuilder(
-    Seq[(TextMap)](
+    Seq[TextMap](
       TextMap(Map("k1" -> "A giraffe drinks by the watering hole", "k2" -> "Cheese", "k3" -> "Hello", "k4" -> "Bye")),
       // scalastyle:off
       TextMap(Map("k2" -> "French Fries", "k4" -> "\uA7BC\u10C8\u2829\u29BA\u23E1")),
@@ -58,38 +58,31 @@ class TextMapNullEstimatorTest
 
   val inputData = ds
 
-  val estimator = new TextMapNullEstimator[TextMap]().setInput(f1)
+  val estimator = new TextMapLenEstimator[TextMap]().setInput(f1)
 
   val expectedResult = Seq(
-    Array(0.0, 0.0, 0.0, 0.0),
-    Array(1.0, 0.0, 1.0, 1.0),
-    Array(1.0, 1.0, 0.0, 1.0)
+    Array(25.0, 6.0, 5.0, 3.0),
+    Array(0.0, 11.0, 0.0, 0.0),
+    Array(0.0, 0.0, 14.0, 0.0)
   ).map(Vectors.dense(_).toOPVector)
 
-  Spec[TextListNullTransformer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vector = estimator.getOutput()
-
-    vector.name shouldBe estimator.getOutputFeatureName
-    vector.typeName shouldBe FeatureType.typeName[OPVector]
-    vector.isResponse shouldBe false
-  }
-
-  it should "transform the data correctly" in {
+  Spec[TextMapLenEstimator[_]] should "take an array of features as input and return a single vector feature" in {
     val transformed = estimator.fit(ds).transform(ds)
     val vector = estimator.getOutput()
 
     val result = transformed.collect(vector)
-    result shouldBe expectedResult
+    result should contain theSameElementsAs expectedResult
+
     val field = transformed.schema(vector.name)
-    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(false), result)
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
       estimator,
       f1 -> List(
-        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k1"),
-        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k2"),
-        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k3"),
-        IndColWithGroup(name = Option(TransmogrifierDefaults.NullString), groupName = "k4")
+        DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k1"),
+        DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k2"),
+        DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k3"),
+        DescColWithGroup(name = Option(OpVectorColumnMetadata.TextLenString), groupName = "k4")
       )
     )
   }

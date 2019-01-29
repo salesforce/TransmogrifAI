@@ -94,8 +94,8 @@ abstract class OpApp {
     val conf = new SparkConf()
     conf
       .setAppName(conf.get("spark.app.name", defaultAppName))
-      .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getCanonicalName)
-      .set("spark.kryo.registrator", kryoRegistrator.getCanonicalName)
+      .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
+      .set("spark.kryo.registrator", kryoRegistrator.getName)
   }
 
   /**

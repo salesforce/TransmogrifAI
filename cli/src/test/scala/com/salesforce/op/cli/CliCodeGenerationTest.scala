@@ -32,9 +32,12 @@ package com.salesforce.op.cli
 
 import language.postfixOps
 import java.io.File
+import java.nio.file.Paths
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+
+import scala.io.Source
 
 /**
  * Test for generator operations
@@ -89,7 +92,7 @@ class CliCodeGenerationTest extends CliTestBase {
     assertResult(result, Succeeded)
   }
 
-  it should "read answers from a file" in {
+  it should "generage code, answers in a file" in {
     val sut = new Sut()
     val result = sut.run(
       "gen",
@@ -104,6 +107,33 @@ class CliCodeGenerationTest extends CliTestBase {
     withClue(result.err) {
       result.outcome shouldBe Succeeded
     }
+  }
+
+  it should "not fail when fields have underscores in names" in {
+    val sut = new Sut()
+    val result = sut.run(
+      "gen",
+      "--input", TestCsvHeadless,
+      "--id", "passengerId",
+      "--response", "survived",
+      "--schema", TestAvscWithUnderscores,
+      "--answers", AnswersFileWithUnderscores,
+      ProjectName,
+      "--overwrite"
+    )
+    withClue(result.err) {
+      result.outcome shouldBe Succeeded
+    }
+    val scalaSourcesFolder = Paths.get(projectFolder, "src", "main", "scala", "com", "salesforce", "app")
+
+    val featuresFile = Source.fromFile(new File(scalaSourcesFolder.toFile, "Features.scala")).getLines
+    val testLines = featuresFile.dropWhile(!_.contains("val p_class = FB"))
+    testLines.hasNext shouldBe true
+    testLines.next
+    val integralPassenger = testLines.next
+    integralPassenger.trim shouldBe ".Integral[Passenger]"
+    val thisOneShouldNotHaveUnderscoreInGetter = testLines.next
+    thisOneShouldNotHaveUnderscoreInGetter.trim shouldBe ".extract(_.getPClass.toIntegral)"
   }
 
   it should "work with autogeneration" in {
@@ -147,7 +177,6 @@ class CliCodeGenerationTest extends CliTestBase {
     result.err should include("Bad data file")
     val folder = new File(ProjectName.toLowerCase)
     folder.exists() shouldBe false
-
   }
 
   it should "complain properly if neither avro nor auto is specified" in {
