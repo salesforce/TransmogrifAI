@@ -100,6 +100,10 @@ private[op] class OpMultiClassificationEvaluator
 
     import dataUse.sparkSession.implicits._
     val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
+
+    log.info("Calculating threshold metrics, raw input dataframe is (first 1000 lines):")
+    dataUse.select(predictionColName, labelColName).show(numRows = 1000, truncate = false)
+
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
@@ -195,6 +199,9 @@ private[op] class OpMultiClassificationEvaluator
       // Doesn't matter which key you use since the scores are sorted
       val topScore: Double = topNScores.head._2.head
       val topNIndices: Map[Label, Array[Int]] = topNsAndScores.mapValues(_.map(_._2))
+
+      log.info(s"Inside computeMetrics - scores: ${scores.toList}, labels: ${label}, topScore: ${topScore}, " +
+        s"trueClassScore: ${trueClassScore}, topNsAndScores(1): ${topNsAndScores(1).toList}")
 
       // To calculate correct / incorrect counts per threshold, we just need to find the array index where the
       // true label score and the top score are no longer >= threshold.

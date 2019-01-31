@@ -32,6 +32,7 @@ package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomText, RandomVector}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -53,6 +54,16 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       (RealNN(1.0), Prediction(0.0, Vectors.dense(10.0, 5.0, 1.0, 0.0, 0.0), Vectors.dense(0.70, 0.25, 0.05, 0.0, 0.0)))
     ))
   val labelMulti = labelRawMulti.copy(isResponse = true)
+
+  val (dsMulti2, labelRawMulti2, predictionMulti2) =
+    TestFeatureBuilder[RealNN, Prediction](Seq(
+      (RealNN(1.0), Prediction(1.0, Vectors.dense(10.0, 60.0, 30.0), Vectors.dense(0.10, 0.60, 0.30))),
+      (RealNN(0.0), Prediction(1.0, Vectors.dense(5.0, 65.0, 30.0), Vectors.dense(0.05, 0.65, 0.30))),
+      (RealNN(2.0), Prediction(0.0, Vectors.dense(50.0, 15.0, 35.0), Vectors.dense(0.50, 0.15, 0.35)))
+    ))
+  val labelMulti2 = labelRawMulti2.copy(isResponse = true)
+
+
 
   // Predictions should never be correct for top1 (since correct class has 2nd highest probability).
   // For top3, it should be correct up to a threshold of 0.25
@@ -86,6 +97,12 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       incorrectCounts = expectedIncorrects,
       noPredictionCounts = expectedNoPredictons
     )
+
+    println(s"Error: ${metricsMulti.Error}")
+    println(s"F1: ${metricsMulti.F1}")
+    println(s"Precision: ${metricsMulti.Precision}")
+    println(s"Recall: ${metricsMulti.Recall}")
+    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
   }
 
   it should "have settable thresholds and topNs" in {
@@ -128,6 +145,164 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       noPredictionCounts = expectedNoPredictons
     )
   }
+
+  it should "work on the CC dataset" in {
+    val topN = Array(1)
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+      .setLabelCol(labelMulti2)
+      .setPredictionCol(predictionMulti2)
+      .setTopNs(topN)
+
+    val metricsMulti = evaluatorMulti.evaluateAll(dsMulti2)
+
+    println(s"Error: ${metricsMulti.Error}")
+    println(s"F1: ${metricsMulti.F1}")
+    println(s"Precision: ${metricsMulti.Precision}")
+    println(s"Recall: ${metricsMulti.Recall}")
+    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
+
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(topN(0)).head * 1.0)/dsMulti2.count()
+    println(s"Accuracy at threshold zero: $accuracyAtZero")
+    assert(accuracyAtZero + metricsMulti.Error == 1.0)
+  }
+
+  it should "work on randomly generated probabilities" in {
+    val numClasses = 5
+    val numRows = 10
+    val vectors = RandomVector.dense(RandomReal.uniform[Real](0.0, 10.0), numClasses).limit(numRows)
+    println(s"vectors: $vectors")
+    val probVectors = vectors.map(v => {
+      val expArray = v.value.toArray.map(math.exp)
+      val denom = expArray.sum
+      expArray.map(x => x/denom).toOPVector
+    })
+    println(s"probVectors: $probVectors")
+    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+      Prediction(prediction = prob.v.argmax.toDouble, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
+    }
+
+    val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows)
+      .map(x => x.value.get.toDouble.toRealNN)
+    println(s"labels: $labels")
+
+    val generatedData: Seq[(RealNN, Prediction)] = labels.zip(predictions)
+    val (rawDF, rawLabel, rawPred) = TestFeatureBuilder(generatedData)
+    // rawDF.show(truncate = false)
+
+    val topNs = Array(1, 3)
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+      .setLabelCol(rawLabel)
+      .setPredictionCol(rawPred)
+      .setTopNs(topNs)
+
+    val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
+
+    println(s"Error: ${metricsMulti.Error}")
+    println(s"F1: ${metricsMulti.F1}")
+    println(s"Precision: ${metricsMulti.Precision}")
+    println(s"Recall: ${metricsMulti.Recall}")
+    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
+
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/rawDF.count()
+    println(s"Accuracy at threshold zero: $accuracyAtZero")
+    assert(accuracyAtZero + metricsMulti.Error == 1.0)
+  }
+
+  // TODO: Check if it's a tie-breaking issue
+  it should "work on probability vectors where there are complete ties for all classes" in {
+    val numClasses = 5
+    val numRows = 10
+    val vectors = Seq.fill[OPVector](numRows)(Array.fill(numClasses)(4.2).toOPVector)
+    println(s"vectors: $vectors")
+    val probVectors = vectors.map(v => {
+      val expArray = v.value.toArray.map(math.exp)
+      val denom = expArray.sum
+      expArray.map(x => x/denom).toOPVector
+    })
+    println(s"probVectors: $probVectors")
+    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+      Prediction(prediction = math.floor(math.random * numClasses),
+        rawPrediction = raw.v.toArray, probability = prob.v.toArray)
+    }
+    println(s"Prediction: $predictions")
+
+    // val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows)
+    //  .map(x => x.value.get.toDouble.toRealNN)
+    val labels = Seq.fill[RealNN](numRows)(RealNN(1.0))
+    println(s"labels: $labels")
+
+    val generatedData: Seq[(RealNN, Prediction)] = labels.zip(predictions)
+    val (rawDF, rawLabel, rawPred) = TestFeatureBuilder(generatedData)
+    // rawDF.show(truncate = false)
+
+    val topNs = Array(1, 3)
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+      .setLabelCol(rawLabel)
+      .setPredictionCol(rawPred)
+      .setTopNs(topNs)
+
+    val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
+
+    println(s"Error: ${metricsMulti.Error}")
+    println(s"F1: ${metricsMulti.F1}")
+    println(s"Precision: ${metricsMulti.Precision}")
+    println(s"Recall: ${metricsMulti.Recall}")
+    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
+
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/rawDF.count()
+    println(s"Accuracy at threshold zero: $accuracyAtZero")
+    assert(accuracyAtZero + metricsMulti.Error == 1.0)
+  }
+
+  // Complete ties may be triggering the problems we're seeing, but need more checks to make sure. We can also
+  // generate scores from a finite set of values - try that to see if partial ties can account for this
+  it should "work on probability vectors where there are lots of ties (low unique score cardinality)" in {
+    val numClasses = 5
+    val numRows = 10
+    val scoreChoices = RandomText.pickLists(domain = List("1", "2", "3")).limit(numClasses).map(x => x.value.get.toDouble)
+    println(s"example scoreChoices: $scoreChoices")
+    val vectors = Seq.fill[OPVector](numRows)(Array.fill(numClasses)(4.2).toOPVector)
+    println(s"vectors: $vectors")
+    val probVectors = vectors.map(v => {
+      val expArray = v.value.toArray.map(math.exp)
+      val denom = expArray.sum
+      expArray.map(x => x/denom).toOPVector
+    })
+    println(s"probVectors: $probVectors")
+    val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
+      Prediction(prediction = math.floor(math.random * numClasses),
+        rawPrediction = raw.v.toArray, probability = prob.v.toArray)
+    }
+    println(s"Prediction: $predictions")
+
+    // val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows)
+    //  .map(x => x.value.get.toDouble.toRealNN)
+    val labels = Seq.fill[RealNN](numRows)(RealNN(1.0))
+    println(s"labels: $labels")
+
+    val generatedData: Seq[(RealNN, Prediction)] = labels.zip(predictions)
+    val (rawDF, rawLabel, rawPred) = TestFeatureBuilder(generatedData)
+    // rawDF.show(truncate = false)
+
+    val topNs = Array(1, 3)
+    val evaluatorMulti = new OpMultiClassificationEvaluator()
+      .setLabelCol(rawLabel)
+      .setPredictionCol(rawPred)
+      .setTopNs(topNs)
+
+    val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
+
+    println(s"Error: ${metricsMulti.Error}")
+    println(s"F1: ${metricsMulti.F1}")
+    println(s"Precision: ${metricsMulti.Precision}")
+    println(s"Recall: ${metricsMulti.Recall}")
+    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
+
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/rawDF.count()
+    println(s"Accuracy at threshold zero: $accuracyAtZero")
+    assert(accuracyAtZero + metricsMulti.Error == 1.0)
+  }
+
 
   it should "not allow topNs to be negative or 0" in {
     intercept[java.lang.IllegalArgumentException](new OpMultiClassificationEvaluator().setTopNs(Array(0, 1, 3)))
