@@ -259,7 +259,8 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   it should "work on probability vectors where there are lots of ties (low unique score cardinality)" in {
     val numClasses = 5
     val numRows = 10
-    val scoreChoices = RandomText.pickLists(domain = List("1", "2", "3")).limit(numClasses).map(x => x.value.get.toDouble)
+    val scoreChoices = RandomText.pickLists(domain = List("1", "2", "3")).limit(numClasses)
+      .map(x => x.value.get.toDouble)
     println(s"example scoreChoices: $scoreChoices")
     val vectors = Seq.fill[OPVector](numRows)(Array.fill(numClasses)(4.2).toOPVector)
     println(s"vectors: $vectors")
