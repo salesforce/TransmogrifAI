@@ -21,6 +21,8 @@ dependencies {
 
     // Lucene - (geo location)
     compile "org.apache.lucene:lucene-spatial3d:$luceneVersion"
+    compile "org.apache.lucene:lucene-spatial:$luceneVersion"
+    compile "org.apache.lucene:lucene-spatial-extras:$luceneVersion"
 
     // Enumeratum
     compile "com.beachape:enumeratum_$scalaVersion:$enumeratumVersion"
