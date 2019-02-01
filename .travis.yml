@@ -39,6 +39,10 @@ jobs:
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
         ./gradlew scalaStyle testScoverageClasses --parallel
+    - stage: 'compile helloworld project'
+      name: 'compile helloworld project'
+      script: |
+        cd helloworld && ./gradlew scalaStyle testScoverageClasses --parallel
     - stage: 'Build'
       name: 'Build Part 1'
       script: |
@@ -68,3 +72,6 @@ jobs:
         echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
       name: 'Build Part 4'
+    - script: |
+        cd helloworld && ./gradlew reportScoverage
+      name: 'Build - helloworld'
