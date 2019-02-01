@@ -102,7 +102,7 @@ private[op] class OpMultiClassificationEvaluator
     val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
     log.info("Calculating threshold metrics, raw input dataframe is (first 1000 lines):")
-    dataUse.select(predictionColName, labelColName).show(numRows = 1000, truncate = false)
+    dataUse.select(col(probabilityColName), col(labelColName).cast(DoubleType)).show(numRows = 1000, truncate = false)
 
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
