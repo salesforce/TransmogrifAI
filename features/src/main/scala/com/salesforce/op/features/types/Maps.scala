@@ -317,7 +317,8 @@ class Prediction private[op](value: Map[String, Double]) extends RealMap(value) 
     s"value map must only contain valid keys: '$PredictionName' or " +
       s"starting with '$RawPredictionName' or '$ProbabilityName'"
   )
-  private def keysStartsWith(name: String): Array[String] = value.keys.filter(_.startsWith(name)).toArray.sorted
+  private def keysStartsWith(name: String): Array[String] = value.keys.filter(_.startsWith(name)).toArray
+    .sortBy(s => s.substring(s.lastIndexOf("_") + 1).toInt)
 
   /**
    * Prediction value
@@ -413,9 +414,17 @@ object Prediction {
    * @return [[Prediction]]
    */
   def apply(prediction: Double, rawPrediction: Array[Double], probability: Array[Double]): Prediction = {
+    println("Hello, welcome to Prediction.apply()")
     val rawPred = rawPrediction.zipWithIndex.map { case (v, i) => s"${RawPredictionName}_$i" -> v }
+    println(s"rawPred: ${rawPred.toList}")
     val prob = probability.zipWithIndex.map { case (v, i) => s"${ProbabilityName}_$i" -> v }
+    println(s"prob: ${prob.toList}")
     val pred = PredictionName -> prediction
-    new Prediction((rawPred ++ prob).toMap + pred)
+    println(s"pred: $pred")
+    val res = new Prediction((rawPred ++ prob).toMap + pred)
+    println(s"res: $res")
+    println(s"res.value: ${res.value}")
+    println(s"keysStartsWith(RawPredictionName): ${res.keysStartsWith(RawPredictionName).toList}")
+    res
   }
 }

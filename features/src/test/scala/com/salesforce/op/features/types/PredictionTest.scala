@@ -88,6 +88,23 @@ class PredictionTest extends FlatSpec with TestCommon {
       "Prediction(prediction = 1.0, rawPrediction = Array(), probability = Array(2.0, 3.0))"
   }
 
+  it should "work" in {
+    val raw: OPVector = Array(1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,
+      1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,4.0,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,
+      1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10,1.0E-10).toOPVector
+    val prob: OPVector = Array(0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.6531023713994107,0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,0.01196198719312376,
+      0.01196198719312376).toOPVector
+    val pred = Prediction(prediction = prob.v.argmax, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
+
+    pred.rawPrediction shouldBe raw.value.toArray
+    pred.probability shouldBe prob.value.toArray
+  }
+
   private def assertPredictionError(f: => Unit) =
     intercept[NonNullableEmptyException](f).getMessage shouldBe
       s"Prediction cannot be empty: value map must contain '$PredictionName' key"
