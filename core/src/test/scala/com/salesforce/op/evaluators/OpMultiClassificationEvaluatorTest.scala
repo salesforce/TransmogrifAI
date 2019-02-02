@@ -152,7 +152,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     )
   }
 
-  ignore should "work on the CC dataset" in {
+  it should "work on the CC dataset" in {
     val topN = Array(1)
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti2)
@@ -172,7 +172,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     assert(accuracyAtZero + metricsMulti.Error == 1.0)
   }
 
-  ignore should "work on a sim of another CC dataset" in {
+  it should "work on a sim of another CC dataset" in {
     val topN = Array(1)
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(labelMulti3)
@@ -192,7 +192,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     assert(accuracyAtZero + metricsMulti.Error == 1.0)
   }
 
-  ignore should "work on randomly generated probabilities" in {
+  it should "work on randomly generated probabilities" in {
     val numClasses = 100
     val numRows = 10000
     val vectors = RandomVector.dense(RandomReal.uniform[Real](0.0, 1.0), numClasses).limit(numRows)
@@ -287,7 +287,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
   // Complete ties may be triggering the problems we're seeing, but need more checks to make sure. We can also
   // generate scores from a finite set of values - try that to see if partial ties can account for this
-  it should "work on probability vectors where there are lots of ties (low unique score cardinality)" in {
+  ignore should "work on probability vectors where there are lots of ties (low unique score cardinality)" in {
     val numClasses = 30
     val numRows = 100
     val correctProb = 0.3
@@ -301,8 +301,8 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
     val scoreChoices = RandomText.pickLists(domain = List("0.00001", "0.00002", "3")).limit(numClasses)
       .map(x => x.value.get.toDouble)
     println(s"example scoreChoices: $scoreChoices")
-    val vectors = Seq.fill[OPVector](numRows)( RandomText.pickLists(domain = List("0.00001", "0.00001", "3")).limit(numClasses)
-      .map(x => x.value.get.toDouble).toOPVector)
+    val vectors = Seq.fill[OPVector](numRows)( RandomText.pickLists(domain = List("0.00001", "0.00001", "3"))
+      .limit(numClasses).map(x => x.value.get.toDouble).toOPVector)
     println(s"vectors: $vectors")
 
     val vectors2 = Seq.fill[OPVector](numRows){
@@ -321,10 +321,10 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
     println(s"probVectors: $probVectors")
     val predictions = vectors2.zip(probVectors).map{ case (raw, prob) =>
-      println(s"raw: $raw")
-      println(s"prob: $prob")
+      // println(s"raw: $raw")
+      // println(s"prob: $prob")
       val res = Prediction(prediction = prob.v.argmax, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
-      println(s"Making prediction: $res")
+      // println(s"Making prediction: $res")
       res
     }
     println(s"Prediction: $predictions")

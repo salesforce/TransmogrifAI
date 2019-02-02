@@ -414,17 +414,17 @@ object Prediction {
    * @return [[Prediction]]
    */
   def apply(prediction: Double, rawPrediction: Array[Double], probability: Array[Double]): Prediction = {
-    println("Hello, welcome to Prediction.apply()")
+    // println("Hello, welcome to Prediction.apply()")
     val rawPred = rawPrediction.zipWithIndex.map { case (v, i) => s"${RawPredictionName}_$i" -> v }
-    println(s"rawPred: ${rawPred.toList}")
+    // println(s"rawPred: ${rawPred.toList}")
     val prob = probability.zipWithIndex.map { case (v, i) => s"${ProbabilityName}_$i" -> v }
-    println(s"prob: ${prob.toList}")
+    // println(s"prob: ${prob.toList}")
     val pred = PredictionName -> prediction
-    println(s"pred: $pred")
+    // println(s"pred: $pred")
     val res = new Prediction((rawPred ++ prob).toMap + pred)
-    println(s"res: $res")
-    println(s"res.value: ${res.value}")
-    println(s"keysStartsWith(RawPredictionName): ${res.keysStartsWith(RawPredictionName).toList}")
+    // println(s"res: $res")
+    // println(s"res.value: ${res.value}")
+    // println(s"keysStartsWith(RawPredictionName): ${res.keysStartsWith(RawPredictionName).toList}")
     res
   }
 }
