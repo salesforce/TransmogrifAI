@@ -229,45 +229,30 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
   ignore should "work on probability vectors where there are ties in probabilities" in {
     val numClasses = 5
     val numRows = 10
+
     val vectors = Seq.fill[OPVector](numRows)(Array.fill(numClasses)(4.2).toOPVector)
-    println(s"vectors: $vectors")
     val probVectors = vectors.map(v => {
       val expArray = v.value.toArray.map(math.exp)
       val denom = expArray.sum
       expArray.map(x => x/denom).toOPVector
     })
-    println(s"probVectors: $probVectors")
     val predictions = vectors.zip(probVectors).map{ case (raw, prob) =>
       Prediction(prediction = math.floor(math.random * numClasses),
         rawPrediction = raw.v.toArray, probability = prob.v.toArray)
     }
-    println(s"Prediction: $predictions")
-
-    // val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows)
-    //  .map(x => x.value.get.toDouble.toRealNN)
     val labels = Seq.fill[RealNN](numRows)(RealNN(1.0))
-    println(s"labels: $labels")
 
     val generatedData: Seq[(RealNN, Prediction)] = labels.zip(predictions)
     val (rawDF, rawLabel, rawPred) = TestFeatureBuilder(generatedData)
-    // rawDF.show(truncate = false)
 
     val topNs = Array(1, 3)
     val evaluatorMulti = new OpMultiClassificationEvaluator()
       .setLabelCol(rawLabel)
       .setPredictionCol(rawPred)
       .setTopNs(topNs)
-
     val metricsMulti = evaluatorMulti.evaluateAll(rawDF)
 
-    println(s"Error: ${metricsMulti.Error}")
-    println(s"F1: ${metricsMulti.F1}")
-    println(s"Precision: ${metricsMulti.Precision}")
-    println(s"Recall: ${metricsMulti.Recall}")
-    println(s"Threshold metrics: ${metricsMulti.ThresholdMetrics}")
-
-    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/rawDF.count()
-    println(s"Accuracy at threshold zero: $accuracyAtZero")
+    val accuracyAtZero = (metricsMulti.ThresholdMetrics.correctCounts(1).head * 1.0)/numRows
     assert(accuracyAtZero + metricsMulti.Error == 1.0)
   }
 
