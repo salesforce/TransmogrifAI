@@ -69,10 +69,14 @@ class PredictionTest extends FlatSpec with TestCommon {
   it should "return raw prediction" in {
     Prediction(2.0).rawPrediction shouldBe Array()
     Prediction(1.0, Array(1.0, 2.0), Array.empty[Double]).rawPrediction shouldBe Array(1.0, 2.0)
+    Prediction(1.0, (1 until 200).map(_.toDouble).toArray, Array.empty[Double]).rawPrediction shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return probability" in {
     Prediction(3.0).probability shouldBe Array()
     Prediction(1.0, Array.empty[Double], Array(1.0, 2.0)).probability shouldBe Array(1.0, 2.0)
+    Prediction(1.0, Array.empty[Double], (1 until 200).map(_.toDouble).toArray).probability shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return score" in {
     Prediction(4.0).score shouldBe Array(4.0)
@@ -86,23 +90,6 @@ class PredictionTest extends FlatSpec with TestCommon {
       "Prediction(prediction = 1.0, rawPrediction = Array(2.0, 3.0), probability = Array())"
     Prediction(1.0, Array.empty[Double], Array(2.0, 3.0)).toString shouldBe
       "Prediction(prediction = 1.0, rawPrediction = Array(), probability = Array(2.0, 3.0))"
-  }
-
-  it should "work" in {
-    val raw: OPVector = Array(1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10,
-      1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 4.0, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10,
-      1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10, 1.0E-10).toOPVector
-    val prob: OPVector = Array(0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.6531023713994107, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376, 0.01196198719312376,
-      0.01196198719312376).toOPVector
-    val pred = Prediction(prediction = prob.v.argmax, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
-
-    pred.rawPrediction shouldBe raw.value.toArray
-    pred.probability shouldBe prob.value.toArray
   }
 
   private def assertPredictionError(f: => Unit) =
