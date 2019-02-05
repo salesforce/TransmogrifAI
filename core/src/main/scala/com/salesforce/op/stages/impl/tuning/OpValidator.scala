@@ -218,7 +218,6 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       case c: DataCutter =>
         val labelCounts = dataset.sparkSession.createDataFrame(classes zip datasetsByClass.map(_.count())).persist()
         c.estimate(labelCounts)
-        labelCounts.unpersist
       case _ =>
     }
     // Creates RDD grouped by classes (0, 1, 2, 3, ..., K)

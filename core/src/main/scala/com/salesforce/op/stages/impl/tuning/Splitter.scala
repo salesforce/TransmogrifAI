@@ -114,6 +114,7 @@ object SplitterParamsDefault {
   val SampleFractionDefault = 0.1
   val MaxTrainingSampleDefault = 1E6.toInt
   val MaxLabelCategoriesDefault = 100
+  val MaxDroppedLabelsDefault = MaxLabelCategoriesDefault
   val MinLabelFractionDefault = 0.0
 }
 
