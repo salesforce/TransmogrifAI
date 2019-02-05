@@ -8,15 +8,19 @@ import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Success}
 
 /**
+ * A transformer that takes as inputs a feature to descale and (potentially different) scaled feature which contains the
+ * metadata for reconstructing the inverse scaling function.
+ * - 1st input feature is the feature to descale
+ * - 2nd input feature is  scaled feature containing the metadata for constructing the scaling used to make this column
  *
  * @param uid           uid for instance
  * @param tti1          type tag for first input
  * @param tti2          type tag for second input
  * @param tto           type tag for output
  * @param ttov          type tag for output value
- * @tparam I1 first input feature type
- * @tparam I2 second input feature type
- * @tparam O  output feature type
+ * @tparam I1           feature type for first input
+ * @tparam I2           feature type fo the second input
+ * @tparam O            output feature type
  */
 final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 (
@@ -42,8 +46,14 @@ final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 }
 
 /**
- *  - 1st input feature is the prediction feature to descale
- *  - 2nd input feature is the scaled label to get the metadata from
+ *  - input feature is the prediction feature to descale
+ *  - the metadata for recovering the inverse scaling function is taken from the scaled label
+ * @param uid           uid for instance
+ * @param tti2          type tag for second input
+ * @param tto           type tag for output
+ * @param ttov          type tag for output value
+ * @tparam I            input feature type
+ * @tparam O            output feature type
  */
 final class PredictionDescaler[I <: Real, O <: Real]
 (

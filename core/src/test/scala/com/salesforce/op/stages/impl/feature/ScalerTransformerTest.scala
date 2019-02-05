@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.{OpWorkflow, OpWorkflowModelWriter}
+import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.utils.json.JsonUtils
@@ -54,7 +54,7 @@ class  ScalerTransformerTest extends FlatSpec with TestSparkContext {
     val vec: FeatureLike[Real] = linearScaler.getOutput()
     val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(testData).train()
     val saveModelPath = tempDir.toPath.toString + "linearScalerTest" + DateTime.now().getMillis.toString
-    OpWorkflowModelWriter.toJson(wfModel, saveModelPath)
+    wfModel.save(saveModelPath)
     val data = wfModel.score()
     val actual = data.collect()
     actual.map(_.getAs[Double](1)) shouldEqual Array(9.0, 3.0, 1.0)
@@ -73,7 +73,7 @@ class  ScalerTransformerTest extends FlatSpec with TestSparkContext {
     val vec: FeatureLike[Real] = predScaler.getOutput()
     val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(testData).train()
     val saveModelPath = tempDir.toPath.toString + "LogScalerTest" + DateTime.now().getMillis.toString
-    OpWorkflowModelWriter.toJson(wfModel, saveModelPath)
+    wfModel.save(saveModelPath)
     val data = wfModel.score()
     val actual = data.collect()
     actual.map(_.getAs[Double](1)) shouldEqual Array(4.0, 1.0, 0.0).map(math.log(_))

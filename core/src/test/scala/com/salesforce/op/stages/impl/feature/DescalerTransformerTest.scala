@@ -30,8 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.{OpWorkflow, OpWorkflowModelWriter}
-import com.salesforce.op.features.{Feature, FeatureLike}
+import com.salesforce.op.OpWorkflow
+import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.utils.json.JsonUtils
@@ -89,7 +89,7 @@ class  DescalerTransformerTest extends FlatSpec with TestSparkContext {
     val deScaler = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse)
     val descaledResponse = deScaler.getOutput()
     val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(testData).train()
-    wfModel.save(tempDir + "linearScalerDescalerTest" + DateTime.now().getMillis)
+    wfModel.save(tempDir + "logScalerDescalerTest" + DateTime.now().getMillis)
     val data = wfModel.score()
     val actual = data.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)

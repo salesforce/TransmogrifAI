@@ -40,12 +40,23 @@ import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Try}
 
 
-
-
+/**
+ * A trait extended by a class class containing the args needed to define a family of scaling & descaling functions
+ */
 trait ScalingArgs extends JsonLike
 case class EmptyArgs() extends ScalingArgs
 case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs
 
+/**
+ * Trait for defining a new family of scaling functions
+ * scalingType: a ScalingType Enum for the scaling name
+ * args: A case class containing the args needed to define scaling and inverse scaling functions
+ * scale: The scaling function
+ * descale: The inverse scaling function
+ *
+ * To add a new family of scaling functions: Add an entry to the scalingType enum, define a Case class extending Scaler,
+ * and add a case statement to both the Scaler and ScalerMetaData case classes
+ */
 trait Scaler extends Serializable {
   def scalingType: ScalingType
   def args: ScalingArgs
@@ -99,6 +110,16 @@ object ScalerMetadata extends {
 
 }
 
+/**
+ * @param uid           uid for instance
+ * @param scalingType   type of scaling functions
+ * @param scalingArgs   arguments to define the scaling function
+ * @param tti           type tag for input
+ * @param tto           type tag for output
+ * @param ttov          type tag for output value
+ * @tparam I input feature type
+ * @tparam O output feature type
+ */
 final class ScalerTransformer[I <: Real, O <: Real]
 (
   uid: String = UID[ScalerTransformer[_, _]],
