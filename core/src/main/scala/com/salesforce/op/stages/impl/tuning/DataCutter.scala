@@ -88,9 +88,10 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val keep: Set[Double] =
       if (!isSet(labelsToKeep) || !isSet(labelsToDrop)) {
         val labels = data.map(r => r.getDouble(0) -> 1L)
-        val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
+        val labelCounts = labels
+          .groupBy(labels.columns(0))
+          .sum(labels.columns(1))
         val (resKeep, resDrop) = estimate(labelCounts)
-        labelCounts.unpersist()
         setLabels(resKeep, resDrop)
         resKeep
       } else getLabelsToKeep.toSet
@@ -113,23 +114,22 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     val colCount = labelCounts.columns(1)
     val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
-    val labelsKeep = labelCounts
+    val labelsOrderedByCount = labelCounts
       .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
       .sort(col(colCount).desc)
-      .take(maxLabels)
-      .map(_.getDouble(0))
-
-    val labelSet = labelsKeep.toSet
-    val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0)).toSet
-
+      .limit(maxLabels + 2000)
+      .collect()
+    val topLabels = labelsOrderedByCount.map(_.getDouble(0))
+    val labelSet = topLabels.take(maxLabels).toSet
+    val topLabelsDropped = topLabels.slice(maxLabels, maxLabels + 2000).toSet
     if (labelSet.nonEmpty) {
-      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: $labelsDropped")
+      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: $topLabelsDropped")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
-        s"Label counts were: ${labelCounts.collect().toSeq}")
+        s"Label counts were: ${labelsOrderedByCount}")
     }
-    labelSet -> labelsDropped
+    labelSet -> topLabelsDropped
   }
 
   override def copy(extra: ParamMap): DataCutter = {
