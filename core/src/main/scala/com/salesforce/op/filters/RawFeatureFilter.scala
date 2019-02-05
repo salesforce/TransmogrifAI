@@ -344,12 +344,13 @@ class RawFeatureFilter[T]
       trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions ++
       scoringSummary.map(s => s.responseDistributions ++ s.predictorDistributions).getOrElse(Array.empty)
 
-    val rawFeatureInfo = RawFeatureInfo(featureDistributions = featureDistributions)
+    val rawFeatureInfo = RawFeatureInfo(
+      featureDistributions = featureDistributions
+    )
 
     FilteredRawData(
       cleanedData = cleanedData, featuresToDrop = featuresToDrop,
-      mapKeysToDrop = mapKeysToDrop, featureDistributions = featureDistributions,
-      rawFeatureInfo = rawFeatureInfo
+      mapKeysToDrop = mapKeysToDrop, rawFeatureInfo = rawFeatureInfo
     )
   }
 }
@@ -382,7 +383,6 @@ object RawFeatureFilter {
  * @param cleanedData           RFF cleaned data
  * @param featuresToDrop        raw features dropped by RFF
  * @param mapKeysToDrop         keys in map features dropped by RFF
- * @param featureDistributions  feature distributions calculated from the training and scoring data
  * @param rawFeatureInfo        feature information calculated from the training data
  */
 case class FilteredRawData
@@ -390,7 +390,6 @@ case class FilteredRawData
   cleanedData: DataFrame,
   featuresToDrop: Array[OPFeature],
   mapKeysToDrop: Map[String, Set[String]],
-  featureDistributions: Seq[FeatureDistribution],
   rawFeatureInfo: RawFeatureInfo
 ) {
 
@@ -398,18 +397,18 @@ case class FilteredRawData
    * Feature distributions calculated from the training data
    */
   def trainingFeatureDistributions: Seq[FeatureDistribution] =
-    featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+    rawFeatureInfo.featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
 
   /**
    * Feature distributions calculated from the scoring data
    */
   def scoringFeatureDistributions: Seq[FeatureDistribution] =
-    featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+    rawFeatureInfo.featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
 }
 
 /**
- * case class container for containing information from RFF (to clarify when finalized)
+ * case class container for storing and passing information from RFF
  *
  * @param featureDistributions  feature distributions calculated from training data
  */

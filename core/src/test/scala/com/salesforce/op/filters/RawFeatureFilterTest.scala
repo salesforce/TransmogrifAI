@@ -246,12 +246,12 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   }
 
   private def assertFeatureDistributions(fd: FilteredRawData, total: Int): Assertion = {
-    fd.featureDistributions.length shouldBe total
+    fd.rawFeatureInfo.featureDistributions.length shouldBe total
     fd.trainingFeatureDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
     fd.trainingFeatureDistributions.length shouldBe total / 2
     fd.scoringFeatureDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
     fd.scoringFeatureDistributions.length shouldBe total / 2
-    fd.trainingFeatureDistributions ++ fd.scoringFeatureDistributions shouldBe fd.featureDistributions
+    fd.trainingFeatureDistributions ++ fd.scoringFeatureDistributions shouldBe fd.rawFeatureInfo.featureDistributions
   }
 
   private def nullLabelCorrelationTest(
