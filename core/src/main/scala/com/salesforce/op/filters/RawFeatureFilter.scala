@@ -344,9 +344,12 @@ class RawFeatureFilter[T]
       trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions ++
       scoringSummary.map(s => s.responseDistributions ++ s.predictorDistributions).getOrElse(Array.empty)
 
+    val rawFeatureInfo = RawFeatureInfo(featureDistributions = featureDistributions)
+
     FilteredRawData(
       cleanedData = cleanedData, featuresToDrop = featuresToDrop,
-      mapKeysToDrop = mapKeysToDrop, featureDistributions = featureDistributions
+      mapKeysToDrop = mapKeysToDrop, featureDistributions = featureDistributions,
+      rawFeatureInfo = rawFeatureInfo
     )
   }
 }
@@ -376,17 +379,19 @@ object RawFeatureFilter {
 /**
  * case class for the RFF filtered data and features to drop
  *
- * @param cleanedData          RFF cleaned data
- * @param featuresToDrop       raw features dropped by RFF
- * @param mapKeysToDrop        keys in map features dropped by RFF
- * @param featureDistributions feature distributions calculated from the training and scoring data
+ * @param cleanedData           RFF cleaned data
+ * @param featuresToDrop        raw features dropped by RFF
+ * @param mapKeysToDrop         keys in map features dropped by RFF
+ * @param featureDistributions  feature distributions calculated from the training and scoring data
+ * @param rawFeatureInfo        feature information calculated from the training data
  */
 case class FilteredRawData
 (
   cleanedData: DataFrame,
   featuresToDrop: Array[OPFeature],
   mapKeysToDrop: Map[String, Set[String]],
-  featureDistributions: Seq[FeatureDistribution]
+  featureDistributions: Seq[FeatureDistribution],
+  rawFeatureInfo: RawFeatureInfo
 ) {
 
   /**
@@ -402,3 +407,13 @@ case class FilteredRawData
     featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
 }
+
+/**
+ * case class container for containing information from RFF (to clarify when finalized)
+ *
+ * @param featureDistributions  feature distributions calculated from training data
+ */
+case class RawFeatureInfo
+(
+  featureDistributions: Seq[FeatureDistribution]
+)

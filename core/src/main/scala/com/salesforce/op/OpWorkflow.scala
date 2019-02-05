@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.{FeatureDistribution, FilteredRawData, RawFeatureFilter, Summary}
+import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -234,12 +234,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
               "The RawFeatureFilter training reader will be used to generate the data for training")
         }
         checkReadersAndFeatures()
-        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, featureDistributions) =
-          rf.generateFilteredRaw(rawFeatures, parameters)
-        setRawFeatureDistributions(featureDistributions.toArray)
-        setBlacklist(featuresToDrop, featureDistributions)
-        setBlacklistMapKeys(mapKeysToDrop)
-        cleanedData
+
+        val FilteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
+
+        setRawFeatureDistributions(FilteredRawData.rawFeatureInfo.featureDistributions.toArray)
+        setBlacklist(FilteredRawData.featuresToDrop, FilteredRawData.rawFeatureInfo.featureDistributions)
+        setBlacklistMapKeys(FilteredRawData.mapKeysToDrop)
+        FilteredRawData.cleanedData
     }
   }
 
