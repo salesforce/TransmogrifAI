@@ -320,7 +320,7 @@ class Prediction private[op](value: Map[String, Double]) extends RealMap(value) 
 
   // Need to make sure we sort the keys by their final index, which comes after an underscore in the apply function
   private def keysStartsWith(name: String): Array[String] = value.keys.filter(_.startsWith(name)).toArray
-    .sortBy(s => s.substring(s.lastIndexOf("_") + 1).toInt)
+    .sortBy(_.split("_").last.toInt)
 
   /**
    * Prediction value

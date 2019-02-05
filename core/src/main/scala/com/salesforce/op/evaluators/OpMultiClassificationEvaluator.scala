@@ -100,7 +100,6 @@ private[op] class OpMultiClassificationEvaluator
 
     import dataUse.sparkSession.implicits._
     val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
-
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       MultiClassificationMetrics(0.0, 0.0, 0.0, 0.0,
