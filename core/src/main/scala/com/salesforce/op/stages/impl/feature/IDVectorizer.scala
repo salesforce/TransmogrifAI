@@ -30,53 +30,39 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
+import com.salesforce.op.{FeatureHistory, UID}
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions}
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
-import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
-import org.apache.spark.ml.param._
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import com.salesforce.op.utils.spark.RichDataset._
 
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
 /**
- * Convert a sequence of text features into a vector by detecting categoricals that are disguised as text.
+ * Convert a sequence of id features into a vector by detecting categoricals.
  * A categorical will be represented as a vector consisting of occurrences of top K most common values of that feature
  * plus occurrences of non top k values and a null indicator (if enabled).
- * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
- * for each non-categorical (if enabled).
+ * Non-categoricals will be removed.
  *
  * @param uid uid for instance
  */
-class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
-  extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
+class IDVectorizer
+(uid: String = UID[IDVectorizer])(implicit tti: TypeTag[ID])
+  extends SequenceEstimator[ID, OPVector](operationName = "IDVectorizer", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
+    with TrackNullsParam with MinSupportParam with MaxCardinalityParams with OneHotFun {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
-  private def makeHashingParams() = HashingFunctionParams(
-    hashWithIndex = $(hashWithIndex),
-    prependFeatureName = $(prependFeatureName),
-    numFeatures = $(numFeatures),
-    numInputs = inN.length,
-    maxNumOfFeatures = TransmogrifierDefaults.MaxNumOfFeatures,
-    binaryFreq = $(binaryFreq),
-    hashAlgorithm = getHashAlgorithm,
-    hashSpaceStrategy = getHashSpaceStrategy
-  )
 
-  def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
+  def fitFn(dataset: Dataset[Seq[ID#Value]]): SequenceModel[ID, OPVector] = {
     require(!dataset.isEmpty, "Input dataset cannot be empty")
 
     val maxCard = $(maxCardinality)
@@ -95,26 +81,21 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       isCategorical -> topValues
     }.unzip
 
-    val smartTextParams = SmartTextVectorizerModelArgs(
+    val idParams = IDVectorizerModelArgs(
       isCategorical = isCategorical,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
-      shouldTrackNulls = $(trackNulls),
-      hashingParams = makeHashingParams()
+      shouldTrackNulls = $(trackNulls)
     )
 
-    val vecMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata = makeVectorMetadata(idParams)
     setMetadata(vecMetadata.toMetadata)
 
-    new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
-      .setAutoDetectLanguage(getAutoDetectLanguage)
-      .setAutoDetectThreshold(getAutoDetectThreshold)
-      .setDefaultLanguage(getDefaultLanguage)
-      .setMinTokenLength(getMinTokenLength)
-      .setToLowercase(getToLowercase)
+    new IDVectorizerModel(args = idParams, operationName = operationName, uid = uid)
+
   }
 
-  private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
+  private def computeTextStats(text: ID#Value, shouldCleanText: Boolean): TextStats = {
     val valueCounts = text match {
       case Some(v) => Map(cleanTextFn(v, shouldCleanText) -> 1)
       case None => Map.empty[String, Int]
@@ -122,91 +103,68 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     TextStats(valueCounts)
   }
 
-  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
-    require(inN.length == smartTextParams.isCategorical.length)
+  private def inputFeaturesToHistory(tf: Array[TransientFeature], thisStageName: String): Map[String, FeatureHistory] =
+    tf.map(f => f.name -> FeatureHistory(originFeatures = f.originFeatures, stages = f.stages :+ thisStageName)).toMap
+
+  private def makeVectorMetadata(idParams: IDVectorizerModelArgs): OpVectorMetadata = {
+    require(inN.length == idParams.isCategorical.length)
 
     val (categoricalFeatures, textFeatures) =
-      CategoricalDetection.partition[TransientFeature](inN, smartTextParams.isCategorical)
+      CategoricalDetection.partition[TransientFeature](inN, idParams.isCategorical)
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
     val unseen = Option($(unseenName))
 
     val categoricalColumns = if (categoricalFeatures.nonEmpty) {
-      makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, categoricalFeatures)
-    } else Array.empty[OpVectorColumnMetadata]
-    val textColumns = if (textFeatures.nonEmpty) {
-      makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++ textFeatures.map(_.toColumnMetaData(isNull = true))
+      makeVectorColumnMetadata(shouldTrackNulls, unseen, idParams.categoricalTopValues, categoricalFeatures)
     } else Array.empty[OpVectorColumnMetadata]
 
-    val columns = categoricalColumns ++ textColumns
-    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+    val columns = categoricalColumns
+    OpVectorMetadata(getOutputFeatureName, columns, inputFeaturesToHistory(inN, stageName))
   }
 }
 
 
-
-
 /**
- * Arguments for [[SmartTextVectorizerModel]]
+ * Arguments for [[IDVectorizerModel]]
  *
  * @param isCategorical    is feature a categorical or not
  * @param topValues        top values to each feature
  * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
- * @param hashingParams    hashing function params
  */
-case class SmartTextVectorizerModelArgs
+case class IDVectorizerModelArgs
 (
   isCategorical: Array[Boolean],
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
-  shouldTrackNulls: Boolean,
-  hashingParams: HashingFunctionParams
+  shouldTrackNulls: Boolean
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
     topValues.zip(isCategorical).collect { case (top, true) => top }
 }
 
-final class SmartTextVectorizerModel[T <: Text] private[op]
+final class IDVectorizerModel
 (
-  val args: SmartTextVectorizerModelArgs,
+  val args: IDVectorizerModelArgs,
   operationName: String,
   uid: String
-)(implicit tti: TypeTag[T]) extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-  with TextTokenizerParams with HashingFun with OneHotModelFun[Text] {
+)(implicit tti: TypeTag[ID]) extends SequenceModel[ID, OPVector](operationName = operationName, uid = uid)
+  with OneHotModelFun[ID] {
 
-  override protected def convertToSet(in: Text): Set[String] = in.value.toSet
+  override protected def convertToSet(in: ID): Set[String] = in.value.toSet
 
-  def transformFn: Seq[Text] => OPVector = {
-    val categoricalPivotFn: Seq[Text] => OPVector = pivotFn(
+  def transformFn: Seq[ID] => OPVector = {
+    val categoricalPivotFn: Seq[ID] => OPVector = pivotFn(
       topValues = args.categoricalTopValues,
       shouldCleanText = args.shouldCleanText,
       shouldTrackNulls = args.shouldTrackNulls
     )
-    (row: Seq[Text]) => {
-      val (rowCategorical, rowText) = CategoricalDetection.partition[Text](row.toArray, args.isCategorical)
+    (row: Seq[ID]) => {
+      val (rowCategorical, _) = CategoricalDetection.partition[ID](row.toArray, args.isCategorical)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
-      val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
-      val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
-      val textNullIndicatorsVector = if (args.shouldTrackNulls) Seq(getNullIndicatorsVector(textTokens)) else Seq.empty
-
-      categoricalVector.combine(textVector, textNullIndicatorsVector: _*)
+      categoricalVector
     }
-  }
-
-  private def getTextTransientFeatures: Array[TransientFeature] =
-    CategoricalDetection.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
-
-  private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
-    val nullIndicators = textTokens.map { tokens =>
-      val nullVal = if (tokens.isEmpty) 1.0 else 0.0
-      Seq(0 -> nullVal)
-    }
-    val reindexed = reindex(nullIndicators)
-    val vector = makeSparseVector(reindexed)
-    vector.toOPVector
   }
 }
-
-

@@ -802,11 +802,11 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
   it should "remove categorical features similar to 'titanic body' by checking for high rule confidence when the" +
     "support is high enough" in {
     // First set up the raw features:
-    val bodyData: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.9).limit(1000)
+    val bodyData: Seq[ID] = RandomText.ids.withProbabilityOfEmpty(0.9).limit(500)
     val boatData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C"))
-      .withProbabilityOfEmpty(0.8).limit(1000)
+      .withProbabilityOfEmpty(0.8).limit(500)
     val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
-      .withProbabilityOfEmpty(0.8).limit(1000)
+      .withProbabilityOfEmpty(0.8).limit(500)
 
     val generatedRawData: Seq[(ID, PickList, Currency)] = bodyData.zip(boatData).zip(currencyData).map{
       case ((id, pi), cu) => (id, pi, cu)
@@ -824,7 +824,9 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     )
     val labelData = labelTransformer.setInput(rawId, rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
       .copy(isResponse = true)
-    val genFeatureVector = Seq(rawId, rawPickList, rawCurrency).transmogrify()
+    val genFeatureVector = Seq(rawId.vectorize(maxCardinality = 100, topK = TransmogrifierDefaults.TopK,
+      minSupport = TransmogrifierDefaults.MinSupport, cleanText = TransmogrifierDefaults.CleanText),
+      rawPickList, rawCurrency).transmogrify()
 
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)

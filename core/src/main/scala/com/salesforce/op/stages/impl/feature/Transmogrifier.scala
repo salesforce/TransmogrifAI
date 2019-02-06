@@ -35,6 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
 import org.apache.spark.ml.PipelineStage
@@ -42,8 +43,12 @@ import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.{Dataset, Encoders}
+import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
+import com.twitter.algebird.Semigroup
 
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
@@ -280,8 +285,8 @@ private[op] case object Transmogrifier {
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
         case t if t =:= weakTypeOf[ID] =>
           val (f, other) = castAs[ID](g)
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+          f.vectorize(maxCardinality = MaxCategoricalCardinality, topK = TopK, minSupport = MinSupport,
+            cleanText = CleanText, trackNulls = TrackNulls, others = other)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
           f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other)
@@ -668,4 +673,44 @@ trait MapStringPivotHelper extends SaveOthersParams {
     val cols = makeVectorColumnMetadata(topValues, inputFeatures, otherValueString, trackNulls)
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
   }
+}
+
+
+/**
+ * Summary statistics of a text feature
+ *
+ * @param valueCounts counts of feature values
+ */
+private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
+
+private[op] object TextStats {
+  def semiGroup(maxCardinality: Int): Semigroup[TextStats] = new Semigroup[TextStats] {
+    override def plus(l: TextStats, r: TextStats): TextStats = {
+      if (l.valueCounts.size > maxCardinality) l
+      else if (r.valueCounts.size > maxCardinality) r
+      else TextStats(l.valueCounts + r.valueCounts)
+    }
+  }
+
+  def empty: TextStats = TextStats(Map.empty)
+}
+
+object CategoricalDetection {
+  val MaxCardinality = 100
+
+  private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
+    val all = input.zip(condition)
+    (all.collect { case (item, true) => item }.toSeq.toArray, all.collect { case (item, false) => item }.toSeq.toArray)
+  }
+}
+
+trait MaxCardinalityParams extends Params {
+  final val maxCardinality = new IntParam(
+    parent = this, name = "maxCardinality",
+    doc = "max number of distinct values a categorical feature can have",
+    isValid = ParamValidators.inRange(lowerBound = 1, upperBound = CategoricalDetection.MaxCardinality)
+  )
+  final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
+  final def getMaxCardinality: Int = $(maxCardinality)
+  setDefault(maxCardinality -> CategoricalDetection.MaxCardinality)
 }
