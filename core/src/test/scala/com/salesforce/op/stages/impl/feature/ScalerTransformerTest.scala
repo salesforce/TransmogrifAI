@@ -34,25 +34,26 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.utils.json.JsonUtils
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.FlatSpec
 
 @RunWith(classOf[JUnitRunner])
-class  ScalerTransformerTest extends FlatSpec with TestSparkContext {
-  val (testData, inA) = TestFeatureBuilder("inA", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
+class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[Real, Real]] {
+  val (inputData, f1) = TestFeatureBuilder("f1", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
   val scalingType = "scalingType"
   val scalingArgs = "scalingArgs"
+  val transformer = new ScalerTransformer[Real, Real](
+    scalingType = ScalingType.Linear,
+    scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 1.0)
+  ).setInput(f1.asInstanceOf[Feature[Real]])
+
+  override val expectedResult: Seq[Real] = Seq(9.0, 3.0, 1.0).map(Real(_))
 
   Spec[ScalerTransformer[_, _]] should "Properly linearly scale numeric fields and serialize the transformer" in {
-    val linearScaler = new ScalerTransformer[Real, Real](
-      scalingType = ScalingType.Linear,
-      scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 1.0)
-    ).setInput(inA.asInstanceOf[Feature[Real]])
-    val vec: FeatureLike[Real] = linearScaler.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(testData).train()
+    val vec: FeatureLike[Real] = transformer.getOutput()
+    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(inputData).train()
     val saveModelPath = tempDir.toPath.toString + "linearScalerTest" + DateTime.now().getMillis.toString
     wfModel.save(saveModelPath)
     val data = wfModel.score()
@@ -69,9 +70,9 @@ class  ScalerTransformerTest extends FlatSpec with TestSparkContext {
     val predScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
       scalingArgs = EmptyArgs()
-    ).setInput(inA.asInstanceOf[Feature[Real]])
+    ).setInput(f1.asInstanceOf[Feature[Real]])
     val vec: FeatureLike[Real] = predScaler.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(testData).train()
+    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(inputData).train()
     val saveModelPath = tempDir.toPath.toString + "LogScalerTest" + DateTime.now().getMillis.toString
     wfModel.save(saveModelPath)
     val data = wfModel.score()
