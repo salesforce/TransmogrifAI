@@ -158,7 +158,7 @@ private[op] abstract class JoinedReader[T, U]
       case r: JoinedReader[_, _] => r.getJoinedData(rawFeatures, opParams)
       case _ =>
         throw new RuntimeException(
-          s"The reader type ${leftReader.getClass.getCanonicalName} is not supported as leftReader for joins!")
+          s"The reader type ${leftReader.getClass.getName} is not supported as leftReader for joins!")
     }
 
     val rightData = getData(rightReader).withColumnRenamed(KeyFieldName, RightKeyName)

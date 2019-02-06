@@ -220,8 +220,7 @@ case object FeatureSparkTypes {
     case MapType(StringType, ArrayType(StringType, _), _) => weakTypeTag[types.MultiPickListMap]
     case MapType(StringType, ArrayType(DoubleType, _), _) => weakTypeTag[types.GeolocationMap]
     case VectorType => weakTypeTag[types.OPVector]
-    case BinaryType =>
-      throw new IllegalArgumentException("Spark BinaryType is currently not supported.")
+    case BinaryType => throw new IllegalArgumentException("Spark BinaryType is currently not supported")
     case _ => throw new IllegalArgumentException(s"No feature type tag mapping for Spark type $sparkType")
   }
 

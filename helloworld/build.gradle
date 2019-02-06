@@ -133,6 +133,14 @@ sourceSets {
             srcDir 'build/generated-main-avro-java'
         }
     }
+    scoverage {
+        runtimeClasspath += sourceSets.main.output
+        compileClasspath += sourceSets.main.output
+    }
+    testScoverage {
+        runtimeClasspath += sourceSets.main.output + sourceSets.test.output
+        compileClasspath += sourceSets.main.output + sourceSets.test.output
+    }
 }
 
 wrapper {

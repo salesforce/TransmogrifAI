@@ -57,7 +57,7 @@ object ReflectionUtils {
   }
 
   /**
-   * Create a new instance of type T given a ctor argse getter function
+   * Create a new instance of type T given a ctor args getter function
    *
    * @param klazz       instance class
    * @param ctorArgs    ctor args getter function
@@ -314,9 +314,7 @@ object ReflectionUtils {
     ctorCandidates.partition(_.isSuccess) match {
       case (Success(ctor) :: _, _) => ctor
       case (_, Failure(error) :: _) => throw error
-      case _ => throw new RuntimeException(
-        s"No constructors were found for type ${klazz.getCanonicalName}"
-      )
+      case _ => throw new RuntimeException(s"No constructors were found for type ${klazz.getName}")
     }
   }
 
@@ -345,7 +343,7 @@ object ReflectionUtils {
     paramValues.collectFirst { case (paramName, Failure(error)) =>
       throw new RuntimeException(
         s"Failed to extract value for param '$paramName' " +
-          s"for an instance of type '${klazz.getCanonicalName}' due to: ${error.getMessage}",
+          s"for an instance of type '${klazz.getName}' due to: ${error.getMessage}",
         error
       )
     }

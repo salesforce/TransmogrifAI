@@ -167,6 +167,7 @@ object OpVectorColumnMetadata {
   val DescriptorValueKey = "descriptor_value"
   val IndicesKey = "indices"
   val NullString = "NullIndicatorValue"
+  val TextLenString = "TextLenValue"
   val OtherString = "OTHER"
 
   /**

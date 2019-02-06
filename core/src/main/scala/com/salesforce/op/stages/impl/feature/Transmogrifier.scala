@@ -76,6 +76,7 @@ private[op] trait TransmogrifierDefaults {
   val FillWithMean: Boolean = true
   val TrackNulls: Boolean = true
   val TrackInvalid: Boolean = false
+  val TrackTextLen: Boolean = false
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
@@ -494,6 +495,21 @@ trait TrackInvalidParam extends Params {
    * Option to keep track of invalid values
    */
   def setTrackInvalid(v: Boolean): this.type = set(trackInvalid, v)
+}
+
+/**
+ * Param that decides whether or not lengths of text are tracked during vectorization
+ */
+trait TrackTextLenParam extends Params {
+  final val trackTextLen = new BooleanParam(
+    parent = this, name = "trackTextLen", doc = "option to keep track of text lengths"
+  )
+  setDefault(trackTextLen, TransmogrifierDefaults.TrackTextLen)
+
+  /**
+   * Option to keep track of text lengths
+   */
+  def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
 }
 
 trait CleanTextFun {

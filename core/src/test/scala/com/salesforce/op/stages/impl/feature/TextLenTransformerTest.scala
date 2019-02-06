@@ -31,9 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.TestOpVectorColumnType.IndCol
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
@@ -41,40 +39,42 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextListNullTransformerTest
-  extends OpTransformerSpec[OPVector, TextListNullTransformer[_]] with TestSparkContext with AttributeAsserts {
+class TextLenTransformerTest extends OpTransformerSpec[OPVector, TextLenTransformer[_]]
+  with TestSparkContext with AttributeAsserts {
 
   val (ds, f1, f2) = TestFeatureBuilder(
     Seq[(TextList, TextList)](
-      (TextList(Seq("A giraffe drinks by the watering hole")), TextList(Seq("A giraffe drinks by the watering hole"))),
+      (TextList(Seq("A", "giraffe", "drinks", "by", "the", "watering", "hole")),
+        TextList(Seq("A giraffe drinks by the watering hole"))),
       (TextList(Seq("A giraffe drinks by the watering hole")), TextList(Seq("Cheese"))),
-      (TextList(Seq("Cheese")), TextList(Seq("A giraffe drinks by the watering hole"))),
+      (TextList(Seq("Cheese", "cake")), TextList(Seq("A giraffe drinks by the watering hole"))),
       (TextList(Seq("Cheese")), TextList(Seq("Cheese"))),
       (TextList.empty, TextList(Seq("A giraffe drinks by the watering hole"))),
-      (TextList.empty, TextList(Seq("Cheese"))),
+      (TextList.empty, TextList(Seq("Cheese", "tart"))),
       (TextList(Seq("A giraffe drinks by the watering hole")), TextList.empty),
       (TextList(Seq("Cheese")), TextList.empty),
       (TextList.empty, TextList.empty)
     )
   )
 
+  // Variables for OpTransformer base tests
   val inputData = ds
 
-  val transformer = new TextListNullTransformer().setInput(f1, f2)
+  val transformer = new TextLenTransformer().setInput(f1, f2)
 
   val expectedResult = Seq(
-    Array(0.0, 0.0),
-    Array(0.0, 0.0),
-    Array(0.0, 0.0),
-    Array(0.0, 0.0),
-    Array(1.0, 0.0),
-    Array(1.0, 0.0),
-    Array(0.0, 1.0),
-    Array(0.0, 1.0),
-    Array(1.0, 1.0)
+    Array(31.0, 37.0),
+    Array(37.0, 6.0),
+    Array(10.0, 37.0),
+    Array(6.0, 6.0),
+    Array(0.0, 37.0),
+    Array(0.0, 10.0),
+    Array(37.0, 0.0),
+    Array(6.0, 0.0),
+    Array(0.0, 0.0)
   ).map(Vectors.dense(_).toOPVector)
 
-  Spec[TextListNullTransformer[_]] should "take an array of features as input and return a single vector feature" in {
+  Spec[TextLenTransformer[_]] should "take an array of features as input and return a single vector feature" in {
     val vector = transformer.getOutput()
 
     vector.name shouldBe transformer.getOutputFeatureName
@@ -86,16 +86,7 @@ class TextListNullTransformerTest
     val transformed = transformer.transform(ds)
     val vector = transformer.getOutput()
 
-    val field = transformed.schema(vector.name)
     val result = transformed.collect(vector)
-    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
-    result shouldBe expectedResult
-
-    val vectorMetadata = transformer.getMetadata()
-    OpVectorMetadata(transformer.getOutputFeatureName, vectorMetadata) shouldEqual TestOpVectorMetadataBuilder(
-      transformer,
-      f1 -> List(IndCol(Some(TransmogrifierDefaults.NullString))),
-      f2 -> List(IndCol(Some(TransmogrifierDefaults.NullString)))
-    )
+    result should contain theSameElementsAs expectedResult
   }
 }
