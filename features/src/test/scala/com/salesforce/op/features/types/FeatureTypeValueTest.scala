@@ -182,7 +182,11 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
       val pred = Prediction.Keys.PredictionName -> a.head
       val expected = (rawPred ++ prob).toMap + pred
       checkVals(Prediction(a.head, v, v), expected)
-      checkVals(Prediction(a.head, a, a), expected)
+      val fullPred = Prediction(a.head, a, a)
+      checkVals(fullPred, expected)
+      fullPred.prediction shouldBe a.head
+      fullPred.probability shouldBe a
+      fullPred.rawPrediction shouldBe a
     }
 
   }
