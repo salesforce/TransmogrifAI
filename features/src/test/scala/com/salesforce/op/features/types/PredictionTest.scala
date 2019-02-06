@@ -69,10 +69,14 @@ class PredictionTest extends FlatSpec with TestCommon {
   it should "return raw prediction" in {
     Prediction(2.0).rawPrediction shouldBe Array()
     Prediction(1.0, Array(1.0, 2.0), Array.empty[Double]).rawPrediction shouldBe Array(1.0, 2.0)
+    Prediction(1.0, (1 until 200).map(_.toDouble).toArray, Array.empty[Double]).rawPrediction shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return probability" in {
     Prediction(3.0).probability shouldBe Array()
     Prediction(1.0, Array.empty[Double], Array(1.0, 2.0)).probability shouldBe Array(1.0, 2.0)
+    Prediction(1.0, Array.empty[Double], (1 until 200).map(_.toDouble).toArray).probability shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return score" in {
     Prediction(4.0).score shouldBe Array(4.0)
