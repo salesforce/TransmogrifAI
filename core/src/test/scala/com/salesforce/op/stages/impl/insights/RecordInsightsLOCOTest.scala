@@ -217,9 +217,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
     // one if it's not null.
     parsed.length shouldBe numRows
-    parsed.foreach(m => if (m.keySet.count(_.columnName.contains("currency_NullIndicatorValue")) > 0)
-      m.size shouldBe 4 else m.size shouldBe 3
-    )
+    parsed.foreach(m => if (m.keySet.count(_.columnName.contains("currency_NullIndicatorValue")) > 0) {
+      m.size shouldBe 4
+    } else m.size shouldBe 3)
 
     // Want to check the average contribution strengths for each picklist response and compare them to the
     // average contribution strengths of the other features. We should have a very high contribution when choices
@@ -228,14 +228,14 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 + v.last._2, res(k.index)._2 + 1)) }
       res
     })
-    val meanImportances = totalImportances.map(x => if(x._2 > 0) x._1/x._2 else Double.NaN)
+    val meanImportances = totalImportances.map(x => if (x._2 > 0) x._1 / x._2 else Double.NaN)
 
     // Similar calculation for the variance of each feature importance
     val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
       m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 +
         math.pow(v.last._2 - meanImportances(k.index), 2), res(k.index)._2 + 1)) }
       res
-    }).map(x => if(x._2 > 1) math.sqrt(x._1/(x._2 - 1)) else Double.NaN)
+    }).map(x => if (x._2 > 1) math.sqrt(x._1 / (x._2 - 1)) else Double.NaN)
 
     // Determine all the indices for insights corresponding to both the "important" and "other" features
     val nanIndices = meanImportances.zipWithIndex.filter(_._1.isNaN).map(_._2).toSet
