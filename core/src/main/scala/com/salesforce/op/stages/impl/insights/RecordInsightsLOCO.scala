@@ -99,7 +99,14 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
 
     val top = maxHeap.dequeueAll
-    top.map{ case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(k), v) }
+    // top.map{ case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
+    top.map{ case (k, _, v) => {
+      // println(s"featureInfo(k): ${featureInfo(k)}")
+      // println(s"featureInfo(featureArray(k)._1): ${featureInfo(featureArray(k)._1)}")
+      // println()
+      // RecordInsightsParser.insightToText(featureInfo(k), v)
+      RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v)
+    } }
       .toMap.toTextMap
   }
 }
