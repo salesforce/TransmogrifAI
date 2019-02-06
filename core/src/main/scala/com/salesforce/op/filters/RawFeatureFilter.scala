@@ -192,13 +192,14 @@ class RawFeatureFilter[T]
 
   /**
    * Take in the distribution summaries for datasets (scoring summary may be empty) and determine which
-   * features should be dropped (including maps with all keys dropped) and which map keys need to be dropped
+   * features should be dropped (including maps with all keys dropped), which map keys need to be dropped, and
+   * why those features are dropped
    *
    * @param trainingDistribs summary of distributions for training data features
    * @param scoringDistribs  summary of distributions for scoring data features (may be an empty seq)
    * @param correlationInfo  info needed to determine feature to drop based on null label-leakage correlation
-   * @return a list of feature names that should be dropped and a map of map keys that should be dropped
-   *         Map(featureName -> key)
+   * @return a list of outcomes of raw feature filter tests for each feature, a list of feature names that
+   *         should be dropped and a map of map keys that should be dropped Map(featureName -> key)
    */
   private[op] def getFeaturesToExclude(
     trainingDistribs: Seq[FeatureDistribution],
@@ -275,7 +276,7 @@ class RawFeatureFilter[T]
         )
       }
 
-    val excludedFeatures = exclusionReasons.map { case er => er.excluded }
+    val excludedFeatures = exclusionReasons.map { er => er.excluded }
 
     val (toDrop, toKeep) = trainingDistribs.zip(excludedFeatures).partition(_._2)
 
@@ -368,7 +369,7 @@ class RawFeatureFilter[T]
       protectedFeatures = protectedFeatures
     )
 
-    val rawFeatureInfo = RawFeatureInfo(
+    val rawFeatureFilterResults = RawFeatureFilterResults(
       rawFeatureFilterConfig = rawFeatureFilterConfig,
       featureDistributions = featureDistributions,
       exclusionReasons = exclusionReasons
@@ -376,7 +377,7 @@ class RawFeatureFilter[T]
 
     FilteredRawData(
       cleanedData = cleanedData, featuresToDrop = featuresToDrop,
-      mapKeysToDrop = mapKeysToDrop, rawFeatureInfo = rawFeatureInfo
+      mapKeysToDrop = mapKeysToDrop, rawFeatureFilterResults = rawFeatureFilterResults
     )
   }
 }
@@ -404,81 +405,31 @@ object RawFeatureFilter {
 }
 
 /**
- * case class for the RFF filtered data and features to drop
+ * Contains RFF filtered data, features to drop, and results from RFF
  *
- * @param cleanedData    RFF cleaned data
- * @param featuresToDrop raw features dropped by RFF
- * @param mapKeysToDrop  keys in map features dropped by RFF
- * @param rawFeatureInfo feature information calculated from the training data
+ * @param cleanedData               RFF cleaned data
+ * @param featuresToDrop            raw features dropped by RFF
+ * @param mapKeysToDrop             keys in map features dropped by RFF
+ * @param rawFeatureFilterResults   feature information calculated from the training data
  */
 case class FilteredRawData
 (
   cleanedData: DataFrame,
   featuresToDrop: Array[OPFeature],
   mapKeysToDrop: Map[String, Set[String]],
-  rawFeatureInfo: RawFeatureInfo
+  rawFeatureFilterResults: RawFeatureFilterResults
 ) {
 
   /**
    * Feature distributions calculated from the training data
    */
   def trainingFeatureDistributions: Seq[FeatureDistribution] =
-    rawFeatureInfo.featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+    rawFeatureFilterResults.featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
 
   /**
    * Feature distributions calculated from the scoring data
    */
   def scoringFeatureDistributions: Seq[FeatureDistribution] =
-    rawFeatureInfo.featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+    rawFeatureFilterResults.featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
 }
-
-
-/**
- * case class container for storing and passing information from RFF
- *
- * @param rawFeatureFilterConfig
- * @param featureDistributions feature distributions calculated from training data
- * @param exclusionReasons
- */
-case class RawFeatureInfo
-(
-  rawFeatureFilterConfig: RawFeatureFilterConfig,
-  featureDistributions: Seq[FeatureDistribution],
-  exclusionReasons: Seq[ExclusionReasons]
-)
-
-/**
- * case class containing configuration settings for Raw Feature Filter
- */
-case class RawFeatureFilterConfig
-(
-  minFill: Double,
-  maxFillDifference: Double,
-  maxFillRatioDiff: Double,
-  maxJSDivergence: Double,
-  maxCorrelation: Double,
-  correlationType: CorrelationType,
-  jsDivergenceProtectedFeatures: Set[String],
-  protectedFeatures: Set[String]
-)
-
-/**
- *
- * @param trainingUnfilled
- * @param scoringUnfilled
- * @param distribMismatchJSDivergence
- * @param distribMismatchFillRateDiff
- * @param distribMismatchFillRatioDiff
- * @param nullLabelCorrelation
- */
-case class ExclusionReasons
-(
-  trainingUnfilled: Boolean = false,
-  scoringUnfilled: Boolean = false,
-  distribMismatchJSDivergence: Boolean = false,
-  distribMismatchFillRateDiff: Boolean = false,
-  distribMismatchFillRatioDiff: Boolean = false,
-  nullLabelCorrelation: Boolean = false,
-  excluded: Boolean = false
-)
