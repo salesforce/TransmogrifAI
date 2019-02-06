@@ -30,12 +30,10 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.{Feature, FeatureLike}
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
-import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -51,15 +49,12 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
 
   override val expectedResult: Seq[Real] = Seq(9.0, 3.0, 1.0).map(Real(_))
 
-  Spec[ScalerTransformer[_, _]] should "Properly linearly scale numeric fields and serialize the transformer" in {
-    val vec: FeatureLike[Real] = transformer.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(inputData).train()
-    val saveModelPath = tempDir.toPath.toString + "linearScalerTest" + DateTime.now().getMillis.toString
-    wfModel.save(saveModelPath)
-    val data = wfModel.score()
-    val actual = data.collect()
+  it should "Properly linearly scale numeric fields" in {
+    val vector: FeatureLike[Real] = transformer.getOutput()
+    val transformed = transformer.transform(inputData)
+    val actual = transformed.collect()
     actual.map(_.getAs[Double](1)) shouldEqual Array(9.0, 3.0, 1.0)
-    val metadata = data.schema(vec.name).metadata
+    val metadata = transformed.schema(vector.name).metadata
     metadata.getString(scalingType) shouldEqual ScalingType.Linear.entryName
     val args: LinearScalerArgs = JsonUtils.fromString[LinearScalerArgs](metadata.getString(scalingArgs)).get
     args.intercept shouldEqual 1.0
@@ -67,18 +62,15 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
   }
 
   it should "Properly log scale numeric fields and serialize the transformer" in {
-    val predScaler = new ScalerTransformer[Real, Real](
+    val logScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
       scalingArgs = EmptyArgs()
     ).setInput(f1.asInstanceOf[Feature[Real]])
-    val vec: FeatureLike[Real] = predScaler.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(vec).setInputDataset(inputData).train()
-    val saveModelPath = tempDir.toPath.toString + "LogScalerTest" + DateTime.now().getMillis.toString
-    wfModel.save(saveModelPath)
-    val data = wfModel.score()
-    val actual = data.collect()
+    val vector: FeatureLike[Real] = logScaler.getOutput()
+    val transformed = logScaler.transform(inputData)
+    val actual = transformed.collect()
     actual.map(_.getAs[Double](1)) shouldEqual Array(4.0, 1.0, 0.0).map(math.log(_))
-    val metadata = data.schema(vec.name).metadata
+    val metadata = transformed.schema(vector.name).metadata
     metadata.getString(scalingType) shouldEqual ScalingType.Logarithmic.entryName
     val args: EmptyArgs = JsonUtils.fromString[EmptyArgs](metadata.getString(scalingArgs)).get
   }
