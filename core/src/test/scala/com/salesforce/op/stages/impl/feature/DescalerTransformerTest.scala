@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.Real
+import com.salesforce.op.features.types.{Prediction, Real}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.utils.json.JsonUtils
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
@@ -45,14 +45,11 @@ class  DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransform
   val scalingType = "scalingType"
   val scalingArgs = "scalingArgs"
   val (testData, f1) = TestFeatureBuilder("f1", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
-  val metadata = ScalerMetadata(scalingType = ScalingType.Linear,
+  val scalerMetadata = ScalerMetadata(scalingType = ScalingType.Linear,
     scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 3.0)
   ).toMetadata()
-  testData.col(f1.name)
-  val colWithMetadata = testData.col(f1.name).as(f1.name, metadata)
+  val colWithMetadata = testData.col(f1.name).as(f1.name, scalerMetadata)
   val inputData = testData.withColumn(f1.name, colWithMetadata)
-  println(inputData.schema)
-  println("metadata" + inputData.schema(f1.name).metadata)
   val expectedResult: Seq[Real] = Seq(0.5, -1.0, -1.5).map(Real(_))
   val transformer = new DescalerTransformer[Real, Real, Real]().setInput(f1, f1)
 
