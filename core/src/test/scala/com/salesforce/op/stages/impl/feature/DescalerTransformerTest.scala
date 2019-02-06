@@ -35,63 +35,46 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.utils.json.JsonUtils
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.FlatSpec
 
 @RunWith(classOf[JUnitRunner])
-class  DescalerTransformerTest extends FlatSpec with TestSparkContext {
-  val (testData, inA) = TestFeatureBuilder("inA", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
+class  DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransformer[Real, Real, Real]] {
   val scalingType = "scalingType"
   val scalingArgs = "scalingArgs"
+  val (testData, f1) = TestFeatureBuilder("f1", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
+  val metadata = ScalerMetadata(scalingType = ScalingType.Linear,
+    scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 3.0)
+  ).toMetadata()
+  testData.col(f1.name)
+  val colWithMetadata = testData.col(f1.name).as(f1.name, metadata)
+  val inputData = testData.withColumn(f1.name, colWithMetadata)
+  println(inputData.schema)
+  println("metadata" + inputData.schema(f1.name).metadata)
+  val expectedResult: Seq[Real] = Seq(0.5, -1.0, -1.5).map(Real(_))
+  val transformer = new DescalerTransformer[Real, Real, Real]().setInput(f1, f1)
 
-  Spec[DescalerTransformer[_, _, _]] should "Properly descale a linear scaling and serialize the workflow" in {
-    val linearScaler = new ScalerTransformer[Real, Real](
-      scalingType = ScalingType.Linear,
-      scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 3.0)
-    ).setInput(inA.asInstanceOf[Feature[Real]])
-    val scaledResponse = linearScaler.getOutput().asInstanceOf[Feature[Real]]
-    val shifter = new UnaryLambdaTransformer[Real, Real](
-      operationName = "shift",
-      transformFn = v => Real(v.value.get + 1)
-    ).setInput(scaledResponse)
-    val metadata = linearScaler.transform(testData).schema(scaledResponse.name).metadata
-    metadata.getString(scalingType) shouldEqual ScalingType.Linear.entryName
-    val args = JsonUtils.fromString[LinearScalerArgs](metadata.getString(scalingArgs)).get
-    args.slope shouldEqual 2.0
-    args.intercept shouldEqual 3.0
-    val shifted = shifter.getOutput()
-    val deScaler = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse)
-    val descaledResponse = deScaler.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(testData).train()
-    wfModel.save(tempDir + "linearScalerDescalerTest" + DateTime.now().getMillis)
-    val data = wfModel.score()
-    val actual = data.collect().map(_.getAs[Double](1))
-    actual shouldEqual Array(4.0, 1.0, 0.0).map(_ + 0.5)
-  }
-
-  it should "Properly descale a log scaling and serialize the workflow" in {
+  it should "Properly descale and serialize log-scaling workflow" in {
     val logScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
       scalingArgs = EmptyArgs()
-    ).setInput(inA.asInstanceOf[Feature[Real]])
+    ).setInput(f1.asInstanceOf[Feature[Real]])
     val scaledResponse = logScaler.getOutput().asInstanceOf[Feature[Real]]
-    val shifter = new UnaryLambdaTransformer[Real, Real](
-      operationName = "shift",
-      transformFn = v => Real(v.value.get + 1)
-    ).setInput(scaledResponse)
-    val metadata = logScaler.transform(testData).schema(scaledResponse.name).metadata
+    val metadata = logScaler.transform(inputData).schema(scaledResponse.name).metadata
     metadata.getString(scalingType) shouldEqual ScalingType.Logarithmic.entryName
     val args = JsonUtils.fromString[EmptyArgs](metadata.getString(scalingArgs)).get
-    val shifted = shifter.getOutput()
-    val deScaler = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse)
-    val descaledResponse = deScaler.getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(testData).train()
+    args shouldEqual EmptyArgs()
+    val shifted = new UnaryLambdaTransformer[Real, Real](
+      operationName = "shift",
+      transformFn = v => Real(v.value.get + 1)
+    ).setInput(scaledResponse).getOutput()
+    val descaledResponse = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse).getOutput()
+    val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(inputData).train()
     wfModel.save(tempDir + "logScalerDescalerTest" + DateTime.now().getMillis)
-    val data = wfModel.score()
-    val actual = data.collect().map(_.getAs[Double](1))
+    val transformed = wfModel.score()
+    val actual = transformed.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
   }

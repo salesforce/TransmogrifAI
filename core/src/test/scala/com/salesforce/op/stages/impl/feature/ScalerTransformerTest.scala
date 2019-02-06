@@ -53,7 +53,6 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
     val vector: FeatureLike[Real] = transformer.getOutput()
     val transformed = transformer.transform(inputData)
     val actual = transformed.collect()
-    actual.map(_.getAs[Double](1)) shouldEqual Array(9.0, 3.0, 1.0)
     val metadata = transformed.schema(vector.name).metadata
     metadata.getString(scalingType) shouldEqual ScalingType.Linear.entryName
     val args: LinearScalerArgs = JsonUtils.fromString[LinearScalerArgs](metadata.getString(scalingArgs)).get
