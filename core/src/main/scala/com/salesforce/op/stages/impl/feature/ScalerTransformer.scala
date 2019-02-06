@@ -44,7 +44,17 @@ import scala.util.{Failure, Try}
  * A trait extended by a class class containing the args needed to define a family of scaling & descaling functions
  */
 trait ScalingArgs extends JsonLike
+
+/**
+ * Case class for Scaling families that take no parameters
+ */
 case class EmptyArgs() extends ScalingArgs
+
+/**
+ * Parameters need to uniquely define a linear scaling function
+ * @param slope the slope of the linear scaler
+ * @param intercept the x axis intercept of the linear scaler
+ */
 case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs
 
 /**
@@ -73,6 +83,9 @@ object Scaler {
   }
 }
 
+/*
+A case class representing a logarithmic scaling function
+ */
 case class LogScaler() extends Scaler {
   val scalingType: ScalingType = ScalingType.Logarithmic
   val args: ScalingArgs = EmptyArgs()
@@ -80,6 +93,10 @@ case class LogScaler() extends Scaler {
   def descale(v: Double): Double = math.exp(v)
 }
 
+/**
+ * A case class representing a linear scaling function
+ * @param args case class containing the slope and intercept of the scaling function
+ */
 case class LinearScaler(args: LinearScalerArgs) extends Scaler {
   require(args.slope != 0.0, "Must have a non zero slope to be invertible")
   val scalingType: ScalingType = ScalingType.Linear
@@ -87,6 +104,11 @@ case class LinearScaler(args: LinearScalerArgs) extends Scaler {
   def descale(v: Double): Double = (v - args.intercept) / args.slope
 }
 
+/**
+ * metadata containing the info needed to reconstruct a Scaler instance
+ * @param scalingType the family of functions containing the scaler
+ * @param scalingArgs the args uniquely defining a function in the scaling family
+ */
 case class ScalerMetadata(scalingType: ScalingType, scalingArgs: ScalingArgs) {
   def toMetadata(): Metadata = new MetadataBuilder()
     .putString("scalingType", scalingType.entryName)

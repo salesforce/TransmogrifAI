@@ -39,7 +39,8 @@ import scala.util.{Failure, Success}
 
 /**
  * A transformer that takes as inputs a feature to descale and (potentially different) scaled feature which contains the
- * metadata for reconstructing the inverse scaling function.
+ * metadata for reconstructing the inverse scaling function.  Transforms the 2nd input feature by applying the inverse
+ * of the scaling function found in the metadata
  * - 1st input feature is the feature to descale
  * - 2nd input feature is  scaled feature containing the metadata for constructing the scaling used to make this column
  *
@@ -76,6 +77,7 @@ final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 }
 
 /**
+ *  Applies to the input column the inverse of the scaling function defined in the Prediction feature metadata.
  *  - input feature is the prediction feature to descale
  *  - the metadata for recovering the inverse scaling function is taken from the scaled label
  * @param uid           uid for instance
