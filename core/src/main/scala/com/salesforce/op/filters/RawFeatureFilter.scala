@@ -204,7 +204,7 @@ class RawFeatureFilter[T]
     trainingDistribs: Seq[FeatureDistribution],
     scoringDistribs: Seq[FeatureDistribution],
     correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
-  ): (Seq[String], Map[String, Set[String]]) = {
+  ): (Seq[ExclusionReasons], Seq[String], Map[String, Set[String]]) = {
 
     def logExcluded(excluded: Seq[Boolean], message: String): Unit = {
       val featuresDropped = trainingDistribs.zip(excluded)
@@ -242,7 +242,7 @@ class RawFeatureFilter[T]
         Seq.fill(featureSize)(false)
       }
 
-    val distribMismatches =
+    val (kl, mf, mfr) =
       if (scoringDistribs.nonEmpty) {
         val combined = trainingDistribs.zip(scoringDistribs)
         log.info(combined.map { case (t, s) => s"\n$t\n$s\nTrain Fill=${t.fillRate()}, Score Fill=${s.fillRate()}, " +
@@ -257,22 +257,34 @@ class RawFeatureFilter[T]
         logExcluded(mf, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
         val mfr = combined.map { case (t, s) => t.relativeFillRatio(s) > maxFillRatioDiff }
         logExcluded(mfr, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
-        kl.zip(mf).zip(mfr).map { case ((a, b), c) => a || b || c }
+        (kl, mf, mfr)
       } else {
-        Seq.fill(featureSize)(false)
+        (Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
       }
 
-    val allExcludeReasons = trainingUnfilled.zip(scoringUnfilled).zip(distribMismatches).zip(trainingNullLabelLeakers)
-      .map { case (((t, s), d), n) => t || s || d || n }
+    val exclusionReasons = trainingUnfilled.zip(scoringUnfilled).zip(kl).zip(mf).zip(mfr).zip(trainingNullLabelLeakers)
+      .map { case (((((t, s), a), b), c), n) =>
+        ExclusionReasons(
+          trainingUnfilled = t,
+          scoringUnfilled = s,
+          distribMismatchJSDivergence = a,
+          distribMismatchFillRateDiff = b,
+          distribMismatchFillRatioDiff = c,
+          nullLabelCorrelation = n,
+          excluded = t || s || a || b || c || n
+        )
+      }
 
-    val (toDrop, toKeep) = trainingDistribs.zip(allExcludeReasons).partition(_._2)
+    val excludedFeatures = exclusionReasons.map { case er => er.excluded }
+
+    val (toDrop, toKeep) = trainingDistribs.zip(excludedFeatures).partition(_._2)
 
     val toDropFeatures = toDrop.map(_._1).groupBy(_.name)
     val toKeepFeatures = toKeep.map(_._1).groupBy(_.name)
     val mapKeys = toKeepFeatures.keySet.intersect(toDropFeatures.keySet)
     val toDropNames = toDropFeatures.collect { case (k, _) if !mapKeys.contains(k) => k }.toSeq
     val toDropMapKeys = toDropFeatures.collect { case (k, v) if mapKeys.contains(k) => k -> v.flatMap(_.key).toSet }
-    toDropNames -> toDropMapKeys
+    (exclusionReasons, toDropNames, toDropMapKeys)
   }
 
   /**
@@ -318,7 +330,7 @@ class RawFeatureFilter[T]
       ss
     }
 
-    val (featuresToDropNames, mapKeysToDrop) = getFeaturesToExclude(
+    val (exclusionReasons, featuresToDropNames, mapKeysToDrop) = getFeaturesToExclude(
       trainingSummary.predictorDistributions.filterNot(d => protectedFeatures.contains(d.name)),
       scoringSummary.toSeq.flatMap(_.predictorDistributions.filterNot(d => protectedFeatures.contains(d.name))),
       trainingSummary.correlationInfo)
@@ -357,8 +369,9 @@ class RawFeatureFilter[T]
     )
 
     val rawFeatureInfo = RawFeatureInfo(
+      rawFeatureFilterConfig = rawFeatureFilterConfig,
       featureDistributions = featureDistributions,
-      rawFeatureFilterConfig = rawFeatureFilterConfig
+      exclusionReasons = exclusionReasons
     )
 
     FilteredRawData(
@@ -420,17 +433,24 @@ case class FilteredRawData
 
 }
 
+
 /**
  * case class container for storing and passing information from RFF
  *
+ * @param rawFeatureFilterConfig
  * @param featureDistributions feature distributions calculated from training data
+ * @param exclusionReasons
  */
 case class RawFeatureInfo
 (
+  rawFeatureFilterConfig: RawFeatureFilterConfig,
   featureDistributions: Seq[FeatureDistribution],
-  rawFeatureFilterConfig: RawFeatureFilterConfig
+  exclusionReasons: Seq[ExclusionReasons]
 )
 
+/**
+ * case class containing configuration settings for Raw Feature Filter
+ */
 case class RawFeatureFilterConfig
 (
   minFill: Double,
@@ -441,4 +461,24 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType,
   jsDivergenceProtectedFeatures: Set[String],
   protectedFeatures: Set[String]
+)
+
+/**
+ *
+ * @param trainingUnfilled
+ * @param scoringUnfilled
+ * @param distribMismatchJSDivergence
+ * @param distribMismatchFillRateDiff
+ * @param distribMismatchFillRatioDiff
+ * @param nullLabelCorrelation
+ */
+case class ExclusionReasons
+(
+  trainingUnfilled: Boolean = false,
+  scoringUnfilled: Boolean = false,
+  distribMismatchJSDivergence: Boolean = false,
+  distribMismatchFillRateDiff: Boolean = false,
+  distribMismatchFillRatioDiff: Boolean = false,
+  nullLabelCorrelation: Boolean = false,
+  excluded: Boolean = false
 )
