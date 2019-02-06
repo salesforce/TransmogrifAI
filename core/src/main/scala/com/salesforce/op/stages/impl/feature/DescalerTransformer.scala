@@ -78,8 +78,9 @@ final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 
 /**
  *  Applies to the input column the inverse of the scaling function defined in the Prediction feature metadata.
- *  - input feature is the prediction feature to descale
- *  - the metadata for recovering the inverse scaling function is taken from the scaled label
+ * - 1st input feature is the Prediction feature to descale
+ * - 2nd input feature is scaled Prediction feature containing the metadata for constructing
+ * the scaling used to make this column
  * @param uid           uid for instance
  * @param tti2          type tag for second input
  * @param tto           type tag for output
