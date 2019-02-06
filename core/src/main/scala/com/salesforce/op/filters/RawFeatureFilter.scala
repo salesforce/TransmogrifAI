@@ -208,7 +208,7 @@ class RawFeatureFilter[T]
 
     def logExcluded(excluded: Seq[Boolean], message: String): Unit = {
       val featuresDropped = trainingDistribs.zip(excluded)
-        .collect{ case (f, d) if d => s"${f.name} ${f.key.getOrElse("")}" }
+        .collect { case (f, d) if d => s"${f.name} ${f.key.getOrElse("")}" }
       log.info(s"$message: ${featuresDropped.mkString(", ")}")
     }
 
@@ -247,7 +247,8 @@ class RawFeatureFilter[T]
         val combined = trainingDistribs.zip(scoringDistribs)
         log.info(combined.map { case (t, s) => s"\n$t\n$s\nTrain Fill=${t.fillRate()}, Score Fill=${s.fillRate()}, " +
           s"JS Divergence=${t.jsDivergence(s)}, Fill Rate Difference=${t.relativeFillRate(s)}, " +
-          s"Fill Ratio Difference=${t.relativeFillRatio(s)}" }.mkString("\n"))
+          s"Fill Ratio Difference=${t.relativeFillRatio(s)}"
+        }.mkString("\n"))
         val kl = combined.map { case (t, s) =>
           !jsDivergenceProtectedFeatures.contains(t.name) && t.jsDivergence(s) > maxJSDivergence
         }
@@ -256,21 +257,21 @@ class RawFeatureFilter[T]
         logExcluded(mf, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
         val mfr = combined.map { case (t, s) => t.relativeFillRatio(s) > maxFillRatioDiff }
         logExcluded(mfr, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
-        kl.zip(mf).zip(mfr).map{ case ((a, b), c) => a || b || c }
+        kl.zip(mf).zip(mfr).map { case ((a, b), c) => a || b || c }
       } else {
         Seq.fill(featureSize)(false)
       }
 
     val allExcludeReasons = trainingUnfilled.zip(scoringUnfilled).zip(distribMismatches).zip(trainingNullLabelLeakers)
-      .map{ case (((t, s), d), n) => t || s || d || n }
+      .map { case (((t, s), d), n) => t || s || d || n }
 
     val (toDrop, toKeep) = trainingDistribs.zip(allExcludeReasons).partition(_._2)
 
     val toDropFeatures = toDrop.map(_._1).groupBy(_.name)
     val toKeepFeatures = toKeep.map(_._1).groupBy(_.name)
     val mapKeys = toKeepFeatures.keySet.intersect(toDropFeatures.keySet)
-    val toDropNames = toDropFeatures.collect{ case (k, _) if !mapKeys.contains(k) => k }.toSeq
-    val toDropMapKeys = toDropFeatures.collect{ case (k, v) if mapKeys.contains(k) => k -> v.flatMap(_.key).toSet }
+    val toDropNames = toDropFeatures.collect { case (k, _) if !mapKeys.contains(k) => k }.toSeq
+    val toDropMapKeys = toDropFeatures.collect { case (k, v) if mapKeys.contains(k) => k -> v.flatMap(_.key).toSet }
     toDropNames -> toDropMapKeys
   }
 
@@ -342,10 +343,22 @@ class RawFeatureFilter[T]
 
     val featureDistributions =
       trainingSummary.responseDistributions ++ trainingSummary.predictorDistributions ++
-      scoringSummary.map(s => s.responseDistributions ++ s.predictorDistributions).getOrElse(Array.empty)
+        scoringSummary.map(s => s.responseDistributions ++ s.predictorDistributions).getOrElse(Array.empty)
+
+    val rawFeatureFilterConfig = RawFeatureFilterConfig(
+      minFill = minFill,
+      maxFillDifference = maxFillDifference,
+      maxFillRatioDiff = maxFillRatioDiff,
+      maxJSDivergence = maxJSDivergence,
+      maxCorrelation = maxCorrelation,
+      correlationType = correlationType,
+      jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures,
+      protectedFeatures = protectedFeatures
+    )
 
     val rawFeatureInfo = RawFeatureInfo(
-      featureDistributions = featureDistributions
+      featureDistributions = featureDistributions,
+      rawFeatureFilterConfig = rawFeatureFilterConfig
     )
 
     FilteredRawData(
@@ -362,7 +375,7 @@ object RawFeatureFilter {
    * Default calculation for the hashing size for RFF (compare js distance) for text features
    *
    * @param summary summary info for feature (max, min, etc)
-   * @param bins number of bins to use
+   * @param bins    number of bins to use
    * @return
    */
   def textBinsFormula(summary: Summary, bins: Int): Int = {
@@ -380,10 +393,10 @@ object RawFeatureFilter {
 /**
  * case class for the RFF filtered data and features to drop
  *
- * @param cleanedData           RFF cleaned data
- * @param featuresToDrop        raw features dropped by RFF
- * @param mapKeysToDrop         keys in map features dropped by RFF
- * @param rawFeatureInfo        feature information calculated from the training data
+ * @param cleanedData    RFF cleaned data
+ * @param featuresToDrop raw features dropped by RFF
+ * @param mapKeysToDrop  keys in map features dropped by RFF
+ * @param rawFeatureInfo feature information calculated from the training data
  */
 case class FilteredRawData
 (
@@ -410,9 +423,22 @@ case class FilteredRawData
 /**
  * case class container for storing and passing information from RFF
  *
- * @param featureDistributions  feature distributions calculated from training data
+ * @param featureDistributions feature distributions calculated from training data
  */
 case class RawFeatureInfo
 (
-  featureDistributions: Seq[FeatureDistribution]
+  featureDistributions: Seq[FeatureDistribution],
+  rawFeatureFilterConfig: RawFeatureFilterConfig
+)
+
+case class RawFeatureFilterConfig
+(
+  minFill: Double,
+  maxFillDifference: Double,
+  maxFillRatioDiff: Double,
+  maxJSDivergence: Double,
+  maxCorrelation: Double,
+  correlationType: CorrelationType,
+  jsDivergenceProtectedFeatures: Set[String],
+  protectedFeatures: Set[String]
 )
