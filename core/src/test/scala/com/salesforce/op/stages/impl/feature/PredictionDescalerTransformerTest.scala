@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -48,4 +49,14 @@ class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, Predicti
   val transformer = new PredictionDescaler[Real, Real]().setInput(p, f1)
 
   val expectedResult: Seq[Real] = Seq(-0.5, -0.25, 0.0, 0.25).map(_.toReal)
+
+  it should "error on missing scaler metadata" in {
+    val (df, p, f1) = TestFeatureBuilder(Seq(4.0, 1.0, 0.0).map(Prediction(_)) zip Seq(0.0, 0.0, 0.0).map(Real(_)))
+    val error = intercept[SparkException](
+      new PredictionDescaler[Real, Real]().setInput(p, f1).transform(df).collect()
+    )
+    error.getCause should not be null
+    error.getCause shouldBe a[RuntimeException]
+    error.getCause.getMessage shouldBe s"Failed to extract scaler metadata for input feature '${f1.name}'"
+  }
 }
