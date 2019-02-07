@@ -185,35 +185,4 @@ final class ScalerTransformer[I <: Real, O <: Real]
   }
 }
 
-/**
- * Scaling transformer that applies a scaling function to a Prediction feature
- *
- * @param uid           uid for instance
- * @param scalingType   type of scaling functions
- * @param scalingArgs   arguments to define the scaling function
- * @param tto           type tag for output
- * @param ttov          type tag for output value
- * @tparam O output feature type
- */
-final class PredictionScaler[O <: Real](
-  uid: String = UID[PredictionScaler[_]],
-  val scalingType: ScalingType,
-  val scalingArgs: ScalingArgs
-)(implicit tto: TypeTag[O], ttov: TypeTag[O#Value])
-  extends UnaryTransformer[Prediction, O](operationName = "predictionDescaler", uid = uid){
-
-  private val ftFactory = FeatureTypeFactory[O]()
-  private val scaler = Scaler(scalingType, scalingArgs)
-
-  def transformFn: Prediction => O = v => {
-    val scaled = Some(scaler.scale(v.prediction))
-    ftFactory.newInstance(scaled)
-  }
-
-  override def onGetMetadata(): Unit = {
-    super.onGetMetadata()
-    val meta = ScalerMetadata(scalingType, scalingArgs).toMetadata()
-    setMetadata(meta)
-  }
-}
 
