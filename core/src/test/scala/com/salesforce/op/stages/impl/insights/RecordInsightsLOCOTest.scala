@@ -30,17 +30,17 @@
 
 package com.salesforce.op.stages.impl.insights
 
-import com.salesforce.op.FeatureHistory
+import com.salesforce.op.{FeatureHistory, OpWorkflow}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
 import com.salesforce.op.stages.impl.regression.OpLinearRegression
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
+import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomText, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.ml.classification.{LogisticRegressionModel, RandomForestClassificationModel}
+import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
@@ -174,6 +174,101 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     parsed.foreach { case (_, in) => Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true }
     // the scores should be the same but opposite in sign
     parsed.foreach { case (_, in) => math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true }
+  }
+
+  it should "return the most predictive features for dat generated with a strong relation to the label" in {
+    val numRows = 1000
+    val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
+    val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
+      .withProbabilityOfEmpty(0.1).limit(numRows)
+    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+      .withProbabilityOfEmpty(0.3).limit(numRows)
+
+    // Generate the label as a function of the features, so we know there should be strong record-level insights
+    val labelData: Seq[RealNN] = pickListData.map(p =>
+      p.value match {
+        case Some("A") | Some("B") | Some("C") => RealNN(1.0)
+        case _ => RealNN(0.0)
+      }
+    )
+
+    // Generate the raw features and corresponding dataframe
+    val generatedData: Seq[(Country, PickList, Currency, RealNN)] =
+      countryData.zip(pickListData).zip(currencyData).zip(labelData).map {
+        case (((co, pi), cu), la) => (co, pi, cu, la)
+      }
+    val (rawDF, rawCountry, rawPickList, rawCurrency, rawLabel) =
+      TestFeatureBuilder("country", "picklist", "currency", "label", generatedData)
+    val rawLabelResponse = rawLabel.copy(isResponse = true)
+    val genFeatureVector = Seq(rawCountry, rawPickList, rawCurrency).transmogrify()
+
+    // Materialize the feature vector along with the label
+    val fullDF = new OpWorkflow().setResultFeatures(genFeatureVector, rawLabelResponse).transform(rawDF)
+
+    val sparkModel = new OpRandomForestClassifier().setInput(rawLabelResponse, genFeatureVector).fit(fullDF)
+    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(genFeatureVector).setTopK(10)
+    val insights = insightsTransformer.transform(fullDF).collect(insightsTransformer.getOutput())
+    val parsed = insights.map(RecordInsightsParser.parseInsights)
+
+    // Grab the feature vector metadata for comparison against the LOCO record insights
+    val vectorMeta = OpVectorMetadata(fullDF.schema.last)
+    val numVectorColumns = vectorMeta.columns.length
+
+    // Each feature vector should only have either three or four non-zero entries. One each from country and picklist,
+    // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
+    // one if it's not null.
+    parsed.length shouldBe numRows
+    parsed.foreach(m => if (m.keySet.count(_.columnName.contains("currency_NullIndicatorValue")) > 0) {
+      m.size shouldBe 4
+    } else m.size shouldBe 3)
+
+    // Want to check the average contribution strengths for each picklist response and compare them to the
+    // average contribution strengths of the other features. We should have a very high contribution when choices
+    // A, B, or C are present in the record (since they determine the label), and low average contributions otherwise.
+    val totalImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
+      m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 + v.last._2, res(k.index)._2 + 1)) }
+      res
+    })
+    val meanImportances = totalImportances.map(x => if (x._2 > 0) x._1 / x._2 else Double.NaN)
+
+    // Determine all the indices for insights corresponding to both the "important" and "other" features
+    val nanIndices = meanImportances.zipWithIndex.filter(_._1.isNaN).map(_._2).toSet
+    val abcIndices = vectorMeta.columns.filter(x => Set("A", "B", "C").contains(x.indicatorValue.getOrElse("")))
+      .map(_.index).toSet -- nanIndices
+    val otherIndices = vectorMeta.columns.indices.filter(x => !abcIndices.contains(x)).toSet -- nanIndices
+
+    // Combine quantities for all the "important" features together and all the "other" features together
+    val abcAvg = math.abs(abcIndices.map(meanImportances.apply).sum) / abcIndices.size
+    val otherAvg = math.abs(otherIndices.map(meanImportances.apply).sum) / otherIndices.size
+
+    // Similar calculation for the variance of each feature importance
+    val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
+      m.foreach { case (k, v) => if (abcIndices.contains(k.index)) {
+        res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - abcAvg, 2), res(k.index)._2 + 1))
+      } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))}
+      res
+    }).map(x => if (x._2 > 1) x._1 / x._2 else Double.NaN)
+    val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
+    val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
+
+    // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
+    assert(abcAvg > 5 * otherAvg, "Average feature strengths for features involved in label formula should be" +
+      "much larger than the average feature strengths of other features")
+    // There should be a really large t-value when comparing the two avg feature strengths
+    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar)/numRows) > 10, "The t-value comparing the" +
+      "average feature strengths between important and other features should be large")
+
+    // Record insights averaged across all records should be similar to the feature importances from Spark's RF
+    val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
+    val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
+    val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
+    val avgRecordInsightRatio = math.abs(abcAvg/otherAvg)
+    val featureImportanceRatio = math.abs(abcAvgRF/otherAvgRF)
+
+    // Compare the ratio of importances between "important" and "other" features in both paradigms
+    assert(math.abs(avgRecordInsightRatio - featureImportanceRatio)*2 /
+      (avgRecordInsightRatio + featureImportanceRatio) < 0.5, "The ratio of feature strengths between important and" +
+      "other features should be similar to the ratio of feature importances from Spark's RandomForest")
   }
 
 }
