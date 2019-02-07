@@ -154,7 +154,7 @@ class CliCodeGenerationTest extends CliTestBase {
     folder.exists() shouldBe true
 
     val expectedContent =
-      Set("README.md", "gradle", "gradlew", "spark.gradle", ".gitignore",
+      Set("README.md", "gradle", "gradlew", "gradlew.bat", "spark.gradle", ".gitignore",
         "build.gradle", "gradle.properties", "settings.gradle", "src")
 
     val content = folder.list()
