@@ -35,20 +35,22 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.utils.json.JsonUtils
+import org.apache.spark.sql.types.MetadataBuilder
 
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class ScalerMetadataTest extends FlatSpec with TestSparkContext{
+  val linearArgs = LinearScalerArgs(slope = 2.0, intercept = 1.0)
 
   Spec[ScalerMetadata] should "properly construct ScalerMetadata for a LinearScaler" in {
     val metadata = ScalerMetadata(scalingType = ScalingType.Linear,
-      scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 1.0)).toMetadata()
+      scalingArgs = linearArgs).toMetadata()
     metadata.getString(ScalerMetadata.scalingTypeName) shouldBe ScalingType.Linear.entryName
     val args = JsonUtils.fromString[LinearScalerArgs](metadata.getString(ScalerMetadata.scalingArgsName))
     args match {
       case Failure(err) => fail(err)
-      case Success(x) => x shouldBe LinearScalerArgs (slope = 2.0, intercept = 1.0)
+      case Success(x) => x shouldBe linearArgs
     }
   }
 
@@ -57,5 +59,13 @@ class ScalerMetadataTest extends FlatSpec with TestSparkContext{
     metadata.getString(ScalerMetadata.scalingTypeName) shouldBe ScalingType.Logarithmic.entryName
     metadata.getString(ScalerMetadata.scalingArgsName) shouldBe "{}"
   }
-}
 
+  it should "use apply to properly convert metadata to ScalerMetadata" in {
+    val metadata = new MetadataBuilder().putString(ScalerMetadata.scalingTypeName, ScalingType.Linear.entryName)
+      .putString(ScalerMetadata.scalingArgsName, linearArgs.toJson(pretty = false)).build()
+    ScalerMetadata.apply(metadata) match {
+      case Failure(err) => fail(err)
+      case Success(x) => x shouldBe ScalerMetadata(ScalingType.Linear, linearArgs)
+    }
+  }
+}
