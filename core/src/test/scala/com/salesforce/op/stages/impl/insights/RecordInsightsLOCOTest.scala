@@ -202,6 +202,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val rawLabelResponse = rawLabel.copy(isResponse = true)
     val genFeatureVector = Seq(rawCountry, rawPickList, rawCurrency).transmogrify()
 
+    // Materialize the feature vector along with the label
     val fullDF = new OpWorkflow().setResultFeatures(genFeatureVector, rawLabelResponse).transform(rawDF)
 
     val sparkModel = new OpRandomForestClassifier().setInput(rawLabelResponse, genFeatureVector).fit(fullDF)
@@ -230,13 +231,6 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     })
     val meanImportances = totalImportances.map(x => if (x._2 > 0) x._1 / x._2 else Double.NaN)
 
-    // Similar calculation for the variance of each feature importance
-    val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
-      m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 +
-        math.pow(v.last._2 - meanImportances(k.index), 2), res(k.index)._2 + 1)) }
-      res
-    }).map(x => if (x._2 > 1) math.sqrt(x._1 / (x._2 - 1)) else Double.NaN)
-
     // Determine all the indices for insights corresponding to both the "important" and "other" features
     val nanIndices = meanImportances.zipWithIndex.filter(_._1.isNaN).map(_._2).toSet
     val abcIndices = vectorMeta.columns.filter(x => Set("A", "B", "C").contains(x.indicatorValue.getOrElse("")))
@@ -244,16 +238,25 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val otherIndices = vectorMeta.columns.indices.filter(x => !abcIndices.contains(x)).toSet -- nanIndices
 
     // Combine quantities for all the "important" features together and all the "other" features together
-    val abcAvg = abcIndices.map(meanImportances.apply).sum / abcIndices.size
-    val otherAvg = otherIndices.map(meanImportances.apply).sum / otherIndices.size
-    val abcVar = abcIndices.map(x => math.pow(meanImportances.apply(x) - abcAvg, 2.0)).sum /
-      (abcIndices.size - 1)
-    val otherVar = otherIndices.map(x => math.pow(meanImportances.apply(x) - otherAvg, 2.0)).sum /
-      (otherIndices.size - 1)
+    val abcAvg = math.abs(abcIndices.map(meanImportances.apply).sum) / abcIndices.size
+    val otherAvg = math.abs(otherIndices.map(meanImportances.apply).sum) / otherIndices.size
+
+    // Similar calculation for the variance of each feature importance
+    val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
+      m.foreach { case (k, v) => if (abcIndices.contains(k.index)) {
+        res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - abcAvg, 2), res(k.index)._2 + 1))
+      } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))}
+      res
+    }).map(x => if (x._2 > 1) x._1 / x._2 else Double.NaN)
+    val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
+    val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
     // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
-    assert(math.abs(abcAvg) > 5 * math.abs(otherAvg))
-    assert(math.abs(abcAvg - otherAvg) / math.sqrt(abcVar + otherVar) > 2) // Is this a better/worse condition?
+    assert(abcAvg > 5 * otherAvg, "Average feature strengths for features involved in label formula should be" +
+      "much larger than the average feature strengths of other features")
+    // There should be a really large t-value when comparing the two avg feature strengths
+    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar)/numRows) > 10, "The t-value comparing the" +
+      "average feature strengths between important and other features should be large")
 
     // Record insights averaged across all records should be similar to the feature importances from Spark's RF
     val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
@@ -264,7 +267,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     // Compare the ratio of importances between "important" and "other" features in both paradigms
     assert(math.abs(avgRecordInsightRatio - featureImportanceRatio)*2 /
-      (avgRecordInsightRatio + featureImportanceRatio) < 0.5)
+      (avgRecordInsightRatio + featureImportanceRatio) < 0.5, "The ratio of feature strengths between important and" +
+      "other features should be similar to the ratio of feature importances from Spark's RandomForest")
   }
 
 }
