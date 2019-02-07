@@ -142,7 +142,7 @@ task repl(type: JavaExec) {
 }
 
 wrapper {
-    gradleVersion = '4.10.2'
+    gradleVersion = '5.2'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'b49c6da1b2cb67a0caf6c7480630b51c70a11ca2016ff2f555eaeda863143a29'
+    distributionSha256Sum = 'ff322863250159595e93b5a4d17a6f0d21c59a1a0497c1e1cf1d53826485503f'
 }
