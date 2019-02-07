@@ -31,7 +31,6 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.OpWorkflow
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.apache.spark.SparkException
@@ -76,10 +75,14 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
 
     val shifted = scaledResponse.map[Real](v => v.value.map(_ + 1).toReal, operationName = "shift")
     val descaledResponse = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse).getOutput()
-    val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(inputData).train()
-    wfModel.save(tempDir + "logScalerDescalerTest" + DateTime.now().getMillis)
+    val workflow = new OpWorkflow().setResultFeatures(descaledResponse)
+    val wfModel = workflow.setInputDataset(inputData).train()
+    val modelLocation = tempDir + "logScalerDescalerTest" + DateTime.now().getMillis
+    wfModel.save(modelLocation)
 
-    val transformed = wfModel.score()
+    val newModel = workflow.loadModel(modelLocation)
+    val transformed = newModel.score()
+
     val actual = transformed.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
