@@ -36,6 +36,7 @@ task copyTools(type: Copy) {
     from '../templates/simple'
     into "$templateResourcesDir/templates/simple"
     include "**/gradlew"
+    include "**/gradlew.bat"
     include "**/spark.gradle"
     exclude "**/*.gradle.template"
 }
