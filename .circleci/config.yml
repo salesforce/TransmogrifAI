@@ -46,14 +46,6 @@ jobs:
           name: Compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - *save-gradle-cache
-  scala-style-hw:
-      <<: *machine-config
-      steps:
-        - checkout
-        - *open-jdk
-        - run:
-            name: Scala style check for HelloWorld
-            command: cd helloworld && ./gradlew --parallel scalaStyle && cd ..
   compile-hw:
       <<: *machine-config
       steps:
@@ -61,7 +53,7 @@ jobs:
         - *open-jdk
         - run:
             name: Compile Helloworld project
-            command: cd helloworld && ./gradlew --parallel testScoverageClasses && cd ..
+            command: cd helloworld && ./gradlew --parallel scalaStyle test && cd ..
 
   test:
     <<: *machine-config
@@ -102,7 +94,6 @@ workflows:
     jobs:
       - scala-style
       - compile
-      - scala-style-hw
       - compile-hw
       - test:
           requires:

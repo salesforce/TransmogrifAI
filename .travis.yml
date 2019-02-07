@@ -25,8 +25,8 @@ cache:
     - $BUILD_CACHE_DIR
 jobs:
   include:
-    - stage: 'Clone repo and compile project'
-      name: 'Clone repo & compile project'
+    - stage: 'Compile project'
+      name: 'Compile project'
       script: |
         find **/src/test/scala/* -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
         TOTAL_TESTS=`cat $TESTS_FILE_NAME | wc -l`
@@ -39,10 +39,10 @@ jobs:
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
         ./gradlew scalaStyle testScoverageClasses --parallel
-    - stage: 'compile helloworld project'
-      name: 'compile helloworld project'
+    - stage: 'Compile Helloworld project'
+      name: 'Compile Helloworld project'
       script: |
-        cd helloworld && ./gradlew scalaStyle testScoverageClasses --parallel
+        cd helloworld && ./gradlew scalaStyle test --parallel
     - stage: 'Build'
       name: 'Build Part 1'
       script: |
@@ -72,6 +72,3 @@ jobs:
         echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
         ./gradlew reportScoverage
       name: 'Build Part 4'
-    - script: |
-        cd helloworld && ./gradlew reportScoverage
-      name: 'Build - helloworld'
