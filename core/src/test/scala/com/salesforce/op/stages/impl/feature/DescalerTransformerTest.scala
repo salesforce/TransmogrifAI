@@ -31,63 +31,57 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.OpWorkflow
-import com.salesforce.op.features.{Feature, FeatureLike}
-import com.salesforce.op.features.types.{Prediction, Real}
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.utils.json.JsonUtils
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import org.apache.spark.SparkException
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.{Failure, Success}
+
 @RunWith(classOf[JUnitRunner])
-class  DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransformer[Real, Real, Real]] {
-  val scalingType = "scalingType"
-  val scalingArgs = "scalingArgs"
-  val (testData, f1) = TestFeatureBuilder("f1", Seq[(Real)](Real(4.0), Real(1.0), Real(0.0)))
-  val scalerMetadata = ScalerMetadata(scalingType = ScalingType.Linear,
-    scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 3.0)
-  ).toMetadata()
+class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransformer[Real, Real, Real]] {
+  val (testData, f1) = TestFeatureBuilder(Seq(4.0, 1.0, 0.0).map(_.toReal))
+  val scalerMetadata = ScalerMetadata(ScalingType.Linear, LinearScalerArgs(slope = 2.0, intercept = 3.0)).toMetadata()
   val colWithMetadata = testData.col(f1.name).as(f1.name, scalerMetadata)
   val inputData = testData.withColumn(f1.name, colWithMetadata)
-  val expectedResult: Seq[Real] = Seq(0.5, -1.0, -1.5).map(Real(_))
-  val transformer = new DescalerTransformer[Real, Real, Real]().setInput(f1, f1)
 
-  it should "Properly descale and serialize log-scaling workflow" in {
+  val transformer = new DescalerTransformer[Real, Real, Real]().setInput(f1, f1)
+  val expectedResult: Seq[Real] = Seq(0.5, -1.0, -1.5).map(_.toReal)
+
+  it should "error on missing scaler metadata" in {
+    val (df, f) = TestFeatureBuilder(Seq(4.0, 1.0, 0.0).map(_.toReal))
+    val error = intercept[SparkException](
+      new DescalerTransformer[Real, Real, Real]().setInput(f, f).transform(df).collect()
+    )
+    error.getCause should not be null
+    error.getCause shouldBe a[RuntimeException]
+    error.getCause.getMessage shouldBe s"Failed to extract scaler metadata for input feature '${f1.name}'"
+  }
+
+  it should "descale and serialize log-scaling workflow" in {
     val logScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
       scalingArgs = EmptyArgs()
-    ).setInput(f1.asInstanceOf[Feature[Real]])
-    val scaledResponse = logScaler.getOutput().asInstanceOf[Feature[Real]]
+    ).setInput(f1)
+    val scaledResponse = logScaler.getOutput()
     val metadata = logScaler.transform(inputData).schema(scaledResponse.name).metadata
-    metadata.getString(scalingType) shouldEqual ScalingType.Logarithmic.entryName
-    val args = JsonUtils.fromString[EmptyArgs](metadata.getString(scalingArgs)).get
-    args shouldEqual EmptyArgs()
-    val shifted = new UnaryLambdaTransformer[Real, Real](
-      operationName = "shift",
-      transformFn = v => Real(v.value.get + 1)
-    ).setInput(scaledResponse).getOutput()
+    ScalerMetadata(metadata) match {
+      case Failure(err) => fail(err)
+      case Success(meta) =>
+        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyArgs())
+    }
+
+    val shifted = scaledResponse.map[Real](v => v.value.map(_ + 1).toReal, operationName = "shift")
     val descaledResponse = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse).getOutput()
     val wfModel = new OpWorkflow().setResultFeatures(descaledResponse).setInputDataset(inputData).train()
     wfModel.save(tempDir + "logScalerDescalerTest" + DateTime.now().getMillis)
+
     val transformed = wfModel.score()
     val actual = transformed.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
   }
-}
-
-@RunWith(classOf[JUnitRunner])
-class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, PredictionDescaler[Real, Real]] {
-  val predictionData = Seq[Prediction](Prediction(-1.0), Prediction(0.0), Prediction(1.0), Prediction(2.0))
-  val featureData = Seq[Real](Real(0.0), Real(0.0), Real(0.0), Real(0.0))
-  val (testData, p, f1) = TestFeatureBuilder[Prediction, Real]("p", "f1", predictionData zip featureData)
-  val scalerMetadata = ScalerMetadata(
-    scalingType = ScalingType.Linear,
-    scalingArgs = LinearScalerArgs(slope = 4.0, intercept = 1.0)
-  ).toMetadata()
-  val colWithMetadata = testData.col(f1.name).as(f1.name, scalerMetadata)
-  val inputData = testData.withColumn(f1.name, colWithMetadata)
-  val expectedResult: Seq[Real] = Seq(-3.0, 1.0, 5.0, 9.0).map(Real(_))
-  val transformer = new PredictionDescaler[Real, Real]().setInput(p, f1)
 }

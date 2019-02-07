@@ -30,12 +30,12 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.UID
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
-
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Try}
 
@@ -52,7 +52,8 @@ case class EmptyArgs() extends ScalingArgs
 
 /**
  * Parameters need to uniquely define a linear scaling function
- * @param slope the slope of the linear scaler
+ *
+ * @param slope     the slope of the linear scaler
  * @param intercept the x axis intercept of the linear scaler
  */
 case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs
@@ -74,7 +75,16 @@ trait Scaler extends Serializable {
   def descale(v: Double): Double
 }
 
+/**
+ * [[Scaler]] instance factory
+ */
 object Scaler {
+  /**
+   * Creates a new instance of a [[Scaler]] based on specified [[ScalingType]] and [[ScalingArgs]]
+   * @param scalingType desired scaling type
+   * @param args specific scaling args
+   * @return
+   */
   def apply(scalingType: ScalingType, args: ScalingArgs): Scaler = (scalingType, args) match {
     case (ScalingType.Linear, l: LinearScalerArgs) => LinearScaler(l)
     case (ScalingType.Logarithmic, _) => LogScaler()
@@ -83,8 +93,8 @@ object Scaler {
   }
 }
 
-/*
-A case class representing a logarithmic scaling function
+/**
+ * A case class representing a logarithmic scaling function
  */
 case class LogScaler() extends Scaler {
   val scalingType: ScalingType = ScalingType.Logarithmic
@@ -95,28 +105,36 @@ case class LogScaler() extends Scaler {
 
 /**
  * A case class representing a linear scaling function
+ *
  * @param args case class containing the slope and intercept of the scaling function
  */
 case class LinearScaler(args: LinearScalerArgs) extends Scaler {
   require(args.slope != 0.0, "Must have a non zero slope to be invertible")
   val scalingType: ScalingType = ScalingType.Linear
+
   def scale(v: Double): Double = args.slope * v + args.intercept
+
   def descale(v: Double): Double = (v - args.intercept) / args.slope
 }
 
 /**
- * metadata containing the info needed to reconstruct a Scaler instance
+ * Metadata containing the info needed to reconstruct a Scaler instance
+ *
  * @param scalingType the family of functions containing the scaler
  * @param scalingArgs the args uniquely defining a function in the scaling family
  */
 case class ScalerMetadata(scalingType: ScalingType, scalingArgs: ScalingArgs) {
   def toMetadata(): Metadata = new MetadataBuilder()
-    .putString("scalingType", scalingType.entryName)
-    .putString("scalingArgs", scalingArgs.toJson(pretty = false))
+    .putString(ScalerMetadata.scalingTypeName, scalingType.entryName)
+    .putString(ScalerMetadata.scalingArgsName, scalingArgs.toJson(pretty = false))
     .build()
 }
 
 object ScalerMetadata extends {
+
+  val scalingTypeName = "scalingType"
+  val scalingArgsName = "scalingArgs"
+
   def apply(meta: Metadata): Try[ScalerMetadata] = for {
     scalingType <- Try(ScalingType.withName(meta.getString("scalingType")))
     args <- Try(meta.getString("scalingArgs"))
@@ -133,12 +151,14 @@ object ScalerMetadata extends {
 }
 
 /**
- * @param uid           uid for instance
- * @param scalingType   type of scaling functions
- * @param scalingArgs   arguments to define the scaling function
- * @param tti           type tag for input
- * @param tto           type tag for output
- * @param ttov          type tag for output value
+ * Scaling transformer that applies a scaling function to a numerical feature
+ *
+ * @param uid         uid for instance
+ * @param scalingType type of scaling functions
+ * @param scalingArgs arguments to define the scaling function
+ * @param tti         type tag for input
+ * @param tto         type tag for output
+ * @param ttov        type tag for output value
  * @tparam I input feature type
  * @tparam O output feature type
  */

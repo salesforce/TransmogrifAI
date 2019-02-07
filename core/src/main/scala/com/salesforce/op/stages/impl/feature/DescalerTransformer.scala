@@ -44,14 +44,14 @@ import scala.util.{Failure, Success}
  * - 1st input feature is the feature to descale
  * - 2nd input feature is  scaled feature containing the metadata for constructing the scaling used to make this column
  *
- * @param uid           uid for instance
- * @param tti1          type tag for first input
- * @param tti2          type tag for second input
- * @param tto           type tag for output
- * @param ttov          type tag for output value
- * @tparam I1           feature type for first input
- * @tparam I2           feature type fo the second input
- * @tparam O            output feature type
+ * @param uid  uid for instance
+ * @param tti1 type tag for first input
+ * @param tti2 type tag for second input
+ * @param tto  type tag for output
+ * @param ttov type tag for output value
+ * @tparam I1 feature type for first input
+ * @tparam I2 feature type fo the second input
+ * @tparam O  output feature type
  */
 final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 (
@@ -77,20 +77,21 @@ final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
 }
 
 /**
- *  Applies to the input column the inverse of the scaling function defined in the Prediction feature metadata.
+ * Applies to the input column the inverse of the scaling function defined in the Prediction feature metadata.
  * - 1st input feature is the Prediction feature to descale
  * - 2nd input feature is scaled Prediction feature containing the metadata for constructing
  * the scaling used to make this column
- * @param uid           uid for instance
- * @param tti2          type tag for second input
- * @param tto           type tag for output
- * @param ttov          type tag for output value
- * @tparam I            input feature type
- * @tparam O            output feature type
+ *
+ * @param uid  uid for instance
+ * @param tti2 type tag for second input
+ * @param tto  type tag for output
+ * @param ttov type tag for output value
+ * @tparam I input feature type
+ * @tparam O output feature type
  */
 final class PredictionDescaler[I <: Real, O <: Real]
 (
-  uid: String = UID[DescalerTransformer[_, _, _]]
+  uid: String = UID[PredictionDescaler[_, _]]
 )(implicit tti2: TypeTag[I], tto: TypeTag[O], ttov: TypeTag[O#Value])
   extends BinaryTransformer[Prediction, I, O](operationName = "descaler", uid = uid) {
 
@@ -105,7 +106,7 @@ final class PredictionDescaler[I <: Real, O <: Real]
   @transient private lazy val scaler = Scaler(scalerMeta.scalingType, scalerMeta.scalingArgs)
 
   def transformFn: (Prediction, I) => O = (v, _) => {
-    val descaled = scaler.descale(v.prediction)
+    val descaled = Some(scaler.descale(v.prediction))
     ftFactory.newInstance(descaled)
   }
 }
