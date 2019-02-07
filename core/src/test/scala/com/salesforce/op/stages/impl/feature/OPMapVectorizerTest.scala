@@ -166,10 +166,11 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     testFeatureToMap[Email, EmailMap, String](emailData, emailData2, emailData3)
   }
 
-  "ID features" should "be vectorized the same whether they're in maps or not" in {
-    val idData: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(10)
-    val idData2: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(10)
-    val idData3: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(10)
+  // TODO: Re-use Test once IDMapVectorizer is implemented
+  ignore should "vectorize ID features the same whether they're in maps or not" in {
+    val idData: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(1000)
+    val idData2: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(1000)
+    val idData3: Seq[ID] = RandomText.uniqueIds.withProbabilityOfEmpty(0.5).limit(1000)
 
     testFeatureToMap[ID, IDMap, String](idData, idData2, idData3)
   }
