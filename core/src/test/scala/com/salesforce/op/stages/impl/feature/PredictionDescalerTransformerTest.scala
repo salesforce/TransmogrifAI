@@ -75,17 +75,38 @@ class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, Predicti
       case Success(meta) =>
         meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyArgs())
     }
-
     val shifted = scaledResponse.map[Prediction](v => Prediction(v.value.getOrElse(Double.NaN) + 1),
       operationName = "shift")
     val descaledPrediction = new PredictionDescaler[Real, Real]().setInput(shifted, scaledResponse).getOutput()
     val workflow = new OpWorkflow().setResultFeatures(descaledPrediction)
     val wfModel = workflow.setInputDataset(inputData).train()
     val transformed = wfModel.score()
-
     val actual = transformed.collect().map(_.getAs[Double](1))
-
     val expected = Array(0.0, 1.0, 2.0, 3.0).map(_ * math.E)
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
+  }
+
+  it should "descale and serialize linear-scaling workflow" in {
+    val scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 0.0)
+    val linearScaler = new ScalerTransformer[Real, Real](
+      scalingType = ScalingType.Linear,
+      scalingArgs = scalingArgs
+    ).setInput(f1)
+    val scaledResponse = linearScaler.getOutput()
+    val metadata = linearScaler.transform(inputData).schema(scaledResponse.name).metadata
+    ScalerMetadata(metadata) match {
+      case Failure(err) => fail(err)
+      case Success(meta) =>
+        meta shouldBe ScalerMetadata(ScalingType.Linear, scalingArgs)
+    }
+    val shifted = scaledResponse.map[Prediction](v => Prediction(v.value.getOrElse(Double.NaN) + 1),
+      operationName = "shift")
+    val descaledPrediction = new PredictionDescaler[Real, Real]().setInput(shifted, scaledResponse).getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(descaledPrediction)
+    val wfModel = workflow.setInputDataset(inputData).train()
+    val transformed = wfModel.score()
+    val actual = transformed.collect().map(_.getAs[Double](1))
+    val expected = Array(0.5, 1.5, 2.5, 3.5)
+    actual shouldBe expected
   }
 }
