@@ -136,8 +136,8 @@ object ScalerMetadata extends {
   val scalingArgsName = "scalingArgs"
 
   def apply(meta: Metadata): Try[ScalerMetadata] = for {
-    scalingType <- Try(ScalingType.withName(meta.getString("scalingType")))
-    args <- Try(meta.getString("scalingArgs"))
+    scalingType <- Try(ScalingType.withName(meta.getString(scalingTypeName)))
+    args <- Try(meta.getString(scalingArgsName))
     meta <- scalingType match {
       case t@ScalingType.Linear =>
         JsonUtils.fromString[LinearScalerArgs](args).map(ScalerMetadata(t, _))

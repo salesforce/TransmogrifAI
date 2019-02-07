@@ -30,16 +30,19 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.{Failure, Success}
+
 @RunWith(classOf[JUnitRunner])
 class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, PredictionDescaler[Real, Real]] {
   val predictionData = Seq(-1.0, 0.0, 1.0, 2.0).map(Prediction(_))
-  val featureData = Seq(0.0, 0.0, 0.0, 0.0).map(_.toReal)
+  val featureData = Seq(0.0, 1.0, 2.0, 3.0).map(_.toReal)
   val (testData, p, f1) = TestFeatureBuilder[Prediction, Real](predictionData zip featureData)
 
   val scalerMetadata = ScalerMetadata(ScalingType.Linear, LinearScalerArgs(slope = 4.0, intercept = 1.0)).toMetadata()
@@ -58,5 +61,31 @@ class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, Predicti
     error.getCause should not be null
     error.getCause shouldBe a[RuntimeException]
     error.getCause.getMessage shouldBe s"Failed to extract scaler metadata for input feature '${f1.name}'"
+  }
+
+  it should "descale and serialize log-scaling workflow" in {
+    val logScaler = new ScalerTransformer[Real, Real](
+      scalingType = ScalingType.Logarithmic,
+      scalingArgs = EmptyArgs()
+    ).setInput(f1)
+    val scaledResponse = logScaler.getOutput()
+    val metadata = logScaler.transform(inputData).schema(scaledResponse.name).metadata
+    ScalerMetadata(metadata) match {
+      case Failure(err) => fail(err)
+      case Success(meta) =>
+        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyArgs())
+    }
+
+    val shifted = scaledResponse.map[Prediction](v => Prediction(v.value.getOrElse(Double.NaN) + 1),
+      operationName = "shift")
+    val descaledPrediction = new PredictionDescaler[Real, Real]().setInput(shifted, scaledResponse).getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(descaledPrediction)
+    val wfModel = workflow.setInputDataset(inputData).train()
+    val transformed = wfModel.score()
+
+    val actual = transformed.collect().map(_.getAs[Double](1))
+
+    val expected = Array(0.0, 1.0, 2.0, 3.0).map(_ * math.E)
+    all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
   }
 }
