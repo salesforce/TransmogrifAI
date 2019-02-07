@@ -34,21 +34,28 @@ import com.salesforce.op.test.TestSparkContext
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.utils.json.JsonUtils
+
+import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class LinearScalerTest extends FlatSpec with TestSparkContext{
+class ScalerMetadataTest extends FlatSpec with TestSparkContext{
 
-  Spec[LinearScaler] should "Error on construction of a non-invertible transformation" in {
-    val error = intercept[java.lang.IllegalArgumentException](
-      LinearScaler(LinearScalerArgs(slope = 0.0, intercept = 1.0))
-    )
-    error.getMessage shouldBe "requirement failed: LinearScaler must have a non-zero slope to be invertible"
+  Spec[ScalerMetadata] should "properly construct ScalerMetadata for a LinearScaler" in {
+    val metadata = ScalerMetadata(scalingType = ScalingType.Linear,
+      scalingArgs = LinearScalerArgs(slope = 2.0, intercept = 1.0)).toMetadata()
+    metadata.getString(ScalerMetadata.scalingTypeName) shouldBe ScalingType.Linear.entryName
+    val args = JsonUtils.fromString[LinearScalerArgs](metadata.getString(ScalerMetadata.scalingArgsName))
+    args match {
+      case Failure(err) => fail(err)
+      case Success(x) => x shouldBe LinearScalerArgs (slope = 2.0, intercept = 1.0)
+    }
   }
 
-  it should "correctly construct the linear scaling and inverse scaling function" in {
-    val sampleData = Seq(0.0, 1.0, 2.0, 3.0, 4.0)
-    val scaler = LinearScaler(LinearScalerArgs(slope = 2.0, intercept = 1.0))
-    sampleData.map(x => scaler.scale(x)) shouldEqual sampleData.map(x => 2.0*x + 1.0)
-    sampleData.map(x => scaler.descale(x)) shouldEqual sampleData.map(x => 0.5*x - 0.5)
+  it should "properly construct ScalerMetaData for a LogScaler" in {
+    val metadata = ScalerMetadata(scalingType = ScalingType.Logarithmic, scalingArgs = EmptyArgs()).toMetadata()
+    metadata.getString(ScalerMetadata.scalingTypeName) shouldBe ScalingType.Logarithmic.entryName
+    metadata.getString(ScalerMetadata.scalingArgsName) shouldBe "{}"
   }
 }
+

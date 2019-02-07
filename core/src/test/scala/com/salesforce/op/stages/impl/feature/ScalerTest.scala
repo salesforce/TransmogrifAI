@@ -37,7 +37,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class ScalerTest extends FlatSpec with TestSparkContext{
-  Spec[ScalerTest] should "error on invalid data" in {
+
+  Spec[Scaler] should "error on invalid data" in {
     val error = intercept[IllegalArgumentException](
       Scaler.apply(scalingType = ScalingType.Linear, args = EmptyArgs())
     )
