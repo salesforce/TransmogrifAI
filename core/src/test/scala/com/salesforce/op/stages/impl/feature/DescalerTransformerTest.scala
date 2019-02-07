@@ -34,7 +34,6 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.apache.spark.SparkException
-import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -77,11 +76,7 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
     val descaledResponse = new DescalerTransformer[Real, Real, Real]().setInput(shifted, scaledResponse).getOutput()
     val workflow = new OpWorkflow().setResultFeatures(descaledResponse)
     val wfModel = workflow.setInputDataset(inputData).train()
-    val modelLocation = tempDir + "logScalerDescalerTest" + DateTime.now().getMillis
-    wfModel.save(modelLocation)
-
-    val newModel = workflow.loadModel(modelLocation)
-    val transformed = newModel.score()
+    val transformed = wfModel.score()
 
     val actual = transformed.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)
