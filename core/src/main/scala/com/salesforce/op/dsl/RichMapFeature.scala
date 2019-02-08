@@ -1067,27 +1067,37 @@ trait RichMapFeature {
         others = domains.tail, trackNulls = trackNulls
       )
     }
+  }
+
+  /**
+   * Enrichment functions for Prediction Features
+   *
+   * @param f FeatureLike of URLMap
+   */
+  implicit class RichPredictionFeature(val f: FeatureLike[Prediction]) {
 
     /**
-     * Enrichment functions for Prediction Features
-     *
-     * @param f FeatureLike of URLMap
+     * Takes single output feature from model of type Prediction and flattens it into 3 features
+     * @return prediction, rawPrediction, probability
      */
-    implicit class RichPredicitionFeature(val f: FeatureLike[Prediction]) {
-
-      /**
-       * Takes single output feature from model of type Prediction and flattens it into 3 features
-       * @return prediction, rawPrediction, probability
-       */
-      def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
-        (f.map[RealNN](_.prediction.toRealNN),
-          f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
-          f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
-        )
-      }
-
+    def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
+      (f.map[RealNN](_.prediction.toRealNN),
+        f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
+        f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
+      )
     }
 
+    /**
+     * Apply PredictionDescaler shortcut function.  Applies the inverse of the scaling function found in
+     * the metadata of the the input feature: scaledFeature
+     * @param scaledFeature Feature containing the metadata to reconstruct the inverse scaling function
+     * @tparam I feature type of the input feature: scaledFeature
+     * @tparam O Output Feature type
+     * @return
+     */
+    def descale[I <: Real : TypeTag, O <: Real: TypeTag](scaledFeature: FeatureLike[I]): FeatureLike[O] = {
+      new PredictionDescaler[I, O]().setInput(f, scaledFeature).getOutput()
+    }
   }
 
 }
