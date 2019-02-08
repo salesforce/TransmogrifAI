@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -81,5 +82,12 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
     val actual = transformed.collect().map(_.getAs[Double](1))
     val expected = Array(4.0, 1.0, 0.0).map(_ * math.E)
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
+  }
+
+  it should "work with its shortcut" in {
+    val scaled = f1.descale[Real](f1)
+    val transformed = scaled.originStage.asInstanceOf[DescalerTransformer[Real, Real, Real]].transform(inputData)
+    val actual = transformed.collect(scaled)
+    actual shouldEqual expectedResult.toArray
   }
 }

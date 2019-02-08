@@ -41,7 +41,7 @@ import scala.util.{Failure, Try}
 
 
 /**
- * A trait extended by a class class containing the args needed to define a family of scaling & descaling functions
+ * A trait to be extended by a case class containing the args needed to define a family of scaling & descaling functions
  */
 trait ScalingArgs extends JsonLike
 
@@ -59,7 +59,7 @@ case class EmptyArgs() extends ScalingArgs
 case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs
 
 /**
- * Trait for defining a new family of scaling functions
+ * A trait for defining a new family of scaling functions
  * scalingType: a ScalingType Enum for the scaling name
  * args: A case class containing the args needed to define scaling and inverse scaling functions
  * scale: The scaling function
@@ -154,7 +154,7 @@ object ScalerMetadata extends {
  * Scaling transformer that applies a scaling function to a numerical feature
  *
  * @param uid         uid for instance
- * @param scalingType type of scaling functions
+ * @param scalingType type of scaling function
  * @param scalingArgs arguments to define the scaling function
  * @param tti         type tag for input
  * @param tto         type tag for output

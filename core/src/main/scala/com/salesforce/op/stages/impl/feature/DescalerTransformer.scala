@@ -41,8 +41,8 @@ import scala.util.{Failure, Success}
  * A transformer that takes as inputs a feature to descale and (potentially different) scaled feature which contains the
  * metadata for reconstructing the inverse scaling function.  Transforms the 2nd input feature by applying the inverse
  * of the scaling function found in the metadata
- * - 1st input feature is the feature to descale
- * - 2nd input feature is  scaled feature containing the metadata for constructing the scaling used to make this column
+ * - 1st input feature the feature to descale
+ * - 2nd input feature the scaled feature containing metadata for constructing the scaling used to make this column
  *
  * @param uid  uid for instance
  * @param tti1 type tag for first input
@@ -50,7 +50,7 @@ import scala.util.{Failure, Success}
  * @param tto  type tag for output
  * @param ttov type tag for output value
  * @tparam I1 feature type for first input
- * @tparam I2 feature type fo the second input
+ * @tparam I2 feature type for the second input
  * @tparam O  output feature type
  */
 final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]

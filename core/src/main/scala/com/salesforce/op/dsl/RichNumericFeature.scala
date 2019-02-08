@@ -346,6 +346,29 @@ trait RichNumericFeature {
           new VectorsCombiner().setInput(filledValues +: bucketized).getOutput()
       }
     }
+
+    /**
+     * Apply ScalerTransformer.  Preserves the input type
+     * @param scalingType type of scaling function
+     * @param scalingArgs arguments to define the scaling function
+     * @return
+     */
+    def scale(
+      scalingType: ScalingType,
+      scalingArgs: ScalingArgs
+    ): FeatureLike[T] = {
+      new ScalerTransformer[T, T](scalingType = scalingType, scalingArgs = scalingArgs).setInput(f).getOutput()
+    }
+
+    /**
+     * Apply DescalerTransformer.  Preserves the input type
+     * @param scaledFeature the feature containing metadata for constructing the scaling used to make this column
+     * @tparam S The type of scaledFeature
+     * @return
+     */
+    def descale[S <: Real : TypeTag](scaledFeature: FeatureLike[S]): FeatureLike[T] = {
+      new DescalerTransformer[T, S, T]().setInput(f, scaledFeature).getOutput()
+    }
   }
 
 
