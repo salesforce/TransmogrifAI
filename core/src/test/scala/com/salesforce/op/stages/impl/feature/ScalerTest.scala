@@ -48,13 +48,13 @@ class ScalerTest extends FlatSpec with TestSparkContext{
   it should "correctly build construct a LinearScaler" in {
     val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
       args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
-    linearScaler shouldBe a [LinearScaler]
+    linearScaler shouldBe a[LinearScaler]
     linearScaler.scalingType shouldBe ScalingType.Linear
   }
 
   it should "correctly build construct a LogScaler" in {
     val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyArgs())
-    linearScaler shouldBe a [LogScaler]
+    linearScaler shouldBe a[LogScaler]
     linearScaler.scalingType shouldBe ScalingType.Logarithmic
   }
 }

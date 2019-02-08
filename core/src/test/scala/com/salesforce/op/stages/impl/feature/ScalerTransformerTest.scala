@@ -84,7 +84,7 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
 
   it should "work with its shortcut" in {
     val scaled = f1.scale[Real](scalingType = ScalingType.Linear,
-      scalingArgs= LinearScalerArgs(slope = 10.0, intercept = 0.5)
+      scalingArgs = LinearScalerArgs(slope = 10.0, intercept = 0.5)
     )
     val transformed = scaled.originStage.asInstanceOf[ScalerTransformer[RealNN, RealNN]].transform(inputData)
     val actual = transformed.collect(scaled)
