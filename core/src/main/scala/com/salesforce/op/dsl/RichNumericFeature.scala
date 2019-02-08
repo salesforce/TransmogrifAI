@@ -348,26 +348,29 @@ trait RichNumericFeature {
     }
 
     /**
-     * Apply ScalerTransformer.  Preserves the input type
+     * Apply ScalerTransformer shortcut.  Applies the scaling function defined by the scalingType and scalingArg params
      * @param scalingType type of scaling function
      * @param scalingArgs arguments to define the scaling function
+     * @tparam O Output feature type
      * @return
      */
-    def scale(
+    def scale[O <: Real : TypeTag](
       scalingType: ScalingType,
       scalingArgs: ScalingArgs
-    ): FeatureLike[T] = {
-      new ScalerTransformer[T, T](scalingType = scalingType, scalingArgs = scalingArgs).setInput(f).getOutput()
+    ): FeatureLike[O] = {
+      new ScalerTransformer[T, O](scalingType = scalingType, scalingArgs = scalingArgs).setInput(f).getOutput()
     }
 
     /**
-     * Apply DescalerTransformer.  Preserves the input type
+     * Apply DescalerTransformer shortcut.  Applies the inverse of the scaling function found in
+     * the metadata of the the input feature: scaledFeature
      * @param scaledFeature the feature containing metadata for constructing the scaling used to make this column
-     * @tparam S The type of scaledFeature
+     * @tparam I feature type of the input feature: scaledFeature
+     * @tparam O output feature type
      * @return
      */
-    def descale[S <: Real : TypeTag](scaledFeature: FeatureLike[S]): FeatureLike[T] = {
-      new DescalerTransformer[T, S, T]().setInput(f, scaledFeature).getOutput()
+    def descale[I <: Real : TypeTag, O <: Real : TypeTag](scaledFeature: FeatureLike[I]): FeatureLike[O] = {
+      new DescalerTransformer[T, I, O]().setInput(f, scaledFeature).getOutput()
     }
   }
 

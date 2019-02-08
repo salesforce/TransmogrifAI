@@ -85,9 +85,9 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
   }
 
   it should "work with its shortcut" in {
-    val scaled = f1.descale[Real](f1)
-    val transformed = scaled.originStage.asInstanceOf[DescalerTransformer[Real, Real, Real]].transform(inputData)
-    val actual = transformed.collect(scaled)
+    val descaled = f1.descale[Real, Real](f1)
+    val transformed = descaled.originStage.asInstanceOf[DescalerTransformer[Real, Real, Real]].transform(inputData)
+    val actual = transformed.collect(descaled)
     actual shouldEqual expectedResult.toArray
   }
 }
