@@ -368,8 +368,12 @@ configure(subProjs) {
 
     if (System.getenv("SIGN_RELEASE") == 'true') {
         signing {
-            // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
-            // and https://gpgtools.org/ (gpg2 installed and configured)
+            // For signing to work read - https://docs.gradle.org/current/userguide/signing_plugin.html
+            // Most importantly:
+            // 1. Install & configure GPGTools - https://gpgtools.org
+            // 2. Copy the full 40 character key id from the output of the command: gpg2 -K
+            // 3. Set 'signing.gnupg.keyName=<key id>' in ~/.gradle/gradle.properties file
+            // 4. If you protect your key with a passphrase add 'signing.password=<secret>' in ~/.gradle/gradle.properties file
             useGpgCmd()
             sign publishing.publications.mavenJava
         }
