@@ -132,9 +132,8 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
   it should "work on randomly generated probabilities" in {
     val numClasses = 100
-    val numRows = 10000
 
-    val vectors = RandomVector.dense(RandomReal.uniform[Real](0.0, 1.0), numClasses).limit(numRows)
+    val vectors = RandomVector.dense(RandomReal.uniform[Real](0.0, 1.0), numClasses).limit(numRows.toInt)
     val probVectors = vectors.map(v => {
       val expArray = v.value.toArray.map(math.exp)
       val denom = expArray.sum
@@ -144,7 +143,7 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
       Prediction(prediction = prob.v.argmax.toDouble, rawPrediction = raw.v.toArray, probability = prob.v.toArray)
     }
 
-    val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows)
+    val labels = RandomIntegral.integrals(from = 0, to = numClasses).limit(numRows.toInt)
       .map(x => x.value.get.toDouble.toRealNN)
 
     val generatedData: Seq[(RealNN, Prediction)] = labels.zip(predictions)
@@ -176,12 +175,11 @@ class OpMultiClassificationEvaluatorTest extends FlatSpec with TestSparkContext 
 
   it should "work on probability vectors where there are many ties (low unique score cardinality)" in {
     val numClasses = 200
-    val numRows = 1000
     val correctProb = 0.3
 
     // Try and make the score one large number for a random class, and equal & small probabilities for all other ones
     val truePredIndex = math.floor(math.random * numClasses).toInt
-    val vectors = Seq.fill[OPVector](numRows){
+    val vectors = Seq.fill[OPVector](numRows.toInt){
       val truePredIndex = math.floor(math.random * numClasses).toInt
       val myVector = Array.fill(numClasses)(1e-10)
       myVector.update(truePredIndex, 4.0)
