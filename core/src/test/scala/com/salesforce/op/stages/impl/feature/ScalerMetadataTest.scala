@@ -68,4 +68,14 @@ class ScalerMetadataTest extends FlatSpec with TestSparkContext{
       case Success(x) => x shouldBe ScalerMetadata(ScalingType.Linear, linearArgs)
     }
   }
+
+  it should "error when apply is given an invalid scaling type" in {
+    val invalidMetaData = new MetadataBuilder().putString(ScalerMetadata.scalingTypeName, "unsupportedScaling")
+      .putString(ScalerMetadata.scalingArgsName, linearArgs.toJson(pretty = false)).build()
+
+    val err =  intercept[NoSuchElementException] (
+      ScalerMetadata.apply(invalidMetaData).get
+    )
+    err.getMessage shouldBe "unsupportedScaling is not a member of Enum (Linear, Logarithmic)"
+  }
 }
