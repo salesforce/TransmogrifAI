@@ -3,24 +3,24 @@
 ## 0.5.1
 
 Bug fixes:
-* Fix indices in LOCO for record-level insights and add more robust tests [#216](https://github.com/salesforce/TransmogrifAI/pull/216)
-* Fix sorting in Prediction type for multiclass classification and add stronger tests [#213](https://github.com/salesforce/TransmogrifAI/pull/213)
-* Fixing code generation bug with underscores in names [#208](https://github.com/salesforce/TransmogrifAI/pull/208)
-* Correct some syntax/compilation errors in Titanic Binary Classification Docs Example [#202](https://github.com/salesforce/TransmogrifAI/pull/202)
+- Fix indices in LOCO for record-level insights and add more robust tests [#216](https://github.com/salesforce/TransmogrifAI/pull/216)
+- Fix sorting in Prediction type for multiclass classification and add stronger tests [#213](https://github.com/salesforce/TransmogrifAI/pull/213)
+- Fixing code generation bug with underscores in names [#208](https://github.com/salesforce/TransmogrifAI/pull/208)
+- Correct some syntax/compilation errors in Titanic Binary Classification Docs Example [#202](https://github.com/salesforce/TransmogrifAI/pull/202)
 
 New features / updates:
-* Make some tests a little less flaky [#221](https://github.com/salesforce/TransmogrifAI/pull/221)
-* Integrate helloworld project with Travis CI [#210](https://github.com/salesforce/TransmogrifAI/pull/210), [#212](https://github.com/salesforce/TransmogrifAI/pull/212)
-* Use ParamGridBuilder in model selector grids to allow modifications [#206](https://github.com/salesforce/TransmogrifAI/pull/206)
-* Use class.getName & update splitter meta parsing [#204](https://github.com/salesforce/TransmogrifAI/pull/204)
-* Export model selector defaults + metadata fixes [#199](https://github.com/salesforce/TransmogrifAI/pull/199)
-* Use OS specific path separator [#193](https://github.com/salesforce/TransmogrifAI/pull/193)
-* Add transformer / estimator for text length calculation and options for using this as default behavior [#190](https://github.com/salesforce/TransmogrifAI/pull/190), [#195](https://github.com/salesforce/TransmogrifAI/pull/195)
-* Allow conversion from Date and Timestamp Spark types to Date and DateTime TransmogrifAI types [#188](https://github.com/salesforce/TransmogrifAI/pull/188)
+- Make some tests a little less flaky [#221](https://github.com/salesforce/TransmogrifAI/pull/221)
+- Integrate helloworld project with Travis CI [#210](https://github.com/salesforce/TransmogrifAI/pull/210), [#212](https://github.com/salesforce/TransmogrifAI/pull/212)
+- Use ParamGridBuilder in model selector grids to allow modifications [#206](https://github.com/salesforce/TransmogrifAI/pull/206)
+- Use class.getName & update splitter meta parsing [#204](https://github.com/salesforce/TransmogrifAI/pull/204)
+- Export model selector defaults + metadata fixes [#199](https://github.com/salesforce/TransmogrifAI/pull/199)
+- Use OS specific path separator [#193](https://github.com/salesforce/TransmogrifAI/pull/193)
+- Add transformer / estimator for text length calculation and options for using this as default behavior [#190](https://github.com/salesforce/TransmogrifAI/pull/190), [#195](https://github.com/salesforce/TransmogrifAI/pull/195)
+- Allow conversion from Date and Timestamp Spark types to Date and DateTime TransmogrifAI types [#188](https://github.com/salesforce/TransmogrifAI/pull/188)
 
 Dependency updates:
-* Upgrade to Gradle 5.2 [#218](https://github.com/salesforce/TransmogrifAI/pull/218)
-* Upgrade shadowjar plugin to 4.0.4 [#220](https://github.com/salesforce/TransmogrifAI/pull/220)
+- Upgrade to Gradle 5.2 [#218](https://github.com/salesforce/TransmogrifAI/pull/218)
+- Upgrade shadowjar plugin to 4.0.4 [#220](https://github.com/salesforce/TransmogrifAI/pull/220)
 
 ## 0.5.0
 
