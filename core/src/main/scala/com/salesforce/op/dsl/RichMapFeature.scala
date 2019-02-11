@@ -1093,7 +1093,7 @@ trait RichMapFeature {
      * @param scaledFeature Feature containing the metadata to reconstruct the inverse scaling function
      * @tparam I feature type of the input feature: scaledFeature
      * @tparam O Output Feature type
-     * @return
+     * @return the scaled prediction value cast to type O.
      */
     def descale[I <: Real : TypeTag, O <: Real: TypeTag](scaledFeature: FeatureLike[I]): FeatureLike[O] = {
       new PredictionDescaler[I, O]().setInput(f, scaledFeature).getOutput()
