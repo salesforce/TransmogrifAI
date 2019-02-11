@@ -267,7 +267,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     // Compare the ratio of importances between "important" and "other" features in both paradigms
     assert(math.abs(avgRecordInsightRatio - featureImportanceRatio)*2 /
-      (avgRecordInsightRatio + featureImportanceRatio) < 0.5, "The ratio of feature strengths between important and" +
+      (avgRecordInsightRatio + featureImportanceRatio) < 0.8, "The ratio of feature strengths between important and" +
       "other features should be similar to the ratio of feature importances from Spark's RandomForest")
   }
 
