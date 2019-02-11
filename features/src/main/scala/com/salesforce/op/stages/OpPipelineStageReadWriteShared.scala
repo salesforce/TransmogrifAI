@@ -31,7 +31,7 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.FeatureDistributionType
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, TimePeriod}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, ScalingType, TimePeriod}
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import enumeratum._
 import org.json4s.ext.JodaTimeSerializers
@@ -83,6 +83,7 @@ object OpPipelineStageReadWriteShared {
       EnumEntrySerializer.json4s[AnyValueTypes](AnyValueTypes) +
       EnumEntrySerializer.json4s[HashAlgorithm](HashAlgorithm) +
       EnumEntrySerializer.json4s[HashSpaceStrategy](HashSpaceStrategy) +
+      EnumEntrySerializer.json4s[ScalingType](ScalingType) +
       EnumEntrySerializer.json4s[TimePeriod](TimePeriod) +
       EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
       new SpecialDoubleSerializer
