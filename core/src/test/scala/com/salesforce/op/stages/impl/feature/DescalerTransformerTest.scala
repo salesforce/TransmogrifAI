@@ -60,7 +60,7 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
     error.getCause.getMessage shouldBe s"Failed to extract scaler metadata for input feature '${f1.name}'"
   }
 
-  it should "descale and serialize log-scaling workflow" in {
+  it should "descale and work in log-scaling workflow" in {
     val logScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
       scalingArgs = EmptyArgs()

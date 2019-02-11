@@ -36,7 +36,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class LinearScalerTest extends FlatSpec with TestSparkContext{
+class LinearScalerTest extends FlatSpec with TestSparkContext {
 
   Spec[LinearScaler] should "Error on construction of a non-invertible transformation" in {
     val error = intercept[java.lang.IllegalArgumentException](

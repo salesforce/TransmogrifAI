@@ -111,9 +111,7 @@ case class LogScaler() extends Scaler {
 case class LinearScaler(args: LinearScalerArgs) extends Scaler {
   require(args.slope != 0.0, "LinearScaler must have a non-zero slope to be invertible")
   val scalingType: ScalingType = ScalingType.Linear
-
   def scale(v: Double): Double = args.slope * v + args.intercept
-
   def descale(v: Double): Double = (v - args.intercept) / args.slope
 }
 
