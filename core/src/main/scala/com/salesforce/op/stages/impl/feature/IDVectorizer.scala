@@ -150,7 +150,7 @@ final class IDVectorizerModel
   val args: IDVectorizerModelArgs,
   operationName: String,
   uid: String
-)(implicit tti: TypeTag[ID]) extends SequenceModel[ID, OPVector](operationName = operationName, uid = uid)
+) extends SequenceModel[ID, OPVector](operationName = operationName, uid = uid)
   with OneHotModelFun[ID] {
 
   override protected def convertToSet(in: ID): Set[String] = in.value.toSet
