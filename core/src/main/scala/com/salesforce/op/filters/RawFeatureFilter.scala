@@ -243,13 +243,7 @@ class RawFeatureFilter[T]
         Seq.fill(featureSize)(false)
       }
 
-    case class DistributionMismatch(
-      jsDivergences: Seq[Boolean],
-      fillRateDiffs: Seq[Boolean],
-      fillRatioDiffs: Seq[Boolean]
-    )
-
-    val DistributionMismatch(jsDivergences, fillRateDiffs, fillRatioDiffs) =
+    val (jsDivergences, fillRateDiffs, fillRatioDiffs) =
       if (scoringDistribs.nonEmpty) {
         val combined = trainingDistribs.zip(scoringDistribs)
         log.info(combined.map { case (t, s) => s"\n$t\n$s\nTrain Fill=${t.fillRate()}, Score Fill=${s.fillRate()}, " +
@@ -264,9 +258,9 @@ class RawFeatureFilter[T]
         logExcluded(fillRateDiffs, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
         val fillRatioDiffs = combined.map { case (t, s) => t.relativeFillRatio(s) > maxFillRatioDiff }
         logExcluded(fillRatioDiffs, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
-        DistributionMismatch(jsDivergences, fillRateDiffs, fillRatioDiffs)
+        (jsDivergences, fillRateDiffs, fillRatioDiffs)
       } else {
-        DistributionMismatch(Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
+        (Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
       }
 
     val exclusionReasons = trainingUnfilled.zip(scoringUnfilled).zip(jsDivergences).zip(fillRateDiffs)
