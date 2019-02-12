@@ -213,11 +213,11 @@ trait RichTextFeature {
     // scalastyle:off parameter.number
     def smartVectorize
     (
-      maxCategoricalCardinality: Int,
       numHashes: Int,
       autoDetectLanguage: Boolean,
       minTokenLength: Int,
       toLowercase: Boolean,
+      maxCategoricalCardinality: Int = TransmogrifierDefaults.MaxCategoricalCardinality,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       trackTextLen: Boolean = TransmogrifierDefaults.TrackTextLen,
