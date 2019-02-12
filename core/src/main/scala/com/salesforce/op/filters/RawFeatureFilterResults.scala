@@ -39,7 +39,7 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType
  * @param featureDistributions    feature distributions calculated from training data
  * @param exclusionReasons        results of RawFeatureFilter tests (reasons why feature is dropped or not)
  */
-private[op] case class RawFeatureFilterResults
+case class RawFeatureFilterResults
 (
   rawFeatureFilterConfig: RawFeatureFilterConfig,
   featureDistributions: Seq[FeatureDistribution],
@@ -49,7 +49,7 @@ private[op] case class RawFeatureFilterResults
 /**
  * Contains configuration settings for RawFeatureFilter
  */
-private[op] case class RawFeatureFilterConfig
+case class RawFeatureFilterConfig
 (
   minFill: Double,
   maxFillDifference: Double,
@@ -72,7 +72,7 @@ private[op] case class RawFeatureFilterConfig
  * @param nullLabelCorrelation          null indicator correlation (absolute) exceeded max allowed
  * @param excluded                      feature excluded after failing one or more tests
  */
-private[op] case class ExclusionReasons
+case class ExclusionReasons
 (
   trainingUnfilled: Boolean = false,
   scoringUnfilled: Boolean = false,

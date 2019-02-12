@@ -243,40 +243,55 @@ class RawFeatureFilter[T]
         Seq.fill(featureSize)(false)
       }
 
-    val (kl, mf, mfr) =
+    case class DistributionMismatch(
+      jsDivergences: Seq[Boolean],
+      fillRateDiffs: Seq[Boolean],
+      fillRatioDiffs: Seq[Boolean]
+    )
+
+    val DistributionMismatch(jsDivergences, fillRateDiffs, fillRatioDiffs) =
       if (scoringDistribs.nonEmpty) {
         val combined = trainingDistribs.zip(scoringDistribs)
         log.info(combined.map { case (t, s) => s"\n$t\n$s\nTrain Fill=${t.fillRate()}, Score Fill=${s.fillRate()}, " +
           s"JS Divergence=${t.jsDivergence(s)}, Fill Rate Difference=${t.relativeFillRate(s)}, " +
           s"Fill Ratio Difference=${t.relativeFillRatio(s)}"
         }.mkString("\n"))
-        val kl = combined.map { case (t, s) =>
+        val jsDivergences = combined.map { case (t, s) =>
           !jsDivergenceProtectedFeatures.contains(t.name) && t.jsDivergence(s) > maxJSDivergence
         }
-        logExcluded(kl, s"Features excluded because JS Divergence exceeded max allowed ($maxJSDivergence)")
-        val mf = combined.map { case (t, s) => t.relativeFillRate(s) > maxFillDifference }
-        logExcluded(mf, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
-        val mfr = combined.map { case (t, s) => t.relativeFillRatio(s) > maxFillRatioDiff }
-        logExcluded(mfr, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
-        (kl, mf, mfr)
+        logExcluded(jsDivergences, s"Features excluded because JS Divergence exceeded max allowed ($maxJSDivergence)")
+        val fillRateDiffs = combined.map { case (t, s) => t.relativeFillRate(s) > maxFillDifference }
+        logExcluded(fillRateDiffs, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
+        val fillRatioDiffs = combined.map { case (t, s) => t.relativeFillRatio(s) > maxFillRatioDiff }
+        logExcluded(fillRatioDiffs, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
+        DistributionMismatch(jsDivergences, fillRateDiffs, fillRatioDiffs)
       } else {
-        (Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
+        DistributionMismatch(Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
       }
 
-    val exclusionReasons = trainingUnfilled.zip(scoringUnfilled).zip(kl).zip(mf).zip(mfr).zip(trainingNullLabelLeakers)
-      .map { case (((((t, s), a), b), c), n) =>
-        ExclusionReasons(
-          trainingUnfilled = t,
-          scoringUnfilled = s,
-          distribMismatchJSDivergence = a,
-          distribMismatchFillRateDiff = b,
-          distribMismatchFillRatioDiff = c,
-          nullLabelCorrelation = n,
-          excluded = t || s || a || b || c || n
+    val exclusionReasons = trainingUnfilled.zip(scoringUnfilled).zip(jsDivergences).zip(fillRateDiffs)
+      .zip(fillRatioDiffs).zip(trainingNullLabelLeakers)
+      .map {
+        case (((((trainingUnfilled, scoringUnfilled), jsDivergence), fillRateDiff), fillRatioDiff), nullLabelCorrelation) =>
+          ExclusionReasons(
+            trainingUnfilled,
+            scoringUnfilled,
+            jsDivergence,
+            fillRateDiff,
+            fillRatioDiff,
+            nullLabelCorrelation,
+            excluded = List(
+              trainingUnfilled,
+              scoringUnfilled,
+              jsDivergence,
+              fillRateDiff,
+              fillRatioDiff,
+              nullLabelCorrelation
+            ).exists(identity)
         )
       }
 
-    val excludedFeatures = exclusionReasons.map { er => er.excluded }
+    val excludedFeatures = exclusionReasons.map { _.excluded }
 
     val (toDrop, toKeep) = trainingDistribs.zip(excludedFeatures).partition(_._2)
 
