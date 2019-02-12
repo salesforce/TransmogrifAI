@@ -54,7 +54,7 @@ import scala.reflect.runtime.universe.TypeTag
  * @param uid uid for instance
  */
 class IDVectorizer
-(uid: String = UID[IDVectorizer])(implicit tti: TypeTag[ID])
+(uid: String = UID[IDVectorizer])
   extends SequenceEstimator[ID, OPVector](operationName = "idvec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with MaxCardinalityParams with OneHotFun {
