@@ -41,9 +41,9 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType
  */
 case class RawFeatureFilterResults
 (
-  rawFeatureFilterConfig: RawFeatureFilterConfig,
-  featureDistributions: Seq[FeatureDistribution],
-  exclusionReasons: Seq[ExclusionReasons]
+  rawFeatureFilterConfig: RawFeatureFilterConfig = RawFeatureFilterConfig(),
+  featureDistributions: Seq[FeatureDistribution] = Seq.empty,
+  exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
 
 /**
@@ -51,19 +51,20 @@ case class RawFeatureFilterResults
  */
 case class RawFeatureFilterConfig
 (
-  minFill: Double,
-  maxFillDifference: Double,
-  maxFillRatioDiff: Double,
-  maxJSDivergence: Double,
-  maxCorrelation: Double,
-  correlationType: CorrelationType,
-  jsDivergenceProtectedFeatures: Set[String],
-  protectedFeatures: Set[String]
+  minFill: Double = 0.0,
+  maxFillDifference: Double = 0.0,
+  maxFillRatioDiff: Double = 0.0,
+  maxJSDivergence: Double = 0.0,
+  maxCorrelation: Double = 0.0,
+  correlationType: CorrelationType = CorrelationType.Pearson,
+  jsDivergenceProtectedFeatures: Set[String] = Set.empty,
+  protectedFeatures: Set[String] = Set.empty
 )
 
 /**
  * Contains results of Raw Feature Filter tests for a given feature
  *
+ * @param name         name of the feature
  * @param trainingUnfilled              training fill rate did not meet min required
  * @param scoringUnfilled               scoring fill rate did not meet min required
  * @param distribMismatchJSDivergence   distribution mismatch: JS Divergence exceeded max allowed
@@ -74,6 +75,7 @@ case class RawFeatureFilterConfig
  */
 case class ExclusionReasons
 (
+  name: String = "",
   trainingUnfilled: Boolean = false,
   scoringUnfilled: Boolean = false,
   distribMismatchJSDivergence: Boolean = false,

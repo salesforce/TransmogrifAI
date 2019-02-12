@@ -263,11 +263,12 @@ class RawFeatureFilter[T]
         (Seq.fill(featureSize)(false), Seq.fill(featureSize)(false), Seq.fill(featureSize)(false))
       }
 
-    val exclusionReasons = trainingUnfilled.zip(scoringUnfilled).zip(jsDivergences).zip(fillRateDiffs)
+    val exclusionReasons = trainingDistribs.map{_.name}.zip(trainingUnfilled).zip(scoringUnfilled).zip(jsDivergences).zip(fillRateDiffs)
       .zip(fillRatioDiffs).zip(trainingNullLabelLeakers)
       .map {
-        case (((((trainingUnfilled, scoringUnfilled), jsDivergence), fillRateDiff), fillRatioDiff), nullLabelCorrelation) =>
+        case ((((((featureName,trainingUnfilled), scoringUnfilled), jsDivergence), fillRateDiff), fillRatioDiff), nullLabelCorrelation) =>
           ExclusionReasons(
+            featureName,
             trainingUnfilled,
             scoringUnfilled,
             jsDivergence,

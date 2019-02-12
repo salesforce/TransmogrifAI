@@ -238,6 +238,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
           rf.generateFilteredRaw(rawFeatures, parameters)
 
+        setRawFeatureFilterResults(rawFeatureFilterResults)
         setRawFeatureDistributions(rawFeatureFilterResults.featureDistributions.toArray)
         setBlacklist(featuresToDrop, rawFeatureFilterResults.featureDistributions)
         setBlacklistMapKeys(mapKeysToDrop)
