@@ -35,7 +35,6 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
 import org.apache.spark.ml.PipelineStage
@@ -43,12 +42,9 @@ import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.{Dataset, Encoders}
-import com.twitter.algebird.Monoid._
-import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
