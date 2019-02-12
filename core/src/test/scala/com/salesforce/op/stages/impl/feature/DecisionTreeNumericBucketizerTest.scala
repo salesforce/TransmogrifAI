@@ -67,8 +67,9 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
   ).map(_.toOPVector)
 
   trait NormalData {
-    val numericData: Seq[Real] = RandomReal.normal[Real]().withProbabilityOfEmpty(0.2).limit(1000)
-    val labelData: Seq[RealNN] = RandomBinary(probabilityOfSuccess = 0.4).limit(1000).map(_.toDouble.toRealNN(0.0))
+    val total = 1000
+    val numericData: Seq[Real] = RandomReal.normal[Real]().withProbabilityOfEmpty(0.2).limit(total)
+    val labelData: Seq[RealNN] = RandomBinary(probabilityOfSuccess = 0.4).limit(total).map(_.toDouble.toRealNN(0.0))
     val (ds, numeric, label) = TestFeatureBuilder[Real, RealNN](numericData zip labelData)
     val expectedSplits = Array.empty[Double]
     lazy val modelLocation = tempDir + "/dt-buck-test-model-" + org.joda.time.DateTime.now().getMillis
@@ -83,20 +84,24 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val expectedSplits = Array.empty[Double]
   }
 
+  // Generate uniformly spaced data so that the splits found by the decision tree will be deterministic. We still
+  // won't get splits exactly at the midpoints between data points (eg. 14.95, 35.95, 90.95) due to the way Spark
+  // calculates splits by binning. The default bins are 32, which limits the resolution of the splits.
   trait UniformData {
-    val (min, max) = (0, 100)
-    val scale = 10
-    val currencyData: Seq[Currency] = Array.range(min, max * scale).map(x => (x / scale).toCurrency)
+    val total = 1000
+    val (min, max) = (0.0, 100.0)
+    val currencyData: Seq[Currency] = (0 until total).map(x => (x * max/total).toCurrency)
+    
     val labelData = currencyData.map(c => {
       c.value.map {
-        case v if v < 15 => 0.0
-        case v if v < 26 => 1.0
-        case v if v < 91 => 2.0
+        case v if v < 15.0 => 0.0
+        case v if v < 36.0 => 1.0
+        case v if v < 91.0 => 2.0
         case _ => 3.0
       }.toRealNN(0.0)
     })
     val (ds, currency, label) = TestFeatureBuilder("currency", "label", currencyData zip labelData)
-    val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
+    val expectedSplits = Array(Double.NegativeInfinity, 15.0, 36.0, 91.0, Double.PositiveInfinity)
   }
 
   it should "produce output that is never a response, except the case where both inputs are" in new NormalData {
