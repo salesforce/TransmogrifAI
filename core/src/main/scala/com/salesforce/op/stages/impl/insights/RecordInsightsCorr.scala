@@ -37,7 +37,7 @@ import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorMetadata}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.mllib.linalg.{Vectors => OldVectors}
-import org.apache.spark.ml.linalg.{DenseVector, Matrix, SparseVector, Vector}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vector}
 import org.apache.spark.ml.param.{IntParam, Param}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import com.twitter.algebird.Operators._
@@ -95,7 +95,7 @@ class RecordInsightsCorr(uid: String = UID[RecordInsightsCorr]) extends
   override def fitFn(dataset: Dataset[(OPVector#Value, OPVector#Value)]): RecordInsightsCorrModel = {
 
     val vectorMetadata = Try(OpVectorMetadata(getInputSchema()(in2.name)))
-    assert(vectorMetadata.isSuccess, s"first input feature must be a feature vector with OpVectorMetadata," +
+    require(vectorMetadata.isSuccess, s"first input feature must be a feature vector with OpVectorMetadata," +
       s"got error parsing metadata: ${vectorMetadata.failed.get}")
 
     val first = dataset.first()
@@ -139,7 +139,7 @@ private[op] final class RecordInsightsCorrModel
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in2.name)).getColumnHistory()
 
   override def transformFn: (OPVector, OPVector) => TextMap = (_, features) => {
-    assert(featureInfo.size == features.value.size, "feature metadata size does not match feature size")
+    require(featureInfo.size == features.value.size, "feature metadata size does not match feature size")
 
     val normalizedFeatures = norm(features)
     val importance = scoreCorr.map{ _.zip(normalizedFeatures).map{ case (a, b) => if (a.isNaN) 0.0 else a * b} }

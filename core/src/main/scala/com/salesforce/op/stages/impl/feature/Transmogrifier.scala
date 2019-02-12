@@ -51,7 +51,7 @@ import scala.reflect.runtime.universe._
  */
 private[op] trait TransmogrifierDefaults {
   val NullString: String = OpVectorColumnMetadata.NullString
-  val OtherString: String = "OTHER"
+  val OtherString: String = OpVectorColumnMetadata.OtherString
   val DefaultNumOfFeatures: Int = 512
   val MaxNumOfFeatures: Int = 16384
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
@@ -71,10 +71,14 @@ private[op] trait TransmogrifierDefaults {
   val FillWithMean: Boolean = true
   val TrackNulls: Boolean = true
   val TrackInvalid: Boolean = false
+  val TrackTextLen: Boolean = false
   val MinDocFrequency: Int = 0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
+  val MaxCategoricalCardinality = 30
+  val CircularDateRepresentations: Seq[TimePeriod] = Seq(TimePeriod.HourOfDay, TimePeriod.DayOfWeek,
+    TimePeriod.DayOfMonth, TimePeriod.DayOfYear)
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -145,11 +149,13 @@ private[op] case object Transmogrifier {
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[DateMap] =>
-          val (f, other) = castAs[DateMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[DateTimeMap] =>
-          val (f, other) = castAs[DateTimeMap](g) // TODO make better default
-          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
+          val (f, other) = castAs[DateTimeMap](g)
+          f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls,
+            referenceDate = ReferenceDate, circularDateReps = CircularDateRepresentations)
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -183,13 +189,17 @@ private[op] case object Transmogrifier {
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g)
-          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
-          f.vectorize(shouldPrependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
+            numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[TextMap] =>
           val (f, other) = castAs[TextMap](g)
-          // Explicitly set cleanText to false here in order to match behavior of Text vectorization
-          f.vectorize(shouldPrependFeatureName = PrependFeatureName, cleanText = false, cleanKeys = CleanKeys,
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
+            numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[URLMap] =>
           val (f, other) = castAs[URLMap](g)
@@ -229,10 +239,12 @@ private[op] case object Transmogrifier {
             trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, others = other, label = label)
         case t if t =:= weakTypeOf[Date] =>
           val (f, other) = castAs[Date](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[DateTime] =>
           val (f, other) = castAs[DateTime](g)
-          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, others = other)
+          f.vectorize(dateListPivot = DateListDefault, referenceDate = ReferenceDate, trackNulls = TrackNulls,
+            circularDateReps = CircularDateRepresentations, others = other)
         case t if t =:= weakTypeOf[Integral] =>
           val (f, other) = castAs[Integral](g)
           f.vectorize(fillValue = FillValue, fillWithMode = FillWithMode, trackNulls = TrackNulls,
@@ -280,16 +292,18 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
-          f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
-            hashSpaceStrategy = defaults.HashSpaceStrategy,
-            autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
-            toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
+            trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
-          f.vectorize(trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
-            hashSpaceStrategy = defaults.HashSpaceStrategy,
-            autoDetectLanguage = TextTokenizer.AutoDetectLanguage, minTokenLength = TextTokenizer.MinTokenLength,
-            toLowercase = TextTokenizer.ToLowercase, prependFeatureName = PrependFeatureName, others = other)
+          f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
+            trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
+            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
+            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
@@ -426,7 +440,7 @@ case object VectorizerUtils {
    * @return one-hot vector with 1.0 in position value
    */
   def oneHot(pos: Int, size: Int): Array[Double] = {
-    assert(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
+    require(pos < size && pos >= 0, s"One-hot index lies outside the bounds of the vector: pos = $pos, size = $size")
     val arr = new Array[Double](size)
     arr(pos) = 1.0
     arr
@@ -478,6 +492,21 @@ trait TrackInvalidParam extends Params {
   def setTrackInvalid(v: Boolean): this.type = set(trackInvalid, v)
 }
 
+/**
+ * Param that decides whether or not lengths of text are tracked during vectorization
+ */
+trait TrackTextLenParam extends Params {
+  final val trackTextLen = new BooleanParam(
+    parent = this, name = "trackTextLen", doc = "option to keep track of text lengths"
+  )
+  setDefault(trackTextLen, TransmogrifierDefaults.TrackTextLen)
+
+  /**
+   * Option to keep track of text lengths
+   */
+  def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
+}
+
 trait CleanTextFun {
   def cleanTextFn(s: String, shouldClean: Boolean): String = if (shouldClean) TextUtils.cleanString(s) else s
 }
@@ -522,7 +551,7 @@ trait PivotParams extends TextParams {
 
 trait MinSupportParam extends Params {
   final val minSupport = new IntParam(
-    parent = this, name = "minSupport", doc = "minimum number of occurences an element must have to appear in pivot",
+    parent = this, name = "minSupport", doc = "minimum number of occurrences an element must have to appear in pivot",
     isValid = ParamValidators.gtEq(0L)
   )
   setDefault(minSupport, TransmogrifierDefaults.MinSupport)
@@ -637,7 +666,7 @@ trait MapStringPivotHelper extends SaveOthersParams {
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),
-      indicatorGroup = Option(key),
+      grouping = Option(key),
       indicatorValue = Option(value)
     )
   }

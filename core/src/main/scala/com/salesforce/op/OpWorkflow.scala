@@ -31,13 +31,14 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.filters.RawFeatureFilter
+import com.salesforce.op.filters.{FeatureDistribution, FilteredRawData, RawFeatureFilter, Summary}
 import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.OPStage
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import com.salesforce.op.stages.impl.selector.ModelSelectorBase
-import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
 import org.apache.spark.annotation.Experimental
@@ -106,8 +107,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   /**
    * Will set the blacklisted features variable and if list is non-empty it will
    * @param features list of features to blacklist
+   * @param distributions feature distributions calculated in raw feature filter
    */
-  private[op] def setBlacklist(features: Array[OPFeature]): Unit = {
+  private[op] def setBlacklist(features: Array[OPFeature], distributions: Seq[FeatureDistribution]): Unit = {
+    // TODO: Figure out a way to keep track of raw features that aren't explicitly blacklisted, but can't be used
+    // TODO: because they're inputs into an explicitly blacklisted feature. Eg. "height" in ModelInsightsTest
     blacklistedFeatures = features
     if (blacklistedFeatures.nonEmpty) {
       val allBlacklisted: MList[OPFeature] = MList(getBlacklist(): _*)
@@ -124,12 +128,14 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
       // for each stage remove anything blacklisted from the inputs and update any changed input features
       initialStages.foreach { stg =>
         val inFeatures = stg.getInputFeatures()
-        val blacklistRemoved = inFeatures.filterNot{ f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+        val blacklistRemoved = inFeatures
+          .filterNot { f => allBlacklisted.exists(bl => bl.sameOrigin(f)) }
+          .map { f =>
+            if (f.isRaw) f.withDistributions(distributions.collect { case d if d.name == f.name => d }) else f
+          }
         val inputsChanged = blacklistRemoved.map{ f => allUpdated.find(u => u.sameOrigin(f)).getOrElse(f) }
         val oldOutput = stg.getOutput()
-        Try{
-          stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()
-        } match {
+        Try(stg.setInputFeatureArray(inputsChanged).setOutputFeatureName(oldOutput.name).getOutput()) match {
           case Success(out) => allUpdated += out
           case Failure(e) =>
             if (initialResultFeatures.contains(oldOutput)) throw new RuntimeException(
@@ -215,22 +221,25 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
     (reader, rawFeatureFilter) match {
-      case (None, None) => throw new IllegalArgumentException("Data reader must be set either directly on the" +
-        " workflow or through the RawFeatureFilter")
+      case (None, None) => throw new IllegalArgumentException(
+        "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
       case (Some(r), None) =>
         checkReadersAndFeatures()
         r.generateDataFrame(rawFeatures, parameters).persist()
       case (rd, Some(rf)) =>
         rd match {
           case None => setReader(rf.trainingReader)
-          case Some(r) => if (r != rf.trainingReader) log.warn("Workflow data reader and RawFeatureFilter training" +
-            " reader do not match! The RawFeatureFilter training reader will be used to generate the data for training")
+          case Some(r) => if (r != rf.trainingReader) log.warn(
+            "Workflow data reader and RawFeatureFilter training reader do not match! " +
+              "The RawFeatureFilter training reader will be used to generate the data for training")
         }
         checkReadersAndFeatures()
-        val filteredRawData = rf.generateFilteredRaw(rawFeatures, parameters)
-        setBlacklist(filteredRawData.featuresToDrop)
-        setBlacklistMapKeys(filteredRawData.mapKeysToDrop)
-        filteredRawData.cleanedData
+        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, featureDistributions) =
+          rf.generateFilteredRaw(rawFeatures, parameters)
+        setRawFeatureDistributions(featureDistributions.toArray)
+        setBlacklist(featuresToDrop, featureDistributions)
+        setBlacklistMapKeys(mapKeysToDrop)
+        cleanedData
     }
   }
 
@@ -340,6 +349,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setParameters(getParameters())
         .setBlacklist(getBlacklist())
         .setBlacklistMapKeys(getBlacklistMapKeys())
+        .setRawFeatureDistributions(getRawFeatureDistributions())
 
     reader.map(model.setReader).getOrElse(model)
   }
@@ -357,7 +367,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     (implicit spark: SparkSession): Array[OPStage] = {
 
     // TODO may want to make workflow take an optional reserve fraction
-    val splitters = stagesToFit.collect { case s: ModelSelectorBase[_, _] => s.splitter }.flatten
+    val splitters = stagesToFit.collect { case s: ModelSelector[_, _] => s.splitter }.flatten
     val splitter = splitters.reduceOption { (a, b) =>
       if (a.getReserveTestFraction > b.getReserveTestFraction) a else b
     }
@@ -481,22 +491,31 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * Add a raw features filter to the workflow to look at fill rates and distributions of raw features and exclude
    * features that do not meet specifications from modeling DAG
    *
-   * @param trainingReader training reader to use in filter if not suplied will fall back to reader specified for
-   *                       workflow (note that this reader will take precidence over readers directly input to the
-   *                       workflow if both are supplied)
-   * @param scoringReader scoring reader to use in filter if not supplied will do the checks possible with only
-   *                      training data avaialable
-   * @param bins number of bins to use in estimating feature distributions
-   * @param minFillRate minimum non-null fraction of instances that a feature should contain
-   * @param maxFillDifference maximum absolute difference in fill rate between scoring and training data for a feature
-   * @param maxFillRatioDiff maximum difference in fill ratio (symetric) between scoring and training data for a feature
-   * @param maxJSDivergence maximum Jensen-Shannon divergence between the training and scoring distributions
-   *                        for a feature
-   * @param protectedFeatures list of features that should never be removed (features that are used to create them will
-   *                          also be protected)
+   * @param trainingReader     training reader to use in filter if not supplied will fall back to reader specified for
+   *                           workflow (note that this reader will take precedence over readers directly input to the
+   *                           workflow if both are supplied)
+   * @param scoringReader      scoring reader to use in filter if not supplied will do the checks possible with only
+   *                           training data available
+   * @param bins               number of bins to use in estimating feature distributions
+   * @param minFillRate        minimum non-null fraction of instances that a feature should contain
+   * @param maxFillDifference  maximum absolute difference in fill rate between scoring and training data for a feature
+   * @param maxFillRatioDiff   maximum difference in fill ratio (symmetric) between scoring and training data for
+   *                           a feature
+   * @param maxJSDivergence    maximum Jensen-Shannon divergence between the training and scoring distributions
+   *                           for a feature
+   * @param protectedFeatures  list of features that should never be removed (features that are used to create them will
+   *                           also be protected)
+   * @param protectedJSFeatures features that are protected from removal by JS divergence check
+   * @param textBinsFormula    formula to compute the text features bin size.
+   *                           Input arguments are [[Summary]] and number of bins to use in computing
+   *                           feature distributions (histograms for numerics, hashes for strings).
+   *                           Output is the bins for the text features.
+   * @param timePeriod         Time period used to apply circulate date transformation for date features, if not
+   *                           specified will use numeric feature transformation
    * @tparam T Type of the data read in
    */
   @Experimental
+  // scalastyle:off parameter.number
   def withRawFeatureFilter[T](
     trainingReader: Option[Reader[T]],
     scoringReader: Option[Reader[T]],
@@ -507,16 +526,20 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     maxJSDivergence: Double = 0.90,
     maxCorrelation: Double = 0.95,
     correlationType: CorrelationType = CorrelationType.Pearson,
-    protectedFeatures: Array[OPFeature] = Array.empty
+    protectedFeatures: Array[OPFeature] = Array.empty,
+    protectedJSFeatures: Array[OPFeature] = Array.empty,
+    textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
+    timePeriod: Option[TimePeriod] = None
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
       "as the reader for the workflow")
     val protectedRawFeatures = protectedFeatures.flatMap(_.rawFeatures).map(_.name).toSet
+    val protectedRawJSFeatures = protectedJSFeatures.flatMap(_.rawFeatures).map(_.name).toSet
     rawFeatureFilter = Option {
       new RawFeatureFilter(
         trainingReader = training.get,
-        scoreReader = scoringReader,
+        scoringReader = scoringReader,
         bins = bins,
         minFill = minFillRate,
         maxFillDifference = maxFillDifference,
@@ -524,9 +547,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         maxJSDivergence = maxJSDivergence,
         maxCorrelation = maxCorrelation,
         correlationType = correlationType,
-        protectedFeatures = protectedRawFeatures)
+        protectedFeatures = protectedRawFeatures,
+        jsDivergenceProtectedFeatures = protectedRawJSFeatures,
+        textBinsFormula = textBinsFormula,
+        timePeriod = timePeriod)
     }
     this
   }
+  // scalastyle:on
 
 }

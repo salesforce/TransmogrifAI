@@ -31,9 +31,12 @@
 package com.salesforce.op.cli.gen
 
 import java.io.File
+import java.nio.file.Paths
 
 import com.salesforce.op.cli.{AvroSchemaFromFile, CliParameters, GeneratorConfig}
 import com.salesforce.op.test.TestCommon
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec}
 
 import scala.io.Source
@@ -41,6 +44,7 @@ import scala.io.Source
 /**
  * Test for generator operations
  */
+@RunWith(classOf[JUnitRunner])
 class OpsTest extends FlatSpec with TestCommon with Assertions {
 
   val tempFolder = new File(System.getProperty("java.io.tmpdir"))
@@ -50,11 +54,13 @@ class OpsTest extends FlatSpec with TestCommon with Assertions {
   val testParams = CliParameters(
     location = tempFolder,
     projName = "cli_test",
-    inputFile = Some(new File("templates/simple/src/main/resources/PassengerData.csv")),
+    inputFile = Some(Paths.get("templates", "simple", "src", "main", "resources", "PassengerData.csv").toFile),
     response = Some("survived"),
     idField = Some("passengerId"),
-    schemaSource = Some(AvroSchemaFromFile(new File("utils/src/main/avro/PassengerCSV.avsc"))),
-    answersFile = Some(new File("cli/passengers.answers")),
+    schemaSource = Some(
+      AvroSchemaFromFile(Paths.get("..", "utils", "src", "main", "avro", "PassengerCSV.avsc").toFile)
+    ),
+    answersFile = Some(new File("passengers.answers")),
     overwrite = true).values
 
   Spec[Ops] should "generate project files" in {
@@ -70,13 +76,13 @@ class OpsTest extends FlatSpec with TestCommon with Assertions {
 
         val buildFileContent = Source.fromFile(buildFile).mkString
 
-        buildFileContent should include("credentials artifactoryCredentials")
+        buildFileContent should include("mainClassName = 'com.salesforce.app.cli_test'")
 
-        val scalaSourcesFolder = new File(projectFolder, "src/main/scala/com/salesforce/app")
-        val featuresFile = Source.fromFile(new File(scalaSourcesFolder, "Features.scala")).getLines
-        val heightLine = featuresFile.find(_ contains "height") map (_.trim)
+        val scalaSourcesFolder = Paths.get(projectFolder.toString, "src", "main", "scala", "com", "salesforce", "app")
+        val featuresFile = Source.fromFile(new File(scalaSourcesFolder.toFile, "Features.scala")).getLines
+        val heightLine = featuresFile.find(_ contains "description") map (_.trim)
         heightLine shouldBe Some(
-          "val height = FeatureBuilder.Real[PassengerCSV].extract(o => o.getHeight.toReal).asPredictor"
+          "val description = FB.Text[PassengerCSV].extract(_.getDescription.toText).asPredictor"
         )
     }
 

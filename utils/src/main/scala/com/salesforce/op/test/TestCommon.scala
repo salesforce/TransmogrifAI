@@ -31,18 +31,25 @@
 package com.salesforce.op.test
 
 import java.io.File
+import java.nio.file.Paths
 
 import org.apache.log4j.{Level, LogManager, Logger}
 import org.scalatest._
 
 import scala.collection.JavaConverters._
 import scala.io.Source
+import scala.language.postfixOps
 import scala.reflect.{ClassTag, _}
 
 /**
  * Trait with test commons such as Spec and Resource functions
  */
 trait TestCommon extends Matchers with Assertions {
+
+  /**
+   * Returns the resource directory path
+   */
+  protected def resourceDir: String = "src/test/resources"
 
   /**
    * Set logging level for
@@ -67,13 +74,32 @@ trait TestCommon extends Matchers with Assertions {
   }
 
   /**
+   * Test data directory
+   * @return directory path
+   */
+  def testDataDir: String = {
+    Some(new File("test-data"))
+      .collect{ case d if d.isDirectory => d.getPath}
+      .getOrElse(Paths.get("test-data-sibling").relativize(Paths.get("test-data")).toString)
+  }
+
+  /**
+   * Load a file as string
+   * @param path absolute or relative path of a file
+   * @return the whole content of resource file as a string
+   */
+  def loadFile(path: String): String = {
+    Source.fromFile(path).mkString
+  }
+
+  /**
    * Load a test resource file
    *
    * @param parent resource folder
    * @param name   resource name
    * @return resource file
    */
-  def resourceFile(parent: String = "src/test/resources", name: String): File = {
+  def resourceFile(parent: String = resourceDir, name: String): File = {
     val file = new File(parent, name)
     if (!file.canRead) throw new IllegalStateException(s"File $file unreadable")
     file
@@ -88,7 +114,7 @@ trait TestCommon extends Matchers with Assertions {
    * @return resource file
    */
   @deprecated("Use loadResource", "3.2.3")
-  def resourceString(parent: String = "src/test/resources", noSpaces: Boolean = true, name: String): String = {
+  def resourceString(parent: String = resourceDir, noSpaces: Boolean = true, name: String): String = {
     val file = resourceFile(parent = parent, name = name)
     val contents = Source.fromFile(file, "UTF-8").mkString
     if (noSpaces) contents.replaceAll("\\s", "") else contents

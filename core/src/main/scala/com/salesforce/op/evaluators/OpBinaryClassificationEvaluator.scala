@@ -32,6 +32,8 @@ package com.salesforce.op.evaluators
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
+import com.salesforce.op.utils.spark.RichEvaluator._
+import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
@@ -64,12 +66,12 @@ private[op] class OpBinaryClassificationEvaluator
   def getDefaultMetric: BinaryClassificationMetrics => Double = _.AuROC
 
   override def evaluateAll(data: Dataset[_]): BinaryClassificationMetrics = {
-
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(data, labelColName)
 
     val (rawPredictionColName, predictionColName, probabilityColName) =
-      (getRawPredictionCol, getPredictionCol, getProbabilityCol)
+      (getRawPredictionCol, getPredictionValueCol, getProbabilityCol)
+
     log.debug(
       "Evaluating metrics on columns :\n label : {}\n rawPrediction : {}\n prediction : {}\n probability : {}\n",
       labelColName, rawPredictionColName, predictionColName, probabilityColName
@@ -79,9 +81,8 @@ private[op] class OpBinaryClassificationEvaluator
     val rdd = dataUse.select(predictionColName, labelColName).as[(Double, Double)].rdd
 
     if (rdd.isEmpty()) {
-      log.error("The dataset is empty")
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Seq(), Seq(), Seq(), Seq())
+      log.warn("The dataset is empty. Returning empty metrics.")
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Seq(), Seq(), Seq(), Seq())
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -122,25 +123,42 @@ private[op] class OpBinaryClassificationEvaluator
     }
   }
 
-  final protected def getBinaryEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getBinaryEvaluatorMetric(
+    metricName: ClassificationEvalMetric,
+    dataset: Dataset[_],
+    default: => Double
+  ): Double = {
+    import dataset.sparkSession.implicits._
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
-    new BinaryClassificationEvaluator()
-      .setLabelCol(labelColName)
-      .setRawPredictionCol(getRawPredictionCol)
-      .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataUse)
+    lazy val rdd = dataUse.select(getPredictionValueCol, labelColName).as[(Double, Double)].rdd
+    lazy val noData = rdd.isEmpty()
+
+    metricName match {
+      case AuPR | AuROC =>
+        new BinaryClassificationEvaluator()
+          .setLabelCol(labelColName)
+          .setRawPredictionCol(getRawPredictionCol)
+          .setMetricName(metricName.sparkEntryName)
+          .evaluateOrDefault(dataUse, default = default)
+
+      case Error =>
+        new MulticlassClassificationEvaluator()
+          .setLabelCol(labelColName)
+          .setPredictionCol(getPredictionValueCol)
+          .setMetricName(metricName.sparkEntryName)
+          .evaluateOrDefault(dataUse, default = default)
+
+      case Precision | Recall | F1 if noData => default
+      case Precision => new MulticlassMetrics(rdd).precision(1.0)
+      case Recall => new MulticlassMetrics(rdd).recall(1.0)
+      case F1 => new MulticlassMetrics(rdd).fMeasure(1.0)
+
+      case m =>
+        throw new IllegalArgumentException(s"Unsupported binary evaluation metric $m")
+    }
   }
 
-  final protected def getMultiEvaluatorMetric(metricName: ClassificationEvalMetric, dataset: Dataset[_]): Double = {
-    val labelColName = getLabelCol
-    val dataUse = makeDataToUse(dataset, labelColName)
-    new MulticlassClassificationEvaluator()
-      .setLabelCol(labelColName)
-      .setPredictionCol(getPredictionCol)
-      .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataUse)
-  }
 }
 
 

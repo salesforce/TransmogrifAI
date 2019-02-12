@@ -78,9 +78,9 @@ case object GeolocationMidpoint
 
 trait GeolocationFunctions {
 
-  val Zero: Array[Double] = Array.fill[Double](4)(0.0)
+  val Zero: Array[Double] = new Array[Double](4)
 
-  def isNone(data: Array[Double]): Boolean = data(3) == 0
+  def isNone(data: Array[Double]): Boolean = data(3) == 0.0
 
   /**
    * Prepare method to be used in the MonoidAggregator for Geolocation objects
@@ -93,7 +93,7 @@ trait GeolocationFunctions {
     if (input.isEmpty) Zero
     else {
       val g = input.toGeoPoint
-      val d = input.accuracy.rangeInUnits / 2
+      val d = input.accuracy.rangeInUnits / 2.0
       Array[Double](
         g.x, g.y, g.z,
         1.0,

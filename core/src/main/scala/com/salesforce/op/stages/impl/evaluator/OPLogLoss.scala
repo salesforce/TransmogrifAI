@@ -41,7 +41,7 @@ import com.salesforce.op.utils.spark.RichDataset.RichDataset
  */
 object LogLoss {
 
-  def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
+  private def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
     import ds.sparkSession.implicits._
     require(!ds.isEmpty, "Dataset is empty, log loss cannot be calculated")
     val avg = ds.map { case (lbl, _, prob, _) =>
@@ -56,7 +56,7 @@ object LogLoss {
     evaluateFn = logLossFun
   )
 
-  def mulitLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
+  def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
     metricName = "MultiClasslogLoss",
     isLargerBetter = false,
     evaluateFn = logLossFun

@@ -43,7 +43,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class BinaryMapVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[BinaryMap, OPVector], BinaryMapVectorizer[BinaryMap]] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[BinaryMap, OPVector], BinaryMapVectorizer[BinaryMap]]
+    with AttributeAsserts {
 
   val (inputData, m1, m2) = TestFeatureBuilder("m1", "m2",
     Seq(
@@ -55,9 +56,9 @@ class BinaryMapVectorizerTest
 
   val estimator = new BinaryMapVectorizer().setTrackNulls(false).setCleanKeys(true).setInput(m1, m2)
 
-  val expectedResult: Seq[OPVector] = Seq(
+  val expectedResult = Seq(
     Vectors.sparse(6, Array(1), Array(1.0)),
-    Vectors.sparse(6, Array(4, 5), Array(1.0, 1.0)),
+    Vectors.sparse(6, Array(3, 4), Array(1.0, 1.0)),
     Vectors.sparse(6, Array(), Array())
   ).map(_.toOPVector)
 
@@ -68,11 +69,12 @@ class BinaryMapVectorizerTest
     val expectedMeta = TestOpVectorMetadataBuilder(
       estimator,
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(None, "B"), IndColWithGroup(None, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "X"))
+      m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(None, "Y"), IndColWithGroup(None, "Z"))
     )
-
-    transformed.collect(vector) shouldBe expectedResult
+    val result = transformed.collect(vector)
+    result shouldBe expectedResult
     val field = transformed.schema(estimator.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta
@@ -82,8 +84,8 @@ class BinaryMapVectorizerTest
     val transformed = estimator.setTrackNulls(true).fit(inputData).transform(inputData)
     val vector = estimator.getOutput()
     val expected = Array(
-      Vectors.sparse(12, Array(2, 5, 9, 11), Array(1.0, 1.0, 1.0, 1.0)),
-      Vectors.sparse(12, Array(1, 3, 7, 8, 10), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(2, 5, 7, 9), Array(1.0, 1.0, 1.0, 1.0)),
+      Vectors.sparse(12, Array(1, 3, 6, 8, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(1, 3, 5, 7, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
     ).map(_.toOPVector)
 
@@ -93,13 +95,14 @@ class BinaryMapVectorizerTest
       m1 -> List(IndColWithGroup(None, "A"), IndColWithGroup(nullIndicatorValue, "A"),
         IndColWithGroup(None, "B"), IndColWithGroup(nullIndicatorValue, "B"),
         IndColWithGroup(None, "C"), IndColWithGroup(nullIndicatorValue, "C")),
-      m2 -> List(IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"),
+      m2 -> List(IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"),
         IndColWithGroup(None, "Y"), IndColWithGroup(nullIndicatorValue, "Y"),
-        IndColWithGroup(None, "X"), IndColWithGroup(nullIndicatorValue, "X"))
+        IndColWithGroup(None, "Z"), IndColWithGroup(nullIndicatorValue, "Z"))
     )
-
-    transformed.collect(vector) shouldBe expected
+    val result = transformed.collect(vector)
+    result shouldBe expected
     val field = transformed.schema(estimator.getOutputFeatureName)
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     OpVectorMetadata(field) shouldEqual expectedMeta
     val vectorMetadata = estimator.getMetadata()
     OpVectorMetadata(field.copy(metadata = vectorMetadata)) shouldEqual expectedMeta

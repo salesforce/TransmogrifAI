@@ -30,15 +30,14 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.OpParams
-import com.salesforce.op.features.{OPFeature, TransientFeature}
-import com.salesforce.op.stages.impl.feature.HashAlgorithm
+import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
 import com.salesforce.op.test.PassengerSparkFixtureTest
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.mllib.feature.HashingTF
+import com.salesforce.op.testkit.RandomText
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+
+import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
@@ -49,19 +48,17 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       (false, Right(Seq(1.0))), (true, Right(Seq.empty[Double])), (false, Left(Seq("male", "female"))),
       (true, Left(Seq.empty[String])), (false, Right(Seq(1.0, 3.0, 5.0)))
     )
-    val summary =
-      Array(Summary(0.0, 1.0), Summary(-1.6, 10.6), Summary(0.0, 3.0), Summary(0.0, 0.0), Summary(1.0, 5.0))
+    val summaries =
+      Array(Summary(0.0, 1.0, 6.0, 10), Summary(-1.6, 10.6, 3.0, 10),
+        Summary(0.0, 3.0, 7.0, 10), Summary(0.0, 0.0, 5.0, 10), Summary(1.0, 5.0, 10.0, 10))
     val bins = 10
-    val hasher: HashingTF = new HashingTF(numFeatures = bins)
-      .setBinary(false)
-      .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
 
     val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
     val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
       if (isEmpty) None else Option(processed)
     }
-    val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution(key, summ, seq, bins, hasher)
+    val distribs = featureKeys.zip(summaries).zip(processedSeqs).map { case ((key, summary), seq) =>
+      FeatureDistribution.fromSummary(key, summary, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
     }
     distribs.foreach{ d =>
       d.key shouldBe None
@@ -72,10 +69,30 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(1).nulls shouldBe 1
     distribs(1).distribution.sum shouldBe 0
     distribs(2).distribution.sum shouldBe 2
-    distribs(2).summaryInfo should contain theSameElementsAs Array(0.0, 3.0)
+    distribs(2).summaryInfo should contain theSameElementsAs Array(0.0, 3.0, 7.0, 10.0)
     distribs(3).distribution.sum shouldBe 0
     distribs(4).distribution.sum shouldBe 3
     distribs(4).summaryInfo.length shouldBe bins
+  }
+
+  it should "be correctly created for text features" in {
+    val features = Array(description, gender)
+    val values: Array[(Boolean, ProcessedSeq)] = Array(
+      (false, Left(RandomText.strings(1, 10).take(10000).toSeq.flatMap(_.value)))
+    )
+    val summary = Array(Summary(1000.0, 50000.0, 70000.0, 10))
+    val bins = 100
+    val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
+    val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
+      if (isEmpty) None else Option(processed)
+    }
+    val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
+      FeatureDistribution.fromSummary(key, summ, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
+    }
+
+    distribs(0).distribution.length shouldBe 100
+    distribs(0).distribution.sum shouldBe 10000
+    distribs.foreach(d => d.featureKey shouldBe d.name -> d.key)
   }
 
   it should "be correctly created for map features" in {
@@ -84,18 +101,16 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Map("A" -> Left(Seq("male", "female"))),
       Map("A" -> Right(Seq(1.0)), "B" -> Right(Seq(1.0))),
       Map("B" -> Right(Seq(0.0))))
-    val summary = Array(
-      Map("A" -> Summary(0.0, 1.0), "B" -> Summary(0.0, 5.0)),
-      Map("A" -> Summary(-1.6, 10.6), "B" -> Summary(0.0, 3.0)),
-      Map("B" -> Summary(0.0, 0.0)))
+    val summaries = Array(
+      Map("A" -> Summary(0.0, 2.0, 100.0, 10), "B" -> Summary(0.0, 5.0, 10.0, 10)),
+      Map("A" -> Summary(-1.6, 10.6, 30.0, 10), "B" -> Summary(0.0, 3.0, 11.0, 10)),
+      Map("B" -> Summary(0.0, 0.0, 0.0, 10)))
     val bins = 10
-    val hasher: HashingTF = new HashingTF(numFeatures = bins)
-      .setBinary(false)
-      .setHashAlgorithm(HashAlgorithm.MurMur3.toString.toLowerCase)
-    val distribs = features.map(_.name).zip(summary).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
+    val distribs = features.map(_.name).zip(summaries).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
-        FeatureDistribution(featureKey, summary, valueMaps.get(key), bins, hasher)
+        FeatureDistribution.fromSummary(featureKey, summary, valueMaps.get(key),
+          bins, (_, bins) => bins, FeatureDistributionType.Scoring)
       }
     }
 
@@ -107,7 +122,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       else d.distribution.length shouldBe 2
     }
     distribs(0).nulls shouldBe 0
-    distribs(0).summaryInfo should contain theSameElementsAs Array(0.0, 1.0)
+    distribs(0).summaryInfo should contain theSameElementsAs Array(0.0, 2.0, 100.0, 10.0)
     distribs(1).nulls shouldBe 1
     distribs(0).distribution.sum shouldBe 2
     distribs(1).distribution.sum shouldBe 0
@@ -115,7 +130,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(2).distribution.sum shouldBe 1
     distribs(4).distribution(0) shouldBe 1
     distribs(4).distribution(1) shouldBe 0
-    distribs(4).summaryInfo.length shouldBe 2
+    distribs(4).summaryInfo.length shouldBe 4
   }
 
   it should "correctly compare fill rates" in {
@@ -141,5 +156,79 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     fd3.jsDivergence(fd3) should be < eps
     val fd4 = FeatureDistribution("A", None, 20, 20, Array(200, 800, 0, 0, 1200), Array.empty)
     (fd3.jsDivergence(fd4) - 1.0) should be < eps
+  }
+
+  it should "reduce correctly" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    val res = FeatureDistribution("A", None, 30, 21, Array(3.0, 12.0, 0.0, 0.0, 18.0), Array.empty)
+
+    fd1.reduce(fd2) shouldBe res
+    FeatureDistribution.semigroup.plus(fd1, fd2) shouldBe res
+  }
+
+  it should "have equals" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    fd1 shouldBe fd1
+    fd1.equals("blarg") shouldBe false
+    fd1 shouldBe fd1.copy(summaryInfo = Array.empty)
+    fd1 shouldBe fd1.copy(summaryInfo = fd1.summaryInfo)
+    fd1 should not be fd2
+  }
+
+  it should "have hashCode" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    fd1.hashCode() shouldBe fd1.hashCode()
+    fd1.hashCode() shouldBe fd1.copy(summaryInfo = fd1.summaryInfo).hashCode()
+    fd1.hashCode() should not be fd1.copy(summaryInfo = Array.empty).hashCode()
+    fd1.hashCode() should not be fd2.hashCode()
+  }
+
+  it should "have toString" in {
+    FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty).toString() shouldBe
+      "FeatureDistribution(type = Training, name = A, key = None, count = 10, nulls = 1, " +
+        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [])"
+  }
+
+  it should "marshall to/from json" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    val json = FeatureDistribution.toJson(Array(fd1, fd2))
+    FeatureDistribution.fromJson(json) match {
+      case Success(r) => r.deep shouldBe Seq(fd1, fd2)
+      case Failure(e) => fail(e)
+    }
+  }
+
+  it should "marshall to/from json with default ctor args" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
+    val fd2 = FeatureDistribution("A", Some("X"), 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    val json =
+      """[{"name":"A","count":10,"nulls":1,"distribution":[1.0,4.0,0.0,0.0,6.0],"type":"Scoring"},
+        |{"name":"A","key":"X","count":20,"nulls":20,"distribution":[2.0,8.0,0.0,0.0,12.0]}]
+        |""".stripMargin
+
+    FeatureDistribution.fromJson(json) match {
+      case Success(r) => r.deep shouldBe Seq(fd1, fd2)
+      case Failure(e) => fail(e)
+    }
+  }
+
+  it should "error on mismatching feature name, key or type" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
+
+    intercept[IllegalArgumentException](fd1.reduce(fd1.copy(name = "boo"))) should have message
+      "requirement failed: Name must match to compare or combine feature distributions: A != boo"
+
+    intercept[IllegalArgumentException](fd1.relativeFillRatio(fd1.copy(key = Some("zz")))) should have message
+      "requirement failed: Key must match to compare or combine feature distributions: None != Some(zz)"
+
+    intercept[IllegalArgumentException](fd1.relativeFillRate(fd1.copy(key = Some("k")))) should have message
+      "requirement failed: Key must match to compare or combine feature distributions: None != Some(k)"
+
+    intercept[IllegalArgumentException](fd1.jsDivergence(fd1.copy(name = "boo"))) should have message
+      "requirement failed: Name must match to compare or combine feature distributions: A != boo"
   }
 }

@@ -31,12 +31,13 @@
 package com.salesforce.op.cli
 
 import java.io.{ByteArrayOutputStream, File, StringReader}
+import java.nio.file.Paths
 
 import com.salesforce.op.OpWorkflowRunType
 import com.salesforce.op.test.TestCommon
 import org.scalactic.source
 import org.scalatest.{Assertion, Assertions, BeforeAndAfter, FlatSpec}
-import org.slf4j.LoggerFactory
+import org.slf4j.{Logger, LoggerFactory}
 
 import scala.io.Source
 import scala.language.postfixOps
@@ -48,7 +49,8 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
   CommandParser.AUTO_ENABLED = true
 
   protected val ProjectName = "CliGeneratedTestProject"
-  val log = LoggerFactory.getLogger("cli-test")
+  protected val projectFolder: String = ProjectName.toLowerCase
+  val log: Logger = LoggerFactory.getLogger("cli-test")
 
   trait Outcome
   case class Crashed(msg: String, code: Int) extends Throwable with Outcome {
@@ -106,19 +108,19 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
 
   after { new Sut().delete(new File(ProjectName)) }
 
-  val expectedSourceFiles = "Features.scala" :: s"$ProjectName.scala"::Nil
+  val expectedSourceFiles: List[String] = "Features.scala" :: s"$ProjectName.scala"::Nil
 
-  val projectDir = new File(ProjectName.toLowerCase)
+  val projectDir: String = ProjectName.toLowerCase
 
   def checkAvroFile(source: File): Unit = {
-    val avroFile = new File(projectDir, s"src/main/avro/${source.getName}")
+    val avroFile = Paths.get(projectDir, "src", "main", "avro", source.getName).toFile
     avroFile should exist
     Source.fromFile(avroFile).getLines.mkString("\n") shouldBe
       Source.fromFile(source).getLines.mkString("\n")
   }
 
   def checkScalaFiles(shouldNotContain: String): Unit = {
-    val srcDir = new File(projectDir, "src/main/scala/com/salesforce/app")
+    val srcDir = Paths.get(projectDir, "src", "main", "scala", "com", "salesforce", "app").toFile
     srcDir should exist
 
     for {
@@ -136,20 +138,22 @@ class CliTestBase extends FlatSpec with TestCommon with Assertions with BeforeAn
 
   def findFile(relPath: String): String = {
     Option(new File(relPath)) filter (_.exists) orElse
-    Option(new File(new File(".."), relPath)) filter (_.exists) getOrElse {
+    Option(Paths.get("fake-rel-path").relativize(Paths.get(relPath)).toFile) filter (_.exists) getOrElse {
       throw new UnsupportedOperationException(
         s"Could not find file $relPath, current is ${new File(".").getAbsolutePath}")
     } getAbsolutePath
   }
 
   protected lazy val TestAvsc: String = findFile("test-data/PassengerDataAll.avsc")
+  protected lazy val TestAvscWithUnderscores: String = findFile("test-data/PassengerDataAll_.avsc")
   protected lazy val TestCsvHeadless: String = findFile("test-data/PassengerDataAll.csv")
   protected lazy val TestSmallCsvWithHeaders: String = findFile("test-data/PassengerDataWithHeader.csv")
   protected lazy val TestBigCsvWithHeaders: String = findFile("test-data/PassengerDataAllWithHeader.csv")
   protected lazy val AvcsSchema: String = findFile("templates/simple/src/main/avro/Passenger.avsc")
   protected lazy val AnswersFile: String = findFile("cli/passengers.answers")
+  protected lazy val AnswersFileWithUnderscores: String = findFile("cli/passengers_.answers")
 
-  protected def appRuntimeArgs(runType: OpWorkflowRunType) =
+  protected def appRuntimeArgs(runType: OpWorkflowRunType): String =
     s"--run-type=${runType.toString.toLowerCase} --model-location=/tmp/titanic-model " +
     s"--read-location Passenger=$TestCsvHeadless"
 }

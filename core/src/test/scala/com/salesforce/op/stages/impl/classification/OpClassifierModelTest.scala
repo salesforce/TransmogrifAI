@@ -34,16 +34,18 @@ import com.salesforce.op.features.types.{Prediction, RealNN}
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
+import ml.dmlc.xgboost4j.scala.spark.{OpXGBoost, OpXGBoostQuietLogging, XGBoostClassifier}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
+import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpClassifierModelTest extends FlatSpec with TestSparkContext {
+class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoostQuietLogging {
 
   private val label = RandomIntegral.integrals(0, 2).limit(1000)
     .map{ v => RealNN(v.value.map(_.toDouble).getOrElse(0.0)) }
@@ -51,9 +53,7 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
 
   private val data = label.zip(fv)
 
-  private val (rawDF, labelF, featureV) =
-    TestFeatureBuilder("label", "features", data)
-
+  private val (rawDF, labelF, featureV) = TestFeatureBuilder("label", "features", data)
 
   Spec[OpDecisionTreeClassificationModel] should "produce the same values as the spark version" in {
     val spk = new DecisionTreeClassifier()
@@ -62,10 +62,8 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
-
 
   Spec[OpLogisticRegressionModel] should "produce the same values as the spark version" in {
     val spk = new LogisticRegression()
@@ -75,7 +73,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -87,7 +84,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, uid = spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -98,7 +94,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .fit(rawDF)
 
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
@@ -118,7 +113,6 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .setLabelCol(labelF.name)
       .fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-
     compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 3)
   }
 
@@ -130,11 +124,20 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext {
       .setLabelCol(labelF.name)
       .fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-    compareOutputsPred(spk.transform(rawDF), op.transform(rawDF), 2)
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-  def compareOutputs(df1: DataFrame, df2: DataFrame): Unit = {
+  Spec[OpXGBoostClassifier] should "produce the same values as the spark version" in {
+    val cl = new XGBoostClassifier()
+    cl.set(cl.trackerConf, OpXGBoost.DefaultTrackerConf)
+      .setFeaturesCol(featureV.name)
+      .setLabelCol(labelF.name)
+    val spk = cl.fit(rawDF)
+    val op = toOP(spk, spk.uid).setInput(labelF, featureV)
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
+  }
 
+  def compareOutputs(df1: DataFrame, df2: DataFrame)(implicit arrayEquality: Equality[Array[Double]]): Unit = {
     def keysStartsWith(name: String, value: Map[String, Double]): Array[Double] = {
       val names = value.keys.filter(_.startsWith(name)).toArray.sorted
       names.map(value)

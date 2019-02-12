@@ -47,7 +47,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
   BinaryModel[RealNN, RealMap, OPVector], DecisionTreeNumericMapBucketizer[Double, RealMap]]
-  with DecisionTreeNumericBucketizerAsserts
+  with DecisionTreeNumericBucketizerAsserts with AttributeAsserts
 {
   import OPMapVectorizerTestHelper._
 
@@ -193,7 +193,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     featureVectorMeta.columns.foreach{ col =>
       col.parentFeatureName should contain theSameElementsAs Seq("currencyMap")
       col.parentFeatureType should contain theSameElementsAs Seq("com.salesforce.op.features.types.CurrencyMap")
-      col.indicatorGroup shouldBe Some("c0")
+      col.grouping shouldBe Some("c0")
     }
   }
 
@@ -228,6 +228,8 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     )
     val scored = model.setInputDataset(data).score(keepIntermediateFeatures = true)
     val res = scored.collect(out)
+    val field = scored.schema(out.name)
+    assertNominal(field, Array.fill(res.head.value.size)(true), res)
     assertMetadata(
       shouldSplit = stage.shouldSplitByKey.toArray.sortBy(_._1).map(_._2),
       splits = stage.splitsByKey.toArray.sortBy(_._1).map(_._2),

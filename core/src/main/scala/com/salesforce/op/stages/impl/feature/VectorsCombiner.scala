@@ -81,42 +81,9 @@ class VectorsCombiner(uid: String = UID[VectorsCombiner])
 
 final class VectorsCombinerModel private[op] (operationName: String, uid: String)
   extends SequenceModel[OPVector, OPVector](operationName = operationName, uid = uid) {
-  def transformFn: Seq[OPVector] => OPVector = VectorsCombiner.combineOP
-}
-
-case object VectorsCombiner {
-
-  /**
-   * Combine multiple OP vectors into one
-   *
-   * @param vectors input vectors
-   * @return result vector
-   */
-  def combineOP(vectors: Seq[OPVector]): OPVector = {
-    new OPVector(combine(vectors.view.map(_.value)))
+  def transformFn: Seq[OPVector] => OPVector = s => s.toList match {
+    case v1 :: v2 :: tail => v1.combine(v2, tail: _*)
+    case v :: Nil => v
+    case Nil => OPVector.empty
   }
-
-  /**
-   * Combine multiple vectors into one
-   *
-   * @param vectors input vectors
-   * @return result vector
-   */
-  def combine(vectors: Seq[Vector]): Vector = {
-    val indices = ArrayBuffer.empty[Int]
-    val values = ArrayBuffer.empty[Double]
-
-    val size = vectors.foldLeft(0)((size, vector) => {
-      vector.foreachActive { case (i, v) =>
-        if (v != 0.0) {
-          indices += size + i
-          values += v
-        }
-      }
-      size + vector.size
-    })
-    Vectors.sparse(size, indices.toArray, values.toArray).compressed
-  }
-
 }
-

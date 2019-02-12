@@ -48,7 +48,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
   BinaryModel[RealNN, Real, OPVector], DecisionTreeNumericBucketizer[Double, Real]]
-  with DecisionTreeNumericBucketizerAsserts
+  with DecisionTreeNumericBucketizerAsserts with AttributeAsserts
 {
   val (inputData, estimator) = {
     val numericData = Seq(1.0.toReal, 18.0.toReal, Real.empty, (-1.23).toReal, 0.0.toReal)
@@ -171,11 +171,17 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val (ds, rawBinary, rawCurrency, rawER, label) =
       TestFeatureBuilder("binary", "currency", "expectedRevenue", "label", rawData)
 
+    // Spark changed their split algorithm in 2.3.0 to use the mean, so adjust our expected value here
+    // https://issues.apache.org/jira/browse/SPARK-16957
+    val splitValue = expectedRevenueData
+      .filter(x => x.nonEmpty && x.value.get > 0.0)
+      .map(_.value.get).min / 2.0
+
     val out = rawER.autoBucketize(label.copy(isResponse = true), trackNulls = true, trackInvalid = true)
     assertBucketizer(
       bucketizer = out.originStage.asInstanceOf[DecisionTreeNumericBucketizer[_, _ <: OPNumeric[_]]],
       data = ds, shouldSplit = true, trackNulls = true, trackInvalid = true,
-      expectedSplits = Array(Double.NegativeInfinity, 0.0, Double.PositiveInfinity),
+      expectedSplits = Array(Double.NegativeInfinity, splitValue, Double.PositiveInfinity),
       expectedTolerance = 0.15
     )
   }
@@ -203,8 +209,11 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val splits = model.splits
     assertSplits(splits = splits, expectedSplits = expectedSplits, expectedTolerance)
 
-    val res = model.transform(data).collect(out)
-    assertMetadata(
+    val transformed = model.transform(data)
+    val res = transformed.collect(out)
+    val field = transformed.schema(out.name)
+    assertNominal(field, Array.fill(res.head.value.size)(true), res)
+      assertMetadata(
       shouldSplit = Array(shouldSplit),
       splits = Array(splits),
       trackNulls = trackNulls, trackInvalid = trackInvalid,

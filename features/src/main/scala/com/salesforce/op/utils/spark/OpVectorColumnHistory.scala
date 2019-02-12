@@ -42,12 +42,15 @@ import org.json4s.jackson.JsonMethods._
  * @param parentFeatureOrigins names of raw features that went into the parent feature
  * @param parentFeatureStages stageNames of all stages applied to the parent feature before conversion to a vector
  * @param parentFeatureType type of the parent feature
- * @param indicatorGroup The name of the group an indicator belongs to (usually the parent feature, but in the case
+ * @param grouping The name of the group a column belongs to (usually the parent feature, but in the case
  *                       of TextMapVectorizer, this includes keys in maps too). Every other vector column in the same
  *                       vector that has this same indicator group should be mutually exclusive to this one. If
  *                       this is not an indicator, then this field is None
- * @param indicatorValue An indicator for a value (null indicator or result of a pivot or whatever that value is),
- *                       otherwise [[None]]
+ * @param indicatorValue A name for a binary indicator value (null indicator or result of a pivot or whatever that
+ *                       value is), otherwise [[None]]
+ * @param descriptorValue   A name for a value that is continuous (not a binary indicator) eg for geolocation (lat,
+ *                          lon, accuracy) or for dates that have been converted to a circular representation the time
+ *                          window and x or y coordinate, otherwise [[None]]
  * @param index the index of the vector column this information is tied to
  */
 case class OpVectorColumnHistory
@@ -57,8 +60,9 @@ case class OpVectorColumnHistory
   parentFeatureOrigins: Seq[String],
   parentFeatureStages: Seq[String],
   parentFeatureType: Seq[String],
-  indicatorGroup: Option[String],
+  grouping: Option[String],
   indicatorValue: Option[String],
+  descriptorValue: Option[String],
   index: Int
 ) extends JsonLike
 

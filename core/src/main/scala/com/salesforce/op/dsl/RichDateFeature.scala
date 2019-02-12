@@ -62,16 +62,22 @@ trait RichDateFeature {
      * of an extracted time period on the unit circle
      *
      * @param timePeriod The time period to extract from the timestamp
+     * @param others     Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
-    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
-      f.transformWith(
-        new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod)
-      )
+    def toUnitCircle
+    (
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      others: Array[FeatureLike[Date]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod).setInput(f +: others).getOutput()
     }
 
     /**
-     * Converts a sequence of Date features into DateList feature and then applies DateList vectorizer.
+     * Converts DateTime features into cartesian coordinate representation of an extracted time periods
+     * (specified in circularDateRepresentations as seq of: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay,
+     * WeekOfMonth, WeekOfYear) on the unit circle.
+     * Also converts a sequence of Date features into DateList feature and then applies DateList vectorizer.
      *
      * DateListPivot can specify:
      * 1) SinceFirst - replace the feature by the number of days between the first event and reference date
@@ -85,6 +91,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
+     * @param circularDateReps list of all the circular date representations that should be included in feature vector
      * @return result feature of type Vector
      */
     def vectorize
@@ -92,10 +99,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
-      f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate, trackNulls = trackNulls,
-        others = others.map(_.toDateList()))
+      val timePeriods = circularDateReps.map(tp => f.toUnitCircle(tp, others))
+      val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
+        trackNulls = trackNulls, others = others.map(_.toDateList()))
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
   }
@@ -125,16 +135,21 @@ trait RichDateFeature {
      * of an extracted time period on the unit circle
      *
      * @param timePeriod The time period to extract from the timestamp
+     * @param others     Other features of same type
      * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
-    def toUnitCircle(timePeriod: TimePeriod = TimePeriod.HourOfDay): FeatureLike[OPVector] = {
-      f.transformWith(
-        new DateToUnitCircleTransformer[DateTime]().setTimePeriod(timePeriod)
-      )
+    def toUnitCircle(
+      timePeriod: TimePeriod = TimePeriod.HourOfDay,
+      others: Array[FeatureLike[DateTime]] = Array.empty
+    ): FeatureLike[OPVector] = {
+      new DateToUnitCircleTransformer[DateTime]().setTimePeriod(timePeriod).setInput(f +: others).getOutput()
     }
 
     /**
-     * Converts a sequence of DateTime features into DateTimeList feature and then applies DateTimeList vectorizer.
+     * Converts DateTime features into cartesian coordinate representation of an extracted time periods
+     * (specified in circularDateRepresentations as seq of: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay,
+     * WeekOfMonth, WeekOfYear) on the unit circle.
+     * Also converts a sequence of DateTime features into DateTimeList feature and then applies DateTimeList vectorizer.
      *
      * DateListPivot can specify:
      * 1) SinceFirst - replace the feature by the number of days between the first event and reference date
@@ -148,6 +163,7 @@ trait RichDateFeature {
      * @param dateListPivot name of the pivot type from [[DateListPivot]] enum
      * @param referenceDate reference date to compare against when [[DateListPivot]] is [[SinceFirst]] or [[SinceLast]]
      * @param trackNulls    option to keep track of values that were missing
+     * @param circularDateReps list of all the circular date representations that should be included in feature vector
      * @return result feature of type Vector
      */
     def vectorize
@@ -155,10 +171,13 @@ trait RichDateFeature {
       dateListPivot: DateListPivot,
       referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTime]] = Array.empty
     ): FeatureLike[OPVector] = {
-      f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
+      val timePeriods = circularDateReps.map(tp => f.toUnitCircle(tp, others))
+      val time = f.toDateTimeList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
         trackNulls = trackNulls, others = others.map(_.toDateTimeList()))
+      if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
   }

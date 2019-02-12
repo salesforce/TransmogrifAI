@@ -34,17 +34,15 @@ import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
-import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer}
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer, _}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.log4j.Level
+import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Row}
-import org.apache.spark.SparkException
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -70,7 +68,9 @@ case class TextRawData
 
 @RunWith(classOf[JUnitRunner])
 class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
-  BinaryEstimator[RealNN, OPVector, OPVector]] with TestSparkContext {
+  BinaryEstimator[RealNN, OPVector, OPVector]] {
+
+  override def specName: String = Spec[SanityChecker]
 
   // loggingLevel(Level.INFO)
 
@@ -87,13 +87,11 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     TextRawData("9", 0.0, Map("beverage" -> "tea")),
     TextRawData("10", 0.0, Map("beverage" -> "coffee")),
     TextRawData("11", 0.0, Map("beverage" -> "water"))
-  ).map( textRawData =>
-    (
-      textRawData.id.toText,
-      textRawData.target.toRealNN,
-      textRawData.textMap.toTextMap
-    )
-  )
+  ).map( textRawData => (
+    textRawData.id.toText,
+    textRawData.target.toRealNN,
+    textRawData.textMap.toTextMap
+  ))
 
   val (textData, id, target, textMap) = TestFeatureBuilder("id", "target", "textMap", textRawData)
   val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
@@ -122,7 +120,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       OpVectorColumnMetadata(
         parentFeatureName = Seq(name),
         parentFeatureType = Seq(FeatureTypeDefaults.Real.getClass.getName),
-        indicatorGroup = None,
+        grouping = None,
         indicatorValue = None
       )
     },
@@ -466,8 +464,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  it should "not calculate correlations on hashed text features if asked not to (using transmogrify)" in {
-    val vectorized = Seq(textMap).transmogrify()
+  it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
+
+    val vectorized = textMap.vectorize(cleanText = TransmogrifierDefaults.CleanText)
 
     val checkedFeatures = new SanityChecker()
       .setCheckSample(1.0)
@@ -486,12 +485,12 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
 
-    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_512")
+    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_513")
     val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
-        "textMap_beverage_NullIndicatorValue_514")
-    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_512", "textMap_fruit_NullIndicatorValue_513",
-      "textMap_beverage_NullIndicatorValue_514"
+      Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
+        "textMap_fruit_NullIndicatorValue_514")
+    val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
+      "textMap_fruit_NullIndicatorValue_514"
     )
     val featuresWithNaNCorr = Seq.empty[String]
 
@@ -533,37 +532,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       featuresToDrop, featuresWithNaNCorr)
   }
 
-  // TODO: Not sure if we should do this test since it may not fail if spark settings are changed
-  it should "fail (due to a Kyro buffer overflow) when calculating a large (5k x 5k) correlation matrix " in {
-    val numHashes = 5000
-
-    val vectorized = textMap.vectorize(
-      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
-      cleanText = false,
-      cleanKeys = TransmogrifierDefaults.CleanKeys,
-      others = Array.empty,
-      trackNulls = TransmogrifierDefaults.TrackNulls,
-      numHashes = numHashes
-    )
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(false)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, vectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    intercept[SparkException](new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData))
-  }
-
-  it should "not fail when calculating feature-label correlations on that same 5k element feature vector" in {
+  it should "not fail when calculating feature-label correlations on a 5k element feature vector" in {
     val numHashes = 5000
 
     val vectorized = textMap.vectorize(
@@ -594,20 +563,50 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
 
     val featuresToDrop = Seq.empty[String]
     val totalFeatures = (0 until numHashes).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_color_NullIndicatorValue_" + numHashes.toString,
-        "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
-        "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+      Seq("textMap_beverage_NullIndicatorValue_" + numHashes.toString,
+        "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
+        "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
     val featuresWithCorr = Seq("textMap_8", "textMap_89", "textMap_294", "textMap_706", "textMap_971",
       "textMap_1364", "textMap_1633", "textMap_2382", "textMap_2527", "textMap_3159", "textMap_3491",
-      "textMap_3804", "textMap_color_NullIndicatorValue_" + numHashes.toString,
-      "textMap_fruit_NullIndicatorValue_" + (numHashes + 1).toString,
-      "textMap_beverage_NullIndicatorValue_" + (numHashes + 2).toString)
+      "textMap_3804", "textMap_beverage_NullIndicatorValue_" + numHashes.toString,
+      "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
+      "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
     val featuresWithNaNCorr = totalFeatures.filterNot(featuresWithCorr.contains)
 
 
     val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
     validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
       featuresToDrop, featuresWithNaNCorr)
+  }
+
+  it should "not fail when maps have the same keys" in {
+    val mapData = textRawData.map{
+      case (i, t, tm) => (i, t, tm.value.toPickListMap, tm.value.toPickListMap,
+        tm.value.map{ case (k, v) => k -> math.random }.toRealMap)
+    }
+    val (mapDataFrame, id, target, plMap1, plMap2, doubleMap) = TestFeatureBuilder(
+      "id", "target", "textMap1", "textMap2", "doubleMap", mapData)
+    val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
+    val features = Seq(id, target, plMap1, plMap2, doubleMap).transmogrify()
+    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
+    val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
+    output.select(checked.name).count() shouldBe 12
+    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    meta.dropped.size shouldBe 0
+    meta.categoricalStats.size shouldBe 10
+    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
+  }
+
+  it should "produce the same statistics if the same transformation is applied twice" in {
+    val plMap = textMap.map[PickListMap](_.value.toPickListMap)
+    val features = Seq(id, target, plMap, plMap).transmogrify()
+    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
+    val output = new OpWorkflow().setResultFeatures(checked).transform(textData)
+    output.select(checked.name).count() shouldBe 12
+    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    meta.dropped.size shouldBe 0
+    meta.categoricalStats.size shouldBe 4
+    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
   }
 
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],

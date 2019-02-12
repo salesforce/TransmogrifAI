@@ -31,13 +31,12 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op.stages.impl.MetadataLike
-
-import scala.util.{Failure, Success, Try}
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.stats.OpStatistics
 import com.salesforce.op.utils.stats.OpStatistics.LabelWiseValues
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -114,17 +113,20 @@ case class SanityCheckerSummary
   }
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val summaryMeta = new MetadataBuilder()
-    summaryMeta.putMetadata(SanityCheckerNames.CorrelationsWLabel, correlationsWLabel.toMetadata())
+    summaryMeta.putMetadata(SanityCheckerNames.CorrelationsWLabel, correlationsWLabel.toMetadata(skipUnsupported))
     summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
-    summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata())
+    summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata(skipUnsupported))
     summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
-    summaryMeta.putMetadataArray(SanityCheckerNames.CategoricalStats, categoricalStats.map(_.toMetadata()))
+    summaryMeta.putMetadataArray(SanityCheckerNames.CategoricalStats,
+      categoricalStats.map(_.toMetadata(skipUnsupported)))
     summaryMeta.build()
   }
 
@@ -160,11 +162,13 @@ case class SummaryStatistics
   )
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
     meta.putDouble(SanityCheckerNames.Count, count)
     meta.putDouble(SanityCheckerNames.SampleFraction, sampleFraction)
@@ -202,15 +206,21 @@ case class CategoricalGroupStats
   maxRuleConfidences: Array[Double],
   supports: Array[Double]
 ) extends MetadataLike {
+
   /**
-   * @return metadata of this specific categorical group
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
     meta.putString(SanityCheckerNames.Group, group)
     meta.putStringArray(SanityCheckerNames.CategoricalFeatures, categoricalFeatures)
-    meta.putMetadata(SanityCheckerNames.ContingencyMatrix, contingencyMatrix.toMetadata)
-    meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel, pointwiseMutualInfo.toMetadata)
+    meta.putMetadata(SanityCheckerNames.ContingencyMatrix, contingencyMatrix.toMetadata(skipUnsupported))
+    meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel,
+      pointwiseMutualInfo.toMetadata(skipUnsupported))
     meta.putDouble(SanityCheckerNames.CramersV, if (cramersV.isNaN) 0 else cramersV)
     meta.putDouble(SanityCheckerNames.MutualInfo, mutualInfo)
     meta.putDoubleArray(SanityCheckerNames.MaxRuleConfidence, maxRuleConfidences)
@@ -230,7 +240,7 @@ case class CategoricalGroupStats
  * @param mutualInfos          Values of MI for each feature (should be the same for everything coming from the same
  *                             contingency matrix)
  * @param counts               Counts of occurrence for categoricals (n x m array of arrays where n = number of labels
- *                             and m = number of features + 1 with last element being occurance count of labels
+ *                             and m = number of features + 1 with last element being occurrence count of labels
  */
 @deprecated("Functionality replaced by Array[CategoricalGroupStats]", "3.3.0")
 case class CategoricalStats
@@ -241,14 +251,23 @@ case class CategoricalStats
   mutualInfos: Array[Double] = Array.empty,
   counts: LabelWiseValues.Type = LabelWiseValues.empty
 ) extends MetadataLike {
+
+  /**
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
+   */
   // TODO: Build the metadata here instead of by treating Cramer's V and mutual info as correlations
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
     meta.putStringArray(SanityCheckerNames.CategoricalFeatures, categoricalFeatures)
     // TODO: use custom serializer here instead of replacing NaNs with 0s
     meta.putDoubleArray(SanityCheckerNames.CramersV, cramersVs.map(f => if (f.isNaN) 0 else f))
     meta.putDoubleArray(SanityCheckerNames.MutualInfo, mutualInfos)
-    meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel, pointwiseMutualInfos.toMetadata)
+    meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel,
+      pointwiseMutualInfos.toMetadata(skipUnsupported))
     val countMeta = new MetadataBuilder()
     counts.map{ case (k, v) => countMeta.putDoubleArray(k, v)}
     meta.putMetadata(SanityCheckerNames.CountMatrix, countMeta.build())
@@ -271,7 +290,7 @@ case class Correlations
   nanCorrs: Seq[String],
   corrType: CorrelationType
 ) extends MetadataLike {
-  assert(featuresIn.length == values.length, "Feature names and correlation values arrays must have the same length")
+  require(featuresIn.length == values.length, "Feature names and correlation values arrays must have the same length")
 
   def this(corrs: Seq[(String, Double)], nans: Seq[String], corrType: CorrelationType) = this(
     featuresIn = corrs.map(_._1),
@@ -281,11 +300,12 @@ case class Correlations
   )
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val corrMeta = new MetadataBuilder()
     corrMeta.putStringArray(SanityCheckerNames.FeaturesIn, featuresIn.toArray)
     corrMeta.putDoubleArray(SanityCheckerNames.Values, values.toArray)
@@ -316,23 +336,6 @@ case object SanityCheckerSummary {
       min = wrapped.getArray[Double](SanityCheckerNames.Min).toSeq,
       mean = wrapped.getArray[Double](SanityCheckerNames.Mean).toSeq,
       variance = wrapped.getArray[Double](SanityCheckerNames.Variance).toSeq
-    )
-  }
-
-  @deprecated("CategoricalStats replaced by Array[CategoricalGroupStats]", "3.3.0")
-  private def categoricalStatsFromMetadata(meta: Metadata): CategoricalStats = {
-    val wrapped = meta.wrapped
-    CategoricalStats(
-      categoricalFeatures = wrapped.getArray[String](SanityCheckerNames.CategoricalFeatures),
-      cramersVs = wrapped.getArray[Double](SanityCheckerNames.CramersV),
-      mutualInfos = wrapped.getArray[Double](SanityCheckerNames.MutualInfo),
-      pointwiseMutualInfos = meta.getMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel)
-        .underlyingMap.asInstanceOf[LabelWiseValues.Type],
-      counts = if (meta.contains(SanityCheckerNames.CountMatrix)) {
-        meta.getMetadata(SanityCheckerNames.CountMatrix)
-          .underlyingMap.asInstanceOf[LabelWiseValues.Type]
-      }
-      else OpStatistics.LabelWiseValues.empty
     )
   }
 
@@ -373,41 +376,7 @@ case object SanityCheckerSummary {
     } match {
       case Success(summary) => summary
       // Parse it under the old format
-      case Failure(_) =>
-        val oldCatStats = categoricalStatsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CategoricalStats))
-        SanityCheckerSummary(
-          // Try to parse correlations under an even older OP 3.1 format (for PLS backwards compatibility)
-          correlationsWLabel = Try(
-            correlationsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel))
-          ) match {
-            case Success(corr) => corr
-            case Failure(_) =>
-              Correlations(
-                featuresIn = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
-                  .getArray[String](SanityCheckerNames.FeaturesIn).toSeq,
-                values = wrapped.get[Metadata](SanityCheckerNames.CorrelationsWLabel).wrapped
-                  .getArray[Double](SanityCheckerNames.Values).toSeq,
-                nanCorrs = wrapped.getArray[String](SanityCheckerNames.CorrelationsWLabelIsNaN).toSeq,
-                corrType = wrapped.get[String](SanityCheckerNames.CorrelationType) match {
-                  case CorrelationType.Pearson.`sparkName` => CorrelationType.Pearson
-                  case CorrelationType.Spearman.`sparkName` => CorrelationType.Spearman
-                }
-              )
-          },
-          dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
-          featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
-          names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq,
-          categoricalStats = Array(CategoricalGroupStats(
-            group = "Unknown - deprecated metadata",
-            categoricalFeatures = oldCatStats.categoricalFeatures,
-            contingencyMatrix = oldCatStats.counts,
-            pointwiseMutualInfo = oldCatStats.pointwiseMutualInfos,
-            cramersV = oldCatStats.cramersVs.head,
-            mutualInfo = oldCatStats.mutualInfos.head,
-            maxRuleConfidences = Array.empty[Double],
-            supports = Array.empty[Double]
-          ))
-        )
+      case Failure(_) => throw new IllegalArgumentException(s"failed to parse SanityCheckerSummary from $meta")
     }
   }
 }

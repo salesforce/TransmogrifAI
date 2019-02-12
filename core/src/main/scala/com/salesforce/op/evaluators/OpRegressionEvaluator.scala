@@ -31,6 +31,7 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.UID
+import com.salesforce.op.utils.spark.RichEvaluator._
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.sql.Dataset
 import org.slf4j.LoggerFactory
@@ -58,13 +59,11 @@ private[op] class OpRegressionEvaluator
   def getDefaultMetric: RegressionMetrics => Double = _.RootMeanSquaredError
 
   override def evaluateAll(data: Dataset[_]): RegressionMetrics = {
-
     val dataUse = makeDataToUse(data, getLabelCol)
-
-    val rmse = getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataUse)
-    val mse = getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataUse)
-    val r2 = getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataUse)
-    val mae = getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataUse)
+    val rmse = getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataUse, default = 0.0)
+    val mse = getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataUse, default = 0.0)
+    val r2 = getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataUse, default = 0.0)
+    val mae = getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataUse, default = 0.0)
 
     val metrics = RegressionMetrics(
       RootMeanSquaredError = rmse, MeanSquaredError = mse, R2 = r2, MeanAbsoluteError = mae
@@ -75,14 +74,18 @@ private[op] class OpRegressionEvaluator
 
   }
 
-  final protected def getRegEvaluatorMetric(metricName: RegressionEvalMetric, dataset: Dataset[_]): Double = {
+  final protected def getRegEvaluatorMetric(
+    metricName: RegressionEvalMetric,
+    dataset: Dataset[_],
+    default: => Double
+  ): Double = {
     val labelName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelName)
     new RegressionEvaluator()
       .setLabelCol(labelName)
-      .setPredictionCol(getPredictionCol)
+      .setPredictionCol(getPredictionValueCol)
       .setMetricName(metricName.sparkEntryName)
-      .evaluate(dataUse)
+      .evaluateOrDefault(dataUse, default = default)
   }
 }
 

@@ -80,6 +80,10 @@ class TestClassVar {
   }
   private def getValue: Int = 2
   def getValuePerf: Int = 2
+
+  def boo(x: Int, y: Int): Int = boo(x + y)
+  def boo(x: Int): Int = x
+  def boo(): Int = boo(1)
 }
 
 @RunWith(classOf[JUnitRunner])
@@ -224,6 +228,29 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     val actual = measure(myClass.getValuePerf)
 
     elapsedReflect should be <= 10 * actual
+  }
+
+  it should "error on reflecting a non existent method" in {
+    val myClass = new TestClassVar()
+    val err = intercept[RuntimeException](ReflectionUtils.reflectMethod(myClass, "non_existent"))
+    err.getMessage shouldBe
+      s"Method with name 'non_existent' was not found on instance of type: ${myClass.getClass}"
+  }
+
+  it should "reflect methods with largest number of arguments by default" in {
+    val myClass = new TestClassVar()
+    val boo = ReflectionUtils.reflectMethod(myClass, "boo", argsCount = None)
+    boo(2, 3) shouldBe 5
+  }
+
+  it should "reflect methods with various number of arguments" in {
+    val myClass = new TestClassVar()
+    val boo = ReflectionUtils.reflectMethod(myClass, "boo", argsCount = Some(0))
+    val boo1 = ReflectionUtils.reflectMethod(myClass, "boo", argsCount = Some(1))
+    val boo2 = ReflectionUtils.reflectMethod(myClass, "boo", argsCount = Some(2))
+    boo() shouldBe 1
+    boo1(2) shouldBe 2
+    boo2(2, 3) shouldBe 5
   }
 
 }

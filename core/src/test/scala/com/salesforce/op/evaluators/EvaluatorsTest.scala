@@ -31,19 +31,21 @@
 package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.classification.ClassificationModelsToTry.LogisticRegression
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
+import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator, RegressionEvaluator}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.TableDrivenPropertyChecks._
+
 
 @RunWith(classOf[JUnitRunner])
 class EvaluatorsTest extends FlatSpec with TestSparkContext {
 
-  val (ds, rawLabel, features) = TestFeatureBuilder[RealNN, OPVector](
+  val (trainData, trainRawLabel, trainFeatures) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
       (1.0, Vectors.dense(12.0, 4.3, 1.3)),
       (0.0, Vectors.dense(0.0, 0.3, 0.1)),
@@ -53,12 +55,12 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
       (0.0, Vectors.dense(0.5, 0.9, 10.1)),
       (1.0, Vectors.dense(11.5, 2.3, 1.3)),
       (0.0, Vectors.dense(0.1, 3.3, 0.1))
-    ).map(v => v._1.toRealNN -> v._2.toOPVector)
+    ).map { case (lbl, feats) => lbl.toRealNN -> feats.toOPVector }
   )
-  val label = rawLabel.copy(isResponse = true)
+  val trainLabel = trainRawLabel.copy(isResponse = true)
 
 
-  val (test_ds, test_rawLabel, test_features) = TestFeatureBuilder[RealNN, OPVector](
+  val (testData, testRawLabel, testFeatures) = TestFeatureBuilder[RealNN, OPVector](
     Seq(
       (1.0, Vectors.dense(3.0, 54.4, 46.9)),
       (0.0, Vectors.dense(4.0, 300, 90)),
@@ -76,92 +78,111 @@ class EvaluatorsTest extends FlatSpec with TestSparkContext {
       (0.0, Vectors.dense(20.5, -0.34, 50.1)),
       (1.0, Vectors.dense(411.5, 2.54, 6.3)),
       (0.0, Vectors.dense(50.1, -3.3, 6.1))
-    ).map(v => v._1.toRealNN -> v._2.toOPVector)
+    ).map { case (lbl, feats) => lbl.toRealNN -> feats.toOPVector }
   )
-  val test_label = test_rawLabel.copy(isResponse = true)
+  val testLabel = testRawLabel.copy(isResponse = true)
 
-  // TODO put back LR when evaluators work with prediction features
-  val testEstimator = BinaryClassificationModelSelector()
-    .setModelsToTry(LogisticRegression)
-    .setLogisticRegressionRegParam(0)
-    .setInput(label, features)
-  val (pred, rawPred, prob) = testEstimator.getOutput()
-  val model = testEstimator.fit(ds)
-  val transformedData = model.setInput(test_label, test_features).transform(test_ds)
+  val testEstimator = new OpLogisticRegression().setInput(trainLabel, trainFeatures)
+  val pred = testEstimator.getOutput()
+  val model = testEstimator.fit(trainData)
 
 
-  val sparkBinaryEvaluator = new BinaryClassificationEvaluator().setLabelCol(test_label.name)
+  val transformedData = model.setInput(testLabel, testFeatures).transform(testData)
+  val rawPred = pred.map[OPVector](p => Vectors.dense(p.rawPrediction).toOPVector)
+  val predValue = pred.map[RealNN](_.prediction.toRealNN)
+
+  val evaluationData = {
+    val transformed = rawPred.originStage.asInstanceOf[Transformer].transform(transformedData)
+    predValue.originStage.asInstanceOf[Transformer].transform(transformed)
+  }
+  val emptyData = evaluationData.filter(r => r.get(0) == "blarg")
+
+  val sparkBinaryEvaluator = new BinaryClassificationEvaluator().setLabelCol(testLabel.name)
     .setRawPredictionCol(rawPred.name)
 
-  val opBinaryMetrics = new OpBinaryClassificationEvaluator().setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob).evaluateAll(transformedData)
+  val opBinaryMetrics = new OpBinaryClassificationEvaluator().setLabelCol(testLabel)
+    .setPredictionCol(pred).evaluateAll(transformedData)
 
-  val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(test_label.name)
-    .setPredictionCol(pred.name)
+  val opBinScoreMetrics = new OpBinScoreEvaluator().setLabelCol(testLabel)
+    .setPredictionCol(pred).evaluateAll(transformedData)
 
-  val sparkRegressionEvaluator = new RegressionEvaluator().setLabelCol(test_label.name)
-    .setPredictionCol(pred.name)
+  val sparkMultiEvaluator = new MulticlassClassificationEvaluator().setLabelCol(testLabel.name)
+    .setPredictionCol(predValue.name)
+
+  val sparkRegressionEvaluator = new RegressionEvaluator().setLabelCol(testLabel.name)
+    .setPredictionCol(predValue.name)
 
 
-  "Evaluators" should "have a binary classification factory" in {
-    evaluateBinaryMetric(Evaluators.BinaryClassification.auROC()) shouldBe
-      evaluateSparkBinaryMetric(BinaryClassEvalMetrics.AuROC.sparkEntryName)
+  Spec(Evaluators.getClass) should "have binary classification evaluators evaluate metrics correctly" in {
+    val binaryEvaluators = Table(
+      ("evaluator", "expectedValue", "expectedDefault"),
+      (Evaluators.BinaryClassification(), evalSparkBinary(BinaryClassEvalMetrics.AuROC.sparkEntryName), 0.0),
+      (Evaluators.BinaryClassification.auROC(), evalSparkBinary(BinaryClassEvalMetrics.AuROC.sparkEntryName), 0.0),
+      (Evaluators.BinaryClassification.brierScore(), opBinScoreMetrics.BrierScore, 0.0),
+      (Evaluators.BinaryClassification.auPR(), evalSparkBinary(BinaryClassEvalMetrics.AuPR.sparkEntryName), 0.0),
+      (Evaluators.BinaryClassification.precision(), opBinaryMetrics.Precision, 0.0),
+      (Evaluators.BinaryClassification.recall(), opBinaryMetrics.Recall, 0.0),
+      (Evaluators.BinaryClassification.f1(), opBinaryMetrics.F1, 0.0),
+      (Evaluators.BinaryClassification.error(), opBinaryMetrics.Error, 0.0),
+      (Evaluators.BinaryClassification.custom(metricName = "test", evaluateFn = data => -123.0), -123.0, -123.0)
+    )
 
-    evaluateBinaryMetric(Evaluators.BinaryClassification.auPR()) shouldBe
-      evaluateSparkBinaryMetric(BinaryClassEvalMetrics.AuPR.sparkEntryName)
-
-    evaluateBinaryMetric(Evaluators.BinaryClassification.precision()) shouldBe opBinaryMetrics.Precision
-    evaluateBinaryMetric(Evaluators.BinaryClassification.recall()) shouldBe opBinaryMetrics.Recall
-    evaluateBinaryMetric(Evaluators.BinaryClassification.f1()) shouldBe opBinaryMetrics.F1
-    evaluateBinaryMetric(Evaluators.BinaryClassification.error()) shouldBe opBinaryMetrics.Error
+    forAll(binaryEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpBinaryClassificationEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
+    }
   }
 
-  it should "have a multi classification factory" in {
-    evaluateMultiMetric(Evaluators.MultiClassification.precision()) shouldBe
-      evaluateSparkMultiMetric(MultiClassEvalMetrics.Precision.sparkEntryName)
+  it should "have multi classification evaluators evaluate metrics correctly" in {
+    val multiEvaluators = Table(
+      ("evaluator", "expectedValue", "expectedDefault"),
+      (Evaluators.MultiClassification(), evalSparkMulti(MultiClassEvalMetrics.F1.sparkEntryName), 0.0),
+      (Evaluators.MultiClassification.precision(), evalSparkMulti(MultiClassEvalMetrics.Precision.sparkEntryName), 0.0),
+      (Evaluators.MultiClassification.recall(), evalSparkMulti(MultiClassEvalMetrics.Recall.sparkEntryName), 0.0),
+      (Evaluators.MultiClassification.f1(), evalSparkMulti(MultiClassEvalMetrics.F1.sparkEntryName), 0.0),
+      (Evaluators.MultiClassification.error(), 1.0 - evalSparkMulti(MultiClassEvalMetrics.Error.sparkEntryName), 0.0),
+      (Evaluators.MultiClassification.custom(metricName = "test", evaluateFn = data => -456.0), -456.0, -456.0)
+    )
 
-    evaluateMultiMetric(Evaluators.MultiClassification.recall()) shouldBe
-      evaluateSparkMultiMetric(MultiClassEvalMetrics.Recall.sparkEntryName)
-
-    evaluateMultiMetric(Evaluators.MultiClassification.f1()) shouldBe
-      evaluateSparkMultiMetric(MultiClassEvalMetrics.F1.sparkEntryName)
-
-    evaluateMultiMetric(Evaluators.MultiClassification.error()) shouldBe
-      1.0 - evaluateSparkMultiMetric(MultiClassEvalMetrics.Error.sparkEntryName)
+    forAll(multiEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpMultiClassificationEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
+    }
   }
 
-  it should "have a regression factory" in {
-    evaluateRegMetric(Evaluators.Regression.mae()) shouldBe
-      evaluateSparkRegMetric(RegressionEvalMetrics.MeanAbsoluteError.sparkEntryName)
+  it should "have regression evaluators evaluate metrics correctly" in {
+    val regrEvaluators = Table(
+      ("evaluator", "expectedValue", "expectedDefault"),
+      (Evaluators.Regression(), evalSparkRegr(RegressionEvalMetrics.RootMeanSquaredError.sparkEntryName), 0.0),
+      (Evaluators.Regression.mae(), evalSparkRegr(RegressionEvalMetrics.MeanAbsoluteError.sparkEntryName), 0.0),
+      (Evaluators.Regression.mse(), evalSparkRegr(RegressionEvalMetrics.MeanSquaredError.sparkEntryName), 0.0),
+      (Evaluators.Regression.rmse(), evalSparkRegr(RegressionEvalMetrics.RootMeanSquaredError.sparkEntryName), 0.0),
+      (Evaluators.Regression.r2(), evalSparkRegr(RegressionEvalMetrics.R2.sparkEntryName), 0.0),
+      (Evaluators.Regression.custom(metricName = "test", evaluateFn = data => -789.0), -789.0, -789.0)
+    )
 
-    evaluateRegMetric(Evaluators.Regression.mse()) shouldBe
-      evaluateSparkRegMetric(RegressionEvalMetrics.MeanSquaredError.sparkEntryName)
-
-    evaluateRegMetric(Evaluators.Regression.rmse()) shouldBe
-      evaluateSparkRegMetric(RegressionEvalMetrics.RootMeanSquaredError.sparkEntryName)
-
-    evaluateRegMetric(Evaluators.Regression.r2()) shouldBe
-      evaluateSparkRegMetric(RegressionEvalMetrics.R2.sparkEntryName)
+    forAll(regrEvaluators) { case (evaluator, expectedValue, expectedDefault) =>
+      withClue(s"Evaluator metric ${evaluator.name}: ") {
+        evaluator shouldBe a[OpRegressionEvaluatorBase[_]]
+        evaluator.setLabelCol(testLabel).setPredictionCol(pred).evaluate(evaluationData) shouldBe expectedValue
+        evaluator.evaluate(emptyData) shouldBe expectedDefault
+      }
+    }
   }
 
-  def evaluateBinaryMetric(binEval: OpBinaryClassificationEvaluator): Double = binEval.setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob)
-    .evaluate(transformedData)
+  def evalSparkBinary(metricName: String): Double =
+    sparkBinaryEvaluator.setMetricName(metricName).evaluate(evaluationData)
 
-  def evaluateSparkBinaryMetric(metricName: String): Double = sparkBinaryEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
+  def evalSparkMulti(metricName: String): Double =
+    sparkMultiEvaluator.setMetricName(metricName).evaluate(evaluationData)
 
-  def evaluateMultiMetric(multiEval: OpMultiClassificationEvaluator): Double = multiEval.setLabelCol(test_label)
-    .setPredictionCol(pred).setRawPredictionCol(rawPred).setProbabilityCol(prob)
-    .evaluate(transformedData)
-
-  def evaluateSparkMultiMetric(metricName: String): Double = sparkMultiEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
-
-  def evaluateRegMetric(regEval: OpRegressionEvaluator): Double = regEval.setLabelCol(test_label).setPredictionCol(pred)
-    .evaluate(transformedData)
-
-  def evaluateSparkRegMetric(metricName: String): Double = sparkRegressionEvaluator.setMetricName(metricName)
-    .evaluate(transformedData)
+  def evalSparkRegr(metricName: String): Double =
+    sparkRegressionEvaluator.setMetricName(metricName).evaluate(evaluationData)
 }
 

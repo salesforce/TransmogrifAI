@@ -31,7 +31,7 @@
 package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.features.types.{Location, MultiPickList, OPVector, Text}
+import com.salesforce.op.features.types.{Location, OPVector, Text}
 
 import scala.reflect.runtime.universe.TypeTag
 

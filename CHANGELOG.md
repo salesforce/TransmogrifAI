@@ -1,5 +1,120 @@
 # Changelog
 
+## 0.5.1
+
+Bug fixes:
+- Fix indices in LOCO for record-level insights and add more robust tests [#216](https://github.com/salesforce/TransmogrifAI/pull/216)
+- Fix sorting in Prediction type for multiclass classification and add stronger tests [#213](https://github.com/salesforce/TransmogrifAI/pull/213)
+- Fixing code generation bug with underscores in names [#208](https://github.com/salesforce/TransmogrifAI/pull/208)
+- Correct some syntax/compilation errors in Titanic Binary Classification Docs Example [#202](https://github.com/salesforce/TransmogrifAI/pull/202)
+
+New features / updates:
+- Make some tests a little less flaky [#221](https://github.com/salesforce/TransmogrifAI/pull/221)
+- Integrate helloworld project with Travis CI [#210](https://github.com/salesforce/TransmogrifAI/pull/210), [#212](https://github.com/salesforce/TransmogrifAI/pull/212)
+- Use ParamGridBuilder in model selector grids to allow modifications [#206](https://github.com/salesforce/TransmogrifAI/pull/206)
+- Use class.getName & update splitter meta parsing [#204](https://github.com/salesforce/TransmogrifAI/pull/204)
+- Export model selector defaults + metadata fixes [#199](https://github.com/salesforce/TransmogrifAI/pull/199)
+- Use OS specific path separator [#193](https://github.com/salesforce/TransmogrifAI/pull/193)
+- Add transformer / estimator for text length calculation and options for using this as default behavior [#190](https://github.com/salesforce/TransmogrifAI/pull/190), [#195](https://github.com/salesforce/TransmogrifAI/pull/195)
+- Allow conversion from Date and Timestamp Spark types to Date and DateTime TransmogrifAI types [#188](https://github.com/salesforce/TransmogrifAI/pull/188)
+
+Dependency updates:
+- Upgrade to Gradle 5.2 [#218](https://github.com/salesforce/TransmogrifAI/pull/218)
+- Upgrade shadowjar plugin to 4.0.4 [#220](https://github.com/salesforce/TransmogrifAI/pull/220)
+
+## 0.5.0
+
+New features and bug fixes:
+
+- XGBoost classification & regression models - EXPERIMENTAL [#44](https://github.com/salesforce/TransmogrifAI/pull/44)
+- Add default param grid for xgboost [#175](https://github.com/salesforce/TransmogrifAI/pull/175)
+- Fix ModelInsights for xgboost [#170](https://github.com/salesforce/TransmogrifAI/pull/170)
+- Added Parquet reader [#169](https://github.com/salesforce/TransmogrifAI/pull/169)
+- Added aggregate & conditional readers for Parquet [#172](https://github.com/salesforce/TransmogrifAI/pull/172)
+- Evaluators check for empty data [#178](https://github.com/salesforce/TransmogrifAI/pull/178)
+- Refactored splitter tests [#176](https://github.com/salesforce/TransmogrifAI/pull/176)
+- Return scoring feature distributions from RawFeatureFilter [#171](https://github.com/salesforce/TransmogrifAI/pull/171)
+- Using MapReduce Api for Avro Read Write [#150](https://github.com/salesforce/TransmogrifAI/pull/150)
+- Improve test coverage for VectorsCombiner and make vector aggregator efficient [#168](https://github.com/salesforce/TransmogrifAI/pull/168)
+- Time based aggregators [#167](https://github.com/salesforce/TransmogrifAI/pull/167)
+- Ignore null values in meta + support floats [#166](https://github.com/salesforce/TransmogrifAI/pull/166)
+- CLI command name fix + bump shadow plugin version + cleanup [#164](https://github.com/salesforce/TransmogrifAI/pull/164)
+- Fix build.sbt example in readme [#165](https://github.com/salesforce/TransmogrifAI/pull/165)
+- Removed an old test I added to check if Spark ran out of memory when calculating a correlation matrix (this is unnecessary and unhelpful) [#160](https://github.com/salesforce/TransmogrifAI/pull/160)
+- Replace assert with require [#159](https://github.com/salesforce/TransmogrifAI/pull/159)
+- Streaming histogram implementation [#152](https://github.com/salesforce/TransmogrifAI/pull/152)
+- Added test and removed dead code for Sanity Checker dealing with map with same key [#153](https://github.com/salesforce/TransmogrifAI/pull/153)
+- Fixed model insights exception when features are excluded from sanity checker correlation calculations [#147](https://github.com/salesforce/TransmogrifAI/pull/147)
+- Added logging of response distribution to RFF [#146](https://github.com/salesforce/TransmogrifAI/pull/146)
+- Use proper test ranges in feature converter test [#143](https://github.com/salesforce/TransmogrifAI/pull/143)
+- Added support for DateType and TimestampType primitive spark types [#135](https://github.com/salesforce/TransmogrifAI/pull/135)
+- Standardizing timezone to UTC [#138](https://github.com/salesforce/TransmogrifAI/pull/138)
+
+Dependency upgrades & misc:
+- XGBoost 0.81 [#180](https://github.com/salesforce/TransmogrifAI/pull/180)
+- Spark 2.3.2 [#44](https://github.com/salesforce/TransmogrifAI/pull/44)
+- Gradle 4.10.2 [#142](https://github.com/salesforce/TransmogrifAI/pull/142)
+- Use OpenJDK8 for CircleCI builds + refactor build config [#140](https://github.com/salesforce/TransmogrifAI/pull/140)
+
+## 0.4.0
+
+New features and bug fixes:
+
+- Allow to specify the formula to compute the text features bin size for `RawFeatureFilter` (see `RawFeatureFilter.textBinsFormula` argument) [#99](https://github.com/salesforce/TransmogrifAI/pull/99)
+- Fixed metadata on `Geolocation` and `GeolocationMap` so that keep the name of the column in descriptorValue. [#100](https://github.com/salesforce/TransmogrifAI/pull/100)
+- Local scoring (aka Sparkless) using Aardpfark. This enables loading and scoring models without Spark context but locally using Aardpfark (PFA for Spark) and Hadrian libraries instead. This allows orders of magnitude faster scoring times compared to Spark. [#41](https://github.com/salesforce/TransmogrifAI/pull/41)
+- Add distributions calculated in `RawFeatureFilter` to `ModelInsights` [#103](https://github.com/salesforce/TransmogrifAI/pull/103)
+- Added binary sequence transformer & estimator: `BinarySequenceTransformer` and `BinarySequenceEstimator` + plus the associated base traits [#84](https://github.com/salesforce/TransmogrifAI/pull/84)
+- Added `StringIndexerHandleInvalid.Keep` option into `OpStringIndexer` (same as in underlying Spark estimator) [#93](https://github.com/salesforce/TransmogrifAI/pull/93)
+- Allow numbers and underscores in feature names [#92](https://github.com/salesforce/TransmogrifAI/pull/92)
+- Stable key order for map vectorizers [#88](https://github.com/salesforce/TransmogrifAI/pull/88)
+- Keep raw feature distributions calculated in raw feature filter [#76](https://github.com/salesforce/TransmogrifAI/pull/76)
+- Transmogrify to use smart text vectorizer for text types: `Text`, `TextArea`, `TextMap` and `TextAreaMap` [#63](https://github.com/salesforce/TransmogrifAI/pull/63)
+- Transmogrify circular date representations for date feature types: `Date`, `DateTime`, `DateMap` and `DateTimeMap` [#100](https://github.com/salesforce/TransmogrifAI/pull/100)
+- Improved test coverage for utils and other modules [#50](https://github.com/salesforce/TransmogrifAI/pull/50), [#53](https://github.com/salesforce/TransmogrifAI/pull/53), [#67](https://github.com/salesforce/TransmogrifAI/pull/67), [#69](https://github.com/salesforce/TransmogrifAI/pull/69), [#70](https://github.com/salesforce/TransmogrifAI/pull/70), [#71](https://github.com/salesforce/TransmogrifAI/pull/71), [#72](https://github.com/salesforce/TransmogrifAI/pull/72), [#73](https://github.com/salesforce/TransmogrifAI/pull/73)
+- Match feature type map hierarchy with regular feature types [#49](https://github.com/salesforce/TransmogrifAI/pull/49)
+- Redundant and deadlock-prone end listener removal [#52](https://github.com/salesforce/TransmogrifAI/pull/52)
+- OS-neutral filesystem path creation [#51](https://github.com/salesforce/TransmogrifAI/pull/51)
+- Make Feature class public instead hide it's ctor [#45](https://github.com/salesforce/TransmogrifAI/pull/45)
+- Specify categorical variables in metadata [#120](https://github.com/salesforce/TransmogrifAI/pull/120)
+- Fix fill geo location vectorizer values [#132](https://github.com/salesforce/TransmogrifAI/pull/132)
+- Adding feature importance for new model types [#128](https://github.com/salesforce/TransmogrifAI/pull/128)
+- Adding binaryclassification bin score evaluator [#119](https://github.com/salesforce/TransmogrifAI/pull/119)
+- Apply DateToUnitCircleTransformer logic in raw feature filter transformations [130#](https://github.com/salesforce/TransmogrifAI/pull/130)
+
+Breaking changes:
+- Made case class to deal with model selector metadata [#39](https://github.com/salesforce/TransmogrifAI/pull/39)
+- Made `FileOutputCommiter` a default and got rid of `DirectMapreduceOutputCommitter` and `DirectOutputCommitter` [#86](https://github.com/salesforce/TransmogrifAI/pull/86)
+- Refactored `OpVectorColumnMetadata` to allow numeric column descriptors [#89](https://github.com/salesforce/TransmogrifAI/pull/89)
+- Renaming `JaccardDistance` to `JaccardSimilarity` [#80](https://github.com/salesforce/TransmogrifAI/pull/80)
+- New model selector interface [#55](https://github.com/salesforce/TransmogrifAI/pull/55). The breaking changes are related to return type and the way the parameters are passed into model selectors. Starting this version model selectors would return a single result feature of type `Prediction` (instead of a variable number of feature - `(pred, raw, prob)`). Example:
+```scala
+val (pred, raw, prob) = MultiClassificationModelSelector() // won't compile anymore
+val prediction = MultiClassificationModelSelector() // ok!
+```
+Another change is the way parameters are passed into model selectors. Example:
+```scala
+BinaryClassificationModelSelector
+  .withCrossValidation()
+  .setLogisticRegressionRegParam(0.05, 0.1) // won't compile anymore
+```
+Instead one should do:
+```scala
+val lr = new OpLogisticRegression()
+val models = Seq(lr -> new ParamGridBuilder().addGrid(lr.regParam, Array(0.05, 0.1)).build())
+BinaryClassificationModelSelector
+  .withCrossValidation(modelsAndParameters = models)
+```
+For more example on how to use new model selectors please refer to our documentation and helloworld examples.
+
+Dependency upgrades & misc:
+- CI/CD runtime improvements for CircleCI and TravisCI
+- Updated Gradle to 4.10
+- Updated `scala-graph` to `1.12.5`
+- Updated `scalafmt` to `1.5.1`
+- New `transmogrifai-local` subproject [#41](https://github.com/salesforce/TransmogrifAI/pull/41) introduces `aardpfark` and `hadrian` dependencies.
+
+
 ## 0.3.4
 Performance improvements:
 - Added featureLabelCorrOnly parameter in SanityChecker to only compute correlations between features and label (defaults to false)
@@ -17,7 +132,7 @@ New features and bug fixes:
 - Pretty print model summaries
 - Ensure OP Models are portable across environments
 - Ignore _ in simple streaming avro file reader
-- Updated evaluators so they can work with either Prediction type feature or three input featues 
+- Updated evaluators so they can work with either Prediction type feature or three input features 
 - Added Algebird kryo registrar
 - Make Sure that SmartTextVectorizerModel can be serialized to/from json
 

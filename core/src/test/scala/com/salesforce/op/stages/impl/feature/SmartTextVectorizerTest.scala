@@ -43,7 +43,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], SmartTextVectorizer[Text]] {
+  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], SmartTextVectorizer[Text]] with AttributeAsserts {
 
   lazy val (inputData, f1, f2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
@@ -82,9 +82,16 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
+    val fieldText = transformed.schema(textVectorized.name)
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
-      val combined = VectorsCombiner.combineOP(Seq(categoricalVector, textVector, nullVector))
+      val combined = categoricalVector.combine(textVector, nullVector)
       smartVector -> combined
     }.unzip
 
@@ -101,7 +108,12 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, categoricalVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, categoricalVectorized)
-
+    val field = transformed.schema(smartVectorized.name)
+    val smartRes = transformed.collect(smartVectorized)
+    assertNominal(field, Array.fill(smartRes.head.value.size)(true), smartRes)
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
     val (smart, expected) = result.unzip
 
     smart shouldBe expected
@@ -121,9 +133,13 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized, textVectorized, nullIndicator).transform(inputData)
     val result = transformed.collect(smartVectorized, textVectorized, nullIndicator)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartVectorized))
+    val fieldText = transformed.schema(textVectorized.name)
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
     val (smart, expected) = result.map { case (smartVector, textVector, nullVector) =>
-      val combined = VectorsCombiner.combineOP(Seq(textVector, nullVector))
+      val combined = textVector.combine(nullVector)
       smartVector -> combined
     }.unzip
 
@@ -144,23 +160,27 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized, shortcutVectorized).transform(inputData)
     val result = transformed.collect(smartVectorized, shortcutVectorized)
-
+    val field = transformed.schema(smartVectorized.name)
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    val fieldShortcut = transformed.schema(shortcutVectorized.name)
+    assertNominal(fieldShortcut, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
+      transformed.collect(shortcutVectorized))
     val (regular, shortcut) = result.unzip
 
     regular shouldBe shortcut
   }
 
-  it should "fail with an assertion error" in {
+  it should "fail with an error" in {
     val emptyDF = inputData.filter(inputData("text1") === "").toDF()
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
       .setInput(f1, f2).getOutput()
 
-    val thrown = intercept[AssertionError] {
+    val thrown = intercept[IllegalArgumentException] {
       new OpWorkflow().setResultFeatures(smartVectorized).transform(emptyDF)
     }
-    assert(thrown.getMessage.contains("assertion failed"))
+    assert(thrown.getMessage.contains("requirement failed"))
   }
 
   it should "generate metadata correctly" in {
@@ -176,21 +196,21 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
       } else if (col.index == 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else if (col.index == 3) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else if (col.index < 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
@@ -209,25 +229,25 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
       } else if (col.index == 2) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else if (col.index == 3) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else if (col.index < 6) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
       } else if (col.index == 6) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(TransmogrifierDefaults.OtherString)
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
@@ -246,17 +266,109 @@ class SmartTextVectorizerTest
     meta.columns.foreach { col =>
       if (col.index < 4) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else if (col.index < 8) {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe None
+        col.grouping shouldBe None
       } else if (col.index == 8) {
         col.parentFeatureName shouldBe Seq(f1.name)
-        col.indicatorGroup shouldBe Option(f1.name)
+        col.grouping shouldBe Option(f1.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       } else {
         col.parentFeatureName shouldBe Seq(f2.name)
-        col.indicatorGroup shouldBe Option(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      }
+    }
+  }
+
+  it should "append the text lengths to the feature vector if one feature is determined to be text" in {
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(true).setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
+    val res = transformed.collect(smartVectorized)
+    val expected = Array(
+      Vectors.sparse(10, Array(0, 4, 6, 8), Array(1.0, 1.0, 1.0, 10.0)),
+      Vectors.sparse(10, Array(0, 9), Array(1.0, 1.0)),
+      Vectors.sparse(10, Array(1, 6, 8), Array(1.0, 1.0, 6.0)),
+      Vectors.sparse(10, Array(0, 6, 8), Array(1.0, 2.0, 9.0)),
+      Vectors.sparse(10, Array(3, 9), Array(1.0, 1.0))
+    ).map(_.toOPVector)
+
+    res shouldEqual expected
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.history.keys shouldBe Set(f1.name, f2.name)
+    meta.columns.length shouldBe 10
+    meta.columns.foreach { col =>
+      if (col.index < 4) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+      } else if (col.index < 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+      } else if (col.index == 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      }
+    }
+  }
+
+  it should "append one text lengths column to the feature vector for each feature determined to be text" in {
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(1).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
+      .setTrackTextLen(true).setInput(f1, f2).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
+    val res = transformed.collect(smartVectorized)
+    val expected = Array(
+      Vectors.sparse(12, Array(0, 2, 4, 6, 8, 9), Array(1.0, 1.0, 1.0, 1.0, 10.0, 10.0)),
+      Vectors.sparse(12, Array(0, 2, 8, 11), Array(1.0, 1.0, 10.0, 1.0)),
+      Vectors.sparse(12, Array(0, 3, 6, 8, 9), Array(1.0, 1.0, 1.0, 11.0, 6.0)),
+      Vectors.sparse(12, Array(0, 2, 6, 8, 9), Array(1.0, 1.0, 2.0, 10.0, 9.0)),
+      Vectors.sparse(12, Array(10, 11), Array(1.0, 1.0))
+    ).map(_.toOPVector)
+
+    res shouldEqual expected
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.history.keys shouldBe Set(f1.name, f2.name)
+    meta.columns.length shouldBe 12
+
+    meta.columns(1)
+
+    meta.columns.foreach { col =>
+      if (col.index < 4) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe None
+      } else if (col.index < 8) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe None
+      } else if (col.index == 8) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else if (col.index == 9) {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
+        col.indicatorValue shouldBe None
+        col.descriptorValue shouldBe Option(OpVectorColumnMetadata.TextLenString)
+      } else if (col.index == 10) {
+        col.parentFeatureName shouldBe Seq(f1.name)
+        col.grouping shouldBe Option(f1.name)
+        col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
+      } else {
+        col.parentFeatureName shouldBe Seq(f2.name)
+        col.grouping shouldBe Option(f2.name)
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }

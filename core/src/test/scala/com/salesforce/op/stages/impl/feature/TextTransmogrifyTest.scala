@@ -43,29 +43,38 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
+class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with AttributeAsserts {
 
   val cityData: Seq[City] = RandomText.cities.take(10).toList
   val countryData: Seq[Country] = RandomText.countries.take(10).toList
   val postalData: Seq[PostalCode] = RandomText.postalCodes.take(10).toList
   val textAreaData: Seq[TextArea] = RandomText.textAreas(0, 10).take(10).toList
   val textData: Seq[Text] = RandomText.strings(0, 10).take(10).toList
+  val largeTextData: Seq[Text] = RandomText.strings(1, 10).take(40).toList
+  val largeTextAreaData: Seq[TextArea] = RandomText.textAreas(1, 10).take(40).toList
 
   val data: Seq[(City, Country, PostalCode, Text, TextArea)] =
     cityData.zip(countryData).zip(postalData).zip(textData).zip(textAreaData)
-      .map{ case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
+      .map { case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
 
   val (ds, city, country, postal, text, textarea) = TestFeatureBuilder("city", "country", "postal", "text",
     "textarea", data)
 
+  val largeData: Seq[(Text, TextArea)] = largeTextData.zip(largeTextAreaData)
+  val (largeDS, largeText, largeTextarea) = TestFeatureBuilder("largerText", "largerTextarea", largeData)
+
+
   "TextVectorizers" should "vectorize various text feature types" in {
-    val feature = Seq(city, country, postal, text).transmogrify()
+    val feature = Seq(city, country, postal, text, textarea).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val vectCollect = vectorized.collect(feature)
 
+    // all text features turned into categoricals since 10 < TextTokenizer.MaxCategoricalCardinality (30)
     for {vector <- vectCollect} {
-      vector.v.size < TransmogrifierDefaults.DefaultNumOfFeatures + (TransmogrifierDefaults.TopK + 2) * 3 shouldBe true
-      vector.v.size >= TransmogrifierDefaults.DefaultNumOfFeatures + 6 shouldBe true
+      // number of feature generated for each categorical will be equal to or larger than 2 (nullIndicator + others)
+      // and smaller or equal to (topK + nullIndicator + others)
+      vector.v.size should be <= (TransmogrifierDefaults.TopK + 2) * 5
+      vector.v.size should be >= 2 * 5
     }
 
     val meta = vectorized.schema.toOpVectorMetadata(feature.name)
@@ -77,10 +86,22 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
         !h.indicatorValue.contains(TransmogrifierDefaults.NullString) &&
         !h.indicatorValue.contains(TransmogrifierDefaults.OtherString)
     )
-    cityColumns.forall(c => c.parentFeatureName.head == c.indicatorGroup.get) shouldBe true
+    cityColumns.forall(c => c.parentFeatureName.head == c.grouping.get) shouldBe true
 
     val allCities = cityData.map(v => v.value.map(TextUtils.cleanString(_)))
     cityColumns.forall(c => allCities.contains(c.indicatorValue)) shouldBe true
+  }
+
+  "TextVectorizers" should "hash text feature correctly" in {
+    val feature = Seq(largeText, largeTextarea).transmogrify()
+    val vectorized = new OpWorkflow().setResultFeatures(feature).transform(largeDS)
+    val vectCollect = vectorized.collect(feature)
+    val field = vectorized.schema(feature.name)
+    val array = Array.fill(vectCollect.head.value.size / 2 - 1)(false) :+ true
+    assertNominal(field, array ++ array, vectCollect)
+    for {vector <- vectCollect} {
+      vector.v.size shouldBe TransmogrifierDefaults.DefaultNumOfFeatures * 2 + 2
+    }
   }
 
   "Transmogrify" should "work on phone features" in {
@@ -90,7 +111,10 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val feature2 = phone.vectorize("US")
     val vectorized = new OpWorkflow().setResultFeatures(feature, feature2).transform(ds)
     val vectCollect = vectorized.collect(feature, feature2)
-
+    val field = vectorized.schema(feature.name)
+    assertNominal(field, Array.fill(vectCollect.head._1.value.size)(true), vectCollect.map(_._1))
+    val field2 = vectorized.schema(feature2.name)
+    assertNominal(field2, Array.fill(vectCollect.head._2.value.size)(true), vectCollect.map(_._2))
     for {(vector1, vector2) <- vectCollect} {
       vector1.v.size shouldBe 2
       vector1.v.toArray should contain theSameElementsAs vector2.v.toArray
@@ -103,7 +127,8 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest {
     val feature = Seq(text).transmogrify()
     val vectorized = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val vectCollect = vectorized.collect(feature)
-
+    val field = vectorized.schema(feature.name)
+    assertNominal(field, Array.fill(vectCollect.head.value.size)(true), vectCollect)
     vectCollect.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures + 1)
   }
 

@@ -42,6 +42,9 @@ class PredictionTest extends FlatSpec with TestCommon {
 
   Spec[Prediction] should "extend FeatureType" in {
     Prediction(1.0) shouldBe a[FeatureType]
+    Prediction(1.0) shouldBe a[OPMap[_]]
+    Prediction(1.0) shouldBe a[NumericMap]
+    Prediction(1.0) shouldBe a[RealMap]
   }
   it should "error if prediction is missing" in {
     intercept[NonNullableEmptyException](new Prediction(null))
@@ -66,15 +69,27 @@ class PredictionTest extends FlatSpec with TestCommon {
   it should "return raw prediction" in {
     Prediction(2.0).rawPrediction shouldBe Array()
     Prediction(1.0, Array(1.0, 2.0), Array.empty[Double]).rawPrediction shouldBe Array(1.0, 2.0)
+    Prediction(1.0, (1 until 200).map(_.toDouble).toArray, Array.empty[Double]).rawPrediction shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return probability" in {
     Prediction(3.0).probability shouldBe Array()
     Prediction(1.0, Array.empty[Double], Array(1.0, 2.0)).probability shouldBe Array(1.0, 2.0)
+    Prediction(1.0, Array.empty[Double], (1 until 200).map(_.toDouble).toArray).probability shouldBe
+      (1 until 200).map(_.toDouble).toArray
   }
   it should "return score" in {
     Prediction(4.0).score shouldBe Array(4.0)
     Prediction(1.0, Array(2.0, 3.0), Array.empty[Double]).score shouldBe Array(1.0)
     Prediction(1.0, Array.empty[Double], Array(2.0, 3.0)).score shouldBe Array(2.0, 3.0)
+  }
+  it should "have a nice .toString method implementation" in {
+    Prediction(4.0).toString shouldBe
+      "Prediction(prediction = 4.0, rawPrediction = Array(), probability = Array())"
+    Prediction(1.0, Array(2.0, 3.0), Array.empty[Double]).toString shouldBe
+      "Prediction(prediction = 1.0, rawPrediction = Array(2.0, 3.0), probability = Array())"
+    Prediction(1.0, Array.empty[Double], Array(2.0, 3.0)).toString shouldBe
+      "Prediction(prediction = 1.0, rawPrediction = Array(), probability = Array(2.0, 3.0))"
   }
 
   private def assertPredictionError(f: => Unit) =

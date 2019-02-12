@@ -23,7 +23,7 @@ package com.salesforce.op.stages.impl.tuning
 import com.github.fommil.netlib.BLAS
 import com.salesforce.op.evaluators.OpEvaluatorBase
 import com.salesforce.op.stages.OPStage
-import com.salesforce.op.stages.impl.selector.{ModelInfo, ModelSelectorBaseNames}
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
@@ -47,7 +47,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   val parallelism: Int = ValidatorParamDefaults.Parallelism
 ) extends OpValidator[M, E] {
 
-  val validationName: String = ModelSelectorBaseNames.CrossValResults
+  val validationName: String = ModelSelectorNames.CrossValResults
   private val blas = BLAS.getInstance()
 
   override def getParams(): Map[String, Any] = Map("numFolds" -> numFolds, "seed" -> seed,
@@ -136,10 +136,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
    * @param splitter  used to estimate splitter params prior to cv
    * @return Array((TrainRDD, ValidationRDD), Index)
    */
-  private[op] override def createTrainValidationSplits[T](stratifyCondition: Boolean,
-    dataset: Dataset[T], label: String, splitter: Option[Splitter] = None): Array[(RDD[Row], RDD[Row])] = {
-
-    // TODO : Implement our own kFold method for better performance in a separate PR
+  private[op] override def createTrainValidationSplits[T](
+    stratifyCondition: Boolean,
+    dataset: Dataset[T],
+    label: String,
+    splitter: Option[Splitter]
+  ): Array[(RDD[Row], RDD[Row])] = {
 
     // get param that stores the label column
     val labelCol = evaluator.getParam(ValidatorParamDefaults.LabelCol)
@@ -160,13 +162,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     }
   }
 
-
   private def stratifyKFolds(rddsByClass: Array[RDD[Row]]): Array[(RDD[Row], RDD[Row])] = {
     // Cross Validation's Train/Validation data for each class
     val foldsByClass = rddsByClass.map(rdd => MLUtils.kFold(rdd, numFolds, seed)).toSeq
 
     if (foldsByClass.isEmpty) {
-      throw new RuntimeException("Dataset is too small for CV forlds selected some empty datasets are created")
+      throw new RuntimeException("Dataset is too small for CV folds selected some empty datasets are created")
     }
     // Merging Train/Validation data one by one
     foldsByClass.reduce[Array[(RDD[Row], RDD[Row])]] {

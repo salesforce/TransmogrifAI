@@ -30,7 +30,6 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.utils.json.JsonLike
 import enumeratum.EnumEntry
 import org.apache.spark.sql.types.Metadata
 
@@ -42,6 +41,24 @@ package object impl {
   trait ModelsToTry extends EnumEntry with Serializable
 
   trait MetadataLike {
-    def toMetadata(): Metadata
+
+    /**
+     * Converts to [[Metadata]]
+     *
+     * @throws RuntimeException in case of unsupported value type
+     * @return [[Metadata]] metadata
+     */
+    def toMetadata(): Metadata = toMetadata(skipUnsupported = false)
+
+    /**
+     * Converts to [[Metadata]]
+     *
+     * @param skipUnsupported skip unsupported values
+     * @throws RuntimeException in case of unsupported value type
+     * @return [[Metadata]] metadata
+     */
+    def toMetadata(skipUnsupported: Boolean): Metadata
+
   }
+
 }

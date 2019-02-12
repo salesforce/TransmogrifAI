@@ -9,7 +9,7 @@ dependencies {
     compile "com.googlecode.libphonenumber:carrier:$googleCarrierVersion"
 
     // Optimaize language detection
-    compile "com.github.relateiq:language-detector:$optimaizeLangDetectorVersion"
+    compile "com.salesforce.transmogrifai:language-detector:$optimaizeLangDetectorVersion"
 
     // Tika library for detecting various binary data formats
     compile "org.apache.tika:tika-core:$tikaVersion"
@@ -22,4 +22,9 @@ dependencies {
 
     // Scopt
     compile "com.github.scopt:scopt_$scalaVersion:$scoptVersion"
+
+    // XGBoost
+    compile ("ml.dmlc:xgboost4j-spark:$xgboostVersion") { exclude group: 'com.esotericsoftware.kryo', module: 'kryo' }
+    // Akka slfj4 logging (version matches XGBoost dependency)
+    testCompile "com.typesafe.akka:akka-slf4j_$scalaVersion:$akkaSlf4jVersion"
 }

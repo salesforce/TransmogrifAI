@@ -30,21 +30,22 @@
 
 package com.salesforce.op.filters
 
-import scala.math.round
-
+import com.salesforce.op.features.types._
+import com.salesforce.op.features.{FeatureBuilder, OPFeature, TransientFeature}
+import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import com.salesforce.op.test.TestSparkContext
-import com.twitter.algebird.Monoid._
+import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.linalg.{Matrix, Vector}
+import com.twitter.algebird.Tuple2Semigroup
 import org.apache.spark.mllib.stat.Statistics
-import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.filters.Summary._
 
 @RunWith(classOf[JUnitRunner])
-class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
+class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
 
   val responseKey1: FeatureKey = "Response1" -> None
   val responseKey2: FeatureKey = "Response2" -> None
@@ -65,6 +66,7 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
     responses = Map(responseKey2 -> Right(Seq(-0.5))),
     predictors = Map(predictorKey2A -> Left(Seq("iv"))))
   val allPreparedFeatures = Seq(preparedFeatures1, preparedFeatures2, preparedFeatures3)
+  implicit val sgTuple2 = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
   val (allResponseSummaries, allPredictorSummaries) = allPreparedFeatures.map(_.summaries).reduce(_ + _)
 
   val allResponseKeys1 = Array(responseKey1, responseKey2)
@@ -72,27 +74,30 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
   val allPredictorKeys1 = Array(predictorKey1, predictorKey2A, predictorKey2B)
   val allPredictorKeys2 = Array(predictorKey1)
 
+
   Spec[PreparedFeatures] should "produce correct summaries" in {
     val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
     val (responseSummaries2, predictorSummaries2) = preparedFeatures2.summaries
     val (responseSummaries3, predictorSummaries3) = preparedFeatures3.summaries
 
     responseSummaries1 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(1.0, 1.0), responseKey2 -> Summary(0.5, 0.5))
+      Seq(responseKey1 -> Summary(1.0, 1.0, 1.0, 1), responseKey2 -> Summary(0.5, 0.5, 0.5, 1))
     predictorSummaries1 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.0), predictorKey2A -> Summary(2.0, 2.0), predictorKey2B -> Summary(1.0, 1.0))
+      Seq(predictorKey1 -> Summary(0.0, 0.0, 0.0, 2), predictorKey2A -> Summary(2.0, 2.0, 2.0, 1),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
     responseSummaries2 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 0.0))
+      Seq(responseKey1 -> Summary(0.0, 0.0, 0.0, 1))
     predictorSummaries2 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.4, 0.5))
+      Seq(predictorKey1 -> Summary(0.4, 0.5, 0.9, 2))
     responseSummaries3 should contain theSameElementsAs
-      Seq(responseKey2 -> Summary(-0.5, -0.5))
+      Seq(responseKey2 -> Summary(-0.5, -0.5, -0.5, 1))
     predictorSummaries3 should contain theSameElementsAs
-      Seq(predictorKey2A -> Summary(1.0, 1.0))
+      Seq(predictorKey2A -> Summary(1.0, 1.0, 1.0, 1))
     allResponseSummaries should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 1.0), responseKey2 -> Summary(-0.5, 0.5))
+      Seq(responseKey1 -> Summary(0.0, 1.0, 1.0, 2), responseKey2 -> Summary(-0.5, 0.5, 0.0, 2))
     allPredictorSummaries should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.5), predictorKey2A -> Summary(1.0, 2.0), predictorKey2B -> Summary(1.0, 1.0))
+      Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4), predictorKey2A -> Summary(1.0, 2.0, 3.0, 2),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
   }
 
   it should "produce correct null-label leakage vector with single response" in {
@@ -155,13 +160,56 @@ class PreparedFeaturesTest extends FlatSpec with TestSparkContext {
     testCorrMatrix(allResponseKeys2, CorrelationType.Spearman, expected)
   }
 
+  it should "transform dates for each period" in {
+    val expectedBins = Map(
+      TimePeriod.DayOfMonth -> 17.0,
+      TimePeriod.DayOfWeek -> 6.0,
+      TimePeriod.DayOfYear -> 17.0,
+      TimePeriod.HourOfDay -> 0.0,
+      TimePeriod.MonthOfYear -> 0.0,
+      TimePeriod.WeekOfMonth -> 2.0,
+      TimePeriod.WeekOfYear -> 2.0
+    )
+    expectedBins.keys should contain theSameElementsAs TimePeriod.values
+
+    val dateMap = FeatureBuilder.DateMap[Passenger]
+      .extract(p => Map("DTMap" -> p.getBoarded.toLong).toDateMap).asPredictor
+
+    val dateFeatures: Array[OPFeature] = Array(boarded, boardedTime, boardedTimeAsDateTime, dateMap)
+    val dateDataFrame: DataFrame = dataReader.generateDataFrame(dateFeatures).persist()
+
+    for {
+      (period, expectedBin) <- expectedBins
+    } {
+      def createExpectedDateMap(d: Double, aggregates: Int): Map[FeatureKey, ProcessedSeq] = Map(
+        (boarded.name, None) -> Right((0 until aggregates).map(_ => d).toList),
+        (boardedTime.name, None) -> Right(List(d)),
+        (boardedTimeAsDateTime.name, None) -> Right(List(d)),
+        (dateMap.name, Option("DTMap")) -> Right(List(d)))
+
+      val res = dateDataFrame.rdd
+        .map(PreparedFeatures(_, Array.empty, dateFeatures.map(TransientFeature(_)), Option(period)))
+        .map(_.predictors.mapValues(_.right.map(_.toList)))
+        .collect()
+
+      val expectedResults: Seq[Map[FeatureKey, ProcessedSeq]] =
+      // The first observation is expected to be aggregated twice
+        Seq(createExpectedDateMap(expectedBin, 2)) ++
+          Seq.fill(4)(expectedBin).map(createExpectedDateMap(_, 1)) ++
+          Seq(Map[FeatureKey, ProcessedSeq]())
+
+      withClue(s"Computed bin for $period period does not match:\n") {
+        res should contain theSameElementsAs expectedResults
+      }
+    }
+  }
+
   def testCorrMatrix(
     responseKeys: Array[FeatureKey],
     correlationType: CorrelationType,
     expectedResult: Seq[Array[Double]]
   ): Unit = {
-    val corrRDD =
-      sc.parallelize(allPreparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, allPredictorKeys1)))
+    val corrRDD = sc.parallelize(allPreparedFeatures.map(_.getNullLabelLeakageVector(responseKeys, allPredictorKeys1)))
     val corrMatrix = Statistics.corr(corrRDD, correlationType.sparkName)
 
     corrMatrix.colIter.zipWithIndex.map { case(vec, idx) =>

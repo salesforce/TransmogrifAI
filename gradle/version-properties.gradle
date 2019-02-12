@@ -2,38 +2,41 @@
  * Helper that calls a command and returns the output.
  */
 def cmdCaller = { commandln ->
-    def stdout = new ByteArrayOutputStream()
-    exec {
-        commandLine commandln
-        standardOutput = stdout
+    try {
+        def stdout = new ByteArrayOutputStream()
+        exec {
+            commandLine commandln
+            standardOutput = stdout
+        }
+        return stdout.toString().trim()
+    } catch (Exception ex) {
+        System.err.println("Command execution failed: '" + commandln.join(" ") + "'. Error: " + ex.message)
+        return ""
     }
-    return stdout.toString().trim()
 }
 
 
-configure(allprojects - project(':templates').subprojects - project(':docs'))  {
+configure(allprojects - project(':templates').subprojects) {
     // Note: to make this function to work on TeamCity set 'VCS checkout mode' to 'Automatically on Agent'
     //noinspection GroovyAssignabilityCheck
     task createVersionProperties() {
         doLast {
-            if (!System.env.OP_VERSION_PROPS_DISABLED) {
-                String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
-                String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
-                String gitBranch = cmdCaller(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
-                String gitDate = cmdCaller(['git', 'log', '-1', '--format=%cd', 'HEAD']);
-                def formattedDate = new Date().format('yyyy-MM-dd HH:mm:ss Z')
+            String gitCommitHash = cmdCaller(['git', 'rev-parse', 'HEAD']);
+            String gitRepo = cmdCaller(['git', 'config', '--get', 'remote.origin.url']);
+            String gitBranch = cmdCaller(['git', 'rev-parse', '--abbrev-ref', 'HEAD']);
+            String gitDate = cmdCaller(['git', 'log', '-1', '--format=%cd', 'HEAD']);
+            def formattedDate = new Date().format('yyyy-MM-dd HH:mm:ss Z')
 
-                String propsStr = 'version=' + version + '\n' +
-                        'build.time=' + formattedDate + '\n' +
-                        'git.repo=' + gitRepo + '\n' +
-                        'git.branch=' + gitBranch + '\n' +
-                        'git.commit.id=' + gitCommitHash + '\n' +
-                        'git.commit.time=' + gitDate + '\n'
+            String propsStr = 'version=' + version + '\n' +
+                    'build.time=' + formattedDate + '\n' +
+                    'git.repo=' + gitRepo + '\n' +
+                    'git.branch=' + gitBranch + '\n' +
+                    'git.commit.id=' + gitCommitHash + '\n' +
+                    'git.commit.time=' + gitDate + '\n'
 
-                File versionFile = file('build/resources/main/op-version.properties')
-                versionFile.parentFile.mkdirs()
-                versionFile.write(propsStr)
-            }
+            File versionFile = file('build/resources/main/op-version.properties')
+            versionFile.parentFile.mkdirs()
+            versionFile.write(propsStr)
         }
     }
 }

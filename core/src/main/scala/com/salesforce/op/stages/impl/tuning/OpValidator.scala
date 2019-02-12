@@ -33,9 +33,8 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
-import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages.OpPipelineStage2
-import com.salesforce.op.stages.impl.selector.{ModelSelectorBaseNames, StageParamNames, _}
+import com.salesforce.op.stages.impl.selector.{ModelSelectorNames, _}
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil._
@@ -137,7 +136,6 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     stratifyCondition: Boolean = isClassification && stratify
   )(implicit spark: SparkSession): BestEstimator[E]
 
-
   /**
    * Get the best model and the metadata with with the validator params
    *
@@ -186,19 +184,21 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     }
   }
 
-
   /**
    * Creates Train Validation Splits
    *
-   * @param stratifyCondition condition to stratify splits
-   * @param dataset
-   * @param label
-   * @param splitter  used to estimate splitter params prior to splits
-   * @return
+   * @param stratifyCondition condition to do stratify train split
+   * @param dataset           dataset to split
+   * @param label             name of label in dataset
+   * @param splitter          used to estimate splitter params prior to ts
+   * @return Array[(Train, Test)]
    */
-  private[op] def createTrainValidationSplits[T](stratifyCondition: Boolean,
-    dataset: Dataset[T], label: String, splitter: Option[Splitter] = None): Array[(RDD[Row], RDD[Row])]
-
+  private[op] def createTrainValidationSplits[T](
+    stratifyCondition: Boolean,
+    dataset: Dataset[T],
+    label: String,
+    splitter: Option[Splitter]
+  ): Array[(RDD[Row], RDD[Row])]
 
   protected def prepareStratification[T](
     dataset: Dataset[T],
@@ -212,20 +212,13 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     val datasetsByClass = classes.map(theClass => dataset.filter(functions.col(label) === theClass))
 
     splitter.map {
-      case d: DataBalancer => {
-        val Array(negative, positive) = datasetsByClass
-        d.estimate(
-          data = dataset,
-          positiveData = positive,
-          negativeData = negative,
-          seed = d.getSeed
-        )
-      }
-      case c: DataCutter => {
-        val labelCounts = dataset.sparkSession.createDataFrame(classes zip datasetsByClass.map(_.count())).persist
+      case d: DataBalancer =>
+        val Array(negativeCount, positiveCount) = datasetsByClass.map(_.count())
+        d.estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = d.getSeed)
+      case c: DataCutter =>
+        val labelCounts = dataset.sparkSession.createDataFrame(classes zip datasetsByClass.map(_.count())).persist()
         c.estimate(labelCounts)
         labelCounts.unpersist
-      }
       case _ =>
     }
     // Creates RDD grouped by classes (0, 1, 2, 3, ..., K)
@@ -249,10 +242,10 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       indexOfLastEstimator = Some(-1)
     )
     val selectTrain = newTrain.select(label, features)
-      .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val selectTest = newTest.select(label, features)
-      .withColumn(ModelSelectorBaseNames.idColName, monotonically_increasing_id())
+      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val (balancedTrain, balancedTest) = splitter.map(s => (
       s.prepare(selectTrain).train,
@@ -285,12 +278,12 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
         case e: OpPipelineStage2[RealNN, OPVector, Prediction]@unchecked =>
           val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked, _)) =
             FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
-              nonNullable = Set(features, ModelSelectorBaseNames.idColName))
+              nonNullable = Set(features, ModelSelectorNames.idColName))
           e.setInput(labelFeat, featuresFeat)
-          evaluator.setFullPredictionCol(e.getOutput())
+          evaluator.setPredictionCol(e.getOutput())
         case _ => // otherwise it is a spark estimator
-          val pi1 = estimator.getParam(StageParamNames.inputParam1Name)
-          val pi2 = estimator.getParam(StageParamNames.inputParam2Name)
+          val pi1 = estimator.getParam(ModelSelectorNames.inputParam1Name)
+          val pi2 = estimator.getParam(ModelSelectorNames.inputParam2Name)
           estimator.set(pi1, label).set(pi2, features)
       }
       Future {

@@ -4,30 +4,29 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:0.9.0'
-        classpath 'com.amazonaws:aws-java-sdk-core:1.11.353'
+        classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
     }
 }
 
 plugins {
     id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
-    id 'org.scoverage' version '2.3.0'
+    id 'org.scoverage' version '2.5.0'
     id 'net.minecrell.licenser' version '0.4.1'
     id 'com.github.jk1.dependency-license-report' version '0.5.0'
-    id 'com.github.johnrengelman.shadow' version '2.0.4'
+    id 'com.github.johnrengelman.shadow' version '4.0.4'
 }
 
 allprojects {
     repositories {
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        jcenter()
     }
 }
 
 apply from: 'gradle/version-properties.gradle'
 
-def allProjs = allprojects - project(':templates').subprojects - project(':docs')
-def subProjs = subprojects - project(':templates').subprojects - project(':docs')
+def allProjs = allprojects - project(':templates').subprojects
+def subProjs = subprojects - project(':templates').subprojects
 
 // distribute to all projects
 ext.subProjs = subProjs
@@ -50,8 +49,8 @@ configure(allProjs) {
     sourceCompatibility = 1.8
     targetCompatibility = 1.8
 
-    // Max: Set this to the main class for cli.
-    // Could not figure out how to configure it just for the cli subproject
+    // Set this to the main class for cli.
+    // Could not figure out how to configure it just for the cli subproject.
     mainClassName = "com.salesforce.op.cli.CLI"
 
     ext {
@@ -61,16 +60,16 @@ configure(allProjs) {
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.11'
         avroVersion = '1.7.7'
-        sparkVersion = '2.2.1'
+        sparkVersion = '2.3.2'
         sparkAvroVersion = '4.0.0'
-        scalaGraphVersion = '1.11.2'
-        scalafmtVersion = '1.0.0-RC1'
+        scalaGraphVersion = '1.12.5'
+        scalafmtVersion = '1.5.1'
         hadoopVersion = 'hadoop2'
         scalajCollVersion = '0.1.2'
         json4sVersion = '3.2.11' // matches Spark dependency version
         jodaTimeVersion = '2.9.4'
         jodaConvertVersion = '1.8.1'
-        algebirdVersion = '0.12.3'
+        algebirdVersion = '0.13.4'
         jacksonVersion = '2.7.3'
         luceneVersion = '7.3.0'
         enumeratumVersion = '1.4.12'
@@ -78,17 +77,21 @@ configure(allProjs) {
         googleLibPhoneNumberVersion = '8.8.5'
         googleGeoCoderVersion = '2.82'
         googleCarrierVersion = '1.72'
-        chillAvroVersion = '0.8.0'
+        chillVersion = '0.8.4'
         reflectionsVersion = '0.9.11'
         collectionsVersion = '3.2.2'
-        optimaizeLangDetectorVersion = '0.7.1'
+        optimaizeLangDetectorVersion = '0.0.1'
         tikaVersion = '1.16'
-        sparkTestingBaseVersion = '2.2.0_0.8.0'
+        sparkTestingBaseVersion = '2.3.1_0.10.0'
         sourceCodeVersion = '0.1.3'
         pegdownVersion = '1.4.2'
         commonsValidatorVersion = '1.6'
         commonsIOVersion = '2.6'
         scoveragePluginVersion = '1.3.1'
+        hadrianVersion = '0.8.5'
+        aardpfarkVersion = '0.1.0-SNAPSHOT'
+        xgboostVersion = '0.81'
+        akkaSlf4jVersion = '2.3.11'
 
         mainClassName = 'com.salesforce.Main'
     }
@@ -145,22 +148,21 @@ configure(allProjs) {
             memoryMaximumSize = '1g'
             jvmArgs = ['-XX:MaxMetaspaceSize=256m']
         }
-    }
-    compileScala {
         scalaCompileOptions.additionalParameters = [
-            "-optimize", "-feature", "-language:implicitConversions", "-language:existentials"
+                "-Yrangepos", "-feature",
+                "-language:implicitConversions", "-language:existentials", "-language:postfixOps"
         ]
     }
-    compileTestScala {
-        scalaCompileOptions.additionalParameters = ["-Yrangepos"]
-    }
+    compileScala.scalaCompileOptions.additionalParameters += "-optimize"
     [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 
     jar {
         manifest.attributes "Main-Class": "$mainClassName"
         baseName = "${rootProject.name}"
     }
-    jar.dependsOn(createVersionProperties)
+    if (System.getenv("CI") != 'true') {
+        jar.dependsOn(createVersionProperties)
+    }
 
     scalaStyle {
         configLocation = "$rootProject.rootDir/gradle/scalastyle-config.xml"
@@ -168,7 +170,10 @@ configure(allProjs) {
         source = "src/main/scala"
         testSource = "src/test/scala"
     }
-    compileScala.dependsOn(scalaStyle)
+
+    if (System.getenv("CI") != 'true') {
+        compileScala.dependsOn(scalaStyle)
+    }
 
     avro {
         createSetters = true
@@ -198,14 +203,13 @@ configure(allProjs) {
         ignoreFailures = true
         include '**/*.java', '**/*.scala'
         exclude '**/org/apache/spark/ml/SparkDefaultParamsReadWrite.scala',
-                '**/com/salesforce/op/utils/io/DirectMapreduceOutputCommitter.scala',
                 '**/com/salesforce/op/test/TestSparkContext.scala',
                 '**/com/salesforce/op/test/TempDirectoryTest.scala',
-                '**/com/salesforce/op/utils/io/DirectOutputCommitter.scala',
                 '**/com/salesforce/op/stages/impl/tuning/OpCrossValidation.scala',
                 '**/com/salesforce/op/stages/impl/tuning/OpTrainValidationSplit.scala',
                 '**/com/salesforce/op/test/*.java',
                 '**/com/fasterxml/jackson/module/scala/**',
+                '**/com/salesforce/op/utils/stats/StreamingHistogram.java',
                 '**/templates/**', '**/resources/**'
     }
     scoverage {
@@ -259,20 +263,21 @@ configure(allProjs) {
             println sourceSets.main.runtimeClasspath.asPath
         }
     }
+
+    if (System.getenv("TEST_FILES") != null) {
+        testScoverage.setIncludes(Arrays.asList(System.getenv("TEST_FILES").split('\n')))
+    }
 }
 
 wrapper {
-    gradleVersion = '4.9'
+    gradleVersion = '5.2'
     distributionType = Wrapper.DistributionType.BIN
-    distributionSha256Sum = 'e66e69dce8173dd2004b39ba93586a184628bc6c28461bc771d6835f7f9b0d28'
+    distributionSha256Sum = 'ff322863250159595e93b5a4d17a6f0d21c59a1a0497c1e1cf1d53826485503f'
 }
 
 task aggregateScoverage(type: org.scoverage.ScoverageAggregate) {
     description 'Aggregates scoverage reports of all subprojects.'
 }
-
-import com.amazonaws.auth.*
-import com.amazonaws.auth.profile.*
 
 configure(subProjs) {
     apply from: "$rootProject.projectDir/gradle/tests.gradle"
@@ -280,17 +285,8 @@ configure(subProjs) {
 
     jar.baseName = "$rootProject.name-$project.name"
 
-    def fetchAwsCredentials = {
-        // Note: 'op-repo-admin' profile must be set in ~/.aws/credentials
-        String profile = "op-repo-admin"
-        try {
-            return new ProfileCredentialsProvider(profile).credentials
-        } catch (Exception e) {
-            logger.debug("Unable to retrieve AWS credentials from '$profile' profile, publishing to S3 will not be available.", e)
-            return new BasicAWSCredentials("unknown-key", "unknown-secret")
-        }
-    }
-    AWSCredentials awsCredentials = fetchAwsCredentials()
+    // ignore link warning in scaladoc
+    scaladoc.scalaDocOptions.additionalParameters = ['-no-link-warnings']
 
     task scaladocJar(type: Jar, dependsOn: scaladoc) {
         classifier = 'javadoc'
@@ -349,29 +345,49 @@ configure(subProjs) {
             }
         }
         repositories {
-            maven {
-                url "s3://op-repo/releases"
-                credentials(AwsCredentials) {
-                    accessKey awsCredentials.AWSAccessKeyId
-                    secretKey awsCredentials.AWSSecretKey
-                }
-            }
             // Disable Sonatype publication for now
-            /* maven {
-                // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
-                url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
-                credentials {
-                    username nexusUsername
-                    password nexusPassword
-                }
-            } */
+            // maven {
+            //     // Note: requires 'nexusUsername' and 'nexusPassword' to be set in ~/.gradle/gradle.properties file
+            //     url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+            //     credentials {
+            //         username nexusUsername
+            //         password nexusPassword
+            //     }
+            // }
+            // Disable Bintray publication for now
+            // maven {
+            //     // Note: requires 'bintrayUsername' and 'bintrayPassword' to be set in ~/.gradle/gradle.properties file
+            //     url "https://api.bintray.com/maven/salesforce/maven/TransmogrifAI/;publish=1"
+            //     credentials {
+            //         username bintrayUsername
+            //         password bintrayPassword
+            //     }
+            // }
         }
     }
 
-    signing {
-        // Note: requires 'signing.keyId', 'signing.password', 'signing.secretKeyRingFile' be set in ~/.gradle/gradle.properties file
-        // and https://gpgtools.org/ (gpg2 installed and configured)
-        useGpgCmd()
-        sign publishing.publications.mavenJava
+    if (System.getenv("SIGN_RELEASE") == 'true') {
+        signing {
+            // For signing to work read - https://docs.gradle.org/current/userguide/signing_plugin.html
+            // Most importantly:
+            // 1. Install & configure GPGTools - https://gpgtools.org
+            // 2. Copy the full 40 character key id from the output of the command: gpg2 -K
+            // 3. Set 'signing.gnupg.keyName=<key id>' in ~/.gradle/gradle.properties file
+            // 4. If you protect your key with a passphrase add 'signing.password=<secret>' in ~/.gradle/gradle.properties file
+            useGpgCmd()
+            sign publishing.publications.mavenJava
+        }
     }
 }
+
+task allScaladoc(type: ScalaDoc) {
+    group 'Documentation'
+    description 'Generates Scaladoc for the main source code of all subprojects.'
+    title 'TransmogrifAI'
+    source subProjs.collect { it.sourceSets.main.allJava + it.sourceSets.main.allScala }
+    classpath = files(subProjs.collect { it.sourceSets.main.compileClasspath })
+    destinationDir = file("build/scaladoc")
+}
+
+// run by Heroku to build docs
+task stage(dependsOn: ':allScaladoc')

@@ -39,10 +39,11 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+import com.salesforce.op.utils.spark.RichDataset._
 
 
 @RunWith(classOf[JUnitRunner])
-class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
+class IntegralVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val (testData, inA, inB, inC, inD) = TestFeatureBuilder("inA", "inB", "inC", "inD",
     Seq(
@@ -113,7 +114,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2L, 2L, null, Vectors.dense(3.0, 2.0, 2.0, 3.0)),
       (null, null, null, null, Vectors.dense(3.0, 3.0, 3.0, 3.0))
     )
-
+    val field = testDataTransformedConstant.schema(testModelConstant.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedZero.head._5.size)(false),
+      testDataTransformedConstant.collect(testModelConstant.getOutput()))
     transformedValuesConstant.map(_.get(0)) shouldEqual expectedZero.map(_._1)
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedZero.map(_._2)
     transformedValuesConstant.map(_.get(2)) shouldEqual expectedZero.map(_._3)
@@ -142,7 +145,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
       (null, null, null, null, Vectors.dense(4.0, 2.0, 1.0, 0.0))
     )
-
+    val field = testDataTransformedMode.schema(testModelMode.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedMode.head._5.size)(false),
+      testDataTransformedMode.collect(testModelMode.getOutput()))
     transformedValuesMode.map(_.get(0)) shouldEqual expectedMode.map(_._1)
     transformedValuesMode.map(_.get(1)) shouldEqual expectedMode.map(_._2)
     transformedValuesMode.map(_.get(2)) shouldEqual expectedMode.map(_._3)
@@ -168,6 +173,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(0.0, 1.0, 2.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
       (null, null, null, null, Vectors.dense(0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0))
     )
+    val field = testDataTransformedConstantTracked.schema(testModelConstantTracked.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedZeroTracked.head._5.size / 2)(Seq(false, true)).flatten,
+      testDataTransformedConstantTracked.collect(testModelConstantTracked.getOutput()))
 
     transformedValuesZeroTracked.map(_.get(0)) shouldEqual expectedZeroTracked.map(_._1)
     transformedValuesZeroTracked.map(_.get(1)) shouldEqual expectedZeroTracked.map(_._2)
@@ -206,6 +214,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(4.0, 1.0, 2.0, 0.0, 2.0, 0.0, 0.0, 1.0)),
       (null, null, null, null, Vectors.dense(4.0, 1.0, 2.0, 1.0, 1.0, 1.0, 0.0, 1.0))
     )
+    val field = testDataTransformedModeTracked.schema(testModelModeTracked.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedModeTracked.head._5.size / 2)(Seq(false, true)).flatten,
+      testDataTransformedModeTracked.collect(testModelModeTracked.getOutput()))
 
     transformedValuesModeTracked.map(_.get(0)) shouldEqual expectedModeTracked.map(_._1)
     transformedValuesModeTracked.map(_.get(1)) shouldEqual expectedModeTracked.map(_._2)
@@ -248,6 +259,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
       (null, null, null, null, Vectors.dense(4.0, 2.0, 1.0, 0.0))
     )
+    val field = testDataTransformedMode.schema(testModelMode.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedMode.head._5.size)(false),
+      testDataTransformedMode.collect(testModelMode.getOutput()))
 
     transformedValuesMode.map(_.get(0)) shouldEqual expectedMode.map(_._1)
     transformedValuesMode.map(_.get(1)) shouldEqual expectedMode.map(_._2)
@@ -278,6 +292,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
       (null, null, null, null, Vectors.dense(4.0, 2.0, 1.0, 0.0))
     )
+    val field = testDataTransformedMode.schema(testModelMode.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedMode.head._5.size)(false),
+      testDataTransformedMode.collect(testModelMode.getOutput()))
 
     transformedValuesMode.map(_.get(0)) shouldEqual expectedMode.map(_._1)
     transformedValuesMode.map(_.get(1)) shouldEqual expectedMode.map(_._2)
@@ -308,6 +325,9 @@ class IntegralVectorizerTest extends FlatSpec with TestSparkContext {
       (null, 2.0, 2.0, null, Vectors.dense(4.0, 2.0, 2.0, 0.0)),
       (null, null, null, null, Vectors.dense(4.0, 2.0, 1.0, 0.0))
     )
+    val field = testDataTransformedMode.schema(testModelMode.getOutputFeatureName)
+    assertNominal(field, Array.fill(expectedMode.head._5.size)(false),
+      testDataTransformedMode.collect(testModelMode.getOutput()))
 
     transformedValuesMode.map(_.get(0)) shouldEqual expectedMode.map(_._1)
     transformedValuesMode.map(_.get(1)) shouldEqual expectedMode.map(_._2)

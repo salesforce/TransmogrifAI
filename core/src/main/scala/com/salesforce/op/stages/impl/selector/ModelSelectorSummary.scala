@@ -73,25 +73,27 @@ case class ModelSelectorSummary
 ) extends MetadataLike {
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     val meta = new MetadataBuilder()
       .putString(ValidationTypeName, validationType.entryName)
-      .putMetadata(ValidationParameters, validationParameters.toMetadata)
-      .putMetadata(DataPrepParameters, dataPrepParameters.toMetadata)
+      .putMetadata(ValidationParameters, validationParameters.toMetadata(skipUnsupported))
+      .putMetadata(DataPrepParameters, dataPrepParameters.toMetadata(skipUnsupported))
       .putString(EvaluationMetric, evaluationMetric.entryName)
       .putString(ProblemTypeName, problemType.entryName)
       .putString(BestModelUID, bestModelUID)
       .putString(BestModelName, bestModelName)
       .putString(BestModelType, bestModelType)
-      .putMetadataArray(ValidationResults, validationResults.map(_.toMetadata()).toArray)
+      .putMetadataArray(ValidationResults, validationResults.map(_.toMetadata(skipUnsupported)).toArray)
       .putStringArray(TrainEvaluation,
         Array(trainEvaluation.getClass.getName, trainEvaluation.toJson(pretty = false)))
 
-    dataPrepResults.map(dp => meta.putMetadata(DataPrepResults, dp.toMetadata()))
+    dataPrepResults.map(dp => meta.putMetadata(DataPrepResults, dp.toMetadata(skipUnsupported)))
     holdoutEvaluation.map(he => meta.putStringArray(HoldoutEvaluation,
       Array(he.getClass.getName, he.toJson(pretty = false))))
     meta.build()
@@ -117,17 +119,19 @@ case class ModelEvaluation
 ) extends MetadataLike {
 
   /**
-   * Convert to metadata instance
+   * Converts to [[Metadata]]
    *
-   * @return
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
    */
-  def toMetadata(): Metadata = {
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(ModelUID, modelUID)
       .putString(ModelName, modelName)
       .putString(ModelTypeName, modelType)
       .putStringArray(MetricValues, Array(metricValues.getClass.getName, metricValues.toJson(pretty = false)))
-      .putMetadata(ModelParameters, modelParameters.toMetadata)
+      .putMetadata(ModelParameters, modelParameters.toMetadata(skipUnsupported))
       .build()
   }
 }
@@ -237,10 +241,12 @@ case object ModelSelectorSummary {
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
           val asMetrics = d.flatMap{ case (_, values) => values.map{
             case (nm: String, mp: Map[String, Any]@unchecked) =>
-              val valsJson = JsonUtils.toJsonString(mp) // gross but it works TODO try to find a better way
+              val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
               nm match {
                 case OpEvaluatorNames.Binary.humanFriendlyName =>
                   nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
+                case OpEvaluatorNames.BinScore.humanFriendlyName =>
+                  nm -> JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson).get
                 case OpEvaluatorNames.Multi.humanFriendlyName =>
                   nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
                 case OpEvaluatorNames.Regression.humanFriendlyName =>
@@ -253,7 +259,6 @@ case object ModelSelectorSummary {
       case n => JsonUtils.fromString(json)(ClassTag(n)).getOrElse(error(n))
     }
   }
-
 
 }
 
@@ -270,11 +275,13 @@ object ProblemType extends Enum[ProblemType] {
   def fromEvalMetrics(eval: EvaluationMetrics): ProblemType = {
     eval match {
       case _: BinaryClassificationMetrics => ProblemType.BinaryClassification
+      case _: BinaryClassificationBinMetrics => ProblemType.BinaryClassification
       case _: MultiClassificationMetrics => ProblemType.MultiClassification
       case _: RegressionMetrics => ProblemType.Regression
       case m: MultiMetrics =>
         val keys = m.metrics.keySet
         if (keys.exists(_.contains(OpEvaluatorNames.Binary.humanFriendlyName))) ProblemType.BinaryClassification
+        else if (keys.exists(_.contains(OpEvaluatorNames.BinScore.humanFriendlyName))) ProblemType.BinaryClassification
         else if (keys.exists(_.contains(OpEvaluatorNames.Multi.humanFriendlyName))) ProblemType.MultiClassification
         else if (keys.exists(_.contains(OpEvaluatorNames.Regression.humanFriendlyName))) ProblemType.Regression
         else ProblemType.Unknown

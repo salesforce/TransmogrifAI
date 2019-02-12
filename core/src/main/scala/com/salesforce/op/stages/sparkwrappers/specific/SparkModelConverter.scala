@@ -34,6 +34,7 @@ import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.regression._
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.regression._
@@ -66,7 +67,7 @@ object SparkModelConverter {
    * @return Op Binary Model which will produce the same values put into a Prediction return feature
    */
   // TODO remove when loco and model selector are updated
-  def toOPUnchecked[T <: Model[_]](model: T): OpTransformer2[RealNN, OPVector, Prediction] =
+  def toOPUnchecked(model: Model[_]): OpTransformer2[RealNN, OPVector, Prediction] =
     toOPUnchecked(model, model.uid)
 
   /**
@@ -77,8 +78,8 @@ object SparkModelConverter {
    * @return Op Binary Model which will produce the same values put into a Prediction return feature
    */
   // TODO remove when loco and model selector are updated
-  def toOPUnchecked[T <: Model[_]](
-    model: T,
+  def toOPUnchecked(
+    model: Model[_],
     uid: String
   ): OpTransformer2[RealNN, OPVector, Prediction] = {
     model match {
@@ -94,6 +95,8 @@ object SparkModelConverter {
       case m: GBTRegressionModel => new OpGBTRegressionModel(m, uid = uid)
       case m: DecisionTreeRegressionModel => new OpDecisionTreeRegressionModel(m, uid = uid)
       case m: GeneralizedLinearRegressionModel => new OpGeneralizedLinearRegressionModel(m, uid = uid)
+      case m: XGBoostClassificationModel => new OpXGBoostClassificationModel(m, uid = uid)
+      case m: XGBoostRegressionModel => new OpXGBoostRegressionModel(m, uid = uid)
       case m => throw new RuntimeException(s"model conversion not implemented for model $m")
     }
   }

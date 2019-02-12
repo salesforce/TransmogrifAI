@@ -142,8 +142,8 @@ class DataGenerationTest extends FlatSpec with PassengerSparkFixtureTest {
       Row("5", null, 2, List("Female"), 0.0, 67, "", List(1471046100),
         Map("Female" -> "string"), Map("Female" -> 1.0), Map("Female" -> false)),
       Row("6", true, null, null, 0.0, null, null, null, null, null, null),
-      Row("4", null, 50, List("Male"), 0.0, 248, "this is a description stuff stuff",
-        List(1471046400, 1471046400, 1471046300), Map("Male" -> "string string string"),
+      Row("4", null, 50, List("Male"), 0.0, 248, "stuff this is a description stuff",
+        List(1471046400, 1471046400, 1471046300 ), Map("Male" -> "string string string"),
         Map("Male" -> 3.0), Map("Male" -> false))
     )
     val passenger4 = dataSet.filter(_.get(0) == "4").head

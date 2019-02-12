@@ -32,17 +32,11 @@ package com.salesforce.op.evaluators
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.RichMetadata._
-import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.evaluation.Evaluator
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.Dataset
-import org.apache.spark.sql.types.Metadata
-
-import scala.util.Try
 
 
 /**
@@ -61,75 +55,55 @@ trait OpHasLabelCol[T <: FeatureType] extends Params {
 /**
  * Trait for predictionCol which contains all output results param
  */
-trait OpHasFullPredictionCol extends Params {
-  final val fullPredictionCol: Param[String] = new Param[String](this, "fullPredictionCol", "prediction column name")
-
-  def setFullPredictionCol(value: String): this.type = set(fullPredictionCol, value)
-  def setFullPredictionCol(value: FeatureLike[Prediction]): this.type = setFullPredictionCol(value.name)
-  final def getFullPredictionCol: String = $(fullPredictionCol)
-}
-
-/**
- * Trait for predictionCol param
- */
-trait OpHasPredictionCol[T <: FeatureType] extends Params {
+trait OpHasPredictionCol extends Params {
   final val predictionCol: Param[String] = new Param[String](this, "predictionCol", "prediction column name")
-  setDefault(predictionCol, "prediction")
 
   def setPredictionCol(value: String): this.type = set(predictionCol, value)
-  def setPredictionCol(value: FeatureLike[T]): this.type = setPredictionCol(value.name)
+  def setPredictionCol(value: FeatureLike[Prediction]): this.type = setPredictionCol(value.name)
   final def getPredictionCol: String = $(predictionCol)
 }
 
 /**
- * Trait for rawPredictionColParam
+ * Trait for internal flattened predictionCol param
  */
-trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
-  final val rawPredictionCol: Param[String] = new Param[String](
-    this,
-    "rawPredictionCol",
-    "raw prediction (a.k.a. confidence) column name"
-  )
-  setDefault(rawPredictionCol, "rawPrediction")
+trait OpHasPredictionValueCol[T <: FeatureType] extends Params {
+  final val predictionValueCol: Param[String] = new Param[String](this, "predictionValueCol", "prediction column name")
+  setDefault(predictionValueCol, "prediction")
 
-  def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
-  def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
-  final def getRawPredictionCol: String = $(rawPredictionCol)
+  protected def setPredictionValueCol(value: String): this.type = set(predictionValueCol, value)
+  protected def setPredictionValueCol(value: FeatureLike[T]): this.type = setPredictionValueCol(value.name)
+  protected final def getPredictionValueCol: String = $(predictionValueCol)
 }
 
 /**
- * Trait for probabilityCol Param
+ * Trait for internal flattened rawPredictionColParam
+ */
+trait OpHasRawPredictionCol[T <: FeatureType] extends Params {
+  final val rawPredictionCol: Param[String] = new Param[String](
+    this, "rawPredictionCol", "raw prediction (a.k.a. confidence) column name"
+  )
+  setDefault(rawPredictionCol, "rawPrediction")
+
+  protected def setRawPredictionCol(value: String): this.type = set(rawPredictionCol, value)
+  protected def setRawPredictionCol(value: FeatureLike[T]): this.type = setRawPredictionCol(value.name)
+  protected final def getRawPredictionCol: String = $(rawPredictionCol)
+}
+
+/**
+ * Trait for internal flattened probabilityCol Param
  */
 trait OpHasProbabilityCol[T <: FeatureType] extends Params {
   final val probabilityCol: Param[String] = new Param[String](
-    this,
-    "probabilityCol",
+    this, "probabilityCol",
     "Column name for predicted class conditional probabilities." +
       " Note: Not all models output well-calibrated probability estimates!" +
       " These probabilities should be treated as confidences, not precise probabilities"
   )
   setDefault(probabilityCol, "probability")
 
-  def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
-  def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
-  final def getProbabilityCol: String = $(probabilityCol)
-}
-
-
-/**
- * Trait for all different kinds of evaluation metrics
- */
-trait EvaluationMetrics extends JsonLike {
-  /**
-   * Convert metrics class to a map
-   * @return a map from metric name to metric value
-   */
-  def toMap: Map[String, Any] = JsonUtils.toMap(JsonUtils.toJsonTree(this))
-  /**
-   * Convert metrics into metadata for saving
-   * @return metadata
-   */
-  def toMetadata: Metadata = this.toMap.toMetadata
+  protected def setProbabilityCol(value: String): this.type = set(probabilityCol, value)
+  protected def setProbabilityCol(value: FeatureLike[T]): this.type = setProbabilityCol(value.name)
+  protected final def getProbabilityCol: String = $(probabilityCol)
 }
 
 /**
@@ -137,9 +111,8 @@ trait EvaluationMetrics extends JsonLike {
  * eval (so with workflows and cross validation).
  */
 abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
-  with OpHasLabelCol[RealNN]
-  with OpHasPredictionCol[RealNN]
-  with OpHasFullPredictionCol {
+  with OpHasLabelCol[RealNN] with OpHasPredictionValueCol[RealNN] with OpHasPredictionCol {
+
   /**
    * Name of evaluator
    */
@@ -171,40 +144,39 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   override def evaluate(dataset: Dataset[_]): Double = getDefaultMetric(evaluateAll(dataset))
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_]
+
 }
 
 /**
  * Base Interface for OpClassificationEvaluator
  */
 private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
-  extends OpEvaluatorBase[T]
-    with OpHasRawPredictionCol[OPVector]
-    with OpHasProbabilityCol[OPVector] {
+  extends OpEvaluatorBase[T] with OpHasRawPredictionCol[OPVector] with OpHasProbabilityCol[OPVector] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val (predictionColName, rawPredictionColName, probabilityColName) =
         (s"${fullPredictionColName}_pred", s"${fullPredictionColName}_raw", s"${fullPredictionColName}_prob")
 
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
       setRawPredictionCol(rawPredictionColName)
       setProbabilityCol(probabilityColName)
 
-      val flattenedData = data.select(labelColName, getFullPredictionCol).rdd.map{ r =>
+      val flattenedData = data.select(labelColName, getPredictionCol).rdd.map{ r =>
         val label = r.getDouble(0)
         val predMap: Prediction = r.getMap[String, Double](1).toMap.toPrediction
         val raw = Vectors.dense(predMap.rawPrediction)
@@ -223,41 +195,35 @@ private[op] abstract class OpClassificationEvaluatorBase[T <: EvaluationMetrics]
 /**
  * Base Interface for OpBinaryClassificationEvaluator
  */
-abstract class OpBinaryClassificationEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpClassificationEvaluatorBase[T]
+abstract class OpBinaryClassificationEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpClassificationEvaluatorBase[T]
 
 
 /**
  * Base Interface for OpMultiClassificationEvaluator
  */
-abstract class OpMultiClassificationEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpClassificationEvaluatorBase[T]
+abstract class OpMultiClassificationEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpClassificationEvaluatorBase[T]
 
 
 /**
  * Base Interface for OpRegressionEvaluator
  */
-abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
-(
-  override val uid: String
-) extends OpEvaluatorBase[T] {
+abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics](override val uid: String)
+  extends OpEvaluatorBase[T] {
 
   /**
-   * Prepare data with differnt input types so that it can be consumed by the evaluator
+   * Prepare data with different input types so that it can be consumed by the evaluator
    * @param data input data
    * @param labelColName name of the label column
    * @return data formatted for use with the evaluator
    */
   protected def makeDataToUse(data: Dataset[_], labelColName: String): Dataset[_] = {
-    if (isSet(fullPredictionCol) &&
-      !(isSet(predictionCol) && data.schema.fieldNames.contains(getPredictionCol))) {
-      val fullPredictionColName = getFullPredictionCol
+    if (isSet(predictionCol) &&
+      !(isSet(predictionValueCol) && data.columns.contains(getPredictionValueCol))) {
+      val fullPredictionColName = getPredictionCol
       val predictionColName = s"${fullPredictionColName}_pred"
-      setPredictionCol(predictionColName)
+      setPredictionValueCol(predictionColName)
 
       val flattenedData = data.select(labelColName, fullPredictionColName).rdd
         .map(r => (r.getDouble(0), r.getMap[String, Double](1).toMap.toPrediction.prediction ))
@@ -266,125 +232,4 @@ abstract class OpRegressionEvaluatorBase[T <: EvaluationMetrics]
 
     } else data
   }
-}
-
-/**
- * Eval metric
- */
-trait EvalMetric extends EnumEntry with Serializable {
-  /**
-   * Spark metric name
-   */
-  def sparkEntryName: String
-
-  /**
-   * Human friendly metric name
-   */
-  def humanFriendlyName: String
-
-}
-
-/**
- * Eval metric companion object
- */
-object EvalMetric {
-
-  def withNameInsensitive(name: String): EvalMetric = {
-    BinaryClassEvalMetrics.withNameInsensitiveOption(name)
-      .orElse(MultiClassEvalMetrics.withNameInsensitiveOption(name))
-      .orElse(RegressionEvalMetrics.withNameInsensitiveOption(name))
-      .orElse(OpEvaluatorNames.withNameInsensitiveOption(name))
-      .getOrElse(OpEvaluatorNames.Custom(name, name))
-  }
-}
-
-/**
- * Classification Metrics
- */
-sealed abstract class ClassificationEvalMetric
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Binary Classification Metrics
- */
-object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
-  val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under precision-recall")
-  case object TP extends ClassificationEvalMetric("TP", "true positive")
-  case object TN extends ClassificationEvalMetric("TN", "true negative")
-  case object FP extends ClassificationEvalMetric("FP", "false positive")
-  case object FN extends ClassificationEvalMetric("FN", "false negative")
-}
-
-/**
- * Multi Classification Metrics
- */
-object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
-  val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
-}
-
-
-/**
- * Regression Metrics
- */
-sealed abstract class RegressionEvalMetric
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Regression Metrics
- */
-object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
-  val values: Seq[RegressionEvalMetric] = findValues
-  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")
-  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error")
-  case object R2 extends RegressionEvalMetric("r2", "r2")
-  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
-}
-
-
-/**
- * GeneralMetrics
- */
-sealed abstract class OpEvaluatorNames
-(
-  val sparkEntryName: String,
-  val humanFriendlyName: String
-) extends EvalMetric
-
-/**
- * Contains evaluator names used in logging
- */
-object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
-  val values: Seq[OpEvaluatorNames] = findValues
-
-  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metics")
-
-  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metics")
-
-  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metics")
-
-  case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
-    override def entryName: String = name.toLowerCase
-  }
-
-  override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
-
-  override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
-    .getOrElse(Custom(name, name))
 }

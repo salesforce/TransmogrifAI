@@ -33,6 +33,8 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
+import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import org.apache.spark.annotation.Experimental
@@ -63,7 +65,11 @@ class RecordInsightsLOCO[T <: Model[T]]
   def getTopK: Int = $(topK)
   setDefault(topK -> 20)
 
-  private val modelApply = toOPUnchecked(model).transformFn
+  private val modelApply = model match {
+    case m: SelectedModel => m.transformFn
+    case m: OpPredictorWrapperModel[_] => m.transformFn
+    case m => toOPUnchecked(m).transformFn
+  }
   private val labelDummy = RealNN(0.0)
 
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))
@@ -93,7 +99,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
 
     val top = maxHeap.dequeueAll
-    top.map{ case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(k), v) }
+    top.map{ case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
       .toMap.toTextMap
   }
 }

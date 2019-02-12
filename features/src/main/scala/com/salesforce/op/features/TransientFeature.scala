@@ -110,7 +110,7 @@ class TransientFeature
   def asFeatureLike[I <: FeatureType]: FeatureLike[I] = getFeature().asInstanceOf[FeatureLike[I]]
 
   /**
-   * Transform trasient feature into column metadata for use vectors
+   * Transform transient feature into column metadata for use vectors
    * (for when each feature creates one column of a vector)
    * @param isNull is the metadata created for a null indicator column
    * @return OpVectorColumnMetadata for vector feature
@@ -119,9 +119,24 @@ class TransientFeature
     new OpVectorColumnMetadata(
       parentFeatureName = Seq(name),
       parentFeatureType = Seq(typeName),
-      indicatorGroup = if (isNull) Some(name) else None,
+      grouping = if (isNull) Some(name) else None,
       indicatorValue = if (isNull) Some(OpVectorColumnMetadata.NullString) else None)
     }
+
+  /**
+   * Transform transient feature into column metadata with an explicit descriptor value specified. Descriptor values
+   * are used for groupings that are not one-hot encoded, eg. text lengths or x/y coords of circle transformed dates.
+   * @param descriptorValue   is the metadata created for descriptor column
+   * @return OpVectorColumnMetadata for vector feature
+   */
+  def toColumnMetaData(descriptorValue: String): OpVectorColumnMetadata = {
+    new OpVectorColumnMetadata(
+      parentFeatureName = Seq(name),
+      parentFeatureType = Seq(typeName),
+      grouping = Some(name),
+      indicatorValue = None,
+      descriptorValue = Some(descriptorValue))
+  }
 
   /**
    * Transform transient feature into vector metadata for use vectors
@@ -135,7 +150,7 @@ class TransientFeature
    */
   def toVectorMetaData(size: Int, fieldName: Option[String] = None): OpVectorMetadata = {
     val columns = (0 until size)
-      .map{ i => toColumnMetaData().copy(indicatorGroup = Option(name)) }
+      .map{ i => toColumnMetaData().copy(grouping = Option(name)) }
       .toArray
     val history = Map(name -> FeatureHistory(originFeatures = originFeatures, stages = stages))
     OpVectorMetadata(fieldName.getOrElse(name), columns, history)

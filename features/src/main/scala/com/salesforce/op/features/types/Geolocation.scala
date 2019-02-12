@@ -97,8 +97,8 @@ object Geolocation {
   private[types] def geolocationData(
     lat: Double,
     lon: Double,
-    accuracy: GeolocationAccuracy): Seq[Double] =
-    geolocationData(lat, lon, accuracy.value)
+    accuracy: GeolocationAccuracy
+  ): Seq[Double] = geolocationData(lat, lon, accuracy.value)
 
   private[types] def geolocationData(
     lat: Double,
@@ -120,6 +120,7 @@ object Geolocation {
   }
   val EquatorInMiles = 24901.0
   val EarthRadius = 3959.0
+  val Names = Seq("latitude", "longitude", "accuracy")
 }
 
 /**
@@ -180,7 +181,7 @@ case object GeolocationAccuracy extends IntEnum[GeolocationAccuracy] {
    * @return accuracy
    */
   def forRangeInMiles(miles: Double): GeolocationAccuracy = {
-    val result = values.dropWhile(_.rangeInMiles < miles * 0.99).headOption getOrElse Unknown
+    val result = values.dropWhile(v => v.rangeInMiles < miles * 0.99).headOption getOrElse Unknown
     result
   }
 

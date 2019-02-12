@@ -45,6 +45,8 @@ class OpDecisionTreeClassifierTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[DecisionTreeClassificationModel],
   OpPredictorWrapper[DecisionTreeClassifier, DecisionTreeClassificationModel]] with PredictionEquality {
 
+  override def specName: String = Spec[OpDecisionTreeClassifier]
+
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](
       1.0.toRealNN -> Vectors.dense(12.0, 4.3, 1.3).toOPVector,
@@ -70,7 +72,6 @@ class OpDecisionTreeClassifierTest extends OpEstimatorSpec[Prediction,
     Prediction(1.0, Array(0.0, 4.0), Array(0.0, 1.0)),
     Prediction(0.0, Array(4.0, 0.0), Array(1.0, 0.0))
   )
-
 
   it should "allow the user to set the desired spark parameters" in {
     estimator

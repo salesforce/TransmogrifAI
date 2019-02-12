@@ -42,7 +42,6 @@ import org.apache.spark.sql.SparkSession
 import org.apache.spark.{SparkConf, SparkContext}
 
 import scala.collection.JavaConverters._
-import scala.util.Try
 
 /**
  * A variety of functionalities for pulling data schema.
@@ -147,7 +146,7 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
 
   override def schemaFile: File = {
     val goodName = recordClassName.capitalize
-    val file = new File(s"/tmp/$goodName.avsc")
+    val file = File.createTempFile(goodName, ".avsc")
     val out = new FileWriter(file)
     val s = dataSchema.toString(true).replace(defaultName, goodName)
     out.write(s)

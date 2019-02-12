@@ -31,16 +31,17 @@
 package com.salesforce.op.utils.io.avro
 
 import java.net.URI
+import java.nio.file.FileSystems
 
-import com.salesforce.op.utils.io.DirectOutputCommitter
 import com.salesforce.op.utils.spark.RichRDD._
 import org.apache.avro.Schema
 import org.apache.avro.generic.GenericRecord
-import org.apache.avro.mapred._
+import org.apache.avro.mapred.AvroKey
+import org.apache.avro.mapreduce.{AvroJob, AvroKeyInputFormat, AvroKeyOutputFormat}
 import org.apache.avro.specific.SpecificData
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.hadoop.io.NullWritable
-import org.apache.hadoop.mapred.JobConf
+import org.apache.hadoop.mapreduce.Job
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
@@ -85,16 +86,17 @@ object AvroInOut {
   }
 
   private[avro] def selectExistingPaths(path: String)(implicit sc: SparkSession): String = {
-    val paths = path.split(",")
-    val firstPath = paths.head.split("/")
-    val bucket = firstPath.slice(0, math.min(4, firstPath.length)).mkString("/")
+    val paths = Option(path).map(_.split(',')).getOrElse(Array.empty)
     val fs = try {
+      val separator = FileSystems.getDefault.getSeparator
+      val firstPath = paths.head.split(separator)
+      val bucket = firstPath.slice(0, math.min(4, firstPath.length)).mkString(separator)
       FileSystem.get(new URI(bucket), sc.sparkContext.hadoopConfiguration)
     } catch {
-      case ex: Exception => throw new IllegalArgumentException(s"Bad path $firstPath: ${ex.getMessage}")
+      case ex: Exception => throw new IllegalArgumentException(s"Bad path '$path': ${ex.getMessage}")
     }
     val found = paths.filter(p => fs.exists(new Path(p)))
-    if (found.isEmpty) throw new IllegalArgumentException("No valid directory found in the list of paths <<$path>>")
+    if (found.isEmpty) throw new IllegalArgumentException(s"No valid directory found in path '$path'")
     found.mkString(",")
   }
 
@@ -134,10 +136,11 @@ object AvroInOut {
     (implicit sc: SparkSession, ct: ClassTag[T]): RDD[T] = {
     def maybeCopy(r: T): T = if (deepCopy) SpecificData.get().deepCopy(r.getSchema, r) else r
 
-    val records = sc.sparkContext.hadoopFile(path,
-      classOf[AvroInputFormat[T]],
-      classOf[AvroWrapper[T]],
-      classOf[NullWritable]
+    val records = sc.sparkContext.newAPIHadoopFile(path,
+      classOf[AvroKeyInputFormat[T]],
+      classOf[AvroKey[T]],
+      classOf[NullWritable],
+      sc.sparkContext.hadoopConfiguration
     )
 
     val results =
@@ -154,28 +157,14 @@ object AvroInOut {
 
   implicit class AvroWriter[T <: GenericRecord](rdd: RDD[T]) {
 
-    private def createJobConfFromContext(schema: String)(implicit sc: SparkSession) = {
-      val jobConf = new JobConf(sc.sparkContext.hadoopConfiguration)
-      jobConf.setOutputCommitter(classOf[DirectOutputCommitter])
-      AvroJob.setOutputSchema(jobConf, new Schema.Parser().parse(schema))
-      jobConf
-    }
-
-    /**
-     * This method writes out RDDs of generic records as avro files to path.
-     *
-     * @param path Input directory where avro records should be written.
-     * @param jobConf job config
-     * @return
-     */
-    def writeAvro(path: String)(implicit jobConf: JobConf): Unit = {
+    private def writeAvro(path: String)(implicit job: Job): Unit = {
       val avroData = rdd.map(ar => (new AvroKey(ar), NullWritable.get))
-      avroData.saveAsHadoopFile(
+      avroData.saveAsNewAPIHadoopFile(
         path,
-        classOf[AvroWrapper[GenericRecord]],
+        classOf[AvroKey[T]],
         classOf[NullWritable],
-        classOf[AvroOutputFormat[GenericRecord]],
-        jobConf
+        classOf[AvroKeyOutputFormat[T]],
+        job.getConfiguration
       )
     }
 
@@ -184,12 +173,12 @@ object AvroInOut {
      *
      * @param path   Input directory where avro records should be written.
      * @param schema Avro schema string for records being written out.
-     * @param sc     Spark Session
      * @return
      */
-    def writeAvro(path: String, schema: String)(implicit sc: SparkSession): Unit = {
-      val jobConf = createJobConfFromContext(schema)
-      writeAvro(path)(jobConf)
+    def writeAvro(path: String, schema: String)
+      (implicit job: Job = Job.getInstance(rdd.sparkContext.hadoopConfiguration)): Unit = {
+      AvroJob.setOutputKeySchema(job, new Schema.Parser().parse(schema))
+      writeAvro(path)(job)
     }
 
   }

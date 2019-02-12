@@ -30,8 +30,6 @@
 
 package com.salesforce.op.utils.io.csv
 
-import java.io.File
-
 import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{AnalysisException, DataFrame}
@@ -39,15 +37,10 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
-import scala.language.postfixOps
-
 @RunWith(classOf[JUnitRunner])
 class CSVInOutTest extends FlatSpec with TestSparkContext {
-  private val testDataDirPath: String = {
-    Some(new File("test-data")) filter (_.isDirectory) getOrElse new File("../test-data") getPath
-  }
   private val csvReader = new CSVInOut(CSVOptions(header = true))
-  private val csvFile = s"$testDataDirPath/PassengerDataAllWithHeader.csv"
+  private val csvFile = s"$testDataDir/PassengerDataAllWithHeader.csv"
 
   Spec[CSVInOut] should "throw error for bad file paths with DataFrame" in {
     val error = intercept[AnalysisException](csvReader.readDataFrame("/bad/file/path/read/dataframe"))

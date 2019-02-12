@@ -32,19 +32,80 @@ package com.salesforce.op.readers
 
 import com.salesforce.op.OpParams
 import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.types._
 import com.salesforce.op.test._
 import org.apache.spark.SparkException
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.joda.time.Duration
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.reflect.runtime.universe._
 
 
 @RunWith(classOf[JUnitRunner])
-class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest {
+class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestCommon {
+  def csvWithoutHeaderPath: String = s"$testDataDir/BigPassenger.csv"
+
+  def csvWithHeaderPath: String = s"$testDataDir/BigPassengerWithHeader.csv"
+
+  def bigPassengerFilePath: String = s"$testDataDir/BigPassengerWithHeader.parquet"
+
+  import spark.implicits._
+
+  val agePredictor = FeatureBuilder.Integral[PassengerCaseClass]
+    .extract(_.age.toIntegral)
+    .asPredictor
+
+  val survivedResponse = FeatureBuilder.Binary[PassengerCaseClass]
+    .extract(_.survived.toBinary)
+    .aggregate(zero = Some(true), (l, r) => Some(l.getOrElse(false) && r.getOrElse(false)))
+    .asResponse
+
+  val aggregateParameters = AggregateParams(
+    timeStampFn = Some[PassengerCaseClass => Long](_.recordDate.getOrElse(0L)),
+    cutOffTime = CutOffTime.UnixEpoch(1471046600)
+  )
+
+  val conditionalParameters = ConditionalParams[PassengerCaseClass](
+    timeStampFn = _.recordDate.getOrElse(0L),
+    targetCondition = _.height.contains(186), // Function to figure out if target event has occurred
+    responseWindow = Some(Duration.millis(800)), // How many days after target event to aggregate for response
+    predictorWindow = None, // How many days before target event to include in predictor aggregation
+    timeStampToKeep = TimeStampToKeep.Min,
+    dropIfTargetConditionNotMet = true
+  )
+
+  val parquetAggReader = DataReaders.Aggregate.parquetCase[PassengerCaseClass](
+    path = Some(bigPassengerFilePath),
+    key = _.passengerId.toString,
+    aggregateParams = aggregateParameters
+  )
+
+  val csvAggReader = DataReaders.Aggregate.csvCase[PassengerCaseClass](
+    path = Some(csvWithoutHeaderPath),
+    key = _.passengerId.toString,
+    aggregateParams = aggregateParameters
+  )
+
+  val csvConditionalReader = DataReaders.Conditional.csvCase[PassengerCaseClass](
+    path = Some(csvWithoutHeaderPath),
+    key = _.passengerId.toString,
+    conditionalParams = conditionalParameters
+  )
+
+  val parquetConditionalReader = DataReaders.Conditional.parquetCase[PassengerCaseClass](
+    path = Some(bigPassengerFilePath),
+    key = _.passengerId.toString,
+    conditionalParams = conditionalParameters
+  )
+
+  val aggReaders = Seq(csvAggReader, parquetAggReader)
+
+  val conditionalReaders = Seq(csvConditionalReader, parquetConditionalReader)
 
   // scalastyle:off
   Spec(DataReaders.getClass) should "define readers" in {
@@ -112,9 +173,34 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest {
       error.getMessage shouldBe "Function is not serializable"
       error.getCause shouldBe a[SparkException]
     }
-
   }
 
-  // TODO: test the readers
+  aggReaders.foreach( reader =>
+    Spec(reader.getClass) should "read and aggregate data correctly" in {
+      val data = reader.readDataset().collect()
+      data.foreach(_ shouldBe a[PassengerCaseClass])
+      data.length shouldBe 8
+
+      val aggregatedData = reader.generateDataFrame(rawFeatures = Array(agePredictor, survivedResponse)).collect()
+      aggregatedData.length shouldBe 6
+      aggregatedData.collect { case r if r.get(0) == "4" => r} shouldEqual Array(Row("4", 60, false))
+
+      reader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
+    }
+  )
+
+  conditionalReaders.foreach( reader =>
+    Spec(reader.getClass) should "read and conditionally aggregate data correctly" in {
+      val data = reader.readDataset().collect()
+      data.foreach(_ shouldBe a[PassengerCaseClass])
+      data.length shouldBe 8
+
+      val aggregatedData = reader.generateDataFrame(rawFeatures = Array(agePredictor, survivedResponse)).collect()
+      aggregatedData.length shouldBe 2
+      aggregatedData shouldEqual Array(Row("3", null, true), Row("4", 10, false))
+
+      reader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
+    }
+  )
 }
 

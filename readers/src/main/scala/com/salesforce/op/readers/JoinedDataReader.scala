@@ -128,7 +128,7 @@ private[op] abstract class JoinedReader[T, U]
 
   final def subReaders: Seq[DataReader[_]] = {
     val allReaders = Seq(leftReader.subReaders, rightReader.subReaders).flatten
-    assert(allReaders.size == allReaders.distinct.size, "Cannot have duplicate readers in joins")
+    require(allReaders.size == allReaders.distinct.size, "Cannot have duplicate readers in joins")
     allReaders
   }
 
@@ -158,7 +158,7 @@ private[op] abstract class JoinedReader[T, U]
       case r: JoinedReader[_, _] => r.getJoinedData(rawFeatures, opParams)
       case _ =>
         throw new RuntimeException(
-          s"The reader type ${leftReader.getClass.getCanonicalName} is not supported as leftReader for joins!")
+          s"The reader type ${leftReader.getClass.getName} is not supported as leftReader for joins!")
     }
 
     val rightData = getData(rightReader).withColumnRenamed(KeyFieldName, RightKeyName)

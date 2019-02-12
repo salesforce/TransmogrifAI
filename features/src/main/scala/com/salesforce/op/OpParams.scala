@@ -34,7 +34,6 @@ import java.io.File
 
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
 
-import scala.concurrent.duration.Duration
 import scala.util.Try
 
 
@@ -158,6 +157,42 @@ final class OpParams
       alternateReaderParams = newAltReaderParams
     )
   }
+
+  // scalastyle:off parameter.number
+  def copy(
+    stageParams: Map[String, Map[String, Any]] = this.stageParams,
+    readerParams: Map[String, ReaderParams] = this.readerParams,
+    modelLocation: Option[String] = this.modelLocation,
+    writeLocation: Option[String] = this.writeLocation,
+    metricsLocation: Option[String] = this.metricsLocation,
+    metricsCompress: Option[Boolean] = this.metricsCompress,
+    metricsCodec: Option[String] = this.metricsCodec,
+    batchDurationSecs: Option[Int] = this.batchDurationSecs,
+    awaitTerminationTimeoutSecs: Option[Int] = this.awaitTerminationTimeoutSecs,
+    customTagName: Option[String] = this.customTagName,
+    customTagValue: Option[String] = this.customTagValue,
+    logStageMetrics: Option[Boolean] = this.logStageMetrics,
+    collectStageMetrics: Option[Boolean] = this.collectStageMetrics,
+    customParams: Map[String, Any] = this.customParams,
+    alternateReaderParams: Map[String, ReaderParams] = this.alternateReaderParams
+  ): OpParams = new OpParams(
+    stageParams = stageParams,
+    readerParams = readerParams,
+    modelLocation = modelLocation,
+    writeLocation = writeLocation,
+    metricsLocation = metricsLocation,
+    metricsCompress = metricsCompress,
+    metricsCodec = metricsCodec,
+    batchDurationSecs = batchDurationSecs,
+    awaitTerminationTimeoutSecs = awaitTerminationTimeoutSecs,
+    customTagName = customTagName,
+    customTagValue = customTagValue,
+    logStageMetrics = logStageMetrics,
+    collectStageMetrics = collectStageMetrics,
+    customParams = customParams,
+    alternateReaderParams = alternateReaderParams
+  )
+  // scalastyle:on
 
   /**
    * Switch the reader params with the alternate reader params and return a new params instance

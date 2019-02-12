@@ -48,18 +48,18 @@ import org.scalatest.prop.PropertyChecks
 class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
   import com.salesforce.op.utils.spark.RichRDD._
 
-  val data = RDDGenerator.genRDD[(Int, Int)](spark.sparkContext)(Arbitrary.arbitrary[(Int, Int)])
+  val data = RDDGenerator.genRDD[(Int, Int)](sc)(Arbitrary.arbitrary[(Int, Int)])
 
   property("save as a text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir + "/op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
       rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }
   }
   property("save as a compressed text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir + "/op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
       rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }

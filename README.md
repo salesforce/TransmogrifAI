@@ -1,6 +1,8 @@
 # TransmogrifAI
 
-[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/graph/badge.svg?token=snKCVButEm)](https://codecov.io/gh/salesforce/TransmogrifAI) [![Spark version](https://img.shields.io/badge/spark-2.2-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE)
+[![Maven Central](https://img.shields.io/maven-central/v/com.salesforce.transmogrifai/transmogrifai-core_2.11.svg?colorB=blue)](https://search.maven.org/search?q=g:com.salesforce.transmogrifai) [![Download](https://api.bintray.com/packages/salesforce/maven/TransmogrifAI/images/download.svg)](https://bintray.com/salesforce/maven/TransmogrifAI/_latestVersion) [![Javadocs](https://www.javadoc.io/badge/com.salesforce.transmogrifai/transmogrifai-core_2.11/0.5.1.svg?color=blue)](https://www.javadoc.io/doc/com.salesforce.transmogrifai/transmogrifai-core_2.11/0.5.1) [![Spark version](https://img.shields.io/badge/spark-2.3-brightgreen.svg)](https://spark.apache.org/downloads.html) [![Scala version](https://img.shields.io/badge/scala-2.11-brightgreen.svg)](https://www.scala-lang.org/download/2.11.12.html) [![License](http://img.shields.io/:license-BSD--3-blue.svg)](./LICENSE) [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
+[![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg)](https://codecov.io/gh/salesforce/TransmogrifAI) [![CodeFactor](https://www.codefactor.io/repository/github/salesforce/transmogrifai/badge)](https://www.codefactor.io/repository/github/salesforce/transmogrifai)
 
 TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
@@ -11,9 +13,7 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
-TransmogrifAI is compatible with Spark 2.2.x and Scala 2.11.x.
-
-[Skip to Quick Start and Documentation](https://github.com/salesforce/TransmogrifAI#quick-start-and-documentation)
+Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
 ## Predicting Titanic Survivors with TransmogrifAI
 
@@ -34,17 +34,19 @@ import spark.implicits._
 // Read Titanic data as a DataFrame
 val passengersData = DataReaders.Simple.csvCase[Passenger](path = pathToData).readDataset().toDF()
 
-// Extract response and predictor variables
-val (survived, features) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
+// Extract response and predictor Features
+val (survived, predictors) = FeatureBuilder.fromDataFrame[RealNN](passengersData, response = "survived")
 
-// Automated feature engineering of predictors
-val featureVector = features.toSeq.transmogrify()
+// Automated feature engineering
+val featureVector = predictors.transmogrify()
 
-// Automated feature selection
-val checkedFeatures = survived.sanityCheck(featureVector, checkSample = 1.0, sampleSeed = 42, removeBadFeatures = true)
+// Automated feature validation and selection
+val checkedFeatures = survived.sanityCheck(featureVector, removeBadFeatures = true)
 
 // Automated model selection
-val (pred, raw, prob) = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
+val pred = BinaryClassificationModelSelector().setInput(survived, checkedFeatures).getOutput()
+
+// Setting up a TransmogrifAI workflow and training the model
 val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(pred).train()
 
 println("Model summary:\n" + model.summaryPretty())
@@ -112,61 +114,107 @@ Top model insights computed using CramersV:
 |-----------------------|----------------------|
 ```
 
-While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
+While this may seem a bit too magical, for those who want more control, TransmogrifAI also provides the flexibility to completely specify all the features being extracted and all the algorithms being applied in your ML pipeline. Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
 
 ## Adding TransmogrifAI into your project
-You can simply add TransmogrifAI as a regular dependency to your existing project. Example for gradle below:
+You can simply add TransmogrifAI as a regular dependency to an existing project.
+Start by picking TransmogrifAI version to match your project dependencies from the version matrix below (if not sure - take the **stable** version):
 
-```groovy
+| TransmogrifAI Version      | Spark Version | Scala Version | Java Version |
+|----------------------------|:-------------:|:-------------:|:------------:|
+| 0.6.0 (unreleased, master) |      2.3      |      2.11     |      1.8     |
+| **0.5.1 (stable)**         |    **2.3**    |    **2.11**   |    **1.8**   |
+| 0.4.0                      |      2.2      |      2.11     |      1.8     |
+| 0.3.4                      |      2.2      |      2.11     |      1.8     |
+
+For Gradle in `build.gradle` add:
+```gradle
 repositories {
+    jcenter()
     mavenCentral()
-    maven { url "https://jitpack.io" }
-    maven {
-        url "s3://op-repo/releases"
-        credentials(AwsCredentials) {
-            // user: op-repo-reader
-            accessKey "AKIAJ6AZFFSFRJI3IKHQ"
-            secretKey "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"
-        }
-    }
-}
-ext {
-    scalaVersion = '2.11'
-    scalaVersionRevision = '12'
-    sparkVersion = '2.2.1'
-    opVersion = '0.3.4'
 }
 dependencies {
-    // Scala
-    scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
-    scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
-    compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
+    // TransmogrifAI core dependency
+    compile 'com.salesforce.transmogrifai:transmogrifai-core_2.11:0.5.1'
 
-    // Spark
-    compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
-    compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-    testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
-
-    // TransmogrifAI
-    compile "com.salesforce:transmogrifai-core_$scalaVersion:$opVersion"
-
-    // Pretrained models used in TransmogrifAI, e.g. OpenNLP POS/NER models etc. (optional)
-    // compile "com.salesforce:transmogrifai-models_$scalaVersion:$opVersion"
-
-    // All your other depdendecies go below
-    // ...
+    // TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
+    // compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.5.1'
 }
+```
+
+For SBT in `build.sbt` add:
+```sbt
+scalaVersion := "2.11.12"
+
+resolvers += Resolver.jcenterRepo
+
+// TransmogrifAI core dependency
+libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-core" % "0.5.1"
+
+// TransmogrifAI pretrained models, e.g. OpenNLP POS/NER models etc. (optional)
+// libraryDependencies += "com.salesforce.transmogrifai" %% "transmogrifai-models" % "0.5.1"
+```
+
+Then import TransmogrifAI into your code:
+```scala
+// TransmogrifAI functionality: feature types, feature builders, feature dsl, readers, aggregators etc.
+import com.salesforce.op._
+import com.salesforce.op.aggregators._
+import com.salesforce.op.features._
+import com.salesforce.op.features.types._
+import com.salesforce.op.readers._
+
+// Spark enrichments (optional)
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.RichRDD._
+import com.salesforce.op.utils.spark.RichRow._
+import com.salesforce.op.utils.spark.RichMetadata._
+import com.salesforce.op.utils.spark.RichStructType._
 ```
 
 ## Quick Start and Documentation
 
-See [Wiki](https://github.com/salesforce/TransmogrifAI/wiki) for full documentation, getting started, examples and other information.
+Visit our [docs site](https://docs.transmogrif.ai) for full documentation, getting started, examples, faq and other information.
 
-See [Scaladoc](https://op-docs.herokuapp.com/scaladoc/#package) for the programming API (can also be viewed [locally](docs/README.md)).
+See [scaladoc](https://scaladoc.transmogrif.ai) for the programming API.
+
+## Authors
+
+ - Kevin Moore	[@jauntbox](https://github.com/jauntbox)
+ - Kin Fai Kan	[@kinfaikan](https://github.com/kinfaikan)
+ - Leah McGuire [@leahmcguire](https://github.com/leahmcguire)
+ - Matthew Tovbin [@tovbinm](https://github.com/tovbinm)
+ - Max Ovsiankin	[@maxov](https://github.com/maxov)
+ - Michael Loh	[@mikeloh77](https://github.com/mikeloh77)
+ - Michael Weil	[@michaelweilsalesforce](https://github.com/michaelweilsalesforce)
+ - Shubha Nabar	[@snabar](https://github.com/snabar)
+ - Vitaly Gordon	[@vitalyg](https://github.com/vitalyg)
+ - Vlad Patryshev	[@vpatryshev](https://github.com/vpatryshev)
+
+## Internal Contributors (prior to release)
+
+ - Chris Rupley	[@crupley](https://github.com/crupley)
+ - Chris Wu	[@cjwooo](https://github.com/cjwooo)
+ - Eric Wayman	[@ericwayman](https://github.com/ericwayman)
+ - Felipe Oliveira	[@feliperazeek](https://github.com/feliperazeek)
+ - Gera Shegalov	[@gerashegalov](https://github.com/gerashegalov)
+ - Jean-Marc Soumet	[@ajmssc](https://github.com/ajmssc)
+ - Marco Vivero	[@marcovivero](https://github.com/marcovivero)
+ - Mario Rodriguez	[@mrodriguezsfiq](https://github.com/mrodriguezsfiq)
+ - Mayukh Bhaowal	[@mayukhb](https://github.com/mayukhb)
+ - Minh-An Quinn	[@minhanquinn](https://github.com/minhanquinn)
+ - Nicolas Drizard	[@nicodri](https://github.com/nicodri)
+ - Oleg Gusak	[@ogusak](https://github.com/ogusak)
+ - Patrick Framption	[@tricktrap](https://github.com/tricktrap)
+ - Ryle Goehausen	[@ryleg](https://github.com/ryleg)
+ - Sanmitra Ijeri	[@sanmitra](https://github.com/sanmitra)
+ - Sky Chen	[@almandsky](https://github.com/almandsky)
+ - Sophie Xiaodan Sun	[@sxd929](https://github.com/sxd929)
+ - Till Bergmann	[@tillbe](https://github.com/tillbe)
+ - Xiaoqian Liu	[@wingsrc](https://github.com/wingsrc)
+
+
 
 ## License
 

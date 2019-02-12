@@ -6,17 +6,69 @@ before_install:
   - unset _JAVA_OPTIONS
 env:
   global:
-    - GRADLE_OPTS="-Xmx256m"
+    - GRADLE_OPTS='-Xmx256m -Dorg.gradle.daemon=false'
+    - BUILD_CACHE_DIR="$HOME/build-cache"
+    - TESTS_FILE_NAME="$TRAVIS_BUILD_DIR/tests.txt"
+    - TESTS_FILES_PREFIX='tests'
 install:
   - true
-script: 
-  - ./gradlew --no-daemon reportScoverage
 after_success:
   - bash <(curl -s https://codecov.io/bash)
 before_cache:
   - rm -f  $HOME/.gradle/caches/modules-2/modules-2.lock
   - rm -fr $HOME/.gradle/caches/*/plugin-resolution/
+  - mkdir -p $BUILD_CACHE_DIR
 cache:
   directories:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
+    - $BUILD_CACHE_DIR
+jobs:
+  include:
+    - stage: 'Compile project'
+      name: 'Compile project'
+      script: |
+        find **/src/test/scala/* -type f -name '*.scala' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g' > $TESTS_FILE_NAME
+        TOTAL_TESTS=`cat $TESTS_FILE_NAME | wc -l`
+        pushd $BUILD_CACHE_DIR
+        echo 'Removing any old cached test files'
+        rm -vf "$TESTS_FILES_PREFIX"*
+        echo 'Splitting test files into following parts'
+        split --numeric-suffixes -l `echo "($TOTAL_TESTS/4)+1" | bc` $TESTS_FILE_NAME $TESTS_FILES_PREFIX
+        ls "$TESTS_FILES_PREFIX"* | sort | xargs wc -l
+        sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
+        popd
+        ./gradlew scalaStyle testScoverageClasses --parallel
+    - stage: 'Compile Helloworld project'
+      name: 'Compile Helloworld project'
+      script: |
+        cd helloworld && ./gradlew scalaStyle test --parallel
+    - stage: 'Build'
+      name: 'Build Part 1'
+      script: |
+        export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"00`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
+    - script: |
+        export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"01`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
+      name: 'Build Part 2'
+    - script: |
+        export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"02`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
+      name: 'Build Part 3'
+    - script: |
+        export TEST_FILES=`cat "$BUILD_CACHE_DIR/$TESTS_FILES_PREFIX"03`
+        COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+        echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+        echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+        ./gradlew reportScoverage
+      name: 'Build Part 4'

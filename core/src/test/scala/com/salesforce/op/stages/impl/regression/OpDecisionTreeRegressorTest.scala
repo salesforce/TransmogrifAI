@@ -44,6 +44,8 @@ class OpDecisionTreeRegressorTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[DecisionTreeRegressionModel],
   OpPredictorWrapper[DecisionTreeRegressor, DecisionTreeRegressionModel]] with PredictionEquality {
 
+  override def specName: String = Spec[OpDecisionTreeRegressor]
+
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](
       (10.0.toRealNN, Vectors.dense(1.0, 4.3, 1.3).toOPVector),

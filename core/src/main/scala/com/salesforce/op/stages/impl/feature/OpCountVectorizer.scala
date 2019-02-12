@@ -114,7 +114,7 @@ class OpCountVectorizer(uid: String = UID[OpCountVectorizer])
     } yield OpVectorColumnMetadata(
       parentFeatureName = Seq(f.name),
       parentFeatureType = Seq(f.typeName),
-      indicatorGroup = None, // TODO do we want to test each word for label pred?
+      grouping = None, // TODO do we want to test each word for label pred?
       indicatorValue = Option(word)
     )
 

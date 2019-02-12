@@ -52,7 +52,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
   import VectorGenerators._
   import com.salesforce.op.utils.spark.RichVector._
 
-  lazy val sparseVevtorsRDDGen = RDDGenerator.genRDD[Vector](spark.sparkContext)(sparseVectorGen)
+  lazy val sparseVevtorsRDDGen = RDDGenerator.genRDD[Vector](sc)(sparseVectorGen)
 
   property("Vectors should error on size mismatch") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
@@ -62,10 +62,13 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
         res <- Seq(
           () => sparse + wrongSize,
           () => sparse - wrongSize,
+          () => sparse dot wrongSize,
           () => dense + wrongSize,
           () => dense - wrongSize,
+          () => dense dot wrongSize,
           () => dense + wrongSize.toDense,
-          () => dense - wrongSize.toDense
+          () => dense - wrongSize.toDense,
+          () => dense dot wrongSize.toDense
         )
       } {
         intercept[IllegalArgumentException](res()).getMessage should {
@@ -75,10 +78,10 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors should '+' add correctly") {
+  property("Vectors should '+' add") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
-      val expected = sparse.toArray.map(_ * 2)
       val dense = sparse.toDense
+      val expected = dense.values.map(_ * 2)
       for {res <- Seq(sparse + sparse, dense + sparse, sparse + dense, dense + dense)} {
         res.size shouldBe sparse.size
         res.toArray should contain theSameElementsAs expected
@@ -86,7 +89,7 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors should '-' subtract correctly") {
+  property("Vectors should '-' subtract") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       for {res <- Seq(sparse - sparse, dense - sparse, sparse - dense, dense - dense)} {
@@ -96,7 +99,31 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     }
   }
 
-  property("Vectors convert to breeze vectors correctly") {
+  property("Vectors should compute dot product") {
+    forAll(sparseVectorGen) { sparse: SparseVector =>
+      val dense = sparse.toDense
+      val expected = dense.values.zip(dense.values).map { case (v1, v2) => v1 * v2 }.sum
+      for {res <- Seq(sparse dot sparse, dense dot sparse, sparse dot dense, dense dot dense)} {
+        res shouldBe expected +- 1e-3
+      }
+    }
+  }
+
+  property("Vectors should combine") {
+    forAll(sparseVectorGen) { sparse: SparseVector =>
+      val dense = sparse.toDense
+      val expected = dense.values ++ dense.values
+      for {res <- Seq(sparse.combine(sparse), dense.combine(sparse), sparse.combine(dense), dense.combine(dense))} {
+        res.size shouldBe 2 * sparse.size
+        res.toArray should contain theSameElementsAs expected
+      }
+      val res = sparse.combine(dense, dense, sparse)
+      res.size shouldBe 4 * sparse.size
+      res.toArray should contain theSameElementsAs (expected ++ expected)
+    }
+  }
+
+  property("Vectors convert to breeze vectors") {
     forAll(sparseVectorGen) { sparse: SparseVector =>
       val dense = sparse.toDense
       sparse.toBreeze.toArray should contain theSameElementsAs dense.toBreeze.toArray
@@ -119,7 +146,25 @@ class RichVectorTest extends PropSpec with PropertyChecks with TestSparkContext 
     )
   }
 
-  property("Vectors add in reduce") {
+  property("Sparse vectors combine efficiently") {
+    val sparseSize = 100000000
+    val sparse = new SparseVector(sparseSize, Array(0, 1, sparseSize - 1), Array(-1.0, 1.0, 3.0))
+    val expected = new SparseVector(sparseSize * 2,
+      Array(0, 1, sparseSize - 1, sparseSize, sparseSize + 1, 2 * sparseSize - 1),
+      Array(-1.0, 1.0, 3.0, -1.0, 1.0, 3.0)
+    )
+    forAllConcurrentCheck[SparseVector](
+      numThreads = 10, numInvocationsPerThread = 50000, atMost = 10.seconds,
+      table = Table[SparseVector]("sparseVectors", sparse),
+      functionCheck = sparse => {
+        val res = sparse.combine(sparse)
+        res shouldBe a[SparseVector]
+        res shouldEqual expected
+      }
+    )
+  }
+
+  property("Vectors '+' add in reduce") {
     forAll(sparseVevtorsRDDGen) { rdd: RDD[Vector] =>
       if (!rdd.isEmpty()) {
         val tolerance = 1e-9 // we are loosing precision here, hence the tolerance

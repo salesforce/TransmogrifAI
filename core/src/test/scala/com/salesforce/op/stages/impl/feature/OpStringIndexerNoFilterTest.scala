@@ -38,8 +38,8 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.feature.StringIndexerModel
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -90,22 +90,4 @@ class OpStringIndexerNoFilterTest extends FlatSpec with TestSparkContext {
 
     indices shouldBe expectedNew
   }
-
-  Spec[OpStringIndexer[_]] should "correctly index a text column" in {
-    val stringIndexer = new OpStringIndexer[Text]().setInput(txtF)
-    val indices = stringIndexer.fit(ds).transform(ds).collect(stringIndexer.getOutput())
-
-    indices shouldBe expected
-  }
-
-  it should "correctly deinxed a numeric column" in {
-    val indexedStage = new OpStringIndexer[Text]().setInput(txtF)
-    val indexed = indexedStage.getOutput()
-    val indices = indexedStage.fit(ds).transform(ds)
-    val deindexedStage = new OpIndexToString().setInput(indexed)
-    val deindexed = deindexedStage.getOutput()
-    val deindexedData = deindexedStage.transform(indices).collect(deindexed)
-    deindexedData shouldBe txtData
-  }
-
 }

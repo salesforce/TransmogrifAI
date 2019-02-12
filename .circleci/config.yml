@@ -1,28 +1,77 @@
 version: 2
+
+machine-config: &machine-config
+  machine: true
+  working_directory: ~/repo
+  environment:
+    TERM: dumb
+    GRADLE_OPTS: -Xmx256m
+
+shared-steps:
+  open-jdk: &open-jdk
+    run:
+      name: Update Java to OpenJDK
+      command: |
+        sudo update-alternatives --set java /usr/lib/jvm/java-8-openjdk-amd64/jre/bin/java
+        sudo update-alternatives --set javac /usr/lib/jvm/java-8-openjdk-amd64/bin/javac
+        export JAVA_HOME=/usr/lib/jvm/java-8-openjdk-amd64
+        java -version
+  save-gradle-cache: &save-gradle-cache
+    save_cache:
+      key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      paths:
+        - ~/.gradle
+        - ~/.m2
+  restore-gradle-cache: &restore-gradle-cache
+    restore_cache:
+      keys:
+        - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+
 jobs:
-  build:
-    machine: true
-    working_directory: ~/repo
-    environment:
-      GRADLE_OPTS: -Xmx256m -Dorg.gradle.daemon=true -Dorg.gradle.caching=true
-      TERM: dumb
-    
+  scala-style:
+    <<: *machine-config
     steps:
       - checkout
-      - restore_cache:
-          keys:
-            - gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
+      - *open-jdk
+      - run:
+          name: Scala style check
+          command: java -version && ./gradlew -v && ./gradlew --parallel scalaStyle
+  compile:
+    <<: *machine-config
+    steps:
+      - checkout
+      - *open-jdk
+      - *restore-gradle-cache
+      - run:
+          name: Compile project
+          command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
+      - *save-gradle-cache
+  compile-hw:
+      <<: *machine-config
+      steps:
+        - checkout
+        - *open-jdk
+        - run:
+            name: Compile Helloworld project
+            command: cd helloworld && ./gradlew --parallel scalaStyle test && cd ..
 
+  test:
+    <<: *machine-config
+    parallelism: 4
+    steps:
+      - checkout
+      - *open-jdk
+      - *restore-gradle-cache
       - run:
-          name: Java version
-          command: java -version
-      - run:
-          name: Build core project
-          command: ./gradlew core:reportScoverage
-      - run:
-          name: Build everything else
-          command: ./gradlew reportScoverage -x core:reportScoverage
-
+          name: Build project
+          command: |
+            TEST_FILES=$(circleci tests glob '**/src/test/scala/**/*.scala')
+            COUNT_TEST_FILE_CMD='echo $TEST_FILES | sort |tr " " "\n" | wc -l'
+            echo "Total test files : `eval $COUNT_TEST_FILE_CMD`"
+            TEST_FILES=$(echo "$TEST_FILES" | circleci tests split --split-by=timings --timings-type=classname --index=$CIRCLE_NODE_INDEX | tr ' ' '\n' | cut -d "/" -f5-$2 | sed 's/.\{6\}$/\*/g')
+            echo -e "Test files running on this container : `eval $COUNT_TEST_FILE_CMD`\n$TEST_FILES\n"
+            export TEST_FILES=$(echo "$TEST_FILES" | sed 's/\\n$//' )
+            java -version && ./gradlew -v && ./gradlew reportScoverage
       - run:
           name: Collect test results
           command: |
@@ -35,13 +84,6 @@ jobs:
           path: ~/junit.xml/
       - store_artifacts:
           path: ~/junit/
-
-      - save_cache:
-          key: gcache-{{ .Branch }}-{{ checksum ".circleci/config.yml" }}-{{ checksum "build.gradle" }}-{{ checksum "gradle/wrapper/gradle-wrapper.properties" }}
-          paths:
-            - ~/.gradle
-            - ~/.m2
-
       - run:
           name: Report scoverage resuts to Codecov
           command: bash <(curl -s https://codecov.io/bash)
@@ -50,4 +92,10 @@ workflows:
   version: 2
   build:
     jobs:
-      - build
+      - scala-style
+      - compile
+      - compile-hw
+      - test:
+          requires:
+            - scala-style
+            - compile

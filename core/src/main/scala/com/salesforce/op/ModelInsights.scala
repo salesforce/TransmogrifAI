@@ -33,24 +33,27 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
+import com.salesforce.op.filters.FeatureDistribution
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
-import com.salesforce.op.utils.json.EnumEntrySerializer
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
+import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoost.RichBooster
+import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
 import org.apache.spark.ml.regression._
 import org.apache.spark.ml.{Model, PipelineStage, Transformer}
-import org.apache.spark.mllib.tree.model.GradientBoostedTreesModel
 import org.json4s._
 import org.json4s.jackson.Serialization
 import org.json4s.jackson.Serialization._
-import com.salesforce.op.utils.json.SpecialDoubleSerializer
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
@@ -97,8 +100,8 @@ case class ModelInsights
   def prettyPrint(topK: Int = 15): String = {
     val res = new ArrayBuffer[String]()
     res ++= prettyValidationResults
-    res += prettySelectedModelInfo
-    res += modelEvaluationMetrics
+    res ++= prettySelectedModelInfo
+    res ++= modelEvaluationMetrics
     res ++= topKCorrelations(topK)
     res ++= topKContributions(topK)
     res ++= topKCramersV(topK)
@@ -149,37 +152,53 @@ case class ModelInsights
     Seq(evalSummary, modelEvalRes.mkString("\n"))
   }
 
-  private def prettySelectedModelInfo: String = {
-    val name = selectedModelInfo.map( sm => s"Selected Model - ${sm.bestModelType} ${sm.bestModelName}" ).getOrElse("")
-    val validationResults: Seq[(String, Any)] = selectedModelInfo.map(
-      _.validationResults.flatMap(e => Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++
-        e.modelParameters.toSeq)
-    ).getOrElse(Seq.empty)
-    val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
-    table.prettyString()
+  private def prettySelectedModelInfo: Seq[String] = {
+    val excludedParams = Set(
+      SparkWrapperParams.SparkStageParamName,
+      ModelSelectorNames.outputParamName, ModelSelectorNames.inputParam1Name,
+      ModelSelectorNames.inputParam2Name, ModelSelectorNames.outputParamName,
+      OpPipelineStageParamsNames.InputFeatures, OpPipelineStageParamsNames.InputSchema,
+      OpPipelineStageParamsNames.OutputMetadata,
+      "labelCol", "predictionCol", "predictionValueCol", "rawPredictionCol", "probabilityCol"
+    )
+    val name = selectedModelInfo.map(sm => s"Selected Model - ${sm.bestModelType}").getOrElse("")
+    val validationResults = (for {
+      sm <- selectedModelInfo.toSeq
+      e <- sm.validationResults.filter(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+    } yield {
+      val params = e.modelParameters.filterKeys(!excludedParams.contains(_))
+      Seq("name" -> e.modelName, "uid" -> e.modelUID, "modelType" -> e.modelType) ++ params
+    }).flatten.sortBy(_._1)
+    if (validationResults.nonEmpty) {
+      val table = Table(name = name, columns = Seq("Model Param", "Value"), rows = validationResults)
+      Seq(table.prettyString())
+    } else Seq.empty
   }
 
-  private def modelEvaluationMetrics: String = {
+  private def modelEvaluationMetrics: Seq[String] = {
     val name = "Model Evaluation Metrics"
-    val niceMetricsNames = (BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
-      RegressionEvalMetrics.values ++ OpEvaluatorNames.values)
-      .map(m => m.entryName -> m.humanFriendlyName).toMap
-    def niceName(nm: String): String = nm.split("_").lastOption.flatMap(n => niceMetricsNames.get(n)).getOrElse(nm)
+    val niceMetricsNames = {
+      BinaryClassEvalMetrics.values ++ MultiClassEvalMetrics.values ++
+        RegressionEvalMetrics.values ++ OpEvaluatorNames.values
+    }.map(m => m.entryName -> m.humanFriendlyName).toMap
+    def niceName(nm: String): String = nm.split('_').lastOption.flatMap(niceMetricsNames.get).getOrElse(nm)
     val trainEvalMetrics = selectedModelInfo.map(_.trainEvaluation)
     val testEvalMetrics = selectedModelInfo.flatMap(_.holdoutEvaluation)
     val (metricNameCol, holdOutCol, trainingCol) = ("Metric Name", "Hold Out Set Value", "Training Set Value")
     (trainEvalMetrics, testEvalMetrics) match {
       case (Some(trainMetrics), Some(testMetrics)) =>
-        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }.toSeq.sortBy(_._1)
+        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) => k -> v.toString }
         val testMetricsMap = testMetrics.toMap
         val rows = trainMetricsMap
-          .map { case (k, v) => (niceName(k), v, testMetricsMap(k).toString) }
-        Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows).prettyString()
+          .map { case (k, v) => (niceName(k), v, testMetricsMap(k).toString) }.toSeq.sortBy(_._1)
+        Seq(Table(name = name, columns = Seq(metricNameCol, trainingCol, holdOutCol), rows = rows).prettyString())
       case (Some(trainMetrics), None) =>
-        val trainMetricsMap = trainMetrics.toMap.collect { case (k, v: Double) =>
-          niceName(k) -> v.toString }.toSeq.sortBy(_._1)
-        Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = trainMetricsMap).prettyString()
-      case (None, _) => "No metrics found"
+        val rows = trainMetrics.toMap.collect { case (k, v: Double) => niceName(k) -> v.toString }.toSeq.sortBy(_._1)
+        Seq(Table(name = name, columns = Seq(metricNameCol, trainingCol), rows = rows).prettyString())
+      case _ =>
+        Seq.empty
     }
   }
 
@@ -311,8 +330,15 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param featureName     name of raw feature insights are about
  * @param featureType     type of raw feature insights are about
  * @param derivedFeatures sequence containing insights for each feature derived from the raw feature
+ * @param distributions   distribution information for the raw feature (if calculated in RawFeatureFilter)
  */
-case class FeatureInsights(featureName: String, featureType: String, derivedFeatures: Seq[Insights])
+case class FeatureInsights
+(
+  featureName: String,
+  featureType: String,
+  derivedFeatures: Seq[Insights],
+  distributions: Seq[FeatureDistribution] = Seq.empty
+)
 
 /**
  * Summary of insights for a derived feature
@@ -366,7 +392,8 @@ case object ModelInsights {
     val typeHints = FullTypeHints(List(
       classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
-      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics], classOf[ThresholdMetrics],
+      classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
+      classOf[BinaryClassificationBinMetrics], classOf[ThresholdMetrics],
       classOf[MultiClassificationMetrics], classOf[RegressionMetrics]
     ))
     val evalMetricsSerializer = new CustomSerializer[EvalMetric](_ =>
@@ -405,7 +432,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     trainingParams: OpParams,
     blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]]
+    blacklistedMapKeys: Map[String, Set[String]],
+    rawFeatureDistributions: Array[FeatureDistribution]
   ): ModelInsights = {
     val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
     val sanityChecker = sanityCheckers.lastOption
@@ -416,7 +444,10 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val models = stages.collect { case s: SelectedModel => s } // TODO support other model types?
+    val models = stages.collect{
+      case s: SelectedModel => s
+      case s: OpPredictorWrapperModel[_] => s
+    } // TODO support other model types?
     val model = models.lastOption
     log.info(
       s"Found ${models.length} models will " +
@@ -427,7 +458,6 @@ case object ModelInsights {
     val label = model.map(_.getInputFeature[RealNN](0)).orElse(sanityChecker.map(_.getInputFeature[RealNN](0))).flatten
     log.info(s"Found ${label.map(_.name + " as label").getOrElse("no label")} to fill in model insights")
 
-
     // Recover the vector metadata
     val vectorInput: Option[OpVectorMetadata] = {
       def makeMeta(s: => OpPipelineStageParams) = Try(OpVectorMetadata(s.getInputSchema().last)).toOption
@@ -436,7 +466,7 @@ case object ModelInsights {
         // first try out to get vector metadata from sanity checker
         .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
         // fall back to model selector stage metadata
-        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelectorBase[_, _]])))
+        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelector[_, _]])))
         // finally try to get it from the last vector stage
         .orElse(
         stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
@@ -450,7 +480,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureDistributions),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = getStageInfo(stages)
@@ -495,15 +525,15 @@ case object ModelInsights {
   private[op] def getFeatureInsights(
     vectorInfo: Option[OpVectorMetadata],
     summary: Option[SanityCheckerSummary],
-    model: Option[SelectedModel],
+    model: Option[Model[_]],
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
-    blacklistedMapKeys: Map[String, Set[String]]
+    blacklistedMapKeys: Map[String, Set[String]],
+    rawFeatureDistributions: Array[FeatureDistribution]
   ): Seq[FeatureInsights] = {
-    val contributions = getModelContributions(model)
-
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
+        val contributions = getModelContributions(model, Option(v.columns.length))
         val droppedSet = s.dropped.toSet
         val indexInToIndexKept = v.columns
           .collect { case c if !droppedSet.contains(c.makeColName()) => c.index }
@@ -524,7 +554,7 @@ case object ModelInsights {
             Insights(
               derivedFeatureName = h.columnName,
               stagesApplied = h.parentFeatureStages,
-              derivedFeatureGroup = h.indicatorGroup,
+              derivedFeatureGroup = h.grouping,
               derivedFeatureValue = h.indicatorValue,
               excluded = Option(s.dropped.contains(h.columnName)),
               corr = getCorr(s.correlationsWLabel, h.columnName),
@@ -540,21 +570,24 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution = keptIndex.map(i => contributions.map(_.applyOrElse(i, Seq.empty))).getOrElse(Seq.empty),
+              contribution =
+                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
               variance = getIfExists(h.index, s.featuresStatistics.variance)
             )
         }
-      case (Some(v), None) => v.getColumnHistory().map { h =>
-        h.parentFeatureOrigins ->
-          Insights(
+      case (Some(v), None) =>
+        val contributions = getModelContributions(model, Option(v.columns.length))
+        v.getColumnHistory().map { h =>
+          h.parentFeatureOrigins -> Insights(
             derivedFeatureName = h.columnName,
             stagesApplied = h.parentFeatureStages,
-            derivedFeatureGroup = h.indicatorGroup,
+            derivedFeatureGroup = h.grouping,
             derivedFeatureValue = h.indicatorValue,
-            contribution = contributions.map(_.applyOrElse(h.index, Seq.empty)) // nothing dropped without sanity check
+            contribution =
+              contributions.map(_.applyOrElse(h.index, (_: Int) => 0.0)) // nothing dropped without sanity check
           )
       }
       case (None, _) => Seq.empty
@@ -582,9 +615,11 @@ case object ModelInsights {
       .map {
         case (fname, seq) =>
           val ftype = allFeatures.find(_.name == fname)
-            .getOrElse(throw new RuntimeException(s"No raw feature with name $fname found in raw features"))
-            .typeName
-          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2))
+            .map(_.typeName)
+            .getOrElse("")
+          val distributions = rawFeatureDistributions.filter(_.name == fname)
+          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
+            distributions = distributions)
       }.toSeq
   }
 
@@ -598,40 +633,52 @@ case object ModelInsights {
     getIfExists(corr.featuresIn.indexOf(name), corr.values).orElse {
       val j = corr.nanCorrs.indexOf(name)
       if (j >= 0) Option(Double.NaN)
-      else throw new RuntimeException(s"Column name $name does not exist in summary correlations")
+      else None
     }
   }
 
-  private[op] def getModelContributions(model: Option[SelectedModel]): Seq[Seq[Double]] = {
-    model.flatMap {
-      _.getSparkMlStage().map {
-        case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-        case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-        case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-        case m: GradientBoostedTreesModel => Seq.empty[Seq[Double]]
-        case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-        case _ => Seq.empty[Seq[Double]]
-      }
-    }.getOrElse(Seq.empty[Seq[Double]])
+  private[op] def getModelContributions
+  (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    val contributions = stage.collect {
+      case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: LinearSVCModel => Seq(m.coefficients.toArray.toSeq)
+      case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
+      case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
+      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+    }
+    contributions.getOrElse(Seq.empty)
   }
 
-  private def getModelInfo(model: Option[SelectedModel]): Option[ModelSelectorSummary] = {
-    model.map(m => ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata()))
+  private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
+    model match {
+      case Some(m: SelectedModel) =>
+        Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
+      case _ => None
+    }
   }
 
   private def getStageInfo(stages: Array[OPStage]): Map[String, Any] = {
-    def getParams(stage: PipelineStage): Map[String, String] =
-      stage.extractParamMap().toSeq
-        .collect{
-          case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
-            p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
-          case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
-            p.param.name != OpPipelineStageParamsNames.InputSchema => p.param.name -> p.value.toString
-        }.toMap
-
+    def getParams(stage: PipelineStage): Map[String, String] = {
+      stage.extractParamMap().toSeq.collect {
+        case p if p.param.name == OpPipelineStageParamsNames.InputFeatures =>
+          p.param.name -> p.value.asInstanceOf[Array[TransientFeature]].map(_.toJsonString()).mkString(", ")
+        case p if p.param.name != OpPipelineStageParamsNames.OutputMetadata &&
+          p.param.name != OpPipelineStageParamsNames.InputSchema && Option(p.value).nonEmpty =>
+          p.param.name -> p.value.toString
+      }.toMap
+    }
     stages.map { s =>
       val params = s match {
         case m: Model[_] => getParams(if (m.hasParent) m.parent else m) // try for parent estimator so can get params

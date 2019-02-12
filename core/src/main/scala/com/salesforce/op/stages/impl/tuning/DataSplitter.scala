@@ -68,8 +68,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData =
-    new ModelData(data, Option(DataSplitterSummary()))
+  def prepare(data: Dataset[Row]): ModelData = ModelData(data, Some(DataSplitterSummary()))
 
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)
@@ -78,11 +77,21 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
 }
 
 /**
- * Empty class because no summary information for a datasplitter
+ * Empty class because no summary information for a data splitter
  */
 case class DataSplitterSummary() extends SplitterSummary {
-  override def toMetadata(): Metadata = new MetadataBuilder()
-    .putString(SplitterSummary.ClassName, this.getClass.getName)
-    .build()
-}
 
+  /**
+   * Converts to [[Metadata]]
+   *
+   * @param skipUnsupported skip unsupported values
+   * @throws RuntimeException in case of unsupported value type
+   * @return [[Metadata]] metadata
+   */
+  def toMetadata(skipUnsupported: Boolean): Metadata = {
+    new MetadataBuilder()
+      .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .build()
+  }
+
+}

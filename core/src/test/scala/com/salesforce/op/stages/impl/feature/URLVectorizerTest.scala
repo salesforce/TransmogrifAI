@@ -45,7 +45,8 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class URLVectorizerTest
-  extends FlatSpec with FeatureTestBase with RichTextFeature with RichMapFeature with RichFeature {
+  extends FlatSpec with FeatureTestBase with RichTextFeature with RichMapFeature with RichFeature
+    with AttributeAsserts {
   val urlKey = "Url1"
   val urlKey2 = "Url2"
   val urls = (RandomText.urlsOn(_ => "salesforce.com").take(2) ++ RandomText.urlsOn(_ => "data.com").take(2)).toSeq
@@ -79,8 +80,13 @@ class URLVectorizerTest
     Vectors.dense(1.0, 0.0, 0.0, 0.0)
   ).map(_.toOPVector)
 
-  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] =
-    new OpWorkflow().setResultFeatures(feature).transform(ds).collect(feature)
+  def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
+    val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
+    val results = transformed.collect(feature)
+    val field = transformed.schema(feature.name)
+    assertNominal(field, Array.fill(results.head.value.size)(true), results)
+    results
+  }
 
   Spec[RichURLMapFeature] should "vectorize UrlMaps correctly" in {
     val (ds1, f1) = TestFeatureBuilder(urls.map(e => Map(urlKey -> e.value.get).toURLMap))

@@ -31,6 +31,8 @@
 package com.salesforce.op.utils.spark
 
 import com.salesforce.op.FeatureHistory
+import com.salesforce.op.features.types.{FeatureType, _}
+import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 
@@ -38,8 +40,9 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
  * Represents a metadata wrapper that includes parent feature information.
  *
  * The metadata includes a columns field that describes the columns in the vector.
- * @param name name of the feature vector
- * @param col information about each element in the vector
+ *
+ * @param name    name of the feature vector
+ * @param col     information about each element in the vector
  * @param history history of parent features used to create the vector map is from
  *                OpVectorColumnMetadata.parentFeatureName (String) to FeatureHistory
  */
@@ -53,7 +56,7 @@ class OpVectorMetadata private
   /**
    * Column metadata with indicies fixed to match order passed in
    */
-  val columns: Array[OpVectorColumnMetadata] = col.zipWithIndex.map{ case(c, i) => c.copy(index = i) }
+  val columns: Array[OpVectorColumnMetadata] = col.zipWithIndex.map { case (c, i) => c.copy(index = i) }
 
   /**
    * Get the number of columns in vectors of this type
@@ -72,6 +75,8 @@ class OpVectorMetadata private
     newColumns: Array[OpVectorColumnMetadata]
   ): OpVectorMetadata = OpVectorMetadata(name, newColumns, history)
 
+  private val binaryTypes = Seq(FeatureType.typeName[Binary], FeatureType.typeName[BinaryMap])
+  private val multiPicklistTypes = Seq(FeatureType.typeName[MultiPickList], FeatureType.typeName[MultiPickListMap])
 
   /**
    * Serialize to spark metadata
@@ -80,14 +85,21 @@ class OpVectorMetadata private
    */
   def toMetadata: Metadata = {
     val groupedCol = columns
-      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.indicatorGroup, c.indicatorValue))
+      .groupBy(c => (c.parentFeatureName, c.parentFeatureType, c.grouping, c.indicatorValue, c.descriptorValue))
     val colData = groupedCol.toSeq
-      .map{ case (_, g) => g.head -> g.map(_.index) }
-    val colMeta = colData.map{ case (c, i) => c.toMetadata(i) }
-    new MetadataBuilder()
+      .map { case (_, g) => g.head -> g.map(_.index) }
+    val colMeta = colData.map { case (c, i) => c.toMetadata(i) }
+    val meta = new MetadataBuilder()
       .putMetadataArray(OpVectorMetadata.ColumnsKey, colMeta.toArray)
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
       .build()
+    val attributes = columns.map {
+      case c if (c.indicatorValue.isDefined || binaryTypes.exists(c.parentFeatureType.contains)) &&
+        !(multiPicklistTypes.exists(c.parentFeatureType.contains) && c.isOtherIndicator) =>
+        BinaryAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
+      case c => NumericAttribute.defaultAttr.withName(c.makeColName()).withIndex(c.index)
+    }
+    new AttributeGroup(name, attributes).toMetadata(meta)
   }
 
   /**
@@ -102,10 +114,11 @@ class OpVectorMetadata private
 
   /**
    * Extract the full history for each element of the vector
+   *
    * @return Sequence of [[OpVectorColumnHistory]]
    */
   def getColumnHistory(): Seq[OpVectorColumnHistory] = {
-    columns.map{ c =>
+    columns.map { c =>
       val hist = c.parentFeatureName.map(pn => history.getOrElse(pn,
         throw new RuntimeException(s"Parent feature name '${pn}' has no associated history")))
       val histComb = hist.head.merge(hist.tail: _*)
@@ -115,8 +128,9 @@ class OpVectorMetadata private
         parentFeatureOrigins = histComb.originFeatures,
         parentFeatureStages = histComb.stages,
         parentFeatureType = c.parentFeatureType,
-        indicatorGroup = c.indicatorGroup,
+        grouping = c.grouping,
         indicatorValue = c.indicatorValue,
+        descriptorValue = c.descriptorValue,
         index = c.index
       )
     }
@@ -151,7 +165,7 @@ class OpVectorMetadata private
       case _ => false
     }
 
-  // have to override to support overriden .equals
+  // have to override to support overridden .equals
   override def hashCode(): Int = 37 * columns.toSeq.hashCode()
 
   override def toString: String =
@@ -160,6 +174,7 @@ class OpVectorMetadata private
 }
 
 object OpVectorMetadata {
+
   import com.salesforce.op.utils.spark.RichMetadata._
 
   val ColumnsKey = "vector_columns"

@@ -49,5 +49,5 @@ class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
       uid = UID[UnaryLambdaTransformer[_, _]]
     ).setInput(weight).setMetadata(meta)
 
-  val expected = Array(21.2248.toReal, Real.empty, 9.6252.toReal, 8.2678.toReal, 11.8464.toReal, 8.2678.toReal)
+  val expected = Array(21.2248.toReal, 8.2678.toReal, Real.empty, 9.6252.toReal, 11.8464.toReal, 8.2678.toReal)
 }

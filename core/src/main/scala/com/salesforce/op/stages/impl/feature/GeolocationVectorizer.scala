@@ -102,8 +102,12 @@ class GeolocationVectorizer
   private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {
     val tf = getTransientFeatures()
     val cols =
-      if (withNullTracking) tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()) ++ Seq(f.toColumnMetaData(isNull = true)))
-      else tf.flatMap(f => Seq.fill(3)(f.toColumnMetaData()))
+      if (withNullTracking) tf.flatMap{ f =>
+        Geolocation.Names.map(nm => f.toColumnMetaData().copy(grouping = Option(f.name), descriptorValue = Option(nm))
+        ) ++ Seq(f.toColumnMetaData(isNull = true))}
+      else tf.flatMap(f =>
+        Geolocation.Names.map(nm => f.toColumnMetaData().copy(grouping = Option(f.name), descriptorValue = Option(nm)))
+      )
     OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
   }
 
@@ -135,7 +139,10 @@ final class GeolocationVectorizerModel private[op]
   def transformFn: Seq[Geolocation] => OPVector = row => {
     val replaced =
       if (!trackNulls) {
-        row.zip(fillValues).flatMap { case (r, m) => if (r.isEmpty) m else r.value }
+        row.zip(fillValues).flatMap { case (r, m) =>
+          val meanToUse: Seq[Double] = if (m.isEmpty) RepresentationOfEmpty else m
+          if (r.isEmpty) meanToUse else r.value
+        }
       }
       else {
         row.zip(fillValues).flatMap { case (r, m) =>

@@ -30,14 +30,15 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import org.apache.spark.ml.param._
-import org.apache.spark.sql.{Dataset, Row}
 import com.salesforce.op.stages.impl.MetadataLike
-import com.salesforce.op.stages.impl.selector.ModelSelectorBaseNames
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.Metadata
+import org.apache.spark.sql.{Dataset, Row}
 
 import scala.util.Try
+
 
 
 
@@ -120,21 +121,23 @@ trait SplitterSummary extends MetadataLike
 
 private[op] object SplitterSummary {
   val ClassName: String = "className"
+
   def fromMetadata(metadata: Metadata): Try[SplitterSummary] = Try {
-    val map = metadata.wrapped.underlyingMap
-    map(ClassName) match {
-      case s if s == classOf[DataSplitterSummary].getCanonicalName => DataSplitterSummary()
-      case s if s == classOf[DataBalancerSummary].getCanonicalName => DataBalancerSummary(
-        positiveLabels = map(ModelSelectorBaseNames.Positive).asInstanceOf[Long],
-        negativeLabels = map(ModelSelectorBaseNames.Negative).asInstanceOf[Long],
-        desiredFraction = map(ModelSelectorBaseNames.Desired).asInstanceOf[Double],
-        upSamplingFraction = map(ModelSelectorBaseNames.UpSample).asInstanceOf[Double],
-        downSamplingFraction = map(ModelSelectorBaseNames.DownSample).asInstanceOf[Double]
+    metadata.getString(ClassName) match {
+      case s if s == classOf[DataSplitterSummary].getName => DataSplitterSummary()
+      case s if s == classOf[DataBalancerSummary].getName => DataBalancerSummary(
+        positiveLabels = metadata.getLong(ModelSelectorNames.Positive),
+        negativeLabels = metadata.getLong(ModelSelectorNames.Negative),
+        desiredFraction = metadata.getDouble(ModelSelectorNames.Desired),
+        upSamplingFraction = metadata.getDouble(ModelSelectorNames.UpSample),
+        downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample)
       )
-      case s if s == classOf[DataCutterSummary].getCanonicalName => DataCutterSummary(
-        labelsKept = map(ModelSelectorBaseNames.LabelsKept).asInstanceOf[Array[Double]],
-        labelsDropped = map(ModelSelectorBaseNames.LabelsDropped).asInstanceOf[Array[Double]]
+      case s if s == classOf[DataCutterSummary].getName => DataCutterSummary(
+        labelsKept = metadata.getDoubleArray(ModelSelectorNames.LabelsKept),
+        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped)
       )
+      case s =>
+        throw new RuntimeException(s"Unknown splitter summary class '$s'")
     }
   }
 }
