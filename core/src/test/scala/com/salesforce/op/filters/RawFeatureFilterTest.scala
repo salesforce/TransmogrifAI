@@ -132,7 +132,6 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // all
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.5, Double.PositiveInfinity, 0.5, 1.0)
     val (exclusionReasons, excludedBothAllF, excludedBothAllMK) = filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
-    println(exclusionReasons)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
     excludedBothAllMK shouldBe empty
   }
