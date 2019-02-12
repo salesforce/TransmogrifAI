@@ -91,7 +91,7 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
     val total = 1000
     val (min, max) = (0.0, 100.0)
     val currencyData: Seq[Currency] = (0 until total).map(x => (x * max/total).toCurrency)
-    
+
     val labelData = currencyData.map(c => {
       c.value.map {
         case v if v < 15.0 => 0.0
