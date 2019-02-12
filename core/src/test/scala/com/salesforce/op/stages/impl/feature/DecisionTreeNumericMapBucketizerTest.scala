@@ -90,7 +90,8 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     val (min, max) = (0.0, 100.0)
     val currencies: RandomReal[Currency] =
       RandomReal.uniform[Currency](minValue = min, maxValue = max).withProbabilityOfEmpty(0.1)
-    val correlated = currencies.limit(total)
+    val correlated: Seq[Currency] = (0 until total).map(x => (x * max/total).toCurrency)
+
     val labelData = correlated.map(c => {
       c.value.map {
         case v if v < 15 => 0.0
