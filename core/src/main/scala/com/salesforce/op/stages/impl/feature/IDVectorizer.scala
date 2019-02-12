@@ -43,7 +43,6 @@ import org.apache.spark.sql.{Dataset, Encoder}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import com.salesforce.op.utils.spark.RichDataset._
 
-import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Convert a sequence of id features into a vector by detecting categoricals.
@@ -69,7 +68,7 @@ class IDVectorizer
     val shouldCleanText = $(cleanText)
 
     implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCard)
-    val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
+    val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val (isCategorical, topValues) = aggregatedStats.map { stats =>
@@ -84,7 +83,6 @@ class IDVectorizer
     val idParams = IDVectorizerModelArgs(
       isCategorical = isCategorical,
       topValues = topValues,
-      shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls)
     )
 
@@ -95,9 +93,9 @@ class IDVectorizer
 
   }
 
-  private def computeTextStats(text: ID#Value, shouldCleanText: Boolean): TextStats = {
+  private def computeTextStats(text: ID#Value): TextStats = {
     val valueCounts = text match {
-      case Some(v) => Map(cleanTextFn(v, shouldCleanText) -> 1)
+      case Some(v) => Map(cleanTextFn(v, false) -> 1)
       case None => Map.empty[String, Int]
     }
     TextStats(valueCounts)
@@ -131,14 +129,12 @@ class IDVectorizer
  *
  * @param isCategorical    is feature a categorical or not
  * @param topValues        top values to each feature
- * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
  */
 case class IDVectorizerModelArgs
 (
   isCategorical: Array[Boolean],
   topValues: Array[Seq[String]],
-  shouldCleanText: Boolean,
   shouldTrackNulls: Boolean
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
@@ -158,7 +154,7 @@ final class IDVectorizerModel
   def transformFn: Seq[ID] => OPVector = {
     val categoricalPivotFn: Seq[ID] => OPVector = pivotFn(
       topValues = args.categoricalTopValues,
-      shouldCleanText = args.shouldCleanText,
+      shouldCleanText = false,
       shouldTrackNulls = args.shouldTrackNulls
     )
     (row: Seq[ID]) => {
