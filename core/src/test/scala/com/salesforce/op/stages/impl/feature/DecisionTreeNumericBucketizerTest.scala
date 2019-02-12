@@ -94,14 +94,14 @@ class DecisionTreeNumericBucketizerTest extends OpEstimatorSpec[OPVector,
 
     val labelData = currencyData.map(c => {
       c.value.map {
-        case v if v < 15.0 => 0.0
-        case v if v < 36.0 => 1.0
-        case v if v < 91.0 => 2.0
+        case v if v < 15 => 0.0
+        case v if v < 26 => 1.0
+        case v if v < 91 => 2.0
         case _ => 3.0
       }.toRealNN(0.0)
     })
     val (ds, currency, label) = TestFeatureBuilder("currency", "label", currencyData zip labelData)
-    val expectedSplits = Array(Double.NegativeInfinity, 15.0, 36.0, 91.0, Double.PositiveInfinity)
+    val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
   }
 
   it should "produce output that is never a response, except the case where both inputs are" in new NormalData {
