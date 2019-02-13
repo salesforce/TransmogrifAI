@@ -38,25 +38,6 @@ import com.twitter.algebird.Semigroup
 
 import scala.reflect.ClassTag
 
-/**
- * Summary statistics of a text feature
- *
- * @param valueCounts counts of feature values
- */
-private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
-
-private[op] object TextStats {
-  def semiGroup(maxCardinality: Int): Semigroup[TextStats] = new Semigroup[TextStats] {
-    override def plus(l: TextStats, r: TextStats): TextStats = {
-      if (l.valueCounts.size > maxCardinality) l
-      else if (r.valueCounts.size > maxCardinality) r
-      else TextStats(l.valueCounts + r.valueCounts)
-    }
-  }
-
-  def empty: TextStats = TextStats(Map.empty)
-}
-
 object CategoricalDetection {
   val MaxCardinality = 100
 
@@ -75,4 +56,23 @@ trait MaxCardinalityParams extends Params {
   final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> CategoricalDetection.MaxCardinality)
+}
+
+/**
+ * Summary statistics of a text feature
+ *
+ * @param valueCounts counts of feature values
+ */
+private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
+
+private[op] object TextStats {
+  def semiGroup(maxCardinality: Int): Semigroup[TextStats] = new Semigroup[TextStats] {
+    override def plus(l: TextStats, r: TextStats): TextStats = {
+      if (l.valueCounts.size > maxCardinality) l
+      else if (r.valueCounts.size > maxCardinality) r
+      else TextStats(l.valueCounts + r.valueCounts)
+    }
+  }
+
+  def empty: TextStats = TextStats(Map.empty)
 }
