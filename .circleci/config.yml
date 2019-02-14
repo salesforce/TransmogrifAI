@@ -43,9 +43,18 @@ jobs:
       - *open-jdk
       - *restore-gradle-cache
       - run:
-          name: Clone repo & compile project
+          name: Compile project
           command: java -version && ./gradlew -v && ./gradlew --parallel testScoverageClasses
       - *save-gradle-cache
+  compile-hw:
+      <<: *machine-config
+      steps:
+        - checkout
+        - *open-jdk
+        - run:
+            name: Compile Helloworld project
+            command: cd helloworld && ./gradlew --parallel scalaStyle test && cd ..
+
   test:
     <<: *machine-config
     parallelism: 4
@@ -85,6 +94,7 @@ workflows:
     jobs:
       - scala-style
       - compile
+      - compile-hw
       - test:
           requires:
             - scala-style

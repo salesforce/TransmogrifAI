@@ -28,56 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.cli
+package com.salesforce.op.stages.impl.feature
 
-// scalastyle:off
-// TODO(vlad): make sure that a simple intellij run fills in the resources
-// @see https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/util/MetadataUtils.scala#L54
-// scalastyle:on
-import java.io.File
+import com.salesforce.op.test.TestSparkContext
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-import com.salesforce.op.cli.gen.Ops
-import org.apache.commons.io.FileUtils
+@RunWith(classOf[JUnitRunner])
+class LinearScalerTest extends FlatSpec with TestSparkContext {
 
-class CliExec {
-  protected val DEBUG = false
-
-  private[cli] def delete(dir: File): Unit = {
-    FileUtils.deleteDirectory(dir)
-    if (dir.exists()) {
-      throw new IllegalStateException(s"Directory '${dir.getAbsolutePath}' still exists")
-    }
+  Spec[LinearScaler] should "Error on construction of a non-invertible transformation" in {
+    val error = intercept[java.lang.IllegalArgumentException](
+      LinearScaler(LinearScalerArgs(slope = 0.0, intercept = 1.0))
+    )
+    error.getMessage shouldBe "requirement failed: LinearScaler must have a non-zero slope to be invertible"
   }
 
-  def main(args: Array[String]): Unit = try {
-    val ops = for {
-      arguments <- CommandParser.parse(args, CliParameters())
-      if arguments.command == "gen"
-      settings <- arguments.values
-    } yield Ops(settings)
-
-    ops getOrElse {
-      CommandParser.showUsage()
-      quit("wrong arguments", 1)
-    }
-
-    val outcome = ops.map (_.run())
-
-    outcome getOrElse quit("Generation failed; see error messages", 1)
-
-  } catch {
-    case x: Exception =>
-      if (DEBUG) x.printStackTrace()
-      val msg = Option(x.getMessage).getOrElse(x.getStackTrace.mkString("", "\n", "\n"))
-      quit(msg)
+  it should "correctly construct the linear scaling and inverse scaling function" in {
+    val sampleData = Seq(0.0, 1.0, 2.0, 3.0, 4.0)
+    val scaler = LinearScaler(LinearScalerArgs(slope = 2.0, intercept = 1.0))
+    sampleData.map(x => scaler.scale(x)) shouldEqual sampleData.map(x => 2.0*x + 1.0)
+    sampleData.map(x => scaler.descale(x)) shouldEqual sampleData.map(x => 0.5*x - 0.5)
   }
-
-  def quit(errorMsg: String, code: Int = -1): Nothing = {
-    System.err.println(errorMsg)
-    sys.exit(code)
-  }
-}
-
-object CLI {
-  def main(args: Array[String]): Unit = (new CliExec).main(args)
 }
