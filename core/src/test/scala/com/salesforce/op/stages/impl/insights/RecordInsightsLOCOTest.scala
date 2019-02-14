@@ -177,7 +177,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return the most predictive features for dat generated with a strong relation to the label" in {
-    val numRows = 1000
+    val numRows = 100
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
     val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
       .withProbabilityOfEmpty(0.1).limit(numRows)

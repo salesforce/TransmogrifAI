@@ -278,9 +278,9 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
   }
 
   "Country features" should "be vectorized the same whether they're in maps or not" in {
-    val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(1000)
-    val countryData2: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(1000)
-    val countryData3: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(1000)
+    val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(100)
+    val countryData2: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(100)
+    val countryData3: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.5).limit(100)
 
     testFeatureToMap[Country, CountryMap, String](countryData, countryData2, countryData3)
   }
@@ -294,25 +294,25 @@ class OPMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
   }
 
   "City features" should "be vectorized the same whether they're in maps or not" in {
-    val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(1000)
-    val cityData2: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(1000)
-    val cityData3: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(1000)
+    val cityData: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(100)
+    val cityData2: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(100)
+    val cityData3: Seq[City] = RandomText.cities.withProbabilityOfEmpty(0.5).limit(100)
 
     testFeatureToMap[City, CityMap, String](cityData, cityData2, cityData3)
   }
 
   "PostalCode features" should "be vectorized the same whether they're in maps or not" in {
-    val postalCodeData: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(1000)
-    val postalCodeData2: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(1000)
-    val postalCodeData3: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(1000)
+    val postalCodeData: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(100)
+    val postalCodeData2: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(100)
+    val postalCodeData3: Seq[PostalCode] = RandomText.postalCodes.withProbabilityOfEmpty(0.5).limit(100)
 
     testFeatureToMap[PostalCode, PostalCodeMap, String](postalCodeData, postalCodeData2, postalCodeData3)
   }
 
   "Street features" should "be vectorized the same whether they're in maps or not" in {
-    val streetData: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(1000)
-    val streetData2: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(1000)
-    val streetData3: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(1000)
+    val streetData: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(100)
+    val streetData2: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(100)
+    val streetData3: Seq[Street] = RandomText.streets.withProbabilityOfEmpty(0.5).limit(100)
 
     testFeatureToMap[Street, StreetMap, String](streetData, streetData2, streetData3)
   }

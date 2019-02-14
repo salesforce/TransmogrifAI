@@ -58,7 +58,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
     with VectorizerDefaults with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with OneHotFun {
+    with TrackNullsParam with MinSupportParam with OneHotFun with MaxCardinalityParams {
 
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
 
@@ -79,8 +79,11 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     // Top K values for each categorical input
     val numToKeep = $(topK)
     val minSup = $(minSupport)
+    val maxCard = $(maxCardinality)
+
     val topValues: Seq[Seq[String]] =
-      countOccurrences.map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
+      countOccurrences.filter(_.size <= maxCard)
+        .map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
 
     // build metadata describing output
     val unseen = Option($(unseenName))
