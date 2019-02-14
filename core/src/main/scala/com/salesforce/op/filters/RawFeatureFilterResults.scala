@@ -37,12 +37,14 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType
  *
  * @param rawFeatureFilterConfig  configuration settings for RawFeatureFilter
  * @param featureDistributions    feature distributions calculated from training data
+ * @param rawFeatureMetrics       feature metrics calculated by RawFeatureFilter
  * @param exclusionReasons        results of RawFeatureFilter tests (reasons why feature is dropped or not)
  */
 case class RawFeatureFilterResults
 (
   rawFeatureFilterConfig: RawFeatureFilterConfig = RawFeatureFilterConfig(),
   featureDistributions: Seq[FeatureDistribution] = Seq.empty,
+  rawFeatureMetrics: Seq[RawFeatureMetrics] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
 
@@ -78,9 +80,30 @@ case class ExclusionReasons
   name: String = "",
   trainingUnfilled: Boolean = false,
   scoringUnfilled: Boolean = false,
-  distribMismatchJSDivergence: Boolean = false,
-  distribMismatchFillRateDiff: Boolean = false,
-  distribMismatchFillRatioDiff: Boolean = false,
+  jsDivergenceMismatch: Boolean = false,
+  fillRateDiffMismatch: Boolean = false,
+  fillRatioDiffMismatch: Boolean = false,
   nullLabelCorrelation: Boolean = false,
   excluded: Boolean = false
+)
+
+/**
+ * Contains raw feature metrics computing in Raw Feature Filter
+ *
+ * @param trainingFillRate
+ * @param scoringFillRate
+ * @param jsDivergence
+ * @param fillRateDiff
+ * @param fillRatioDiff
+ * @param nullLabelCorrelation
+ */
+case class RawFeatureMetrics
+(
+  name: String = "",
+  trainingFillRate: Double = 0.0,
+  nullLabelCorrelation: Double = Double.NaN,
+  scoringFillRate: Double = 0.0,
+  jsDivergence: Double = 0.0,
+  fillRateDiff: Double = 0.0,
+  fillRatioDiff: Double = 0.0
 )

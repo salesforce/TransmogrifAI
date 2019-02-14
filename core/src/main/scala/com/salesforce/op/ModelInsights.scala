@@ -89,7 +89,6 @@ case class ModelInsights
     if (pretty) writePretty(this) else write(this)
   }
 
-
   /**
    * High level model summary in a compact print friendly format containing:
    * selected model info, model evaluation results and feature correlations/contributions/cramersV values.
@@ -334,7 +333,6 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param exclusionReasons exclusion reasons for the raw feature (if calculated in RawFeatureFilter)
  *
  */
-
 case class FeatureInsights
 (
   featureName: String,

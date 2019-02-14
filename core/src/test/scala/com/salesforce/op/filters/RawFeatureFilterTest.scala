@@ -85,7 +85,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on the stats of training fill rate" in {
     // only fill rate matters
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val (exclusionReasons, excludedTrainF, excludedTrainMK) = filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
+    val (rawFeatureMetrics, exclusionReasons, excludedTrainF, excludedTrainMK) = filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
     excludedTrainF.toSet shouldEqual Set("B", "D")
     excludedTrainMK.keySet shouldEqual Set("C")
     excludedTrainMK.head._2 shouldEqual Set("2")
@@ -96,7 +96,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // only fill rate matters
 
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val (exclusionReasons, excludedBothF, excludedBothMK) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (rawFeatureMetrics, exclusionReasons, excludedBothF, excludedBothMK) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothF.toSet shouldEqual Set("B", "D")
     excludedBothMK.keySet shouldEqual Set("C")
     excludedBothMK.head._2 shouldEqual Set("2")
@@ -106,26 +106,26 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on the stats of relative fill rate" in {
     // relative fill rate matters
     val filter2 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val (exclusionReasons, excludedBothRelF, excludedBothRelMK) = filter2.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (rawFeatureMetrics, exclusionReasons, excludedBothRelF, excludedBothRelMK) = filter2.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothRelF.toSet shouldEqual Set("A")
     excludedBothRelMK shouldBe empty
-    exclusionReasons.filter(_.distribMismatchFillRateDiff).map { _.name}.toSet shouldEqual Set("A")
+    exclusionReasons.filter(_.fillRateDiffMismatch).map { _.name}.toSet shouldEqual Set("A")
   }
 
   it should "correctly determine which features to exclude based on the stats of fill rate ratio" in {
     // relative fill ratio matters
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 1.0, 2.0, 1.0, 1.0)
-    val (exclusionReasons, excludedBothRelFR, excludedBothRelMKR) =
+    val (rawFeatureMetrics, exclusionReasons, excludedBothRelFR, excludedBothRelMKR) =
       filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothRelFR.toSet shouldEqual Set("D", "A", "B")
     excludedBothRelMKR shouldBe empty
-    exclusionReasons.filter(_.distribMismatchFillRatioDiff).map { _.name}.toSet shouldEqual Set("A", "B", "D")
+    exclusionReasons.filter(_.fillRatioDiffMismatch).map { _.name}.toSet shouldEqual Set("A", "B", "D")
   }
 
   it should "correctly determine which features to exclude based on the stats of js distance" in {
     // js distance
     val filter3 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.0, 1.0, Double.PositiveInfinity, 0.5, 1.0)
-    val (exclusionReasons, excludedBothDistF, excludedBothDistMK) =
+    val (rawFeatureMetrics, exclusionReasons, excludedBothDistF, excludedBothDistMK) =
       filter3.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothDistF.isEmpty shouldEqual true
     excludedBothDistMK.keySet shouldEqual Set("C")
@@ -136,7 +136,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   it should "correctly determine which features to exclude based on all the stats" in {
     // all
     val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.5, Double.PositiveInfinity, 0.5, 1.0)
-    val (exclusionReasons, excludedBothAllF, excludedBothAllMK) = filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    val (rawFeatureMetrics, exclusionReasons, excludedBothAllF, excludedBothAllMK) = filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
     excludedBothAllMK shouldBe empty
     exclusionReasons.filter(_.excluded).map { _.name }.toSet shouldEqual Set("A", "B", "C", "D")
