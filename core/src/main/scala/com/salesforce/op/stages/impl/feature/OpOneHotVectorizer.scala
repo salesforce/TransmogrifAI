@@ -60,6 +60,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     with VectorizerDefaults with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with OneHotFun with MaxCardinalityParams {
 
+
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
 
   protected def makeModel(topValues: Seq[Seq[String]], shouldCleanText: Boolean,

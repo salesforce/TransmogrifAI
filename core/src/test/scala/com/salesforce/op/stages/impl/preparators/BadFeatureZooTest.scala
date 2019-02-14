@@ -824,8 +824,8 @@ class BadFeatureZooTest extends FlatSpec with TestSparkContext with Logging {
     )
     val labelData = labelTransformer.setInput(rawId, rawPickList).getOutput().asInstanceOf[Feature[RealNN]]
       .copy(isResponse = true)
-    val genFeatureVector = Seq(rawId.vectorize(maxCardinality = 100, topK = TransmogrifierDefaults.TopK,
-      minSupport = TransmogrifierDefaults.MinSupport, cleanText = TransmogrifierDefaults.CleanText),
+    val genFeatureVector = Seq(rawId.vectorize(
+      maxCardinality = 100, topK = TransmogrifierDefaults.TopK, minSupport = TransmogrifierDefaults.MinSupport),
       rawPickList, rawCurrency).transmogrify()
 
     val checkedFeatures = new SanityChecker()
