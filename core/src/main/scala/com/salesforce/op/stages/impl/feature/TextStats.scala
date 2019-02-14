@@ -38,7 +38,7 @@ import com.twitter.algebird.Semigroup
 
 import scala.reflect.ClassTag
 
-object CategoricalDetection {
+case object CategoricalDetection {
   val MaxCardinality = 100
 
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {

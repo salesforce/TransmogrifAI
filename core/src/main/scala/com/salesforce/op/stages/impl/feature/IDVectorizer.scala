@@ -30,18 +30,18 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.{FeatureHistory, UID}
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.{FeatureHistory, UID}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
-import org.apache.spark.sql.{Dataset, Encoder}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.sql.{Dataset, Encoder}
 
 
 /**
@@ -52,20 +52,18 @@ import com.salesforce.op.utils.spark.RichDataset._
  *
  * @param uid uid for instance
  */
-class IDVectorizer
-(uid: String = UID[IDVectorizer])
+class IDVectorizer(uid: String = UID[IDVectorizer])
   extends SequenceEstimator[ID, OPVector](operationName = "idvec", uid = uid)
-    with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with MaxCardinalityParams with OneHotFun {
+    with PivotParams with SaveOthersParams with TrackNullsParam
+    with MinSupportParam with MaxCardinalityParams with OneHotFun {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
-
 
   def fitFn(dataset: Dataset[Seq[ID#Value]]): SequenceModel[ID, OPVector] = {
     require(!dataset.isEmpty, "Input dataset cannot be empty")
 
     val maxCard = $(maxCardinality)
-    val shouldCleanText = $(cleanText)
+    val minSupp = $(minSupport)
 
     implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats).toArray)
@@ -74,7 +72,7 @@ class IDVectorizer
     val (isCategorical, topValues) = aggregatedStats.map { stats =>
       val isCategorical = stats.valueCounts.size <= maxCard
       val topValues = stats.valueCounts
-        .filter { case (_, count) => count >= $(minSupport) }
+        .filter { case (_, count) => count >= minSupp }
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
       isCategorical -> topValues
@@ -90,12 +88,11 @@ class IDVectorizer
     setMetadata(vecMetadata.toMetadata)
 
     new IDVectorizerModel(args = idParams, operationName = operationName, uid = uid)
-
   }
 
   private def computeTextStats(text: ID#Value): TextStats = {
     val valueCounts = text match {
-      case Some(v) => Map(cleanTextFn(v, false) -> 1)
+      case Some(v) => Map(v -> 1)
       case None => Map.empty[String, Int]
     }
     TextStats(valueCounts)
@@ -107,7 +104,7 @@ class IDVectorizer
   private def makeVectorMetadata(idParams: IDVectorizerModelArgs): OpVectorMetadata = {
     require(inN.length == idParams.isCategorical.length)
 
-    val (categoricalFeatures, textFeatures) =
+    val (categoricalFeatures, _) =
       CategoricalDetection.partition[TransientFeature](inN, idParams.isCategorical)
 
     // build metadata describing output
@@ -157,7 +154,7 @@ final class IDVectorizerModel
       shouldCleanText = false,
       shouldTrackNulls = args.shouldTrackNulls
     )
-    (row: Seq[ID]) => {
+    row: Seq[ID] => {
       val (rowCategorical, _) = CategoricalDetection.partition[ID](row.toArray, args.isCategorical)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       categoricalVector

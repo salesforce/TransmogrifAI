@@ -60,7 +60,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   uid: String = UID[SmartTextMapVectorizer[T]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtMapVec", uid = uid)
-    with PivotParams with CleanTextFun with SaveOthersParams
+    with PivotParams with TextParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams {

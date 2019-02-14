@@ -283,7 +283,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[ID] =>
           val (f, other) = castAs[ID](g)
           f.vectorize(maxCardinality = MaxCategoricalCardinality, topK = TopK, minSupport = MinSupport,
-            cleanText = CleanText, trackNulls = TrackNulls, others = other)
+            trackNulls = TrackNulls, others = other)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
           f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other)
@@ -541,7 +541,7 @@ trait TextParams extends Params {
 }
 
 
-trait PivotParams extends TextParams {
+trait PivotParams extends Params {
   final val topK = new IntParam(
     parent = this, name = "topK", doc = "number of elements to keep for each vector",
     isValid = ParamValidators.gt(0L)

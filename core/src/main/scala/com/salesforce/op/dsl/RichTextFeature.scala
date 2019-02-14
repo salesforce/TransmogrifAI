@@ -747,27 +747,24 @@ trait RichTextFeature {
      * Converts a sequence of [[ID]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param maxCardinality     Maximum Cardinality for a categorical
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param others     Other [[ID]] features to include
+     * @param topK           How many values to keep in the vector
+     * @param minSupport     Min times a value must occur to be retained in pivot
+     * @param maxCardinality Maximum Cardinality for a categorical
+     * @param trackNulls     keep an extra column that indicated if feature was null
+     * @param others         Other [[ID]] features to include
      * @return The vectorized features
      */
     def vectorize
     (
-      maxCardinality: Int,
       topK: Int,
       minSupport: Int,
-      cleanText: Boolean,
+      maxCardinality: Int = TransmogrifierDefaults.MaxCategoricalCardinality,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[ID]] = Array.empty
     ): FeatureLike[OPVector] = {
-      new IDVectorizer().setMaxCardinality(maxCardinality).setTopK(topK).setMinSupport(minSupport)
-        .setCleanText(cleanText).setTrackNulls(trackNulls)
-        .setInput(f +: others)
-        .getOutput
+      new IDVectorizer()
+        .setMaxCardinality(maxCardinality).setTopK(topK).setMinSupport(minSupport).setTrackNulls(trackNulls)
+        .setInput(f +: others).getOutput()
     }
 
   }
