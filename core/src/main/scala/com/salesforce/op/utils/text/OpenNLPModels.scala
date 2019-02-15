@@ -128,7 +128,7 @@ object OpenNLPModels {
     } catch {
       case e: Exception => throw new RuntimeException(
         s"Failed to load OpenNLP model from resource '$resourcePath'. " +
-          "Make sure to include OP 'models' dependency jar in your application classpath.", e
+          "Make sure to include TransmogrifAI 'models' dependency jar in your application classpath.", e
       )
     }
 

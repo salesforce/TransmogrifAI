@@ -19,7 +19,7 @@ dependencies {
     compile ("com.twitter:chill-avro_$scalaVersion:$chillVersion") { exclude group: "org.apache.avro", module: "avro" }
     compile "com.twitter:chill-algebird_$scalaVersion:$chillVersion"
 
-    // Lucene - (geo location)
+    // Lucene geo location
     compile "org.apache.lucene:lucene-spatial3d:$luceneVersion"
     compile "org.apache.lucene:lucene-spatial:$luceneVersion"
     compile "org.apache.lucene:lucene-spatial-extras:$luceneVersion"
