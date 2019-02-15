@@ -30,8 +30,11 @@
 
 package com.salesforce.op.utils.geo
 
+import java.nio.file.Paths
+
 import com.salesforce.op.test.TestCommon
-import org.apache.lucene.store.{BaseDirectory, RAMDirectory}
+import org.apache.log4j.Level
+import org.apache.lucene.store.{BaseDirectory, NIOFSDirectory, RAMDirectory, SimpleFSDirectory}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -40,13 +43,21 @@ import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class LuceneReverseGeocoderTest extends FlatSpec with TestCommon {
+  loggingLevel(Level.INFO)
+
   import LuceneReverseGeocoder._
 
-  val sampleSize = 10000
+  val sampleSize = 1000
   lazy val cities = worldCitiesData.take(sampleSize)
 
+  // val indexDirectory: BaseDirectory = new NIOFSDirectory(Paths.get("/tmp/world-cities"))
   val indexDirectory: BaseDirectory = new RAMDirectory()
+
   val geocoder = new LuceneReverseGeocoder()
+  lazy val index = openIndex(indexDirectory) match {
+    case Failure(err) => fail(err)
+    case Success(idx) => idx
+  }
 
   Spec[LuceneReverseGeocoder] should "build index of cities" in {
     buildIndex(cities, indexDirectory) match {
@@ -57,36 +68,50 @@ class LuceneReverseGeocoderTest extends FlatSpec with TestCommon {
     }
   }
   it should "open an index" in {
-    openIndex(indexDirectory) match {
-      case Failure(err) => fail(err)
-      case Success(index) =>
-        index.collectionStatistics("id").maxDoc() shouldBe cities.size
-    }
+    index.collectionStatistics("id").maxDoc() shouldBe cities.size
   }
   it should "get nearest cities" in {
-    openIndex(indexDirectory) match {
-      case Failure(err) => fail(err)
-      case Success(index) =>
-        val city = cities.head
-        val results = geocoder.nearestCities(index,
-          latitude = city.latitude, longitude = city.longitude,
-          radiusInKM = 10, numOfResults = 10)
-        results.size should be >= 1
-        results should contain(city)
-    }
+    val city = cities.head
+    val results = geocoder.nearestCities(index,
+      latitude = city.latitude, longitude = city.longitude,
+      radiusInKM = 10, numOfResults = 10)
+
+    results should contain(city)
+  }
+  it should "get nearest countries" in {
+    val city = cities.head
+    val results = geocoder.nearestCountries(index,
+      latitude = city.latitude, longitude = city.longitude,
+      radiusInKM = 10, numOfResults = 10)
+
+    results should contain(city.country)
   }
 
-//  it should "nearest cities to Palo Alto, CA" in {
-//    openIndex(indexDirectory) match {
-//      case Failure(err) => fail(err)
-//      case Success(index) =>
-//        val results = geocoder.nearestCities(
-//          index, latitude = 37.4419, longitude = -122.1430, radiusInKM = 10, numOfResults = 10)
-//
-//        results.size should be >= 1
-//        // results should contain (city)
-//        // println("QUERY: " + city)
-//        results.foreach(println)
-//    }
-//  }
+  it should "get nearest cities in a timely fashion" in {
+    val start = System.currentTimeMillis()
+    val items = cities.take(10000)
+    for { city <- items } {
+      val results = geocoder.nearestCountries(index,
+        latitude = city.latitude, longitude = city.longitude,
+        radiusInKM = 10, numOfResults = 10)
+
+      results should contain(city.country)
+    }
+    val elapsed = System.currentTimeMillis() - start
+    println((elapsed.toDouble / items.size) + "ms per query")
+  }
+
+  //  it should "nearest cities to Palo Alto, CA" in {
+  //    openIndex(indexDirectory) match {
+  //      case Failure(err) => fail(err)
+  //      case Success(index) =>
+  //        val results = geocoder.nearestCities(
+  //          index, latitude = 37.4419, longitude = -122.1430, radiusInKM = 10, numOfResults = 10)
+  //
+  //        results.size should be >= 1
+  //        // results should contain (city)
+  //        // println("QUERY: " + city)
+  //        results.foreach(println)
+  //    }
+  //  }
 }

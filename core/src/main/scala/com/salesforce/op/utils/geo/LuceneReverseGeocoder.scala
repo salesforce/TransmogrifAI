@@ -31,10 +31,13 @@
 package com.salesforce.op.utils.geo
 
 import java.io.{BufferedReader, InputStreamReader}
+import java.nio.charset.StandardCharsets
 import java.nio.file.Paths
+import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
 import org.apache.lucene.document.{Document, NumericDocValuesField, StoredField}
+import org.apache.lucene.index.IndexWriterConfig.OpenMode
 import org.apache.lucene.index.{DirectoryReader, IndexWriter, IndexWriterConfig}
 import org.apache.lucene.search.{IndexSearcher, Sort, SortField, TopDocs}
 import org.apache.lucene.spatial.SpatialStrategy
@@ -45,8 +48,10 @@ import org.apache.lucene.store.BaseDirectory
 import org.locationtech.spatial4j.context.SpatialContext
 import org.locationtech.spatial4j.distance.DistanceUtils
 import org.locationtech.spatial4j.shape.Point
+import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.Duration
 import scala.util.Try
 
 
@@ -88,7 +93,33 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    * @return nearest cities to the specified coordinate within the radius in KM
    */
   def nearestCountries(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[String] = {
-    val cities = nearestCities(latitude = latitude, longitude = longitude,
+    nearestCountries(
+      searcher = LuceneReverseGeocoder.worldCities,
+      latitude = latitude, longitude = longitude,
+      radiusInKM = radiusInKM, numOfResults = numOfResults)
+  }
+
+  /**
+   * Find the nearest cities to the specified coordinate within the radius in KM
+   *
+   * @param searcher     world cities index searcher
+   * @param latitude     latitude value
+   * @param longitude    longitude value
+   * @param radiusInKM   radius in KM
+   * @param numOfResults number of results to return
+   * @return nearest cities to the specified coordinate within the radius in KM
+   */
+  private[geo] def nearestCountries
+  (
+    searcher: IndexSearcher,
+    latitude: Double,
+    longitude: Double,
+    radiusInKM: Double,
+    numOfResults: Int
+  ): Seq[String] = {
+    val cities =  nearestCities(
+      searcher = searcher,
+      latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
 
     cities.map(_.country).distinct
@@ -104,7 +135,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    * @param numOfResults number of results to return
    * @return nearest cities to the specified coordinate within the radius in KM
    */
-  def nearestCities
+  private[geo] def nearestCities
   (
     searcher: IndexSearcher,
     latitude: Double,
@@ -138,6 +169,13 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
  */
 private[geo] case object LuceneReverseGeocoder {
 
+  lazy val log = LoggerFactory.getLogger(classOf[LuceneReverseGeocoder])
+
+  /**
+   * World cities data (used to construct the index offline)
+   */
+  lazy val worldCitiesData: Seq[WorldCity] = loadWorldCitiesData()
+
   /**
    * Default SpatialContext implementation for geospatial
    */
@@ -150,11 +188,6 @@ private[geo] case object LuceneReverseGeocoder {
     val grid = new GeohashPrefixTree(context, 11)
     new RecursivePrefixTreeStrategy(grid, "geoLoc")
   }
-
-  /**
-   * World cities data (used to construct the index offline)
-   */
-  lazy val worldCitiesData: Seq[WorldCity] = loadWorldCitiesData()
 
   /**
    * World cities index
@@ -170,8 +203,9 @@ private[geo] case object LuceneReverseGeocoder {
    */
   def buildIndex(cities: Seq[WorldCity], directory: BaseDirectory): Try[Long] = Try {
     val start = System.currentTimeMillis()
+    log.info(s"Building index with ${cities.size} cities...")
 
-    val iwConfig = new IndexWriterConfig(null)
+    val iwConfig = new IndexWriterConfig(null).setOpenMode(OpenMode.CREATE)
     val indexWriter = new IndexWriter(directory, iwConfig)
 
     for {
@@ -184,7 +218,10 @@ private[geo] case object LuceneReverseGeocoder {
     }
     indexWriter.close()
 
-    System.currentTimeMillis() - start
+    val elapsed = Duration.apply(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS)
+    val docSec = if (elapsed.toSeconds > 0) cities.size / elapsed.toSeconds else cities.size
+    log.info(s"Elapsed ${elapsed.toSeconds} seconds ($docSec doc/sec). Index saved to '$directory'.")
+    elapsed.toMillis
   }
 
   /**
@@ -202,14 +239,17 @@ private[geo] case object LuceneReverseGeocoder {
    * Load World Cities dataset - https://www.kaggle.com/max-mind/world-cities-database
    */
   def loadWorldCitiesData(): Seq[WorldCity] = {
+    val start = System.currentTimeMillis()
     val dataPath = Paths.get("data/world-cities-database.zip").toFile.getCanonicalFile.getAbsoluteFile
+    log.info(s"Loading world cities data from: $dataPath")
+
     val citiesCsv = {
       val zip = new ZipFile(dataPath)
       val in = zip.getInputStream(zip.entries().asScala.find(_.getName == "worldcitiespop.csv").get)
-      new BufferedReader(new InputStreamReader(in, "UTF-8"))
+      new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))
     }.lines().iterator().asScala.drop(1) // skip header
 
-    citiesCsv.map { c =>
+    val cities = citiesCsv.map { c =>
       val Array(country, city, accentCity, region, population, latitude, longitude) = c.split(',')
       WorldCity(
         country = country,
@@ -221,6 +261,10 @@ private[geo] case object LuceneReverseGeocoder {
         longitude = longitude.toDouble
       )
     }.toSeq
+
+    val elapsed = Duration.apply(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS)
+    log.info(s"Loaded ${cities.size} cities. Elapsed ${elapsed.toSeconds} seconds.")
+    cities
   }
 
   /**
