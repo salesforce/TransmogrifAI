@@ -32,7 +32,7 @@ package com.salesforce.op.utils.geo
 
 import java.io.{BufferedReader, InputStreamReader}
 import java.nio.charset.StandardCharsets
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipFile
 
@@ -174,11 +174,6 @@ private[geo] case object LuceneReverseGeocoder {
   lazy val log = LoggerFactory.getLogger(classOf[LuceneReverseGeocoder])
 
   /**
-   * World cities data (used to construct the index offline)
-   */
-  lazy val worldCitiesData: Seq[WorldCity] = loadWorldCitiesData()
-
-  /**
    * Default SpatialContext implementation for geospatial
    */
   val context: SpatialContext = SpatialContext.GEO
@@ -239,10 +234,12 @@ private[geo] case object LuceneReverseGeocoder {
 
   /**
    * Load World Cities dataset - https://www.kaggle.com/max-mind/world-cities-database
+   *
+   * @param path path to 'world-cities-database.zip' file
    */
-  def loadWorldCitiesData(): Seq[WorldCity] = {
+  def loadWorldCitiesData(path: Path): Seq[WorldCity] = {
     val start = System.currentTimeMillis()
-    val dataPath = Paths.get("data/world-cities-database.zip").toFile.getCanonicalFile.getAbsoluteFile
+    val dataPath = Paths.get(s"$path/world-cities-database.zip").toFile.getCanonicalFile.getAbsoluteFile
     log.info(s"Loading world cities data from: $dataPath")
 
     val citiesCsv = {

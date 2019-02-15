@@ -48,7 +48,7 @@ class LuceneReverseGeocoderTest extends FlatSpec with TestCommon {
   import LuceneReverseGeocoder._
 
   val sampleSize = 1000
-  lazy val cities = worldCitiesData.take(sampleSize)
+  lazy val cities = loadWorldCitiesData(Paths.get(dataDirectory("data"))).take(sampleSize)
 
   // val indexDirectory: BaseDirectory = new NIOFSDirectory(Paths.get("/tmp/world-cities"))
   val indexDirectory: BaseDirectory = new RAMDirectory()

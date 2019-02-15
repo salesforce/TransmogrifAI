@@ -77,10 +77,16 @@ trait TestCommon extends Matchers with Assertions {
    * Test data directory
    * @return directory path
    */
-  def testDataDir: String = {
-    Some(new File("test-data"))
+  def testDataDir: String = dataDirectory("test-data")
+
+  /**
+   * Test data directory
+   * @return directory path
+   */
+  def dataDirectory(directory: String): String = {
+    Some(new File(directory))
       .collect{ case d if d.isDirectory => d.getPath}
-      .getOrElse(Paths.get("test-data-sibling").relativize(Paths.get("test-data")).toString)
+      .getOrElse(Paths.get(s"$directory-sibling").relativize(Paths.get(directory)).toString)
   }
 
   /**
