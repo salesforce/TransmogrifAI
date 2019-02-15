@@ -49,9 +49,16 @@ import org.locationtech.spatial4j.shape.Point
 import scala.collection.JavaConverters._
 import scala.util.Try
 
+
+// scalastyle:off
 /**
- * Reverse Geocoder implementation using Lucene spatial index
+ * Reverse Geocoder implementation using Lucene spatial index.
+ *
+ * Related read:
+ * 1. https://opensourceconnections.com/blog/2014/04/11/indexing-polygons-in-lucene-with-accuracy
+ * 2. https://github.com/apache/lucene-solr/blob/branch_7x/lucene/spatial-extras/src/test/org/apache/lucene/spatial/SpatialExample.java
  */
+// scalastyle:on
 class LuceneReverseGeocoder extends ReverseGeocoder {
 
   /**
@@ -63,13 +70,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    * @param numOfResults number of results to return
    * @return nearest cities to the specified coordinate within the radius in KM
    */
-  def nearestCities
-  (
-    latitude: Double,
-    longitude: Double,
-    radiusInKM: Double,
-    numOfResults: Int
-  ): Seq[WorldCity] = {
+  def nearestCities(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[WorldCity] = {
     nearestCities(
       searcher = LuceneReverseGeocoder.worldCities,
       latitude = latitude, longitude = longitude,
@@ -86,20 +87,12 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    *
    * @return nearest cities to the specified coordinate within the radius in KM
    */
-  def nearestCountries
-  (
-    latitude: Double,
-    longitude: Double,
-    radiusInKM: Double,
-    numOfResults: Int
-  ): Seq[String] = {
-    val cities = nearestCities(
-      latitude = latitude, longitude = longitude,
+  def nearestCountries(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[String] = {
+    val cities = nearestCities(latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
 
     cities.map(_.country).distinct
   }
-
 
   /**
    * Find the nearest cities to the specified coordinate within the radius in KM
@@ -141,9 +134,9 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
 
 
 /**
- * Helper facilities to build and read Lucene reverse geocoder index
+ * Helper facilities to build, read and query Lucene reverse geocoder index
  */
-case object LuceneReverseGeocoder {
+private[geo] case object LuceneReverseGeocoder {
 
   /**
    * Default SpatialContext implementation for geospatial
@@ -205,13 +198,16 @@ case object LuceneReverseGeocoder {
     new IndexSearcher(indexReader)
   }
 
-  private[geo] def loadWorldCitiesData(): Seq[WorldCity] = {
+  /**
+   * Load World Cities dataset - https://www.kaggle.com/max-mind/world-cities-database
+   */
+  def loadWorldCitiesData(): Seq[WorldCity] = {
     val dataPath = Paths.get("data/world-cities-database.zip").toFile.getCanonicalFile.getAbsoluteFile
     val citiesCsv = {
       val zip = new ZipFile(dataPath)
       val in = zip.getInputStream(zip.entries().asScala.find(_.getName == "worldcitiespop.csv").get)
       new BufferedReader(new InputStreamReader(in, "UTF-8"))
-    }.lines().iterator().asScala.drop(1)
+    }.lines().iterator().asScala.drop(1) // skip header
 
     citiesCsv.map { c =>
       val Array(country, city, accentCity, region, population, latitude, longitude) = c.split(',')
@@ -227,13 +223,22 @@ case object LuceneReverseGeocoder {
     }.toSeq
   }
 
-  private[geo] def makePoint(latitude: Double, longitude: Double): Point =
+  /**
+   * Make [[Point]] from lat and lon values, where X - longitude, Y - latitude
+   */
+  def makePoint(latitude: Double, longitude: Double): Point =
     context.getShapeFactory.pointXY(longitude, latitude) // X - longitude, Y - latitude
 
-  private[geo] def calcDistance(p: Point, latitude: Double, longitude: Double): Double =
+  /**
+   * Calculate distance between a [[Point]] and lat and lon values
+   */
+  def calcDistance(p: Point, latitude: Double, longitude: Double): Double =
     context.calcDistance(p, longitude, latitude) // X - longitude, Y - latitude
 
-  private[geo] def makeDocument(id: Int, city: WorldCity): Document = {
+  /**
+   * Make Lucene [[Document]] instance for indexing
+   */
+  def makeDocument(id: Int, city: WorldCity): Document = {
     val doc = new Document()
     doc.add(new NumericDocValuesField("id", id))
     doc.add(new StoredField("city", city.city))
@@ -246,7 +251,10 @@ case object LuceneReverseGeocoder {
     doc
   }
 
-  private[geo] def makeCity(doc: Document): WorldCity = {
+  /**
+   * Make city class instance from Lucene [[Document]] for index retrieval
+   */
+  def makeCity(doc: Document): WorldCity = {
     WorldCity(
       city = doc.get("city"),
       country = doc.get("country"),

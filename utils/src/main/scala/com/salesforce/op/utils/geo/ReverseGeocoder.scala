@@ -45,12 +45,7 @@ trait ReverseGeocoder extends Serializable {
    *
    * @return nearest cities to the specified coordinate within the radius in KM
    */
-  def nearestCities(
-    latitude: Double,
-    longitude: Double,
-    radiusInKM: Double,
-    numOfResults: Int
-  ): Seq[WorldCity]
+  def nearestCities(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[WorldCity]
 
   /**
    * Find the nearest countries to the specified coordinate within the radius in KM
@@ -62,12 +57,7 @@ trait ReverseGeocoder extends Serializable {
    *
    * @return nearest countries to the specified coordinate within the radius in KM
    */
-  def nearestCountries(
-    latitude: Double,
-    longitude: Double,
-    radiusInKM: Double,
-    numOfResults: Int
-  ): Seq[String]
+  def nearestCountries(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[String]
 
 }
 
