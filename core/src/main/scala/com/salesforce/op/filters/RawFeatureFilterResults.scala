@@ -37,14 +37,14 @@ import com.salesforce.op.stages.impl.preparators.CorrelationType
  *
  * @param rawFeatureFilterConfig  configuration settings for RawFeatureFilter
  * @param featureDistributions    feature distributions calculated from training data
- * @param rawFeatureMetrics       feature metrics calculated by RawFeatureFilter
+ * @param rawFeatureFilterMetrics feature metrics calculated by RawFeatureFilter
  * @param exclusionReasons        results of RawFeatureFilter tests (reasons why feature is dropped or not)
  */
 case class RawFeatureFilterResults
 (
   rawFeatureFilterConfig: RawFeatureFilterConfig = RawFeatureFilterConfig(),
   featureDistributions: Seq[FeatureDistribution] = Seq.empty,
-  rawFeatureMetrics: Seq[RawFeatureMetrics] = Seq.empty,
+  rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
 
@@ -54,56 +54,57 @@ case class RawFeatureFilterResults
 case class RawFeatureFilterConfig
 (
   minFill: Double = 0.0,
-  maxFillDifference: Double = 0.0,
-  maxFillRatioDiff: Double = 0.0,
-  maxJSDivergence: Double = 0.0,
-  maxCorrelation: Double = 0.0,
+  maxFillDifference: Double = Double.PositiveInfinity,
+  maxFillRatioDiff: Double = Double.PositiveInfinity,
+  maxJSDivergence: Double = 1.0,
+  maxCorrelation: Double = 1.0,
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
 )
 
 /**
- * Contains results of Raw Feature Filter tests for a given feature
+ * Contains raw feature metrics computing in Raw Feature Filter
  *
- * @param name         name of the feature
- * @param trainingUnfilled              training fill rate did not meet min required
- * @param scoringUnfilled               scoring fill rate did not meet min required
- * @param distribMismatchJSDivergence   distribution mismatch: JS Divergence exceeded max allowed
- * @param distribMismatchFillRateDiff   distribution mismatch: fill rate difference exceeded max allowed
- * @param distribMismatchFillRatioDiff  distribution mismatch: fill ratio difference exceeded max allowed
- * @param nullLabelCorrelation          null indicator correlation (absolute) exceeded max allowed
- * @param excluded                      feature excluded after failing one or more tests
+ * @param name                          feature name
+ * @param trainingFillRate              proportion of values that are null in the training distribution
+ * @param trainingNullLabelAbsoluteCorr correlation between null indicator and the label in the training distribution
+ * @param scoringFillRate               proportion of values that are null in the scoring distribution
+ * @param jsDivergence                  Jensen-Shannon (JS) divergence between the training and scoring distributions
+ * @param fillRateDiff                  absolute difference in fill rates between the training and scoring distributions
+ * @param fillRatioDiff                 ratio of difference in fill rates between the training and scoring distributions
  */
-case class ExclusionReasons
+case class RawFeatureFilterMetrics
 (
-  name: String = "",
-  trainingUnfilled: Boolean = false,
-  scoringUnfilled: Boolean = false,
-  jsDivergenceMismatch: Boolean = false,
-  fillRateDiffMismatch: Boolean = false,
-  fillRatioDiffMismatch: Boolean = false,
-  nullLabelCorrelation: Boolean = false,
-  excluded: Boolean = false
+  name: String,
+  trainingFillRate: Double,
+  trainingNullLabelAbsoluteCorr: Option[Double],
+  scoringFillRate: Option[Double],
+  jsDivergence: Option[Double],
+  fillRateDiff: Option[Double],
+  fillRatioDiff: Option[Double]
 )
 
 /**
- * Contains raw feature metrics computing in Raw Feature Filter
+ * Contains results of Raw Feature Filter tests for a given feature
  *
- * @param trainingFillRate
- * @param scoringFillRate
- * @param jsDivergence
- * @param fillRateDiff
- * @param fillRatioDiff
- * @param nullLabelCorrelation
+ * @param name                    feature name
+ * @param trainingUnfilledState   training fill rate did not meet min required
+ * @param trainingNullLabelLeaker null indicator correlation (absolute) exceeded max allowed
+ * @param scoringUnfilledState    scoring fill rate did not meet min required
+ * @param jsDivergenceMismatch    distribution mismatch: JS Divergence exceeded max allowed
+ * @param fillRateDiffMismatch    distribution mismatch: fill rate difference exceeded max allowed
+ * @param fillRatioDiffMismatch   distribution mismatch: fill ratio difference exceeded max allowed
+ * @param excluded                feature excluded after failing one or more tests
  */
-case class RawFeatureMetrics
+case class ExclusionReasons
 (
-  name: String = "",
-  trainingFillRate: Double = 0.0,
-  nullLabelCorrelation: Double = Double.NaN,
-  scoringFillRate: Double = 0.0,
-  jsDivergence: Double = 0.0,
-  fillRateDiff: Double = 0.0,
-  fillRatioDiff: Double = 0.0
+  name: String,
+  trainingUnfilledState: Boolean,
+  trainingNullLabelLeaker: Boolean,
+  scoringUnfilledState: Boolean,
+  jsDivergenceMismatch: Boolean,
+  fillRateDiffMismatch: Boolean,
+  fillRatioDiffMismatch: Boolean,
+  excluded: Boolean
 )

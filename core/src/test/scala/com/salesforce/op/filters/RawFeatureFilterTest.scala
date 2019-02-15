@@ -89,7 +89,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedTrainF.toSet shouldEqual Set("B", "D")
     excludedTrainMK.keySet shouldEqual Set("C")
     excludedTrainMK.head._2 shouldEqual Set("2")
-    exclusionReasons.filter(_.trainingUnfilled).map { _.name}.toSet shouldEqual Set("B", "C", "D")
+    exclusionReasons.filter(_.trainingUnfilledState).map { _.name}.toSet shouldEqual Set("B", "C", "D")
   }
 
   it should "correctly determine which features to exclude based on the stats of training and scoring fill rate" in {
@@ -100,7 +100,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedBothF.toSet shouldEqual Set("B", "D")
     excludedBothMK.keySet shouldEqual Set("C")
     excludedBothMK.head._2 shouldEqual Set("2")
-    exclusionReasons.filter(x => x.trainingUnfilled || x.scoringUnfilled).map { _.name}.toSet shouldEqual Set("B", "C", "D")
+    exclusionReasons.filter(x => x.trainingUnfilledState || x.scoringUnfilledState).map { _.name}.toSet shouldEqual Set("B", "C", "D")
   }
 
   it should "correctly determine which features to exclude based on the stats of relative fill rate" in {
