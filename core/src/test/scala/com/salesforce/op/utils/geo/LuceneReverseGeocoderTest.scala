@@ -89,8 +89,8 @@ class LuceneReverseGeocoderTest extends FlatSpec with TestCommon {
 
   it should "get nearest cities in a timely fashion" in {
     val start = System.currentTimeMillis()
-    val items = cities.take(10000)
-    for { city <- items } {
+    val items = cities.take(1000)
+    for { city <- cities } {
       val results = geocoder.nearestCountries(index,
         latitude = city.latitude, longitude = city.longitude,
         radiusInKM = 10, numOfResults = 10)
@@ -98,7 +98,8 @@ class LuceneReverseGeocoderTest extends FlatSpec with TestCommon {
       results should contain(city.country)
     }
     val elapsed = System.currentTimeMillis() - start
-    println((elapsed.toDouble / items.size) + "ms per query")
+    log.info(s"Nearest cities benchmark: executed ${items.size} queries with average " +
+      (elapsed.toDouble / items.size) + "ms/query")
   }
 
   //  it should "nearest cities to Palo Alto, CA" in {

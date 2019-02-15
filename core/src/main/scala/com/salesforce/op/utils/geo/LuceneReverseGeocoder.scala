@@ -217,7 +217,7 @@ private[geo] case object LuceneReverseGeocoder {
 
     val elapsed = Duration.apply(System.currentTimeMillis() - start, TimeUnit.MILLISECONDS)
     val docSec = if (elapsed.toSeconds > 0) cities.size / elapsed.toSeconds else cities.size
-    log.info(s"Elapsed ${elapsed.toSeconds} seconds ($docSec doc/sec). Index saved to '$directory'.")
+    log.info(s"Elapsed ${elapsed.toSeconds} seconds ($docSec doc/sec). Index saved to - $directory")
     elapsed.toMillis
   }
 
