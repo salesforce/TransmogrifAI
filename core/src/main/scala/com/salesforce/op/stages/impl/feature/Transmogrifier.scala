@@ -541,7 +541,7 @@ trait TextParams extends Params {
 }
 
 
-trait PivotParams extends Params {
+trait PivotParams extends TextParams {
   final val topK = new IntParam(
     parent = this, name = "topK", doc = "number of elements to keep for each vector",
     isValid = ParamValidators.gt(0L)
