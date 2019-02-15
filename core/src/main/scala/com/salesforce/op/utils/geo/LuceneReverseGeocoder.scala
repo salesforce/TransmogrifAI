@@ -79,8 +79,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    */
   def nearestCities(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[WorldCity] = {
     nearestCities(
-      searcher = LuceneReverseGeocoder.worldCities,
-      latitude = latitude, longitude = longitude,
+      searcher = LuceneReverseGeocoder.worldCities, latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
   }
 
@@ -96,8 +95,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
    */
   def nearestCountries(latitude: Double, longitude: Double, radiusInKM: Double, numOfResults: Int): Seq[String] = {
     nearestCountries(
-      searcher = LuceneReverseGeocoder.worldCities,
-      latitude = latitude, longitude = longitude,
+      searcher = LuceneReverseGeocoder.worldCities, latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
   }
 
@@ -120,8 +118,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
     numOfResults: Int
   ): Seq[String] = {
     val cities = nearestCities(
-      searcher = searcher,
-      latitude = latitude, longitude = longitude,
+      searcher = searcher, latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
 
     cities.map(_.country).distinct
