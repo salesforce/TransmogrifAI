@@ -59,6 +59,8 @@ import scala.util.Try
 /**
  * Reverse Geocoder implementation using Lucene spatial index.
  *
+ * TODO: add more details on the implementation
+ *
  * Related read:
  * 1. https://opensourceconnections.com/blog/2014/04/11/indexing-polygons-in-lucene-with-accuracy
  * 2. https://github.com/apache/lucene-solr/blob/branch_7x/lucene/spatial-extras/src/test/org/apache/lucene/spatial/SpatialExample.java
@@ -117,7 +119,7 @@ class LuceneReverseGeocoder extends ReverseGeocoder {
     radiusInKM: Double,
     numOfResults: Int
   ): Seq[String] = {
-    val cities =  nearestCities(
+    val cities = nearestCities(
       searcher = searcher,
       latitude = latitude, longitude = longitude,
       radiusInKM = radiusInKM, numOfResults = numOfResults)
@@ -192,7 +194,7 @@ private[geo] case object LuceneReverseGeocoder {
   /**
    * World cities index
    */
-  lazy val worldCities: IndexSearcher = ???
+  lazy val worldCities: IndexSearcher = throw new NotImplementedError // TODO: implement default index
 
   /**
    * Builds reverse geocoder index and saves it into the specified directory
