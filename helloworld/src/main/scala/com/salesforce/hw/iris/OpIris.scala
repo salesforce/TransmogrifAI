@@ -57,9 +57,9 @@ object OpIris extends OpAppWithRunner with IrisFeatures {
       val path = getFinalReadPath(params)
       val myFile = spark.sparkContext.textFile(path)
 
-      Left(myFile.filter(_.nonEmpty).zipWithIndex.map { case (x, number) =>
-        val words = x.split(",")
-        new Iris(number.toInt, words(0).toDouble, words(1).toDouble, words(2).toDouble, words(3).toDouble, words(4))
+      Left(myFile.filter(_.nonEmpty).zipWithIndex.map { case (x, id) =>
+        val Array(sepalLength, sepalWidth, petalLength, petalWidth, klass) = x.split(",")
+        new Iris(id.toInt, sepalLength.toDouble, sepalWidth.toDouble, petalLength.toDouble, petalWidth.toDouble, klass)
       })
     }
   }
