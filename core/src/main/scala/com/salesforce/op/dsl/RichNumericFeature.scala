@@ -346,6 +346,32 @@ trait RichNumericFeature {
           new VectorsCombiner().setInput(filledValues +: bucketized).getOutput()
       }
     }
+
+    /**
+     * Apply ScalerTransformer shortcut.  Applies the scaling function defined by the scalingType and scalingArg params
+     * @param scalingType type of scaling function
+     * @param scalingArgs arguments to define the scaling function
+     * @tparam O Output feature type
+     * @return the descaled input cast to type O
+     */
+    def scale[O <: Real : TypeTag](
+      scalingType: ScalingType,
+      scalingArgs: ScalingArgs
+    ): FeatureLike[O] = {
+      new ScalerTransformer[T, O](scalingType = scalingType, scalingArgs = scalingArgs).setInput(f).getOutput()
+    }
+
+    /**
+     * Apply DescalerTransformer shortcut.  Applies the inverse of the scaling function found in
+     * the metadata of the the input feature: scaledFeature
+     * @param scaledFeature the feature containing metadata for constructing the scaling used to make this column
+     * @tparam I feature type of the input feature: scaledFeature
+     * @tparam O output feature type
+     * @return the scaled input cast to type O
+     */
+    def descale[I <: Real : TypeTag, O <: Real : TypeTag](scaledFeature: FeatureLike[I]): FeatureLike[O] = {
+      new DescalerTransformer[T, I, O]().setInput(f, scaledFeature).getOutput()
+    }
   }
 
 

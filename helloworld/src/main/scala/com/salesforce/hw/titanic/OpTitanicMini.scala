@@ -38,7 +38,6 @@ import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsTo
 import com.salesforce.op.stages.impl.classification._
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
-import org.apache.log4j.{Level, LogManager}
 
 /**
  * A minimal Titanic Survival example with TransmogrifAI
@@ -62,7 +61,6 @@ object OpTitanicMini {
   )
 
   def main(args: Array[String]): Unit = {
-    LogManager.getLogger("com.salesforce.op").setLevel(Level.ERROR)
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
     import spark.implicits._
 
@@ -81,6 +79,7 @@ object OpTitanicMini {
     val prediction = BinaryClassificationModelSelector
       .withCrossValidation(modelTypesToUse = Seq(OpLogisticRegression, OpRandomForestClassifier))
       .setInput(survived, checkedFeatures).getOutput()
+
     val model = new OpWorkflow().setInputDataset(passengersData).setResultFeatures(prediction).train()
 
     println("Model summary:\n" + model.summaryPretty())
