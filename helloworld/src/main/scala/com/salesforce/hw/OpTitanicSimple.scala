@@ -90,8 +90,8 @@ object OpTitanicSimple {
     println(s"Using user-supplied CSV file path: $csvFilePath")
 
     // Set up a SparkSession as normal
-    val conf = new SparkConf().setAppName(this.getClass.getSimpleName.stripSuffix("$"))
-    implicit val spark = SparkSession.builder.config(conf).getOrCreate()
+    implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
+    import spark.implicits._ // Needed for Encoders for the Passenger case class
 
     ////////////////////////////////////////////////////////////////////////////////
     // RAW FEATURE DEFINITIONS
@@ -125,18 +125,16 @@ object OpTitanicSimple {
     val passengerFeatures = Seq(
       pClass, name, age, sibSp, parCh, ticket,
       cabin, embarked, familySize, estimatedCostOfTickets,
-      pivotedSex, ageGroup
+      pivotedSex, ageGroup, normedAge
     ).transmogrify()
 
     // Optionally check the features with a sanity checker
-    val sanityCheck = true
-    val finalFeatures = if (sanityCheck) survived.sanityCheck(passengerFeatures) else passengerFeatures
+    val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
 
     // Define the model we want to use (here a simple logistic regression) and get the resulting output
-    val prediction =
-      BinaryClassificationModelSelector.withTrainValidationSplit(
-        modelTypesToUse = Seq(OpLogisticRegression)
-      ).setInput(survived, finalFeatures).getOutput()
+    val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
+      modelTypesToUse = Seq(OpLogisticRegression)
+    ).setInput(survived, checkedFeatures).getOutput()
 
     val evaluator = Evaluators.BinaryClassification().setLabelCol(survived).setPredictionCol(prediction)
 
@@ -144,30 +142,20 @@ object OpTitanicSimple {
     // WORKFLOW
     /////////////////////////////////////////////////////////////////////////////////
 
-    import spark.implicits._ // Needed for Encoders for the Passenger case class
     // Define a way to read data into our Passenger class from our CSV file
-    val trainDataReader = DataReaders.Simple.csvCase[Passenger](
-      path = Option(csvFilePath),
-      key = _.id.toString
-    )
+    val dataReader = DataReaders.Simple.csvCase[Passenger](path = Option(csvFilePath), key = _.id.toString)
 
     // Define a new workflow and attach our data reader
-    val workflow =
-      new OpWorkflow()
-        .setResultFeatures(survived, prediction)
-        .setReader(trainDataReader)
+    val workflow = new OpWorkflow().setResultFeatures(survived, prediction).setReader(dataReader)
 
     // Fit the workflow to the data
-    val fittedWorkflow = workflow.train()
-    println(s"Summary: ${fittedWorkflow.summary()}")
+    val model = workflow.train()
+    println(s"Model summary:\n${model.summaryPretty()}")
 
     // Manifest the result features of the workflow
     println("Scoring the model")
-    val (dataframe, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator)
+    val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
 
-    println("Transformed dataframe columns:")
-    dataframe.columns.foreach(println)
-    println("Metrics:")
-    println(metrics)
+    println("Metrics:\n" + metrics)
   }
 }
