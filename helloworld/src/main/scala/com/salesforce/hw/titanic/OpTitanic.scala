@@ -47,7 +47,7 @@ object OpTitanic extends OpAppWithRunner with TitanicFeatures {
   // READER DEFINITION
   /////////////////////////////////////////////////////////////////////////////////
 
-  val randomSeed = 112233L
+  val randomSeed = 42L
   val simpleReader = DataReaders.Simple.csv[Passenger](
     schema = Passenger.getClassSchema.toString, key = _.getPassengerId.toString
   )
