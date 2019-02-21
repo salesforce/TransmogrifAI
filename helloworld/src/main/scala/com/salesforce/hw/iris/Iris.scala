@@ -30,13 +30,11 @@
 
 package com.salesforce.hw.iris
 
-import com.esotericsoftware.kryo.Kryo
-import com.salesforce.op.utils.kryo.OpKryoRegistrator
-
-class IrisKryoRegistrator extends OpKryoRegistrator {
-
-  override def registerCustomClasses(kryo: Kryo): Unit = {
-    doAvroRegistration[com.salesforce.hw.iris.Iris](kryo)
-  }
-
-}
+case class Iris
+(
+  sepalLength: Double,
+  sepalWidth: Double,
+  petalLength: Double,
+  petalWidth: Double,
+  irisClass: String
+)

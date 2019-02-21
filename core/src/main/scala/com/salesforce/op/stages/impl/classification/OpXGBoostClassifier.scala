@@ -366,9 +366,10 @@ class OpXGBoostClassificationModel
     val data = removeMissingValues(Iterator(features.value.asXGB), missing)
     val dm = new DMatrix(dataIter = data)
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
+    val rawPrediction = if (model.numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
     val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
     val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
-    Prediction(prediction = prediction, rawPrediction = rawPred, probability = probability)
+    Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
   }
 }
