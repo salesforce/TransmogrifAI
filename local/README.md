@@ -30,7 +30,7 @@ import com.salesforce.op.local._
 val model = workflow.loadModel("/path/to/model")
 val scoreFn = model.scoreFunction
 val rawData = Seq(Map("age" -> 18, "name" -> "Peter"), Map("name" -> "John"))
-val scores= rawData.map(scoreFn)
+val scores = rawData.map(scoreFn)
 ```
 
 Or using the local runner:
