@@ -80,6 +80,11 @@ private[op] trait TransmogrifierDefaults {
   val MaxCategoricalCardinality = 30
   val CircularDateRepresentations: Seq[TimePeriod] = Seq(TimePeriod.HourOfDay, TimePeriod.DayOfWeek,
     TimePeriod.DayOfMonth, TimePeriod.DayOfYear)
+
+  val DefaultRegion: String = PhoneNumberParser.DefaultRegion
+  val AutoDetectLanguage: Boolean = TextTokenizer.AutoDetectLanguage
+  val MinTokenLength: Int = TextTokenizer.MinTokenLength
+  val ToLowercase: Boolean = TextTokenizer.ToLowercase
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -179,7 +184,7 @@ private[op] case object Transmogrifier {
             trackNulls = TrackNulls, trackInvalid = TrackInvalid, minInfoGain = MinInfoGain, label = label)
         case t if t =:= weakTypeOf[PhoneMap] =>
           val (f, other) = castAs[PhoneMap](g) // TODO make better default
-          f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other, trackNulls = TrackNulls)
+          f.vectorize(defaultRegion = DefaultRegion, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[PickListMap] =>
           val (f, other) = castAs[PickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -191,15 +196,15 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[TextAreaMap] =>
           val (f, other) = castAs[TextAreaMap](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
-            numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            numHashes = DefaultNumOfFeatures, autoDetectLanguage = AutoDetectLanguage,
+            minTokenLength = MinTokenLength, toLowercase = ToLowercase,
             prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[TextMap] =>
           val (f, other) = castAs[TextMap](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
-            numHashes = DefaultNumOfFeatures, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            numHashes = DefaultNumOfFeatures, autoDetectLanguage = AutoDetectLanguage,
+            minTokenLength = MinTokenLength, toLowercase = ToLowercase,
             prependFeatureName = PrependFeatureName, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[URLMap] =>
@@ -286,7 +291,7 @@ private[op] case object Transmogrifier {
             trackNulls = TrackNulls, others = other)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
-          f.vectorize(defaultRegion = PhoneNumberParser.DefaultRegion, others = other)
+          f.vectorize(defaultRegion = DefaultRegion, others = other)
         case t if t =:= weakTypeOf[PickList] =>
           val (f, other) = castAs[PickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
@@ -295,15 +300,15 @@ private[op] case object Transmogrifier {
           val (f, other) = castAs[Text](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
-            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
+            minTokenLength = MinTokenLength, toLowercase = ToLowercase,
             prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
-            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = TextTokenizer.AutoDetectLanguage,
-            minTokenLength = TextTokenizer.MinTokenLength, toLowercase = TextTokenizer.ToLowercase,
+            hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
+            minTokenLength = MinTokenLength, toLowercase = ToLowercase,
             prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
