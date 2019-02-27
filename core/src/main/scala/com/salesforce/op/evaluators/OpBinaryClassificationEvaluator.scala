@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
+import com.salesforce.op.evaluators.LiftEvaluator.LiftMetricBand
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
@@ -82,7 +83,8 @@ private[op] class OpBinaryClassificationEvaluator
 
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
-      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, Seq(), Seq(), Seq(), Seq())
+      BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+        Seq(), Seq(), Seq(), Seq(), Seq())
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -113,10 +115,12 @@ private[op] class OpBinaryClassificationEvaluator
       val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
+      val liftMetrics = LiftEvaluator(scoreAndLabels)
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
         AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
-        thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold
+        thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold,
+        LiftMetrics = liftMetrics
       )
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
@@ -195,7 +199,8 @@ case class BinaryClassificationMetrics
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   recallByThreshold: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
-  falsePositiveRateByThreshold: Seq[Double]
+  falsePositiveRateByThreshold: Seq[Double],
+  LiftMetrics: Seq[LiftMetricBand]
 ) extends EvaluationMetrics {
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
   def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
