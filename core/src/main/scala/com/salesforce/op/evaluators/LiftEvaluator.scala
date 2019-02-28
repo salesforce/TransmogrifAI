@@ -1,28 +1,58 @@
+/*
+ * Copyright (c) 2017, Salesforce.com, Inc.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * * Redistributions of source code must retain the above copyright notice, this
+ *   list of conditions and the following disclaimer.
+ *
+ * * Redistributions in binary form must reproduce the above copyright notice,
+ *   this list of conditions and the following disclaimer in the documentation
+ *   and/or other materials provided with the distribution.
+ *
+ * * Neither the name of the copyright holder nor the names of its
+ *   contributors may be used to endorse or promote products derived from
+ *   this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+ * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 package com.salesforce.op.evaluators
 
 import org.apache.spark.rdd.RDD
 
 /**
-  * Object to calculate Lift metrics for BinaryClassification problems
-  * Intended for write-back to core for Scorecard or to Looker
-  *
-  * Algorithm for calculating a chart as seen here:
-  * https://www.kdnuggets.com/2016/03/lift-analysis-data-scientist-secret-weapon.html
-  */
+ * Object to calculate Lift metrics for BinaryClassification problems
+ * Intended to build a Lift Plot.
+ *
+ * Algorithm for calculating a chart as seen here:
+ * https://www.kdnuggets.com/2016/03/lift-analysis-data-scientist-secret-weapon.html
+ */
 object LiftEvaluator {
 
   /**
-    * Stores basic lift values for a specific band of scores
-    *
-    * @param group   name / key for score band
-    * @param lowerBound minimum score represented in lift
-    * @param upperBound maximum score represented in lift
-    * @param rate calculated lift value, i.e. # yes / total count
-    * @param average lift rate across all score bands
-    * @param totalCount  total number of records in score band
-    * @param yesCount number of yes records in score band
-    * @param noCount number of no records in score band
-    */
+   * Stores basic lift values for a specific band of scores
+   *
+   * @param group      name / key for score band
+   * @param lowerBound minimum score represented in lift
+   * @param upperBound maximum score represented in lift
+   * @param rate       calculated lift value, i.e. # yes / total count
+   * @param average    lift rate across all score bands
+   * @param totalCount total number of records in score band
+   * @param yesCount   number of yes records in score band
+   * @param noCount    number of no records in score band
+   */
   case class LiftMetricBand
   (
     group: String,
@@ -36,11 +66,12 @@ object LiftEvaluator {
   )
 
   /**
-    * Builds Lift Map for serialization, wrapper for liftMetricBands function
-    *
-    * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
-    * @return Seq of LiftMetricBand containers of Lift calculations
-    */
+   * Builds Seq[LiftMetricBand] for BinaryClassificationMetrics, calls liftMetricBands function
+   * with default score bands function
+   *
+   * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
+   * @return Seq of LiftMetricBand containers of Lift calculations
+   */
   def apply
   (
     scoreAndLabels: RDD[(Double, Double)]
@@ -52,18 +83,18 @@ object LiftEvaluator {
   }
 
   /**
-    * Builds Lift Map for serialization using RDD api
-    *
-    * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
-    * @param getScoreBands function to calculate score bands, potentially using score distribution
-    * @return Seq of LiftMetricBand containers of Lift calculations
-    */
+   * Builds Seq of LiftMetricBand using RDD api
+   *
+   * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
+   * @param getScoreBands  function to calculate score bands, potentially using score distribution
+   * @return Seq of LiftMetricBand containers of Lift calculations
+   */
   private[op] def liftMetricBands
   (
     scoreAndLabels: RDD[(Double, Double)],
     getScoreBands: RDD[Double] => Seq[(Double, Double, String)]
   ): Seq[LiftMetricBand] = {
-    val bands = getScoreBands(scoreAndLabels.map{case (score, _) => score})
+    val bands = getScoreBands(scoreAndLabels.map { case (score, _) => score })
     val bandedLabels = scoreAndLabels.map { case (score, label) =>
       (categorizeScoreIntoBand((score, bands)), label)
     }.collect { case (Some(band), label) => (band, label) }
@@ -75,14 +106,15 @@ object LiftEvaluator {
   }
 
   /**
-    * function to return score bands for calculating lift
-    * Default: 10 equidistant bands for all 0.1 increments
-    * from 0.0 to 1.0
-    *
-    * @return sequence of (lowerBound, upperBound, bandString) tuples
-    */
+   * function to return score bands for calculating lift
+   * Default: 10 equidistant bands for all 0.1 increments
+   * from 0.0 to 1.0
+   *
+   * @param scores RDD of scores. unused in this function
+   * @return sequence of (lowerBound, upperBound, bandString) tuples
+   */
   private[op] def getDefaultScoreBands(scores: RDD[Double]):
-    Seq[(Double, Double, String)] =
+  Seq[(Double, Double, String)] =
     Seq(
       (0.0, 0.1, "0-10"),
       (0.1, 0.2, "10-20"),
@@ -97,16 +129,16 @@ object LiftEvaluator {
     )
 
   /**
-    * PartialFunction. Defined when scores are [0.0, 1.0]
-    * Places a score Double into a score band based on
-    * lower and upper bounds
-    *
-    * @param score BinaryClassification score Double, [0.0, 1.0]
-    * @param bands sequence of upper/lower score bands
-    * @return optional key to describe categorized band, if found
-    */
+   * PartialFunction. Defined when scores are [0.0, 1.0]
+   * Places a score Double into a score band based on
+   * lower and upper bounds
+   *
+   * @param score BinaryClassification score Double, [0.0, 1.0]
+   * @param bands sequence of upper/lower score bands
+   * @return optional key to describe categorized band, if found
+   */
   private[op] def categorizeScoreIntoBand:
-    PartialFunction[(Double, Seq[(Double, Double, String)]), Option[String]] = {
+  PartialFunction[(Double, Seq[(Double, Double, String)]), Option[String]] = {
     case (score: Double, bands: Seq[(Double, Double, String)])
       if (score >= 0.0) & (score <= 1.0) =>
       bands.find { case (l, u, _) =>
@@ -118,11 +150,11 @@ object LiftEvaluator {
   }
 
   /**
-    * aggregates labels into counts by lift band
-    *
-    * @param bandedLabels PairRDD of (bandString, label)
-    * @return Map of bandString -> (total count, count of positive labels)
-    */
+   * aggregates labels into counts by lift band
+   *
+   * @param bandedLabels PairRDD of (bandString, label)
+   * @return Map of bandString -> (total count, count of positive labels)
+   */
   private[op] def aggregateBandedLabels
   (
     bandedLabels: RDD[(String, Double)]
@@ -138,14 +170,14 @@ object LiftEvaluator {
   }
 
   /**
-    * calculates a baseline "yes" rate across score bands
-    *
-    * @param perBandCounts
-    * @return overall # yes / total records across all bands
-    */
+   * calculates a baseline "yes" rate across score bands
+   *
+   * @param perBandCounts
+   * @return overall # yes / total records across all bands
+   */
   private[op] def overallLiftRate(perBandCounts: Map[String, (Long, Long)]): Double = {
-    val overallTotalCount = perBandCounts.values.map({case (totalCount, _) => totalCount}).sum
-    val overallYesCount = perBandCounts.values.map({case (_, yesCount) => yesCount}).sum
+    val overallTotalCount = perBandCounts.values.map({ case (totalCount, _) => totalCount }).sum
+    val overallYesCount = perBandCounts.values.map({ case (_, yesCount) => yesCount }).sum
     overallTotalCount match {
       case 0L => Double.NaN
       case _ => overallYesCount.toDouble / overallTotalCount
@@ -153,17 +185,17 @@ object LiftEvaluator {
   }
 
   /**
-    * Formats lift data in one band into LiftMetricBand data,
-    * including lower bound of score band, upper bound, total record
-    * count per band, and lift (# trues / total)
-    *
-    * @param lower         lower bound of band
-    * @param upper         upper bound of band
-    * @param bandString    String key of band e.g. "10-20"
-    * @param perBandCounts calculated total counts and counts of true labels
-    * @param overallRate   overall Lift rate across all bands
-    * @return LiftMetricBand container of metrics
-    */
+   * Formats lift data in one band into LiftMetricBand data,
+   * including lower bound of score band, upper bound, total record
+   * count per band, and lift (# trues / total)
+   *
+   * @param lower         lower bound of band
+   * @param upper         upper bound of band
+   * @param bandString    String key of band e.g. "10-20"
+   * @param perBandCounts calculated total counts and counts of true labels
+   * @param overallRate   overall Lift rate across all bands
+   * @return LiftMetricBand container of metrics
+   */
   private[op] def formatLiftMetricBand
   (
     lower: Double,
@@ -201,6 +233,5 @@ object LiftEvaluator {
       )
     }
   }
-
 
 }

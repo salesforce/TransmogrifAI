@@ -115,7 +115,7 @@ private[op] class OpBinaryClassificationEvaluator
       val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
-      val liftMetrics = LiftEvaluator(scoreAndLabels)
+      val liftMetrics = LiftEvaluator(scoreAndLabels = scoreAndLabels)
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
         AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
@@ -200,6 +200,7 @@ case class BinaryClassificationMetrics
   recallByThreshold: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   falsePositiveRateByThreshold: Seq[Double],
+  @JsonDeserialize(contentAs = classOf[LiftMetricBand])
   LiftMetrics: Seq[LiftMetricBand]
 ) extends EvaluationMetrics {
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
