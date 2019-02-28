@@ -88,28 +88,28 @@ class LiftEvaluatorTest extends FlatSpec with TestSparkContext {
     val perBandCountsEmpty = Map[String, (Long, Long)]()
     val overallRateFilled = LiftEvaluator.overallLiftRate(perBandCountsFilled)
     val overallRateEmpty = LiftEvaluator.overallLiftRate(perBandCountsEmpty)
-    overallRateFilled shouldBe 0.4
-    overallRateEmpty.isNaN shouldBe true
+    overallRateFilled shouldBe Some(0.4)
+    overallRateEmpty shouldBe None
   }
 
   "LiftEvaluator.formatLiftMetricBand" should "format a LiftMetricBand as required" in {
     val perBandCounts = Map("A" -> (4L, 2L))
-    val metricBandA = LiftEvaluator.formatLiftMetricBand(0.0, 0.1, "A", perBandCounts, 0.5)
+    val metricBandA = LiftEvaluator.formatLiftMetricBand(0.0, 0.1, "A", perBandCounts, Some(0.5))
     metricBandA.group shouldBe "A"
     metricBandA.lowerBound shouldBe 0.0
     metricBandA.upperBound shouldBe 0.1
-    metricBandA.rate shouldBe 0.5
-    metricBandA.average shouldBe 0.5
+    metricBandA.rate shouldBe Some(0.5)
+    metricBandA.average shouldBe Some(0.5)
     metricBandA.totalCount shouldBe 4L
     metricBandA.yesCount shouldBe 2L
     metricBandA.noCount shouldBe 2L
 
-    val metricBandB = LiftEvaluator.formatLiftMetricBand(0.1, 0.2, "B", perBandCounts, 0.5)
+    val metricBandB = LiftEvaluator.formatLiftMetricBand(0.1, 0.2, "B", perBandCounts, Some(0.5))
     metricBandB.group shouldBe "B"
     metricBandB.lowerBound shouldBe 0.1
     metricBandB.upperBound shouldBe 0.2
-    metricBandB.rate.isNaN shouldBe true
-    metricBandB.average shouldBe 0.5
+    metricBandB.rate shouldBe None
+    metricBandB.average shouldBe Some(0.5)
     metricBandB.totalCount shouldBe 0L
     metricBandB.yesCount shouldBe 0L
     metricBandB.noCount shouldBe 0L
@@ -120,11 +120,11 @@ class LiftEvaluatorTest extends FlatSpec with TestSparkContext {
     val band010 = liftSeq.find(_.group == "0-10").get
     val band90100 = liftSeq.find(_.group == "90-100").get
 
-    band010.rate shouldBe 0.0
+    band010.rate shouldBe Some(0.0)
     band010.lowerBound shouldBe 0.0
     band010.upperBound shouldBe 0.1
-    band010.average shouldBe 0.45
-    band90100.rate shouldBe 0.9
+    band010.average shouldBe Some(0.45)
+    band90100.rate shouldBe Some(0.9)
   }
 
   "LiftEvaluator.liftMetricBands" should "correctly give defaults with empty RDD" in {
@@ -135,11 +135,11 @@ class LiftEvaluatorTest extends FlatSpec with TestSparkContext {
     val band010 = liftSeq.find(_.group == "0-10").get
     val band90100 = liftSeq.find(_.group == "90-100").get
 
-    band010.rate.isNaN shouldBe true
+    band010.rate shouldBe None
     band010.lowerBound shouldBe 0.0
     band010.upperBound shouldBe 0.1
-    band010.average.isNaN shouldBe true
-    band90100.rate.isNaN shouldBe true
+    band010.average shouldBe None
+    band90100.rate shouldBe None
   }
 
   "LiftEvaluator.apply" should "correctly calculate a Seq[LiftMetricBand]" in {
@@ -147,11 +147,11 @@ class LiftEvaluatorTest extends FlatSpec with TestSparkContext {
     val band010 = liftSeq.find(_.group == "0-10").get
     val band90100 = liftSeq.find(_.group == "90-100").get
 
-    band010.rate shouldBe 0.0
+    band010.rate shouldBe Some(0.0)
     band010.lowerBound shouldBe 0.0
     band010.upperBound shouldBe 0.1
-    band010.average shouldBe 0.45
-    band90100.rate shouldBe 0.9
+    band010.average shouldBe Some(0.45)
+    band90100.rate shouldBe Some(0.9)
   }
 
 }

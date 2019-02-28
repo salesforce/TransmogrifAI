@@ -47,8 +47,8 @@ object LiftEvaluator {
    * @param group      name / key for score band
    * @param lowerBound minimum score represented in lift
    * @param upperBound maximum score represented in lift
-   * @param rate       calculated lift value, i.e. # yes / total count
-   * @param average    lift rate across all score bands
+   * @param rate       optional calculated lift value, i.e. # yes / total count
+   * @param average    optional lift rate across all score bands
    * @param totalCount total number of records in score band
    * @param yesCount   number of yes records in score band
    * @param noCount    number of no records in score band
@@ -58,12 +58,12 @@ object LiftEvaluator {
     group: String,
     lowerBound: Double,
     upperBound: Double,
-    rate: Double,
-    average: Double,
+    rate: Option[Double],
+    average: Option[Double],
     totalCount: Long,
     yesCount: Long,
     noCount: Long
-  )
+  ) extends EvaluationMetrics
 
   /**
    * Builds Seq[LiftMetricBand] for BinaryClassificationMetrics, calls liftMetricBands function
@@ -175,12 +175,12 @@ object LiftEvaluator {
    * @param perBandCounts
    * @return overall # yes / total records across all bands
    */
-  private[op] def overallLiftRate(perBandCounts: Map[String, (Long, Long)]): Double = {
+  private[op] def overallLiftRate(perBandCounts: Map[String, (Long, Long)]): Option[Double] = {
     val overallTotalCount = perBandCounts.values.map({ case (totalCount, _) => totalCount }).sum
     val overallYesCount = perBandCounts.values.map({ case (_, yesCount) => yesCount }).sum
     overallTotalCount match {
-      case 0L => Double.NaN
-      case _ => overallYesCount.toDouble / overallTotalCount
+      case 0L => None
+      case _ => Some(overallYesCount.toDouble / overallTotalCount)
     }
   }
 
@@ -193,7 +193,7 @@ object LiftEvaluator {
    * @param upper         upper bound of band
    * @param bandString    String key of band e.g. "10-20"
    * @param perBandCounts calculated total counts and counts of true labels
-   * @param overallRate   overall Lift rate across all bands
+   * @param overallRate   optional overall Lift rate across all bands
    * @return LiftMetricBand container of metrics
    */
   private[op] def formatLiftMetricBand
@@ -202,13 +202,13 @@ object LiftEvaluator {
     upper: Double,
     bandString: String,
     perBandCounts: Map[String, (Long, Long)],
-    overallRate: Double
+    overallRate: Option[Double]
   ): LiftMetricBand = {
     perBandCounts.get(bandString) match {
       case Some((numTotal, numYes)) => {
         val lift = numTotal match {
-          case 0L => Double.NaN
-          case _ => numYes.toDouble / numTotal
+          case 0L => None
+          case _ => Some(numYes.toDouble / numTotal)
         }
         LiftMetricBand(
           group = bandString,
@@ -225,7 +225,7 @@ object LiftEvaluator {
         group = bandString,
         lowerBound = lower,
         upperBound = upper,
-        rate = Double.NaN,
+        rate = None,
         average = overallRate,
         totalCount = 0L,
         yesCount = 0L,

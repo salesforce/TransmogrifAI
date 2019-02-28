@@ -162,8 +162,8 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
 
     LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
-    overallLiftRate shouldBe metrics.LiftMetrics.head.average
-    overallLiftRate shouldBe metrics.LiftMetrics.last.average
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.head.average
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.last.average
   }
 
   it should "evaluate the metrics with one prediction input" in {
@@ -186,8 +186,8 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.F1 shouldBe f1
 
     LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
-    overallLiftRate shouldBe metrics.LiftMetrics.head.average
-    overallLiftRate shouldBe metrics.LiftMetrics.last.average
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.head.average
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.last.average
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
@@ -205,10 +205,10 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
 
-    metricsZero.LiftMetrics.head.rate shouldBe 0.0
+    metricsZero.LiftMetrics.head.rate shouldBe Some(0.0)
     metricsZero.LiftMetrics.head.yesCount shouldBe 0L
     metricsZero.LiftMetrics.head.noCount shouldBe 1L
-    metricsZero.LiftMetrics.tail.head.rate.isNaN shouldBe true
+    metricsZero.LiftMetrics.tail.head.rate shouldBe None
   }
 
 
@@ -226,10 +226,10 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Recall shouldBe 1.0
     metricsOne.Error shouldBe 0.0
 
-    metricsOne.LiftMetrics.head.rate shouldBe 1.0
+    metricsOne.LiftMetrics.head.rate shouldBe Some(1.0)
     metricsOne.LiftMetrics.head.yesCount shouldBe 1L
     metricsOne.LiftMetrics.head.noCount shouldBe 0L
-    metricsOne.LiftMetrics.tail.head.rate.isNaN shouldBe true
+    metricsOne.LiftMetrics.tail.head.rate shouldBe None
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {
