@@ -12,12 +12,6 @@ import org.apache.spark.rdd.RDD
 object LiftEvaluator {
 
   /**
-    * Scoreband name that represents the lift values across
-    * all scores, 0 to 100
-    */
-  private[op] val overallScoreband = "overall"
-
-  /**
     * Stores basic lift values for a specific band of scores
     *
     * @param group   name / key for score band
@@ -42,13 +36,10 @@ object LiftEvaluator {
   )
 
   /**
-    * Builds Lift Map for serialization, wrapper for liftMap function
-    * for the DataFrame api
+    * Builds Lift Map for serialization, wrapper for liftMetricBands function
     *
-    * @param holdoutDF DataFrame of scored hold-out data
-    * @param labelCol  column name for labels
-    * @param scoreCol  column name for scores
-    * @return AutoMLMetrics: Metrics object for serialization
+    * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
+    * @return Seq of LiftMetricBand containers of Lift calculations
     */
   def apply
   (
@@ -63,7 +54,8 @@ object LiftEvaluator {
   /**
     * Builds Lift Map for serialization using RDD api
     *
-    * @param labelsAndScores RDD[(Double, Double)] of BinaryClassification (label, score) tuples
+    * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
+    * @param getScoreBands function to calculate score bands, potentially using score distribution
     * @return Seq of LiftMetricBand containers of Lift calculations
     */
   private[op] def liftMetricBands
@@ -79,7 +71,7 @@ object LiftEvaluator {
     val overallRate = overallLiftRate(perBandCounts)
     bands.map({ case (lower, upper, band) =>
       formatLiftMetricBand(lower, upper, band, perBandCounts, overallRate)
-    })
+    }).sortBy(band => band.lowerBound)
   }
 
   /**
@@ -146,10 +138,10 @@ object LiftEvaluator {
   }
 
   /**
-    *
+    * calculates a baseline "yes" rate across score bands
     *
     * @param perBandCounts
-    * @return
+    * @return overall # yes / total records across all bands
     */
   private[op] def overallLiftRate(perBandCounts: Map[String, (Long, Long)]): Double = {
     val overallTotalCount = perBandCounts.values.map({case (totalCount, _) => totalCount}).sum
@@ -169,6 +161,7 @@ object LiftEvaluator {
     * @param upper         upper bound of band
     * @param bandString    String key of band e.g. "10-20"
     * @param perBandCounts calculated total counts and counts of true labels
+    * @param overallRate   overall Lift rate across all bands
     * @return LiftMetricBand container of metrics
     */
   private[op] def formatLiftMetricBand
@@ -182,7 +175,7 @@ object LiftEvaluator {
     perBandCounts.get(bandString) match {
       case Some((numTotal, numYes)) => {
         val lift = numTotal match {
-          case 0.0 => Double.NaN
+          case 0L => Double.NaN
           case _ => numYes.toDouble / numTotal
         }
         LiftMetricBand(

@@ -149,6 +149,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       flattenedData2.select(predValue.name, test_label.name).rdd
     )
+    val overallLiftRate = (tp + fn) / (tp + tn + fp + fn)
 
     tp.toDouble shouldBe metrics.TP
     tn.toDouble shouldBe metrics.TN
@@ -159,6 +160,10 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     recall shouldBe metrics.Recall
     f1 shouldBe metrics.F1
     1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
+
+    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
+    overallLiftRate shouldBe metrics.LiftMetrics.head.average
+    overallLiftRate shouldBe metrics.LiftMetrics.last.average
   }
 
   it should "evaluate the metrics with one prediction input" in {
@@ -169,6 +174,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
       transformedData2.select(prediction.name, test_label.name).rdd
         .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
     )
+    val overallLiftRate = (tp + fn) / (tp + tn + fp + fn)
 
     tp.toDouble shouldBe metrics.TP
     tn.toDouble shouldBe metrics.TN
@@ -178,6 +184,10 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.Precision shouldBe precision
     metrics.Recall shouldBe recall
     metrics.F1 shouldBe f1
+
+    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
+    overallLiftRate shouldBe metrics.LiftMetrics.head.average
+    overallLiftRate shouldBe metrics.LiftMetrics.last.average
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
@@ -194,6 +204,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Precision shouldBe 0.0
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
+
+    metricsZero.LiftMetrics.head.rate shouldBe 0.0
+    metricsZero.LiftMetrics.head.yesCount shouldBe 0L
+    metricsZero.LiftMetrics.head.noCount shouldBe 1L
+    metricsZero.LiftMetrics.tail.head.rate.isNaN shouldBe true
   }
 
 
@@ -210,6 +225,11 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Precision shouldBe 1.0
     metricsOne.Recall shouldBe 1.0
     metricsOne.Error shouldBe 0.0
+
+    metricsOne.LiftMetrics.head.rate shouldBe 1.0
+    metricsOne.LiftMetrics.head.yesCount shouldBe 1L
+    metricsOne.LiftMetrics.head.noCount shouldBe 0L
+    metricsOne.LiftMetrics.tail.head.rate.isNaN shouldBe true
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {
