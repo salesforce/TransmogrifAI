@@ -234,10 +234,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
               "The RawFeatureFilter training reader will be used to generate the data for training")
         }
         checkReadersAndFeatures()
-        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, featureDistributions) =
+
+        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
           rf.generateFilteredRaw(rawFeatures, parameters)
-        setRawFeatureDistributions(featureDistributions.toArray)
-        setBlacklist(featuresToDrop, featureDistributions)
+
+        setRawFeatureFilterResults(rawFeatureFilterResults)
+        setRawFeatureDistributions(rawFeatureFilterResults.featureDistributions.toArray)
+        setBlacklist(featuresToDrop, rawFeatureFilterResults.featureDistributions)
         setBlacklistMapKeys(mapKeysToDrop)
         cleanedData
     }

@@ -540,6 +540,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
      * it's not explicitly blacklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
+
     insights.features.foreach(f =>
       f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
     )
