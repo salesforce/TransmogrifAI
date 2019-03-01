@@ -253,10 +253,11 @@ class RawFeatureFilter[T]
       val fillRateDiffs = Seq.fill(featureSize)(None)
       val fillRatioDiffs = Seq.fill(featureSize)(None)
 
-      combineRawFeatureFilterMetrics(
+      val rawFeatureFilterMetrics = combineRawFeatureFilterMetrics(
         trainingDistribs, trainingFillRates, trainingNullLabelAbsoluteCorrs,
         scoringFillRates, jsDivergences, fillRateDiffs, fillRatioDiffs
       )
+      rawFeatureFilterMetrics
 
     } else {
 
