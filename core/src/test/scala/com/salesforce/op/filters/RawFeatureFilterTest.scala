@@ -106,8 +106,10 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (rawFeatureFilterMetrics, _, _, _) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     rawFeatureFilterMetrics.map(_.trainingFillRate) shouldEqual List(0.9, 0.0, 0.9, 0.05, 0.1, 0.05)
     rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldEqual List(None, None, None, None, None, None)
-    rawFeatureFilterMetrics.map(_.scoringFillRate) shouldEqual List(Some(0.2), Some(0.0), Some(0.9), Some(0.05), Some(0.0), Some(0.0))
-    rawFeatureFilterMetrics.map(_.jsDivergence).dropRight(2) shouldEqual List(Some(0.0), Some(0.0), Some(1.0), Some(0.0))
+    rawFeatureFilterMetrics.map(_.scoringFillRate) shouldEqual
+      List(Some(0.2), Some(0.0), Some(0.9), Some(0.05), Some(0.0), Some(0.0))
+    rawFeatureFilterMetrics.map(_.jsDivergence).dropRight(2) shouldEqual
+      List(Some(0.0), Some(0.0), Some(1.0), Some(0.0))
     println(rawFeatureFilterMetrics.map(_.jsDivergence).drop(4))
     rawFeatureFilterMetrics.map(_.jsDivergence).drop(4).map { jsd =>
       jsd match {
