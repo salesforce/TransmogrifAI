@@ -28,21 +28,34 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.hw.titanic
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.FeatureBuilder
-import com.salesforce.op.features.types._
+import com.salesforce.op.test.TestSparkContext
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-trait TitanicFeatures extends Serializable {
-  val survived = FeatureBuilder.RealNN[Passenger].extract(_.getSurvived.toDouble.toRealNN).asResponse
-  val pClass = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getPclass).map(_.toString).toPickList).asPredictor // scalastyle:off
-  val name = FeatureBuilder.Text[Passenger].extract(d => Option(d.getName).toText).asPredictor
-  val sex = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getSex).toPickList).asPredictor
-  val age = FeatureBuilder.Real[Passenger].extract(d => Option(Double.unbox(d.getAge)).toReal).asPredictor
-  val sibSp = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getSibSp).map(_.toString).toPickList).asPredictor
-  val parch = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getParch).map(_.toString).toPickList).asPredictor
-  val ticket = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getTicket).toPickList).asPredictor
-  val fare = FeatureBuilder.Real[Passenger].extract(d => Option(Double.unbox(d.getFare)).toReal).asPredictor
-  val cabin = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getCabin).toPickList).asPredictor
-  val embarked = FeatureBuilder.PickList[Passenger].extract(d => Option(d.getEmbarked).toPickList).asPredictor
+@RunWith(classOf[JUnitRunner])
+class ScalerTest extends FlatSpec with TestSparkContext {
+
+  Spec[Scaler] should "error on invalid data" in {
+    val error = intercept[IllegalArgumentException](
+      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyArgs())
+    )
+    error.getMessage shouldBe "Invalid combination of scaling type 'Linear' and args type 'EmptyArgs'"
+  }
+
+  it should "correctly build construct a LinearScaler" in {
+    val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
+      args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
+    linearScaler shouldBe a[LinearScaler]
+    linearScaler.scalingType shouldBe ScalingType.Linear
+  }
+
+  it should "correctly build construct a LogScaler" in {
+    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyArgs())
+    linearScaler shouldBe a[LogScaler]
+    linearScaler.scalingType shouldBe ScalingType.Logarithmic
+  }
 }
+

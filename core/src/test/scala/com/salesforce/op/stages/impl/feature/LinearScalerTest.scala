@@ -28,16 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.hw.boston
+package com.salesforce.op.stages.impl.feature
 
-import com.esotericsoftware.kryo.Kryo
-import com.salesforce.op.utils.kryo.OpKryoRegistrator
+import com.salesforce.op.test.TestSparkContext
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
+@RunWith(classOf[JUnitRunner])
+class LinearScalerTest extends FlatSpec with TestSparkContext {
 
-class BostonKryoRegistrator extends OpKryoRegistrator {
-
-  override def registerCustomClasses(kryo: Kryo): Unit = {
-    doClassRegistration(kryo)(classOf[BostonHouse])
+  Spec[LinearScaler] should "Error on construction of a non-invertible transformation" in {
+    val error = intercept[java.lang.IllegalArgumentException](
+      LinearScaler(LinearScalerArgs(slope = 0.0, intercept = 1.0))
+    )
+    error.getMessage shouldBe "requirement failed: LinearScaler must have a non-zero slope to be invertible"
   }
 
+  it should "correctly construct the linear scaling and inverse scaling function" in {
+    val sampleData = Seq(0.0, 1.0, 2.0, 3.0, 4.0)
+    val scaler = LinearScaler(LinearScalerArgs(slope = 2.0, intercept = 1.0))
+    sampleData.map(x => scaler.scale(x)) shouldEqual sampleData.map(x => 2.0*x + 1.0)
+    sampleData.map(x => scaler.descale(x)) shouldEqual sampleData.map(x => 0.5*x - 0.5)
+  }
 }

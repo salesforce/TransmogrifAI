@@ -28,15 +28,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.hw.iris
+package com.salesforce.op.stages.impl.feature
 
-import com.esotericsoftware.kryo.Kryo
-import com.salesforce.op.utils.kryo.OpKryoRegistrator
+import enumeratum.{Enum, EnumEntry}
 
-class IrisKryoRegistrator extends OpKryoRegistrator {
+sealed trait ScalingType extends EnumEntry with Serializable
 
-  override def registerCustomClasses(kryo: Kryo): Unit = {
-    doAvroRegistration[com.salesforce.hw.iris.Iris](kryo)
-  }
-
+object ScalingType extends Enum[ScalingType] {
+  val values = findValues
+  case object Linear extends ScalingType
+  case object Logarithmic extends ScalingType
 }
