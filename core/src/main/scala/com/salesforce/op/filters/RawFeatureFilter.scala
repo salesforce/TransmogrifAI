@@ -323,7 +323,8 @@ class RawFeatureFilter[T]
 
     logExcluded(
       excluded = trainingNullLabelLeakers,
-      message = s"Features excluded because null indicator correlation (absolute) exceeded max allowed ($maxCorrelation)"
+      message = s"Features excluded because null indicator correlation (absolute) " +
+        s"exceeded max allowed ($maxCorrelation)"
     )
 
     // combines exclusion reasons computed for each feature into ExclusionReasons class
@@ -405,10 +406,14 @@ class RawFeatureFilter[T]
         case None => false
       }
 
-      logExcluded(scoringUnfilledStates, s"Features excluded because scoring fill rate did not meet min required ($minFill)")
-      logExcluded(jsDivergenceMismatches, s"Features excluded because JS Divergence exceeded max allowed ($maxJSDivergence)")
-      logExcluded(fillRateDiffMismatches, s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
-      logExcluded(fillRatioDiffMismatches, s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
+      logExcluded(scoringUnfilledStates,
+        s"Features excluded because scoring fill rate did not meet min required ($minFill)")
+      logExcluded(jsDivergenceMismatches,
+        s"Features excluded because JS Divergence exceeded max allowed ($maxJSDivergence)")
+      logExcluded(fillRateDiffMismatches,
+        s"Features excluded because fill rate difference exceeded max allowed ($maxFillDifference)")
+      logExcluded(fillRatioDiffMismatches,
+        s"Features excluded because fill ratio difference exceeded max allowed ($maxFillRatioDiff)")
 
       val exclusionReasons: Seq[ExclusionReasons] = combineExclusionReasons(
         trainingDistribs, trainingUnfilledStates, trainingNullLabelLeakers,
