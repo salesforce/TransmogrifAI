@@ -52,11 +52,17 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       .uniform(lr.regParam, min, max)
       .build(5)
     lrParams.length shouldBe 5
+    lrParams.foreach(_.toSeq.length shouldBe 1)
+    lrParams.foreach(_.toSeq.foreach( p => (p.value.asInstanceOf[Double] < max &&
+      p.value.asInstanceOf[Double] > min) shouldBe true))
 
     val lrParams2 = new RandomParamBuilder()
       .exponential(lr.regParam, min, max)
       .build(20)
     lrParams2.length shouldBe 20
+    lrParams.foreach(_.toSeq.length shouldBe 1)
+    lrParams.foreach(_.toSeq.foreach( p => (p.value.asInstanceOf[Double] < max &&
+      p.value.asInstanceOf[Double] > min) shouldBe true))
   }
 
   it should "build a param grid of the desired length with many param variables" in {
@@ -66,6 +72,7 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       .uniform(lr.maxIter, 2, 50)
       .build(23)
     lrParams.length shouldBe 23
+    lrParams.foreach(_.toSeq.length shouldBe 3)
   }
 
 }
