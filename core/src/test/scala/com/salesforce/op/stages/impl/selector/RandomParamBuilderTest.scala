@@ -67,5 +67,5 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       .build(23)
     lrParams.length shouldBe 23
   }
-  
+
 }
