@@ -29,7 +29,7 @@
  */
 package com.salesforce.op.stages.impl.selector
 
-import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
+import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier, OpXGBoostClassifier}
 import com.salesforce.op.test.TestSparkContext
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -40,10 +40,8 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
 
   private val lr = new OpLogisticRegression()
   private val rf = new OpRandomForestClassifier()
+  private val xgb = new OpXGBoostClassifier()
 
-  private val lrParams = new RandomParamBuilder()
-    .uniform(lr.regParam, 0.1, 100)
-    .build(5)
 
   it should "build a param grid of the desired length with one param variable" in {
     val min = 0.00001
@@ -55,14 +53,16 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
     lrParams.foreach(_.toSeq.length shouldBe 1)
     lrParams.foreach(_.toSeq.foreach( p => (p.value.asInstanceOf[Double] < max &&
       p.value.asInstanceOf[Double] > min) shouldBe true))
+    lrParams.foreach(_.toSeq.map(_.param).toSet shouldBe Set(lr.regParam))
 
     val lrParams2 = new RandomParamBuilder()
       .exponential(lr.regParam, min, max)
       .build(20)
     lrParams2.length shouldBe 20
-    lrParams.foreach(_.toSeq.length shouldBe 1)
-    lrParams.foreach(_.toSeq.foreach( p => (p.value.asInstanceOf[Double] < max &&
+    lrParams2.foreach(_.toSeq.length shouldBe 1)
+    lrParams2.foreach(_.toSeq.foreach( p => (p.value.asInstanceOf[Double] < max &&
       p.value.asInstanceOf[Double] > min) shouldBe true))
+    lrParams2.foreach(_.toSeq.map(_.param).toSet shouldBe Set(lr.regParam))
   }
 
   it should "build a param grid of the desired length with many param variables" in {
@@ -73,6 +73,31 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       .build(23)
     lrParams.length shouldBe 23
     lrParams.foreach(_.toSeq.length shouldBe 3)
+    lrParams.foreach(_.toSeq.map(_.param).toSet shouldBe Set(lr.regParam, lr.family, lr.maxIter))
+  }
+
+  it should "work for all param types" in {
+    val xgbParams = new RandomParamBuilder()
+      .subset(xgb.checkpointPath, Seq("a", "b"))//string
+      .uniform(xgb.alpha, 0, 1)//double
+      .uniform(xgb.missing, 0, 100)//float
+      .uniform(xgb.checkpointInterval, 2, 5)//int
+      .uniform(xgb.seed, 5, 1000)//long
+      .uniform(xgb.useExternalMemory)//boolean
+      .exponential(xgb.baseScore, 0.0001, 1)//double
+      .exponential(xgb.missing, 0.000001F, 1) //float - overwrites first call
+      .build(2)
+
+    xgbParams.length shouldBe 2
+    xgbParams.foreach(_.toSeq.length shouldBe 7)
+    xgbParams.foreach(_.toSeq.map(_.param).toSet shouldBe Set(xgb.checkpointPath, xgb.alpha, xgb.missing,
+      xgb.checkpointInterval, xgb.seed, xgb.useExternalMemory, xgb.baseScore))
+  }
+
+  it should "throw an assert error if an improper min value is passed in for exponential scale" in {
+    intercept[AssertionError]( new RandomParamBuilder()
+      .exponential(xgb.baseScore, 0, 1)).getMessage() shouldBe
+      "assertion failed: Min value must be greater than zero for exponential distribution to work"
   }
 
 }

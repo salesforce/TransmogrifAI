@@ -52,9 +52,9 @@ private object Distribution extends Enum[Distribution] {
 class RandomParamBuilder {
 
   private val paramDefs = mutable.Map.empty[Param[_], (Distribution, _, _, Seq[_])]
-  private val generator = new Random()
+  private val rand = new Random()
 
-  protected def addParams[T](param: Param[T], dist: Distribution, min: T, max: T): this.type = {
+  private def addParams[T](param: Param[T], dist: Distribution, min: T, max: T): this.type = {
     paramDefs.put(param, (dist, min, max, Seq()))
     this
   }
@@ -64,6 +64,7 @@ class RandomParamBuilder {
    * Adds parameter values uniformly selected from a sequence
    *
    * @param param parameter to add
+   *
    * @param seq   sequence of possible values
    */
   def subset[T](param: Param[T], seq: Seq[T]): this.type = {
@@ -129,31 +130,33 @@ class RandomParamBuilder {
   }
 
   /**
-   * Adds double param with range of values exponentially distributed
+   * Adds double param with range of values exponentially distributed in range specified (must be in (0, +Inf)
    *
    * @param param parameter to add
    * @param min   minimum value for param
    * @param max   maximum value for param
    */
   def exponential(param: DoubleParam, min: Double, max: Double): this.type = {
+    assert(min > 0, "Min value must be greater than zero for exponential distribution to work")
     addParams[Double](param, Exponential, min, max)
   }
 
   /**
-   * Adds float param with range of values exponentially distributed
+   * Adds float param with range of values exponentially distributed in range specified (must be in (0, +Inf)
    *
    * @param param parameter to add
    * @param min   minimum value for param
    * @param max   maximum value for param
    */
   def exponential(param: FloatParam, min: Float, max: Float): this.type = {
+    assert(min > 0, "Min value must be greater than zero for exponential distribution to work")
     addParams[Float](param, Exponential, min, max)
   }
 
   private def getExpRand(min: Double, max: Double) = {
     val minExp = math.log10(min)
     val maxExp = math.log10(max)
-    val exp = (maxExp - minExp) * generator.nextDouble() + minExp
+    val exp = (maxExp - minExp) * rand.nextDouble() + minExp
     math.pow(10, exp)
   }
 
@@ -163,22 +166,22 @@ class RandomParamBuilder {
    * @return An array of param maps containing randomly generated values for each param specified
    */
   def build(totalParams: Int): Array[ParamMap] = {
-    (0 until totalParams).map{ _ =>
+    val allParams = for { _  <- 0 until totalParams } yield {
       val params = new ParamMap()
       paramDefs.foreach {
         case (param, (Subset, _, _, seq: Seq[_])) =>
-          params.put(param.asInstanceOf[Param[Any]], seq(generator.nextInt(seq.length)))
+          params.put(param.asInstanceOf[Param[Any]], seq(rand.nextInt(seq.length)))
         case (param, (Uniform, min: Double, max: Double, _)) =>
-          params.put(param.asInstanceOf[Param[Any]], (max - min) * generator.nextDouble() + min)
+          params.put(param.asInstanceOf[Param[Any]], (max - min) * rand.nextDouble() + min)
         case (param, (Uniform, min: Float, max: Float, _)) =>
-          params.put(param.asInstanceOf[Param[Any]], (max - min) * generator.nextFloat() + min)
+          params.put(param.asInstanceOf[Param[Any]], (max - min) * rand.nextFloat() + min)
         case (param, (Uniform, min: Int, max: Int, _)) =>
-          params.put(param.asInstanceOf[Param[Any]], generator.nextInt(max - min) + min)
+          params.put(param.asInstanceOf[Param[Any]], rand.nextInt(max - min) + min)
         case (param, (Uniform, min: Long, max: Long, _)) =>
           val range = math.min(max - min, Integer.MAX_VALUE.toLong).toInt
-          params.put(param.asInstanceOf[Param[Any]], generator.nextInt(range).toLong + min)
+          params.put(param.asInstanceOf[Param[Any]], rand.nextInt(range).toLong + min)
         case (param, (Uniform, _: Boolean, _: Boolean, _)) =>
-          params.put(param.asInstanceOf[Param[Any]], generator.nextBoolean())
+          params.put(param.asInstanceOf[Param[Any]], rand.nextBoolean())
         case (param, (Exponential, min: Double, max: Double, _)) =>
           params.put(param.asInstanceOf[Param[Any]], getExpRand(min, max))
         case (param, (Exponential, min: Float, max: Float, _)) =>
@@ -186,6 +189,7 @@ class RandomParamBuilder {
         case (_, _) => throw new IllegalArgumentException("parameter type and distribution not supported")
       }
       params
-    }.toArray[ParamMap]
+    }
+    allParams.toArray
   }
 }
