@@ -212,7 +212,6 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       ),
       bot -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    println(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata))
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     val expected2 = Array(
       Vectors.dense(1.0, 1.0, 0.0, 0.0, 1.0, 0.0),
@@ -405,6 +404,37 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val expect = OpVectorMetadata("", field.metadata).columns
       .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
     assertNominal(field, expect, result)
+  }
+
+  it should "remove feature because of high cardinality" in {
+    val localData = Seq(
+      Seq("A"),
+      Seq("B"),
+      Seq("A"),
+      Seq("C"),
+      Seq("C"),
+      Seq("A", "B")
+    )
+    val (localDF, f1) = TestFeatureBuilder(localData.map(_.toMultiPickList))
+
+    val oPSetVectorizer = new OpSetVectorizer[MultiPickList]().setMaxPercentageCardinality(0.1)
+
+    val res = oPSetVectorizer.setInput(f1).getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(res).transform(localDF)
+    val field = transformed.schema(res.name)
+    val result = transformed.collect(res)
+    val expect = OpVectorMetadata("", field.metadata).columns
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
+    assertNominal(field, expect, result)
+    val expected = Array(
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty
+    )
+    result should contain theSameElementsAs  expected
   }
 
   it should "process multiple columns of numerics, PickLists, and MultiPickLists using the vectorize shortcut" in {
