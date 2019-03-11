@@ -30,17 +30,25 @@
 
 package com.salesforce.op.stages.impl.feature
 
+
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.{HLL, HyperLogLogMonoid}
+import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.Dataset
+import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.runtime.universe.TypeTag
+
+
+
 
 /**
  * Converts a sequence of features into a vector keeping the top K most common occurrences of each
@@ -58,26 +66,50 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
     with VectorizerDefaults with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with OneHotFun {
+    with TrackNullsParam with MinSupportParam with OneHotFun with MaxPercentageCardinalityParams {
 
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
 
   protected def makeModel(topValues: Seq[Seq[String]], shouldCleanText: Boolean,
     shouldTrackNulls: Boolean, operationName: String, uid: String): SequenceModel[T, OPVector]
 
+  // private implicit val hllqEnc: Encoder[HLL] = org.apache.spark.sql.Encoders.kryo[HLL]
+
+  private implicit val hllSeqEnc: Encoder[Seq[HLL]] = org.apache.spark.sql.Encoders.kryo[Seq[HLL]]
+
+  private implicit val classTag = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+
+
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanText = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
 
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
+    val n = rdd.count()
+    val hll = new HyperLogLogMonoid(12)
+
+
+
+    val countUniques: Seq[HLL] =
+      if (rdd.isEmpty()) Seq.empty[HLL] else dataset.map(_.map(v => {
+        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
+        hll.toHLL(kryoSerializer.serialize(v).array())
+      })).reduce{
+        (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }}
+
+    val percentFilter = countUniques.map(_.estimatedSize / n < $(maxPercentageCardinality))
+    val filteredRDD = rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
+
+
 
     val countOccurrences: Seq[Map[String, Int]] = {
-      if (rdd.isEmpty) Seq.empty[Map[String, Int]]
-      else rdd.reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      if (filteredRDD.isEmpty) Seq.empty[Map[String, Int]]
+      else filteredRDD.reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
     }
 
     // Top K values for each categorical input
     val numToKeep = $(topK)
+
     val minSup = $(minSupport)
     val topValues: Seq[Seq[String]] =
       countOccurrences.map(m => m.toSeq.filter(_._2 >= minSup).sortBy(v => -v._2 -> v._1).take(numToKeep).map(_._1))
@@ -101,6 +133,12 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
       uid = uid
     )
   }
+}
+
+
+
+object OpOneHotVectorizer {
+  val MaxPctCardinality = 1.0
 }
 
 abstract class OpOneHotVectorizerModel[T <: FeatureType]
@@ -210,6 +248,14 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
 )(implicit tti: TypeTag[T])
   extends OpOneHotVectorizerModel[T](topValues, shouldCleanText, shouldTrackNulls, operationName, uid) {
   override protected def convertToSet(in: T): Set[_] = in.value.toSet
+}
+
+/**
+ * HyperLogLog Monoid
+ */
+private[op] object HLL {
+  val aggregator = new HyperLogLogMonoid(12)
+  def empty: TextStats = TextStats(Map.empty)
 }
 
 /**

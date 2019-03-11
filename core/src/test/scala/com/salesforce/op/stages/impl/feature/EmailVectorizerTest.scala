@@ -82,6 +82,7 @@ class EmailVectorizerTest
 
 
   def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
+    ds.show()
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val field = transformed.schema(feature.name)
     val collected = transformed.collect(feature)
@@ -196,5 +197,16 @@ class EmailVectorizerTest
     result(0) shouldBe result(1)
     result(2) shouldBe result(3)
     result should contain theSameElementsAs expectedEmail
+  }
+  it should "remove high cardinality features" in {
+    val (ds2, f2) = TestFeatureBuilder(emails)
+    val vectorized = f2.vectorize(topK = TopK, minSupport = MinSupport,
+      cleanText = CleanText, maxPctCardinality = 0.1)
+    vectorized.originStage shouldBe a[OpTextPivotVectorizer[_]]
+    vectorized shouldBe a[FeatureLike[_]]
+
+    val result = transformAndCollect(ds2, vectorized)
+
+    result should contain theSameElementsAs Array.fill(ds2.count().toInt)(OPVector.empty)
   }
 }

@@ -156,7 +156,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
 object SmartTextVectorizer {
   val MaxCardinality = 100
-
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }.toSeq.toArray, all.collect { case (item, false) => item }.toSeq.toArray)
@@ -258,4 +257,14 @@ trait MaxCardinalityParams extends Params {
   final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
+}
+trait MaxPercentageCardinalityParams extends Params {
+  final val maxPercentageCardinality = new DoubleParam(
+    parent = this, name = "maxPercentageCardinality",
+    doc = "max percentage of distinct values a categorical feature can have",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
+  )
+  final def setMaxPercentageCardinality(v: Double): this.type = set(maxPercentageCardinality, v)
+  final def getMaxPercentageCardinality: Double = $(maxPercentageCardinality)
+  setDefault(maxPercentageCardinality -> 1.0)
 }

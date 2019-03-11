@@ -73,6 +73,7 @@ private[op] trait TransmogrifierDefaults {
   val TrackInvalid: Boolean = false
   val TrackTextLen: Boolean = false
   val MinDocFrequency: Int = 0
+  val MaxPercentCardinality = 1.0
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
@@ -283,11 +284,12 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[Email] =>
           val (f, other) = castAs[Email](g)
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[ID] =>
           val (f, other) = castAs[ID](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
           f.vectorize(defaultRegion = DefaultRegion, others = other)
@@ -315,19 +317,24 @@ private[op] case object Transmogrifier {
             others = other)
         case t if t =:= weakTypeOf[Country] =>
           val (f, other) = castAs[Country](g) // TODO make do something smart for Country
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[State] =>
           val (f, other) = castAs[State](g) // TODO make do something smart for State
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[City] =>
           val (f, other) = castAs[City](g) // TODO make do something smart for City
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PostalCode] =>
           val (f, other) = castAs[PostalCode](g) // TODO make do something smart for PostalCode
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Street] =>
           val (f, other) = castAs[Street](g) // TODO make do something smart for Street
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
 
         // Unknown
         case t => throw new IllegalArgumentException(s"No vectorizer available for type $t")

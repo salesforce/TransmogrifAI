@@ -32,6 +32,7 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{Location, OPVector, Text}
+import com.salesforce.op.stages.impl.feature.OpOneHotVectorizer
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -62,9 +63,10 @@ trait RichLocationFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      f.pivot(others, topK, minSupport, cleanText)
+      f.pivot(others, topK, minSupport, cleanText, maxPctCardinality = maxPctCardinality)
     }
 
   }

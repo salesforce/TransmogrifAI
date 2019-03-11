@@ -76,12 +76,14 @@ trait RichTextFeature {
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val vectorizer = new OpTextPivotVectorizer[T]()
 
       f.transformWith[OPVector](
-        stage = vectorizer.setTopK(topK).setMinSupport(minSupport).setCleanText(cleanText).setTrackNulls(trackNulls),
+        stage = vectorizer.setTopK(topK).setMinSupport(minSupport).setCleanText(cleanText)
+          .setTrackNulls(trackNulls).setMaxPercentageCardinality(maxPctCardinality),
         fs = others
       )
     }
@@ -537,7 +539,8 @@ trait RichTextFeature {
       isStrict: Boolean = PhoneNumberParser.StrictValidation,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       fillValue: Boolean = TransmogrifierDefaults.BinaryFillValue,
-      others: Array[FeatureLike[Phone]] = Array.empty
+      others: Array[FeatureLike[Phone]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val valid = (f +: others).map(_.isValidPhoneDefaultCountry(defaultRegion = defaultRegion, isStrict = isStrict))
       valid.head.vectorize(others = valid.tail, fillValue = fillValue, trackNulls = trackNulls)
@@ -579,11 +582,12 @@ trait RichTextFeature {
       cleanText: Boolean,
       minSupport: Int,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[Email]] = Array.empty
+      others: Array[FeatureLike[Email]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](_.domain.toPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
-        trackNulls = trackNulls
+        trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }
 
@@ -634,11 +638,12 @@ trait RichTextFeature {
       cleanText: Boolean,
       minSupport: Int,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[URL]] = Array.empty
+      others: Array[FeatureLike[URL]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](v => if (v.isValid) v.domain.toPickList else PickList.empty))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
-        trackNulls = trackNulls
+        trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }
 
@@ -676,14 +681,16 @@ trait RichTextFeature {
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       typeHint: Option[String] = None,
-      others: Array[FeatureLike[Base64]] = Array.empty
+      others: Array[FeatureLike[Base64]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
 
       val feats: Array[FeatureLike[PickList]] =
         (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](_.value.toPickList))
 
       feats.head.vectorize(
-        topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls, others = feats.tail
+        topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls, others = feats.tail,
+        maxPctCardinality = maxPctCardinality
       )
     }
 
@@ -708,9 +715,11 @@ trait RichTextFeature {
       minSupport: Int,
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[PickList]] = Array.empty
+      others: Array[FeatureLike[PickList]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)
+      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls,
+        maxPctCardinality = maxPctCardinality)
     }
 
   }
@@ -734,9 +743,11 @@ trait RichTextFeature {
       minSupport: Int,
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[ComboBox]] = Array.empty
+      others: Array[FeatureLike[ComboBox]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)
+      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls,
+        maxPctCardinality = maxPctCardinality)
     }
 
   }
@@ -760,9 +771,11 @@ trait RichTextFeature {
       minSupport: Int,
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[ID]] = Array.empty
+      others: Array[FeatureLike[ID]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls)
+      f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls,
+        maxPctCardinality = maxPctCardinality)
     }
 
   }
