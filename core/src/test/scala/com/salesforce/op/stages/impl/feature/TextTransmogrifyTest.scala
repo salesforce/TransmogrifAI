@@ -34,6 +34,7 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichStructType._
 import com.salesforce.op.utils.text.TextUtils
@@ -130,6 +131,37 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
     val field = vectorized.schema(feature.name)
     assertNominal(field, Array.fill(vectCollect.head.value.size)(true), vectCollect)
     vectCollect.forall(_.value.size == TransmogrifierDefaults.DefaultNumOfFeatures + 1)
+  }
+
+  "OpTextPivotVectorizer" should "drop high cardinality feature" in {
+    val data = Seq(
+      "A",
+      "B",
+      "A",
+      "C",
+      "C",
+      "A"
+    )
+    val (df, f1) = TestFeatureBuilder(data.map(_.toText))
+
+    val textPivotVectorizer = new OpTextPivotVectorizer[Text]().setMaxPercentageCardinality(0.2)
+
+    val res = textPivotVectorizer.setInput(f1).getOutput()
+    val transformed = new OpWorkflow().setResultFeatures(res).transform(df)
+    val field = transformed.schema(res.name)
+    val result = transformed.collect(res)
+    val expect = OpVectorMetadata("", field.metadata).columns
+      .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[Text]))
+    assertNominal(field, expect, result)
+    val expected = Array(
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty
+    )
+    result should contain theSameElementsAs  expected
   }
 
 }
