@@ -157,5 +157,8 @@ object OpTitanicSimple {
     val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
 
     println("Metrics:\n" + metrics)
+
+    // Stop Spark gracefully
+    spark.stop()
   }
 }
