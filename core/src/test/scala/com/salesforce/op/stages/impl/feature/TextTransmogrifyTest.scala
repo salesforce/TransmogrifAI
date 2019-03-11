@@ -58,7 +58,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
       .map { case ((((ci, co), p), t), ta) => (ci, co, p, t, ta) }
 
   val (ds, city, country, postal, text, textarea) = TestFeatureBuilder("city", "country", "postal", "text",
-    "textarea", data)
+    "textarea", data ++ data)
 
   val largeData: Seq[(Text, TextArea)] = largeTextData.zip(largeTextAreaData)
   val (largeDS, largeText, largeTextarea) = TestFeatureBuilder("largerText", "largerTextarea", largeData)
