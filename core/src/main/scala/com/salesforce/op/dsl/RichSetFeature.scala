@@ -66,13 +66,14 @@ trait RichSetFeature {
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val opSetVectorizer = new OpSetVectorizer[T]()
 
       f.transformWith[OPVector](
         stage = opSetVectorizer.setTopK(topK).setCleanText(cleanText).setTrackNulls(trackNulls)
-          .setMinSupport(minSupport),
+          .setMinSupport(minSupport).setMaxPercentageCardinality(maxPctCardinality),
         fs = others
       )
     }
@@ -95,9 +96,11 @@ trait RichSetFeature {
       minSupport: Int,
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] =
-      f.pivot(others = others, topK = topK, cleanText = cleanText, minSupport = minSupport, trackNulls = trackNulls)
+      f.pivot(others = others, topK = topK, cleanText = cleanText, minSupport = minSupport, trackNulls = trackNulls,
+        maxPctCardinality = maxPctCardinality)
 
   }
 

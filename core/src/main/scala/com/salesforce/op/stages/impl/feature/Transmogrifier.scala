@@ -277,11 +277,11 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[Base64] =>
           val (f, other) = castAs[Base64](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[ComboBox] =>
           val (f, other) = castAs[ComboBox](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Email] =>
           val (f, other) = castAs[Email](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
@@ -292,11 +292,11 @@ private[op] case object Transmogrifier {
             others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
-          f.vectorize(defaultRegion = DefaultRegion, others = other)
+          f.vectorize(defaultRegion = DefaultRegion, others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PickList] =>
           val (f, other) = castAs[PickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
@@ -314,7 +314,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Country] =>
           val (f, other) = castAs[Country](g) // TODO make do something smart for Country
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
