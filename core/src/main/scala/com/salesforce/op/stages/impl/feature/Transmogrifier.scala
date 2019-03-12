@@ -37,11 +37,12 @@ import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
+import com.twitter.algebird.HLL
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.{Dataset, Encoders}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
@@ -165,7 +166,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[IDMap] =>
           val (f, other) = castAs[IDMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -177,7 +178,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[MultiPickListMap] =>
           val (f, other) = castAs[MultiPickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PercentMap] =>
           val (f, other) = castAs[PercentMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
@@ -210,7 +211,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[URLMap] =>
           val (f, other) = castAs[URLMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[CountryMap] =>
           val (f, other) = castAs[CountryMap](g) // TODO make Country specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
@@ -271,7 +272,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[MultiPickList] =>
           val (f, other) = castAs[MultiPickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
 
         // Text
         case t if t =:= weakTypeOf[Base64] =>
@@ -630,10 +631,13 @@ trait MapStringPivotHelper extends SaveOthersParams {
   type MapMap = SequenceAggregators.MapMap
   type SeqSeqTupArr = Seq[Seq[(String, Array[String])]]
   type SeqMapMap = SequenceAggregators.SeqMapMap
+  type HLLMap = Map[String, HLL]
 
   protected implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, String]]]
   protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
   protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
+  protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
+
 
   protected def getCategoryMaps[V]
   (
@@ -648,10 +652,14 @@ trait MapStringPivotHelper extends SaveOthersParams {
     }
   )
 
-  protected def filterHighCardinality(
-    in: Dataset[Seq[Map[String, String]]],
+  protected def filterHighCardinality[V](
+    in: Dataset[Seq[Map[String, V]]],
     filter: Map[String, Boolean]
-  ): Dataset[Seq[Map[String, String]]] = in.map(_.map(_.filter { case (k, _) => filter.getOrElse(k, true) }))
+  ): Dataset[Seq[Map[String, V]]] = {
+    implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, V]]]
+
+    in.map(_.map(_.filter { case (k, _) => filter.getOrElse(k, true) }))
+  }
 
   protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
     val sumAggr = SequenceAggregators.SumSeqMapMap(size = inputSize)

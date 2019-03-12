@@ -34,7 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
-import com.twitter.algebird.{HLL, HyperLogLogMonoid}
+import com.twitter.algebird.HyperLogLogMonoid
 import org.apache.spark.SparkConf
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -58,8 +58,6 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
     with MaxPercentageCardinalityParams {
 
-  type HLLMap = Map[String, HLL]
-  private implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)

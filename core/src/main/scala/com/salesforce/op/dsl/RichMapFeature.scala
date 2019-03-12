@@ -499,7 +499,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       others: Array[FeatureLike[T]] = Array.empty,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       new MultiPickListMapVectorizer[T]()
         .setInput(f +: others)
@@ -510,6 +511,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setMaxPercentageCardinality(maxPctCardinality)
         .getOutput()
     }
   }
