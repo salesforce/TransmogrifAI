@@ -58,6 +58,8 @@ trait RichSetFeature {
      * @param minSupport min occurrences to keep a value
      * @param cleanText  if true ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep a count of nulls
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def pivot
@@ -88,6 +90,8 @@ trait RichSetFeature {
      * @param minSupport min occurrences to keep a value
      * @param cleanText  if true ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep a count of nulls
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def vectorize

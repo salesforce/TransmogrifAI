@@ -56,6 +56,8 @@ trait RichLocationFeature {
      * @param topK      keep topK values
      * @param minSupport    min times a value must occur to be retained in pivot
      * @param cleanText if true ignores capitalization and punctuations when grouping categories
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def vectorize

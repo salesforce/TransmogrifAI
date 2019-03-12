@@ -68,6 +68,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  if true ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def pivot
@@ -532,6 +534,8 @@ trait RichTextFeature {
      * @param trackNulls    produce column indicating if the number was null
      * @param fillValue     value to fill in for nulls in vactor creation
      * @param others        other phone numbers to vectorize
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return vector feature containing information about phone number
      */
     def vectorize(
@@ -574,6 +578,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return The vectorized features
      */
     def vectorize
@@ -630,6 +636,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return The vectorized features
      */
     def vectorize
@@ -673,6 +681,8 @@ trait RichTextFeature {
      * @param trackNulls keep an extra column that indicated if feature was null
      * @param typeHint   MIME type hint, i.e. 'application/json', 'text/plain' etc.
      * @param others     other features of the same type
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return result feature of type vector
      */
     def vectorize(
@@ -707,6 +717,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return The vectorized features
      */
     def vectorize
@@ -735,6 +747,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return The vectorized features
      */
     def vectorize
@@ -763,6 +777,8 @@ trait RichTextFeature {
      * @param minSupport Min times a value must occur to be retained in pivot
      * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
      * @param trackNulls keep an extra column that indicated if feature was null
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return The vectorized features
      */
     def vectorize
@@ -775,7 +791,7 @@ trait RichTextFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls,
-        maxPctCardinality = maxPctCardinality)
+      )
     }
 
   }

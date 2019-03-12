@@ -84,6 +84,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -488,6 +489,7 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -995,6 +997,8 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return an OPVector feature
      */
     def vectorize(
@@ -1045,6 +1049,8 @@ trait RichMapFeature {
      * @param whiteListKeys keys to whitelist
      * @param blackListKeys keys to blacklist
      * @param trackNulls    option to keep track of values that were missing
+     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return an OPVector feature
      */
     def vectorize(
