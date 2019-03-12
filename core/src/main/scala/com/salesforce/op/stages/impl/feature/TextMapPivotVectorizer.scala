@@ -34,7 +34,10 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
-import org.apache.spark.sql.Dataset
+import com.twitter.algebird.{HLL, HyperLogLogMonoid}
+import org.apache.spark.SparkConf
+import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -52,7 +55,11 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 )(implicit tti: TypeTag[T])
   extends SequenceEstimator[T, OPVector](operationName = "vecPivotTextMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
-    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam {
+    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
+    with MaxPercentageCardinalityParams {
+
+  type HLLMap = Map[String, HLL]
+  private implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
@@ -60,8 +67,29 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 
     def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
+
+    val rdd = dataset.rdd
+    val n = dataset.count()
+    val hll = new HyperLogLogMonoid(12)
+
+
+    val countUniques: Seq[HLLMap] =
+      if (rdd.isEmpty()) Seq.empty[HLLMap] else dataset.map(_.map(_.map { case (k, v) =>
+        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
+        k -> hll.toHLL(kryoSerializer.serialize(v).array())
+      })).reduce {
+        (a, b) => a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
+          case (k, v) => k -> (v + m1.getOrElse(k, hll.zero)) } }
+      }
+
+    val percentFilter = countUniques.flatMap(_.map{ case (k, v) =>
+      k -> (v.estimatedSize / n < $(maxPercentageCardinality))}.toSeq).toMap
+    val filteredDataset = filterHighCardinality(dataset, percentFilter)
+
+
     val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(dataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+      getCategoryMaps(filteredDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+
 
     val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 

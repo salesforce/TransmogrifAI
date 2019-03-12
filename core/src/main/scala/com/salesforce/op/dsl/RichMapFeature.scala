@@ -95,7 +95,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       new TextMapPivotVectorizer[T]()
         .setInput(f +: others)
@@ -106,6 +107,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setMaxPercentageCardinality(maxPctCardinality)
         .getOutput()
     }
   }
@@ -156,7 +158,8 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       typeHint: Option[String] = None,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[Base64Map]] = Array.empty
+      others: Array[FeatureLike[Base64Map]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
 
       val feats: Array[FeatureLike[PickListMap]] = (f +: others).map(_.detectMimeTypes(typeHint))
@@ -170,6 +173,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
+        .setMaxPercentageCardinality(maxPctCardinality)
         .getOutput()
     }
   }
@@ -999,7 +1003,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[EmailMap]] = Array.empty
+      others: Array[FeatureLike[EmailMap]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
         val transformer = new OPMapTransformer[Email, PickList, EmailMap, PickListMap](
@@ -1015,7 +1020,7 @@ trait RichMapFeature {
       domains.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, cleanKeys = cleanKeys,
         whiteListKeys = whiteListKeys, blackListKeys = blackListKeys,
-        others = domains.tail, trackNulls = trackNulls
+        others = domains.tail, trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }
   }
@@ -1048,7 +1053,8 @@ trait RichMapFeature {
       whiteListKeys: Array[String] = Array.empty,
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[URLMap]] = Array.empty
+      others: Array[FeatureLike[URLMap]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
         val transformer =
@@ -1064,7 +1070,7 @@ trait RichMapFeature {
       domains.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, cleanKeys = cleanKeys,
         whiteListKeys = whiteListKeys, blackListKeys = blackListKeys,
-        others = domains.tail, trackNulls = trackNulls
+        others = domains.tail, trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }
   }
