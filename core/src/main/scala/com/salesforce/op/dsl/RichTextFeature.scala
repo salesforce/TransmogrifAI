@@ -791,7 +791,7 @@ trait RichTextFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       f.pivot(others = others, topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls,
-      )
+        maxPctCardinality = maxPctCardinality)
     }
 
   }
