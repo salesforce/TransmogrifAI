@@ -196,7 +196,7 @@ case object FeatureTypeSparkConverter {
 
       // Sets
       case wt if wt <:< weakTypeOf[t.MultiPickList] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.MultiPickList.value else value.asInstanceOf[MWrappedArray[String]].toSet
+        if (value == null) FeatureTypeDefaults.MultiPickList.value else value.asInstanceOf[Seq[String]].toSet
 
       // Everything else
       case _ => identity
