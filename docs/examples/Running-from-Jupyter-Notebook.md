@@ -16,8 +16,8 @@ Prerequisites:
 Installation using pip
 
 ```$xslt
-sudo pip install beakerx
-sudo beakerx install
+pip install beakerx
+beakerx install
 ```
 
 Installation using conda
@@ -35,15 +35,9 @@ Reference : [BeakerX Documentation](http://beakerx.com/documentation)
 
 BeakerX provides a [docker container image](https://hub.docker.com/r/beakerx/beakerx/) on docker hub.
 
-Assuming your Transmogrify source code is downloaded at `/Users/rdua/work/github/rajdeepd/TransmogrifAI`. You can use the `docker run` command to start the container.
-
-We need the directory above so that we can mount sample notebooks and dataset
-into the container using docker volumes.
-
 ### Increase the RAM available to Docker container
 
 Increase the Memory available to docker containers from the docker UI as shown below
-
 
 ![docker-settings][docker-settings]
 
@@ -51,11 +45,18 @@ Increase the Memory available to docker containers from the docker UI as shown b
 
 ### Set TransmogrifAI_HOME
 
+Assuming your Transmogrify source code is downloaded at `/Users/johndoe/TransmogrifAI` run the command:
+
 ```bash
-export TransmogrifAI_HOME=<TransmogrifAI installation dir>
+export TransmogrifAI_HOME="/Users/johndoe/TransmogrifAI"
 ```
 
+We need the directory above so that we can mount sample notebooks and dataset
+into the container using docker volumes.
+
 ### Run the BeakerX Container
+
+You can use the `docker run` command to start the container as follows:
 
 ```bash
 docker run -p 8888:8888 -v $TransmogrifAI_HOME/helloworld/notebooks:/home/beakerx/helloworld-notebooks \
@@ -85,7 +86,7 @@ On opening the image in the browser you will notice that in the home page
 
 ### Sample Notebooks
 
-Following notebooks are currently available
+Following notebooks are currently available:
 
 #### Titanic Binary Classification
 
