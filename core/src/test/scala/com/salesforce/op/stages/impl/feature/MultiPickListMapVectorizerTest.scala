@@ -566,9 +566,7 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
       OPVector.empty,
       OPVector.empty
     )
-    transformed.show()
     val vector = vectorizer.getOutput()
-    println(vectorMetadata)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(fitted.getOutput())
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
