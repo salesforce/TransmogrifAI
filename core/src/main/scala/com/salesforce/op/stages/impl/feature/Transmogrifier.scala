@@ -35,16 +35,20 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
-import com.twitter.algebird.HLL
+import com.twitter.algebird.{HLL, HyperLogLogMonoid}
+import org.apache.spark.SparkConf
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
@@ -638,6 +642,24 @@ trait MapStringPivotHelper extends SaveOthersParams {
   protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
   protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
 
+  protected def countMapUniques[V, T <: OPMap[V]](in: Dataset[Seq[T#Value]])
+    (implicit classTag: ClassTag[V]): Seq[HLLMap] = {
+    val rdd = in.rdd
+    val hll = new HyperLogLogMonoid(12)
+
+    val countMapUniques: Seq[HLLMap] =
+      if (rdd.isEmpty()) Seq.empty[HLLMap] else in.map(_.map(_.map { case (k, v) =>
+        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
+        k -> hll.toHLL(kryoSerializer.serialize(v).array())
+      })).reduce {
+        (a, b) =>
+          a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
+            case (k, v) => k -> (v + m1.getOrElse(k, hll.zero))
+          }
+          }
+      }
+    countMapUniques
+  }
 
   protected def getCategoryMaps[V]
   (

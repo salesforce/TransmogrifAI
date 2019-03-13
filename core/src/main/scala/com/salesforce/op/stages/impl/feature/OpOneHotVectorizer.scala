@@ -45,6 +45,7 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.{Dataset, Encoder}
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
 
@@ -73,34 +74,16 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
   protected def makeModel(topValues: Seq[Seq[String]], shouldCleanText: Boolean,
     shouldTrackNulls: Boolean, operationName: String, uid: String): SequenceModel[T, OPVector]
 
-  // private implicit val hllqEnc: Encoder[HLL] = org.apache.spark.sql.Encoders.kryo[HLL]
-
-  private implicit val hllSeqEnc: Encoder[Seq[HLL]] = org.apache.spark.sql.Encoders.kryo[Seq[HLL]]
-
-  private implicit val classTag = ReflectionUtils.classTagForWeakTypeTag[T#Value]
-
-
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanText = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
+    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
 
+    val uniqueCounts = countUniques(dataset)
+    val n = dataset.count()
+    val percentFilter = uniqueCounts.map(_.estimatedSize / n < $(maxPercentageCardinality))
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
-    val n = rdd.count()
-    val hll = new HyperLogLogMonoid(12)
-
-
-
-    val countUniques: Seq[HLL] =
-      if (rdd.isEmpty()) Seq.empty[HLL] else dataset.map(_.map(v => {
-        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
-        hll.toHLL(kryoSerializer.serialize(v).array())
-      })).reduce{
-        (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }}
-
-    val percentFilter = countUniques.map(_.estimatedSize / n < $(maxPercentageCardinality))
     val filteredRDD = rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
-
-
 
     val countOccurrences: Seq[Map[String, Int]] = {
       if (filteredRDD.isEmpty) Seq.empty[Map[String, Int]]
@@ -262,6 +245,22 @@ private[op] object HLL {
  * One Hot Functionality
  */
 private[op] trait OneHotFun {
+
+  protected def countUniques[V](dataset: Dataset[Seq[V]])(implicit  classTag: ClassTag[V]): Seq[HLL] = {
+    val rdd = dataset.rdd
+    val hll = new HyperLogLogMonoid(12)
+    implicit val hllSeqEnc: Encoder[Seq[HLL]] = org.apache.spark.sql.Encoders.kryo[Seq[HLL]]
+
+    val countUniques: Seq[HLL] =
+      if (rdd.isEmpty()) Seq.empty[HLL] else dataset.map(_.map(v => {
+        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
+        hll.toHLL(kryoSerializer.serialize(v).array())
+      })).reduce{
+        (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }}
+
+    countUniques
+
+  }
 
   protected def makeVectorColumnMetadata(
     shouldTrackNulls: Boolean, unseen: Option[String], topValues: Seq[Seq[String]], features: Array[TransientFeature]
