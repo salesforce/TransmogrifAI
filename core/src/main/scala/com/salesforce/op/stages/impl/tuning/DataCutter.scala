@@ -98,7 +98,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
     val summary = DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop)
 
-    ModelData(dataUse, Some(summary))
+    ModelData(dataUse.persist(), Some(summary))
   }
 
   /**

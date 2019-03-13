@@ -43,6 +43,7 @@ import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import org.apache.spark.ml.feature.StringIndexer
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -175,6 +176,38 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val pred = model.getOutput()
     val justScores = transformedData.collect(pred).map(_.prediction)
     justScores shouldEqual transformedData.collect(label).map(_.v.get)
+  }
+
+  it should "drop labels during estimator fit" in {
+    val numLabels = 1000
+    val labelsBeyondMax = normalVectorRDD(sc, numLabels, 4, seed = seed)
+      .map(v => Vectors.dense(v.toArray.slice(0, 3)) -> v(3))
+      .toDF("features", "rawLabel")
+
+    val labelsBeyondMaxIndexed = new StringIndexer()
+      .setInputCol("rawLabel")
+      .setOutputCol("label")
+      .fit(labelsBeyondMax)
+      .transform(labelsBeyondMax)
+      .select("label", "features")
+
+    val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder
+      .fromDataFrame[RealNN](labelsBeyondMaxIndexed, response = "label", nonNullable = Set("features"))
+
+    val dataCutter = DataCutter(seed = 42, maxLabelCategories = 10, minLabelFraction = 0.0)
+    val testEstimator =
+      MultiClassificationModelSelector
+        .withCrossValidation(
+          Option(dataCutter),
+          numFolds = 4,
+          validationMetric = Evaluators.MultiClassification.precision(),
+          seed = 10L,
+          modelTypesToUse = Seq(MTT.OpRandomForestClassifier)
+        )
+        .setInput(label, features)
+
+    testEstimator.fit(labelsBeyondMaxIndexed)
+    assert(dataCutter.getLabelsToKeep.size === dataCutter.getMaxLabelCategories)
   }
 
   it should "fit and predict for default models" in {
