@@ -76,7 +76,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
     val filteredDataset = filterHighCardinality(dataset, percentFilter)
 
     val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(dataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+      getCategoryMaps(filteredDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
     val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
