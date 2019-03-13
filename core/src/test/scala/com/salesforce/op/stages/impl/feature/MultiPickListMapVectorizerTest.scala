@@ -547,4 +547,23 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     if (log.isInfoEnabled) df.show(false)
     log.info("Metadata: {}", OpVectorMetadata(outName, meta).toString)
   }
+
+  it should "drop features with max cardinality" in {
+    val fitted = vectorizer.setMaxPercentageCardinality(0.2)
+      .fit(dataSet)
+    val transformed = fitted.transform(dataSet)
+    val vectorMetadata = fitted.getMetadata()
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
+    val expected = Array(
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty,
+      OPVector.empty
+    )
+    val vector = vectorizer.getOutput()
+    val field = transformed.schema(vector.name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
+  }
 }
