@@ -9,27 +9,26 @@ We are going to leverage [BeakerX](http://beakerx.com/) Scala kernel for Jupyter
 
 Prerequisites:
 
-* Apache Maven
 * Python 3
 * JDK 8
 
-Installation using pip
+Installation using `pip`:
 
 ```$xslt
 pip install beakerx
 beakerx install
 ```
 
-Installation using conda
+Installation using [Anaconda](https://www.anaconda.com/distribution/):
 
 ```$xslt
 conda create -y -n beakerx 'python>=3'
 source activate beakerx
-conda config --env --add pinned_packages 'openjdk>8.0.121'
+conda config --env --add pinned_packages 'openjdk=8.0.152'
 conda install -y -c conda-forge ipywidgets beakerx
 ```
 
-Reference : [BeakerX Documentation](http://beakerx.com/documentation)
+Reference : [BeakerX Documentation](http://beakerx.com/documentation).
 
 ## Setup BeakerX on Mac with Docker
 
