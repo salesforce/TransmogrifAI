@@ -64,7 +64,7 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 
     def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
-    val uniqueCounts = countMapUniques(dataset)
+    val uniqueCounts = countMapUniques(dataset, $(bits))
     val n = dataset.count()
 
     val percentFilter = uniqueCounts.flatMap(_.map{ case (k, v) =>

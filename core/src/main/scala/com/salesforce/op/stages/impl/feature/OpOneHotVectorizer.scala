@@ -79,7 +79,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     val shouldTrackNulls = $(trackNulls)
     implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
 
-    val uniqueCounts = countUniques(dataset)
+    val uniqueCounts = countUniques(dataset, $(bits))
     val n = dataset.count()
     val percentFilter = uniqueCounts.map(_.estimatedSize / n < $(maxPercentageCardinality))
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
@@ -233,22 +233,15 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
   override protected def convertToSet(in: T): Set[_] = in.value.toSet
 }
 
-/**
- * HyperLogLog Monoid
- */
-private[op] object HLL {
-  val aggregator = new HyperLogLogMonoid(12)
-  def empty: TextStats = TextStats(Map.empty)
-}
 
 /**
  * One Hot Functionality
  */
 private[op] trait OneHotFun {
 
-  protected def countUniques[V](dataset: Dataset[Seq[V]])(implicit  classTag: ClassTag[V]): Seq[HLL] = {
+  protected def countUniques[V](dataset: Dataset[Seq[V]], bits: Int)(implicit  classTag: ClassTag[V]): Seq[HLL] = {
     val rdd = dataset.rdd
-    val hll = new HyperLogLogMonoid(12)
+    val hll = new HyperLogLogMonoid(bits)
     implicit val hllSeqEnc: Encoder[Seq[HLL]] = org.apache.spark.sql.Encoders.kryo[Seq[HLL]]
 
     val countUniques: Seq[HLL] =

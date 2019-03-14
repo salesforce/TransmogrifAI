@@ -68,7 +68,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
       }
     }
 
-    val uniqueCounts = countMapUniques(dataset)
+    val uniqueCounts = countMapUniques(dataset, $(bits))
     val n = dataset.count()
 
     val percentFilter = uniqueCounts.flatMap(_.map{ case (k, v) =>

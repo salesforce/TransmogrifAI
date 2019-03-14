@@ -642,10 +642,10 @@ trait MapStringPivotHelper extends SaveOthersParams {
   protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
   protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
 
-  protected def countMapUniques[V, T <: OPMap[V]](in: Dataset[Seq[T#Value]])
+  protected def countMapUniques[V, T <: OPMap[V]](in: Dataset[Seq[T#Value]], bits: Int)
     (implicit classTag: ClassTag[V]): Seq[HLLMap] = {
     val rdd = in.rdd
-    val hll = new HyperLogLogMonoid(12)
+    val hll = new HyperLogLogMonoid(bits)
 
     val countMapUniques: Seq[HLLMap] =
       if (rdd.isEmpty()) Seq.empty[HLLMap] else in.map(_.map(_.map { case (k, v) =>
