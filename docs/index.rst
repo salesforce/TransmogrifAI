@@ -6,7 +6,7 @@
 TransmogrifAI
 =========================================
 
-TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an **AutoML** library written in Scala that runs on top of Spark. It was developed with a focus on enhancing machine learning **developer productivity** through **machine learning automation**, and an API that enforces **compile-time type-safety**, **modularity** and **reuse**.
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an **AutoML** library written in Scala that runs on top of Apache Spark. It was developed with a focus on enhancing machine learning **developer productivity** through **machine learning automation**, and an API that enforces **compile-time type-safety**, **modularity** and **reuse**.
 
 Use TransmogrifAI if you need a machine learning library to:
 
