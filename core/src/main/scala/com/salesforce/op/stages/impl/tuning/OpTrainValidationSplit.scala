@@ -77,7 +77,7 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
         label = label,
         features = features,
         splitter = splitter
-      )).getOrElse(trainingDataset, validationDataset)
+      )).getOrElse(prepareWithoutDag(splitter, trainingDataset, validationDataset))
     }
     implicit val ec: ExecutionContext = makeExecutionContext()
     val modelSummaries = getSummary(modelInfo, label = label, features = features, train = newTrain, test = newTest)

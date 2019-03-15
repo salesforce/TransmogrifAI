@@ -43,7 +43,7 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.monotonically_increasing_id
-import org.apache.spark.sql.{Dataset, Row, SparkSession, functions}
+import org.apache.spark.sql.{DataFrame, Dataset, Row, SparkSession, functions}
 import org.apache.spark.util.SparkThreadUtils
 import org.slf4j.{Logger, LoggerFactory}
 
@@ -225,6 +225,16 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     datasetsByClass.map(_.toDF().rdd)
   }
 
+  protected def prepareWithoutDag(
+    splitter: Option[Splitter],
+    training: DataFrame,
+    validation: DataFrame
+  ): (DataFrame, DataFrame) = {
+    val trainingValidation = Vector(training, validation).flatMap(df =>
+      splitter.map(_.prepare(df).train).orElse(Some(df)))
+    (trainingValidation.head, trainingValidation.last)
+  }
+
   protected def applyDAG(
     dag: StagesDAG,
     training: Dataset[Row],
@@ -241,18 +251,14 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       hasTest = true,
       indexOfLastEstimator = Some(-1)
     )
-    val selectTrain = newTrain.select(label, features)
-      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
-    val selectTest = newTest.select(label, features)
-      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
+    val balancedTrainTest = Vector(newTrain, newTest)
+      .map(_
+        .select(label, features)
+        .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id()))
+      .flatMap(df => splitter.map(_.prepare(df).train).orElse(Some(df)))
 
-    val (balancedTrain, balancedTest) = splitter.map(s => (
-      s.prepare(selectTrain).train,
-      s.prepare(selectTest).train)
-    ).getOrElse((selectTrain, selectTest))
-
-    (balancedTrain, balancedTest)
+    (balancedTrainTest.head, balancedTrainTest.last)
   }
 
   /**

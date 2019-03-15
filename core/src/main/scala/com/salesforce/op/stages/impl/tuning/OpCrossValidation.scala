@@ -109,7 +109,9 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
               dag = d, training = training, validation = validation,
               label = label, features = features, splitter = splitter
             )
-          ).getOrElse(training -> validation)
+          ).getOrElse {
+            prepareWithoutDag(splitter = splitter, training = training, validation = validation)
+          }
           getSummary(modelInfo = modelInfo, label = label, features = features, train = newTrain, test = newTest)
         }
       }
