@@ -300,9 +300,11 @@ class RawFeatureFilter[T]
     val scoreData = scoringReader.flatMap { s =>
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
       log.info("Loaded scoring data")
-      if (sd.count() > 0) Some(sd)
+      val scoringDataCount = sd.count()
+      if (scoringDataCount >= RawFeatureFilter.minRowsForScoringSet) Some(sd)
       else {
-        log.warn("Scoring dataset was empty. Only training data checks will be used.")
+        log.warn(s"Scoring dataset has $scoringDataCount rows, which is less than the minimum required of " +
+          s"${RawFeatureFilter.minRowsForScoringSet}. Only training data checks will be used.")
         None
       }
     }
@@ -370,6 +372,10 @@ object RawFeatureFilter {
     //  else math.min(math.max(bins, sum / AvgBinValue), MaxBins).toInt()
     bins
   }
+
+  // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
+  // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
+  val minRowsForScoringSet = 500
 
 }
 
