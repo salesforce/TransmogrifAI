@@ -13,6 +13,12 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
 
+To understand TransmogrifAI better, check out these 
+- [Implementing AutoML Techniques at Salesforce Scale](https://databricks.com/session/implementing-automl-techniques-at-salesforce-scale), a talk by [@tovbinm](https://github.com/tovbinm)
+- [Automated Machine Learning for Structured Data](https://engineering.salesforce.com/open-sourcing-transmogrifai-4e5d0e098da2), a blog by [@snabar](https://github.com/snabar)
+
+Skip to [Quick Start and Documentation](#quick-start-and-documentation).
+
 Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
 ## Predicting Titanic Survivors with TransmogrifAI
