@@ -32,14 +32,12 @@ package com.salesforce.op.local
 
 import java.nio.file.Paths
 
-import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
+import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
-import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatureBuilder}
+import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
@@ -63,7 +61,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     .indexed(handleInvalid = StringIndexerHandleInvalid.Skip)
 
   val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-    splitter = None, modelTypesToUse = Seq(BinaryClassificationModelsToTry.OpLogisticRegression)
+    splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
   ).setInput(survivedNum, features).getOutput()
 
   val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum, indexed).setReader(dataReader)
@@ -118,49 +116,5 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
         indexed.name -> indexedV.value.get
       )
     } score shouldBe expected
-  }
-
-  it should "handle multi picklist features without throwing an exception" in {
-    // First set up the raw features:
-    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).limit(1000)
-    val domain = List("Strawberry Milk", "Chocolate Milk", "Soy Milk", "Almond Milk")
-    val picklistData: Seq[PickList] = RandomText.pickLists(domain).limit(1000)
-    val domainSize = 20
-    val maxChoices = 2
-    val multiPickListData: Seq[MultiPickList] = RandomMultiPickList.of(
-      RandomText.textFromDomain(domain = List.range(0, domainSize).map(_.toString)), minLen = 0, maxLen = maxChoices
-    ).limit(1000)
-
-    // Generate the raw features and corresponding dataframe
-    val generatedData: Seq[(Currency, MultiPickList, PickList)] =
-      currencyData.zip(multiPickListData).zip(picklistData).map {
-        case ((cu, mp), pm) => (cu, mp, pm)
-      }
-    val (rawDF, rawCurrency, rawMultiPickList, rawPicklist) =
-      TestFeatureBuilder("currency", "multipicklist", "picklist", generatedData)
-
-    val labelTransformer = new UnaryLambdaTransformer[Currency, RealNN](operationName = "labelFunc",
-      transformFn = p => if (p.value.exists(_ >= 10.0)) 1.0.toRealNN else 0.0.toRealNN
-    )
-
-    val labelData = labelTransformer.setInput(rawCurrency).getOutput().asInstanceOf[Feature[RealNN]]
-      .copy(isResponse = true)
-
-    val genFeatureVector = Seq(rawCurrency, rawMultiPickList, rawPicklist).transmogrify()
-
-    val prediction = new OpLogisticRegression().setInput(labelData, genFeatureVector).getOutput()
-
-    val workflow = new OpWorkflow().setResultFeatures(prediction)
-
-    val model = workflow.setInputDataset(rawDF).train()
-
-    noException should be thrownBy
-      model.scoreFunction(Map("currency" -> 10.0, "multipicklist" -> Seq("0", "19"), "picklist" -> "Soy Milk"))
-
-    noException should be thrownBy
-      model.scoreFunction(Map("currency" -> 10.0, "multipicklist" -> Nil, "picklist" -> "Soy Milk"))
-
-    noException should be thrownBy
-      model.scoreFunction(Map("currency" -> 10.0, "multipicklist" -> null, "picklist" -> "Soy Milk"))
   }
 }

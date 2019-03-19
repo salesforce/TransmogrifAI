@@ -192,7 +192,7 @@ case object FeatureTypeSparkConverter {
       // Maps
       case wt if wt <:< weakTypeOf[t.MultiPickListMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.MultiPickListMap.value
-        else value.asInstanceOf[Map[String, MWrappedArray[String]]].map { case (k, v) => k -> v.toSet }
+        else value.asInstanceOf[Map[String, Seq[String]]].map { case (k, v) => k -> v.toSet }
 
       // Sets
       case wt if wt <:< weakTypeOf[t.MultiPickList] => (value: Any) =>
