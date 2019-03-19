@@ -3,7 +3,7 @@
 **2019**
 * [Automated Machine Learning with TransmogrifAI](https://vaultanalytics.com/podcast/automated-machine-learning-with-transmogrifai/), Till Bergmann, Data Crunch Podcast
 * [Automated ML Pipelines For Unseen Customer Data](https://www.youtube.com/watch?v=IZyceNOSitI), Kevin Moore, PAPIs.io, [Slides](https://drive.google.com/file/d/1MStBS4tR1yuklCuDCrZHrejNAFk1j_k9/view)
-* [Meet TransmogrifAI, Open Source AutoML That Powers Einstein Predictions](https://www.youtube.com/watch?v=93vsqjfGPCw&feature=youtu.be&t=2800), Matthew Tovbin, SF Big Data Analytics Meetup, [Slides](https://www.slideshare.net/MatthewTovbin/meet-transmogrifai-open-source-automl-that-powers-einstein-predictions-136249954)
+* [Meet TransmogrifAI, Open Source AutoML That Powers Einstein Predictions](https://www.youtube.com/watch?v=93vsqjfGPCw&feature=youtu.be&t=2800), Matthew Tovbin, SF Big Analytics Meetup, [Slides](https://www.slideshare.net/MatthewTovbin/meet-transmogrifai-open-source-automl-that-powers-einstein-predictions-136249954)
 
 **2018**
 * [AutoML: The Assembly Line of Machine Learning](http://www.dataengconf.com/automl-the-assembly-line-of-machine-learning), Mayukh Bhaowal, DataEngConf
