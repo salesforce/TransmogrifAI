@@ -38,9 +38,7 @@ BeakerX provides a [docker container image](https://hub.docker.com/r/beakerx/bea
 
 Increase the Memory available to docker containers from the docker UI as shown below
 
-![docker-settings][docker-settings]
-
-[docker-settings]: https://github.com/salesforce/TransmogrifAI/raw/master/resources/docker_memory_settings.png
+![docker-settings](https://github.com/salesforce/TransmogrifAI/raw/master/resources/docker_memory_settings.png)
 
 ### Set TransmogrifAI_HOME
 
@@ -73,17 +71,13 @@ http://localhost:8888/?token=<sometoken>
 
 On opening the image in the browser you will notice that in the home page
 
-![notebook_home][notebook_home]
+![notebook_home](https://github.com/salesforce/TransmogrifAI/raw/master/resources/notebook_home.png)
 
 "helloworld-notebooks" mounted folder (`/home/beakerx/helloworld-notebooks`) is where all our samples are located.
 
-![helloworld_notebooks][helloworld_notebooks]
+![helloworld_notebooks](https://github.com/salesforce/TransmogrifAI/raw/master/resources/helloworld_notebooks.png)
 
-[notebook_home]: https://github.com/salesforce/TransmogrifAI/raw/master/resources/notebook_home.png
-[helloworld_notebooks]: https://github.com/salesforce/TransmogrifAI/raw/master/resources/helloworld_notebooks.png
-
-
-### Sample Notebooks
+## Sample Notebooks
 
 Following notebooks are currently available:
 
@@ -91,13 +85,10 @@ Following notebooks are currently available:
 
 [OpTitanicSimple.ipynb](http://localhost:8888/notebooks/helloworld-notebooks/OpTitanicSimple.ipynb)
 
-![op_titanic][op_titanic]
+![op_titanic](https://github.com/salesforce/TransmogrifAI/raw/master/resources/op_titanic.png)
 
 #### Iris MultiClass Classification
 
 [OpIris.ipynb](http://localhost:8888/notebooks/helloworld-notebooks/OpIris.ipynb)
 
-![op_iris][op_iris]
-
-[op_titanic]: https://github.com/salesforce/TransmogrifAI/raw/master/resources/op_titanic.png
-[op_iris]: https://github.com/salesforce/TransmogrifAI/raw/master/resources/op_iris.png
+![op_iris](https://github.com/salesforce/TransmogrifAI/raw/master/resources/op_iris.png)
