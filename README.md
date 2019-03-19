@@ -4,7 +4,7 @@
 
 [![TravisCI Build Status](https://travis-ci.com/salesforce/TransmogrifAI.svg?token=Ex9czVEUD7AzPTmVh6iX&branch=master)](https://travis-ci.com/salesforce/TransmogrifAI) [![CircleCI Build Status](https://circleci.com/gh/salesforce/TransmogrifAI.svg?&style=shield&circle-token=e84c1037ae36652d38b49207728181ee85337e0b)](https://circleci.com/gh/salesforce/TransmogrifAI) [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2557/badge)](https://bestpractices.coreinfrastructure.org/projects/2557) [![Codecov](https://codecov.io/gh/salesforce/TransmogrifAI/branch/master/graph/badge.svg)](https://codecov.io/gh/salesforce/TransmogrifAI) [![CodeFactor](https://www.codefactor.io/repository/github/salesforce/transmogrifai/badge)](https://www.codefactor.io/repository/github/salesforce/transmogrifai)
 
-TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
+TransmogrifAI (pronounced trăns-mŏgˈrə-fī) is an AutoML library written in Scala that runs on top of Apache Spark. It was developed with a focus on accelerating machine learning developer productivity through machine learning automation, and an API that enforces compile-time type-safety, modularity, and reuse.
 _Through automation, it achieves accuracies close to hand-tuned models with almost 100x reduction in time._
 
 Use TransmogrifAI if you need a machine learning library to:
@@ -12,6 +12,10 @@ Use TransmogrifAI if you need a machine learning library to:
 * Build production ready machine learning applications in hours, not months
 * Build machine learning models without getting a Ph.D. in machine learning
 * Build modular, reusable, strongly typed machine learning workflows
+
+To understand the motivation behind TransmogrifAI check out these:
+- [Open Sourcing TransmogrifAI: Automated Machine Learning for Structured Data](https://engineering.salesforce.com/open-sourcing-transmogrifai-4e5d0e098da2), a blog post by [@snabar](https://github.com/snabar)
+- [Meet TransmogrifAI, Open Source AutoML That Powers Einstein Predictions](https://www.youtube.com/watch?v=93vsqjfGPCw&feature=youtu.be&t=2800), a talk by [@tovbinm](https://github.com/tovbinm)
 
 Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
