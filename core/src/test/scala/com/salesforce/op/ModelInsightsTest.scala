@@ -32,7 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType}
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
@@ -456,7 +456,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
       Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      Array.empty[FeatureDistribution]
+      RawFeatureFilterResults()
     )
     featureInsights.size shouldBe 2
 

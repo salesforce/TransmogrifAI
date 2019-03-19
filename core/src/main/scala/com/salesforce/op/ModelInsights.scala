@@ -485,7 +485,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults.rawFeatureDistributions, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = getStageInfo(stages)
@@ -534,7 +534,6 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureDistributions: Seq[FeatureDistribution],
     rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
@@ -623,7 +622,7 @@ case object ModelInsights {
           val ftype = allFeatures.find(_.name == fname)
             .map(_.typeName)
             .getOrElse("")
-          val distributions = rawFeatureDistributions.filter(_.name == fname)
+          val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
           FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
             distributions = distributions, exclusionReasons = exclusionReasons)
