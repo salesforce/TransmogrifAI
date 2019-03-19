@@ -35,7 +35,7 @@ import java.io.File
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.{Real, RealNN}
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters._
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.sparkwrappers.generic.SwUnaryEstimator
@@ -87,12 +87,17 @@ class OpWorkflowModelReaderWriterTest
   val distributions = Array(FeatureDistribution("a", None, 1L, 1L, Array(1.0), Array(1.0)),
     FeatureDistribution("b", Option("b"), 2L, 2L, Array(2.0), Array(2.0)))
 
+  val rawFeatureFilterResults = RawFeatureFilterResults(
+    rawFeatureDistributions = distributions
+  )
+
+
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
     val model = new OpWorkflowModel(wf.uid, wf.parameters)
       .setStages(wf.stages)
       .setFeatures(wf.resultFeatures)
       .setParameters(wf.parameters)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
 
     model.setReader(wf.reader.get)
   }
@@ -110,7 +115,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(density)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -122,7 +127,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(density, weight2)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -131,7 +136,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(weight)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -148,7 +153,7 @@ class OpWorkflowModelReaderWriterTest
       .setParameters(workflowParams)
       .setReader(dummyReader)
       .setResultFeatures(scaled)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -313,7 +318,7 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareDistributions(wf1.getRawFeatureDistributions(), wf2.getRawFeatureDistributions())
+    compareRawFeatureFilterResults(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
@@ -324,7 +329,7 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareDistributions(wf1.getRawFeatureDistributions(), wf2.getRawFeatureDistributions())
+    compareRawFeatureFilterResults(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareParams(p1: OpParams, p2: OpParams): Unit = {
@@ -333,9 +338,21 @@ class OpWorkflowModelReaderWriterTest
     p1.customParams shouldBe p2.customParams
   }
 
-  def compareDistributions(d1: Array[FeatureDistribution], d2: Array[FeatureDistribution]): Unit = {
+  def compareRawFeatureFilterConfig(c1: RawFeatureFilterConfig, c2: RawFeatureFilterConfig): Unit = {
+    c1.minFill shouldBe  c2.minFill
+    c1.maxFillDifference shouldBe c2.maxFillDifference
+    c1.maxFillRatioDiff shouldBe c2.maxFillRatioDiff
+    c1.maxJSDivergence shouldBe c2.maxJSDivergence
+    c1.maxCorrelation shouldBe c2.maxCorrelation
+    c1.correlationType shouldBe c2.correlationType
+    c1.jsDivergenceProtectedFeatures shouldBe c2.jsDivergenceProtectedFeatures
+    c1.protectedFeatures shouldBe c2.protectedFeatures
+
+  }
+
+  def compareDistributions(d1: Seq[FeatureDistribution], d2: Seq[FeatureDistribution]): Unit = {
     d1.zip(d2)
-      .foreach{ case (a, b) =>
+      .foreach { case (a, b) =>
         a.name shouldEqual b.name
         a.key shouldEqual b.key
         a.count shouldEqual b.count
@@ -343,6 +360,40 @@ class OpWorkflowModelReaderWriterTest
         a.distribution shouldEqual b.distribution
         a.summaryInfo shouldEqual b.summaryInfo
       }
+  }
+
+  def compareRawFeatureFilterMetrics(m1: Seq[RawFeatureFilterMetrics], m2: Seq[RawFeatureFilterMetrics]): Unit = {
+    m1.zip(m2)
+      .foreach { case (a, b) =>
+        a.name shouldBe b.name
+        a.trainingFillRate shouldBe b.trainingFillRate
+        a.trainingNullLabelAbsoluteCorr shouldBe b.trainingNullLabelAbsoluteCorr
+        a.scoringFillRate shouldBe b.scoringFillRate
+        a.jsDivergence shouldBe b.jsDivergence
+        a.fillRateDiff shouldBe b.fillRateDiff
+        a.fillRatioDiff shouldBe b.fillRatioDiff
+      }
+  }
+
+  def compareExclusionReasons(er1: Seq[ExclusionReasons], er2: Seq[ExclusionReasons]): Unit = {
+    er1.zip(er2)
+      .foreach { case (a, b) =>
+        a.name shouldBe b.name
+        a.trainingUnfilledState shouldBe b.trainingUnfilledState
+        a.trainingNullLabelLeaker shouldBe b.trainingNullLabelLeaker
+        a.scoringUnfilledState shouldBe b.scoringUnfilledState
+        a.jsDivergenceMismatch shouldBe b.jsDivergenceMismatch
+        a.fillRateDiffMismatch shouldBe b.fillRateDiffMismatch
+        a.fillRatioDiffMismatch shouldBe b.fillRatioDiffMismatch
+        a.excluded shouldBe b.excluded
+      }
+  }
+
+  def compareRawFeatureFilterResults(rff1: RawFeatureFilterResults, rff2: RawFeatureFilterResults): Unit = {
+    compareRawFeatureFilterConfig(rff1.rawFeatureFilterConfig, rff2.rawFeatureFilterConfig)
+    compareDistributions(rff1.rawFeatureDistributions, rff2.rawFeatureDistributions)
+    compareRawFeatureFilterMetrics(rff1.rawFeatureFilterMetrics, rff2.rawFeatureFilterMetrics)
+    compareExclusionReasons(rff1.exclusionReasons, rff2.exclusionReasons)
   }
 }
 

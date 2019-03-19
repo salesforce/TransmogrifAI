@@ -110,14 +110,12 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       List(Some(0.2), Some(0.0), Some(0.9), Some(0.05), Some(0.0), Some(0.0))
     rawFeatureFilterMetrics.map(_.jsDivergence).dropRight(2) shouldEqual
       List(Some(0.0), Some(0.0), Some(1.0), Some(0.0))
-    println(rawFeatureFilterMetrics.map(_.jsDivergence).drop(4))
     rawFeatureFilterMetrics.map(_.jsDivergence).drop(4).map { jsd =>
       jsd match {
         case Some(x) => x.isNaN
         case _ => false
       }
     } shouldEqual List(true, true)
-
     rawFeatureFilterMetrics.map(_.fillRateDiff) shouldEqual
       List(Some(0.7), Some(0.0), Some(0.0), Some(0.0), Some(0.1), Some(0.05))
     rawFeatureFilterMetrics.map(_.fillRatioDiff) shouldEqual
@@ -308,13 +306,15 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   }
 
   private def assertFeatureDistributions(fd: FilteredRawData, total: Int): Assertion = {
-    fd.rawFeatureFilterResults.featureDistributions.length shouldBe total
+    fd.rawFeatureFilterResults.rawFeatureDistributions.length shouldBe total
     fd.trainingFeatureDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
     fd.trainingFeatureDistributions.length shouldBe total / 2
     fd.scoringFeatureDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
     fd.scoringFeatureDistributions.length shouldBe total / 2
     fd.trainingFeatureDistributions ++ fd.scoringFeatureDistributions shouldBe
-      fd.rawFeatureFilterResults.featureDistributions
+      fd.rawFeatureFilterResults.rawFeatureDistributions
+
+
   }
 
   private def nullLabelCorrelationTest(

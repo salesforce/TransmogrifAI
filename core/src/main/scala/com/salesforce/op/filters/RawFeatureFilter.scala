@@ -57,7 +57,7 @@ import scala.util.Failure
  * This information is then used to compute which raw features should be excluded from the workflow DAG
  * Note: Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
  * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. However, they
- * are accessible from an OpWorkflowModel via getRawFeatureDistributions().
+ * are accessible from an OpWorkflowModel via getRawFeatureFilterResults().
  *
  * @param trainingReader                reader to get the training data
  * @param scoringReader                 reader to get the scoring data for comparison
@@ -315,7 +315,6 @@ class RawFeatureFilter[T]
       message = s"Features excluded because training fill rate did not meet min required ($minFill)"
     )
 
-    // TODO: modify to handle Seq[Option[Boolean]] instead
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
       case Some(corr) => corr > maxCorrelation
       case None => false
@@ -323,7 +322,7 @@ class RawFeatureFilter[T]
 
     logExcluded(
       excluded = trainingNullLabelLeakers,
-      message = s"Features excluded because null indicator correlation (absolute) " +
+      message = "Features excluded because null indicator correlation (absolute) " +
         s"exceeded max allowed ($maxCorrelation)"
     )
 
@@ -548,7 +547,7 @@ class RawFeatureFilter[T]
 
     val rawFeatureFilterResults = RawFeatureFilterResults(
       rawFeatureFilterConfig = rawFeatureFilterConfig,
-      featureDistributions = featureDistributions,
+      rawFeatureDistributions = featureDistributions,
       rawFeatureFilterMetrics = rawFeatureFilterMetrics,
       exclusionReasons = exclusionReasons
     )
@@ -604,12 +603,12 @@ case class FilteredRawData
    * Feature distributions calculated from the training data
    */
   def trainingFeatureDistributions: Seq[FeatureDistribution] =
-    rawFeatureFilterResults.featureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
 
   /**
    * Feature distributions calculated from the scoring data
    */
   def scoringFeatureDistributions: Seq[FeatureDistribution] =
-    rawFeatureFilterResults.featureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
 }

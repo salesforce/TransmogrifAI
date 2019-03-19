@@ -74,9 +74,6 @@ private[op] trait OpWorkflowCore {
   // map keys that were blacklisted from use in dag
   private[op] var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
 
-  // raw feature distributions calculated in raw feature filter
-  private[op] var rawFeatureDistributions: Array[FeatureDistribution] = Array[FeatureDistribution]()
-
   // raw feature filter results calculated in raw feature filter
   private[op] var rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
 
@@ -93,11 +90,6 @@ private[op] trait OpWorkflowCore {
 
   private[op] final def setRawFeatures(features: Array[OPFeature]): this.type = {
     rawFeatures = features
-    this
-  }
-
-  private[op] final def setRawFeatureDistributions(distributions: Array[FeatureDistribution]): this.type = {
-    rawFeatureDistributions = distributions
     this
   }
 
@@ -206,21 +198,21 @@ private[op] trait OpWorkflowCore {
    * Get raw feature distribution information computed on training and scoring data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawFeatureDistributions(): Array[FeatureDistribution] = rawFeatureDistributions
+  final def getRawFeatureDistributions(): Seq[FeatureDistribution] = rawFeatureFilterResults.rawFeatureDistributions
 
   /**
    * Get raw feature distribution information computed on training data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawTrainingFeatureDistributions(): Array[FeatureDistribution] =
-    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+  final def getRawTrainingFeatureDistributions(): Seq[FeatureDistribution] =
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
 
   /**
    * Get raw feature distribution information computed on scoring data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawScoringFeatureDistributions(): Array[FeatureDistribution] =
-    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+  final def getRawScoringFeatureDistributions(): Seq[FeatureDistribution] =
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
 
   /**
    * Get raw feature filter results (filter configuration, feature distributions, and feature exclusion reasons)

@@ -542,7 +542,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
     insights.features.foreach(f =>
-      f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
+      f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Seq.empty)
     )
   }
 

@@ -31,25 +31,55 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.preparators.CorrelationType
+import com.salesforce.op.utils.json.EnumEntrySerializer
+import org.json4s.jackson.Serialization
+import org.json4s.{DefaultFormats, Formats}
+
+import scala.util.Try
 
 /**
  * Contains configuration and results from RawFeatureFilter
  *
  * @param rawFeatureFilterConfig  configuration settings for RawFeatureFilter
- * @param featureDistributions    feature distributions calculated from training data
+ * @param rawFeatureDistributions feature distributions calculated from training data
  * @param rawFeatureFilterMetrics feature metrics calculated by RawFeatureFilter
  * @param exclusionReasons        results of RawFeatureFilter tests (reasons why feature is dropped or not)
  */
 case class RawFeatureFilterResults
 (
   rawFeatureFilterConfig: RawFeatureFilterConfig = RawFeatureFilterConfig(),
-  featureDistributions: Seq[FeatureDistribution] = Seq.empty,
+  rawFeatureDistributions: Seq[FeatureDistribution] = Seq.empty,
   rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
-)
+) extends RawFeatureFilterResultsLike
+
+object RawFeatureFilterResults {
+
+  implicit val jsonFormats: Formats = DefaultFormats +
+    EnumEntrySerializer.json4s[RawFeatureFilterResultsType](RawFeatureFilterResultsType)
+
+  /**
+   * RawFeatureFilterResults to json
+   *
+   * @param results raw feature filter results
+   * @return json array
+   */
+  def toJson(results: RawFeatureFilterResults): String = Serialization.write[RawFeatureFilterResults](results)
+
+  /**
+   * RawFeatureFilterResults from json
+   *
+   * @param json json
+   * @return raw feature filter results
+   */
+  def fromJson(json: String): Try[RawFeatureFilterResults] = Try {
+    Serialization.read[RawFeatureFilterResults](json)
+  }
+
+}
 
 /**
- * Contains configuration settings for RawFeatureFilter
+ * Contains configuration settings for Raw Feature Filter
  */
 case class RawFeatureFilterConfig
 (
@@ -61,7 +91,7 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
-)
+) extends RawFeatureFilterConfigLike
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter
@@ -83,7 +113,7 @@ case class RawFeatureFilterMetrics
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
   fillRatioDiff: Option[Double]
-)
+) extends RawFeatureFilterMetricsLike
 
 /**
  * Contains results of Raw Feature Filter tests for a given feature
@@ -107,4 +137,4 @@ case class ExclusionReasons
   fillRateDiffMismatch: Boolean,
   fillRatioDiffMismatch: Boolean,
   excluded: Boolean
-)
+) extends ExclusionReasonsLike

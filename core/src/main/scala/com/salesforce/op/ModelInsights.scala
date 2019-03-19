@@ -424,10 +424,13 @@ case object ModelInsights {
   /**
    * Function to extract the model summary info from the stages used to create the selected model output feature
    *
-   * @param stages         stages used to make the feature
-   * @param rawFeatures    raw features in the workflow
-   * @param trainingParams parameters used to create the workflow model
-   * @return model insight summary
+   * @param stages                  stages used to make the feature
+   * @param rawFeatures             raw features in the workflow
+   * @param trainingParams          parameters used to create the workflow model
+   * @param blacklistedFeatures     blacklisted features from use in DAG
+   * @param blacklistedMapKeys      blacklisted map keys from use in DAG
+   * @param rawFeatureFilterResults results of raw feature filter
+   * @return
    */
   private[op] def extractFromStages(
     stages: Array[OPStage],
@@ -435,7 +438,6 @@ case object ModelInsights {
     trainingParams: OpParams,
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureDistributions: Array[FeatureDistribution],
     rawFeatureFilterResults: RawFeatureFilterResults
   ): ModelInsights = {
     val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
@@ -483,7 +485,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureDistributions, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults.rawFeatureDistributions, rawFeatureFilterResults),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = getStageInfo(stages)
@@ -532,7 +534,7 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureDistributions: Array[FeatureDistribution],
+    rawFeatureDistributions: Seq[FeatureDistribution],
     rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {

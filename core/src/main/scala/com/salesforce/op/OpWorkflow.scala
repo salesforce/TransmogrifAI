@@ -239,8 +239,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           rf.generateFilteredRaw(rawFeatures, parameters)
 
         setRawFeatureFilterResults(rawFeatureFilterResults)
-        setRawFeatureDistributions(rawFeatureFilterResults.featureDistributions.toArray)
-        setBlacklist(featuresToDrop, rawFeatureFilterResults.featureDistributions)
+        setBlacklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
         setBlacklistMapKeys(mapKeysToDrop)
         cleanedData
     }
@@ -352,7 +351,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         .setParameters(getParameters())
         .setBlacklist(getBlacklist())
         .setBlacklistMapKeys(getBlacklistMapKeys())
-        .setRawFeatureDistributions(getRawFeatureDistributions())
+        .setRawFeatureFilterResults(getRawFeatureFilterResults())
 
     reader.map(model.setReader).getOrElse(model)
   }
