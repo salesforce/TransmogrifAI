@@ -38,7 +38,6 @@ import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSel
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
-import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.{OpParams, OpWorkflow}
@@ -117,4 +116,5 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
       )
     } score shouldBe expected
   }
+
 }
