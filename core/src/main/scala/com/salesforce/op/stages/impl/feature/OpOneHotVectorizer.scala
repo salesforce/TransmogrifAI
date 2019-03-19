@@ -37,13 +37,13 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HLL, HyperLogLogMonoid}
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -77,9 +77,18 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanText = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
-    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
 
-    val uniqueCounts = countUniques(dataset, $(bits))
+    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+    implicit val spark = dataset.sparkSession
+    implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
+
+    // Approach: 1 - Aggregator on dataset
+    // val hll = SequenceAggregators.HLLSeq[T#Value](size = inN.length, bits = $(bits))
+    // val uniqueCounts: Seq[HLL] = dataset.select(hll.toColumn).first()
+
+    // Approach: 2 - Aggregating on RDD
+    val uniqueCounts = countUniques(dataset, size = inN.length, bits = $(bits))
+
     val n = dataset.count()
     val percentFilter = uniqueCounts.map(_.estimatedSize / n < $(maxPercentageCardinality))
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
@@ -239,20 +248,20 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
  */
 private[op] trait OneHotFun {
 
-  protected def countUniques[V](dataset: Dataset[Seq[V]], bits: Int)(implicit  classTag: ClassTag[V]): Seq[HLL] = {
+  protected def countUniques[V : ClassTag](dataset: Dataset[Seq[V]], size: Int, bits: Int)
+    (implicit kryo: KryoSerializer): Seq[HLL] = {
     val rdd = dataset.rdd
     val hll = new HyperLogLogMonoid(bits)
-    implicit val hllSeqEnc: Encoder[Seq[HLL]] = org.apache.spark.sql.Encoders.kryo[Seq[HLL]]
+    val zero = Seq.fill(size)(hll.zero)
 
-    val countUniques: Seq[HLL] =
-      if (rdd.isEmpty()) Seq.empty[HLL] else dataset.map(_.map(v => {
-        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
-        hll.toHLL(kryoSerializer.serialize(v).array())
-      })).reduce{
-        (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }}
+    val countUniques: Seq[HLL] = {
+      rdd.mapPartitions { it =>
+        val k = kryo.newInstance()
+        it.map(_.map(v => hll.create(k.serialize(v).array())))
+      }.fold(zero) { (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 } }
+    }
 
     countUniques
-
   }
 
   protected def makeVectorColumnMetadata(
