@@ -81,7 +81,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.parameters.toJson(pretty = false)) ~
       (FN.TrainParameters.entryName -> model.trainingParams.toJson(pretty = false)) ~
-      (FN.RawFeatureFilterResultsFieldName.entryName -> RawFeatureFilterResults.toJson(model.getRawFeatureFilterResults()))
+      (FN.RawFeatureFilterResultsFieldName.entryName ->
+        RawFeatureFilterResults.toJson(model.getRawFeatureFilterResults()))
   }
 
   private def resultFeaturesJArray(): JArray =
