@@ -96,8 +96,8 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       .setFeatures(resultFeatures)
       .setParameters(params)
       .setBlacklist(blacklist)
-      .setRawFeatureFilterResults( // for backwards compatibility
-        if (results.rawFeatureDistributions.nonEmpty) {
+      .setRawFeatureFilterResults(
+        if (results.rawFeatureDistributions.nonEmpty) { // for backwards compatibility
           results
         }
         else {
