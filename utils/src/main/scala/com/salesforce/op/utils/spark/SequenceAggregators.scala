@@ -66,8 +66,8 @@ object SequenceAggregators {
 
     new Aggregator[Seq[T], Seq[HLL], Seq[HLL]] {
       val zero: Seq[HLL] = Seq.fill(size)(hll.zero)
-      private val k = kryo.newInstance()
       def reduce(b: Seq[HLL], a: Seq[T]): Seq[HLL] = {
+        lazy val k = kryo.newInstance()
         val av = a.map(v => hll.create(k.serialize(v).array()))
         merge(b, av)
       }
