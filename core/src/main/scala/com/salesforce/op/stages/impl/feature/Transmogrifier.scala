@@ -78,7 +78,7 @@ private[op] trait TransmogrifierDefaults {
   val TrackInvalid: Boolean = false
   val TrackTextLen: Boolean = false
   val MinDocFrequency: Int = 0
-  val MaxPercentCardinality = 1.0
+  val MaxPercentCardinality = OpOneHotVectorizer.MaxPctCardinality
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain

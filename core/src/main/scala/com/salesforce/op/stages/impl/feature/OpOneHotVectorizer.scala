@@ -37,13 +37,12 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HLL, HyperLogLogMonoid}
-import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.Dataset
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
