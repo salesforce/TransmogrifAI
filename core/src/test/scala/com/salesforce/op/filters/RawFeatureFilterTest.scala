@@ -31,14 +31,22 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.OpParams
-import com.salesforce.op.features.{FeatureDistributionType, OPFeature}
-import com.salesforce.op.readers.DataFrameFieldNames
-import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
+import com.salesforce.op.features.{Feature, FeatureDistributionType, OPFeature}
+import com.salesforce.op.features.types._
+import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
+import com.salesforce.op.test._
+import com.salesforce.op.testkit._
+import com.salesforce.op.testkit.RandomData
+import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
 import com.salesforce.op.utils.spark.RichDataset._
 import com.twitter.algebird.Operators._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.junit.runner.RunWith
 import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
+
+import scala.reflect.runtime.universe.TypeTag
 
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
@@ -134,6 +142,213 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (excludedBothAllF, excludedBothAllMK) = filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
     excludedBothAllMK shouldBe empty
+  }
+
+  /**
+   * Generates a random dataframe and OPFeatures from supplied data generators and their types. The names of the
+   * columns of the dataframe are fixed to be myF1, myF2, myF3, and myF4 so that the same OPFeatures can be used to
+   * refer to columns in either dataframe.
+   *
+   * @param f1        Random data generator for feature 1 (type F1)
+   * @param f2        Random data generator for feature 2 (type F2)
+   * @param f3        Random data generator for feature 3 (type F3)
+   * @param f4        Random data generator for feature 4 (type F4)
+   * @param numRows   Number of rows to generate
+   * @tparam F1       Type of feature 1
+   * @tparam F2       Type of feature 2
+   * @tparam F3       Type of feature 3
+   * @tparam F4       Type of feature 4
+   * @return          Tuple containing the generated dataframe and each individual OPFeature
+   */
+  def generateRandomDfAndFeatures[
+    F1 <: FeatureType : TypeTag,
+    F2 <: FeatureType : TypeTag,
+    F3 <: FeatureType : TypeTag,
+    F4 <: FeatureType : TypeTag
+  ](f1: RandomData[F1], f2: RandomData[F2], f3: RandomData[F3], f4: RandomData[F4], numRows: Int):
+  (Dataset[Row], Feature[F1], Feature[F2], Feature[F3], Feature[F4])  = {
+
+    val f1Data = f1.limit(numRows)
+    val f2Data = f2.limit(numRows)
+    val f3Data = f3.limit(numRows)
+    val f4Data = f4.limit(numRows)
+
+    // Combine the data into a single tuple for each row
+    val generatedTrainData: Seq[(F1, F2, F3, F4)] = f1Data.zip(f2Data).zip(f3Data).zip(f4Data).map {
+      case (((a, b), c), d) => (a, b, c, d)
+    }
+
+    TestFeatureBuilder[F1, F2, F3, F4]("myF1", "myF2", "myF3", "myF4", generatedTrainData)
+  }
+
+  it should "use a simple function to generate random data" in {
+    val (testDf, f1, f2, f3, f4) = generateRandomDfAndFeatures[City, Country, PickList, Currency](
+      RandomText.cities.withProbabilityOfEmpty(0.2),
+      RandomText.countries.withProbabilityOfEmpty(0.2),
+      RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I")).withProbabilityOfEmpty(0.2),
+      RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.2),
+      1000
+    )
+
+    testDf.show(10)
+  }
+
+  it should "clean a dataframe filled with randomly generated data" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
+    val countryGenerator = RandomText.countries.withProbabilityOfEmpty(0.2)
+    val pickListGenerator = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+      .withProbabilityOfEmpty(0.2)
+    val currencyGenerator = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, trainCity, trainCountry, trainPickList, trainCurrency) =
+      generateRandomDfAndFeatures[City, Country, PickList, Currency](
+        cityGenerator,
+        countryGenerator,
+        pickListGenerator,
+        currencyGenerator.withProbabilityOfEmpty(0.2),
+        1000
+      )
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _, _) = generateRandomDfAndFeatures[City, Country, PickList, Currency](
+        cityGenerator,
+        countryGenerator,
+        pickListGenerator,
+        currencyGenerator.withProbabilityOfEmpty(1.0),
+        1000
+      )
+
+    // Define the readers
+    val trainReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(trainDf)
+    }
+    val scoreReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(scoreDf)
+    }
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(trainCity, trainCountry, trainPickList, trainCurrency)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+
+    // Check that the only feature that was dropped was the currency feature
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    filteredRawData.featuresToDrop.length shouldBe 1
+    filteredRawData.featuresToDrop.head.name.startsWith("myF4") shouldBe true
+  }
+
+  it should "not remove any features when the training and scoring sets are identical" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
+    val countryGenerator = RandomText.countries.withProbabilityOfEmpty(0.2)
+    val pickListGenerator = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+      .withProbabilityOfEmpty(0.2)
+    val currencyGenerator = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, trainCity, trainCountry, trainPickList, trainCurrency) =
+    generateRandomDfAndFeatures[City, Country, PickList, Currency](
+      cityGenerator,
+      countryGenerator,
+      pickListGenerator,
+      currencyGenerator.withProbabilityOfEmpty(0.2),
+      1000
+    )
+
+    // Define the readers
+    val trainReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(trainDf)
+    }
+    val scoreReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(trainDf)
+    }
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(trainCity, trainCountry, trainPickList, trainCurrency)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    filteredRawData.featuresToDrop shouldBe empty
+    filteredRawData.mapKeysToDrop shouldBe empty
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs
+      trainReader.generateDataFrame(features).schema.fields
+
+    assertFeatureDistributions(filteredRawData, total = features.length * 2)
+
+    // Also check that the all the feature distributions are the same between the training and scoring sets
+    filteredRawData.trainingFeatureDistributions.zip(filteredRawData.trainingFeatureDistributions).foreach{
+      case (train, score) =>
+        train.name shouldBe score.name
+        train.key shouldBe score.key
+        train.count shouldBe score.count
+        train.nulls shouldBe score.nulls
+        train.distribution shouldBe score.distribution
+        train.summaryInfo shouldBe score.summaryInfo
+    }
+  }
+
+  it should "correctly clean the dataframe due to min fill rates" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val stateGenerator = RandomText.states.withProbabilityOfEmpty(0.2)
+    val pickListGenerator = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+      .withProbabilityOfEmpty(0.2)
+    val realMapGenerator = RandomMap.ofReals(RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0), 0, 4)
+      .withKeys ("customReal" +)
+    val binaryMapGenerator = RandomMap.ofBinaries(probabilityOfSuccess = 0.25, 0, 4)
+      .withKeys ("customBinary" +)
+
+    val currencyGenerator = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
+    val c1 = currencyGenerator.limit(1000)
+    val c2 = currencyGenerator.limit(1000)
+    val c3 = currencyGenerator.limit(1000)
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3).asRaw(isResponse = false)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, trainState, trainPickList, trainRealMap, trainBinaryMap) =
+    generateRandomDfAndFeatures[State, PickList, RealMap, BinaryMap](
+      stateGenerator,
+      pickListGenerator,
+      realMapGenerator,
+      binaryMapGenerator,
+      1000
+    )
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _, _) = generateRandomDfAndFeatures[City, Country, PickList, Currency](
+      cityGenerator,
+      countryGenerator,
+      pickListGenerator,
+      currencyGenerator.withProbabilityOfEmpty(1.0),
+      1000
+    )
+
+    // Define the readers
+    val trainReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(trainDf)
+    }
+    val scoreReader = new CustomReader[Row](ReaderKey.randomKey) {
+      def readFn(params: OpParams)(implicit spark: SparkSession): Either[RDD[Row], Dataset[Row]] = Right(scoreDf)
+    }
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(trainCity, trainCountry, trainPickList, trainCurrency)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+
+    // Check that the only feature that was dropped was the currency feature
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    filteredRawData.featuresToDrop.length shouldBe 1
+    filteredRawData.featuresToDrop.head.name.startsWith("myF4") shouldBe true
   }
 
   it should "correctly clean the dataframe returned and give the features to blacklist" in {
