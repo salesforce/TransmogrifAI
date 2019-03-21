@@ -30,16 +30,10 @@
 
 package com.salesforce.op.utils.spark
 
-import com.twitter.algebird.{HLL, HyperLogLogMonoid}
 import com.twitter.algebird.Operators._
-import org.apache.spark.SparkConf
-import org.apache.spark.mllib.tree.configuration.FeatureType.FeatureType
-import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.expressions.Aggregator
-import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
-
-import scala.reflect.ClassTag
+import org.apache.spark.sql.{Encoder, Encoders}
 
 /**
  * A factory for Spark sequence aggregators
@@ -51,35 +45,7 @@ object SequenceAggregators {
   // TODO: try using Algebird monoid to avoid code repetition below
 
   /**
-   * HyperLogLog sequence aggregator
-   *
-   * @param size the size of the Sequence
-   * @param bits number of bits for HyperLogLog
-   * @param kryo kryo serializer is used to produce
-   * @tparam T
-   * @return spark aggregator
-   */
-  def HLLSeq[T : ClassTag](size: Int, bits: Int)
-    (implicit kryo: KryoSerializer): Aggregator[Seq[T], Seq[HLL], Seq[HLL]] = {
-    val hllEncoder = Encoders.kryo[Seq[HLL]]
-    val hll = new HyperLogLogMonoid(bits)
-
-    new Aggregator[Seq[T], Seq[HLL], Seq[HLL]] {
-      val zero: Seq[HLL] = Seq.fill(size)(hll.zero)
-      def reduce(b: Seq[HLL], a: Seq[T]): Seq[HLL] = {
-        lazy val k = kryo.newInstance()
-        val av = a.map(v => hll.create(k.serialize(v).array()))
-        merge(b, av)
-      }
-      def merge(b1: Seq[HLL], b2: Seq[HLL]): Seq[HLL] = b1.zip(b2).map { case (h1, h2) => h1 + h2 }
-      def finish(reduction: Seq[HLL]): Seq[HLL] = reduction
-      def bufferEncoder: Encoder[Seq[HLL]] = hllEncoder
-      def outputEncoder: Encoder[Seq[HLL]] = hllEncoder
-    }
-  }
-
-  /**
-   * Creates an aggregator that sums a Dataset column of type Seq[T: Numeric]
+   * Creates a TypedColumn that sums a Dataset column of type Seq[T: Numeric]
    *
    * @param size the size of the Sequence
    * @tparam T numeric type
@@ -102,7 +68,7 @@ object SequenceAggregators {
   type SeqTupD = Seq[(Double, Int)]
 
   /**
-   * Creates an aggregator that computes mean on a Dataset column of type Seq[Option[Double]]
+   * Creates a TypedColumn that computes mean on a Dataset column of type Seq[Option[Double]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -126,7 +92,7 @@ object SequenceAggregators {
   type SeqMapLL = Seq[Map[Long, Long]]
 
   /**
-   * Creates an aggregator that computes mode on a Dataset column of type Seq[Option[Long]]
+   * Creates a TypedColumn that computes mode on a Dataset column of type Seq[Option[Long]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -168,7 +134,7 @@ object SequenceAggregators {
   type SeqMapMap = Seq[MapMap]
 
   /**
-   * Creates an aggregator that sums a Dataset column of type Seq[Map[String, Map[String, Long]]] such that the maps are
+   * Creates a TypedColumn that sums a Dataset column of type Seq[Map[String, Map[String, Long]]] such that the maps are
    * summed with the keys preserved and the values resulting are the sum of the values for the two maps
    *
    * @param size the size of the Sequence
@@ -188,7 +154,7 @@ object SequenceAggregators {
   type SeqSet = Seq[Set[String]]
 
   /**
-   * Creates an aggregator that sums a Dataset column of type Seq[Set[String]]
+   * Creates a TypedColumn that sums a Dataset column of type Seq[Set[String]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -208,7 +174,7 @@ object SequenceAggregators {
   type SeqMapTuple = Seq[Map[String, (Double, Int)]]
 
   /**
-   * Creates an aggregator that computes the means by key of a Dataset column of type Seq[Map[String, Double]].
+   * Creates a TypedColumn that computes the means by key of a Dataset column of type Seq[Map[String, Double]].
    * Each map has a separate mean by key computed.
    * Because each map does not have to have all the possible keys,
    * the element counts for each map's keys can all be different.
@@ -235,7 +201,7 @@ object SequenceAggregators {
   type SeqMapMapLong = Seq[Map[String, Map[Long, Long]]]
 
   /**
-   * Creates an aggregator that computes the modes by key of a Dataset column of type Seq[Map[String, Long]].
+   * Creates a TypedColumn that computes the modes by key of a Dataset column of type Seq[Map[String, Long]].
    * Each map has a separate mode by key computed.
    * Because each map does not have to have all the possible keys,
    * the element counts for each map's keys can all be different.

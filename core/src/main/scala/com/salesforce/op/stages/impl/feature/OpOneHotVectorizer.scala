@@ -81,11 +81,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     implicit val spark = dataset.sparkSession
     implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
 
-    // Approach: 1 - Aggregator on dataset
-    // val hll = SequenceAggregators.HLLSeq[T#Value](size = inN.length, bits = $(bits))
-    // val uniqueCounts: Seq[HLL] = dataset.select(hll.toColumn).first()
-
-    // Approach: 2 - Aggregating on RDD
+    // Aggregating on RDD
     val uniqueCounts = countUniques(dataset, size = inN.length, bits = $(bits))
 
     val n = dataset.count()
