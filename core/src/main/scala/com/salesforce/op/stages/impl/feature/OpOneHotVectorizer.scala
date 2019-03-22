@@ -82,9 +82,8 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
 
     // Aggregating on RDD
-    val uniqueCounts = countUniques(dataset, size = inN.length, bits = $(bits))
+    val (uniqueCounts, n) = countUniques(dataset, size = inN.length, bits = $(bits))
 
-    val n = dataset.count()
     val percentFilter = uniqueCounts.map(_.estimatedSize / n < $(maxPercentageCardinality))
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
     val filteredRDD = rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
@@ -244,16 +243,17 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
 private[op] trait OneHotFun {
 
   protected def countUniques[V : ClassTag](dataset: Dataset[Seq[V]], size: Int, bits: Int)
-    (implicit kryo: KryoSerializer): Seq[HLL] = {
+    (implicit kryo: KryoSerializer): (Seq[HLL], Long) = {
     val rdd = dataset.rdd
     val hll = new HyperLogLogMonoid(bits)
     val zero = Seq.fill(size)(hll.zero)
 
-    val countUniques: Seq[HLL] = {
+    val countUniques: (Seq[HLL], Long) = {
       rdd.mapPartitions { it =>
         val k = kryo.newInstance()
         it.map(_.map(v => hll.create(k.serialize(v).array())))
-      }.fold(zero) { (a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 } }
+      }.map(_ -> 1L).fold(zero -> 0L) {case ((a, c1), (b, c2)) => a.zip(b).map {
+        case (m1, m2) => m1 + m2 } -> (c1 + c2) }
     }
 
     countUniques

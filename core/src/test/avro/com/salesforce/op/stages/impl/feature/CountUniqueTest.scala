@@ -55,9 +55,10 @@ class CountUniqueTest extends FlatSpec with TestSparkContext with OneHotFun {
 
   Spec[OpOneHotVectorizer[_]] should "count uniques" in {
     val m = data.first.size
-    val uniqueCounts = countUniques(data, size = m, bits = bits).map(_.estimatedSize.toInt)
+    val (uniqueCounts, n) = countUniques(data, size = m, bits = bits)
     val expected = countUniquesManually(data)
-    uniqueCounts should contain theSameElementsAs expected
+    uniqueCounts.map(_.estimatedSize.toInt) should contain theSameElementsAs expected
+    n shouldBe data.count()
   }
 
 

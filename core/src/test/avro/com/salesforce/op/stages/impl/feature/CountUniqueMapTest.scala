@@ -56,10 +56,10 @@ class CountUniqueMapTest extends FlatSpec with TestSparkContext with CountUnique
 
   Spec[MapStringPivotHelper] should "count unique maps" in {
     val m = mapData.first.size
-    val uniqueCounts = countMapUniques(mapData, size = m, bits = bits)
-      .flatMap(_.map { case (_, v) => v.estimatedSize.toInt })
+    val (uniqueCounts, n) = countMapUniques(mapData, size = m, bits = bits)
+    n shouldBe mapData.count()
     val expected = countUniquesMapManually(mapData)
-    uniqueCounts should contain theSameElementsAs expected
+    uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) should contain theSameElementsAs expected
   }
 
 

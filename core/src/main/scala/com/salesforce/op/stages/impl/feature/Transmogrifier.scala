@@ -528,7 +528,7 @@ trait CountUniqueMapFun {
   type HLLMap = Map[String, HLL]
   protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
   protected def countMapUniques[V: ClassTag, T <: OPMap[V]](in: Dataset[Seq[T#Value]], size: Int, bits: Int)
-    (implicit kryo: KryoSerializer): Seq[HLLMap] = {
+    (implicit kryo: KryoSerializer): (Seq[HLLMap], Long) = {
     val rdd = in.rdd
     val hll = new HyperLogLogMonoid(bits)
     val hllRDD = rdd.mapPartitions { it =>
@@ -536,13 +536,13 @@ trait CountUniqueMapFun {
       it.map(_.map(_.map { case (k, v) =>
         k -> hll.create(ks.serialize(v).array())
       }))
-    }
+    }.map(_ -> 1L)
     val zero = Seq.fill(size)(Map.empty[String, HLL])
-    val countMapUniques: Seq[HLLMap] = hllRDD.fold(zero) { (a, b) =>
+    val countMapUniques: (Seq[HLLMap], Long) = hllRDD.fold(zero -> 0L) {case  ((a, c1), (b, c2)) =>
       a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
         case (k, v) => k -> (v + m1.getOrElse(k, hll.zero))
       }
-      }
+      } -> (c1 + c2)
     }
     countMapUniques
   }
