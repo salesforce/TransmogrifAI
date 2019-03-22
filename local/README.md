@@ -39,6 +39,6 @@ val scoreFn = new OpWorkflowRunnerLocal(workflow).score(opParams)
 Below is an example of measured scoring performance on 6m records with 10 fields and 12 transformations applied.
 Executed on MacBook Pro i7 3.5Ghz in a single thread.
 ```
-Scored 6,000,000 records in 239s
+Scored 6,000,000 records in 710s
 Average time per record: 0.105ms
 ```
