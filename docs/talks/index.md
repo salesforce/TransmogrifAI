@@ -1,5 +1,9 @@
 # Talks
 
+**2019**
+* [Automated Machine Learning with TransmogrifAI](https://vaultanalytics.com/podcast/automated-machine-learning-with-transmogrifai/), Till Bergmann, Data Crunch Podcast
+* [Automated ML Pipelines For Unseen Customer Data](https://www.youtube.com/watch?v=IZyceNOSitI), Kevin Moore, PAPIs.io, [Slides](https://drive.google.com/file/d/1MStBS4tR1yuklCuDCrZHrejNAFk1j_k9/view)
+
 **2018**
 * [AutoML: The Assembly Line of Machine Learning](http://www.dataengconf.com/automl-the-assembly-line-of-machine-learning), Mayukh Bhaowal, DataEngConf
 * [The Black Swan of Perfectly Interpretable Models](https://www.infoq.com/presentations/salesforce-einstein-ml), Leah McGuire and Mayukh Bhaowal, QCon.ai
