@@ -35,7 +35,6 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
-import scala.reflect.internal.{MissingRequirementError, Required}
 
 @RunWith(classOf[JUnitRunner])
 class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
@@ -80,14 +79,14 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
 
   it should "work for all param types" in {
     val xgbParams = new RandomParamBuilder()
-      .subset(xgb.checkpointPath, Seq("a", "b"))//string
-      .uniform(xgb.alpha, 0, 1)//double
-      .uniform(xgb.missing, 0, 100)//float
-      .uniform(xgb.checkpointInterval, 2, 5)//int
-      .uniform(xgb.seed, 5, 1000)//long
-      .uniform(xgb.useExternalMemory)//boolean
-      .exponential(xgb.baseScore, 0.0001, 1)//double
-      .exponential(xgb.missing, 0.000001F, 1) //float - overwrites first call
+      .subset(xgb.checkpointPath, Seq("a", "b")) // string
+      .uniform(xgb.alpha, 0, 1) // double
+      .uniform(xgb.missing, 0, 100) // float
+      .uniform(xgb.checkpointInterval, 2, 5) // int
+      .uniform(xgb.seed, 5, 1000) // long
+      .uniform(xgb.useExternalMemory) // boolean
+      .exponential(xgb.baseScore, 0.0001, 1) // double
+      .exponential(xgb.missing, 0.000001F, 1) // float - overwrites first call
       .build(2)
 
     xgbParams.length shouldBe 2

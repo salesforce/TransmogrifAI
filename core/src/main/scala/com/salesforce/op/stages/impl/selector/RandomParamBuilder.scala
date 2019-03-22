@@ -167,7 +167,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    * @return An array of param maps containing randomly generated values for each param specified
    */
   def build(totalParams: Int): Array[ParamMap] = {
-    val allParams = for { _  <- 0 until totalParams } yield {
+    val allParams = for { _ <- 0 until totalParams } yield {
       val params = new ParamMap()
       paramDefs.foreach {
         case (param, (Subset, _, _, seq: Seq[_])) =>
