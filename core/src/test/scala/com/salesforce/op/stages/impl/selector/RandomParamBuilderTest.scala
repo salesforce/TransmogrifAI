@@ -35,6 +35,8 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.reflect.internal.{MissingRequirementError, Required}
+
 @RunWith(classOf[JUnitRunner])
 class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
 
@@ -43,7 +45,7 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
   private val xgb = new OpXGBoostClassifier()
 
 
-  it should "build a param grid of the desired length with one param variable" in {
+  Spec[RandomParamBuilder] should "build a param grid of the desired length with one param variable" in {
     val min = 0.00001
     val max = 10
     val lrParams = new RandomParamBuilder()
@@ -94,10 +96,10 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       xgb.checkpointInterval, xgb.seed, xgb.useExternalMemory, xgb.baseScore))
   }
 
-  it should "throw an assert error if an improper min value is passed in for exponential scale" in {
-    intercept[AssertionError]( new RandomParamBuilder()
+  it should "throw a requirement error if an improper min value is passed in for exponential scale" in {
+    intercept[IllegalArgumentException]( new RandomParamBuilder()
       .exponential(xgb.baseScore, 0, 1)).getMessage() shouldBe
-      "assertion failed: Min value must be greater than zero for exponential distribution to work"
+      "requirement failed: Min value must be greater than zero for exponential distribution to work"
   }
 
 }
