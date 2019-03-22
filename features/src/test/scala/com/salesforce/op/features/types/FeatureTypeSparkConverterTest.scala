@@ -86,6 +86,13 @@ class FeatureTypeSparkConverterTest
     Map("1" -> Seq(1.0, 5.0, 6.0)).toGeolocationMap -> Map("1" -> MWrappedArray.make(Array(1.0, 5.0, 6.0)))
   )
 
+  val localMultiPickListValues = Table("mp",
+    (Seq("a", "b"), new MultiPickList(Seq("a", "b").toSet)),
+    (Nil, new MultiPickList(Set.empty[String])),
+    (null, new MultiPickList(Set.empty[String]))
+  )
+  val localMultiPickListMapValues = Seq(Map("k0" -> Seq("a", "b", "c")))
+
   property("is a feature type converter") {
     forAll(featureTypeConverters) { ft => ft shouldBe a[FeatureTypeSparkConverter[_]] }
   }
@@ -202,6 +209,17 @@ class FeatureTypeSparkConverterTest
   property("convert feature type map values to spark values") {
     forAll(featureTypeMapValues) { case (featureValue, sparkValue) =>
       FeatureTypeSparkConverter.toSpark(featureValue) shouldEqual sparkValue
+    }
+  }
+  property("convert string seq to MultiPickList feature type") {
+    forAll(localMultiPickListValues) { case (local, expected) =>
+      FeatureTypeSparkConverter[MultiPickList]().fromSpark(local) shouldBe expected
+    }
+  }
+  property("convert multi-picklist map to MultiPickListMap feature type") {
+    localMultiPickListMapValues.foreach { local =>
+      val expected = new MultiPickListMap(local.map{ case (k, v) => k -> v.toSet })
+      FeatureTypeSparkConverter[MultiPickListMap]().fromSpark(local) shouldBe expected
     }
   }
 }
