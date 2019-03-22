@@ -23,8 +23,8 @@ Then in your code you may load and score models as follows:
 import com.salesforce.op.local._
 
 val model = workflow.loadModel("/path/to/model")
-val scoreFn = model.scoreFunction
-val rawData = Seq(Map("age" -> 18, "name" -> "Peter"), Map("name" -> "John"))
+val scoreFn = model.scoreFunction // create score function once and then use it indefinitely
+val rawData = Seq(Map("name" -> "Peter", "age" -> 18), Map("name" -> "John", "age" -> 23))
 val scores = rawData.map(scoreFn)
 ```
 
