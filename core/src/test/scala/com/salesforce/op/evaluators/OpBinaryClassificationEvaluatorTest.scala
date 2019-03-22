@@ -161,9 +161,8 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     f1 shouldBe metrics.F1
     1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
 
-    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
-    Some(overallLiftRate) shouldBe metrics.LiftMetrics.head.average
-    Some(overallLiftRate) shouldBe metrics.LiftMetrics.last.average
+    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.liftMetricBands.size
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.overallRate
   }
 
   it should "evaluate the metrics with one prediction input" in {
@@ -172,7 +171,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       transformedData2.select(prediction.name, test_label.name).rdd
-        .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
+        .map(r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)))
     )
     val overallLiftRate = (tp + fn) / (tp + tn + fp + fn)
 
@@ -185,9 +184,8 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.Recall shouldBe recall
     metrics.F1 shouldBe f1
 
-    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.size
-    Some(overallLiftRate) shouldBe metrics.LiftMetrics.head.average
-    Some(overallLiftRate) shouldBe metrics.LiftMetrics.last.average
+    LiftEvaluator.getDefaultScoreBands(sc.emptyRDD).size shouldBe metrics.LiftMetrics.liftMetricBands.size
+    Some(overallLiftRate) shouldBe metrics.LiftMetrics.overallRate
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
@@ -205,12 +203,14 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
 
-    metricsZero.LiftMetrics.head.rate shouldBe Some(0.0)
-    metricsZero.LiftMetrics.head.yesCount shouldBe 0L
-    metricsZero.LiftMetrics.head.noCount shouldBe 1L
-    metricsZero.LiftMetrics.tail.head.rate shouldBe None
+    metricsZero.LiftMetrics.liftMetricBands.head.rate shouldBe Some(0.0)
+    metricsZero.LiftMetrics.liftMetricBands.head.yesCount shouldBe 0L
+    metricsZero.LiftMetrics.liftMetricBands.head.noCount shouldBe 1L
+    metricsZero.LiftMetrics.liftMetricBands.tail.head.rate shouldBe None
+    metricsZero.LiftMetrics.threshold shouldBe LiftMetrics.defaultThreshold
+    metricsZero.LiftMetrics.overallRate shouldBe Some(0.0)
+    metricsZero.LiftMetrics.liftRatio shouldBe LiftMetrics.defaultLiftRatio
   }
-
 
 
   it should "evaluate the metrics on dataset with only the label and prediction 1" in {
@@ -226,10 +226,13 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Recall shouldBe 1.0
     metricsOne.Error shouldBe 0.0
 
-    metricsOne.LiftMetrics.head.rate shouldBe Some(1.0)
-    metricsOne.LiftMetrics.head.yesCount shouldBe 1L
-    metricsOne.LiftMetrics.head.noCount shouldBe 0L
-    metricsOne.LiftMetrics.tail.head.rate shouldBe None
+    metricsOne.LiftMetrics.liftMetricBands.head.rate shouldBe Some(1.0)
+    metricsOne.LiftMetrics.liftMetricBands.head.yesCount shouldBe 1L
+    metricsOne.LiftMetrics.liftMetricBands.head.noCount shouldBe 0L
+    metricsOne.LiftMetrics.liftMetricBands.tail.head.rate shouldBe None
+    metricsOne.LiftMetrics.threshold shouldBe LiftMetrics.defaultThreshold
+    metricsOne.LiftMetrics.overallRate shouldBe Some(1.0)
+    metricsOne.LiftMetrics.liftRatio shouldBe 1.0
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {

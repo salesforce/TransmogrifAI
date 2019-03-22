@@ -34,7 +34,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.salesforce.op.utils.spark.RichEvaluator._
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
-import com.salesforce.op.evaluators.LiftEvaluator.LiftMetricBand
 import org.apache.spark.ml.evaluation.{BinaryClassificationEvaluator, MulticlassClassificationEvaluator}
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.mllib.evaluation.{MulticlassMetrics, BinaryClassificationMetrics => SparkMLBinaryClassificationMetrics}
@@ -49,9 +48,9 @@ import org.slf4j.LoggerFactory
  * The metrics are AUROC, AUPR, Precision, Recall, F1 and Error Rate
  * Default evaluation returns AUROC
  *
- * @param name name of default metric
+ * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
- * @param uid uid for instance
+ * @param uid            uid for instance
  */
 
 private[op] class OpBinaryClassificationEvaluator
@@ -84,7 +83,7 @@ private[op] class OpBinaryClassificationEvaluator
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Seq(), Seq(), Seq(), Seq(), Seq())
+        Seq(), Seq(), Seq(), Seq(), LiftMetrics.empty)
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -115,7 +114,7 @@ private[op] class OpBinaryClassificationEvaluator
       val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
-      val liftMetrics = LiftEvaluator(scoreAndLabels = scoreAndLabels)
+      val liftMetrics = new LiftEvaluator().evaluateScoreAndLabels(scoreAndLabels = scoreAndLabels)
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
         AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
@@ -128,10 +127,10 @@ private[op] class OpBinaryClassificationEvaluator
   }
 
   final protected def getBinaryEvaluatorMetric(
-    metricName: ClassificationEvalMetric,
-    dataset: Dataset[_],
-    default: => Double
-  ): Double = {
+                                                metricName: ClassificationEvalMetric,
+                                                dataset: Dataset[_],
+                                                default: => Double
+                                              ): Double = {
     import dataset.sparkSession.implicits._
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
@@ -200,9 +199,9 @@ case class BinaryClassificationMetrics
   recallByThreshold: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   falsePositiveRateByThreshold: Seq[Double],
-  @JsonDeserialize(contentAs = classOf[LiftMetricBand])
-  LiftMetrics: Seq[LiftMetricBand]
+  LiftMetrics: LiftMetrics
 ) extends EvaluationMetrics {
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
+
   def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
 }

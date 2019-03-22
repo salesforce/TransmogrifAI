@@ -30,7 +30,90 @@
 
 package com.salesforce.op.evaluators
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize
+import com.salesforce.op.UID
 import org.apache.spark.rdd.RDD
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.DoubleType
+import org.slf4j.LoggerFactory
+
+/**
+ * Evaluator Class to calculate Lift metrics for BinaryClassification problems
+ * Intended to build a Lift Plot, or with a threshold, evaluate to a numeric
+ * value, liftRatio, to determine model fit. See:
+ * https://en.wikipedia.org/wiki/Lift_(data_mining)
+ *
+ * Algorithm for calculating a chart as seen here:
+ * https://www.kdnuggets.com/2016/03/lift-analysis-data-scientist-secret-weapon.html
+ *
+ * @param threshold decision value to categorize score probabilities into predicted labels
+ * @param bandFn    function to convert score distribution into score bands
+ * @param uid       UID for evaluator
+ */
+class LiftEvaluator
+(
+  threshold: Double = LiftMetrics.defaultThreshold,
+  bandFn: RDD[Double] => Seq[(Double, Double, String)] = LiftEvaluator.getDefaultScoreBands,
+  override val uid: String = UID[OpBinaryClassificationEvaluator]
+) extends OpBinaryClassificationEvaluatorBase[LiftMetrics](uid = uid) {
+
+  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
+
+  override val name: EvalMetric = BinaryClassEvalMetrics.LiftMetrics
+
+  /**
+   * Default metrics is liftRatio, which is calculated as:
+   * (# yes records with score >= threshold / # total records with score >= threshold)
+   * / (# yes records overall / # total records overall)
+   *
+   * @return double value used as spark eval number
+   */
+  override def getDefaultMetric: LiftMetrics => Double = _.liftRatio
+
+  /**
+   * Evaluates entire dataset, pulling out score and label columns
+   * into an RDD and return an an instance of LiftMetrics
+   *
+   * @param dataset data to evaluate
+   * @return metrics
+   */
+  override def evaluateAll(dataset: Dataset[_]): LiftMetrics = {
+    val labelColumnName = getLabelCol
+    val dataToUse = makeDataToUse(dataset, labelColumnName)
+      .select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd
+    if (dataToUse.isEmpty()) {
+      log.warn("The dataset is empty. Returning empty metrics.")
+      LiftMetrics.empty
+    } else {
+      val scoreAndLabels = dataToUse.map {
+        case Row(prob: Vector, label: Double) => (prob(1), label)
+        case Row(prob: Double, label: Double) => (prob, label)
+      }
+      evaluateScoreAndLabels(scoreAndLabels)
+    }
+  }
+
+  /**
+   * Calculates a Seq of lift metrics per score band and
+   * an overall lift ratio value, returned as LiftMetrics,
+   * from an RDD of scores and labels
+   *
+   * @param scoreAndLabels RDD of score and label doubles
+   * @return an instance of LiftMetrics
+   */
+  def evaluateScoreAndLabels(scoreAndLabels: RDD[(Double, Double)]): LiftMetrics = {
+    val liftMetricBands = LiftEvaluator.liftMetricBands(scoreAndLabels, bandFn)
+    val overallRate = LiftEvaluator.thresholdLiftRate(scoreAndLabels, 0.0)
+    val liftRatio = LiftEvaluator.liftRatio(overallRate, scoreAndLabels, threshold)
+    LiftMetrics(
+      liftMetricBands = liftMetricBands,
+      threshold = threshold,
+      liftRatio = liftRatio,
+      overallRate = overallRate)
+  }
+}
 
 /**
  * Object to calculate Lift metrics for BinaryClassification problems
@@ -42,47 +125,6 @@ import org.apache.spark.rdd.RDD
 object LiftEvaluator {
 
   /**
-   * Stores basic lift values for a specific band of scores
-   *
-   * @param group      name / key for score band
-   * @param lowerBound minimum score represented in lift
-   * @param upperBound maximum score represented in lift
-   * @param rate       optional calculated lift value, i.e. # yes / total count
-   * @param average    optional lift rate across all score bands
-   * @param totalCount total number of records in score band
-   * @param yesCount   number of yes records in score band
-   * @param noCount    number of no records in score band
-   */
-  case class LiftMetricBand
-  (
-    group: String,
-    lowerBound: Double,
-    upperBound: Double,
-    rate: Option[Double],
-    average: Option[Double],
-    totalCount: Long,
-    yesCount: Long,
-    noCount: Long
-  ) extends EvaluationMetrics
-
-  /**
-   * Builds Seq[LiftMetricBand] for BinaryClassificationMetrics, calls liftMetricBands function
-   * with default score bands function
-   *
-   * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
-   * @return Seq of LiftMetricBand containers of Lift calculations
-   */
-  def apply
-  (
-    scoreAndLabels: RDD[(Double, Double)]
-  ): Seq[LiftMetricBand] = {
-    liftMetricBands(
-      scoreAndLabels,
-      getDefaultScoreBands
-    )
-  }
-
-  /**
    * Builds Seq of LiftMetricBand using RDD api
    *
    * @param scoreAndLabels RDD[(Double, Double)] of BinaryClassification (score, label) tuples
@@ -92,17 +134,17 @@ object LiftEvaluator {
   private[op] def liftMetricBands
   (
     scoreAndLabels: RDD[(Double, Double)],
-    getScoreBands: RDD[Double] => Seq[(Double, Double, String)]
+    bandFn: RDD[Double] => Seq[(Double, Double, String)]
   ): Seq[LiftMetricBand] = {
-    val bands = getScoreBands(scoreAndLabels.map { case (score, _) => score })
+    val scores = scoreAndLabels.map { case (score, _) => score }
+    val bands = bandFn(scores)
     val bandedLabels = scoreAndLabels.map { case (score, label) =>
       (categorizeScoreIntoBand((score, bands)), label)
     }.collect { case (Some(band), label) => (band, label) }
     val perBandCounts = aggregateBandedLabels(bandedLabels)
-    val overallRate = overallLiftRate(perBandCounts)
-    bands.map({ case (lower, upper, band) =>
-      formatLiftMetricBand(lower, upper, band, perBandCounts, overallRate)
-    }).sortBy(band => band.lowerBound)
+    bands.map { case (lower, upper, band) =>
+      formatLiftMetricBand(lower, upper, band, perBandCounts)
+    }.sortBy(band => band.lowerBound)
   }
 
   /**
@@ -113,8 +155,7 @@ object LiftEvaluator {
    * @param scores RDD of scores. unused in this function
    * @return sequence of (lowerBound, upperBound, bandString) tuples
    */
-  private[op] def getDefaultScoreBands(scores: RDD[Double]):
-  Seq[(Double, Double, String)] =
+  private[op] def getDefaultScoreBands(scores: RDD[Double]): Seq[(Double, Double, String)] =
     Seq(
       (0.0, 0.1, "0-10"),
       (0.1, 0.2, "10-20"),
@@ -170,17 +211,57 @@ object LiftEvaluator {
   }
 
   /**
-   * calculates a baseline "yes" rate across score bands
+   * Subsets scoresAndLabels to only records with scores greater than
+   * a threshold, categorizing them as predicted "yes" labels, then
+   * returns (# of true "yes" labels / # predicted yes)
    *
-   * @param perBandCounts
-   * @return overall # yes / total records across all bands
+   * @param scoreAndLabels RDD of labels and scores
+   * @param threshold      decision value, where scores >= thres are predicted "yes"
+   * @return Optional lift rate, None if denominator is 0
    */
-  private[op] def overallLiftRate(perBandCounts: Map[String, (Long, Long)]): Option[Double] = {
-    val overallTotalCount = perBandCounts.values.map({ case (totalCount, _) => totalCount }).sum
-    val overallYesCount = perBandCounts.values.map({ case (_, yesCount) => yesCount }).sum
-    overallTotalCount match {
+  private[op] def thresholdLiftRate
+  (
+    scoreAndLabels: RDD[(Double, Double)],
+    threshold: Double
+  ): Option[Double] = {
+    val (yesCount, totalCount) = scoreAndLabels.aggregate(zeroValue = (0L, 0L))({
+      case ((yesCount, totalCount), (score, label)) => {
+        if (score < threshold) (yesCount, totalCount)
+        else (yesCount + label.toLong, totalCount + 1L)
+      }
+    }, { case ((yesCountX, totalCountX), (yesCountY, totalCountY)) =>
+      (yesCountX + yesCountY, totalCountX + totalCountY)
+    })
+    totalCount match {
       case 0L => None
-      case _ => Some(overallYesCount.toDouble / overallTotalCount)
+      case _ => Some(yesCount.toDouble / totalCount.toDouble)
+    }
+  }
+
+  /**
+   * Given a threshold decision value, calculates the lift
+   * in label prediction accuracy over random, as described here:
+   * https://en.wikipedia.org/wiki/Lift_(data_mining)
+   *
+   * @param overallRate    # yes / total count across all data
+   * @param scoreAndLabels RDD of scores and labels
+   * @param threshold      decision boundary for categorizing scores
+   * @return lift ratio, given threshold
+   */
+  private[op] def liftRatio
+  (
+    overallRate: Option[Double],
+    scoreAndLabels: RDD[(Double, Double)],
+    threshold: Double
+  ): Double = overallRate match {
+    case None => LiftMetrics.defaultLiftRatio
+    case Some(0.0) => LiftMetrics.defaultLiftRatio
+    case Some(rate) => {
+      val thresholdLift = thresholdLiftRate(scoreAndLabels, threshold)
+      thresholdLift match {
+        case None => LiftMetrics.defaultLiftRatio
+        case Some(thresholdRate) => thresholdRate / rate
+      }
     }
   }
 
@@ -193,7 +274,6 @@ object LiftEvaluator {
    * @param upper         upper bound of band
    * @param bandString    String key of band e.g. "10-20"
    * @param perBandCounts calculated total counts and counts of true labels
-   * @param overallRate   optional overall Lift rate across all bands
    * @return LiftMetricBand container of metrics
    */
   private[op] def formatLiftMetricBand
@@ -201,8 +281,7 @@ object LiftEvaluator {
     lower: Double,
     upper: Double,
     bandString: String,
-    perBandCounts: Map[String, (Long, Long)],
-    overallRate: Option[Double]
+    perBandCounts: Map[String, (Long, Long)]
   ): LiftMetricBand = {
     perBandCounts.get(bandString) match {
       case Some((numTotal, numYes)) => {
@@ -215,7 +294,6 @@ object LiftEvaluator {
           lowerBound = lower,
           upperBound = upper,
           rate = lift,
-          average = overallRate,
           totalCount = numTotal,
           yesCount = numYes,
           noCount = numTotal - numYes
@@ -226,7 +304,6 @@ object LiftEvaluator {
         lowerBound = lower,
         upperBound = upper,
         rate = None,
-        average = overallRate,
         totalCount = 0L,
         yesCount = 0L,
         noCount = 0L
@@ -234,4 +311,55 @@ object LiftEvaluator {
     }
   }
 
+}
+
+/**
+ * Stores basic lift values for a specific band of scores
+ *
+ * @param group      name / key for score band
+ * @param lowerBound minimum score represented in lift
+ * @param upperBound maximum score represented in lift
+ * @param rate       optional calculated lift value, i.e. # yes / total count
+ * @param totalCount total number of records in score band
+ * @param yesCount   number of yes records in score band
+ * @param noCount    number of no records in score band
+ */
+case class LiftMetricBand
+(
+  group: String,
+  lowerBound: Double,
+  upperBound: Double,
+  rate: Option[Double],
+  totalCount: Long,
+  yesCount: Long,
+  noCount: Long
+) extends EvaluationMetrics
+
+/**
+ * Stores sequence of lift score band metrics
+ * as well as overall lift values
+ *
+ * @param liftMetricBands Seq of LiftMetricBand, calculated by LiftEvaluator
+ * @param threshold       threshold used to categorize scores
+ * @param liftRatio       overall lift ratio, given a specified threshold
+ * @param overallRate     # yes records / # total records
+ */
+case class LiftMetrics
+(
+  @JsonDeserialize(contentAs = classOf[LiftMetricBand])
+  liftMetricBands: Seq[LiftMetricBand],
+  threshold: Double,
+  liftRatio: Double,
+  overallRate: Option[Double]
+) extends EvaluationMetrics
+
+/**
+ * Companion object to LiftMetrics case class
+ * for storing default values
+ */
+object LiftMetrics {
+  val defaultThreshold = 0.5
+  val defaultLiftRatio = 1.0
+
+  def empty: LiftMetrics = LiftMetrics(Seq(), defaultThreshold, defaultLiftRatio, None)
 }
