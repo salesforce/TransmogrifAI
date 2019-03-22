@@ -101,4 +101,9 @@ class RandomParamBuilderTest extends FlatSpec with TestSparkContext {
       "requirement failed: Min value must be greater than zero for exponential distribution to work"
   }
 
+  it should "throw a requirement error if an min max are passed in" in {
+    intercept[IllegalArgumentException]( new RandomParamBuilder()
+      .uniform(xgb.baseScore, 1, 0)).getMessage() shouldBe
+      "requirement failed: Min must be less than max"
+  }
 }

@@ -79,7 +79,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    * @param max   maximum value for param
    */
   def uniform(param: DoubleParam, min: Double, max: Double): this.type = {
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Double](param, Uniform, min, max)
   }
 
@@ -91,7 +91,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    * @param max   maximum value for param
    */
   def uniform(param: FloatParam, min: Float, max: Float): this.type = {
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Float](param, Uniform, min, max)
   }
 
@@ -103,7 +103,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    * @param max   maximum value for param
    */
   def uniform(param: IntParam, min: Int, max: Int): this.type = {
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Int](param, Uniform, min, max)
   }
 
@@ -115,7 +115,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    * @param max   maximum value for param
    */
   def uniform(param: LongParam, min: Long, max: Long): this.type = {
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Long](param, Uniform, min, max)
   }
 
@@ -137,7 +137,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    */
   def exponential(param: DoubleParam, min: Double, max: Double): this.type = {
     require(min > 0, "Min value must be greater than zero for exponential distribution to work")
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Double](param, Exponential, min, max)
   }
 
@@ -150,7 +150,7 @@ class RandomParamBuilder(random: Random = new Random()) {
    */
   def exponential(param: FloatParam, min: Float, max: Float): this.type = {
     require(min > 0, "Min value must be greater than zero for exponential distribution to work")
-    require(min < max, "min must be less than max")
+    require(min < max, "Min must be less than max")
     addParams[Float](param, Exponential, min, max)
   }
 
