@@ -35,6 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.Dataset
 
 import scala.reflect.ClassTag
@@ -55,7 +56,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
   extends SequenceEstimator[T, OPVector](operationName = "vecCatMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
-    with MaxPercentageCardinalityParams {
+    with MaxPercentageCardinalityParams with CountUniqueMapFun {
 
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
@@ -67,8 +68,10 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
         k -> cats.map(_ -> 1L).groupBy(_._1).map { case (c, a) => c -> a.map(_._2).sum }
       }
     }
-
-    val uniqueCounts = countMapUniques(dataset, $(bits))
+    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+    implicit val spark = dataset.sparkSession
+    implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
+    val uniqueCounts = countMapUniques(dataset, size = inN.length, bits = $(bits))
     val n = dataset.count()
 
     val percentFilter = uniqueCounts.flatMap(_.map{ case (k, v) =>

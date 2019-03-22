@@ -524,6 +524,30 @@ trait TrackTextLenParam extends Params {
   def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
 }
 
+trait CountUniqueMapFun {
+  type HLLMap = Map[String, HLL]
+  protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
+  protected def countMapUniques[V: ClassTag, T <: OPMap[V]](in: Dataset[Seq[T#Value]], size: Int, bits: Int)
+    (implicit kryo: KryoSerializer): Seq[HLLMap] = {
+    val rdd = in.rdd
+    val hll = new HyperLogLogMonoid(bits)
+    val hllRDD = rdd.mapPartitions { it =>
+      val ks = kryo.newInstance()
+      it.map(_.map(_.map { case (k, v) =>
+        k -> hll.create(ks.serialize(v).array())
+      }))
+    }
+    val zero = Seq.fill(size)(Map.empty[String, HLL])
+    val countMapUniques: Seq[HLLMap] = hllRDD.fold(zero) { (a, b) =>
+      a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
+        case (k, v) => k -> (v + m1.getOrElse(k, hll.zero))
+      }
+      }
+    }
+    countMapUniques
+  }
+}
+
 trait CleanTextFun {
   def cleanTextFn(s: String, shouldClean: Boolean): String = if (shouldClean) TextUtils.cleanString(s) else s
 }
@@ -635,31 +659,12 @@ trait MapStringPivotHelper extends SaveOthersParams {
   type MapMap = SequenceAggregators.MapMap
   type SeqSeqTupArr = Seq[Seq[(String, Array[String])]]
   type SeqMapMap = SequenceAggregators.SeqMapMap
-  type HLLMap = Map[String, HLL]
 
   protected implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, String]]]
   protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
   protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
-  protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
 
-  protected def countMapUniques[V, T <: OPMap[V]](in: Dataset[Seq[T#Value]], bits: Int)
-    (implicit classTag: ClassTag[V]): Seq[HLLMap] = {
-    val rdd = in.rdd
-    val hll = new HyperLogLogMonoid(bits)
 
-    val countMapUniques: Seq[HLLMap] =
-      if (rdd.isEmpty()) Seq.empty[HLLMap] else in.map(_.map(_.map { case (k, v) =>
-        val kryoSerializer = new KryoSerializer(new SparkConf()).newInstance()
-        k -> hll.toHLL(kryoSerializer.serialize(v).array())
-      })).reduce {
-        (a, b) =>
-          a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
-            case (k, v) => k -> (v + m1.getOrElse(k, hll.zero))
-          }
-          }
-      }
-    countMapUniques
-  }
 
   protected def getCategoryMaps[V]
   (
