@@ -164,6 +164,11 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     }
   }
 
+  /**
+   * RawFeatureDistributions is now contained in and written / read through RawFeatureFilterResults.
+   * All setters of RawFeatureDistributions are now deprecated.
+   * This resolve function is to allow backwards compatibility where RawFeatureDistributions was a saved field
+   */
   private def resolveRawFeatureDistributions(json: JValue): Try[Seq[FeatureDistribution]] = {
 
     val rawFeatureDistributionsEntryName = "rawFeatureDistributions"
