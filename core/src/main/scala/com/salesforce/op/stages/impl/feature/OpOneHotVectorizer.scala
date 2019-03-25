@@ -77,20 +77,26 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     val shouldCleanText = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
 
-    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
-    implicit val spark = dataset.sparkSession
-    implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
-
-    // Aggregating on RDD
-    val (uniqueCounts, n) = countUniques(dataset, size = inN.length, bits = $(bits))
-
-    val percentFilter = uniqueCounts.map(_.estimatedSize / n < $(maxPercentageCardinality))
+    val maxPctCard = $(maxPercentageCardinality)
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
-    val filteredRDD = rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
+
+    val finalRDD = if (maxPctCard != 1.0) {
+      implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+      implicit val spark = dataset.sparkSession
+      implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
+
+      // Aggregating on RDD
+      val (uniqueCounts, n) = countUniques(dataset, size = inN.length, bits = $(bits))
+
+      val percentFilter = uniqueCounts.map(_.estimatedSize / n < maxPctCard)
+      rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
+    } else {
+      rdd
+    }
 
     val countOccurrences: Seq[Map[String, Int]] = {
-      if (filteredRDD.isEmpty) Seq.empty[Map[String, Int]]
-      else filteredRDD.reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      if (finalRDD.isEmpty) Seq.empty[Map[String, Int]]
+      else finalRDD.reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
     }
 
     // Top K values for each categorical input

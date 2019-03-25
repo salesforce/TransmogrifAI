@@ -82,7 +82,6 @@ class EmailVectorizerTest
 
 
   def transformAndCollect(ds: DataFrame, feature: FeatureLike[OPVector]): Array[OPVector] = {
-    ds.show()
     val transformed = new OpWorkflow().setResultFeatures(feature).transform(ds)
     val field = transformed.schema(feature.name)
     val collected = transformed.collect(feature)

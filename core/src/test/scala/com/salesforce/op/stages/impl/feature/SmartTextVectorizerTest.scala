@@ -48,7 +48,6 @@ class SmartTextVectorizerTest
   lazy val (inputData, f1, f2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
       ("hello world".toText, "Hello world!".toText),
-      ("hello world".toText, "Hello world!".toText),
       ("hello world".toText, "What's up".toText),
       ("good evening".toText, "How are you doing, my friend?".toText),
       ("hello world".toText, "Not bad, my friend.".toText),
@@ -62,7 +61,6 @@ class SmartTextVectorizerTest
     .setInput(f1, f2)
 
   val expectedResult = Seq(
-    Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
     Vectors.sparse(9, Array(1, 6), Array(1.0, 1.0)),
@@ -293,7 +291,6 @@ class SmartTextVectorizerTest
     val res = transformed.collect(smartVectorized)
     val expected = Array(
       Vectors.sparse(10, Array(0, 4, 6, 8), Array(1.0, 1.0, 1.0, 10.0)),
-      Vectors.sparse(10, Array(0, 4, 6, 8), Array(1.0, 1.0, 1.0, 10.0)),
       Vectors.sparse(10, Array(0, 9), Array(1.0, 1.0)),
       Vectors.sparse(10, Array(1, 6, 8), Array(1.0, 1.0, 6.0)),
       Vectors.sparse(10, Array(0, 6, 8), Array(1.0, 2.0, 9.0)),
@@ -333,7 +330,6 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
     val res = transformed.collect(smartVectorized)
     val expected = Array(
-      Vectors.sparse(12, Array(0, 2, 4, 6, 8, 9), Array(1.0, 1.0, 1.0, 1.0, 10.0, 10.0)),
       Vectors.sparse(12, Array(0, 2, 4, 6, 8, 9), Array(1.0, 1.0, 1.0, 1.0, 10.0, 10.0)),
       Vectors.sparse(12, Array(0, 2, 8, 11), Array(1.0, 1.0, 10.0, 1.0)),
       Vectors.sparse(12, Array(0, 3, 6, 8, 9), Array(1.0, 1.0, 1.0, 11.0, 6.0)),

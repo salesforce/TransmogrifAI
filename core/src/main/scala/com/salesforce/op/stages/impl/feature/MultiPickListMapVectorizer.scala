@@ -68,17 +68,23 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
         k -> cats.map(_ -> 1L).groupBy(_._1).map { case (c, a) => c -> a.map(_._2).sum }
       }
     }
-    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
-    implicit val spark = dataset.sparkSession
-    implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
-    val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(bits))
+    val maxPctCard = $(maxPercentageCardinality)
+    val finalDataset = if (maxPctCard != 1.0) {
+      implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+      implicit val spark = dataset.sparkSession
+      implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
+      val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(bits))
 
-    val percentFilter = uniqueCounts.flatMap(_.map{ case (k, v) =>
-      k -> (v.estimatedSize / n < $(maxPercentageCardinality))}.toSeq).toMap
-    val filteredDataset = filterHighCardinality(dataset, percentFilter)
+      val percentFilter = uniqueCounts.flatMap(_.map { case (k, v) =>
+        k -> (v.estimatedSize / n < $(maxPercentageCardinality))
+      }.toSeq).toMap
+      filterHighCardinality(dataset, percentFilter)
+    } else {
+      dataset
+    }
 
     val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(filteredDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+      getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
     val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 

@@ -74,8 +74,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
 
   lazy val (ds, tech, cnty) = TestFeatureBuilder(
     Seq(
-      (Map.empty[String, Set[String]], Map.empty[String, Set[String]]),
-      (Map.empty[String, Set[String]], Map.empty[String, Set[String]]),
       (Map("tech" -> Set("Spark", "Scala")), Map("cnty" -> Set("Canada", "US"))),
       (Map("tech" -> Set("        sPaRk   ", "Python", "Torch   ")), Map("cnty" -> Set("France ", "UK           "))),
       (Map("tech" -> Set("R", "Hive")), Map("cnty" -> Set("Germany"))),
@@ -511,8 +509,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     printRes(transformed, vectorMetadata, kcVectorizer.getOutputFeatureName)
 
     val expected = Array(
-      Vectors.sparse(8, Array.empty, Array.empty),
-      Vectors.sparse(8, Array.empty, Array.empty),
       Vectors.sparse(8, Array(1, 3, 6, 7), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(8, Array(0, 1, 2, 4, 5), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(8, Array(3, 7), Array(2.0, 1.0)),
@@ -536,8 +532,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     printRes(transformed, vectorMetadata, kcVectorizer.getOutputFeatureName)
 
     val expected = Array(
-      Vectors.sparse(10, Array(4, 9), Array(1.0, 1.0)),
-      Vectors.sparse(10, Array(4, 9), Array(1.0, 1.0)),
       Vectors.sparse(10, Array(1, 3, 7, 8), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(0, 1, 2, 5, 6), Array(1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(3, 8), Array(2.0, 1.0)),
@@ -547,11 +541,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
-  }
-
-  private def printRes(df: DataFrame, meta: Metadata, outName: String): Unit = {
-    if (log.isInfoEnabled) df.show(false)
-    log.info("Metadata: {}", OpVectorMetadata(outName, meta).toString)
   }
 
   it should "drop features with max cardinality" in {
@@ -571,5 +560,10 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     val result = transformed.collect(fitted.getOutput())
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
+  }
+
+  private def printRes(df: DataFrame, meta: Metadata, outName: String): Unit = {
+    if (log.isInfoEnabled) df.show(false)
+    log.info("Metadata: {}", OpVectorMetadata(outName, meta).toString)
   }
 }
