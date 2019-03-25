@@ -33,13 +33,13 @@ package com.salesforce.op.filters
 import com.salesforce.op.{OpParams, OpWorkflow}
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
+import com.salesforce.op.readers.{CustomReader, ReaderKey}
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
 import com.salesforce.op.testkit.RandomData
 import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
 import com.salesforce.op.utils.spark.RichDataset._
-import com.twitter.algebird.Operators._
 import org.apache.log4j.Level
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
@@ -53,6 +53,10 @@ import scala.reflect.runtime.universe.TypeTag
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
 
   // loggingLevel(Level.INFO)
+
+  // Our randomly generated data will generate feature names and corresponding map keys in this universe
+  val featureUniverse = Set("myF1", "myF2", "myF3")
+  val mapKeyUniverse = Set("f1", "f2", "f3")
 
   Spec[RawFeatureFilter[_]] should "compute feature stats correctly" in {
     val features: Array[OPFeature] =
@@ -147,6 +151,464 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedBothAllMK shouldBe empty
   }
 
+  it should "not remove any features when the training and scoring sets are identical" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
+    val countryGenerator = RandomText.countries.withProbabilityOfEmpty(0.2)
+    val pickListGenerator = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+      .withProbabilityOfEmpty(0.2)
+    val currencyGenerator = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.2)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, trainCity, trainCountry, trainPickList, trainCurrency) =
+    generateRandomDfAndFeatures[City, Country, PickList, Currency](
+      cityGenerator, countryGenerator, pickListGenerator, currencyGenerator,1000
+    )
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(trainDf, trainDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(trainCity, trainCountry, trainPickList, trainCurrency)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.4, 0.1, 1.0, 0.1, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    filteredRawData.featuresToDrop shouldBe empty
+    filteredRawData.mapKeysToDrop shouldBe empty
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs
+      trainReader.generateDataFrame(features).schema.fields
+
+    assertFeatureDistributionEquality(filteredRawData, total = features.length * 2)
+  }
+
+  it should "correctly clean the dataframe containing map and non-map features due to min fill rate" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
+    val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
+    val currencyGenerator50 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.5)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator95, currencyGenerator50, currencyGenerator25,1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    // Check that using the training reader only will result in the rarely filled features being removed
+    val filter = new RawFeatureFilter(trainReader, None, 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF2"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f2")
+    )
+
+    // Check that using the scoring reader only will result in the rarely filled in both training and scoring sets
+    // being removed
+    val filterWithScoring = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawDataWithScoring = filterWithScoring.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawDataWithScoring,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF1", "myF2"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f1", "f2")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawDataWithScoring, total = 12)
+  }
+
+  /**
+   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
+   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
+   * raw features - each key contains the same data as the corresponding raw feature.
+   *
+   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
+   * fill rate difference of 0.6. The RawFeatureFilter is set up with a maximum absolute fill rate of 0.4 so both
+   * f2 and f3 (as well as their corresponding map keys) should be removed.
+   */
+  it should "correctly clean the dataframe containing map and non-map features due to max absolute fill rate " +
+    "difference" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.2)
+    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.8)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) =
+    generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator3, currencyGenerator2, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 0.4, Double.PositiveInfinity, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF2", "myF3"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f2", "f3")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 12)
+  }
+
+  /**
+   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
+   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
+   * raw features - each key contains the same data as the corresponding raw feature.
+   *
+   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
+   * fill rate difference of 0.25, and a relative fill ratio difference of 6. The RawFeatureFilter is set up with a
+   * maximum fill ratio difference of 4 so both f2 and f3 (as well as their corresponding map keys) should be removed.
+   */
+  it should "correctly clean the dataframe containing map and non-map features due to max fill ratio " +
+    "difference" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
+    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.7)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) =
+    generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator3, currencyGenerator2, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 1.0, 4.0, 1.0, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF2", "myF3"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f2", "f3")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 12)
+  }
+
+  /**
+   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
+   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
+   * raw features - each key contains the same data as the corresponding raw feature.
+   *
+   * Features f1 & f3 are switched between the training and scoring sets, so they should have a very large JS
+   * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
+   * f1 and f3 (as well as their corresponding map keys) should be removed.
+   */
+  it should "correctly clean the dataframe containing map and non-map features due to JS divergence" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0)
+    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 1000.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator3, currencyGenerator2, currencyGenerator1, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 0.8, 1.0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF1", "myF3"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f1", "f3")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 12)
+  }
+
+  it should "not drop protected raw features or response features" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
+    val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
+    val currencyGenerator50 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.5)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator95, currencyGenerator50, currencyGenerator25, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    // Check that using the scoring reader only will result in the rarely filled in both training and scoring sets
+    // being removed, except for the protected feature that would normally be removed
+    val filterWithProtected = new RawFeatureFilter(trainReader, Some(scoreReader),
+      bins = 10,
+      minFill = 0.1,
+      maxFillDifference = 1.0,
+      maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 1.0,
+      maxCorrelation = 1.0,
+      protectedFeatures = Set("myF1")
+    )
+    val filteredRawData = filterWithProtected.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF2"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f1", "f2")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 12)
+
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader),
+      bins = 10,
+      minFill = 0.1,
+      maxFillDifference = 1.0,
+      maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 1.0,
+      maxCorrelation = 1.0
+    )
+    val featuresWithResponse: Array[OPFeature] = Array(c1.copy(isResponse = true), c2, c3, mapFeatureRaw)
+    val filteredRawDataWithResponse = filter.generateFilteredRaw(featuresWithResponse, params)
+
+    checkDroppedFeatures(
+      filteredRawDataWithResponse,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF2"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f1", "f2")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawDataWithResponse, total = 12)
+  }
+
+  /**
+   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
+   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
+   * raw features - each key contains the same data as the corresponding raw feature.
+   *
+   * Features f1 & f3 are switched between the training and scoring sets, so they should have a very large JS
+   * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
+   * f1 and f3 (as well as their corresponding map keys) should be removed, but they are added to a list of features
+   * protected from JS divergence removal.
+   */
+  it should "not drop JS divergence-protected features based on JS divergence check" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0)
+    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 1000.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator3, currencyGenerator2, currencyGenerator1, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader),
+      bins = 10,
+      minFill = 0.1,
+      maxFillDifference = 1.0,
+      maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 0.8,
+      maxCorrelation = 1.0,
+      jsDivergenceProtectedFeatures = Set("myF3")
+    )
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse,
+      expectedDroppedFeatures = Set("myF1"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f1", "f3")
+    )
+
+    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 12)
+  }
+
+
+  it should "correctly drop features based on null-label correlations" in {
+    // Define random generators that will be the same for training and scoring dataframes
+    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
+    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
+
+    // Define the training dataframe and the features (these should be the same between the training and scoring
+    // dataframes since they point to columns with the same names)
+    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
+    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
+
+    // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+    val labelTransformer = new UnaryLambdaTransformer[Currency, RealNN](operationName = "labelFunc",
+      transformFn = r => r.value match {
+        case Some(v) => RealNN(1.0)
+        case _ => RealNN(0.0)
+      }
+    )
+    val labelData = labelTransformer.setInput(c2).getOutput().asInstanceOf[Feature[RealNN]]
+      .copy(isResponse = true)
+    val labelDataRaw = labelData.asRaw(isResponse = true)
+    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(trainDf)
+
+    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
+    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+    )
+    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(scoreDf)
+
+    // Define the readers
+    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
+
+    val params = new OpParams()
+    // We should be able to set the features to either be the train features or the score ones here
+    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw, labelDataRaw)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 0.8)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+
+    // TODO: check that filter.getFeaturesToExclude contains the correlation exclusions too
+    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
+    checkDroppedFeatures(
+      filteredRawData,
+      mapFeatureRaw,
+      featureUniverse = featureUniverse ++ Set(labelData.name),
+      expectedDroppedFeatures = Set("myF2"),
+      mapKeyUniverse = mapKeyUniverse,
+      expectedDroppedKeys = Set("f2")
+    )
+
+    // There should be 14 FeatureDistributions - training and scoring for 4 raw features, one map with three keys
+    assertFeatureDistributions(filteredRawData, total = 14)
+  }
+
   /**
    * Generates a random dataframe and OPFeatures from supplied data generators and their types. The names of the
    * columns of the dataframe are fixed to be myF1, myF2, myF3, and myF4 so that the same OPFeatures can be used to
@@ -197,10 +659,10 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * @return          Tuple containing the generated dataframe and each individual OPFeature
    */
   def generateRandomDfAndFeatures[
-    F1 <: FeatureType : TypeTag,
-    F2 <: FeatureType : TypeTag,
-    F3 <: FeatureType : TypeTag,
-    F4 <: FeatureType : TypeTag
+  F1 <: FeatureType : TypeTag,
+  F2 <: FeatureType : TypeTag,
+  F3 <: FeatureType : TypeTag,
+  F4 <: FeatureType : TypeTag
   ](f1: RandomData[F1], f2: RandomData[F2], f3: RandomData[F3], f4: RandomData[F4], numRows: Int):
   (Dataset[Row], Feature[F1], Feature[F2], Feature[F3], Feature[F4])  = {
 
@@ -217,511 +679,6 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     TestFeatureBuilder[F1, F2, F3, F4]("myF1", "myF2", "myF3", "myF4", generatedTrainData)
   }
 
-  it should "not remove any features when the training and scoring sets are identical" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
-    val countryGenerator = RandomText.countries.withProbabilityOfEmpty(0.2)
-    val pickListGenerator = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
-      .withProbabilityOfEmpty(0.2)
-    val currencyGenerator = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.2)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, trainCity, trainCountry, trainPickList, trainCurrency) =
-    generateRandomDfAndFeatures[City, Country, PickList, Currency](
-      cityGenerator, countryGenerator, pickListGenerator, currencyGenerator,1000
-    )
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(trainDf, trainDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(trainCity, trainCountry, trainPickList, trainCurrency)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    filteredRawData.featuresToDrop shouldBe empty
-    filteredRawData.mapKeysToDrop shouldBe empty
-    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs
-      trainReader.generateDataFrame(features).schema.fields
-
-    assertFeatureDistributions(filteredRawData, total = features.length * 2)
-
-    // Also check that the all the feature distributions are the same between the training and scoring sets
-    filteredRawData.trainingFeatureDistributions.zip(filteredRawData.trainingFeatureDistributions).foreach{
-      case (train, score) =>
-        train.name shouldBe score.name
-        train.key shouldBe score.key
-        train.count shouldBe score.count
-        train.nulls shouldBe score.nulls
-        train.distribution shouldBe score.distribution
-        train.summaryInfo shouldBe score.summaryInfo
-    }
-  }
-
-  it should "correctly clean the dataframe containing map and non-map features due to min fill rate" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
-    val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
-    val currencyGenerator50 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.5)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
-    )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
-    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
-    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
-
-    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
-    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator95, currencyGenerator50, currencyGenerator25,1000
-    )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-
-    // Check that using the training reader only will result in the rarely filled features being removed
-    val filter = new RawFeatureFilter(trainReader, None, 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawData.featuresToDrop.length shouldBe 1
-    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawData.mapKeysToDrop.values.head.size shouldBe 1
-
-    // The fure that is 99% empty should be thrown out
-    filteredRawData.featuresToDrop.head.name.startsWith("myF2") shouldBe true
-    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f2")
-
-    // Check the actual filtered dataframe schemas
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe true
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe false
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe true
-    filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet should not contain "f2")
-
-    // There should be 6 FeatureDistributions - training for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawData, total = 6)
-
-
-    // Check that using the scoring reader only will result in the rarely filled in both training and scoring sets
-    // being removed
-    val filterWithScoring = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawDataWithScoring = filterWithScoring.generateFilteredRaw(features, params)
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawDataWithScoring.featuresToDrop.length shouldBe 2
-    filteredRawDataWithScoring.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawDataWithScoring.mapKeysToDrop.values.head.size shouldBe 2
-
-    // The feature that is 99% empty should be thrown out
-    filteredRawDataWithScoring.featuresToDrop.map(_.name) should contain theSameElementsAs Seq("myF1", "myF2")
-    filteredRawDataWithScoring.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f1", "f2")
-    // filteredDataWithScoring.mapKeysToDrop
-    //  .foldLeft(Set.empty[String])((acc, x) => acc ++ x._2) should contain theSameElementsAs Seq("f1", "f2")
-
-    filteredRawDataWithScoring.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe false
-    filteredRawDataWithScoring.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe false
-    filteredRawDataWithScoring.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe true
-    filteredRawDataWithScoring.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("f3"))
-
-    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawDataWithScoring, total = 12)
-  }
-
-  /**
-   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
-   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
-   * raw features - each key contains the same data as the corresponding raw feature.
-   *
-   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
-   * fill rate difference of 0.6. The RawFeatureFilter is set up with a maximum absolute fill rate of 0.4 so both
-   * f2 and f3 (as well as their corresponding map keys) should be removed.
-   */
-  it should "correctly clean the dataframe containing map and non-map features due to max absolute fill rate " +
-    "difference" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val realGenerator1 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
-    val realGenerator2 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.2)
-    val realGenerator3 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.8)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, r1, r2, r3) =
-    generateRandomDfAndFeatures[Real, Real, Real](
-      realGenerator1, realGenerator2, realGenerator3, 1000
-    )
-    val mapFeature = makeTernaryOPMapTransformer[Real, RealMap, Double](r1, r2, r3)
-    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
-    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
-
-    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
-    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Real, Real, Real](
-      realGenerator1, realGenerator3, realGenerator2, 1000
-    )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(r1, r2, r3, mapFeatureRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 0.4, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    /*
-    val exclusions = filter.getFeaturesToExclude(
-      trainingDistribs = filteredRawData.trainingFeatureDistributions,
-      scoringDistribs = filteredRawData.scoringFeatureDistributions,
-      correlationInfo = Map.empty
-    )
-    println(exclusions)
-     */
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawData.featuresToDrop.length shouldBe 2
-    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawData.mapKeysToDrop.values.head.size shouldBe 2
-
-    // Since we swtiched the distributions in features 2 & 3 between the training and scoring sets, then both of them
-    // should be removed (the two raw features and the two corresponding map keys)
-    filteredRawData.featuresToDrop.map(_.name) should contain theSameElementsAs Seq("myF2", "myF3")
-    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f2", "f3")
-
-    // Check the actual filtered dataframe schemas
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe true
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe false
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe false
-    filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("f1"))
-
-    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawData, total = 12)
-  }
-
-  /**
-   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
-   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
-   * raw features - each key contains the same data as the corresponding raw feature.
-   *
-   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
-   * fill rate difference of 0.25, and a relative fill ratio difference of 6. The RawFeatureFilter is set up with a
-   * maximum fill ratio difference of 4 so both f2 and f3 (as well as their corresponding map keys) should be removed.
-   */
-  it should "correctly clean the dataframe containing map and non-map features due to max fill ratio " +
-    "difference" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val realGenerator1 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
-    val realGenerator2 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
-    val realGenerator3 = RandomReal.logNormal[Real](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.7)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, r1, r2, r3) =
-    generateRandomDfAndFeatures[Real, Real, Real](
-      realGenerator1, realGenerator2, realGenerator3, 1000
-    )
-    val mapFeature = makeTernaryOPMapTransformer[Real, RealMap, Double](r1, r2, r3)
-    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
-    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
-
-    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
-    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Real, Real, Real](
-      realGenerator1, realGenerator3, realGenerator2, 1000
-    )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(r1, r2, r3, mapFeatureRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 1.0, 4.0, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawData.featuresToDrop.length shouldBe 2
-    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawData.mapKeysToDrop.values.head.size shouldBe 2
-
-    // Since we swtiched the distributions in features 2 & 3 between the training and scoring sets, then both of them
-    // should be removed (the two raw features and the two corresponding map keys)
-    filteredRawData.featuresToDrop.map(_.name) should contain theSameElementsAs Seq("myF2", "myF3")
-    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f2", "f3")
-
-    // Check the actual filtered dataframe schemas
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe true
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe false
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe false
-    filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("f1"))
-
-    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawData, total = 12)
-  }
-
-  /**
-   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
-   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
-   * raw features - each key contains the same data as the corresponding raw feature.
-   *
-   * Features f1 & f3 are switched between the training and scoring sets, so they should have a very large JS
-   * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
-   * f1 and f3 (as well as their corresponding map keys) should be removed.
-   */
-  it should "correctly clean the dataframe containing map and non-map features due to JS divergence" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
-    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0)
-    val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 1000.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
-    )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
-    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
-    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
-
-    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
-    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator3, currencyGenerator2, currencyGenerator1, 1000
-    )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 0.8, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawData.featuresToDrop.length shouldBe 2
-    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawData.mapKeysToDrop.values.head.size shouldBe 2
-
-    // The feature that is 99% empty should be thrown out
-    filteredRawData.featuresToDrop.map(_.name) should contain theSameElementsAs Seq("myF1", "myF3")
-    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f1", "f3")
-
-    // Check the actual filtered dataframe schemas
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe false
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe true
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe false
-    filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("f2"))
-
-    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawData, total = 12)
-  }
-
-  it should "not drop protected raw features" in {
-    // Define random generators that will be the same for training and scoring dataframes
-    val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
-    val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
-    val currencyGenerator50 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.5)
-
-    // Define the training dataframe and the features (these should be the same between the training and scoring
-    // dataframes since they point to columns with the same names)
-    val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
-    )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
-    // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
-    val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
-
-    // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
-    val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator95, currencyGenerator50, currencyGenerator25, 1000
-    )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
-
-    // Define the readers
-    val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
-
-    val params = new OpParams()
-    // We should be able to set the features to either be the train features or the score ones here
-    val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-
-    // Check that using the scoring reader only will result in the rarely filled in both training and scoring sets
-    // being removed, except for the protected feature that would normally be removed
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader),
-      bins = 10,
-      minFill = 0.1,
-      maxFillDifference = 1.0,
-      maxFillRatioDiff = Double.PositiveInfinity,
-      maxJSDivergence = 1.0,
-      maxCorrelation = 1.0,
-      protectedFeatures = Set("myF1")
-    )
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-
-    // TODO: Add a check for the reason dropped once that information is passed on to the workflow
-    // Check that we drop one feature, as well as its corresponding map key
-    filteredRawData.featuresToDrop.length shouldBe 1
-    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
-    filteredRawData.mapKeysToDrop.values.head.size shouldBe 2
-
-    // The feature that is 99% empty should be thrown out
-    filteredRawData.featuresToDrop.map(_.name) should contain theSameElementsAs Seq("myF2")
-    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs Set("f1", "f2")
-    // filteredData.mapKeysToDrop
-    //  .foldLeft(Set.empty[String])((acc, x) => acc ++ x._2) should contain theSameElementsAs Seq("f1", "f2")
-
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF1") shouldBe true
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF2") shouldBe false
-    filteredRawData.cleanedData.schema.fields.exists(_.name == "myF3") shouldBe true
-    filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("f3"))
-
-    // There should be 12 FeatureDistributions - training and scoring for 3 raw features, one map with three keys
-    // The map and non-map features should also be the same
-    assertFeatureDistributionEquality(filteredRawData, total = 12)
-  }
-  
-  // TODO: check null leakage removals (just do one threshold, or two in the same test)
-
-
-  it should "correctly clean the dataframe returned and give the features to blacklist" in {
-    val params = new OpParams()
-    val survPred = survived.copy(isResponse = false)
-    val features: Array[OPFeature] =
-      Array(survPred, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.0, 1.0, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop shouldBe empty
-    filteredRawData.mapKeysToDrop shouldBe empty
-    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
-
-    assertFeatureDistributions(filteredRawData, total = 26)
-
-    val filter1 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData1 = filter1.generateFilteredRaw(features, params)
-    filteredRawData1.featuresToDrop should contain theSameElementsAs Array(survPred)
-    filteredRawData1.mapKeysToDrop should contain theSameElementsAs Map(
-      "numericMap" -> Set("Male"), "booleanMap" -> Set("Male"), "stringMap" -> Set("Male"))
-    filteredRawData1.cleanedData.schema.fields.exists(_.name == survPred.name) shouldBe false
-    filteredRawData1.cleanedData.collect(stringMap).foreach(m =>
-      if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
-    assertFeatureDistributions(filteredRawData, total = 26)
-  }
-
-  it should "not drop response features" in {
-    val params = new OpParams()
-    val features: Array[OPFeature] =
-      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop shouldBe empty
-    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
-    filteredRawData.cleanedData.collect(stringMap)
-      .foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
-    assertFeatureDistributions(filteredRawData, total = 26)
-  }
-
-  it should "not drop protected features" in {
-    val params = new OpParams()
-    val features: Array[OPFeature] =
-      Array(survived, age, gender, height, weight, description, boarded)
-    val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1, 2, 0.2, 0.9)
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
-    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
-      Array(DataFrameFieldNames.KeyFieldName, survived.name)
-    assertFeatureDistributions(filteredRawData, total = 14)
-
-    val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1, 2, 0.2, 0.9,
-      protectedFeatures = Set(age.name, gender.name))
-    val filteredRawData2 = filter2.generateFilteredRaw(features, params)
-    filteredRawData2.featuresToDrop.toSet shouldEqual Set(height, weight, description, boarded)
-    filteredRawData2.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
-      Array(DataFrameFieldNames.KeyFieldName, survived.name, age.name, gender.name)
-    assertFeatureDistributions(filteredRawData, total = 14)
-  }
-
-  it should "not drop JS divergence-protected features based on JS divergence check" in {
-    val params = new OpParams()
-    val features: Array[OPFeature] =
-      Array(survived, age, gender, height, weight, description, boarded, boardedTime, boardedTimeAsDateTime)
-    val filter = new RawFeatureFilter(
-      trainingReader = dataReader,
-      scoringReader = Some(simpleReader),
-      bins = 10,
-      minFill = 0.0,
-      maxFillDifference = 1.0,
-      maxFillRatioDiff = Double.PositiveInfinity,
-      maxJSDivergence = 0.0,
-      maxCorrelation = 1.0,
-      jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name)
-    )
-
-    val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
-    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
-      Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
-    assertFeatureDistributions(filteredRawData, total = 18)
-  }
-
-  it should "correctly drop features based on null-label leakage correlation greater than 0.9" in {
-    val expectedDropped = Seq(boarded, weight, gender)
-    val expectedMapKeys = Seq("Female", "Male")
-    val expectedDroppedMapKeys = Map[String, Set[String]]()
-    nullLabelCorrelationTest(0.9, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
-  }
-
-  it should "correctly drop features based on null-label leakage correlation greater than 0.6" in {
-    val expectedDropped = Seq(boarded, weight, gender, age)
-    val expectedMapKeys = Seq("Female", "Male")
-    val expectedDroppedMapKeys = Map[String, Set[String]]()
-    nullLabelCorrelationTest(0.6, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
-  }
-
-  it should "correctly drop features based on null-label leakage correlation greater than 0.4" in {
-    val expectedDropped = Seq(boarded, weight, gender, age, description)
-    val expectedMapKeys = Seq("Male")
-    val expectedDroppedMapKeys = Map("booleanMap" -> Set("Female"), "stringMap" -> Set("Female"),
-      "numericMap" -> Set("Female"))
-    nullLabelCorrelationTest(0.4, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
-  }
-
-  it should "correctly drop features based on null-label leakage correlation greater than 0.3" in {
-    val expectedDropped = Seq(boarded, weight, gender, age, description, booleanMap, numericMap, stringMap)
-    // all the maps dropped
-    val expectedDroppedMapKeys = Map[String, Set[String]]()
-    nullLabelCorrelationTest(0.3, expectedDropped, Seq(), expectedDroppedMapKeys)
-  }
-
   private def assertFeatureDistributions(fd: FilteredRawData, total: Int): Assertion = {
     fd.featureDistributions.length shouldBe total
     fd.trainingFeatureDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
@@ -733,7 +690,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
   private def assertFeatureDistributionEquality(fd: FilteredRawData, total: Int): Unit = {
     fd.featureDistributions.length shouldBe total
-    fd.trainingFeatureDistributions.zip(fd.trainingFeatureDistributions).foreach {
+    fd.trainingFeatureDistributions.zip(fd.scoringFeatureDistributions).foreach {
       case (train, score) =>
         train.name shouldBe score.name
         train.key shouldBe score.key
@@ -762,42 +719,40 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     (trainReader, scoreReader)
   }
 
-  private def nullLabelCorrelationTest(
-    maxCorrelation: Double,
-    expectedDropped: Seq[OPFeature],
-    expectedMapKeys: Seq[String],
-    expectedDroppedMapKeys: Map[String, Set[String]]
+  // TODO: Expand scope to take multiple map types, and/or type parameters for maps of different types
+  /**
+   * Automates various checks on whether features are removed from the cleaned dataframe produced by RawFeatureFilter.
+   * Right now, it is specialized to accept just one map type feature, which is hardcoded to be a CurrencyMap based
+   * on current tests.
+   *
+   * @param filteredRawData         FilteredRawData object prdduced by RawFeatureFilter
+   * @param mapFeatureRaw           Name of raw map feature to check keys on
+   * @param featureUniverse         Set of raw feature names you start with
+   * @param expectedDroppedFeatures Expected set of raw feature names to be dropped
+   * @param mapKeyUniverse          Set of map keys in mapFeatureRaw you start with
+   * @param expectedDroppedKeys     Expected set of map keys to be dropped
+   */
+  private def checkDroppedFeatures(
+    filteredRawData: FilteredRawData,
+    mapFeatureRaw: FeatureLike[CurrencyMap],
+    featureUniverse: Set[String],
+    expectedDroppedFeatures: Set[String],
+    mapKeyUniverse: Set[String],
+    expectedDroppedKeys: Set[String]
   ): Unit = {
-    def getFilter(maxCorrelation: Double): RawFeatureFilter[Passenger] = new RawFeatureFilter(
-      trainingReader = dataReader,
-      scoringReader = Some(simpleReader),
-      bins = 10,
-      minFill = 0.0,
-      maxFillDifference = 1.0,
-      maxFillRatioDiff = Double.PositiveInfinity,
-      maxJSDivergence = 1.0,
-      maxCorrelation = maxCorrelation)
+    // Check that we drop one feature, as well as its corresponding map key
+    filteredRawData.featuresToDrop.length shouldBe expectedDroppedFeatures.size
+    filteredRawData.mapKeysToDrop.keySet.size shouldBe 1
+    filteredRawData.mapKeysToDrop.values.head.size shouldBe expectedDroppedKeys.size
 
-    val params = new OpParams()
-    val features: Array[OPFeature] =
-      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
-    val filteredRawData@FilteredRawData(df, dropped, droppedKeyValue, _) =
-      getFilter(maxCorrelation).generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.map(_.name) should contain theSameElementsAs expectedDroppedFeatures
+    filteredRawData.mapKeysToDrop.head._2 should contain theSameElementsAs expectedDroppedKeys
 
-    assertFeatureDistributions(filteredRawData, total = 26)
-    dropped should contain theSameElementsAs expectedDropped
-    droppedKeyValue should contain theSameElementsAs expectedDroppedMapKeys
-
-    df.schema.fields.map(_.name) should contain theSameElementsAs
-      DataFrameFieldNames.KeyFieldName +: features.diff(dropped).map(_.name)
-    if (expectedMapKeys.nonEmpty) {
-      df.collect(booleanMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
-      df.collect(numericMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
-      df.collect(stringMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
-    } else {
-      intercept[IllegalArgumentException] { df.collect(booleanMap) }
-      intercept[IllegalArgumentException] { df.collect(numericMap) }
-      intercept[IllegalArgumentException] { df.collect(stringMap) }
-    }
+    // Check the actual filtered dataframe schemas
+    featureUniverse.foreach(f => {
+      filteredRawData.cleanedData.schema.fields.exists(_.name == f) shouldBe !expectedDroppedFeatures.contains(f)
+      filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
+        if (m.nonEmpty) m.value.keySet.intersect(expectedDroppedKeys) shouldBe Set.empty)
+    })
   }
 }
