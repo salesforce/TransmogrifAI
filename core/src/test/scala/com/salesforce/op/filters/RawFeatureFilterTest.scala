@@ -57,6 +57,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
   // Our randomly generated data will generate feature names and corresponding map keys in this universe
   val featureUniverse = Set("myF1", "myF2", "myF3")
   val mapKeyUniverse = Set("f1", "f2", "f3")
+  // Number of rows to use in randomly generated data sets
+  val numRows = 1000
 
   Spec[RawFeatureFilter[_]] should "compute feature stats correctly" in {
     val features: Array[OPFeature] =
@@ -151,6 +153,12 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedBothAllMK shouldBe empty
   }
 
+  /**
+   * This test uses several data generators to generate data according to different distributions, makes a reader
+   * corresponding to the generated dataframe, and then uses that as both the training and scoring reader in
+   * RawFeatureFilter. Not only should no features be removed, but the training and scoring distributions should be
+   * identical.
+   */
   it should "not remove any features when the training and scoring sets are identical" in {
     // Define random generators that will be the same for training and scoring dataframes
     val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
@@ -163,7 +171,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // dataframes since they point to columns with the same names)
     val (trainDf, trainCity, trainCountry, trainPickList, trainCurrency) =
     generateRandomDfAndFeatures[City, Country, PickList, Currency](
-      cityGenerator, countryGenerator, pickListGenerator, currencyGenerator,1000
+      cityGenerator, countryGenerator, pickListGenerator, currencyGenerator, numRows
     )
 
     // Define the readers
@@ -183,6 +191,17 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     assertFeatureDistributionEquality(filteredRawData, total = features.length * 2)
   }
 
+  /**
+   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
+   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
+   * raw features - each key contains the same data as the corresponding raw feature.
+   *
+   * Features c1, c2, and c3 are permuted between the training and scoring sets. In the training set, feature c2
+   * has a 5% fill rate and should be removed. In the scoring set, map key f1 has a 5% fill rate so should be removed.
+   * This test checks removal when only the training reader is used, and when both the training and scoring readers
+   * are used.
+   *
+   */
   it should "correctly clean the dataframe containing map and non-map features due to min fill rate" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
@@ -192,7 +211,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Define the training dataframe and the features (these should be the same between the training and scoring
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
+      currencyGenerator25, currencyGenerator95, currencyGenerator50, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
@@ -201,7 +220,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator95, currencyGenerator50, currencyGenerator25,1000
+      currencyGenerator95, currencyGenerator50, currencyGenerator25, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -220,7 +239,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF2"),
+      expectedDroppedFeatures = Set(c2.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f2")
     )
@@ -235,7 +254,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawDataWithScoring,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF1", "myF2"),
+      expectedDroppedFeatures = Set(c1.name, c2.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f1", "f2")
     )
@@ -249,9 +268,9 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
    * raw features - each key contains the same data as the corresponding raw feature.
    *
-   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
+   * Features c2 & c3 are switched between the training and scoring sets, so that they should have an absolute
    * fill rate difference of 0.6. The RawFeatureFilter is set up with a maximum absolute fill rate of 0.4 so both
-   * f2 and f3 (as well as their corresponding map keys) should be removed.
+   * c2 and c3 (as well as their corresponding map keys f2 & f3) should be removed.
    */
   it should "correctly clean the dataframe containing map and non-map features due to max absolute fill rate " +
     "difference" in {
@@ -264,7 +283,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) =
     generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
@@ -273,7 +292,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator3, currencyGenerator2, 1000
+      currencyGenerator1, currencyGenerator3, currencyGenerator2, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -291,7 +310,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF2", "myF3"),
+      expectedDroppedFeatures = Set(c2.name, c3.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f2", "f3")
     )
@@ -305,9 +324,9 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
    * raw features - each key contains the same data as the corresponding raw feature.
    *
-   * Features f2 & f3 are switched between the training and scoring sets, so that they should have an absolute
+   * Features c2 & c3 are switched between the training and scoring sets, so that they should have an absolute
    * fill rate difference of 0.25, and a relative fill ratio difference of 6. The RawFeatureFilter is set up with a
-   * maximum fill ratio difference of 4 so both f2 and f3 (as well as their corresponding map keys) should be removed.
+   * maximum fill ratio difference of 4 so both c2 and c3 (as well as their corresponding map keys) should be removed.
    */
   it should "correctly clean the dataframe containing map and non-map features due to max fill ratio " +
     "difference" in {
@@ -320,16 +339,16 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) =
     generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator3, currencyGenerator2, 1000
+      currencyGenerator1, currencyGenerator3, currencyGenerator2, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -347,7 +366,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF2", "myF3"),
+      expectedDroppedFeatures = Set(c2.name, c3.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f2", "f3")
     )
@@ -361,7 +380,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
    * raw features - each key contains the same data as the corresponding raw feature.
    *
-   * Features f1 & f3 are switched between the training and scoring sets, so they should have a very large JS
+   * Features c1 & c3 are switched between the training and scoring sets, so they should have a very large JS
    * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
    * f1 and f3 (as well as their corresponding map keys) should be removed.
    */
@@ -374,7 +393,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Define the training dataframe and the features (these should be the same between the training and scoring
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
@@ -383,7 +402,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator3, currencyGenerator2, currencyGenerator1, 1000
+      currencyGenerator3, currencyGenerator2, currencyGenerator1, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -401,7 +420,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF1", "myF3"),
+      expectedDroppedFeatures = Set(c1.name, c3.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f1", "f3")
     )
@@ -419,7 +438,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Define the training dataframe and the features (these should be the same between the training and scoring
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator25, currencyGenerator95, currencyGenerator50, 1000
+      currencyGenerator25, currencyGenerator95, currencyGenerator50, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
@@ -428,7 +447,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator95, currencyGenerator50, currencyGenerator25, 1000
+      currencyGenerator95, currencyGenerator50, currencyGenerator25, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -447,7 +466,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       maxFillRatioDiff = Double.PositiveInfinity,
       maxJSDivergence = 1.0,
       maxCorrelation = 1.0,
-      protectedFeatures = Set("myF1")
+      protectedFeatures = Set(c1.name)
     )
     val filteredRawData = filterWithProtected.generateFilteredRaw(features, params)
 
@@ -456,7 +475,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF2"),
+      expectedDroppedFeatures = Set(c2.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f1", "f2")
     )
@@ -479,7 +498,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawDataWithResponse,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF2"),
+      expectedDroppedFeatures = Set(c2.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f1", "f2")
     )
@@ -488,26 +507,27 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     assertFeatureDistributions(filteredRawDataWithResponse, total = 12)
   }
 
+  // TODO: Add a way to protect map keys from removal?
   /**
-   * This test generates three numeric generators with the same underlying distribution, but different fill rates.
-   * Each generator corresponds to a different raw feature. Additionally, a single map feature is made from the three
-   * raw features - each key contains the same data as the corresponding raw feature.
+   * This test generates three numeric generators with very different underlying distributions. Each generator
+   * corresponds to a different raw feature. Additionally, a single map feature is made from the three raw features -
+   * each key contains the same data as the corresponding raw feature.
    *
-   * Features f1 & f3 are switched between the training and scoring sets, so they should have a very large JS
+   * Features c1 & c3 are switched between the training and scoring sets, so they should have a very large JS
    * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
-   * f1 and f3 (as well as their corresponding map keys) should be removed, but they are added to a list of features
+   * c1 and c3 (as well as their corresponding map keys) should be removed, but c3 is added to a list of features
    * protected from JS divergence removal.
    */
   it should "not drop JS divergence-protected features based on JS divergence check" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
-    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0)
+    val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
     val currencyGenerator3 = RandomReal.logNormal[Currency](mean = 1000.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
 
     // Define the training dataframe and the features (these should be the same between the training and scoring
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
@@ -516,7 +536,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator3, currencyGenerator2, currencyGenerator1, 1000
+      currencyGenerator3, currencyGenerator2, currencyGenerator1, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
@@ -533,7 +553,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       maxFillRatioDiff = Double.PositiveInfinity,
       maxJSDivergence = 0.8,
       maxCorrelation = 1.0,
-      jsDivergenceProtectedFeatures = Set("myF3")
+      jsDivergenceProtectedFeatures = Set(c3.name)
     )
     val filteredRawData = filter.generateFilteredRaw(features, params)
 
@@ -542,7 +562,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse,
-      expectedDroppedFeatures = Set("myF1"),
+      expectedDroppedFeatures = Set(c1.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f1", "f3")
     )
@@ -551,7 +571,15 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     assertFeatureDistributions(filteredRawData, total = 12)
   }
 
-
+  /**
+   * This test generates three numeric generators where ach generator corresponds to a different raw feature.
+   * Additionally, a single map feature is made from the three raw features - each key contains the same data
+   * as the corresponding raw feature.
+   *
+   * A binary label is generated with a perfect relationship to feature c2 - if it is empty then the label is 0,
+   * otherwise it is 1. Therefore feature c2 (and its corresponding map key) should be removed by the correlation
+   * check between a raw feature's null indicator and the label.
+   */
   it should "correctly drop features based on null-label correlations" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
@@ -561,27 +589,26 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Define the training dataframe and the features (these should be the same between the training and scoring
     // dataframes since they point to columns with the same names)
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
 
-    // Construct a label that we know is highly biased from the pickList data to check if SanityChecker detects it
+    // Construct a label that we know is directly correlated to the currency data
     val labelTransformer = new UnaryLambdaTransformer[Currency, RealNN](operationName = "labelFunc",
       transformFn = r => r.value match {
         case Some(v) => RealNN(1.0)
         case _ => RealNN(0.0)
       }
     )
-    val labelData = labelTransformer.setInput(c2).getOutput().asInstanceOf[Feature[RealNN]]
-      .copy(isResponse = true)
+    val labelData = labelTransformer.setInput(c2).getOutput().asInstanceOf[Feature[RealNN]].copy(isResponse = true)
     val labelDataRaw = labelData.asRaw(isResponse = true)
     val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
-      currencyGenerator1, currencyGenerator2, currencyGenerator3, 1000
+      currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
     val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(scoreDf)
 
@@ -600,7 +627,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       filteredRawData,
       mapFeatureRaw,
       featureUniverse = featureUniverse ++ Set(labelData.name),
-      expectedDroppedFeatures = Set("myF2"),
+      expectedDroppedFeatures = Set(c2.name),
       mapKeyUniverse = mapKeyUniverse,
       expectedDroppedKeys = Set("f2")
     )
