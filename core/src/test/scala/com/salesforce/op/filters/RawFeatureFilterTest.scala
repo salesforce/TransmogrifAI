@@ -778,8 +778,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     // Check the actual filtered dataframe schemas
     featureUniverse.foreach(f => {
       filteredRawData.cleanedData.schema.fields.exists(_.name == f) shouldBe !expectedDroppedFeatures.contains(f)
-      filteredRawData.cleanedData.collect(mapFeatureRaw).foreach(m =>
-        if (m.nonEmpty) m.value.keySet.intersect(expectedDroppedKeys) shouldBe Set.empty)
     })
+    filteredRawData.cleanedData.collect(mapFeatureRaw)
+      .foreach(_.value.keySet.intersect(expectedDroppedKeys) shouldBe Set.empty)
   }
 }
