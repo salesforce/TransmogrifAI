@@ -54,10 +54,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
-
-  // TODO: remove .map[Text] once Aardpfark supports null inputs for StringIndexer
-  val indexed = description.map[Text](v => if (v.isEmpty) Text("") else v)
-    .indexed(handleInvalid = StringIndexerHandleInvalid.Skip)
+  val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
 
   val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
     splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
