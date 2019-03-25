@@ -216,13 +216,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator95, currencyGenerator50, currencyGenerator25, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -246,7 +246,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // Check that using the scoring reader only will result in the rarely filled in both training and scoring sets
     // being removed
-    val filterWithScoring = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
+    val filterWithScoring = new RawFeatureFilter(trainReader, Some(scoreReader),
+      10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 1.0)
     val filteredRawDataWithScoring = filterWithScoring.generateFilteredRaw(features, params)
 
     // TODO: Add a check for the reason dropped once that information is passed on to the workflow
@@ -288,13 +289,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator3, currencyGenerator2, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -302,7 +303,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     // We should be able to set the features to either be the train features or the score ones here
     val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 0.4, Double.PositiveInfinity, 1.0, 1.0)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader),
+      10, 0.0, 0.4, Double.PositiveInfinity, 1.0, 1.0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
 
     // TODO: Add a check for the reason dropped once that information is passed on to the workflow
@@ -350,7 +352,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator3, currencyGenerator2, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -398,13 +400,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator3, currencyGenerator2, currencyGenerator1, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -443,13 +445,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator95, currencyGenerator50, currencyGenerator25, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -532,13 +534,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator3, currencyGenerator2, currencyGenerator1, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -604,13 +606,13 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     )
     val labelData = labelTransformer.setInput(c2).getOutput().asInstanceOf[Feature[RealNN]].copy(isResponse = true)
     val labelDataRaw = labelData.asRaw(isResponse = true)
-    val transformedTrainDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(trainDf)
+    val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(trainDf)
 
     // Define the scoring dataframe (we can reuse the existing features so don't need to keep them)
     val (scoreDf, _, _, _) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val transformedScoreDf =  new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(scoreDf)
+    val transformedScoreDf = new OpWorkflow().setResultFeatures(mapFeature, labelData).transform(scoreDf)
 
     // Define the readers
     val (trainReader, scoreReader) = makeReaders(transformedTrainDf, transformedScoreDf)
@@ -650,12 +652,11 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * @tparam F3       Type of feature 3
    * @return          Tuple containing the generated dataframe and each individual OPFeature
    */
-  def generateRandomDfAndFeatures[
-  F1 <: FeatureType : TypeTag,
-  F2 <: FeatureType : TypeTag,
-  F3 <: FeatureType : TypeTag
+  def generateRandomDfAndFeatures[F1 <: FeatureType : TypeTag,
+    F2 <: FeatureType : TypeTag,
+    F3 <: FeatureType : TypeTag
   ](f1: RandomData[F1], f2: RandomData[F2], f3: RandomData[F3], numRows: Int):
-  (Dataset[Row], Feature[F1], Feature[F2], Feature[F3])  = {
+  (Dataset[Row], Feature[F1], Feature[F2], Feature[F3]) = {
 
     val f1Data = f1.limit(numRows)
     val f2Data = f2.limit(numRows)
@@ -685,13 +686,12 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * @tparam F4       Type of feature 4
    * @return          Tuple containing the generated dataframe and each individual OPFeature
    */
-  def generateRandomDfAndFeatures[
-  F1 <: FeatureType : TypeTag,
-  F2 <: FeatureType : TypeTag,
-  F3 <: FeatureType : TypeTag,
-  F4 <: FeatureType : TypeTag
+  def generateRandomDfAndFeatures[F1 <: FeatureType : TypeTag,
+    F2 <: FeatureType : TypeTag,
+    F3 <: FeatureType : TypeTag,
+    F4 <: FeatureType : TypeTag
   ](f1: RandomData[F1], f2: RandomData[F2], f3: RandomData[F3], f4: RandomData[F4], numRows: Int):
-  (Dataset[Row], Feature[F1], Feature[F2], Feature[F3], Feature[F4])  = {
+  (Dataset[Row], Feature[F1], Feature[F2], Feature[F3], Feature[F4]) = {
 
     val f1Data = f1.limit(numRows)
     val f2Data = f2.limit(numRows)
