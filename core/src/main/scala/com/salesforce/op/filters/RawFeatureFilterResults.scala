@@ -32,6 +32,7 @@ package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.json.EnumEntrySerializer
+import enumeratum.{Enum, EnumEntry}
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -51,7 +52,7 @@ case class RawFeatureFilterResults
   rawFeatureDistributions: Seq[FeatureDistribution] = Seq.empty,
   rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
-) extends RawFeatureFilterResultsLike
+)
 
 object RawFeatureFilterResults {
 
@@ -78,6 +79,12 @@ object RawFeatureFilterResults {
 
 }
 
+sealed trait RawFeatureFilterResultsType extends EnumEntry with Serializable
+
+object RawFeatureFilterResultsType extends Enum[RawFeatureFilterResultsType] {
+  val values: Seq[RawFeatureFilterResultsType] = findValues
+}
+
 /**
  * Contains configuration settings for Raw Feature Filter
  */
@@ -91,7 +98,7 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
-) extends RawFeatureFilterConfigLike
+)
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter
@@ -113,7 +120,7 @@ case class RawFeatureFilterMetrics
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
   fillRatioDiff: Option[Double]
-) extends RawFeatureFilterMetricsLike
+)
 
 /**
  * Contains results of Raw Feature Filter tests for a given feature
@@ -137,4 +144,4 @@ case class ExclusionReasons
   fillRateDiffMismatch: Boolean,
   fillRatioDiffMismatch: Boolean,
   excluded: Boolean
-) extends ExclusionReasonsLike
+)
