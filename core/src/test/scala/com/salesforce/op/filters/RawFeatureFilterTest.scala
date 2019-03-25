@@ -91,11 +91,11 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       Double.PositiveInfinity, 1.0, 1.0)
     val (rawFeatureFilterMetrics, _, _, _) = filter.getFeaturesToExclude(trainSummaries, Seq.empty, Map.empty)
     rawFeatureFilterMetrics.map(_.trainingFillRate) shouldBe List(0.9, 0.0, 0.9, 0.05, 0.1, 0.05)
-    rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldBe List(None, None, None, None, None, None)
-    rawFeatureFilterMetrics.map(_.scoringFillRate) shouldBe List(None, None, None, None, None, None)
-    rawFeatureFilterMetrics.map(_.jsDivergence) shouldBe List(None, None, None, None, None, None)
-    rawFeatureFilterMetrics.map(_.fillRateDiff) shouldBe List(None, None, None, None, None, None)
-    rawFeatureFilterMetrics.map(_.fillRatioDiff) shouldBe List(None, None, None, None, None, None)
+    rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldBe List.fill(6)(None)
+    rawFeatureFilterMetrics.map(_.scoringFillRate) shouldBe List.fill(6)(None)
+    rawFeatureFilterMetrics.map(_.jsDivergence) shouldBe List.fill(6)(None)
+    rawFeatureFilterMetrics.map(_.fillRateDiff) shouldBe List.fill(6)(None)
+    rawFeatureFilterMetrics.map(_.fillRatioDiff) shouldBe List.fill(6)(None)
   }
 
   it should "correctly compute and store raw feature filter metrics when correlation is unavailable and " +
@@ -105,7 +105,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       Double.PositiveInfinity, 1.0, 1.0)
     val (rawFeatureFilterMetrics, _, _, _) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     rawFeatureFilterMetrics.map(_.trainingFillRate) shouldEqual List(0.9, 0.0, 0.9, 0.05, 0.1, 0.05)
-    rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldEqual List(None, None, None, None, None, None)
+    rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldEqual List.fill(6)(None)
     rawFeatureFilterMetrics.map(_.scoringFillRate) shouldEqual
       List(Some(0.2), Some(0.0), Some(0.9), Some(0.05), Some(0.0), Some(0.0))
     rawFeatureFilterMetrics.map(_.jsDivergence).dropRight(2) shouldEqual

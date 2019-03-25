@@ -51,7 +51,7 @@ case class RawFeatureFilterResults
   rawFeatureDistributions: Seq[FeatureDistribution] = Seq.empty,
   rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
-) extends RawFeatureFilterResultsLike
+)
 
 object RawFeatureFilterResults {
 
@@ -91,7 +91,7 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
-) extends RawFeatureFilterConfigLike
+)
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter
@@ -113,7 +113,7 @@ case class RawFeatureFilterMetrics
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
   fillRatioDiff: Option[Double]
-) extends RawFeatureFilterMetricsLike
+)
 
 /**
  * Contains results of Raw Feature Filter tests for a given feature
@@ -137,4 +137,4 @@ case class ExclusionReasons
   fillRateDiffMismatch: Boolean,
   fillRatioDiffMismatch: Boolean,
   excluded: Boolean
-) extends ExclusionReasonsLike
+)
