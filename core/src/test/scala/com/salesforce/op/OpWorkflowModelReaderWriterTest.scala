@@ -339,7 +339,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   def compareRawFeatureFilterConfig(c1: RawFeatureFilterConfig, c2: RawFeatureFilterConfig): Unit = {
-    c1.minFill shouldBe  c2.minFill
+    c1.minFill shouldBe c2.minFill
     c1.maxFillDifference shouldBe c2.maxFillDifference
     c1.maxFillRatioDiff shouldBe c2.maxFillRatioDiff
     c1.maxJSDivergence shouldBe c2.maxJSDivergence
@@ -347,7 +347,6 @@ class OpWorkflowModelReaderWriterTest
     c1.correlationType shouldBe c2.correlationType
     c1.jsDivergenceProtectedFeatures shouldBe c2.jsDivergenceProtectedFeatures
     c1.protectedFeatures shouldBe c2.protectedFeatures
-
   }
 
   def compareDistributions(d1: Seq[FeatureDistribution], d2: Seq[FeatureDistribution]): Unit = {

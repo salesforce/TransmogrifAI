@@ -31,8 +31,6 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import com.salesforce.op.utils.json.EnumEntrySerializer
-import enumeratum.{Enum, EnumEntry}
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -56,8 +54,7 @@ case class RawFeatureFilterResults
 
 object RawFeatureFilterResults {
 
-  implicit val jsonFormats: Formats = DefaultFormats +
-    EnumEntrySerializer.json4s[RawFeatureFilterResultsType](RawFeatureFilterResultsType)
+  implicit val jsonFormats: Formats = DefaultFormats
 
   /**
    * RawFeatureFilterResults to json
@@ -73,16 +70,9 @@ object RawFeatureFilterResults {
    * @param json json
    * @return raw feature filter results
    */
-  def fromJson(json: String): Try[RawFeatureFilterResults] = Try {
-    Serialization.read[RawFeatureFilterResults](json)
-  }
+  def fromJson(json: String): Try[RawFeatureFilterResults] =
+    Try { Serialization.read[RawFeatureFilterResults](json) }
 
-}
-
-sealed trait RawFeatureFilterResultsType extends EnumEntry with Serializable
-
-object RawFeatureFilterResultsType extends Enum[RawFeatureFilterResultsType] {
-  val values: Seq[RawFeatureFilterResultsType] = findValues
 }
 
 /**

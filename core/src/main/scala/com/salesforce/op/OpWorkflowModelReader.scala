@@ -90,20 +90,12 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json, path))
       blacklist <- Try(resolveBlacklist(json))
       results <- resolveRawFeatureFilterResults(json)
-      distributions <- resolveRawFeatureDistributions(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
       .setBlacklist(blacklist)
-      .setRawFeatureFilterResults(
-        if (results.rawFeatureDistributions.nonEmpty) { // for backwards compatibility
-          results
-        }
-        else {
-          RawFeatureFilterResults(rawFeatureDistributions = distributions)
-        }
-      )
+      .setRawFeatureFilterResults(results)
   }
 
   private def resolveBlacklist(json: JValue): Array[OPFeature] = {
@@ -170,9 +162,7 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
    * This resolve function is to allow backwards compatibility where RawFeatureDistributions was a saved field
    */
   private def resolveRawFeatureDistributions(json: JValue): Try[Seq[FeatureDistribution]] = {
-
     val rawFeatureDistributionsEntryName = "rawFeatureDistributions"
-
     if ((json \ rawFeatureDistributionsEntryName) != JNothing) { // for backwards compatibility
       val distString = (json \ rawFeatureDistributionsEntryName).extract[String]
       FeatureDistribution.fromJson(distString)
@@ -185,8 +175,13 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     if ((json \ RawFeatureFilterResultsFieldName.entryName) != JNothing) { // for backwards compatibility
       val resultsString = (json \ RawFeatureFilterResultsFieldName.entryName).extract[String]
       RawFeatureFilterResults.fromJson(resultsString)
-    } else {
-      Success(RawFeatureFilterResults())
+    }
+    else {
+      val distributions = resolveRawFeatureDistributions(json) match { // sets raw feature distributions if available
+        case Success(d) => d
+        case Failure(_) => Seq.empty
+      }
+      Success(RawFeatureFilterResults(rawFeatureDistributions = distributions))
     }
   }
 

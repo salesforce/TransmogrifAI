@@ -263,12 +263,12 @@ class RawFeatureFilter[T]
 
       require(scoringDistribs.length == featureSize, "scoring and training features must match")
 
-      val scoringFillRates = scoringDistribs.map(distrib => Some(distrib.fillRate()))
+      val scoringFillRates = scoringDistribs.map(distrib => Option(distrib.fillRate()))
 
       val combined = trainingDistribs.zip(scoringDistribs)
-      val jsDivergences = combined.map { case (t, s) => Some(t.jsDivergence(s)) }
-      val fillRateDiffs = combined.map { case (t, s) => Some(t.relativeFillRate(s)) }
-      val fillRatioDiffs = combined.map { case (t, s) => Some(t.relativeFillRatio(s)) }
+      val jsDivergences = combined.map { case (t, s) => Option(t.jsDivergence(s)) }
+      val fillRateDiffs = combined.map { case (t, s) => Option(t.relativeFillRate(s)) }
+      val fillRatioDiffs = combined.map { case (t, s) => Option(t.relativeFillRatio(s)) }
 
       val rawFeatureFilterMetrics = combineRawFeatureFilterMetrics(
         trainingDistribs, trainingFillRates, trainingNullLabelAbsoluteCorrs,
