@@ -56,7 +56,7 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
   extends SequenceEstimator[T, OPVector](operationName = "vecPivotTextMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
-    with MaxPercentageCardinalityParams with CountUniqueMapFun {
+    with MaxPercentageCardinalityParams with UniqueCountFun {
 
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
@@ -66,19 +66,18 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
     def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
     val maxPctCard = $(maxPercentageCardinality)
-    val finalDataset = if (maxPctCard != 1.0) {
-      implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
-      implicit val spark = dataset.sparkSession
-      implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
-      val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(bits))
+    val finalDataset =
+      if (maxPctCard == 1.0) dataset
+      else {
+        implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+        implicit val kryo = new KryoSerializer(dataset.sparkSession.sparkContext.getConf)
+        val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(hllBits))
 
-      val percentFilter = uniqueCounts.flatMap(_.map { case (k, v) =>
-        k -> (v.estimatedSize / n < $(maxPercentageCardinality))
-      }.toSeq).toMap
-      filterHighCardinality(dataset, percentFilter)
-    } else {
-      dataset
-    }
+        val percentFilter = uniqueCounts.flatMap(_.map { case (k, v) =>
+          k -> (v.estimatedSize / n < $(maxPercentageCardinality))}.toSeq
+        ).toMap
+        filterHighCardinality(dataset, percentFilter)
+      }
 
     val categoryMaps: Dataset[SeqMapMap] =
       getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)

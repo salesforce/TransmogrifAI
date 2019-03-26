@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.{FeatureBuilder, FeatureSparkTypes}
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.features.types._
-import com.salesforce.op.testkit.{RandomReal, RandomVector}
+import com.salesforce.op.testkit.{RandomMap, RandomReal, RandomVector}
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql._
@@ -46,14 +46,15 @@ import com.twitter.algebird.Operators._
 import scala.reflect.ClassTag
 
 @RunWith(classOf[JUnitRunner])
-class CountUniqueTest extends FlatSpec with TestSparkContext with OneHotFun {
-  val bits = 12
+class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun {
+  import spark.implicits._
+
   implicit val classTag: ClassTag[Double] = ReflectionUtils.classTagForWeakTypeTag[Double]
   implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
-  lazy val data = createData(10000, 1000)
+  val bits = 12
 
-
-  Spec[OpOneHotVectorizer[_]] should "count uniques" in {
+  Spec[OneHotFun] should "count uniques" in {
+    val data = createData(1000, 10)
     val m = data.first.size
     val (uniqueCounts, n) = countUniques(data, size = m, bits = bits)
     val expected = countUniquesManually(data)
@@ -61,22 +62,46 @@ class CountUniqueTest extends FlatSpec with TestSparkContext with OneHotFun {
     n shouldBe data.count()
   }
 
+  it should "count unique maps" in {
+    val data = createMapData(1000, 10)
+    val m = data.first.size
+    val (uniqueCounts, n) = countMapUniques(data, size = m, bits = bits)
+    n shouldBe data.count()
+    val expected = countUniquesMapManually(data)
+    uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) should contain theSameElementsAs expected
+  }
 
-  def createData(nRows: Int, nCols: Int): Dataset[Seq[Double]] = {
+
+  private def createMapData(nRows: Int, nCols: Int): Dataset[Seq[Map[String, Double]]] = {
+    val poisson = RandomReal.poisson[Real](10)
+    val seq = (0 until nCols).map(j =>
+      RandomMap.ofReals[Real, RealMap](poisson, 1, 4).withKeys(i => s"$j$i").limit(nRows)
+    ).transpose
+    val features = (0 until nCols).map(i => FeatureBuilder.fromRow[RealMap](i.toString).asPredictor)
+    val schema = FeatureSparkTypes.toStructType(features: _ *)
+    implicit val rowEncoder = RowEncoder(schema)
+    val data = seq.map(p => Row.fromSeq(p.map(_.value))).toDF().map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
+    data.persist
+  }
+
+  private def createData(nRows: Int, nCols: Int): Dataset[Seq[Double]] = {
     val fv = RandomVector.dense(RandomReal.poisson(10), nCols).limit(nRows)
     val seq = fv.map(_.value.toArray.toSeq.map(_.toReal))
     val features = (0 until nCols).map(i => FeatureBuilder.fromRow[Real](i.toString).asPredictor)
     val schema = FeatureSparkTypes.toStructType(features: _ *)
     implicit val rowEncoder = RowEncoder(schema)
-    import spark.implicits._
     val data = seq.map(p => Row.fromSeq(
       p.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
     )).toDF().map(_.toSeq.map(_.asInstanceOf[Double]))
     data.persist
   }
 
-
-  def countUniquesManually(data: Dataset[Seq[Double]]): Seq[Int] = {
+  private def countUniquesManually(data: Dataset[Seq[Double]]): Seq[Int] = {
     data.rdd.map(_.map(v => Map(v -> 1L))).reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }).map(_.size)
+  }
+
+  private def countUniquesMapManually(data: Dataset[Seq[Map[String, Double]]]): Seq[Int] = {
+    data.rdd.map(_.map(_.flatMap { case (k, v) => Map(k -> Map(v -> 1L)) }))
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }).flatMap(_.map(_._2.size))
   }
 }

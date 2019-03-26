@@ -35,20 +35,15 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
-import com.twitter.algebird.{HLL, HyperLogLogMonoid}
-import org.apache.spark.SparkConf
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.types.StructField
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.{Dataset, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /**
@@ -524,30 +519,6 @@ trait TrackTextLenParam extends Params {
   def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
 }
 
-trait CountUniqueMapFun {
-  type HLLMap = Map[String, HLL]
-  protected implicit val hllMapSeqEnc: Encoder[Seq[HLLMap]] = org.apache.spark.sql.Encoders.kryo[Seq[HLLMap]]
-  protected def countMapUniques[V: ClassTag, T <: OPMap[V]](in: Dataset[Seq[T#Value]], size: Int, bits: Int)
-    (implicit kryo: KryoSerializer): (Seq[HLLMap], Long) = {
-    val rdd = in.rdd
-    val hll = new HyperLogLogMonoid(bits)
-    val hllRDD = rdd.mapPartitions { it =>
-      val ks = kryo.newInstance()
-      it.map(_.map(_.map { case (k, v) =>
-        k -> hll.create(ks.serialize(v).array())
-      }))
-    }.map(_ -> 1L)
-    val zero = Seq.fill(size)(Map.empty[String, HLL])
-    val countMapUniques: (Seq[HLLMap], Long) = hllRDD.fold(zero -> 0L) {case  ((a, c1), (b, c2)) =>
-      a.zip(b).map { case (m1, m2) => (m1 ++ m2).map {
-        case (k, v) => k -> (v + m1.getOrElse(k, hll.zero))
-      }
-      } -> (c1 + c2)
-    }
-    countMapUniques
-  }
-}
-
 trait CleanTextFun {
   def cleanTextFn(s: String, shouldClean: Boolean): String = if (shouldClean) TextUtils.cleanString(s) else s
 }
@@ -664,8 +635,6 @@ trait MapStringPivotHelper extends SaveOthersParams {
   protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
   protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
 
-
-
   protected def getCategoryMaps[V]
   (
     in: Dataset[Seq[Map[String, V]]],
@@ -684,7 +653,6 @@ trait MapStringPivotHelper extends SaveOthersParams {
     filter: Map[String, Boolean]
   ): Dataset[Seq[Map[String, V]]] = {
     implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, V]]]
-
     in.map(_.map(_.filter { case (k, _) => filter.getOrElse(k, true) }))
   }
 

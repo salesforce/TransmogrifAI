@@ -265,19 +265,17 @@ trait MaxPercentageCardinalityParams extends Params {
     doc = "max percentage of distinct values a categorical feature can have",
     isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
   )
-
   final def setMaxPercentageCardinality(v: Double): this.type = set(maxPercentageCardinality, v)
-
   final def getMaxPercentageCardinality: Double = $(maxPercentageCardinality)
-
   setDefault(maxPercentageCardinality -> 1.0)
 
-  final val bits = new IntParam(
-    parent = this, name = "bit", doc = "Number of bits used for hashing. Error is about 1.04/sqrt(2^{bits})." +
-      " Default is 12 bits for 1% error which means each HLLInstance is about 2^{12} = 4kb per instance.",
+  final val hllBits = new IntParam(
+    parent = this, name = "hllBits", doc =
+      "Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits})." +
+        " Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.",
     isValid = ParamValidators.gtEq(4)
   )
-  setDefault(bits, 12)
-
-  def setBits(value: Int): this.type = set(bits, value)
+  final def setHLLBits(value: Int): this.type = set(hllBits, value)
+  final def getHLLBits: Int = $(hllBits)
+  setDefault(hllBits, 12)
 }
