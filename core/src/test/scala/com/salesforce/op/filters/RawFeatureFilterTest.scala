@@ -33,7 +33,7 @@ package com.salesforce.op.filters
 import com.salesforce.op.{OpParams, OpWorkflow}
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.{CustomReader, ReaderKey}
+import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.test._
 import com.salesforce.op.testkit._
@@ -43,6 +43,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.log4j.Level
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
+import com.twitter.algebird.Operators._
 import org.junit.runner.RunWith
 import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
@@ -153,13 +154,128 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedBothAllMK shouldBe empty
   }
 
+  it should "correctly clean the dataframe returned and give the features to blacklist" in {
+    val params = new OpParams()
+    val survPred = survived.copy(isResponse = false)
+    val features: Array[OPFeature] =
+      Array(survPred, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filter = new RawFeatureFilter(dataReader, Some(simpleReader),
+      10, 0.0, 1.0, Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop shouldBe empty
+    filteredRawData.mapKeysToDrop shouldBe empty
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
+
+    assertFeatureDistributions(filteredRawData, total = 26)
+
+    val filter1 = new RawFeatureFilter(dataReader, Some(simpleReader),
+      10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
+    val filteredRawData1 = filter1.generateFilteredRaw(features, params)
+    filteredRawData1.featuresToDrop should contain theSameElementsAs Array(survPred)
+    filteredRawData1.mapKeysToDrop should contain theSameElementsAs Map(
+      "numericMap" -> Set("Male"), "booleanMap" -> Set("Male"), "stringMap" -> Set("Male"))
+    filteredRawData1.cleanedData.schema.fields.exists(_.name == survPred.name) shouldBe false
+    filteredRawData1.cleanedData.collect(stringMap).foreach(m =>
+      if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    assertFeatureDistributions(filteredRawData, total = 26)
+  }
+
+  it should "not drop response features" in {
+    val params = new OpParams()
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filter = new RawFeatureFilter(dataReader, Some(simpleReader),
+      10, 0.5, 0.5, Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop shouldBe empty
+    filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
+    filteredRawData.cleanedData.collect(stringMap)
+      .foreach(m => if (m.nonEmpty) m.value.keySet shouldEqual Set("Female"))
+    assertFeatureDistributions(filteredRawData, total = 26)
+  }
+
+  it should "not drop protected features" in {
+    val params = new OpParams()
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded)
+    val filter = new RawFeatureFilter(dataReader, Some(simpleReader),
+      10, 0.1, 0.1, 2, 0.2, 0.9, minScoringRows = 0)
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
+      Array(DataFrameFieldNames.KeyFieldName, survived.name)
+    assertFeatureDistributions(filteredRawData, total = 14)
+
+    val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader),
+      10, 0.1, 0.1, 2, 0.2, 0.9, minScoringRows = 0,
+      protectedFeatures = Set(age.name, gender.name))
+    val filteredRawData2 = filter2.generateFilteredRaw(features, params)
+    filteredRawData2.featuresToDrop.toSet shouldEqual Set(height, weight, description, boarded)
+    filteredRawData2.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
+      Array(DataFrameFieldNames.KeyFieldName, survived.name, age.name, gender.name)
+    assertFeatureDistributions(filteredRawData, total = 14)
+  }
+
+  it should "not drop JS divergence-protected features based on JS divergence check" in {
+    val params = new OpParams()
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded, boardedTime, boardedTimeAsDateTime)
+    val filter = new RawFeatureFilter(
+      trainingReader = dataReader,
+      scoringReader = Some(simpleReader),
+      bins = 10,
+      minFill = 0.0,
+      maxFillDifference = 1.0,
+      maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 0.0,
+      maxCorrelation = 1.0,
+      jsDivergenceProtectedFeatures = Set(boardedTime.name, boardedTimeAsDateTime.name),
+      minScoringRows = 0
+    )
+
+    val filteredRawData = filter.generateFilteredRaw(features, params)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
+      Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
+    assertFeatureDistributions(filteredRawData, total = 18)
+  }
+
+  it should "correctly drop features based on null-label leakage correlation greater than 0.9" in {
+    val expectedDropped = Seq(boarded, weight, gender)
+    val expectedMapKeys = Seq("Female", "Male")
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.9, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
+  }
+
+  it should "correctly drop features based on null-label leakage correlation greater than 0.6" in {
+    val expectedDropped = Seq(boarded, weight, gender, age)
+    val expectedMapKeys = Seq("Female", "Male")
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.6, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
+  }
+
+  it should "correctly drop features based on null-label leakage correlation greater than 0.4" in {
+    val expectedDropped = Seq(boarded, weight, gender, age, description)
+    val expectedMapKeys = Seq("Male")
+    val expectedDroppedMapKeys = Map("booleanMap" -> Set("Female"), "stringMap" -> Set("Female"),
+      "numericMap" -> Set("Female"))
+    nullLabelCorrelationTest(0.4, expectedDropped, expectedMapKeys, expectedDroppedMapKeys)
+  }
+
+  it should "correctly drop features based on null-label leakage correlation greater than 0.3" in {
+    val expectedDropped = Seq(boarded, weight, gender, age, description, booleanMap, numericMap, stringMap)
+    // all the maps dropped
+    val expectedDroppedMapKeys = Map[String, Set[String]]()
+    nullLabelCorrelationTest(0.3, expectedDropped, Seq(), expectedDroppedMapKeys)
+  }
+
   /**
    * This test uses several data generators to generate data according to different distributions, makes a reader
    * corresponding to the generated dataframe, and then uses that as both the training and scoring reader in
    * RawFeatureFilter. Not only should no features be removed, but the training and scoring distributions should be
    * identical.
    */
-  it should "not remove any features when the training and scoring sets are identical" in {
+  it should "not remove any features when the training and scoring sets are identical generated data" in {
     // Define random generators that will be the same for training and scoring dataframes
     val cityGenerator = RandomText.cities.withProbabilityOfEmpty(0.2)
     val countryGenerator = RandomText.countries.withProbabilityOfEmpty(0.2)
@@ -202,7 +318,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * are used.
    *
    */
-  it should "correctly clean the dataframe containing map and non-map features due to min fill rate" in {
+  it should "correctly clean randomly generated map and non-map features due to min fill rate" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
     val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
@@ -273,7 +389,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * fill rate difference of 0.6. The RawFeatureFilter is set up with a maximum absolute fill rate of 0.4 so both
    * c2 and c3 (as well as their corresponding map keys f2 & f3) should be removed.
    */
-  it should "correctly clean the dataframe containing map and non-map features due to max absolute fill rate " +
+  it should "correctly clean the randomly generated map and non-map features due to max absolute fill rate " +
     "difference" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
@@ -330,7 +446,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * fill rate difference of 0.25, and a relative fill ratio difference of 6. The RawFeatureFilter is set up with a
    * maximum fill ratio difference of 4 so both c2 and c3 (as well as their corresponding map keys) should be removed.
    */
-  it should "correctly clean the dataframe containing map and non-map features due to max fill ratio " +
+  it should "correctly clean the randomly generated map and non-map features due to max fill ratio " +
     "difference" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.0)
@@ -386,7 +502,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * divergence (practically, 1.0). The RawFeatureFilter is set up with a maximum JS divergence of 0.8, so both
    * f1 and f3 (as well as their corresponding map keys) should be removed.
    */
-  it should "correctly clean the dataframe containing map and non-map features due to JS divergence" in {
+  it should "correctly clean the randomly generated map and non-map features due to JS divergence" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
     val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0)
@@ -431,7 +547,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     assertFeatureDistributions(filteredRawData, total = 12)
   }
 
-  it should "not drop protected raw features or response features" in {
+  it should "not drop protected raw features or response features from generated data" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator25 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.25)
     val currencyGenerator95 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.95)
@@ -520,7 +636,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * c1 and c3 (as well as their corresponding map keys) should be removed, but c3 is added to a list of features
    * protected from JS divergence removal.
    */
-  it should "not drop JS divergence-protected features based on JS divergence check" in {
+  it should "not drop JS divergence-protected features based on JS divergence check with generated data" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 1.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
     val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 5.0).withProbabilityOfEmpty(0.1)
@@ -582,7 +698,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * otherwise it is 1. Therefore feature c2 (and its corresponding map key) should be removed by the correlation
    * check between a raw feature's null indicator and the label.
    */
-  it should "correctly drop features based on null-label correlations" in {
+  it should "correctly drop features based on null-label correlations with generated data" in {
     // Define random generators that will be the same for training and scoring dataframes
     val currencyGenerator1 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
     val currencyGenerator2 = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0).withProbabilityOfEmpty(0.3)
@@ -725,6 +841,46 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
         train.nulls shouldBe score.nulls
         train.distribution shouldBe score.distribution
         train.summaryInfo shouldBe score.summaryInfo
+    }
+  }
+
+  private def nullLabelCorrelationTest(
+    maxCorrelation: Double,
+    expectedDropped: Seq[OPFeature],
+    expectedMapKeys: Seq[String],
+    expectedDroppedMapKeys: Map[String, Set[String]]
+  ): Unit = {
+    def getFilter(maxCorrelation: Double): RawFeatureFilter[Passenger] = new RawFeatureFilter(
+      trainingReader = dataReader,
+      scoringReader = Some(simpleReader),
+      bins = 10,
+      minFill = 0.0,
+      maxFillDifference = 1.0,
+      maxFillRatioDiff = Double.PositiveInfinity,
+      maxJSDivergence = 1.0,
+      maxCorrelation = maxCorrelation,
+      minScoringRows = 0)
+
+    val params = new OpParams()
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filteredRawData@FilteredRawData(df, dropped, droppedKeyValue, _) =
+      getFilter(maxCorrelation).generateFilteredRaw(features, params)
+
+    assertFeatureDistributions(filteredRawData, total = 26)
+    dropped should contain theSameElementsAs expectedDropped
+    droppedKeyValue should contain theSameElementsAs expectedDroppedMapKeys
+
+    df.schema.fields.map(_.name) should contain theSameElementsAs
+      DataFrameFieldNames.KeyFieldName +: features.diff(dropped).map(_.name)
+    if (expectedMapKeys.nonEmpty) {
+      df.collect(booleanMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
+      df.collect(numericMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
+      df.collect(stringMap).map(_.value.keySet).reduce(_ + _) should contain theSameElementsAs expectedMapKeys
+    } else {
+      intercept[IllegalArgumentException] { df.collect(booleanMap) }
+      intercept[IllegalArgumentException] { df.collect(numericMap) }
+      intercept[IllegalArgumentException] { df.collect(stringMap) }
     }
   }
 
