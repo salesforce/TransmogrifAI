@@ -197,12 +197,12 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
     val json = FeatureDistribution.toJson(Array(fd1, fd2))
     FeatureDistribution.fromJson(json) match {
-      case Success(r) => r.deep shouldBe Seq(fd1, fd2)
+      case Success(r) => r shouldBe Seq(fd1, fd2)
       case Failure(e) => fail(e)
     }
   }
 
-  it should "marshall to/from json with default ctor args" in {
+  it should "marshall to/from json with default vector args" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
     val fd2 = FeatureDistribution("A", Some("X"), 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
     val json =
@@ -211,7 +211,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
         |""".stripMargin
 
     FeatureDistribution.fromJson(json) match {
-      case Success(r) => r.deep shouldBe Seq(fd1, fd2)
+      case Success(r) => r shouldBe Seq(fd1, fd2)
       case Failure(e) => fail(e)
     }
   }

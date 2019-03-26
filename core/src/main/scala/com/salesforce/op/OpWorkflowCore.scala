@@ -34,7 +34,7 @@ import com.salesforce.op.utils.stages.FitStagesUtil._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.features.{FeatureDistributionType, OPFeature}
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -74,8 +74,8 @@ private[op] trait OpWorkflowCore {
   // map keys that were blacklisted from use in dag
   private[op] var blacklistedMapKeys: Map[String, Set[String]] = Map[String, Set[String]]()
 
-  // raw feature distributions calculated in raw feature filter
-  private[op] var rawFeatureDistributions: Array[FeatureDistribution] = Array[FeatureDistribution]()
+  // raw feature filter results calculated in raw feature filter
+  private[op] var rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
 
   // stages of the workflow
   private[op] var stages: Array[OPStage] = Array[OPStage]()
@@ -93,8 +93,8 @@ private[op] trait OpWorkflowCore {
     this
   }
 
-  private[op] final def setRawFeatureDistributions(distributions: Array[FeatureDistribution]): this.type = {
-    rawFeatureDistributions = distributions
+  private[op] final def setRawFeatureFilterResults(results: RawFeatureFilterResults): this.type = {
+    rawFeatureFilterResults = results
     this
   }
 
@@ -198,21 +198,28 @@ private[op] trait OpWorkflowCore {
    * Get raw feature distribution information computed on training and scoring data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawFeatureDistributions(): Array[FeatureDistribution] = rawFeatureDistributions
+  final def getRawFeatureDistributions(): Seq[FeatureDistribution] = rawFeatureFilterResults.rawFeatureDistributions
 
   /**
    * Get raw feature distribution information computed on training data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawTrainingFeatureDistributions(): Array[FeatureDistribution] =
-    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
+  final def getRawTrainingFeatureDistributions(): Seq[FeatureDistribution] =
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Training)
 
   /**
    * Get raw feature distribution information computed on scoring data during raw feature filter
    * @return sequence of feature distribution information
    */
-  final def getRawScoringFeatureDistributions(): Array[FeatureDistribution] =
-    rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+  final def getRawScoringFeatureDistributions(): Seq[FeatureDistribution] =
+    rawFeatureFilterResults.rawFeatureDistributions.filter(_.`type` == FeatureDistributionType.Scoring)
+
+  /**
+   * Get raw feature filter results (filter configuration, feature distributions, and feature exclusion reasons)
+   * @return raw feature filter results
+   */
+  final def getRawFeatureFilterResults(): RawFeatureFilterResults = rawFeatureFilterResults
+
 
   /**
    * Determine if any of the raw features do not have a matching reader

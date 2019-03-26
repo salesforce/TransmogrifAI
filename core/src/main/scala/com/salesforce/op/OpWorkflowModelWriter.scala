@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.FeatureJsonHelper
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageWriter}
 import enumeratum._
 import org.apache.hadoop.fs.Path
@@ -81,7 +81,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
       (FN.AllFeatures.entryName -> allFeaturesJArray) ~
       (FN.Parameters.entryName -> model.parameters.toJson(pretty = false)) ~
       (FN.TrainParameters.entryName -> model.trainingParams.toJson(pretty = false)) ~
-      (FN.RawFeatureDistributions.entryName -> FeatureDistribution.toJson(model.getRawFeatureDistributions()))
+      (FN.RawFeatureFilterResultsFieldName.entryName ->
+        RawFeatureFilterResults.toJson(model.getRawFeatureFilterResults()))
   }
 
   private def resultFeaturesJArray(): JArray =
@@ -138,7 +139,7 @@ private[op] object OpWorkflowModelReadWriteShared {
     case object AllFeatures extends FieldNames("allFeatures")
     case object Parameters extends FieldNames("parameters")
     case object TrainParameters extends FieldNames("trainParameters")
-    case object RawFeatureDistributions extends FieldNames("rawFeatureDistributions")
+    case object RawFeatureFilterResultsFieldName extends FieldNames("rawFeatureFilterResults")
   }
 
 }
