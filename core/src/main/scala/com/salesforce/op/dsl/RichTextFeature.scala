@@ -534,7 +534,6 @@ trait RichTextFeature {
      * @param trackNulls    produce column indicating if the number was null
      * @param fillValue     value to fill in for nulls in vactor creation
      * @param others        other phone numbers to vectorize
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return vector feature containing information about phone number
      */
@@ -543,8 +542,7 @@ trait RichTextFeature {
       isStrict: Boolean = PhoneNumberParser.StrictValidation,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       fillValue: Boolean = TransmogrifierDefaults.BinaryFillValue,
-      others: Array[FeatureLike[Phone]] = Array.empty,
-      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
+      others: Array[FeatureLike[Phone]] = Array.empty
     ): FeatureLike[OPVector] = {
       val valid = (f +: others).map(_.isValidPhoneDefaultCountry(defaultRegion = defaultRegion, isStrict = isStrict))
       valid.head.vectorize(others = valid.tail, fillValue = fillValue, trackNulls = trackNulls)
