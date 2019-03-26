@@ -179,7 +179,7 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     else {
       val distributions = resolveRawFeatureDistributions(json) match { // sets raw feature distributions if available
         case Success(d) => d
-        case Failure(_) => Seq.empty
+        case Failure(_) => throw new RuntimeException("Error resolving raw feature distributions")
       }
       Success(RawFeatureFilterResults(rawFeatureDistributions = distributions))
     }

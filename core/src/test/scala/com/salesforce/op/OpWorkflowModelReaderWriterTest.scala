@@ -318,7 +318,7 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareRawFeatureFilterResults(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
+    RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
@@ -329,70 +329,13 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareRawFeatureFilterResults(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
+    RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareParams(p1: OpParams, p2: OpParams): Unit = {
     p1.stageParams shouldBe p2.stageParams
     p1.readerParams.toString() shouldBe p2.readerParams.toString()
     p1.customParams shouldBe p2.customParams
-  }
-
-  def compareRawFeatureFilterConfig(c1: RawFeatureFilterConfig, c2: RawFeatureFilterConfig): Unit = {
-    c1.minFill shouldBe c2.minFill
-    c1.maxFillDifference shouldBe c2.maxFillDifference
-    c1.maxFillRatioDiff shouldBe c2.maxFillRatioDiff
-    c1.maxJSDivergence shouldBe c2.maxJSDivergence
-    c1.maxCorrelation shouldBe c2.maxCorrelation
-    c1.correlationType shouldBe c2.correlationType
-    c1.jsDivergenceProtectedFeatures shouldBe c2.jsDivergenceProtectedFeatures
-    c1.protectedFeatures shouldBe c2.protectedFeatures
-  }
-
-  def compareDistributions(d1: Seq[FeatureDistribution], d2: Seq[FeatureDistribution]): Unit = {
-    d1.zip(d2)
-      .foreach { case (a, b) =>
-        a.name shouldEqual b.name
-        a.key shouldEqual b.key
-        a.count shouldEqual b.count
-        a.nulls shouldEqual b.nulls
-        a.distribution shouldEqual b.distribution
-        a.summaryInfo shouldEqual b.summaryInfo
-      }
-  }
-
-  def compareRawFeatureFilterMetrics(m1: Seq[RawFeatureFilterMetrics], m2: Seq[RawFeatureFilterMetrics]): Unit = {
-    m1.zip(m2)
-      .foreach { case (a, b) =>
-        a.name shouldBe b.name
-        a.trainingFillRate shouldBe b.trainingFillRate
-        a.trainingNullLabelAbsoluteCorr shouldBe b.trainingNullLabelAbsoluteCorr
-        a.scoringFillRate shouldBe b.scoringFillRate
-        a.jsDivergence shouldBe b.jsDivergence
-        a.fillRateDiff shouldBe b.fillRateDiff
-        a.fillRatioDiff shouldBe b.fillRatioDiff
-      }
-  }
-
-  def compareExclusionReasons(er1: Seq[ExclusionReasons], er2: Seq[ExclusionReasons]): Unit = {
-    er1.zip(er2)
-      .foreach { case (a, b) =>
-        a.name shouldBe b.name
-        a.trainingUnfilledState shouldBe b.trainingUnfilledState
-        a.trainingNullLabelLeaker shouldBe b.trainingNullLabelLeaker
-        a.scoringUnfilledState shouldBe b.scoringUnfilledState
-        a.jsDivergenceMismatch shouldBe b.jsDivergenceMismatch
-        a.fillRateDiffMismatch shouldBe b.fillRateDiffMismatch
-        a.fillRatioDiffMismatch shouldBe b.fillRatioDiffMismatch
-        a.excluded shouldBe b.excluded
-      }
-  }
-
-  def compareRawFeatureFilterResults(rff1: RawFeatureFilterResults, rff2: RawFeatureFilterResults): Unit = {
-    compareRawFeatureFilterConfig(rff1.rawFeatureFilterConfig, rff2.rawFeatureFilterConfig)
-    compareDistributions(rff1.rawFeatureDistributions, rff2.rawFeatureDistributions)
-    compareRawFeatureFilterMetrics(rff1.rawFeatureFilterMetrics, rff2.rawFeatureFilterMetrics)
-    compareExclusionReasons(rff1.exclusionReasons, rff2.exclusionReasons)
   }
 }
 
