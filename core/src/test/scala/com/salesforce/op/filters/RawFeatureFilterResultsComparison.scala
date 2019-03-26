@@ -57,7 +57,6 @@ object RawFeatureFilterResultsComparison extends FlatSpec with Matchers {
     d1.summaryInfo shouldEqual d2.summaryInfo
   }
 
-
   def compareSeqDistributions(d1: Seq[FeatureDistribution], d2: Seq[FeatureDistribution]): Unit = {
     d1.zip(d2).foreach { case (a, b) => compareDistributions(a, b) }
   }
