@@ -78,6 +78,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
 
   Spec[OpCrossValidation[_, _]] should "stratify binary class data" in {
     val balancer = new DataBalancer()
+    balancer.examine(binaryDS)
     val splits = cv.createTrainValidationSplits(cvStratifyCondition, binaryDS, label.name, Some(balancer))
     splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
@@ -85,39 +86,44 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().prepare(binaryDS).summary
+      Some(s) shouldBe new DataBalancer().examine(binaryDS)
     }
   }
 
   it should "stratify multi class data" in {
-    val splits = cv.createTrainValidationSplits(cvStratifyCondition, multiDS, multiLabel.name, Some(new DataCutter()))
+    val dc = new DataCutter()
+    dc.examine(multiDS)
+    val splits = cv.createTrainValidationSplits(cvStratifyCondition, multiDS, multiLabel.name, Some(dc))
     splits.length shouldBe ValidatorParamDefaults.NumFolds
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().prepare(multiDS).summary)(_ => succeed)
+    assertDataCutterSummary(new DataCutter().examine(multiDS))(_ => succeed)
   }
 
   Spec[OpTrainValidationSplit[_, _]] should "stratify binary class data" in {
     val balancer = new DataBalancer()
+    balancer.examine(binaryDS)
     val splits = ts.createTrainValidationSplits(tsStratifyCondition, binaryDS, label.name, Some(balancer))
     splits.foreach { case (train, validate) =>
       assertFractions(Array(1 - p, p), train)
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().prepare(binaryDS).summary
+      Some(s) shouldBe new DataBalancer().examine(binaryDS)
     }
   }
 
   it should "stratify multi class data" in {
-    val splits = ts.createTrainValidationSplits(tsStratifyCondition, multiDS, multiLabel.name, Some(new DataCutter()))
+    val dc = new DataCutter()
+    dc.examine(multiDS)
+    val splits = ts.createTrainValidationSplits(tsStratifyCondition, multiDS, multiLabel.name, Some(dc))
     splits.foreach { case (train, validate) =>
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().prepare(multiDS).summary)(_ => succeed)
+    assertDataCutterSummary(new DataCutter().examine(multiDS))(_ => succeed)
   }
 
   /**

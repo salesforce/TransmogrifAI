@@ -144,6 +144,8 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    */
   def prepare(data: Dataset[Row]): Dataset[Row] = {
 
+    if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
+
     val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
     val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
     val seed = getSeed

@@ -81,13 +81,13 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
   it should "throw an error when all the data is filtered out" in {
     val dataCutter = DataCutter(seed = seed, minLabelFraction = 0.4)
-    dataCutter.examine(randDF)
-    assertThrows[RuntimeException](dataCutter.prepare(randDF))
+    assertThrows[RuntimeException](dataCutter.examine(randDF))
   }
 
   it should "throw an error when prepare is called before examine" in {
     val dataCutter = DataCutter(seed = seed, minLabelFraction = 0.4)
-    assertThrows[RuntimeException](dataCutter.prepare(randDF))
+    intercept[RuntimeException](dataCutter.prepare(randDF)).getMessage shouldBe
+      "Cannot call prepare until examine has been called"
   }
 
   it should "filter out all but the top N label categories" in {
@@ -103,7 +103,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     }
 
     val dc2 = DataCutter(seed = seed).setMaxLabelCategories(3)
-    val s2 = dc2.estimate(biasDF)
+    val s2 = dc2.examine(biasDF)
     val split2 = dc2.prepare(biasDF)
 
     findDistinct(split2).collect().toSet shouldEqual Set(0.0, 1.0, 2.0)
@@ -129,7 +129,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     }
 
     val dc2 = DataCutter(seed = seed, minLabelFraction = 0.2, reserveTestFraction = 0.5)
-    val s2 = dc2.estimate(biasDF)
+    val s2 = dc2.examine(biasDF)
     val split2 = dc2.prepare(biasDF)
     findDistinct(split2).count() shouldBe 3
     assertDataCutterSummary(s2) { s =>
@@ -143,15 +143,12 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     val keep = Set(0.0, 1.0)
     val drop = Set(5.0, 7.0)
     val dc = DataCutter(seed = seed).setLabels(keep = keep, drop = drop)
-    val sum = dc.examine(randDF)
+    dc.summary = Option(DataCutterSummary(labelsKept = dc.getLabelsToKeep, labelsDropped = dc.getLabelsToDrop))
     val split = dc.prepare(randDF)
 
     findDistinct(split).collect().sorted shouldBe Array(0.0, 1.0)
     dc.getLabelsToKeep shouldBe keep.toArray
     dc.getLabelsToDrop shouldBe drop.toArray
-    assertDataCutterSummary(sum) { s =>
-      s shouldBe DataCutterSummary(dc.getLabelsToKeep, dc.getLabelsToDrop)
-    }
   }
 
   private def findDistinct(d: Dataset[_]): Dataset[Double] = d.toDF().map(_.getDouble(0)).distinct()

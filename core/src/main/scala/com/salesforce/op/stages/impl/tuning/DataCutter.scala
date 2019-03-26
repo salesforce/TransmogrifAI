@@ -106,6 +106,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Training set test set
    */
   def prepare(data: Dataset[Row]): Dataset[Row] = {
+    if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
 
     val keep: Set[Double] = getLabelsToKeep.toSet
     val dataUse = data.filter(r => keep.contains(r.getDouble(0)))

@@ -113,6 +113,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   protected[op] def findBestEstimator(data: Dataset[_], dag: StagesDAG, persistEveryKStages: Int = 0)
     (implicit spark: SparkSession): Unit = {
 
+    splitter.map(_.examine(data.select(labelColName).toDF()))
     val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = data,
       label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
       stratifyCondition = validator.isClassification
@@ -146,11 +147,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
-    val splitterSummary = splitter match {
-      case Some(spltr) => spltr.examine(datasetWithID)
-      case None => None
-    }
-
+    val splitterSummary = splitter.flatMap(_.examine(datasetWithID))
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
@@ -159,10 +156,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       best
     }
 
-    val preparedData =  splitter match {
-      case Some(spltr) => spltr.prepare(datasetWithID)
-      case None => datasetWithID
-    }
+    val preparedData = splitter.map(_.prepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
