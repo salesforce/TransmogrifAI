@@ -82,6 +82,9 @@ import scala.util.Failure
  *                                      Output is the bins for the text features.
  * @param timePeriod                    Time period used to apply circulate date transformation for date features, if
  *                                      not specified will use regular numeric feature transformation
+ * @param minScoringRows                Minimum row threshold for scoring set comparisons to be used in checks. If
+ *                                      the scoring set size is below this threshold, then only training data checks
+ *                                      will be used
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
@@ -98,7 +101,8 @@ class RawFeatureFilter[T]
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
-  val timePeriod: Option[TimePeriod] = None
+  val timePeriod: Option[TimePeriod] = None,
+  val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -110,6 +114,7 @@ class RawFeatureFilter[T]
     s" maxFillRatioDiff must be greater than 0.0")
   require(maxJSDivergence >= 0.0 && maxJSDivergence <= 1.0, s"Invalid maxJSDivergence size $maxJSDivergence," +
     s" maxJSDivergence must be between 0 and 1")
+  require(minScoringRows >= 0, s"minRowsForScoringSet must be >= 0, but was set to $minScoringRows")
 
   ClosureUtils.checkSerializable(textBinsFormula) match {
     case Failure(e) => throw new IllegalArgumentException("The argument textBinsFormula must be serializable", e)
@@ -301,10 +306,10 @@ class RawFeatureFilter[T]
       val sd = s.generateDataFrame(rawFeatures, parameters.switchReaderParams()).persist()
       log.info("Loaded scoring data")
       val scoringDataCount = sd.count()
-      if (scoringDataCount >= RawFeatureFilter.minRowsForScoringSet) Some(sd)
+      if (scoringDataCount >= minScoringRows) Some(sd)
       else {
         log.warn(s"Scoring dataset has $scoringDataCount rows, which is less than the minimum required of " +
-          s"${RawFeatureFilter.minRowsForScoringSet}. Only training data checks will be used.")
+          s"$minScoringRows. Only training data checks will be used.")
         None
       }
     }
@@ -375,7 +380,7 @@ object RawFeatureFilter {
 
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
-  val minRowsForScoringSet = 500
+  val minScoringRowsDefault = 500
 
 }
 

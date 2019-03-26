@@ -244,13 +244,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val wf = new OpWorkflow()
       .setResultFeatures(pred)
-      .withRawFeatureFilter(Option(dataReader), None, maxFillRatioDiff = 1.0)
+      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), maxFillRatioDiff = 1.0, minScoringRows = 0)
     val data = wf.computeDataUpTo(weight)
 
-    // Since there are < 500 rows in the scoring set, only the training set checks are applied here, and the only
-    // removal reasons should be null indicator - label correlations
     data.schema.fields.map(_.name).toSet shouldEqual
-      Set("booleanMap", "description", "height", "stringMap", "age", "key", "survived", "numericMap")
+      Set("key", "height", "survived", "stringMap", "numericMap", "booleanMap")
   }
 
   it should "return a model that transforms the data correctly" in {

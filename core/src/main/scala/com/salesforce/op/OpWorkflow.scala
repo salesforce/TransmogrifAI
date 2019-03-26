@@ -512,6 +512,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *                           Output is the bins for the text features.
    * @param timePeriod         Time period used to apply circulate date transformation for date features, if not
    *                           specified will use numeric feature transformation
+   * @param minScoringRows     Minimum row threshold for scoring set comparisons to be used in checks. If the scoring
+   *                           set size is below this threshold, then only training data checks will be used
    * @tparam T Type of the data read in
    */
   @Experimental
@@ -529,7 +531,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     protectedFeatures: Array[OPFeature] = Array.empty,
     protectedJSFeatures: Array[OPFeature] = Array.empty,
     textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
-    timePeriod: Option[TimePeriod] = None
+    timePeriod: Option[TimePeriod] = None,
+    minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
@@ -550,7 +553,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         protectedFeatures = protectedRawFeatures,
         jsDivergenceProtectedFeatures = protectedRawJSFeatures,
         textBinsFormula = textBinsFormula,
-        timePeriod = timePeriod)
+        timePeriod = timePeriod,
+        minScoringRows = minScoringRows)
     }
     this
   }
