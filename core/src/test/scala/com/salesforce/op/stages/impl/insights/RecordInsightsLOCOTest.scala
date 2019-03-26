@@ -252,7 +252,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
     // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
-    assert(abcAvg > 5 * otherAvg,
+    assert(abcAvg > 4 * otherAvg,
       "Average feature strengths for features involved in label formula should be " +
       "much larger than the average feature strengths of other features")
     // There should be a really large t-value when comparing the two avg feature strengths

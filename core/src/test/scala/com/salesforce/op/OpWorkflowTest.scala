@@ -44,7 +44,6 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.log4j.Level
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
@@ -239,24 +238,19 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "use the raw feature filter to generate data instead of the reader when the filter is specified" in {
-    loggingLevel(Level.INFO)
-
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
 
-    val tempdata = new OpWorkflow().setReader(dataReader).setResultFeatures(pred).computeDataUpTo(weight)
-    tempdata.show(numRows = 10, truncate = false)
-
     val wf = new OpWorkflow()
       .setResultFeatures(pred)
-      .withRawFeatureFilter(Option(dataReader), Option(simpleReader),
-        maxFillRatioDiff = 1.0) // only height and the female key of maps should meet this criteria
+      .withRawFeatureFilter(Option(dataReader), None, maxFillRatioDiff = 1.0)
     val data = wf.computeDataUpTo(weight)
-    data.show(10, truncate = false)
 
+    // Since there are < 500 rows in the scoring set, only the training set checks are applied here, and the only
+    // removal reasons should be null indicator - label correlations
     data.schema.fields.map(_.name).toSet shouldEqual
-      Set("key", "height", "survived", "stringMap", "numericMap", "booleanMap")
+      Set("booleanMap", "description", "height", "stringMap", "age", "key", "survived", "numericMap")
   }
 
   it should "return a model that transforms the data correctly" in {
