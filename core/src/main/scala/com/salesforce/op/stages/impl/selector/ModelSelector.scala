@@ -146,20 +146,24 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
-    val ModelData(trainData, splitterSummary) = splitter match {
-      case Some(spltr) => spltr.prepare(datasetWithID)
-      case None => ModelData(datasetWithID, None)
+    val splitterSummary = splitter match {
+      case Some(spltr) => spltr.examine(datasetWithID)
+      case None => None
     }
 
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
-        .validate(modelInfo = modelsUse, dataset = trainData, label = in1.name, features = in2.name)
+        .validate(modelInfo = modelsUse, dataset = datasetWithID, label = in1.name, features = in2.name)
       bestEstimator = Some(best)
       best
     }
 
-    val bestModel = estimator.fit(trainData).asInstanceOf[M]
+    val preparedData =  splitter match {
+      case Some(spltr) => spltr.prepare(datasetWithID)
+      case None => datasetWithID
+    }
+    val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
     log.info(s"With parameters : ${bestEst.extractParamMap()}")
@@ -168,7 +172,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
     // get eval results for metadata
-    val trainingEval = evaluate(bestModel.transform(trainData))
+    val trainingEval = evaluate(bestModel.transform(preparedData))
 
     val metadataSummary = ModelSelectorSummary(
       validationType = ValidationType.fromValidator(validator),

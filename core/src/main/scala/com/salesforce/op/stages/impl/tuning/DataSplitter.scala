@@ -61,6 +61,16 @@ case object DataSplitter {
  */
 class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
 
+
+  /**
+   * Function to use examine the data set to set parameters for preparation
+   * eg - do data balancing or dropping based on the labels
+   *
+   * @param data
+   * @return Parameters set in examining data
+   */
+  override def examine(data: Dataset[Row]): Option[SplitterSummary] = Some(DataSplitterSummary())
+
   /**
    * Function to use to prepare the dataset for modeling
    * eg - do data balancing or dropping based on the labels
@@ -68,7 +78,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData = ModelData(data, Some(DataSplitterSummary()))
+  def prepare(data: Dataset[Row]): Dataset[Row] = data
 
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)

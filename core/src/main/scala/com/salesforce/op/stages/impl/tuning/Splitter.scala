@@ -42,13 +42,6 @@ import scala.util.Try
 
 
 
-/**
- * Case class for Training & test sets
- *
- * @param train      training set is persisted at construction
- * @param summary    summary for building metadata
- */
-case class ModelData(train: Dataset[Row], summary: Option[SplitterSummary])
 
 /**
  * Abstract class that will carry on the creation of training set + test set
@@ -74,7 +67,17 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData
+  def prepare(data: Dataset[Row]): Dataset[Row]
+
+
+  /**
+   * Function to use examine the data set to set parameters for preparation
+   * eg - do data balancing or dropping based on the labels
+   *
+   * @param data
+   * @return Parameters set in examining data
+   */
+  def examine(data: Dataset[Row]): Option[SplitterSummary]
 
 }
 

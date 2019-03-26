@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.test.TestSparkContext
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.mllib.random.RandomRDDs
+import org.apache.spark.sql.{Dataset, Row}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertion, FlatSpec}
@@ -105,57 +106,68 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val fraction = 0.4
     val maxSize = 2000
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
+    val s1 = balancer.examine(data)
     val res1 = balancer.prepare(data)
     val (downSample, upSample) = balancer.getProportions(smallCount, bigCount, fraction, maxSize)
 
     balancer.getUpSampleFraction shouldBe upSample
     balancer.getDownSampleFraction shouldBe downSample
     balancer.getIsPositiveSmall shouldBe false
-    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.4, 2.0, 0.75))
+    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.4, 2.0, 0.75))
+  }
+
+  it should "throw an error if you try to prepare before examining" in {
+    val balancer = DataBalancer(sampleFraction = 0.1, maxTrainingSample = 2000, seed = 11L)
+    intercept[Error](balancer.prepare(data)).getMessage shouldBe ""
   }
 
   it should "remember that data is already balanced" in {
     val fraction = 0.01
     val maxSize = 20000
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
+    val s1 = balancer.examine(data)
     val res1 = balancer.prepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe 1.0
-    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
+    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
   }
 
   it should "remember that data is already balanced, but needs to be sample because too big" in {
     val fraction = 0.01
     val maxSize = 100
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
+    val s1 = balancer.examine(data)
     val res1 = balancer.prepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
-    checkRecurringPrepare(balancer, res1, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
+    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
   }
 
   private def checkRecurringPrepare(
     balancer: DataBalancer,
-    previousResult: ModelData,
+    previousResult: Dataset[Row],
+    summary: Option[SplitterSummary],
     expectedSummary: DataBalancerSummary
   ): Assertion = {
-    assertDataBalancerSummary(previousResult.summary) { s =>
+    assertDataBalancerSummary(summary) { s =>
       s shouldBe expectedSummary
       balancer.summary shouldBe Some(expectedSummary)
     }
 
     // Rerun balancer with set params
     withClue("Data balancer should not update the summary") {
-      val ModelData(train, s) = balancer.prepare(spark.emptyDataFrame)
+      val s = balancer.examine(spark.emptyDataFrame)
+      val train = balancer.prepare(spark.emptyDataFrame)
       train.count() shouldBe 0
       s shouldBe Some(expectedSummary)
       balancer.summary shouldBe Some(expectedSummary)
     }
 
     // Rerun balancer again and expect the same data & summary
+    val s2 = balancer.examine(data)
     val res2 = balancer.prepare(data)
-    res2.train.collect() shouldBe previousResult.train.collect()
-    res2.summary shouldBe previousResult.summary
+    res2.collect() shouldBe previousResult.collect()
+    s2 shouldBe summary
     balancer.summary shouldBe Some(expectedSummary)
   }
 

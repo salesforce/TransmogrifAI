@@ -75,6 +75,29 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
+  @transient private[op] var summary: Option[DataCutterSummary] = None
+
+  /**
+   * Function to use examine the data set to set parameters for preparation
+   * eg - do data balancing or dropping based on the labels
+   *
+   * @param data
+   * @return Parameters set in examining data
+   */
+  override def examine(data: Dataset[Row]): Option[SplitterSummary] = {
+
+    import data.sparkSession.implicits._
+
+    val labels = data.map(r => r.getDouble(0) -> 1L)
+    val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
+    val (resKeep, resDrop) = estimate(labelCounts)
+    labelCounts.unpersist()
+    setLabels(resKeep, resDrop)
+
+    summary = Option(DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop))
+    summary
+  }
+
   /**
    * function to use to prepare the dataset for modeling
    * eg - do data balancing or dropping based on the labels
@@ -82,23 +105,12 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data first column must be the label as a double
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData = {
-    import data.sparkSession.implicits._
+  def prepare(data: Dataset[Row]): Dataset[Row] = {
 
-    val keep: Set[Double] =
-      if (!isSet(labelsToKeep) || !isSet(labelsToDrop)) {
-        val labels = data.map(r => r.getDouble(0) -> 1L)
-        val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
-        val (resKeep, resDrop) = estimate(labelCounts)
-        labelCounts.unpersist()
-        setLabels(resKeep, resDrop)
-        resKeep
-      } else getLabelsToKeep.toSet
-
+    val keep: Set[Double] = getLabelsToKeep.toSet
     val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
-    val summary = DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop)
 
-    ModelData(dataUse, Some(summary))
+    dataUse
   }
 
   /**
