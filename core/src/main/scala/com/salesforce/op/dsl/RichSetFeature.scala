@@ -75,7 +75,7 @@ trait RichSetFeature {
 
       f.transformWith[OPVector](
         stage = opSetVectorizer.setTopK(topK).setCleanText(cleanText).setTrackNulls(trackNulls)
-          .setMinSupport(minSupport).setMaxPercentageCardinality(maxPctCardinality),
+          .setMinSupport(minSupport).setMaxPctCardinality(maxPctCardinality),
         fs = others
       )
     }

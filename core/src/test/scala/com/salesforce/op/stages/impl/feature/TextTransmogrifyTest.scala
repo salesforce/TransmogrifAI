@@ -144,7 +144,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
     )
     val (df, f1) = TestFeatureBuilder(data.map(_.toText))
 
-    val textPivotVectorizer = new OpTextPivotVectorizer[Text]().setMaxPercentageCardinality(0.2)
+    val textPivotVectorizer = new OpTextPivotVectorizer[Text]().setMaxPctCardinality(0.2)
 
     val res = textPivotVectorizer.setInput(f1).getOutput()
     val transformed = new OpWorkflow().setResultFeatures(res).transform(df)

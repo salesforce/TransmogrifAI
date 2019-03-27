@@ -108,7 +108,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
-        .setMaxPercentageCardinality(maxPctCardinality)
+        .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
     }
   }
@@ -175,7 +175,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
-        .setMaxPercentageCardinality(maxPctCardinality)
+        .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
     }
   }
@@ -514,7 +514,7 @@ trait RichMapFeature {
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
         .setTrackNulls(trackNulls)
-        .setMaxPercentageCardinality(maxPctCardinality)
+        .setMaxPctCardinality(maxPctCardinality)
         .getOutput()
     }
   }

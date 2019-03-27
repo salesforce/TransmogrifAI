@@ -40,6 +40,7 @@ import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid, Semigroup}
+import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators, Params}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -75,7 +76,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     val shouldCleanText = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
 
-    val maxPctCard = $(maxPercentageCardinality)
+    val maxPctCard = $(maxPctCardinality)
     val rdd: RDD[Seq[Map[String, Int]]] = convertToSeqOfMaps(dataset)
 
     val finalRDD =
@@ -123,10 +124,39 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 }
 
 
+trait MaxPercentageCardinalityParams extends Params {
+  final val maxPctCardinality = new DoubleParam(
+    parent = this, name = "maxPctCardinality",
+    doc = "max percentage of distinct values a categorical feature can have",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
+  )
+  final def setMaxPctCardinality(v: Double): this.type = set(maxPctCardinality, v)
+  final def getMaxPctCardinality: Double = $(maxPctCardinality)
+  setDefault(maxPctCardinality -> OpOneHotVectorizer.MaxPctCardinality)
+
+  final val hllBits = new IntParam(
+    parent = this, name = "hllBits", doc =
+      "Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits})." +
+        " Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.",
+    isValid = ParamValidators.gtEq(4)
+  )
+  final def setHLLBits(value: Int): this.type = set(hllBits, value)
+  final def getHLLBits: Int = $(hllBits)
+  setDefault(hllBits -> OpOneHotVectorizer.HLLBits)
+}
+
 
 object OpOneHotVectorizer {
-  // Default value for max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+  /**
+   * Default value for max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+   */
   val MaxPctCardinality = 1.0
+
+  /**
+   * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
+   * Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.
+   */
+  val HLLBits = 12
 }
 
 abstract class OpOneHotVectorizerModel[T <: FeatureType]

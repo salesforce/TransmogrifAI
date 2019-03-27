@@ -68,7 +68,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
         k -> cats.map(_ -> 1L).groupBy(_._1).map { case (c, a) => c -> a.map(_._2).sum }
       }
     }
-    val maxPctCard = $(maxPercentageCardinality)
+    val maxPctCard = $(maxPctCardinality)
     val finalDataset =
       if (maxPctCard == 1.0) dataset
       else {

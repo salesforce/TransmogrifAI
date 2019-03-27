@@ -85,7 +85,7 @@ trait RichTextFeature {
 
       f.transformWith[OPVector](
         stage = vectorizer.setTopK(topK).setMinSupport(minSupport).setCleanText(cleanText)
-          .setTrackNulls(trackNulls).setMaxPercentageCardinality(maxPctCardinality),
+          .setTrackNulls(trackNulls).setMaxPctCardinality(maxPctCardinality),
         fs = others
       )
     }

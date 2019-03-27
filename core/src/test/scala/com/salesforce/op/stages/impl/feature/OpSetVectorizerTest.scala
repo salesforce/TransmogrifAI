@@ -407,7 +407,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     )
     val (localDF, f1) = TestFeatureBuilder(localData.map(_.toMultiPickList))
 
-    val oPSetVectorizer = new OpSetVectorizer[MultiPickList]().setMaxPercentageCardinality(0.1)
+    val oPSetVectorizer = new OpSetVectorizer[MultiPickList]().setMaxPctCardinality(0.1)
 
     val res = oPSetVectorizer.setInput(f1).getOutput()
     val transformed = new OpWorkflow().setResultFeatures(res).transform(localDF)

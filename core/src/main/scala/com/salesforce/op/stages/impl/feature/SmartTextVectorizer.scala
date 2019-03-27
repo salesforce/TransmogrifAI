@@ -258,24 +258,3 @@ trait MaxCardinalityParams extends Params {
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
 }
-
-trait MaxPercentageCardinalityParams extends Params {
-  final val maxPercentageCardinality = new DoubleParam(
-    parent = this, name = "maxPercentageCardinality",
-    doc = "max percentage of distinct values a categorical feature can have",
-    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
-  )
-  final def setMaxPercentageCardinality(v: Double): this.type = set(maxPercentageCardinality, v)
-  final def getMaxPercentageCardinality: Double = $(maxPercentageCardinality)
-  setDefault(maxPercentageCardinality -> 1.0)
-
-  final val hllBits = new IntParam(
-    parent = this, name = "hllBits", doc =
-      "Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits})." +
-        " Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.",
-    isValid = ParamValidators.gtEq(4)
-  )
-  final def setHLLBits(value: Int): this.type = set(hllBits, value)
-  final def getHLLBits: Int = $(hllBits)
-  setDefault(hllBits, 12)
-}

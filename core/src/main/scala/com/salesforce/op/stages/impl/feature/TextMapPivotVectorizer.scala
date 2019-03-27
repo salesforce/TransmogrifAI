@@ -65,7 +65,7 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 
     def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
-    val maxPctCard = $(maxPercentageCardinality)
+    val maxPctCard = $(maxPctCardinality)
     val finalDataset =
       if (maxPctCard == 1.0) dataset
       else {
