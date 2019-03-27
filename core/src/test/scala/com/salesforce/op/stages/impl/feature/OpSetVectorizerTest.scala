@@ -397,14 +397,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
   }
 
   it should "remove feature because of high cardinality" in {
-    val localData = Seq(
-      Seq("A"),
-      Seq("B"),
-      Seq("A"),
-      Seq("C"),
-      Seq("C"),
-      Seq("A", "B")
-    )
+    val localData = Seq(Seq("A"), Seq("B"), Seq("A"), Seq("C"), Seq("C"), Seq("A", "B"))
     val (localDF, f1) = TestFeatureBuilder(localData.map(_.toMultiPickList))
 
     val oPSetVectorizer = new OpSetVectorizer[MultiPickList]().setMaxPctCardinality(0.1)
@@ -416,14 +409,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val expect = OpVectorMetadata("", field.metadata).columns
       .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
     assertNominal(field, expect, result)
-    val expected = Array(
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty
-    )
+    val expected = Array.fill(6)(OPVector.empty)
     result should contain theSameElementsAs  expected
   }
 
