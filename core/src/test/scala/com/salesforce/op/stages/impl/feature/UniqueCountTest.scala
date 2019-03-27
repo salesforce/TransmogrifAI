@@ -48,7 +48,7 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
 
   implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
 
-  Spec[OneHotFun] should "count uniques" in {
+  Spec[UniqueCountFun] should "count uniques" in {
     val data = createData(1000, 10)
     val m = data.first.size
     val (uniqueCounts, total) = countUniques[Double](data, size = m, bits = 12)
@@ -57,7 +57,7 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     uniqueCounts.map(_.estimatedSize.toInt) should contain theSameElementsAs expected
   }
 
-  it should "count unique maps" in {
+  it should "count uniques in maps" in {
     val data = createMapData(1000, 10)
     val m = data.first.size
     val (uniqueCounts, total) = countMapUniques[Double](data, size = m, bits = 12)
