@@ -56,17 +56,17 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
   Spec[OneHotFun] should "count uniques" in {
     val data = createData(1000, 10)
     val m = data.first.size
-    val (uniqueCounts, n) = countUniques(data, size = m, bits = bits)
+    val (uniqueCounts, total) = countUniques(data, size = m, bits = bits)
+    total shouldBe data.count()
     val expected = countUniquesManually(data)
     uniqueCounts.map(_.estimatedSize.toInt) should contain theSameElementsAs expected
-    n shouldBe data.count()
   }
 
   it should "count unique maps" in {
     val data = createMapData(1000, 10)
     val m = data.first.size
-    val (uniqueCounts, n) = countMapUniques(data, size = m, bits = bits)
-    n shouldBe data.count()
+    val (uniqueCounts, total) = countMapUniques(data, size = m, bits = bits)
+    total shouldBe data.count()
     val expected = countUniquesMapManually(data)
     uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) should contain theSameElementsAs expected
   }

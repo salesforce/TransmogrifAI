@@ -292,7 +292,7 @@ private[op] case object Transmogrifier {
             others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
-          f.vectorize(defaultRegion = DefaultRegion, others = other, maxPctCardinality = MaxPercentCardinality)
+          f.vectorize(defaultRegion = DefaultRegion, others = other)
         case t if t =:= weakTypeOf[PickList] =>
           val (f, other) = castAs[PickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
@@ -647,14 +647,6 @@ trait MapStringPivotHelper extends SaveOthersParams {
       convertToMapOfMaps(filteredMap)
     }
   )
-
-  protected def filterHighCardinality[V](
-    in: Dataset[Seq[Map[String, V]]],
-    filter: Map[String, Boolean]
-  ): Dataset[Seq[Map[String, V]]] = {
-    implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, V]]]
-    in.map(_.map(_.filter { case (k, _) => filter.getOrElse(k, true) }))
-  }
 
   protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
     val sumAggr = SequenceAggregators.SumSeqMapMap(size = inputSize)

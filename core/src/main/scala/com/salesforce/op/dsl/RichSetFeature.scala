@@ -53,12 +53,12 @@ trait RichSetFeature {
      * OPSet feature (ie the final vector has length k * number of OPSet inputs). Plus an additional column
      * for "other" values - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others     other features to include in the pivot
-     * @param topK       keep topK values
-     * @param minSupport min occurrences to keep a value
-     * @param cleanText  if true ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep a count of nulls
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        min occurrences to keep a value
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep a count of nulls
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return
      */
@@ -85,12 +85,12 @@ trait RichSetFeature {
      * OPSet feature (ie the final vector has length k * number of OPSet inputs). Plus an additional column
      * for "other" values - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others    other features to include in the pivot
-     * @param topK      keep topK values
-     * @param minSupport min occurrences to keep a value
-     * @param cleanText  if true ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep a count of nulls
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        min occurrences to keep a value
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep a count of nulls
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return
      */

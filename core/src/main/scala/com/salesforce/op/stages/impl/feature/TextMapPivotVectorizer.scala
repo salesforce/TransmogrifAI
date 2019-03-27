@@ -72,19 +72,17 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
         implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
         implicit val kryo = new KryoSerializer(dataset.sparkSession.sparkContext.getConf)
         val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(hllBits))
+        val percentFilters = uniqueCounts.map(_.map { case (k, v) => k -> (v.estimatedSize / n < maxPctCard) })
 
-        val percentFilter = uniqueCounts.flatMap(_.map { case (k, v) =>
-          k -> (v.estimatedSize / n < $(maxPercentageCardinality))}.toSeq
-        ).toMap
-        filterHighCardinality(dataset, percentFilter)
+        dataset.map(_.zip(percentFilters).collect { case (m, percentFilter) =>
+          m.filterKeys(k => percentFilter.getOrElse(k, true))
+        })(seqIEncoder)
       }
 
     val categoryMaps: Dataset[SeqMapMap] =
       getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
-
     val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
-
 
     val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
       stageName, $(trackNulls))

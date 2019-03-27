@@ -84,7 +84,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
         implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
         implicit val kryo = new KryoSerializer(dataset.sparkSession.sparkContext.getConf)
 
-        val (uniqueCounts, n) = countUniques[T#Value](dataset, size = inN.length, bits = $(hllBits))(classTag, kryo)
+        val (uniqueCounts, n) = countUniques(dataset, size = inN.length, bits = $(hllBits))
         val percentFilter = uniqueCounts.map(_.estimatedSize / n < maxPctCard)
         rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
       }
@@ -125,6 +125,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 
 
 object OpOneHotVectorizer {
+  // Default value for max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
   val MaxPctCardinality = 1.0
 }
 
@@ -280,20 +281,12 @@ private[op] trait UniqueCountFun {
    * @tparam V value type
    * @return HyperLogLog [[HLL]] of unique values count for each of the sequence components and total rows count
    */
-  protected def countUniques[V: ClassTag](dataset: Dataset[Seq[V]], size: Int, bits: Int)
+  def countUniques[V: ClassTag](dataset: Dataset[Seq[V]], size: Int, bits: Int)
     (implicit kryo: KryoSerializer): (Seq[HLL], Long) = {
-    val rdd = dataset.rdd
-    val hll = new HyperLogLogMonoid(bits)
-    val zero = Seq.fill(size)(hll.zero) -> 0L
-
-    val hlls = rdd.mapPartitions { it =>
-      val k = kryo.newInstance() // reuse the same kryo instance for the partition
-      it.map(seq => (seq.map(v => hll.create(k.serialize(v).array())), 1L))
-    }
-    val countUniques = hlls.fold(zero) { case ((a, c1), (b, c2)) =>
-      (a.zip(b).map { case (m1, m2) => m1 + m2 }, c1 + c2)
-    }
-    countUniques
+    val key = "k"
+    val rdd = dataset.rdd.map(seq => seq.map(v => Map(key -> v)))
+    val (counts, total) = countMapUniques(rdd, size = size, bits = bits)
+    counts.flatMap(_.get(key)) -> total
   }
 
   /**
@@ -306,20 +299,27 @@ private[op] trait UniqueCountFun {
    * @tparam V value type
    * @return HyperLogLog [[HLL]] of unique values count for each of the sequence components and total rows count
    */
-  protected def countMapUniques[V: ClassTag]
+  def countMapUniques[V: ClassTag]
   (
     dataset: Dataset[Seq[Map[String, V]]],
     size: Int,
     bits: Int
   )(implicit kryo: KryoSerializer): (Seq[Map[String, HLL]], Long) = {
-    val rdd = dataset.rdd
-    val hll = new HyperLogLogMonoid(bits)
+    countMapUniques(dataset.rdd, size = size, bits = bits)
+  }
 
+  private def countMapUniques[V: ClassTag]
+  (
+    rdd: RDD[Seq[Map[String, V]]],
+    size: Int,
+    bits: Int
+  )(implicit kryo: KryoSerializer): (Seq[Map[String, HLL]], Long) = {
+    val hll = new HyperLogLogMonoid(bits)
+    val hllMapMonoid = Monoid.mapMonoid[String, HLL](hll)
     val hlls = rdd.mapPartitions { it =>
       val ks = kryo.newInstance() // reuse the same kryo instance for the partition
       it.map(_.map(_.map { case (k, v) => (k, hll.create(ks.serialize(v).array())) }) -> 1L)
     }
-    val hllMapMonoid: Monoid[Map[String, HLL]] = Monoid.mapMonoid[String, HLL](Semigroup.from[HLL](_ + _))
     val zero = Seq.fill(size)(Map.empty[String, HLL]) -> 0L
     val countMapUniques = hlls.fold(zero) { case ((a, c1), (b, c2)) =>
       a.zip(b).map { case (m1, m2) => hllMapMonoid.plus(m1, m2) } -> (c1 + c2)

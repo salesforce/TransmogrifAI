@@ -63,12 +63,12 @@ trait RichTextFeature {
      * Text feature (ie the final vector has length k * number of Text inputs). Plus two additional columns
      * for "other" values and nulls - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others     other features to include in the pivot
-     * @param topK       keep topK values
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  if true ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return
      */
@@ -571,12 +571,12 @@ trait RichTextFeature {
      * and keeping the top K occurrences of each feature, along with an extra column per feature
      * indicating how many values were not in the top K.
      *
-     * @param others     Other [[Email]] features
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            Other [[Email]] features
+     * @param topK              How many values to keep in the vector
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         If true, ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return The vectorized features
      */
@@ -629,12 +629,12 @@ trait RichTextFeature {
      * and keeping the top K occurrences of each feature, along with an extra column per feature
      * indicating how many values were not in the top K.
      *
-     * @param others     Other [[URL]] features
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            Other [[URL]] features
+     * @param topK              How many values to keep in the vector
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         If true, ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return The vectorized features
      */
@@ -673,13 +673,13 @@ trait RichTextFeature {
      * Extracts Base64 features (MIME type etc.),
      * then converts those into PickList features and vectorizes them.
      *
-     * @param topK       number of values to keep for each key
-     * @param minSupport min times a value must occur to be retained in pivot
-     * @param cleanText  clean text before pivoting
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param typeHint   MIME type hint, i.e. 'application/json', 'text/plain' etc.
-     * @param others     other features of the same type
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text before pivoting
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param typeHint          MIME type hint, i.e. 'application/json', 'text/plain' etc.
+     * @param others            other features of the same type
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return result feature of type vector
      */
@@ -710,12 +710,12 @@ trait RichTextFeature {
      * Converts a sequence of [[PickList]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others     Other [[PickList]] features to include in pivot
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            Other [[PickList]] features to include in pivot
+     * @param topK              How many values to keep in the vector
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         If true, ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return The vectorized features
      */
@@ -740,12 +740,12 @@ trait RichTextFeature {
      * Converts a sequence of [[ComboBox]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others     Other [[ComboBox]] features to include in pivot
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            Other [[ComboBox]] features to include in pivot
+     * @param topK              How many values to keep in the vector
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         If true, ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return The vectorized features
      */
@@ -770,12 +770,12 @@ trait RichTextFeature {
      * Converts a sequence of [[ID]] features into a vector keeping the top K occurrences of each feature,
      * along with an extra column per feature indicating how many values were not in the top K.
      *
-     * @param others     Other [[ID]] features to include in pivot
-     * @param topK       How many values to keep in the vector
-     * @param minSupport Min times a value must occur to be retained in pivot
-     * @param cleanText  If true, ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep an extra column that indicated if feature was null
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            Other [[ID]] features to include in pivot
+     * @param topK              How many values to keep in the vector
+     * @param minSupport        Min times a value must occur to be retained in pivot
+     * @param cleanText         If true, ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep an extra column that indicated if feature was null
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return The vectorized features
      */

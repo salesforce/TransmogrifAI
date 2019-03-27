@@ -76,15 +76,15 @@ trait RichMapFeature {
     /**
      * Apply TextMapPivotVectorizer on any OPMap that has string values
      *
-     * @param others        other features of the same type
-     * @param topK          number of values to keep for each key
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText     clean text before pivoting
-     * @param cleanKeys     clean map keys before pivoting
-     * @param whiteListKeys keys to whitelist
-     * @param blackListKeys keys to blacklist
-     * @param trackNulls    option to keep track of values that were missing
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            other features of the same type
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text before pivoting
+     * @param cleanKeys         clean map keys before pivoting
+     * @param whiteListKeys     keys to whitelist
+     * @param blackListKeys     keys to blacklist
+     * @param trackNulls        option to keep track of values that were missing
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -138,15 +138,16 @@ trait RichMapFeature {
      * and then vectorized using the TextMapPivotVectorizer.
      *
      *
-     * @param others        other features of the same type
-     * @param topK          number of values to keep for each key
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText     clean text before pivoting
-     * @param cleanKeys     clean map keys before pivoting
-     * @param whiteListKeys keys to whitelist
-     * @param blackListKeys keys to blacklist
-     * @param typeHint      optional hint for MIME type detector
-     * @param trackNulls    option to keep track of values that were missing
+     * @param others            other features of the same type
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text before pivoting
+     * @param cleanKeys         clean map keys before pivoting
+     * @param whiteListKeys     keys to whitelist
+     * @param blackListKeys     keys to blacklist
+     * @param typeHint          optional hint for MIME type detector
+     * @param trackNulls        option to keep track of values that were missing
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -481,15 +482,15 @@ trait RichMapFeature {
     /**
      * Apply MultiPickListMapVectorizer on any OPMap that has set values
      *
-     * @param others        other features of the same type
-     * @param topK          number of values to keep for each key
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText     clean text before pivoting
-     * @param cleanKeys     clean map keys before pivoting
-     * @param whiteListKeys keys to whitelist
-     * @param blackListKeys keys to blacklist
-     * @param trackNulls    option to keep track of values that were missing
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param others            other features of the same type
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text before pivoting
+     * @param cleanKeys         clean map keys before pivoting
+     * @param whiteListKeys     keys to whitelist
+     * @param blackListKeys     keys to blacklist
+     * @param trackNulls        option to keep track of values that were missing
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -990,14 +991,14 @@ trait RichMapFeature {
      * Transform EmailMap feature to PickListMap by extracting email domains, converting them
      * to PickList and then vectorize the PickListMap
      *
-     * @param topK          number of values to keep for each key
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText     clean text after email split but before pivoting
-     * @param cleanKeys     clean map keys before pivoting
-     * @param whiteListKeys keys to whitelist
-     * @param blackListKeys keys to blacklist
-     * @param trackNulls    option to keep track of values that were missing
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text after email split but before pivoting
+     * @param cleanKeys         clean map keys before pivoting
+     * @param whiteListKeys     keys to whitelist
+     * @param blackListKeys     keys to blacklist
+     * @param trackNulls        option to keep track of values that were missing
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
@@ -1042,14 +1043,14 @@ trait RichMapFeature {
      * Transform URLMap feature to PickListMap by extracting domains of valid urls, converting them
      * to PickList and then vectorize the PickListMap
      *
-     * @param topK          number of values to keep for each key
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText     clean text after email split but before pivoting
-     * @param cleanKeys     clean map keys before pivoting
-     * @param whiteListKeys keys to whitelist
-     * @param blackListKeys keys to blacklist
-     * @param trackNulls    option to keep track of values that were missing
-     * @param maxPctCardinality Max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     * @param topK              number of values to keep for each key
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         clean text after email split but before pivoting
+     * @param cleanKeys         clean map keys before pivoting
+     * @param whiteListKeys     keys to whitelist
+     * @param blackListKeys     keys to blacklist
+     * @param trackNulls        option to keep track of values that were missing
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
      *
      * @return an OPVector feature
      */
