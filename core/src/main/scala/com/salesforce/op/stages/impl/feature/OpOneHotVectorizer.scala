@@ -43,7 +43,7 @@ import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid, Semigroup}
 import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators, Params}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.serializer.KryoSerializer
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.Dataset
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -122,29 +122,6 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
     )
   }
 }
-
-
-trait MaxPercentageCardinalityParams extends Params {
-  final val maxPctCardinality = new DoubleParam(
-    parent = this, name = "maxPctCardinality",
-    doc = "max percentage of distinct values a categorical feature can have",
-    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
-  )
-  final def setMaxPctCardinality(v: Double): this.type = set(maxPctCardinality, v)
-  final def getMaxPctCardinality: Double = $(maxPctCardinality)
-  setDefault(maxPctCardinality -> OpOneHotVectorizer.MaxPctCardinality)
-
-  final val hllBits = new IntParam(
-    parent = this, name = "hllBits", doc =
-      "Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits})." +
-        " Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.",
-    isValid = ParamValidators.gtEq(4)
-  )
-  final def setHLLBits(value: Int): this.type = set(hllBits, value)
-  final def getHLLBits: Int = $(hllBits)
-  setDefault(hllBits -> OpOneHotVectorizer.HLLBits)
-}
-
 
 object OpOneHotVectorizer {
   /**
@@ -269,6 +246,28 @@ final class OpTextPivotVectorizerModel[T <: Text] private[op]
 }
 
 
+trait MaxPercentageCardinalityParams extends Params {
+  final val maxPctCardinality = new DoubleParam(
+    parent = this, name = "maxPctCardinality",
+    doc = "max percentage of distinct values a categorical feature can have",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
+  )
+  final def setMaxPctCardinality(v: Double): this.type = set(maxPctCardinality, v)
+  final def getMaxPctCardinality: Double = $(maxPctCardinality)
+  setDefault(maxPctCardinality -> OpOneHotVectorizer.MaxPctCardinality)
+
+  final val hllBits = new IntParam(
+    parent = this, name = "hllBits", doc =
+      "Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits})." +
+        " Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.",
+    isValid = ParamValidators.gtEq(4)
+  )
+  final def setHLLBits(value: Int): this.type = set(hllBits, value)
+  final def getHLLBits: Int = $(hllBits)
+  setDefault(hllBits -> OpOneHotVectorizer.HLLBits)
+}
+
+
 /**
  * One Hot Functionality
  */
@@ -344,12 +343,13 @@ private[op] trait UniqueCountFun {
     size: Int,
     bits: Int
   )(implicit kryo: KryoSerializer): (Seq[Map[String, HLL]], Long) = {
-    val hll = new HyperLogLogMonoid(bits)
-    val hllMapMonoid = Monoid.mapMonoid[String, HLL](hll)
     val hlls = rdd.mapPartitions { it =>
+      val hll = new HyperLogLogMonoid(bits)
       val ks = kryo.newInstance() // reuse the same kryo instance for the partition
       it.map(_.map(_.map { case (k, v) => (k, hll.create(ks.serialize(v).array())) }) -> 1L)
     }
+    val hllSG = Semigroup.from[HLL](_ + _) // we use Semigroup here to avoid map keys removal
+    val hllMapMonoid = Monoid.mapMonoid[String, HLL](hllSG)
     val zero = Seq.fill(size)(Map.empty[String, HLL]) -> 0L
     val countMapUniques = hlls.fold(zero) { case ((a, c1), (b, c2)) =>
       a.zip(b).map { case (m1, m2) => hllMapMonoid.plus(m1, m2) } -> (c1 + c2)
