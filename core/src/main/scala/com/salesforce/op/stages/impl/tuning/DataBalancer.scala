@@ -124,7 +124,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def examine(data: Dataset[Row]): Option[SplitterSummary] = {
+  override def preValidationPrepare(data: Dataset[Row]): SplitterSummary = {
     val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
     val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
     val negativeCount = negativeData.count()
@@ -133,7 +133,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
 
     estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = seed)
 
-    summary
+    summary.get
   }
 
   /**
@@ -142,7 +142,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set
    */
-  def prepare(data: Dataset[Row]): Dataset[Row] = {
+  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
 
     if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
 

@@ -248,8 +248,8 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val (balancedTrain, balancedTest) = splitter.map(s => (
-      s.prepare(selectTrain),
-      s.prepare(selectTest))
+      s.validationPrepare(selectTrain),
+      s.validationPrepare(selectTest))
     ).getOrElse((selectTrain, selectTest))
 
     (balancedTrain, balancedTest)

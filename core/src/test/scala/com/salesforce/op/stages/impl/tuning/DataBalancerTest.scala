@@ -106,8 +106,8 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val fraction = 0.4
     val maxSize = 2000
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
-    val s1 = balancer.examine(data)
-    val res1 = balancer.prepare(data)
+    val s1 = balancer.preValidationPrepare(data)
+    val res1 = balancer.validationPrepare(data)
     val (downSample, upSample) = balancer.getProportions(smallCount, bigCount, fraction, maxSize)
 
     balancer.getUpSampleFraction shouldBe upSample
@@ -118,7 +118,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
 
   it should "throw an error if you try to prepare before examining" in {
     val balancer = DataBalancer(sampleFraction = 0.1, maxTrainingSample = 2000, seed = 11L)
-    intercept[RuntimeException](balancer.prepare(data)).getMessage shouldBe
+    intercept[RuntimeException](balancer.validationPrepare(data)).getMessage shouldBe
       "Cannot call prepare until examine has been called"
   }
 
@@ -126,8 +126,8 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val fraction = 0.01
     val maxSize = 20000
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
-    val s1 = balancer.examine(data)
-    val res1 = balancer.prepare(data)
+    val s1 = balancer.preValidationPrepare(data)
+    val res1 = balancer.validationPrepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe 1.0
     checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
@@ -137,8 +137,8 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val fraction = 0.01
     val maxSize = 100
     val balancer = DataBalancer(sampleFraction = fraction, maxTrainingSample = maxSize, seed = 11L)
-    val s1 = balancer.examine(data)
-    val res1 = balancer.prepare(data)
+    val s1 = balancer.preValidationPrepare(data)
+    val res1 = balancer.validationPrepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
     checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
@@ -157,14 +157,14 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
 
     // Rerun balancer with set params
     withClue("Data balancer should not update the summary") {
-      val train = balancer.prepare(spark.emptyDataFrame)
+      val train = balancer.validationPrepare(spark.emptyDataFrame)
       train.count() shouldBe 0
       balancer.summary shouldBe Some(expectedSummary)
     }
 
     // Rerun balancer again and expect the same data & summary
-    val s2 = balancer.examine(data)
-    val res2 = balancer.prepare(data)
+    val s2 = balancer.preValidationPrepare(data)
+    val res2 = balancer.validationPrepare(data)
     res2.collect() shouldBe previousResult.collect()
     s2 shouldBe summary
     balancer.summary shouldBe Some(expectedSummary)

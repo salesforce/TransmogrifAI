@@ -69,7 +69,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def examine(data: Dataset[Row]): Option[SplitterSummary] = Some(DataSplitterSummary())
+  override def preValidationPrepare(data: Dataset[Row]): SplitterSummary = DataSplitterSummary()
 
   /**
    * Function to use to prepare the dataset for modeling
@@ -78,7 +78,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): Dataset[Row] = data
+  def validationPrepare(data: Dataset[Row]): Dataset[Row] = data
 
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)

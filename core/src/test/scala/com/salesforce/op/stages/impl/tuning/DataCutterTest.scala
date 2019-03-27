@@ -57,8 +57,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
   Spec[DataCutter] should "not filter out any data when the parameters are permissive" in {
     val dc1 = DataCutter(seed = seed, minLabelFraction = 0.0, maxLabelCategories = 100000)
-    val s1 = dc1.examine(randDF)
-    val split1 = dc1.prepare(randDF)
+    val s1 = dc1.preValidationPrepare(randDF)
+    val split1 = dc1.validationPrepare(randDF)
 
     split1.count() shouldBe dataSize
     assertDataCutterSummary(s1) { s =>
@@ -68,8 +68,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     }
 
     val dc2 = DataCutter(seed = seed, minLabelFraction = 0.0, maxLabelCategories = 100000)
-    val s2 = dc2.examine(biasDF)
-    val split2 = dc2.prepare(biasDF)
+    val s2 = dc2.preValidationPrepare(biasDF)
+    val split2 = dc2.validationPrepare(biasDF)
 
     split2.count() shouldBe dataSize
     assertDataCutterSummary(s2) { s =>
@@ -81,19 +81,19 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
   it should "throw an error when all the data is filtered out" in {
     val dataCutter = DataCutter(seed = seed, minLabelFraction = 0.4)
-    assertThrows[RuntimeException](dataCutter.examine(randDF))
+    assertThrows[RuntimeException](dataCutter.preValidationPrepare(randDF))
   }
 
   it should "throw an error when prepare is called before examine" in {
     val dataCutter = DataCutter(seed = seed, minLabelFraction = 0.4)
-    intercept[RuntimeException](dataCutter.prepare(randDF)).getMessage shouldBe
+    intercept[RuntimeException](dataCutter.validationPrepare(randDF)).getMessage shouldBe
       "Cannot call prepare until examine has been called"
   }
 
   it should "filter out all but the top N label categories" in {
     val dc1 = DataCutter(seed = seed, minLabelFraction = 0.0, maxLabelCategories = 100, reserveTestFraction = 0.5)
-    val s1 = dc1.examine(randDF)
-    val split1 = dc1.prepare(randDF)
+    val s1 = dc1.preValidationPrepare(randDF)
+    val split1 = dc1.validationPrepare(randDF)
 
     findDistinct(split1).count() shouldBe 100
     assertDataCutterSummary(s1) { s =>
@@ -103,8 +103,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     }
 
     val dc2 = DataCutter(seed = seed).setMaxLabelCategories(3)
-    val s2 = dc2.examine(biasDF)
-    val split2 = dc2.prepare(biasDF)
+    val s2 = dc2.preValidationPrepare(biasDF)
+    val split2 = dc2.validationPrepare(biasDF)
 
     findDistinct(split2).collect().toSet shouldEqual Set(0.0, 1.0, 2.0)
     assertDataCutterSummary(s2) { s =>
@@ -116,8 +116,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
   it should "filter out anything that does not have at least the specified data fraction" in {
     val dc1 = DataCutter(seed = seed, minLabelFraction = 0.0012, maxLabelCategories = 100000, reserveTestFraction = 0.5)
-    val s1 = dc1.examine(randDF)
-    val split1 = dc1.prepare(randDF)
+    val s1 = dc1.preValidationPrepare(randDF)
+    val split1 = dc1.validationPrepare(randDF)
 
     val distinct = findDistinct(randDF).count()
     val distTrain = findDistinct(split1)
@@ -129,8 +129,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     }
 
     val dc2 = DataCutter(seed = seed, minLabelFraction = 0.2, reserveTestFraction = 0.5)
-    val s2 = dc2.examine(biasDF)
-    val split2 = dc2.prepare(biasDF)
+    val s2 = dc2.preValidationPrepare(biasDF)
+    val split2 = dc2.validationPrepare(biasDF)
     findDistinct(split2).count() shouldBe 3
     assertDataCutterSummary(s2) { s =>
       s.labelsKept.length shouldBe 3
@@ -144,7 +144,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     val drop = Set(5.0, 7.0)
     val dc = DataCutter(seed = seed).setLabels(keep = keep, drop = drop)
     dc.summary = Option(DataCutterSummary(labelsKept = dc.getLabelsToKeep, labelsDropped = dc.getLabelsToDrop))
-    val split = dc.prepare(randDF)
+    val split = dc.validationPrepare(randDF)
 
     findDistinct(split).collect().sorted shouldBe Array(0.0, 1.0)
     dc.getLabelsToKeep shouldBe keep.toArray

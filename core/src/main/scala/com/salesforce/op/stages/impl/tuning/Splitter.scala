@@ -61,23 +61,23 @@ abstract class Splitter(val uid: String) extends SplitterParams {
   }
 
   /**
-   * Function to use to prepare the dataset for modeling
+   * Function to use to prepare the dataset for modeling within the validation step
    * eg - do data balancing or dropping based on the labels
    *
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): Dataset[Row]
+  def validationPrepare(data: Dataset[Row]): Dataset[Row]
 
 
   /**
-   * Function to use examine the data set to set parameters for preparation
+   * Function to use examine the data set to set parameters for preparation before validation
    * eg - do data balancing or dropping based on the labels
    *
    * @param data
    * @return Parameters set in examining data
    */
-  def examine(data: Dataset[Row]): Option[SplitterSummary]
+  def preValidationPrepare(data: Dataset[Row]): SplitterSummary
 
 }
 

@@ -84,7 +84,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data
    * @return Parameters set in examining data
    */
-  override def examine(data: Dataset[Row]): Option[SplitterSummary] = {
+  override def preValidationPrepare(data: Dataset[Row]): SplitterSummary = {
 
     import data.sparkSession.implicits._
 
@@ -95,7 +95,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     setLabels(resKeep, resDrop)
 
     summary = Option(DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop))
-    summary
+    summary.get
   }
 
   /**
@@ -105,7 +105,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data first column must be the label as a double
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): Dataset[Row] = {
+  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
 
     val keep: Set[Double] = getLabelsToKeep.toSet
