@@ -80,7 +80,9 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     val features = (0 until nCols).map(i => FeatureBuilder.fromRow[RealMap](i.toString).asPredictor)
     val schema = FeatureSparkTypes.toStructType(features: _ *)
     implicit val rowEncoder = RowEncoder(schema)
-    val data = seq.map(p => Row.fromSeq(p.map(_.value))).toDF().map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
+    val data =
+      seq.map(p => Row.fromSeq(p.map(_.value))).toDF()
+        .map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
     data.persist
   }
 
@@ -90,18 +92,23 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     val features = (0 until nCols).map(i => FeatureBuilder.fromRow[Real](i.toString).asPredictor)
     val schema = FeatureSparkTypes.toStructType(features: _ *)
     implicit val rowEncoder = RowEncoder(schema)
-    val data = seq.map(p => Row.fromSeq(
-      p.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
-    )).toDF().map(_.toSeq.map(_.asInstanceOf[Double]))
+    val data =
+      seq.map(p => Row.fromSeq(p.map(FeatureTypeSparkConverter.toSpark))).toDF()
+        .map(_.toSeq.map(_.asInstanceOf[Double]))
     data.persist
   }
 
   private def countUniquesManually(data: Dataset[Seq[Double]]): Seq[Int] = {
-    data.rdd.map(_.map(v => Map(v -> 1L))).reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }).map(_.size)
+    data.rdd
+      .map(_.map(v => Map(v -> 1L)))
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      .map(_.size)
   }
 
   private def countUniquesMapManually(data: Dataset[Seq[Map[String, Double]]]): Seq[Int] = {
-    data.rdd.map(_.map(_.flatMap { case (k, v) => Map(k -> Map(v -> 1L)) }))
-      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 }).flatMap(_.map(_._2.size))
+    data.rdd
+      .map(_.map(_.flatMap { case (k, v) => Map(k -> Map(v -> 1L)) }))
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      .flatMap(_.map(_._2.size))
   }
 }
