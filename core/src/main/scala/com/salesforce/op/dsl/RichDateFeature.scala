@@ -32,11 +32,14 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
+import com.salesforce.op.lambda.{lambdas, materializeLambdas}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature.{DateListPivot, DateToUnitCircleTransformer, TimePeriod, TransmogrifierDefaults}
 import org.joda.time.{DateTime => JDateTime}
 
-
+object RichDateFeature
+import RichDateFeature._
+@materializeLambdas
 trait RichDateFeature {
   self: RichFeature with RichListFeature =>
 
@@ -45,6 +48,7 @@ trait RichDateFeature {
    *
    * @param f Date Feature
    */
+
   implicit class RichDateFeature(val f: FeatureLike[Date]) {
 
     /**
@@ -52,9 +56,10 @@ trait RichDateFeature {
      * @return
      */
     def toDateList(): FeatureLike[DateList] = {
-      f.transformWith(
-        new UnaryLambdaTransformer[Date, DateList](operationName = "dateToList", _.value.toSeq.toDateList)
+      @lambdas val toDateList = new UnaryLambdaTransformer[Date, DateList](
+        operationName = "dateToList", (x: Date) => x.value.toSeq.toDateList
       )
+      f.transformWith(toDateList)
     }
 
     /**
@@ -102,9 +107,13 @@ trait RichDateFeature {
       circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
     ): FeatureLike[OPVector] = {
+
+      // Unfortunately I wasn't able to use lambda rewriter here due to value "f" being out of scope
       val timePeriods = circularDateReps.map(tp => f.toUnitCircle(tp, others))
-      val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
-        trackNulls = trackNulls, others = others.map(_.toDateList()))
+
+      @lambdas val time = f.toDateList().vectorize(dateListPivot = dateListPivot, referenceDate = referenceDate,
+        trackNulls = trackNulls, others = others.map((x: FeatureLike[Date]) => x.toDateList()))
+
       if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
@@ -183,3 +192,5 @@ trait RichDateFeature {
   }
 
 }
+
+

@@ -1,4 +1,5 @@
 dependencies {
+    compile project(":lambda")
     compile project(':readers')
     testRuntime project(':models')
     testCompile project(':testkit')
