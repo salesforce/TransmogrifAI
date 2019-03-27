@@ -30,6 +30,8 @@
 
 package com.salesforce.op.filters
 
+import com.salesforce.op.features.FeatureDistributionType
+
 trait FiltersTestData {
 
   protected val eps = 1E-2
@@ -44,11 +46,11 @@ trait FiltersTestData {
   )
 
   protected val scoreSummaries = Seq(
-    FeatureDistribution("A", None, 10, 8, Array(1, 4, 0, 0, 6), Array.empty),
-    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("C", Some("1"), 10, 1, Array(0, 0, 10, 10, 0), Array.empty),
-    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty),
-    FeatureDistribution("D", Some("1"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty),
-    FeatureDistribution("D", Some("2"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty)
+    FeatureDistribution("A", None, 10, 8, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring),
+    FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty, FeatureDistributionType.Scoring),
+    FeatureDistribution("C", Some("1"), 10, 1, Array(0, 0, 10, 10, 0), Array.empty, FeatureDistributionType.Scoring),
+    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty, FeatureDistributionType.Scoring),
+    FeatureDistribution("D", Some("1"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty, FeatureDistributionType.Scoring),
+    FeatureDistribution("D", Some("2"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty, FeatureDistributionType.Scoring)
   )
 }

@@ -30,9 +30,10 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
 import com.salesforce.op.stages.{OpPipelineStageReader, _}
 import org.apache.spark.ml.util.MLReader
@@ -81,19 +82,20 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
    * @return workflow model instance
    */
   def loadJson(json: JValue, path: String): Try[OpWorkflowModel] = {
+
     for {
       trainParams <- OpParams.fromString((json \ TrainParameters.entryName).extract[String])
       params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
       (stages, resultFeatures) <- Try(resolveFeaturesAndStages(json, path))
       blacklist <- Try(resolveBlacklist(json))
-      distributions <- resolveRawFeatureDistributions(json)
+      results <- resolveRawFeatureFilterResults(json)
     } yield model
       .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
       .setFeatures(resultFeatures)
       .setParameters(params)
       .setBlacklist(blacklist)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(results)
   }
 
   private def resolveBlacklist(json: JValue): Array[OPFeature] = {
@@ -154,12 +156,24 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     }
   }
 
-  private def resolveRawFeatureDistributions(json: JValue): Try[Array[FeatureDistribution]] = {
-    if ((json \ RawFeatureDistributions.entryName) != JNothing) { // for backwards compatibility
-      val distString = (json \ RawFeatureDistributions.entryName).extract[String]
-      FeatureDistribution.fromJson(distString)
-    } else {
-      Success(Array.empty[FeatureDistribution])
+  private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
+    if ((json \ RawFeatureFilterResultsFieldName.entryName) != JNothing) {
+      val resultsString = (json \ RawFeatureFilterResultsFieldName.entryName).extract[String]
+      RawFeatureFilterResults.fromJson(resultsString)
+    }
+    else { // for backwards compatibility
+      /**
+       * RawFeatureDistributions is now contained in and written / read through RawFeatureFilterResults.
+       * All setters of RawFeatureDistributions are now deprecated.
+       * This resolve function is to allow backwards compatibility where RawFeatureDistributions was a saved field
+       */
+      val rawFeatureDistributionsEntryName = "rawFeatureDistributions"
+      if ((json \ rawFeatureDistributionsEntryName) != JNothing) {
+        val distString = (json \ rawFeatureDistributionsEntryName).extract[String]
+        FeatureDistribution.fromJson(distString).map(d => RawFeatureFilterResults(rawFeatureDistributions = d))
+      } else {
+        Success(RawFeatureFilterResults())
+      }
     }
   }
 

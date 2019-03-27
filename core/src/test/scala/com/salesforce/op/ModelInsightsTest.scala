@@ -32,7 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType}
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
@@ -335,7 +335,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     pretty should include("Top Contributions")
   }
 
-  it should "correctly serialize and deserialize from json" in {
+  it should "correctly serialize and deserialize from json when raw feature filter is not used" in {
     val insights = workflowModel.modelInsights(pred)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
@@ -346,6 +346,45 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
+            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
+        }
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
+          case (o, i) =>
+            o.validationType shouldEqual i.validationType
+            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
+            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
+            o.dataPrepResults shouldEqual i.dataPrepResults
+            o.evaluationMetric shouldEqual i.evaluationMetric
+            o.problemType shouldEqual i.problemType
+            o.bestModelUID shouldEqual i.bestModelUID
+            o.bestModelName shouldEqual i.bestModelName
+            o.bestModelType shouldEqual i.bestModelType
+            o.validationResults.zip(i.validationResults).foreach{
+              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
+                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
+            }
+            o.trainEvaluation shouldEqual i.trainEvaluation
+            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
+        }
+        insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
+        insights.stageInfo.keys shouldEqual deser.stageInfo.keys
+    }
+  }
+
+  it should "correctly serialize and deserialize from json when raw feature filter is used" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+    ModelInsights.fromJson(insights.toJson()) match {
+      case Failure(e) => fail(e)
+      case Success(deser) =>
+        insights.label shouldEqual deser.label
+        insights.features.zip(deser.features).foreach{
+          case (i, o) =>
+            i.featureName shouldEqual o.featureName
+            i.featureType shouldEqual o.featureType
+            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
+            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
         }
         insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
           case (o, i) =>
@@ -456,7 +495,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
       Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      Array.empty[FeatureDistribution]
+      RawFeatureFilterResults()
     )
     featureInsights.size shouldBe 2
 
@@ -523,6 +562,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "include raw feature distribution information when RawFeatureFilter is used" in {
     val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
+
     val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
 
     val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
@@ -540,8 +580,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
      * it's not explicitly blacklisted itself.
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
+
     insights.features.foreach(f =>
-      f.distributions should contain theSameElementsAs wfDistributionsGrouped.getOrElse(f.featureName, Array.empty)
+      f.distributions shouldBe wfDistributionsGrouped.getOrElse(f.featureName, Seq.empty)
     )
   }
 
