@@ -413,17 +413,11 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "drop features with max cardinality" in {
-    val fitted = vectorizer.setMaxPctCardinality(0.2)
-      .fit(dataSet)
+    val fitted = vectorizer.setMaxPctCardinality(0.2).fit(dataSet)
     val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
-    val expected = Array(
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty
-    )
+    val expected = Array.fill(4)(OPVector.empty)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(fitted.getOutput())
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)

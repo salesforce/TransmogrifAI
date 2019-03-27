@@ -312,7 +312,7 @@ private[op] trait UniqueCountFun {
    */
   def countUniques[V: ClassTag](dataset: Dataset[Seq[V]], size: Int, bits: Int)
     (implicit kryo: KryoSerializer): (Seq[HLL], Long) = {
-    val key = "k"
+    val key = "k" // lift values into map with a single key
     val rdd = dataset.rdd.map(seq => seq.map(v => Map(key -> v)))
     val (counts, total) = countMapUniques(rdd, size = size, bits = bits)
     counts.flatMap(_.get(key)) -> total

@@ -134,14 +134,7 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
   }
 
   "OpTextPivotVectorizer" should "drop high cardinality feature" in {
-    val data = Seq(
-      "A",
-      "B",
-      "A",
-      "C",
-      "C",
-      "A"
-    )
+    val data = Seq("A", "B", "A", "C", "C", "A")
     val (df, f1) = TestFeatureBuilder(data.map(_.toText))
 
     val textPivotVectorizer = new OpTextPivotVectorizer[Text]().setMaxPctCardinality(0.2)
@@ -153,15 +146,8 @@ class TextTransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with 
     val expect = OpVectorMetadata("", field.metadata).columns
       .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[Text]))
     assertNominal(field, expect, result)
-    val expected = Array(
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty,
-      OPVector.empty
-    )
-    result should contain theSameElementsAs  expected
+
+    result should contain theSameElementsAs Array.fill(6)(OPVector.empty)
   }
 
 }
