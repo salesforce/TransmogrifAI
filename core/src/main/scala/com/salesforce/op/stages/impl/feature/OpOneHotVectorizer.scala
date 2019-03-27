@@ -315,7 +315,8 @@ private[op] trait UniqueCountFun {
     val key = "k" // lift values into map with a single key
     val rdd = dataset.rdd.map(seq => seq.map(v => Map(key -> v)))
     val (counts, total) = countMapUniques(rdd, size = size, bits = bits)
-    counts.flatMap(_.get(key)) -> total
+    val zero = new HyperLogLogMonoid(bits).zero
+    counts.map(_.getOrElse(key, zero)) -> total
   }
 
   /**
@@ -348,8 +349,8 @@ private[op] trait UniqueCountFun {
       val ks = kryo.newInstance() // reuse the same kryo instance for the partition
       it.map(_.map(_.map { case (k, v) => (k, hll.create(ks.serialize(v).array())) }) -> 1L)
     }
-    val hllSG = Semigroup.from[HLL](_ + _) // we use Semigroup here to avoid map keys removal
-    val hllMapMonoid = Monoid.mapMonoid[String, HLL](hllSG)
+    val hllSG = Semigroup.from[HLL](_ + _)
+    val hllMapMonoid = Monoid.mapMonoid[String, HLL](hllSG)  // we use Semigroup here to avoid map keys removal
     val zero = Seq.fill(size)(Map.empty[String, HLL]) -> 0L
     val countMapUniques = hlls.fold(zero) { case ((a, c1), (b, c2)) =>
       a.zip(b).map { case (m1, m2) => hllMapMonoid.plus(m1, m2) } -> (c1 + c2)

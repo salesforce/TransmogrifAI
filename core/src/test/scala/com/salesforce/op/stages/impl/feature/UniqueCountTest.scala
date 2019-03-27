@@ -31,13 +31,11 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{FeatureBuilder, FeatureSparkTypes}
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit.{RandomMap, RandomReal, RandomVector}
-import com.twitter.algebird.Operators._
+import com.twitter.algebird.{Monoid, Semigroup}
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql._
-import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -49,59 +47,76 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
   implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
 
   Spec[UniqueCountFun] should "count uniques" in {
-    val data = createData(1000, 10)
-    val m = data.first.size
-    val (uniqueCounts, total) = countUniques[Double](data, size = m, bits = 12)
+    val (numRows, numCols, bits) = (1000, 10, 12)
+    val data = createData(numRows, numCols)
+    val (uniqueCounts, total) = countUniques[Double](data, size = numCols, bits = bits)
     total shouldBe data.count()
-    val expected = countUniquesManually(data)
-    uniqueCounts.map(_.estimatedSize.toInt) should contain theSameElementsAs expected
+    val expected = expectedCountUniques(data)
+    uniqueCounts.map(_.estimatedSize.toInt) shouldBe expected
+  }
+
+  it should "count uniques on empty data" in {
+    val (numRows, numCols, bits) = (0, 10, 12)
+    val data = createData(numRows, numCols)
+    val (uniqueCounts, total) = countUniques[Double](data, size = numCols, bits = bits)
+    total shouldBe numRows
+    uniqueCounts.size shouldBe numCols
+    uniqueCounts.foreach(_.estimatedSize shouldBe 0.0)
+
   }
 
   it should "count uniques in maps" in {
-    val data = createMapData(1000, 10)
-    val m = data.first.size
-    val (uniqueCounts, total) = countMapUniques[Double](data, size = m, bits = 12)
-    total shouldBe data.count()
-    val expected = countUniquesMapManually(data)
-    uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) should contain theSameElementsAs expected
+    val (numRows, numCols, bits) = (1000, 10, 12)
+    val data = createMapData(numRows, numCols)
+    val (uniqueCounts, total) = countMapUniques[Double](data, size = numCols, bits = bits)
+    total shouldBe numRows
+    val expected = expectedCountMapUniques(data)
+    uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) shouldBe expected
+  }
+
+  it should "count uniques in maps on empty data" in {
+    val (numRows, numCols, bits) = (0, 10, 12)
+    val data = createMapData(numRows, numCols)
+    val (uniqueCounts, total) = countMapUniques[Double](data, size = numCols, bits = bits)
+    total shouldBe numRows
+    uniqueCounts.size shouldBe numCols
+    uniqueCounts.foreach(_.size shouldBe 0)
   }
 
 
   private def createData(nRows: Int, nCols: Int): Dataset[Seq[Double]] = {
-    val fv = RandomVector.dense(RandomReal.poisson(10), nCols).limit(nRows)
-    val seq = fv.map(_.value.toArray.toSeq.map(_.toReal))
-    val features = (0 until nCols).map(i => FeatureBuilder.fromRow[Real](i.toString).asPredictor)
-    val schema = FeatureSparkTypes.toStructType(features: _ *)
-    implicit val rowEncoder = RowEncoder(schema)
-
-    seq.map(p => Row.fromSeq(p.map(FeatureTypeSparkConverter.toSpark))).toDF()
-      .map(_.toSeq.map(_.asInstanceOf[Double]))
+    RandomVector.dense(RandomReal.poisson(10), nCols)
+      .limit(nRows)
+      .map(_.value.toArray.toSeq)
+      .toDS()
   }
 
   private def createMapData(nRows: Int, nCols: Int): Dataset[Seq[Map[String, Double]]] = {
     val poisson = RandomReal.poisson[Real](10)
-    val seq = (0 until nCols).map(j =>
-      RandomMap.ofReals[Real, RealMap](poisson, 1, 4).withKeys(i => s"$j$i").limit(nRows)
-    ).transpose
-    val features = (0 until nCols).map(i => FeatureBuilder.fromRow[RealMap](i.toString).asPredictor)
-    val schema = FeatureSparkTypes.toStructType(features: _ *)
-    implicit val rowEncoder = RowEncoder(schema)
-
-    seq.map(p => Row.fromSeq(p.map(_.value))).toDF()
-      .map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
+    ((0 until nCols).map(j =>
+      RandomMap.ofReals[Real, RealMap](poisson, 0, 10)
+        .limit(nRows)
+        .map(_.value)
+    ).transpose: Seq[Seq[Map[String, Double]]]).toDS()
   }
 
-  private def countUniquesManually(data: Dataset[Seq[Double]]): Seq[Int] = {
+  private def expectedCountUniques(data: Dataset[Seq[Double]]): Seq[Int] = {
     data.rdd
       .map(_.map(v => Map(v -> 1L)))
-      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => MapTestMonoids.mapDLMonoid.plus(m1, m2) })
       .map(_.size)
   }
 
-  private def countUniquesMapManually(data: Dataset[Seq[Map[String, Double]]]): Seq[Int] = {
+  private def expectedCountMapUniques(data: Dataset[Seq[Map[String, Double]]]): Seq[Int] = {
     data.rdd
       .map(_.map(_.flatMap { case (k, v) => Map(k -> Map(v -> 1L)) }))
-      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => MapTestMonoids.mapMDLMonoid.plus(m1, m2) })
       .flatMap(_.map(_._2.size))
   }
+}
+
+private object MapTestMonoids {
+  val longSG = Semigroup.from[Long](_ + _)
+  val mapDLMonoid = Monoid.mapMonoid[Double, Long](longSG)  // we use Semigroup here to avoid map keys removal
+  val mapMDLMonoid = Monoid.mapMonoid[String, Map[Double, Long]](mapDLMonoid)
 }
