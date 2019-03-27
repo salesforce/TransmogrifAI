@@ -71,22 +71,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def /[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "divide",
-          transformFn = (i1: I, i2: I2) => {
-            val result = for {
-              x <- i1.toDouble
-              y <- i2.toDouble
-            } yield x / y
-
-            result filter Number.isValid toReal
-          }
-        ),
-        f = that
-      )
-    }
+    def /[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      new DivideTransformer[I, I2]().setInput(f, that).getOutput()
 
     /**
      * Apply Multiply transformer shortcut function
@@ -102,22 +88,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def *[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "multiply",
-          transformFn = (i1: I, i2: I2) => {
-            val result = for {
-              x <- i1.toDouble
-              y <- i2.toDouble
-            } yield x * y
-
-            result filter Number.isValid toReal
-          }
-        ),
-        f = that
-      )
-    }
+    def *[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      new MultiplyTransformer[I, I2]().setInput(f, that).getOutput()
 
     /**
      * Apply Plus transformer shortcut function
@@ -133,15 +105,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def +[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "plus",
-          transformFn = (i1: I, i2: I2) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
-        ),
-        f = that
-      )
-    }
+    def +[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      new AdditionTransformer[I, I2]().setInput(f, that).getOutput()
 
     /**
      * Apply Minus transformer shortcut function
@@ -157,23 +122,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def -[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "minus",
-          transformFn = (i1: I, i2: I2) => {
-            val optZ = (i1.toDouble, i2.toDouble) match {
-              case (Some(x), Some(y)) => Some(x - y)
-              case (Some(x), None) => Some(x)
-              case (None, Some(y)) => Some(-y)
-              case (None, None) => None
-            }
-            optZ.toReal
-          }
-        ),
-        f = that
-      )
-    }
+    def -[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      new SubtractionTransformer[I, I2]().setInput(f, that).getOutput()
 
     /**
      * Apply Divide scalar transformer shortcut function
