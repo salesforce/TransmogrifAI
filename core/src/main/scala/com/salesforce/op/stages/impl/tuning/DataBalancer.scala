@@ -124,7 +124,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row]): SplitterSummary = {
+  override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
     val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
     val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
     val negativeCount = negativeData.count()
@@ -133,7 +133,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
 
     estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = seed)
 
-    summary.get
+    summary
   }
 
   /**

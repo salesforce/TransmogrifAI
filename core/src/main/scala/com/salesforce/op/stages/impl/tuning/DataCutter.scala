@@ -84,7 +84,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row]): SplitterSummary = {
+  override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
 
     import data.sparkSession.implicits._
 
@@ -95,7 +95,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     setLabels(resKeep, resDrop)
 
     summary = Option(DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop))
-    summary.get
+    summary
   }
 
   /**

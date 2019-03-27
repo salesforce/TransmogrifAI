@@ -77,7 +77,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Parameters set in examining data
    */
-  def preValidationPrepare(data: Dataset[Row]): SplitterSummary
+  def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary]
 
 }
 
