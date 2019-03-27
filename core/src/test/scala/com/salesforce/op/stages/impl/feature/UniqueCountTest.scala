@@ -30,33 +30,28 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, FeatureSparkTypes}
 import com.salesforce.op.test.TestSparkContext
-import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.{RandomMap, RandomReal, RandomVector}
-import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.twitter.algebird.Operators._
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.twitter.algebird.Operators._
-
-import scala.reflect.ClassTag
 
 @RunWith(classOf[JUnitRunner])
 class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun {
   import spark.implicits._
 
-  implicit val classTag: ClassTag[Double] = ReflectionUtils.classTagForWeakTypeTag[Double]
   implicit val kryo = new KryoSerializer(spark.sparkContext.getConf)
-  val bits = 12
 
   Spec[OneHotFun] should "count uniques" in {
     val data = createData(1000, 10)
     val m = data.first.size
-    val (uniqueCounts, total) = countUniques(data, size = m, bits = bits)
+    val (uniqueCounts, total) = countUniques[Double](data, size = m, bits = 12)
     total shouldBe data.count()
     val expected = countUniquesManually(data)
     uniqueCounts.map(_.estimatedSize.toInt) should contain theSameElementsAs expected
@@ -65,12 +60,23 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
   it should "count unique maps" in {
     val data = createMapData(1000, 10)
     val m = data.first.size
-    val (uniqueCounts, total) = countMapUniques(data, size = m, bits = bits)
+    val (uniqueCounts, total) = countMapUniques[Double](data, size = m, bits = 12)
     total shouldBe data.count()
     val expected = countUniquesMapManually(data)
     uniqueCounts.flatMap(_.map { case (_, v) => v.estimatedSize.toInt }) should contain theSameElementsAs expected
   }
 
+
+  private def createData(nRows: Int, nCols: Int): Dataset[Seq[Double]] = {
+    val fv = RandomVector.dense(RandomReal.poisson(10), nCols).limit(nRows)
+    val seq = fv.map(_.value.toArray.toSeq.map(_.toReal))
+    val features = (0 until nCols).map(i => FeatureBuilder.fromRow[Real](i.toString).asPredictor)
+    val schema = FeatureSparkTypes.toStructType(features: _ *)
+    implicit val rowEncoder = RowEncoder(schema)
+
+    seq.map(p => Row.fromSeq(p.map(FeatureTypeSparkConverter.toSpark))).toDF()
+      .map(_.toSeq.map(_.asInstanceOf[Double]))
+  }
 
   private def createMapData(nRows: Int, nCols: Int): Dataset[Seq[Map[String, Double]]] = {
     val poisson = RandomReal.poisson[Real](10)
@@ -80,22 +86,9 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     val features = (0 until nCols).map(i => FeatureBuilder.fromRow[RealMap](i.toString).asPredictor)
     val schema = FeatureSparkTypes.toStructType(features: _ *)
     implicit val rowEncoder = RowEncoder(schema)
-    val data =
-      seq.map(p => Row.fromSeq(p.map(_.value))).toDF()
-        .map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
-    data.persist
-  }
 
-  private def createData(nRows: Int, nCols: Int): Dataset[Seq[Double]] = {
-    val fv = RandomVector.dense(RandomReal.poisson(10), nCols).limit(nRows)
-    val seq = fv.map(_.value.toArray.toSeq.map(_.toReal))
-    val features = (0 until nCols).map(i => FeatureBuilder.fromRow[Real](i.toString).asPredictor)
-    val schema = FeatureSparkTypes.toStructType(features: _ *)
-    implicit val rowEncoder = RowEncoder(schema)
-    val data =
-      seq.map(p => Row.fromSeq(p.map(FeatureTypeSparkConverter.toSpark))).toDF()
-        .map(_.toSeq.map(_.asInstanceOf[Double]))
-    data.persist
+    seq.map(p => Row.fromSeq(p.map(_.value))).toDF()
+      .map(_.toSeq.map(_.asInstanceOf[Map[String, Double]]))
   }
 
   private def countUniquesManually(data: Dataset[Seq[Double]]): Seq[Int] = {
