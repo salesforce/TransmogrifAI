@@ -156,32 +156,24 @@ class OpWorkflowModelReader(val workflow: OpWorkflow) extends MLReader[OpWorkflo
     }
   }
 
-  /**
-   * RawFeatureDistributions is now contained in and written / read through RawFeatureFilterResults.
-   * All setters of RawFeatureDistributions are now deprecated.
-   * This resolve function is to allow backwards compatibility where RawFeatureDistributions was a saved field
-   */
-  private def resolveRawFeatureDistributions(json: JValue): Try[Seq[FeatureDistribution]] = {
-    val rawFeatureDistributionsEntryName = "rawFeatureDistributions"
-    if ((json \ rawFeatureDistributionsEntryName) != JNothing) { // for backwards compatibility
-      val distString = (json \ rawFeatureDistributionsEntryName).extract[String]
-      FeatureDistribution.fromJson(distString)
-    } else {
-      Success(Seq.empty)
-    }
-  }
-
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
-    if ((json \ RawFeatureFilterResultsFieldName.entryName) != JNothing) { // for backwards compatibility
+    if ((json \ RawFeatureFilterResultsFieldName.entryName) != JNothing) {
       val resultsString = (json \ RawFeatureFilterResultsFieldName.entryName).extract[String]
       RawFeatureFilterResults.fromJson(resultsString)
     }
-    else {
-      val distributions = resolveRawFeatureDistributions(json) match { // sets raw feature distributions if available
-        case Success(d) => d
-        case Failure(_) => throw new RuntimeException("Error resolving raw feature distributions")
+    else { // for backwards compatibility
+      /**
+       * RawFeatureDistributions is now contained in and written / read through RawFeatureFilterResults.
+       * All setters of RawFeatureDistributions are now deprecated.
+       * This resolve function is to allow backwards compatibility where RawFeatureDistributions was a saved field
+       */
+      val rawFeatureDistributionsEntryName = "rawFeatureDistributions"
+      if ((json \ rawFeatureDistributionsEntryName) != JNothing) {
+        val distString = (json \ rawFeatureDistributionsEntryName).extract[String]
+        FeatureDistribution.fromJson(distString).map(d => RawFeatureFilterResults(rawFeatureDistributions = d))
+      } else {
+        Success(RawFeatureFilterResults())
       }
-      Success(RawFeatureFilterResults(rawFeatureDistributions = distributions))
     }
   }
 
