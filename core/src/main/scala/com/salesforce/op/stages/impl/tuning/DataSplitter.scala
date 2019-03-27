@@ -63,7 +63,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
 
 
   /**
-   * Function to use examine the data set to set parameters for preparation
+   * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
    *
    * @param data

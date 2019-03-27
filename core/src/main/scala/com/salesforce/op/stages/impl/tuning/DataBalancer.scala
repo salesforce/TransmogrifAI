@@ -118,7 +118,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
 
 
   /**
-   * Function to use examine the data set to set parameters for preparation
+   * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
    *
    * @param data
@@ -137,7 +137,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
   }
 
   /**
-   * Split into a training set and a test set and balance the training set
+   * Rebalance the training data within the validation step
    *
    * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set

@@ -78,7 +78,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   @transient private[op] var summary: Option[DataCutterSummary] = None
 
   /**
-   * Function to use examine the data set to set parameters for preparation
+   * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
    *
    * @param data
@@ -99,8 +99,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   }
 
   /**
-   * function to use to prepare the dataset for modeling
-   * eg - do data balancing or dropping based on the labels
+   * Removes labels that should not be used in modeling
    *
    * @param data first column must be the label as a double
    * @return Training set test set
