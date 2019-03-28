@@ -220,3 +220,55 @@ class ScalarDivideTransformer[I <: OPNumeric[_], N]
 ) extends UnaryTransformer[I, Real](operationName = "scalarDivide", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ / n.toDouble(scalar)).filter(Number.isValid).toReal
 }
+
+
+/**
+ * Absolute value transformer
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class AbsoluteValueTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[AbsoluteValueTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Real](operationName = "abs", uid = uid){
+  override def transformFn: I => Real = (i: I) => i.toDouble.map(math.abs).toReal
+}
+
+/**
+ * Ceil transformer
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class CeilTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[CeilTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Integral](operationName = "ceil", uid = uid){
+  override def transformFn: I => Integral = (i: I) => i.toDouble.map(v => math.round(math.ceil(v))).toIntegral
+}
+
+
+/**
+ * Floor transformer
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class FloorTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[FloorTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Integral](operationName = "floor", uid = uid){
+  override def transformFn: I => Integral = (i: I) => i.toDouble.map(v => math.round(math.floor(v))).toIntegral
+}
+
+
