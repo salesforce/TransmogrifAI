@@ -115,7 +115,8 @@ private[op] class OpBinScoreEvaluator
         // binCenters is the center point in each bin.
         // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
         val diff = maxScore - minScore
-        val binCenters = for {i <- 0 until numOfBins} yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
+        val binCenters = for {i <- 0 until numOfBins}
+          yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
 
         val metrics = BinaryClassificationBinMetrics(
           BrierScore = brierScoreSum / numberOfPoints,
@@ -168,5 +169,6 @@ case class BinaryClassificationBinMetrics
 ) extends EvaluationMetrics
 
 object BinaryClassificationBinMetrics {
-  def empty: BinaryClassificationBinMetrics = BinaryClassificationBinMetrics(0.0, 0.0, Seq(), Seq(), Seq(), Seq(), Seq())
+  def empty: BinaryClassificationBinMetrics =
+    BinaryClassificationBinMetrics(0.0, 0.0, Seq(), Seq(), Seq(), Seq(), Seq())
 }
