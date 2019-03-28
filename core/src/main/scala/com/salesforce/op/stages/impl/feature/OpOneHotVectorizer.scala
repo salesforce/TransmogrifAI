@@ -87,13 +87,11 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
 
         val (uniqueCounts, n) = countUniques(dataset, size = inN.length, bits = $(hllBits))
         val percentFilter = uniqueCounts.map(_.estimatedSize / n < maxPctCard)
-        rdd.map(_.zip(percentFilter).filter(_._2).map(_._1))
+        rdd.map(_.zip(percentFilter).collect { case (v, true) => v })
       }
 
-    val countOccurrences: Seq[Map[String, Int]] = {
-      if (finalRDD.isEmpty) Seq.empty[Map[String, Int]]
-      else finalRDD.reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
-    }
+    val countOccurrences: Seq[Map[String, Int]] =
+      finalRDD.fold(Seq.fill(inN.length)(Map.empty[String, Int]))((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
 
     // Top K values for each categorical input
     val numToKeep = $(topK)
