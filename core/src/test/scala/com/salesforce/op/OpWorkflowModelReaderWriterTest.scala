@@ -35,7 +35,7 @@ import java.io.File
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.features.types.{Real, RealNN}
-import com.salesforce.op.filters.FeatureDistribution
+import com.salesforce.op.filters._
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.sparkwrappers.generic.SwUnaryEstimator
@@ -87,12 +87,17 @@ class OpWorkflowModelReaderWriterTest
   val distributions = Array(FeatureDistribution("a", None, 1L, 1L, Array(1.0), Array(1.0)),
     FeatureDistribution("b", Option("b"), 2L, 2L, Array(2.0), Array(2.0)))
 
+  val rawFeatureFilterResults = RawFeatureFilterResults(
+    rawFeatureDistributions = distributions
+  )
+
+
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
     val model = new OpWorkflowModel(wf.uid, wf.parameters)
       .setStages(wf.stages)
       .setFeatures(wf.resultFeatures)
       .setParameters(wf.parameters)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
 
     model.setReader(wf.reader.get)
   }
@@ -110,7 +115,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(density)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -122,7 +127,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(density, weight2)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -131,7 +136,7 @@ class OpWorkflowModelReaderWriterTest
       .setReader(dummyReader)
       .setResultFeatures(weight)
       .setParameters(workflowParams)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -148,7 +153,7 @@ class OpWorkflowModelReaderWriterTest
       .setParameters(workflowParams)
       .setReader(dummyReader)
       .setResultFeatures(scaled)
-      .setRawFeatureDistributions(distributions)
+      .setRawFeatureFilterResults(rawFeatureFilterResults)
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
@@ -313,7 +318,7 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareDistributions(wf1.getRawFeatureDistributions(), wf2.getRawFeatureDistributions())
+    RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
@@ -324,25 +329,13 @@ class OpWorkflowModelReaderWriterTest
     compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
     compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
     compareStages(wf1.stages, wf2.stages)
-    compareDistributions(wf1.getRawFeatureDistributions(), wf2.getRawFeatureDistributions())
+    RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareParams(p1: OpParams, p2: OpParams): Unit = {
     p1.stageParams shouldBe p2.stageParams
     p1.readerParams.toString() shouldBe p2.readerParams.toString()
     p1.customParams shouldBe p2.customParams
-  }
-
-  def compareDistributions(d1: Array[FeatureDistribution], d2: Array[FeatureDistribution]): Unit = {
-    d1.zip(d2)
-      .foreach{ case (a, b) =>
-        a.name shouldEqual b.name
-        a.key shouldEqual b.key
-        a.count shouldEqual b.count
-        a.nulls shouldEqual b.nulls
-        a.distribution shouldEqual b.distribution
-        a.summaryInfo shouldEqual b.summaryInfo
-      }
   }
 }
 

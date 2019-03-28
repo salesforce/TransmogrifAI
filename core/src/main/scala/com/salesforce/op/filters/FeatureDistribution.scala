@@ -187,7 +187,7 @@ object FeatureDistribution {
    * @param fd feature distributions
    * @return json array
    */
-  def toJson(fd: Array[FeatureDistribution]): String = Serialization.write[Array[FeatureDistribution]](fd)
+  def toJson(fd: Seq[FeatureDistribution]): String = Serialization.write[Seq[FeatureDistribution]](fd)
 
   /**
    * Feature distributions from json
@@ -195,8 +195,8 @@ object FeatureDistribution {
    * @param json feature distributions json
    * @return feature distributions array
    */
-  def fromJson(json: String): Try[Array[FeatureDistribution]] = Try {
-    Serialization.read[Array[FeatureDistribution]](json)
+  def fromJson(json: String): Try[Seq[FeatureDistribution]] = Try {
+    Serialization.read[Seq[FeatureDistribution]](json)
   }
 
   /**
