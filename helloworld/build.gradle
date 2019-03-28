@@ -25,7 +25,7 @@ apply plugin: 'scalaStyle'
 apply plugin: 'com.commercehub.gradle.plugin.avro'
 
 apply from: 'gradle/tests.gradle'
-apply from: 'gradle/spark.gradle'
+apply from: "${rootProject.projectDir}/../gradle/spark.gradle"
 
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
