@@ -113,6 +113,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   protected[op] def findBestEstimator(data: Dataset[_], dag: StagesDAG, persistEveryKStages: Int = 0)
     (implicit spark: SparkSession): Unit = {
 
+    splitter.foreach(_.preValidationPrepare(data.select(labelColName).toDF()))
     val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = data,
       label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
       stratifyCondition = validator.isClassification
@@ -146,20 +147,17 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithID.isEmpty, "Dataset cannot be empty")
 
-    val ModelData(trainData, splitterSummary) = splitter match {
-      case Some(spltr) => spltr.prepare(datasetWithID)
-      case None => ModelData(datasetWithID, None)
-    }
-
+    val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithID))
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
-        .validate(modelInfo = modelsUse, dataset = trainData, label = in1.name, features = in2.name)
+        .validate(modelInfo = modelsUse, dataset = datasetWithID, label = in1.name, features = in2.name)
       bestEstimator = Some(best)
       best
     }
 
-    val bestModel = estimator.fit(trainData).asInstanceOf[M]
+    val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
+    val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
     log.info(s"With parameters : ${bestEst.extractParamMap()}")
@@ -168,7 +166,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
     // get eval results for metadata
-    val trainingEval = evaluate(bestModel.transform(trainData))
+    val trainingEval = evaluate(bestModel.transform(preparedData))
 
     val metadataSummary = ModelSelectorSummary(
       validationType = ValidationType.fromValidator(validator),
