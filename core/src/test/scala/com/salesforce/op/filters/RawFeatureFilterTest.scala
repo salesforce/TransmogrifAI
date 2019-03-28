@@ -242,7 +242,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.5, 0.5,
-      Double.PositiveInfinity, 1.0, 1.0,  minScoringRows = 0)
+      Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
     filteredRawData.featuresToDrop shouldBe empty
     filteredRawData.cleanedData.schema.fields should contain theSameElementsAs passengersDataSet.schema.fields
@@ -255,7 +255,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded)
-    val filter = new RawFeatureFilter(dataReader, Some(simpleReader),10, 0.1, 0.1,
+    val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1,
       2, 0.2, 0.9, minScoringRows = 0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
@@ -263,7 +263,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
       Array(DataFrameFieldNames.KeyFieldName, survived.name)
     assertFeatureDistributions(filteredRawData, total = 14)
 
-    val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader),10, 0.1, 0.1,
+    val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1,
       2, 0.2, 0.9, minScoringRows = 0,
       protectedFeatures = Set(age.name, gender.name))
     val filteredRawData2 = filter2.generateFilteredRaw(features, params)
@@ -501,7 +501,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    *
    * Features c2 & c3 are switched between the training and scoring sets, so that they should have an absolute
    * fill rate difference of 0.25, and a relative fill ratio difference of 6. The RawFeatureFilter is set up with a
-   * maximum fill ratio difference of 4 so both c2 and c3 (as well as their corresponding map keys) should be removed.
+   * maximum fill ratio difference of 3 so both c2 and c3 (as well as their corresponding map keys) should be removed.
    */
   it should "correctly clean the randomly generated map and non-map features due to max fill ratio " +
     "difference" in {
@@ -533,7 +533,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     // We should be able to set the features to either be the train features or the score ones here
     val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 1.0, 4.0, 1.0, 1.0)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.0, 1.0, 3.0, 1.0, 1.0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
 
     // TODO: Add a check for the reason dropped once that information is passed on to the workflow
