@@ -53,7 +53,7 @@ class AddTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
 )(
   implicit override val tti1: TypeTag[I1],
   override val tti2: TypeTag[I2]
-) extends BinaryTransformer[I1, I2, Real](operationName = "addition", uid = uid){
+) extends BinaryTransformer[I1, I2, Real](operationName = "plus", uid = uid){
   override def transformFn: (I1, I2) => Real = (i1: I1, i2: I2) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
 }
 
@@ -73,8 +73,8 @@ class ScalarAddTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarAddTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarAddition", uid = uid){
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "scalarPlus", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ + n.toDouble(scalar)).toReal
 }
 
@@ -122,8 +122,8 @@ class ScalarSubtractTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarSubtractTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarSubtract", uid = uid){
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "scalarMinus", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ - n.toDouble(scalar)).toReal
 }
 
@@ -168,7 +168,7 @@ class ScalarMultiplyTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarMultiplyTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
+  val n: Numeric[N]
 ) extends UnaryTransformer[I, Real](operationName = "scalarMultiply", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ * n.toDouble(scalar)).filter(Number.isValid).toReal
 }
@@ -216,7 +216,7 @@ class ScalarDivideTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarDivideTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
+  val n: Numeric[N]
 ) extends UnaryTransformer[I, Real](operationName = "scalarDivide", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ / n.toDouble(scalar)).filter(Number.isValid).toReal
 }
@@ -272,3 +272,104 @@ class FloorTransformer[I <: OPNumeric[_]]
 }
 
 
+/**
+ * Exp transformer: returns Euler's number `e` raised to the power of feature value
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class ExpTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[ExpTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Real](operationName = "exp", uid = uid){
+  override def transformFn: I => Real = (i: I) => i.toDouble.map(math.exp).filter(Number.isValid).toReal
+}
+
+
+/**
+ * Square root transformer
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class SqrtTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[ExpTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Real](operationName = "sqrt", uid = uid){
+  override def transformFn: I => Real = (i: I) => i.toDouble.map(math.sqrt).filter(Number.isValid).toReal
+}
+
+/**
+ * Log base N transformer
+ *
+ * @param base     base for log value
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @param n        value converter
+ * @tparam I       input feature type
+ * @tparam N       value type
+ */
+class LogTransformer[I <: OPNumeric[_], N]
+(
+  val base: N,
+  uid: String = UID[LogTransformer[_, _]]
+)(
+  implicit override val tti: TypeTag[I],
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "log", uid = uid){
+  override def transformFn: I => Real = (i: I) => {
+    def logN(v: Double): Double = math.log10(v) / math.log10(n.toDouble(base))
+    i.toDouble.map(logN).filter(Number.isValid).toReal
+  }
+}
+
+
+
+/**
+ * Power transformer
+ *
+ * @param base     base for log value
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @param n        value converter
+ * @tparam I       input feature type
+ * @tparam N       value type
+ */
+class PowerTransformer[I <: OPNumeric[_], N]
+(
+  val power: N,
+  uid: String = UID[PowerTransformer[_, _]]
+)(
+  implicit override val tti: TypeTag[I],
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "power", uid = uid){
+  override def transformFn: I => Real = (i: I) =>
+    i.toDouble.map(v => math.pow(v, n.toDouble(power))).filter(Number.isValid).toReal
+}
+
+/**
+ * Round transformer
+ *
+ * @param digits   digits to round to
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class RoundTransformer[I <: OPNumeric[_]]
+(
+  val digits: Int,
+  uid: String = UID[PowerTransformer[_, _]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Real](operationName = "round", uid = uid){
+  override def transformFn: I => Real = (i: I) => {
+    val places = math.pow(10, digits)
+    i.toDouble.map(v => math.round(v * places) / places).filter(Number.isValid).toReal
+  }
+}
