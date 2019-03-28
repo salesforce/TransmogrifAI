@@ -75,8 +75,10 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
     metrics shouldBe BinaryClassificationBinMetrics(
       0.09800605366,
+      0.25,
       Seq(0.125, 0.375, 0.625, 0.875),
       Seq(2, 0, 1, 2),
+      Seq(0.0, 0.0, 0.0, 2.0),
       Seq(0.003205, 0.0, 0.7, 0.99999),
       Seq(0.0, 0.0, 0.0, 1.0)
     )
@@ -89,8 +91,10 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
     metrics shouldBe BinaryClassificationBinMetrics(
       40.999986666733335,
+      3.2499975,
       Seq(0.62500875, 3.87500625, 7.125003749999999, 10.37500125),
       Seq(2, 0, 0, 1),
+      Seq(1.0, 0.0, 0.0, 1.0),
       Seq(0.49999999999999994, 0.0, 0.0, 12.0),
       Seq(0.5, 0.0, 0.0, 1.0)
     )
@@ -107,7 +111,7 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
     val metrics = new OpBinScoreEvaluator(numOfBins = 10)
       .setLabelCol(labelEmptyData.name).setPredictionCol(predictionEmptyData.name).evaluateAll(emptyData)
 
-    metrics shouldBe BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
+    metrics shouldBe BinaryClassificationBinMetrics(0.0, 0.0, Seq(), Seq(), Seq(), Seq(), Seq())
   }
 
   it should "evaluate bin metrics for skewed data" in {
@@ -116,8 +120,10 @@ class OpBinScoreEvaluatorTest extends FlatSpec with TestSparkContext {
 
     metrics shouldBe BinaryClassificationBinMetrics(
       7.294225500000013E-4,
+      0.2,
       Seq(0.1, 0.30000000000000004, 0.5, 0.7, 0.9),
       Seq(0, 0, 0, 0, 4),
+      Seq(0.0, 0.0, 0.0, 0.0, 4.0),
       Seq(0.0, 0.0, 0.0, 0.0, 0.98617),
       Seq(0.0, 0.0, 0.0, 0.0, 1.0)
     )

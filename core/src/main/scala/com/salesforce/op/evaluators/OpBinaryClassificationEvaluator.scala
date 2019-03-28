@@ -83,7 +83,7 @@ private[op] class OpBinaryClassificationEvaluator
     if (rdd.isEmpty()) {
       log.warn("The dataset is empty. Returning empty metrics.")
       BinaryClassificationMetrics(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        Seq(), Seq(), Seq(), Seq(), LiftMetrics.empty)
+        Seq(), Seq(), Seq(), Seq(), BinaryClassificationBinMetrics.empty)
     } else {
       val multiclassMetrics = new MulticlassMetrics(rdd)
       val labels = multiclassMetrics.labels
@@ -114,23 +114,24 @@ private[op] class OpBinaryClassificationEvaluator
       val falsePositiveRateByThreshold = sparkMLMetrics.roc().collect().map(_._1).slice(1, thresholds.length + 1)
       val aUROC = sparkMLMetrics.areaUnderROC()
       val aUPR = sparkMLMetrics.areaUnderPR()
-      val liftMetrics = new LiftEvaluator().evaluateScoreAndLabels(scoreAndLabels = scoreAndLabels)
+      val binMetrics = new OpBinScoreEvaluator().evaluateScoreAndLabels(scoreAndLabels = scoreAndLabels)
       val metrics = BinaryClassificationMetrics(
         Precision = precision, Recall = recall, F1 = f1, AuROC = aUROC,
         AuPR = aUPR, Error = error, TP = tp, TN = tn, FP = fp, FN = fn,
         thresholds, precisionByThreshold, recallByThreshold, falsePositiveRateByThreshold,
-        LiftMetrics = liftMetrics
+        BinaryClassificationBinMetrics = binMetrics
       )
       log.info("Evaluated metrics: {}", metrics.toString)
       metrics
     }
   }
 
-  final protected def getBinaryEvaluatorMetric(
-                                                metricName: ClassificationEvalMetric,
-                                                dataset: Dataset[_],
-                                                default: => Double
-                                              ): Double = {
+  final protected def getBinaryEvaluatorMetric
+  (
+    metricName: ClassificationEvalMetric,
+    dataset: Dataset[_],
+    default: => Double
+  ): Double = {
     import dataset.sparkSession.implicits._
     val labelColName = getLabelCol
     val dataUse = makeDataToUse(dataset, labelColName)
@@ -199,7 +200,7 @@ case class BinaryClassificationMetrics
   recallByThreshold: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   falsePositiveRateByThreshold: Seq[Double],
-  LiftMetrics: LiftMetrics
+  BinaryClassificationBinMetrics: BinaryClassificationBinMetrics
 ) extends EvaluationMetrics {
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
 
