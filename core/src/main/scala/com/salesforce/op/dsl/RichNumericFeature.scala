@@ -32,13 +32,9 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.stages.impl.preparators.{CorrelationType, CorrelationExclusion, SanityChecker}
+import com.salesforce.op.stages.impl.preparators.{CorrelationExclusion, CorrelationType, SanityChecker}
 import com.salesforce.op.stages.impl.regression.IsotonicRegressionCalibrator
-import com.salesforce.op.utils.tuples.RichTuple._
-import com.salesforce.op.utils.numeric.Number
 
 import scala.language.postfixOps
 import scala.reflect.ClassTag
@@ -72,7 +68,7 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def /[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
-      new DivideTransformer[I, I2]().setInput(f, that).getOutput()
+      f.transformWith(new DivideTransformer[I, I2](), that)
 
     /**
      * Apply Multiply transformer shortcut function
@@ -89,7 +85,7 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def *[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
-      new MultiplyTransformer[I, I2]().setInput(f, that).getOutput()
+      f.transformWith(new MultiplyTransformer[I, I2](), that)
 
     /**
      * Apply Plus transformer shortcut function
@@ -106,7 +102,7 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def +[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
-      new AdditionTransformer[I, I2]().setInput(f, that).getOutput()
+      f.transformWith(new AddTransformer[I, I2](), that)
 
     /**
      * Apply Minus transformer shortcut function
@@ -123,7 +119,7 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def -[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
-      new SubtractionTransformer[I, I2]().setInput(f, that).getOutput()
+      f.transformWith(new SubtractTransformer[I, I2](), that)
 
     /**
      * Apply Divide scalar transformer shortcut function
@@ -133,13 +129,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def /[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "divideS",
-          transformFn = r => r.toDouble.map(_ / n.toDouble(v)).filter(Number.isValid).toReal)
-      )
-    }
+    def /[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarDivideTransformer(scalar = v))
 
     /**
      * Apply Multiply scalar transformer shortcut function
@@ -149,13 +140,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def *[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "multiplyS",
-          transformFn = r => r.toDouble.map(_ * n.toDouble(v)).filter(Number.isValid).toReal)
-      )
-    }
+    def *[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarMultiplyTransformer(scalar = v))
 
     /**
      * Apply Plus scalar transformer shortcut function
@@ -165,13 +151,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def +[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "plusS",
-          transformFn = r => r.toDouble.map(_ + n.toDouble(v)).toReal)
-      )
-    }
+    def +[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarAddTransformer[I, N](scalar = v))
 
     /**
      * Apply Minus scalar transformer shortcut function
@@ -181,13 +162,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "minusS",
-          transformFn = r => r.toDouble.map(_ - n.toDouble(v)).toReal)
-      )
-    }
+    def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarSubtractTransformer[I, N](scalar = v))
 
   }
 
