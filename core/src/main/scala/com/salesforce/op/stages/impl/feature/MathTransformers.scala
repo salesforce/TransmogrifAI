@@ -53,7 +53,7 @@ class AddTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
 )(
   implicit override val tti1: TypeTag[I1],
   override val tti2: TypeTag[I2]
-) extends BinaryTransformer[I1, I2, Real](operationName = "addition", uid = uid){
+) extends BinaryTransformer[I1, I2, Real](operationName = "plus", uid = uid){
   override def transformFn: (I1, I2) => Real = (i1: I1, i2: I2) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
 }
 
@@ -73,8 +73,8 @@ class ScalarAddTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarAddTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarAddition", uid = uid){
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "scalarPlus", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ + n.toDouble(scalar)).toReal
 }
 
@@ -122,8 +122,8 @@ class ScalarSubtractTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarSubtractTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarSubtract", uid = uid){
+  val n: Numeric[N]
+) extends UnaryTransformer[I, Real](operationName = "scalarMinus", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ - n.toDouble(scalar)).toReal
 }
 
@@ -168,7 +168,7 @@ class ScalarMultiplyTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarMultiplyTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
+  val n: Numeric[N]
 ) extends UnaryTransformer[I, Real](operationName = "scalarMultiply", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ * n.toDouble(scalar)).filter(Number.isValid).toReal
 }
@@ -216,7 +216,8 @@ class ScalarDivideTransformer[I <: OPNumeric[_], N]
   uid: String = UID[ScalarDivideTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I],
-  n: Numeric[N]
+  val n: Numeric[N]
 ) extends UnaryTransformer[I, Real](operationName = "scalarDivide", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ / n.toDouble(scalar)).filter(Number.isValid).toReal
 }
+
