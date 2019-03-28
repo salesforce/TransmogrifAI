@@ -52,14 +52,14 @@ import scala.reflect.runtime.universe.TypeTag
 
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
-  
+
   // loggingLevel(Level.INFO)
 
   // Our randomly generated data will generate feature names and corresponding map keys in this universe
   val featureUniverse = Set("myF1", "myF2", "myF3")
   val mapKeyUniverse = Set("f1", "f2", "f3")
   // Number of rows to use in randomly generated data sets
-  val numRows = 1000
+  val numRows = 500
 
   Spec[RawFeatureFilter[_]] should "correctly compute feature stats" in {
     val features: Array[OPFeature] =
