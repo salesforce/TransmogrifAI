@@ -33,7 +33,6 @@ package com.salesforce.op.evaluators
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.evaluation._
@@ -43,7 +42,6 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.functions.sum
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -150,8 +148,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       flattenedData2.select(predValue.name, test_label.name).rdd
     )
-    val numRows = transformedData.count()
-    val sumOfLabels = transformedData.select(sum(test_label.name)).collect()(0)(0)
 
     tp.toDouble shouldBe metrics.TP
     tn.toDouble shouldBe metrics.TN
@@ -162,9 +158,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     recall shouldBe metrics.Recall
     f1 shouldBe metrics.F1
     1.0 - sparkMulticlassEvaluator.setMetricName(Error.sparkEntryName).evaluate(flattenedData2) shouldBe metrics.Error
-
-    numRows shouldBe metrics.BinaryClassificationBinMetrics.numberOfDataPoints.sum
-    sumOfLabels shouldBe metrics.BinaryClassificationBinMetrics.sumOfLabels.sum
   }
 
   it should "evaluate the metrics with one prediction input" in {
@@ -175,8 +168,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
       transformedData2.select(prediction.name, test_label.name).rdd
         .map(r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)))
     )
-    val numRows = transformedData2.count()
-    val sumOfLabels = transformedData2.select(sum(test_label.name)).collect()(0)(0)
 
     tp.toDouble shouldBe metrics.TP
     tn.toDouble shouldBe metrics.TN
@@ -186,9 +177,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metrics.Precision shouldBe precision
     metrics.Recall shouldBe recall
     metrics.F1 shouldBe f1
-
-    numRows shouldBe metrics.BinaryClassificationBinMetrics.numberOfDataPoints.sum
-    sumOfLabels shouldBe metrics.BinaryClassificationBinMetrics.sumOfLabels.sum
   }
 
   it should "evaluate the metrics on dataset with only the label and prediction 0" in {
@@ -205,11 +193,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Precision shouldBe 0.0
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
-
-    metricsZero.BinaryClassificationBinMetrics.BrierScore shouldBe 0.0
-    metricsZero.BinaryClassificationBinMetrics.numberOfDataPoints.sum shouldBe 1L
-    metricsZero.BinaryClassificationBinMetrics.sumOfLabels.sum shouldBe 0.0
-    metricsZero.BinaryClassificationBinMetrics.averageConversionRate(0) shouldBe 0.0
   }
 
 
@@ -225,11 +208,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsOne.Precision shouldBe 1.0
     metricsOne.Recall shouldBe 1.0
     metricsOne.Error shouldBe 0.0
-
-    metricsOne.BinaryClassificationBinMetrics.BrierScore shouldBe 1.0
-    metricsOne.BinaryClassificationBinMetrics.numberOfDataPoints.sum shouldBe 1L
-    metricsOne.BinaryClassificationBinMetrics.sumOfLabels.sum shouldBe 1.0
-    metricsOne.BinaryClassificationBinMetrics.averageConversionRate(0) shouldBe 1.0
   }
 
   private def getPosNegValues(rdd: RDD[Row]): (Double, Double, Double, Double, Double, Double, Double) = {

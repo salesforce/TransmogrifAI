@@ -140,7 +140,6 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   case object FP extends ClassificationEvalMetric("FP", "false positive")
   case object FN extends ClassificationEvalMetric("FN", "false negative")
   case object BrierScore extends ClassificationEvalMetric("brierScore", "brier score")
-  case object LiftMetrics extends ClassificationEvalMetric("liftMetrics", "lift plot")
 }
 
 /**
