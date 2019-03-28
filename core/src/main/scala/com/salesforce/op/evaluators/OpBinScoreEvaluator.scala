@@ -53,8 +53,7 @@ import org.slf4j.LoggerFactory
  */
 private[op] class OpBinScoreEvaluator
 (
-  val numOfBins: Int = 10,
-  override val isLargerBetter: Boolean = false,
+  val numOfBins: Int = 100,
   uid: String = UID[OpBinScoreEvaluator]
 ) extends OpBinaryClassificationEvaluatorBase[BinaryClassificationBinMetrics](uid = uid) {
 
@@ -148,7 +147,7 @@ private[op] class OpBinScoreEvaluator
  * @param binSize               size of each bin
  * @param binCenters            center of each bin
  * @param numberOfDataPoints    total number of data points in each bin
- * @param
+ * @param sumOfLabels           sum of the label in each bin
  * @param averageScore          average score in each bin
  * @param averageConversionRate average conversion rate in each bin
  */

@@ -199,6 +199,5 @@ case class BinaryClassificationMetrics
   falsePositiveRateByThreshold: Seq[Double]
 ) extends EvaluationMetrics {
   def rocCurve: Seq[(Double, Double)] = recallByThreshold.zip(falsePositiveRateByThreshold)
-
   def prCurve: Seq[(Double, Double)] = precisionByThreshold.zip(recallByThreshold)
 }
