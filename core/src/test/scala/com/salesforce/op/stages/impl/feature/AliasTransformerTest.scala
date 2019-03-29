@@ -57,8 +57,8 @@ class AliasTransformerTest extends OpTransformerSpec[RealNN, AliasTransformer[Re
   it should "have a shortcut that changes feature name on a derived feature" in {
     val feature = (f1 / f2).alias
     feature.name shouldBe "feature"
-    feature.originStage shouldBe a[BinaryLambdaTransformer[_, _, _]]
-    val origin = feature.originStage.asInstanceOf[BinaryLambdaTransformer[_, _, _]]
+    feature.originStage shouldBe a[DivideTransformer[_, _]]
+    val origin = feature.originStage.asInstanceOf[DivideTransformer[_, _]]
     val transformed = origin.transform(inputData)
     transformed.columns should contain (feature.name)
     transformed.collect(feature) shouldEqual sample.map { case (v1, v2) => (v1.v -> v2.v).map(_ / _).toRealNN(0.0) }

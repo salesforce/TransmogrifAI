@@ -74,7 +74,7 @@ class ScalarAddTransformer[I <: OPNumeric[_], N]
 )(
   implicit override val tti: TypeTag[I],
   val n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarPlus", uid = uid){
+) extends UnaryTransformer[I, Real](operationName = "plusS", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ + n.toDouble(scalar)).toReal
 }
 
@@ -123,7 +123,7 @@ class ScalarSubtractTransformer[I <: OPNumeric[_], N]
 )(
   implicit override val tti: TypeTag[I],
   val n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarMinus", uid = uid){
+) extends UnaryTransformer[I, Real](operationName = "minusS", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ - n.toDouble(scalar)).toReal
 }
 
@@ -169,7 +169,7 @@ class ScalarMultiplyTransformer[I <: OPNumeric[_], N]
 )(
   implicit override val tti: TypeTag[I],
   val n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarMultiply", uid = uid){
+) extends UnaryTransformer[I, Real](operationName = "multiplyS", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ * n.toDouble(scalar)).filter(Number.isValid).toReal
 }
 
@@ -217,7 +217,7 @@ class ScalarDivideTransformer[I <: OPNumeric[_], N]
 )(
   implicit override val tti: TypeTag[I],
   val n: Numeric[N]
-) extends UnaryTransformer[I, Real](operationName = "scalarDivide", uid = uid){
+) extends UnaryTransformer[I, Real](operationName = "divideS", uid = uid){
   override def transformFn: I => Real = (i: I) => i.toDouble.map(_ / n.toDouble(scalar)).filter(Number.isValid).toReal
 }
 
