@@ -48,6 +48,8 @@ import scala.util.Try
  */
 abstract class Splitter(val uid: String) extends SplitterParams {
 
+  @transient private[op] var summary: Option[SplitterSummary] = None
+
   /**
    * Function to use to create the training set and test set.
    *
@@ -67,7 +69,10 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Training set test set
    */
-  def validationPrepare(data: Dataset[Row]): Dataset[Row]
+  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+    checkPreconditions()
+    data
+  }
 
 
   /**
@@ -78,6 +83,10 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @return Parameters set in examining data
    */
   def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary]
+
+
+  protected def checkPreconditions(): Unit =
+    require(summary.nonEmpty, "Cannot call validationPrepare until preValidationPrepare has been called")
 
 }
 
