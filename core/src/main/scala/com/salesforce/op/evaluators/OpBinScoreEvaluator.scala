@@ -48,7 +48,6 @@ import org.slf4j.LoggerFactory
  * and returns [[BinaryClassificationBinMetrics]].
  *
  * @param numOfBins       number of bins to produce
- * @param isLargerBetter  false, i.e. larger BrierScore values are not better
  * @param uid             uid for instance
  */
 private[op] class OpBinScoreEvaluator
