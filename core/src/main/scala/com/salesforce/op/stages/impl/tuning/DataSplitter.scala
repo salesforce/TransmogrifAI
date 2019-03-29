@@ -61,8 +61,6 @@ case object DataSplitter {
  */
 class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
 
-//  @transient override private[op] var summary: Option[DataSplitterSummary] = None
-
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels

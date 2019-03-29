@@ -75,8 +75,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-//  @transient override private[op] var summary: Option[DataCutterSummary] = None
-
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels

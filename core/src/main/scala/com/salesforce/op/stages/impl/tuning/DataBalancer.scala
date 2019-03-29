@@ -72,7 +72,6 @@ case object DataBalancer {
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-//  @transient override private[op] var summary: Option[DataBalancerSummary] = None
 
   /**
    * Computes the upSample and downSample proportions.
