@@ -119,7 +119,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
   it should "throw an error if you try to prepare before examining" in {
     val balancer = DataBalancer(sampleFraction = 0.1, maxTrainingSample = 2000, seed = 11L)
     intercept[RuntimeException](balancer.validationPrepare(data)).getMessage shouldBe
-      "Cannot call prepare until examine has been called"
+      "Cannot call validationPrepare until preValidationPrepare has been called"
   }
 
   it should "remember that data is already balanced" in {

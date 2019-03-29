@@ -87,7 +87,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
   it should "throw an error when prepare is called before examine" in {
     val dataCutter = DataCutter(seed = seed, minLabelFraction = 0.4)
     intercept[RuntimeException](dataCutter.validationPrepare(randDF)).getMessage shouldBe
-      "Cannot call prepare until examine has been called"
+      "Cannot call validationPrepare until preValidationPrepare has been called"
   }
 
   it should "filter out all but the top N label categories" in {
