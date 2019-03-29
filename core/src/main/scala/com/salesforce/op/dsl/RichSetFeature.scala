@@ -53,11 +53,13 @@ trait RichSetFeature {
      * OPSet feature (ie the final vector has length k * number of OPSet inputs). Plus an additional column
      * for "other" values - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others     other features to include in the pivot
-     * @param topK       keep topK values
-     * @param minSupport min occurrences to keep a value
-     * @param cleanText  if true ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep a count of nulls
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        min occurrences to keep a value
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep a count of nulls
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def pivot
@@ -66,13 +68,14 @@ trait RichSetFeature {
       topK: Int = TransmogrifierDefaults.TopK,
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
-      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls
+      trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val opSetVectorizer = new OpSetVectorizer[T]()
 
       f.transformWith[OPVector](
         stage = opSetVectorizer.setTopK(topK).setCleanText(cleanText).setTrackNulls(trackNulls)
-          .setMinSupport(minSupport),
+          .setMinSupport(minSupport).setMaxPctCardinality(maxPctCardinality),
         fs = others
       )
     }
@@ -82,11 +85,13 @@ trait RichSetFeature {
      * OPSet feature (ie the final vector has length k * number of OPSet inputs). Plus an additional column
      * for "other" values - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others    other features to include in the pivot
-     * @param topK      keep topK values
-     * @param minSupport min occurrences to keep a value
-     * @param cleanText  if true ignores capitalization and punctuations when grouping categories
-     * @param trackNulls keep a count of nulls
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        min occurrences to keep a value
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param trackNulls        keep a count of nulls
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def vectorize
@@ -95,9 +100,11 @@ trait RichSetFeature {
       minSupport: Int,
       cleanText: Boolean,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] =
-      f.pivot(others = others, topK = topK, cleanText = cleanText, minSupport = minSupport, trackNulls = trackNulls)
+      f.pivot(others = others, topK = topK, cleanText = cleanText, minSupport = minSupport, trackNulls = trackNulls,
+        maxPctCardinality = maxPctCardinality)
 
   }
 
