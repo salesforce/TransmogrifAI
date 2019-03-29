@@ -32,6 +32,7 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{Location, OPVector, Text}
+import com.salesforce.op.stages.impl.feature.OpOneHotVectorizer
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -51,10 +52,12 @@ trait RichLocationFeature {
      * feature (ie the final vector has length k * number of inputs). Plus an additional column
      * for "other" values - which will capture values that do not make the cut or values not seen in training
      *
-     * @param others    other features to include in the pivot
-     * @param topK      keep topK values
-     * @param minSupport    min times a value must occur to be retained in pivot
-     * @param cleanText if true ignores capitalization and punctuations when grouping categories
+     * @param others            other features to include in the pivot
+     * @param topK              keep topK values
+     * @param minSupport        min times a value must occur to be retained in pivot
+     * @param cleanText         if true ignores capitalization and punctuations when grouping categories
+     * @param maxPctCardinality max percentage of distinct values a categorical feature can have (between 0.0 and 1.00)
+     *
      * @return
      */
     def vectorize
@@ -62,9 +65,10 @@ trait RichLocationFeature {
       topK: Int,
       minSupport: Int,
       cleanText: Boolean,
-      others: Array[FeatureLike[T]] = Array.empty
+      others: Array[FeatureLike[T]] = Array.empty,
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      f.pivot(others, topK, minSupport, cleanText)
+      f.pivot(others, topK, minSupport, cleanText, maxPctCardinality = maxPctCardinality)
     }
 
   }
