@@ -27,45 +27,20 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
+import com.salesforce.op.features.types.Real
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
-import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.tuples.RichTuple._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-
 @RunWith(classOf[JUnitRunner])
-class AliasTransformerTest extends OpTransformerSpec[RealNN, AliasTransformer[RealNN]] {
-  val sample = Seq((RealNN(1.0), RealNN(2.0)), (RealNN(4.0), RealNN(4.0)))
-  val (inputData, f1, f2) = TestFeatureBuilder(sample)
-  val transformer = new AliasTransformer(name = "feature").setInput(f1)
-  val expectedResult: Seq[RealNN] = sample.map(_._1)
-
-  it should "have a shortcut that changes feature name on a raw feature" in {
-    val feature = f1.alias
-    feature.name shouldBe "feature"
-    feature.originStage shouldBe a[AliasTransformer[_]]
-    val origin = feature.originStage.asInstanceOf[AliasTransformer[RealNN]]
-    val transformed = origin.transform(inputData)
-    transformed.collect(feature) shouldEqual expectedResult
-  }
-  it should "have a shortcut that changes feature name on a derived feature" in {
-    val feature = (f1 / f2).alias
-    feature.name shouldBe "feature"
-    feature.originStage shouldBe a[DivideTransformer[_, _]]
-    val origin = feature.originStage.asInstanceOf[DivideTransformer[_, _]]
-    val transformed = origin.transform(inputData)
-    transformed.columns should contain (feature.name)
-    transformed.collect(feature) shouldEqual sample.map { case (v1, v2) => (v1.v -> v2.v).map(_ / _).toRealNN(0.0) }
-  }
-  it should "have a shortcut that changes feature name on a derived wrapped feature" in {
-    val feature = f1.toIsotonicCalibrated(label = f2).alias
-    feature.name shouldBe "feature"
-    feature.originStage shouldBe a[AliasTransformer[_]]
-  }
+class ScalarDivideTransformerTest extends OpTransformerSpec[Real, ScalarDivideTransformer[Real, Double]] {
+  val sample = Seq(Real(1.0), Real(4.0), Real.empty, Real(-1.0), Real(2.0))
+  val (inputData, f1) = TestFeatureBuilder(sample)
+  val transformer: ScalarDivideTransformer[Real, Double] = new ScalarDivideTransformer[Real, Double](2.0)
+    .setInput(f1)
+  override val expectedResult: Seq[Real] = Seq(Real(0.5), Real(2.0), Real.empty, Real(-0.5), Real(1.0))
 }
+
+
