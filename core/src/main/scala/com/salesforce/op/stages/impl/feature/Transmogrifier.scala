@@ -631,22 +631,21 @@ trait MapStringPivotHelper extends SaveOthersParams {
   type SeqSeqTupArr = Seq[Seq[(String, Array[String])]]
   type SeqMapMap = SequenceAggregators.SeqMapMap
 
-  protected implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, String]]]
-  protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
-  protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
-
   protected def getCategoryMaps[V]
   (
     in: Dataset[Seq[Map[String, V]]],
     convertToMapOfMaps: Map[String, V] => MapMap,
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean
-  ): Dataset[SeqMapMap] = in.map(seq =>
-    seq.map { kc =>
-      val filteredMap = filterKeys[V](kc, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
-      convertToMapOfMaps(filteredMap)
-    }
-  )
+  ): Dataset[SeqMapMap] = {
+    implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
+    in.map(seq =>
+      seq.map { kc =>
+        val filteredMap = filterKeys[V](kc, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
+        convertToMapOfMaps(filteredMap)
+      }
+    )
+  }
 
   protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
     val sumAggr = SequenceAggregators.SumSeqMapMap(size = inputSize)

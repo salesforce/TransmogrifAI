@@ -40,6 +40,7 @@ import org.apache.spark.sql.Dataset
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe.typeTag
 
 /**
  * Converts a sequence of KeyString features into a vector keeping the top K most common occurrences of each
@@ -56,36 +57,26 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
   extends SequenceEstimator[T, OPVector](operationName = "vecPivotTextMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
-    with MaxPercentageCardinalityParams with UniqueCountFun {
-
+    with MaxPctCardinalityParams with MaxPctCardinalityFun {
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
 
-    def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
+    // Throw out values above max percent cardinality
+    val finalDataset: Dataset[Seq[T#Value]] =
+      filterByMaxCardinality(dataset, maxPctCardinality = $(maxPctCardinality), size = inN.length, bits = $(hllBits))
 
-    val maxPctCard = $(maxPctCardinality)
-    val finalDataset =
-      if (maxPctCard == 1.0) dataset
-      else {
-        implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
-        implicit val kryo = new KryoSerializer(dataset.sparkSession.sparkContext.getConf)
-        val (uniqueCounts, n) = countMapUniques(dataset, size = inN.length, bits = $(hllBits))
-        val percentFilters = uniqueCounts.map(_.map { case (k, v) => (k, v.estimatedSize / n < maxPctCard) })
-
-        dataset.map(_.zip(percentFilters).collect { case (m, percentFilter) =>
-          m.filter { case (k, _) => percentFilter.getOrElse(k, true) }
-        })(seqIEncoder)
-      }
+    def convertToMapOfMaps(mapIn: Map[String, String]): MapMap =
+      mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
     val categoryMaps: Dataset[SeqMapMap] =
       getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
     val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
-      stageName, $(trackNulls))
+    val vectorMeta =
+      makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName, stageName, $(trackNulls))
     setMetadata(vectorMeta.toMetadata)
 
     new TextMapPivotVectorizerModel[T](

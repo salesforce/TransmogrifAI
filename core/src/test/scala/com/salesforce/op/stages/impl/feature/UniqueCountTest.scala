@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit._
-import com.twitter.algebird.{Monoid, Semigroup}
+import com.twitter.algebird.Operators._
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql._
 import org.junit.runner.RunWith
@@ -63,7 +63,6 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     total shouldBe numRows
     uniqueCounts.size shouldBe numCols
     uniqueCounts.foreach(_.estimatedSize shouldBe 0.0)
-
   }
 
   it should "count uniques in maps" in {
@@ -105,12 +104,10 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     // Minus 1 because we don't count the None in the unique values
     val countExploded = countUniques(exploded, size = explodedSize, bits = bits)._1.map(_.estimatedSize.toInt - 1)
 
-
     countMap should contain theSameElementsAs countExploded
-
   }
 
-  it should "count uniques Strings" in {
+  it should "count uniques string values" in {
     val (numRows, numCols, bits) = (1000, 10, 18)
     val data = createStringData(numRows, numCols)
     val (uniqueCounts, total) = countUniques[String](data, size = numCols, bits = bits)
@@ -119,7 +116,7 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
     uniqueCounts.map(_.estimatedSize.toInt) shouldBe expected
   }
 
-  it should "count uniques in Strings Maps" in {
+  it should "count uniques in strings map values" in {
     val (numRows, numCols, bits) = (1000, 10, 20)
     val data = createMapStringData(numRows, numCols)
     val (uniqueCounts, total) = countMapUniques[String](data, size = numCols, bits = bits)
@@ -175,21 +172,14 @@ class UniqueCountTest extends FlatSpec with TestSparkContext with UniqueCountFun
   private def expectedCountUniques[V](data: Dataset[Seq[V]]): Seq[Int] = {
     data.rdd
       .map(_.map(v => Map(v -> 1L)))
-      .reduce((a, b) => a.zip(b).map { case (m1, m2) => MapTestMonoids.mapDLMonoid.plus(m1, m2) })
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
       .map(_.size)
   }
 
   private def expectedCountMapUniques[V](data: Dataset[Seq[Map[String, V]]]): Seq[Int] = {
     data.rdd
       .map(_.map(_.flatMap { case (k, v) => Map(k -> Map(v -> 1L)) }))
-      .reduce((a, b) => a.zip(b).map { case (m1, m2) => MapTestMonoids.mapMDLMonoid.plus(m1, m2) })
+      .reduce((a, b) => a.zip(b).map { case (m1, m2) => m1 + m2 })
       .flatMap(_.map(_._2.size))
   }
-}
-
-private object MapTestMonoids {
-  val longSG = Semigroup.from[Long](_ + _)
-  // we use Semigroup here to avoid map keys removal
-  def mapDLMonoid[V]: Monoid[Map[V, Long]] = Monoid.mapMonoid[V, Long](longSG)
-  def mapMDLMonoid[V]: Monoid[Map[String, Map[V, Long]]] = Monoid.mapMonoid[String, Map[V, Long]](mapDLMonoid)
 }
