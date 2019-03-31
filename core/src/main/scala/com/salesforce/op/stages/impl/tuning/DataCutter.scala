@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
+import org.apache.spark.ml.attribute.NominalAttribute
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
@@ -104,11 +105,17 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    */
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     val dataPrep = super.validationPrepare(data)
+    val labelColName = dataPrep.columns(0)
+    val labelCol = dataPrep.col(labelColName)
+    val metadata = NominalAttribute.defaultAttr
+      .withName(labelColName)
+      .withNumValues(getLabelsToKeep.size)
+      .toMetadata()
 
     val keep: Set[Double] = getLabelsToKeep.toSet
-    val dataUse = dataPrep.filter(r => keep.contains(r.getDouble(0)))
-
-    dataUse
+    dataPrep
+      .filter(r => keep.contains(r.getDouble(0)))
+      .withColumn(labelColName, labelCol.as("_", metadata))
   }
 
   /**
