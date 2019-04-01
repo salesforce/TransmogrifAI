@@ -85,29 +85,30 @@ private[op] class OpBinScoreEvaluator
 
     // Finding stats per bin -> avg score, avg conv rate,
     // total num of data points and overall brier score.
-    implicit val sg = new Tuple4Semigroup[Double, Double, Long, Double]()
+    implicit val sg = new Tuple4Semigroup[Double, Long, Long, Double]()
     val stats = scoreAndLabels.map {
       case (score, label) =>
-        (getBinIndex(score, minScore, maxScore), (score, label, 1L, math.pow(score - label, 2)))
+        (getBinIndex(score, minScore, maxScore),
+          (score, if (label > 0.0) 1L else 0L, 1L, math.pow(score - label, 2)))
     }.reduceByKey(_ + _).map {
-      case (bin, (scoreSum, labelSum, count, squaredError)) =>
-        (bin, scoreSum, labelSum, count, squaredError)
+      case (bin, (scoreSum, positiveCount, count, squaredError)) =>
+        (bin, scoreSum, positiveCount, count, squaredError)
     }.collect()
 
     stats.toList match {
       case Nil => BinaryClassificationBinMetrics.empty
       case _ => {
         val zero = (new Array[Double](numOfBins), new Array[Double](numOfBins),
-          new Array[Long](numOfBins), new Array[Double](numOfBins), 0.0, 0L)
-        val (averageScore, averageConversionRate, numberOfDataPoints, sumOfLabels, brierScoreSum, numberOfPoints) =
+          new Array[Long](numOfBins), new Array[Long](numOfBins), 0.0, 0L)
+        val (averageScore, averageConversionRate, numberOfDataPoints, positiveLabels, brierScoreSum, numberOfPoints) =
           stats.foldLeft(zero) {
-            case ((score, convRate, dataPoints, labelSums, brierScoreSum, totalPoints),
-            (binIndex, scoreSum, labelSum, counts, squaredError)) =>
+            case ((score, convRate, dataPoints, positiveLabels, brierScoreSum, totalPoints),
+            (binIndex, scoreSum, positiveCount, counts, squaredError)) =>
               score(binIndex) = scoreSum / counts
-              convRate(binIndex) = labelSum / counts
+              convRate(binIndex) = positiveCount.toDouble / counts
               dataPoints(binIndex) = counts
-              labelSums(binIndex) = labelSum
-              (score, convRate, dataPoints, labelSums, brierScoreSum + squaredError, totalPoints + counts)
+              positiveLabels(binIndex) = positiveCount
+              (score, convRate, dataPoints, positiveLabels, brierScoreSum + squaredError, totalPoints + counts)
           }
 
         // binCenters is the center point in each bin.
@@ -121,7 +122,7 @@ private[op] class OpBinScoreEvaluator
           binSize = diff / numOfBins,
           binCenters = binCenters,
           numberOfDataPoints = numberOfDataPoints,
-          sumOfLabels = sumOfLabels,
+          numberOfPositiveLabels = positiveLabels,
           averageScore = averageScore,
           averageConversionRate = averageConversionRate
         )
@@ -142,13 +143,13 @@ private[op] class OpBinScoreEvaluator
 /**
  * Metrics of BinaryClassificationBinMetrics
  *
- * @param BrierScore            brier score for overall dataset
- * @param binSize               size of each bin
- * @param binCenters            center of each bin
- * @param numberOfDataPoints    total number of data points in each bin
- * @param sumOfLabels           sum of the label in each bin
- * @param averageScore          average score in each bin
- * @param averageConversionRate average conversion rate in each bin
+ * @param BrierScore             brier score for overall dataset
+ * @param binSize                size of each bin
+ * @param binCenters             center of each bin
+ * @param numberOfDataPoints     total number of data points in each bin
+ * @param numberOfPositiveLabels sum of the label in each bin
+ * @param averageScore           average score in each bin
+ * @param averageConversionRate  average conversion rate in each bin
  */
 case class BinaryClassificationBinMetrics
 (
@@ -159,7 +160,7 @@ case class BinaryClassificationBinMetrics
   @JsonDeserialize(contentAs = classOf[java.lang.Long])
   numberOfDataPoints: Seq[Long],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
-  sumOfLabels: Seq[Double],
+  numberOfPositiveLabels: Seq[Long],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   averageScore: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
