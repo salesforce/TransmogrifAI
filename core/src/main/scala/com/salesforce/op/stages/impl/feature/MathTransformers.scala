@@ -273,6 +273,23 @@ class FloorTransformer[I <: OPNumeric[_]]
 
 
 /**
+ * Round transformer
+ *
+ * @param uid      uid for instance
+ * @param tti      type tag for input
+ * @tparam I       input feature type
+ */
+class RoundTransformer[I <: OPNumeric[_]]
+(
+  uid: String = UID[FloorTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Integral](operationName = "floor", uid = uid){
+  override def transformFn: I => Integral = (i: I) => i.toDouble.map(v => math.round(v)).toIntegral
+}
+
+
+/**
  * Exp transformer: returns Euler's number `e` raised to the power of feature value
  *
  * @param uid      uid for instance
@@ -353,6 +370,7 @@ class PowerTransformer[I <: OPNumeric[_], N]
     i.toDouble.map(v => math.pow(v, n.toDouble(power))).filter(Number.isValid).toReal
 }
 
+
 /**
  * Round transformer
  *
@@ -361,16 +379,16 @@ class PowerTransformer[I <: OPNumeric[_], N]
  * @param tti      type tag for input
  * @tparam I       input feature type
  */
-class RoundTransformer[I <: OPNumeric[_]]
+class RoundDigitsTransformer[I <: OPNumeric[_]]
 (
   val digits: Int,
   uid: String = UID[PowerTransformer[_, _]]
 )(
   implicit override val tti: TypeTag[I]
 ) extends UnaryTransformer[I, Real](operationName = "round", uid = uid){
-  override def transformFn: I => Real = (i: I) => {
-    val places = math.pow(10, digits)
-    i.toDouble.map(v => math.round(v * places) / places).filter(Number.isValid).toReal
+  override def transformFn: I => Real = (in: I) => {
+    val scaler = math.pow(10, digits)
+    in.toDouble.map{ i => math.round(i * scaler) / scaler }.filter(Number.isValid).toReal
   }
 }
 

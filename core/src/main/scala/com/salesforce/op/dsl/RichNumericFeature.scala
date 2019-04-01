@@ -165,6 +165,70 @@ trait RichNumericFeature {
     def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
       f.transformWith(new ScalarSubtractTransformer[I, N](scalar = v))
 
+    /**
+     * Take the absolute value of the feature
+     * @return transformed feature
+     */
+    def abs(): FeatureLike[Real] =
+      f.transformWith(new AbsoluteValueTransformer[I]())
+
+    /**
+     * Take the ceil of the feature value
+     * @return transformed feature
+     */
+    def ceil(): FeatureLike[Integral] =
+      f.transformWith(new CeilTransformer[I]())
+
+    /**
+     * Take the floor of the feature value
+     * @return transformed feature
+     */
+    def floor(): FeatureLike[Integral] =
+      f.transformWith(new FloorTransformer[I]())
+
+    /**
+     * Round the feature value
+     * @return transformed feature
+     */
+    def round(): FeatureLike[Integral] =
+      f.transformWith(new RoundTransformer[I]())
+
+    /**
+     * Round the feature value
+     * @return transformed feature
+     */
+    def round(digits: Int): FeatureLike[Real] =
+      f.transformWith(new RoundDigitsTransformer[I](digits = digits))
+
+    /**
+     * Exp transformer: returns Euler's number `e` raised to the power of feature value
+     * @return transformed feature
+     */
+    def exp(): FeatureLike[Real] =
+      f.transformWith(new ExpTransformer[I]())
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def sqrt(): FeatureLike[Real] =
+      f.transformWith(new SqrtTransformer[I]())
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def log[N](base: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new LogTransformer[I, N](base = base))
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def power[N](power: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new PowerTransformer[I, N](power = power))
+
+
   }
 
   /**
