@@ -39,6 +39,8 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
+import scala.util.Try
+
 case object DataCutter {
 
   /**
@@ -105,17 +107,37 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    */
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     val dataPrep = super.validationPrepare(data)
-    val labelColName = dataPrep.columns(0)
-    val labelCol = dataPrep.col(labelColName)
-    val metadata = NominalAttribute.defaultAttr
-      .withName(labelColName)
-      .withNumValues(getLabelsToKeep.size)
-      .toMetadata()
+    Try {
+      val labelColMeta = dataPrep.schema.head.metadata
+      log.info(s"Label column metadata $labelColMeta")
+      dataPrep.schema.head.metadata
+        .getMetadata("ml_attr")
+        .getStringArray("vals")
+        .map(_.toDouble)
+    }
+      .map(_.toSet)
+      .recover { case _: NoSuchElementException => Set.empty }
+      .map { valSet =>
 
-    val keep: Set[Double] = getLabelsToKeep.toSet
-    dataPrep
-      .filter(r => keep.contains(r.getDouble(0)))
-      .withColumn(labelColName, labelCol.as("_", metadata))
+        val labelSet = getLabelsToKeep.toSet
+        if (valSet == labelSet) {
+          log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
+          dataPrep
+        } else {
+          log.info(s"Dropping rows with columns not in $labelSet")
+
+          val labelColName = dataPrep.columns(0)
+          val labelCol = dataPrep.col(labelColName)
+          val metadata = NominalAttribute.defaultAttr
+            .withName(labelColName)
+            .withValues(getLabelsToKeep.map(_.toString))
+            .toMetadata()
+          dataPrep
+            .filter(r => labelSet.contains(r.getDouble(0)))
+            .withColumn(labelColName, labelCol.as("_", metadata))
+        }
+    }
+      .get
   }
 
   /**

@@ -37,6 +37,7 @@ import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.ModelType
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
@@ -44,14 +45,12 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.param._
-import org.apache.spark.ml.{Estimator, Model, PipelineStage, PredictionModel}
+import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 
 /**
@@ -138,16 +137,22 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     implicit val spark = dataset.sparkSession
 
-    val datasetWithID =
+    val datasetWithIDPre =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
       } else {
         dataset.select(in1.name, in2.name)
           .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
       }
-    require(!datasetWithID.isEmpty, "Dataset cannot be empty")
+    require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
-    val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithID))
+    val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithIDPre))
+    val datasetWithID = splitter.collect {
+      // TODO validate in best estimator below cannot defer label trimming to blanket
+      //  validationPrepare, redesign to accommodate for special case
+      //
+      case dc: DataCutter => dc.validationPrepare(datasetWithIDPre)
+    }.getOrElse(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
