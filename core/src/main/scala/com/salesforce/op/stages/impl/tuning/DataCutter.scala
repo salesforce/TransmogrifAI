@@ -35,7 +35,7 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.attribute.NominalAttribute
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
@@ -108,9 +108,10 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     val dataPrep = super.validationPrepare(data)
     Try {
-      val labelColMeta = dataPrep.schema.head.metadata
-      log.info(s"Label column metadata $labelColMeta")
-      dataPrep.schema.head.metadata
+      val labelSF: StructField = dataPrep.schema.head
+      val labelColMeta = labelSF.metadata
+      log.info(s"Label column metadata ${labelSF.name} $labelColMeta")
+      labelColMeta
         .getMetadata("ml_attr")
         .getStringArray("vals")
         .map(_.toDouble)
