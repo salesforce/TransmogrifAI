@@ -116,7 +116,10 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         .map(_.toDouble)
     }
       .map(_.toSet)
-      .recover { case _: NoSuchElementException => Set.empty }
+      .recover { case nonFatal =>
+        log.warn(s"Recovering non-fatal exception: $nonFatal", nonFatal)
+        Set.empty
+      }
       .map { valSet =>
 
         val labelSet = getLabelsToKeep.toSet
