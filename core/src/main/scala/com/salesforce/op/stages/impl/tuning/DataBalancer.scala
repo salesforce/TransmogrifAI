@@ -72,7 +72,6 @@ case object DataBalancer {
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-  @transient private[op] var summary: Option[DataBalancerSummary] = None
 
   /**
    * Computes the upSample and downSample proportions.
@@ -142,12 +141,12 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set
    */
-  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
 
-    if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
+    val dataPrep = super.validationPrepare(data)
 
-    val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
-    val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
+    val negativeData = dataPrep.filter(_.getDouble(0) == 0.0).persist()
+    val positiveData = dataPrep.filter(_.getDouble(0) == 1.0).persist()
     val seed = getSeed
 
     // If these conditions are met, that means that we have enough information to balance the data : upSample,
@@ -172,7 +171,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
         sampleBalancedData(
           fraction = fraction,
           seed = seed,
-          data = data,
+          data = dataPrep,
           positiveData = positiveData,
           negativeData = negativeData
         )

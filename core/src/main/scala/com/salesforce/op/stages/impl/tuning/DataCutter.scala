@@ -75,8 +75,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  @transient private[op] var summary: Option[DataCutterSummary] = None
-
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
@@ -104,11 +102,11 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data first column must be the label as a double
    * @return Training set test set
    */
-  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
-    if (summary.isEmpty) throw new RuntimeException("Cannot call prepare until examine has been called")
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+    val dataPrep = super.validationPrepare(data)
 
     val keep: Set[Double] = getLabelsToKeep.toSet
-    val dataUse = data.filter(r => keep.contains(r.getDouble(0)))
+    val dataUse = dataPrep.filter(r => keep.contains(r.getDouble(0)))
 
     dataUse
   }

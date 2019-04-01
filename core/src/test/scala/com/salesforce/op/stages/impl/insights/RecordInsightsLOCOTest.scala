@@ -176,7 +176,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     parsed.foreach { case (_, in) => math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true }
   }
 
-  it should "return the most predictive features for dat generated with a strong relation to the label" in {
+  it should "return the most predictive features for data generated with a strong relation to the label" in {
     val numRows = 1000
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
     val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
@@ -252,11 +252,12 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
     // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
-    assert(abcAvg > 5 * otherAvg, "Average feature strengths for features involved in label formula should be" +
+    assert(abcAvg > 4 * otherAvg,
+      "Average feature strengths for features involved in label formula should be " +
       "much larger than the average feature strengths of other features")
     // There should be a really large t-value when comparing the two avg feature strengths
-    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar)/numRows) > 10, "The t-value comparing the" +
-      "average feature strengths between important and other features should be large")
+    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar)/numRows) > 10,
+      "The t-value comparing the average feature strengths between important and other features should be large")
 
     // Record insights averaged across all records should be similar to the feature importances from Spark's RF
     val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
@@ -267,8 +268,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     // Compare the ratio of importances between "important" and "other" features in both paradigms
     assert(math.abs(avgRecordInsightRatio - featureImportanceRatio)*2 /
-      (avgRecordInsightRatio + featureImportanceRatio) < 0.8, "The ratio of feature strengths between important and" +
-      "other features should be similar to the ratio of feature importances from Spark's RandomForest")
+      (avgRecordInsightRatio + featureImportanceRatio) < 0.8,
+      "The ratio of feature strengths between important and other features should be similar to the ratio of " +
+        "feature importances from Spark's RandomForest")
   }
 
 }
