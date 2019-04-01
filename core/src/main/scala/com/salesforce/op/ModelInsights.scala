@@ -33,7 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.filters.{ExclusionReasons, FeatureDistribution, RawFeatureFilterResults}
+import com.salesforce.op.filters.{ExclusionReasons, FeatureDistribution, RawFeatureFilterMetrics, RawFeatureFilterResults}
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
@@ -338,6 +338,7 @@ case class FeatureInsights
   featureName: String,
   featureType: String,
   derivedFeatures: Seq[Insights],
+  metrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   distributions: Seq[FeatureDistribution] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
@@ -622,10 +623,11 @@ case object ModelInsights {
           val ftype = allFeatures.find(_.name == fname)
             .map(_.typeName)
             .getOrElse("")
+          val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
           val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
           FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
-            distributions = distributions, exclusionReasons = exclusionReasons)
+            metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons)
       }.toSeq
   }
 
