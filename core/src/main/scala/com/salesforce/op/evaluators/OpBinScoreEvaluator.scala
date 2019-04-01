@@ -147,7 +147,7 @@ private[op] class OpBinScoreEvaluator
  * @param binSize                size of each bin
  * @param binCenters             center of each bin
  * @param numberOfDataPoints     total number of data points in each bin
- * @param numberOfPositiveLabels sum of the label in each bin
+ * @param numberOfPositiveLabels count of labels > 0 in each bin
  * @param averageScore           average score in each bin
  * @param averageConversionRate  average conversion rate in each bin
  */
