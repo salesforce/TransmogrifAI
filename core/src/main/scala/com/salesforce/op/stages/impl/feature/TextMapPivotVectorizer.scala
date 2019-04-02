@@ -34,9 +34,13 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
+import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.Dataset
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
+import scala.reflect.runtime.universe.typeTag
 
 /**
  * Converts a sequence of KeyString features into a vector keeping the top K most common occurrences of each
@@ -52,22 +56,27 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
 )(implicit tti: TypeTag[T])
   extends SequenceEstimator[T, OPVector](operationName = "vecPivotTextMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
-    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam {
+    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
+    with MaxPctCardinalityParams with MaxPctCardinalityFun {
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
 
-    def convertToMapOfMaps(mapIn: Map[String, String]): MapMap = mapIn.map { case (k, v) => k -> Map(v -> 1L) }
+    // Throw out values above max percent cardinality
+    val finalDataset: Dataset[Seq[T#Value]] =
+      filterByMaxCardinality(dataset, maxPctCardinality = $(maxPctCardinality), size = inN.length, bits = $(hllBits))
+
+    def convertToMapOfMaps(mapIn: Map[String, String]): MapMap =
+      mapIn.map { case (k, v) => k -> Map(v -> 1L) }
 
     val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(dataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+      getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
     val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-
-    val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
-      stageName, $(trackNulls))
+    val vectorMeta =
+      makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName, stageName, $(trackNulls))
     setMetadata(vectorMeta.toMetadata)
 
     new TextMapPivotVectorizerModel[T](
