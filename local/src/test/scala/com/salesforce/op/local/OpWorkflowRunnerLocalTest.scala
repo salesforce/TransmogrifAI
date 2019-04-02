@@ -34,13 +34,13 @@ import java.nio.file.Paths
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers.DataFrameFieldNames._
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
-import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
+import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
 import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import com.salesforce.op.{OpParams, OpWorkflow}
+import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -54,25 +54,40 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   val features = Seq(height, weight, gender, description, age).transmogrify()
   val survivedNum = survived.occurs()
+
   val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
 
+  // TODO - BUG! we seem to be loosing null label in OpStringIndexerNoFilterModel
+  // val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
+  // val indexedNoFilter = description.indexed()
+
+  //  TODO - BUG! might be the same problem!
+  // val indexed = description.indexed()
+  // val deindexed = indexed.deindexed(handleInvalid = IndexToStringHandleInvalid.Error)
+
+  //  TODO - try to reproduce the same bug as in E1
+  // ? HOW ?
+
+  val logReg = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
+    case (lg: OpLogisticRegression, _) => lg -> new ParamGridBuilder().build()
+  }
+
   val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-    splitter = None, modelTypesToUse = Seq(OpLogisticRegression)
+    modelsAndParameters = logReg, splitter = None
   ).setInput(survivedNum, features).getOutput()
 
-  val workflow = new OpWorkflow().setResultFeatures(prediction, survivedNum, indexed).setReader(dataReader)
+  val workflow = new OpWorkflow().setReader(dataReader)
+    .setResultFeatures(prediction, survivedNum, indexed)
 
   lazy val model = workflow.train()
-
   lazy val modelLocation = {
     val path = Paths.get(tempDir.toString, "op-runner-local-test-model").toFile.getCanonicalFile.toString
     model.save(path)
     path
   }
-
   lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).sort(KeyFieldName).collect().map(_.toMap)
-
   lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed)
+
 
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
@@ -105,13 +120,15 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
-      (score, (predV, survivedV, indexedV)) <- scores.zip(expectedScores)
+      ((score, (predV, survivedV, indexedV)), i) <- scores.zip(expectedScores).zipWithIndex
       expected = Map(
         prediction.name -> predV.value,
         survivedNum.name -> survivedV.value.get,
         indexed.name -> indexedV.value.get
       )
-    } score shouldBe expected
+    } withClue(s"Record index $i: ") {
+      score shouldBe expected
+    }
   }
 
 }
