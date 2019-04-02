@@ -42,7 +42,7 @@ class RoundDigitsTransformerTest extends OpTransformerSpec[Real, RoundDigitsTran
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: RoundDigitsTransformer[Real] = new RoundDigitsTransformer[Real](2)
     .setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(1.42), Real(4.32), Real.empty, Real(-1.0), Real(2.04))
+  val expectedResult: Seq[Real] = Seq(Real(1.42), Real(4.32), Real.empty, Real(-1.0), Real(2.04))
 
   it should "have a working shortcut" in {
     val f2 = f1.round(4)

@@ -40,7 +40,7 @@ class ScalarDivideTransformerTest extends OpTransformerSpec[Real, ScalarDivideTr
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: ScalarDivideTransformer[Real, Double] = new ScalarDivideTransformer[Real, Double](2.0)
     .setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(0.5), Real(2.0), Real.empty, Real(-0.5), Real(1.0))
+  val expectedResult: Seq[Real] = Seq(Real(0.5), Real(2.0), Real.empty, Real(-0.5), Real(1.0))
 }
 
 

@@ -40,7 +40,7 @@ class AbsoluteValueTransformerTest extends OpTransformerSpec[Real, AbsoluteValue
   val sample = Seq(Real(-1.0), Real(-4.0), Real.empty, Real(5.0), Real(-5.5), Real(0.1), Real(2.0), Real(0.0))
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: AbsoluteValueTransformer[Real] = new AbsoluteValueTransformer[Real]().setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(1.0), Real(4.0), Real.empty, Real(5.0),
+  val expectedResult: Seq[Real] = Seq(Real(1.0), Real(4.0), Real.empty, Real(5.0),
     Real(5.5), Real(0.1), Real(2.0), Real(0.0))
 
   it should "have a working shortcut" in {
@@ -48,11 +48,4 @@ class AbsoluteValueTransformerTest extends OpTransformerSpec[Real, AbsoluteValue
     f2.originStage.isInstanceOf[AbsoluteValueTransformer[_]] shouldBe true
   }
 }
-
-
-
-
-
-
-
 

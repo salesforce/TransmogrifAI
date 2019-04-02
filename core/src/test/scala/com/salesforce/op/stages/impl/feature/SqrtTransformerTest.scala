@@ -40,19 +40,12 @@ class SqrtTransformerTest extends OpTransformerSpec[Real, SqrtTransformer[Real]]
   val sample = Seq(Real(-1.3), Real(-4.9), Real.empty, Real(5.1), Real(-5.1), Real(0.1), Real(2.5), Real(0.4))
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: SqrtTransformer[Real] = new SqrtTransformer[Real]().setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real.empty, Real.empty, Real.empty,
-    Real(math.sqrt(5.1)), Real.empty, Real(math.sqrt(0.1)), Real(math.sqrt(2.5)), Real(math.sqrt(0.4)))
+  val expectedResult: Seq[Real] = Seq(None, None, None,
+    Some(5.1), None, Some(0.1), Some(2.5), Some(0.4)).map(_.map(math.sqrt).toReal)
 
   it should "have a working shortcut" in {
     val f2 = f1.sqrt()
     f2.originStage.isInstanceOf[SqrtTransformer[_]] shouldBe true
   }
 }
-
-
-
-
-
-
-
 

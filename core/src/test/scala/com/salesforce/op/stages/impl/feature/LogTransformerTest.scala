@@ -36,23 +36,16 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class LogTransformerTest extends OpTransformerSpec[Real, LogTransformer[Real, Double]] {
+class LogTransformerTest extends OpTransformerSpec[Real, LogTransformer[Real]] {
   val sample = Seq(Real(-1.3), Real(-4.9), Real.empty, Real(5.1), Real(-5.1), Real(0.1), Real(2.5), Real(0.4))
   val (inputData, f1) = TestFeatureBuilder(sample)
-  val transformer: LogTransformer[Real, Double] = new LogTransformer[Real, Double](10).setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real.empty, Real.empty, Real.empty,
-    Real(math.log10(5.1)), Real.empty, Real(math.log10(0.1)), Real(math.log10(2.5)), Real(math.log10(0.4)))
+  val transformer: LogTransformer[Real] = new LogTransformer[Real](10).setInput(f1)
+  val expectedResult: Seq[Real] = Seq(None, None, None,
+    Some(5.1), None, Some(0.1), Some(2.5), Some(0.4)).map(_.map(math.log10).toReal)
 
   it should "have a working shortcut" in {
     val f2 = f1.log(2)
-    f2.originStage.isInstanceOf[LogTransformer[_, _]] shouldBe true
+    f2.originStage.isInstanceOf[LogTransformer[_]] shouldBe true
   }
 }
-
-
-
-
-
-
-
 

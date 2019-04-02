@@ -40,7 +40,7 @@ class FloorTransformerTest extends OpTransformerSpec[Integral, FloorTransformer[
   val sample = Seq(Real(-1.3), Real(-4.9), Real.empty, Real(5.1), Real(-5.1), Real(0.1), Real(2.5), Real(0.4))
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: FloorTransformer[Real] = new FloorTransformer[Real]().setInput(f1)
-  override val expectedResult: Seq[Integral] = Seq(Integral(-2), Integral(-5), Integral.empty, Integral(5),
+  val expectedResult: Seq[Integral] = Seq(Integral(-2), Integral(-5), Integral.empty, Integral(5),
     Integral(-6), Integral(0), Integral(2), Integral(0))
 
   it should "have a working shortcut" in {
@@ -48,11 +48,4 @@ class FloorTransformerTest extends OpTransformerSpec[Integral, FloorTransformer[
     f2.originStage.isInstanceOf[FloorTransformer[_]] shouldBe true
   }
 }
-
-
-
-
-
-
-
 

@@ -40,19 +40,11 @@ class ExpTransformerTest extends OpTransformerSpec[Real, ExpTransformer[Real]] {
   val sample = Seq(Real(-1.3), Real(-4.9), Real.empty, Real(5.1), Real(-5.1), Real(0.1), Real(2.5), Real(0.4))
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: ExpTransformer[Real] = new ExpTransformer[Real]().setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(math.exp(-1.3)), Real(math.exp(-4.9)), Real.empty,
-    Real(math.exp(5.1)), Real(math.exp(-5.1)), Real(math.exp(0.1)), Real(math.exp(2.5)), Real(math.exp(0.4)))
+  override val expectedResult: Seq[Real] = Seq(Some(-1.3), Some(-4.9), None,
+    Some(5.1), Some(-5.1), Some(0.1), Some(2.5), Some(0.4)).map(_.map(math.exp).toReal)
 
   it should "have a working shortcut" in {
     val f2 = f1.exp()
     f2.originStage.isInstanceOf[ExpTransformer[_]] shouldBe true
   }
 }
-
-
-
-
-
-
-
-
