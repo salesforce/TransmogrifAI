@@ -218,15 +218,15 @@ trait RichNumericFeature {
      * Square root transformer
      * @return transformed feature
      */
-    def log[N](base: N)(implicit n: Numeric[N]): FeatureLike[Real] =
-      f.transformWith(new LogTransformer[I, N](base = base))
+    def log(base: Double): FeatureLike[Real] =
+      f.transformWith(new LogTransformer[I](base = base))
 
     /**
      * Square root transformer
      * @return transformed feature
      */
-    def power[N](power: N)(implicit n: Numeric[N]): FeatureLike[Real] =
-      f.transformWith(new PowerTransformer[I, N](power = power))
+    def power(power: Double): FeatureLike[Real] =
+      f.transformWith(new PowerTransformer[I](power = power))
 
 
   }

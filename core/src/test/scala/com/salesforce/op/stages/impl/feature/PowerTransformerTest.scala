@@ -41,7 +41,7 @@ class PowerTransformerTest extends OpTransformerSpec[Real, PowerTransformer[Real
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: PowerTransformer[Real] = new PowerTransformer[Real](3.0).setInput(f1)
   override val expectedResult: Seq[Real] = Seq(Some(-1.3), Some(-4.9), None,
-    Some(5.1), Some(-5.1), None(0.1), Some(2.5),
+    Some(5.1), Some(-5.1), Some(0.1), Some(2.5),
     Some(0.4)).map(_.map(v => math.pow(v, 3)).toReal)
 
   it should "have a working shortcut" in {
