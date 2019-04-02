@@ -30,23 +30,21 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.{OpParams, OpWorkflow}
-import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.test._
-import com.salesforce.op.testkit._
-import com.salesforce.op.testkit.RandomData
 import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
+import com.salesforce.op.test._
+import com.salesforce.op.testkit.{RandomData, _}
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.log4j.Level
+import com.salesforce.op.{OpParams, OpWorkflow}
+import com.twitter.algebird.Operators._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import com.twitter.algebird.Operators._
 import org.junit.runner.RunWith
-import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{Assertion, FlatSpec}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -291,6 +289,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     )
 
     val filteredRawData = filter.generateFilteredRaw(features, params)
+
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)

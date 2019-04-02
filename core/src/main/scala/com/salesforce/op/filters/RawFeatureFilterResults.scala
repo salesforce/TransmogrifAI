@@ -31,6 +31,7 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.preparators.CorrelationType
+import org.json4s.Extraction
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -88,7 +89,51 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
-)
+) {
+
+  /**
+   * Marshall RawFeatureFilterConfig to map
+   *
+   * @return Map[String, Map[String, Object]]
+   */
+  def toMap: Map[String, Any] = RawFeatureFilterConfig.toMap(this)
+
+  /**
+   * Summarize RawFeatureFilterConfig in format of stageInfo
+   *
+   * @return Map[String, Map[String, Object]]
+   */
+  def getInfo: Map[String, Map[String, Object]] = RawFeatureFilterConfig.getInfo(this)
+
+}
+
+/**
+ * This object is used to output Raw Feature Filter configuration settings alongside stage info in ModelInsights
+ */
+object RawFeatureFilterConfig {
+
+  implicit val formats = DefaultFormats
+
+  /**
+   * Marshall RawFeatureFilterConfig to map
+   *
+   * @return Map[String, Map[String, Object]]
+   */
+  def toMap(b: RawFeatureFilterConfig): Map[String, Any] = Extraction.decompose(b).extract[Map[String, Any]]
+
+  /**
+   * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
+   * ModelInsights
+   *
+   * @return Map[String, Map[String, Object]]
+   */
+  def getInfo(b: RawFeatureFilterConfig): Map[String, Map[String, Object]] = {
+    val stageName = "rawFeatureFilter"
+    val uid = "rawFeatureFilter"
+    Map(stageName -> Map("uid" -> uid, "params" -> b.toMap))
+  }
+
+}
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter

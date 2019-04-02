@@ -483,13 +483,16 @@ case object ModelInsights {
       s"Found ${vectorInput.map(_.name + " as feature vector").getOrElse("no feature vector")}" +
         s" to fill in model insights"
     )
+
+    val rawFeatureFilterConfigInfo = rawFeatureFilterResults.rawFeatureFilterConfig.getInfo
+
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
         blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
-      stageInfo = getStageInfo(stages)
+      stageInfo = rawFeatureFilterConfigInfo ++ getStageInfo(stages)
     )
   }
 
