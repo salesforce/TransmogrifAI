@@ -187,7 +187,8 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       .map(_.getDouble(0))
 
     if (labelSet.nonEmpty) {
-      log.info(s"DataCutter is keeping labels: $labelsKeep and dropping labels: $labelsDropped")
+      log.info(s"DataCutter is keeping labels: ${labelsKeep.mkString}" +
+        s" and dropping labels: ${labelsDropped.mkString}")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
