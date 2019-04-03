@@ -99,19 +99,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     summary
   }
 
-
-  private def getNumValuesFromMetadata(data: DataFrame): Int = {
-    val labelSF: StructField = data.schema.head
-    val labelColMetadata = labelSF.metadata
-    log.info(s"Label column metadata ${labelSF.name} $labelColMetadata")
-    Try(labelColMetadata.getLong("num_vals").toInt)
-      .recover { case nonFatal =>
-        log.warn(s"Recovering non-fatal failure to extract num_vals with -1", nonFatal)
-        -1
-      }
-      .get
-  }
-
   /**
    * Removes labels that should not be used in modeling
    *
@@ -120,27 +107,41 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    */
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     val dataPrep = super.validationPrepare(data)
-    val labelSet = getLabelsToKeep.toSet
-    log.info(s"Dropping rows with columns not in $labelSet")
+    Try {
+      val labelSF: StructField = dataPrep.schema.head
+      val labelColMeta = labelSF.metadata
+      log.info(s"Label column metadata ${labelSF.name} $labelColMeta")
+      labelColMeta
+        .getMetadata("ml_attr")
+        .getStringArray("vals")
+        .map(_.toDouble)
+    }
+      .map(_.toSet)
+      .recover { case nonFatal =>
+        log.warn(s"Recovering non-fatal exception: $nonFatal", nonFatal)
+        Set.empty
+      }
+      .map { valSet =>
 
-    val labelColName = dataPrep.columns(0)
+        val labelSet = getLabelsToKeep.toSet
+        if (valSet == labelSet) {
+          log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
+          dataPrep
+        } else {
+          log.info(s"Dropping rows with columns not in $labelSet")
 
-    val metadata = NominalAttribute.defaultAttr
-      .withName(labelColName)
-      .withNumValues(labelSet.size)
-      .toMetadata()
-
-    val labelCol = dataPrep
-      .col(labelColName)
-      .as("_", metadata)
-
-    val res = dataPrep
-      .filter(r => labelSet.contains(r.getDouble(0)))
-      .withColumn(labelColName, labelCol)
-
-    assert(labelSet.size == getNumValuesFromMetadata(res))
-
-    res
+          val labelColName = dataPrep.columns(0)
+          val labelCol = dataPrep.col(labelColName)
+          val metadata = NominalAttribute.defaultAttr
+            .withName(labelColName)
+            .withValues(getLabelsToKeep.map(_.toString))
+            .toMetadata()
+          dataPrep
+            .filter(r => labelSet.contains(r.getDouble(0)))
+            .withColumn(labelColName, labelCol.as("_", metadata))
+        }
+    }
+      .get
   }
 
   /**
