@@ -148,9 +148,6 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithIDPre))
     val datasetWithID = splitter.collect {
-      // TODO validate in best estimator below cannot defer label trimming to blanket
-      //  validationPrepare, redesign to accommodate for special case
-      //
       case dc: DataCutter => dc.validationPrepare(datasetWithIDPre)
     }.getOrElse(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
@@ -161,7 +158,11 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       best
     }
 
-    val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
+    val preparedData = splitter.collect {
+      case _: DataCutter => datasetWithID
+      case sp => sp.validationPrepare(datasetWithID)
+    }.getOrElse(datasetWithID)
+
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
