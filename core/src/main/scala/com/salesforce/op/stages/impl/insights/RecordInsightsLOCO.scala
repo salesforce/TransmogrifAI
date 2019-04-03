@@ -37,10 +37,11 @@ import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.IntParam
+import org.apache.spark.ml.param.{IntParam, Param}
 
 import scala.collection.mutable.PriorityQueue
 
@@ -64,6 +65,13 @@ class RecordInsightsLOCO[T <: Model[T]]
   def setTopK(value: Int): this.type = set(topK, value)
   def getTopK: Int = $(topK)
   setDefault(topK -> 20)
+  
+  final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
+    doc = "Whether returning topK based on absolute value or topKpositive and negatives"
+  )
+  def setTopKStrategy(strat: TopKStrategy): this.type = set(topKStrategy, strat.entryName)
+
+  setDefault(topKStrategy, TopKStrategy.Abs.entryName)
 
   private val modelApply = model match {
     case m: SelectedModel => m.transformFn
@@ -108,4 +116,15 @@ class RecordInsightsLOCO[T <: Model[T]]
 private[insights] object MinScore extends Ordering[(Int, Double, Array[Double])] {
   def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
     math.abs(y._2) compare math.abs(x._2)
+}
+
+sealed abstract class TopKStrategy(val name: String) extends EnumEntry with Serializable
+
+object TopKStrategy extends Enum[TopKStrategy] {
+  val values = findValues
+
+  case object Abs extends TopKStrategy("abs")
+
+  case object PositiveNegative extends TopKStrategy("positive and negative")
+
 }
