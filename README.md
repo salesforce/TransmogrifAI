@@ -16,6 +16,7 @@ Use TransmogrifAI if you need a machine learning library to:
 To understand the motivation behind TransmogrifAI check out these:
 - [Open Sourcing TransmogrifAI: Automated Machine Learning for Structured Data](https://engineering.salesforce.com/open-sourcing-transmogrifai-4e5d0e098da2), a blog post by [@snabar](https://github.com/snabar)
 - [Meet TransmogrifAI, Open Source AutoML That Powers Einstein Predictions](https://www.youtube.com/watch?v=93vsqjfGPCw&feature=youtu.be&t=2800), a talk by [@tovbinm](https://github.com/tovbinm)
+- [Low Touch Machine Learning](https://www.youtube.com/watch?v=PKTvo9X9Sjg), a talk by [@leahmcguire](https://github.com/leahmcguire)
 
 Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
