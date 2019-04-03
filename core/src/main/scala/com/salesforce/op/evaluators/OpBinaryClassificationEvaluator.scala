@@ -48,9 +48,9 @@ import org.slf4j.LoggerFactory
  * The metrics are AUROC, AUPR, Precision, Recall, F1 and Error Rate
  * Default evaluation returns AUROC
  *
- * @param name name of default metric
+ * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
- * @param uid uid for instance
+ * @param uid            uid for instance
  */
 
 private[op] class OpBinaryClassificationEvaluator
@@ -123,7 +123,8 @@ private[op] class OpBinaryClassificationEvaluator
     }
   }
 
-  final protected def getBinaryEvaluatorMetric(
+  final protected def getBinaryEvaluatorMetric
+  (
     metricName: ClassificationEvalMetric,
     dataset: Dataset[_],
     default: => Double
