@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.selector.{ProblemType, SelectedModel}
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
@@ -65,7 +65,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   def setTopK(value: Int): this.type = set(topK, value)
   def getTopK: Int = $(topK)
   setDefault(topK -> 20)
-  
+
   final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
     doc = "Whether returning topK based on absolute value or topKpositive and negatives"
   )
@@ -82,6 +82,22 @@ class RecordInsightsLOCO[T <: Model[T]]
 
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))
 
+  private val vectorDummy = Array.fill(featureInfo.length)(0.0).toOPVector
+
+  private val problemType = modelApply(labelDummy, vectorDummy).score.length match {
+    case 0 => ProblemType.Unknown
+    case 1 => ProblemType.Regression
+    case 2 => ProblemType.BinaryClassification
+    case n if(n > 2) => ProblemType.MultiClassification
+  }
+
+  private def computeDiffs(i: Int, oldInd: Int, featureArray: Array[(Int, Double)], featureSize: Int,
+    baseScore: Array[Double]): Array[Double] = {
+    featureArray.update(i, (oldInd, 0))
+    val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
+    val diffs = baseScore.zip(score).map { case (b, s) => b - s }
+    diffs
+  }
   override def transformFn: OPVector => TextMap = (features) => {
     val baseScore = modelApply(labelDummy, features).score
     val maxHeap = PriorityQueue.empty(MinScore)
@@ -94,29 +110,90 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     val k = $(topK)
     var i = 0
-    while (i < filledSize) {
-      val (oldInd, oldVal) = featureArray(i)
-      featureArray.update(i, (oldInd, 0))
-      val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
-      val diffs = baseScore.zip(score).map{ case (b, s) => b - s }
-      val max = diffs.maxBy(math.abs)
-      maxHeap.enqueue((i, max, diffs))
-      if (i >= k) maxHeap.dequeue()
-      featureArray.update(i, (oldInd, oldVal))
-      i += 1
-    }
+    val top = $(topKStrategy) match {
+      case s if s == TopKStrategy.Abs.entryName => {
+        while (i < filledSize) {
+          val absoluteMaxHeap = PriorityQueue.empty(AbsScore)
+          var count = 0
+          val (oldInd, oldVal) = featureArray(i)
+          featureArray.update(i, (oldInd, 0))
+          val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
+          val diffs = baseScore.zip(score).map { case (b, s) => b - s }
+          val max = diffs.maxBy(math.abs)
+          if (max != 0) { // Not keeping LOCOs with value 0.0
+            absoluteMaxHeap.enqueue((i, max, diffs))
+            count += 1
+            if (count > k) absoluteMaxHeap.dequeue()
+          }
+          featureArray.update(i, (oldInd, oldVal))
+          i += 1
+        }
 
-    val top = maxHeap.dequeueAll
+        val topAbs = maxHeap.dequeueAll
+        topAbs.sortBy { case (_, v, _) => -math.abs(v) }
+
+      }
+      case s if s == TopKStrategy.PositiveNegative.entryName => {
+        // Heap that will contain the top K positive LOCO values
+        val positiveMaxHeap = PriorityQueue.empty(MinScore)
+        // Heap that will contain the top K negative LOCO values
+        val negativeMaxHeap = PriorityQueue.empty(MaxScore)
+        // for each element of the feature vector != 0.0
+        // Size of positive heap
+        var positiveCount = 0
+        // Size of negative heap
+        var negativeCount = 0
+        for {i <- 0 until filledSize} {
+          val (oldInd, oldVal) = featureArray(i)
+          val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
+          val max = if (problemType == ProblemType.Regression) diffs(0) else diffs(1)
+
+          if (max > 0.0) { // if positive LOCO then add it to positive heap
+            positiveMaxHeap.enqueue((i, max, diffs))
+            positiveCount += 1
+            if (positiveCount > k) { // remove the lowest element if the heap size goes from 5 to 6
+              positiveMaxHeap.dequeue()
+            }
+          } else if (max < 0.0) { // if negative LOCO then add it to negative heap
+            negativeMaxHeap.enqueue((i, max, diffs))
+            negativeCount += 1
+            if (negativeCount > k) { // remove the highest element if the heap size goes from 5 to 6
+              negativeMaxHeap.dequeue()
+            } // Not keeping LOCOs with value 0
+          }
+          featureArray.update(i, (oldInd, oldVal))
+        }
+        val topPositive = positiveMaxHeap.dequeueAll
+        val topNegative = negativeMaxHeap.dequeueAll
+        (topPositive ++ topNegative).sortBy { case (_, v, _) => -v }
+      }
+    }
     top.map{ case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
       .toMap.toTextMap
   }
 }
 
 
-private[insights] object MinScore extends Ordering[(Int, Double, Array[Double])] {
+private[insights] object AbsScore extends Ordering[(Int, Double, Array[Double])] {
   def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
     math.abs(y._2) compare math.abs(x._2)
 }
+
+  /**
+   * Ordering of the heap that removes lowest score
+   */
+  private object MinScore extends Ordering[(Int, Double, Array[Double])] {
+    def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
+      y._2 compare x._2
+  }
+
+  /**
+   * Ordering of the heap that removes highest score
+   */
+  private object MaxScore extends Ordering[(Int, Double, Array[Double])] {
+    def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
+      x._2 compare y._2
+  }
 
 sealed abstract class TopKStrategy(val name: String) extends EnumEntry with Serializable
 
