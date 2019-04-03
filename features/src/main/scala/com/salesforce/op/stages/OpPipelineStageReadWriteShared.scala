@@ -55,6 +55,13 @@ object OpPipelineStageReadWriteShared {
     case object Uid extends FieldNames("uid")
     case object Class extends FieldNames("class")
     case object ParamMap extends FieldNames("paramMap")
+    case object LambdaClassName extends FieldNames("lambdaClassName")
+    case object LambdaTypeI1 extends FieldNames("lambdaTypeI1")
+    case object LambdaTypeO extends FieldNames("lambdaTypeO")
+    case object LambdaTypeOV extends FieldNames("lambdaTypeOV")
+    case object LambdaClassArgs extends FieldNames("lambdaClassArgs")
+    case object OperationName extends FieldNames("operationName")
+
   }
 
   /**

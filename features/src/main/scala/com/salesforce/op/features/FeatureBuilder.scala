@@ -30,6 +30,7 @@
 
 package com.salesforce.op.features
 
+import com.salesforce.op.UID
 import com.salesforce.op.aggregators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.{FeatureGeneratorStage, OpPipelineStage}
@@ -219,13 +220,27 @@ object FeatureBuilder {
   def fromRow[O <: FeatureType : WeakTypeTag](name: String): FeatureBuilderWithExtract[Row, O] = fromRow[O](name, None)
   def fromRow[O <: FeatureType : WeakTypeTag](index: Int)(implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, Some(index))
   def fromRow[O <: FeatureType : WeakTypeTag](name: String, index: Option[Int]): FeatureBuilderWithExtract[Row, O] = {
-    val c = FeatureTypeSparkConverter[O]()
+    val idx = index.getOrElse(-1)
     new FeatureBuilderWithExtract[Row, O](
       name = name,
-      extractFn = (r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name))),
-      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))"
+      extractFn = fromRowLambda(idx, name),
+      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))",
+      constructorArgs = Array(name, idx)
     )
   }
+  def fromRowLambda[O <: FeatureType: WeakTypeTag](
+    index: Int = -1,
+    name: String = ""
+  )(r: Row) = {
+    val c = FeatureTypeSparkConverter[O]()
+    val v: Any = if (index >= 0) {
+      r.get(index)
+    } else {
+      r.getAny(name)
+    }
+    c.fromSpark(v)
+  }
+
   // scalastyle:on
 }
 
@@ -269,7 +284,8 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
 (
   val name: String,
   val extractFn: I => O,
-  val extractSource: String
+  val extractSource: String,
+  val constructorArgs: Array[_] = Array()
 )(implicit val tti: WeakTypeTag[I], val tto: WeakTypeTag[O]) {
 
   var aggregator: MonoidAggregator[Event[O], _, O] = MonoidAggregatorDefaults.aggregatorOf[O](tto)
@@ -333,7 +349,9 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
         aggregator = aggregator,
         outputName = name,
         outputIsResponse = isResponse,
-        aggregateWindow = aggregateWindow
+        aggregateWindow = aggregateWindow//,
+      //  uid = UID.fromLambdaClass(extractFn, constructorArgs),
+        ,constructorArgs = constructorArgs
       )(tti, tto)
 
     originStage.getOutput().asInstanceOf[Feature[O]]

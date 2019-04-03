@@ -121,10 +121,9 @@ case object FeatureUID {
    * @param stageUid stage uid
    * @return UID
    */
-  def apply[T <: FeatureType : WeakTypeTag](stageUid: String): String = {
-    val (_, stageUidSuffix) = UID.fromString(stageUid)
-    val shortTypeName = FeatureType.shortTypeName[T]
-    s"${shortTypeName}_$stageUidSuffix"
+  def apply[T <: FeatureType: WeakTypeTag](stageUid: String): String = {
+    stageUid.replaceAll("\\$|\\.", "_")
   }
+
 
 }

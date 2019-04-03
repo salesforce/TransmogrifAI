@@ -9,7 +9,7 @@ else
 fi
 
 echo "Compiling '$PROJECT' project..."
-./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=true $PROJECT:compileScala -q
+./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=true $PROJECT:compileScala -x scalastyle -q
 
 if [ $? == 0 ]; then
   CLASSPATH=$(./gradlew -Dorg.gradle.parallel=true -Dorg.gradle.daemon=false $PROJECT:classpath -q)

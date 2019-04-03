@@ -119,6 +119,7 @@ configure(allProjs) {
         testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
         compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
         testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
+        compile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
 
         // Test
         compileOnly "org.scalatest:scalatest_$scalaVersion:$scalaTestVersion"

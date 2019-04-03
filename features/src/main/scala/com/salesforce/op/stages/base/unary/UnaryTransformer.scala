@@ -116,12 +116,13 @@ abstract class UnaryTransformer[I <: FeatureType, O <: FeatureType]
  * Transformer that takes a single input feature and produces a single new output feature using the specified function.
  * Performs row wise transformation specified in transformFn.
  *
- * @param operationName unique name of the operation this stage performs
- * @param transformFn   function used to convert input to output
- * @param uid           uid for instance
- * @param tti           type tag for input
- * @param tto           type tag for output
- * @param ttov          type tag for output value
+ * @param operationName  unique name of the operation this stage performs
+ * @param transformFn    function used to convert input to output
+ * @param uid            uid for instance
+ * @param lambdaCtorArgs arguments needed to create instance of our lambda
+ * @param tti            type tag for input
+ * @param tto            type tag for output
+ * @param ttov           type tag for output value
  * @tparam I input feature type
  * @tparam O output feature type
  */
@@ -129,7 +130,8 @@ final class UnaryLambdaTransformer[I <: FeatureType, O <: FeatureType]
 (
   operationName: String,
   val transformFn: I => O,
-  uid: String = UID[UnaryLambdaTransformer[I, O]]
+  uid: String = UID[UnaryLambdaTransformer[I, O]],
+  val lambdaCtorArgs:Array[_] = Array()
 )(
   implicit tti: TypeTag[I],
   tto: TypeTag[O],

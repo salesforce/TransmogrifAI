@@ -15,6 +15,7 @@ plugins {
 repositories {
     jcenter()
     mavenCentral()
+    mavenLocal()
 }
 
 apply plugin: 'application'
@@ -39,7 +40,7 @@ ext {
     junitVersion = '4.11'
     sparkVersion = '2.3.2'
     scalatestVersion = '3.0.0'
-    transmogrifaiVersion ='0.5.1'
+    transmogrifaiVersion ='0.6.107-SNAPSHOT'
     collectionsVersion = '3.2.2'
     scoveragePluginVersion = '1.3.1'
     mainClassName = "com.salesforce.dummy.DummyMain"
@@ -49,6 +50,7 @@ ext {
 configurations {
     scalaLibrary
     scalaCompiler
+    macroParadisePlugin
 }
 
 //noinspection GroovyAssignabilityCheck
@@ -59,6 +61,7 @@ dependencies {
     scoverage "org.scoverage:scalac-scoverage-runtime_$scalaVersion:$scoveragePluginVersion"
     scalaLibrary "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
     scalaCompiler "org.scala-lang:scala-compiler:$scalaVersion.$scalaVersionRevision"
+    macroParadisePlugin "org.scalamacros:paradise_$scalaVersion.$scalaVersionRevision:2.1.0"
     compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
 
     // Spark
@@ -103,8 +106,20 @@ tasks.withType(ScalaCompile) {
         jvmArgs = ['-XX:MaxMetaspaceSize=256m']
     }
 }
-compileScala { scalaCompileOptions.additionalParameters = ["-optimize"] }
-compileTestScala { scalaCompileOptions.additionalParameters = ["-Yrangepos"] }
+compileScala {
+    scalaCompileOptions.additionalParameters = [
+        "-optimize" ,
+        "-Xplugin:" + configurations.macroParadisePlugin.getFiles().head().path,
+        "-Xplugin-require:macroparadise"
+    ]
+}
+compileTestScala {
+        scalaCompileOptions.additionalParameters = [
+        "-Yrangepos",
+        "-Xplugin:" + configurations.macroParadisePlugin.getFiles().head().path,
+        "-Xplugin-require:macroparadise"
+        ]
+}
 [compileJava, compileTestJava]*.options.collect { options -> options.encoding = 'UTF-8' }
 
 jar {

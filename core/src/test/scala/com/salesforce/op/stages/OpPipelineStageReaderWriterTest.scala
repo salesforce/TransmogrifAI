@@ -58,7 +58,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   private val log = LoggerFactory.getLogger(this.getClass)
   private lazy val savePath = tempDir + "/" + this.getClass.getSimpleName + "-" + System.currentTimeMillis()
   private lazy val writer = new OpPipelineStageWriter(stage)
-  private lazy val stageJsonString: String = writer.writeToJsonString(savePath)
+  private lazy val stageJsonString: String = writer.writeToJsonString(savePath, writeLambdas = true)
   private lazy val stageJson: JValue = parse(stageJsonString)
   private lazy val isModel = stage.isInstanceOf[Model[_]]
   private val FN = FieldNames
@@ -108,7 +108,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
-    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath)
+    val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, loadLambdas = true)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]
     stageLoaded.getOutput() shouldBe a[FeatureLike[_]]

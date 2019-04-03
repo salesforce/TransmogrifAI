@@ -34,6 +34,8 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import OpPipelineStageReadWriteShared._
+import com.salesforce.op.ClassInstantinator
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
 import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
@@ -41,6 +43,7 @@ import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
 
+import scala.collection.mutable
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Success, Try}
 
@@ -61,21 +64,22 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    *
    * @return stage metadata json string
    */
-  def writeToJsonString(path: String): String = compact(writeToJson(path))
+  def writeToJsonString(path: String, writeLambdas: Boolean = false): String = compact(writeToJson(path, writeLambdas))
 
   /**
    * Stage metadata json
    *
    * @return stage metadata json
    */
-  def writeToJson(path: String): JObject = jsonSerialize(writeToMap(path)).asInstanceOf[JObject]
+  def writeToJson(path: String, writeLambdas: Boolean = false): JObject = jsonSerialize(writeToMap(path, writeLambdas)).asInstanceOf[JObject]
 
   /**
    * Stage metadata map
    *
    * @return stage metadata map
    */
-  def writeToMap(path: String): Map[String, Any] = {
+  def writeToMap(path: String, writeLambdas: Boolean = false): Map[String, Any] = {
+
     // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]]
     // so they can save
     stage match {
@@ -85,13 +89,61 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     // We produce stage metadata for all the Spark params
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
     // Add isModel indicator
-    val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
+    val m = mutable.Map[String, Any]()
+    m ++= parse(metadataJson).extract[Map[String, Any]]
+    m.update(FieldNames.IsModel.entryName, isModel)
+    if (writeLambdas) {
+      m ++= getLambdaDetails
+    }
+
     // In case we stumbled upon a model instance, we also include it's ctor args
     // so we can reconstruct the model instance when loading
-    if (isModel) metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap) else metadata
+    if (isModel) {
+      m.update(FieldNames.CtorArgs.entryName, modelCtorArgs().toMap)
+    }
+    m.toMap
   }
 
   private def isModel: Boolean = stage.isInstanceOf[Model[_]]
+
+  private def getLambdaDetails: Map[String, Any] = {
+    stage match {
+      case t: UnaryLambdaTransformer[_, _] => {
+        val n = t.transformFn.getClass.getName
+        ClassInstantinator.instantinateRaw(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
+          case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n}")
+          case _ => {
+            val args =
+              t.lambdaCtorArgs.map(
+                a =>
+                  Array(a.getClass.getName, a match {
+                    case x: Int => x
+                    case x: Double => x
+                    case x: String => x
+                    case x: Boolean => x
+                    case _ =>
+                      throw new IllegalArgumentException(
+                        s"Unsupported type [${a.getClass.getName}] for lambda: ${n}"
+                      )
+
+                  })
+              )
+            Map(
+              FieldNames.LambdaClassName.entryName -> n,
+              FieldNames.LambdaTypeI1.entryName -> ReflectionUtils.dealisedTypeName(t.tti.tpe),
+              FieldNames.LambdaTypeO.entryName -> ReflectionUtils.dealisedTypeName(t.tto.tpe),
+              FieldNames.LambdaTypeOV.entryName -> ReflectionUtils.dealisedTypeName(t.ttov.tpe),
+              FieldNames.OperationName.entryName -> t.operationName,
+              FieldNames.LambdaClassArgs.entryName -> args,
+              FieldNames.Uid.entryName -> t.uid
+            ).asInstanceOf[Map[String, Any]]
+          }
+        }
+
+      }
+      case _ => Map()
+    }
+  }
 
   /**
    * Extract model ctor args values keyed by their names, so we can reconstruct the model instance when loading.

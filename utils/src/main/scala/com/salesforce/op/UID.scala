@@ -34,7 +34,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import org.apache.spark.ml.util.Identifiable
 
+import scala.collection.mutable
 import scala.reflect._
+import scala.util.{Failure, Success}
 
 /**
  * Unique Identifier (UID) generator
@@ -72,6 +74,29 @@ case object UID {
     try { uid.split("_") match { case Array(prefix, suffix) => prefix -> suffix } }
     catch {
       case _: Exception => throw new IllegalArgumentException(s"Invalid UID: $uid")
+    }
+  }
+
+  /**
+    * Generate UID from lambda class
+    *
+    * @param f a lambda function
+    * @throws IllegalArgumentException (See code for description)
+    * @return String
+    */
+  def fromLambdaClass(f: AnyRef,
+                      constructorArgs: Array[_] = Array()): String = {
+    val n = f.getClass.getName
+
+
+      println(s"YY:${n} ${constructorArgs.map(_.toString).mkString(",")}")
+
+    ClassInstantinator.instantinateRaw(n, constructorArgs.map(_.asInstanceOf[AnyRef])) match {
+      case Success(_) => n + ":" + constructorArgs.map(_.toString).mkString(":")
+      case Failure(e) =>
+        throw new IllegalArgumentException(
+          s"Unable to instantiate lambda: $n (Make sure it is stored in object and not in class/trait) [${e.getMessage}]"
+        )
     }
   }
 

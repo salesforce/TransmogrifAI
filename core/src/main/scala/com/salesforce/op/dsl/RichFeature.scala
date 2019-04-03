@@ -30,6 +30,7 @@
 
 package com.salesforce.op.dsl
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
@@ -58,10 +59,10 @@ trait RichFeature {
      * @param f map A => B
      * @return feature of type B
      */
-    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map")
-      (implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
+    // scalastyle:off
+    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map")(implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
       feature.transformWith(
-        new UnaryLambdaTransformer[A, B](operationName = operationName, transformFn = f)
+        new UnaryLambdaTransformer[A, B](operationName = operationName, transformFn = f, uid = UID.fromLambdaClass(f))
       )
     }
 

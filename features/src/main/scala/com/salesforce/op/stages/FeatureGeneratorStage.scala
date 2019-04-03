@@ -66,7 +66,8 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   outputName: String,
   override val outputIsResponse: Boolean,
   val aggregateWindow: Option[Duration] = None,
-  val uid: String = UID[FeatureGeneratorStage[I, O]]
+  val uid: String = UID[FeatureGeneratorStage[I, O]],
+  val constructorArgs: Array[_] = Array()
 )(
   implicit val tti: WeakTypeTag[I],
   val tto: WeakTypeTag[O]

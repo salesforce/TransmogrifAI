@@ -32,8 +32,9 @@ package com.salesforce.hw
 
 import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
-import com.salesforce.op.features.FeatureBuilder
+import com.salesforce.op.features.{FeatureBuilder, FeatureLike}
 import com.salesforce.op.features.types._
+import com.salesforce.op.lambda.{lambdas, materializeLambdas}
 import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
@@ -75,6 +76,8 @@ case class Passenger
 /**
  * A simplified TransmogrifAI example classification app using the Titanic dataset
  */
+//scalastyle:off
+@materializeLambdas
 object OpTitanicSimple {
 
   /**
@@ -98,35 +101,32 @@ object OpTitanicSimple {
     /////////////////////////////////////////////////////////////////////////////////
 
     // Define features using the OP types based on the data
-    val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
-    val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
+    @lambdas val survived = FeatureBuilder.RealNN[Passenger].extract((x: Passenger) => x.survived.toRealNN).asResponse
+    @lambdas val age = FeatureBuilder.Real[Passenger].extract((x: Passenger) => x.age.toReal).asPredictor
+   /* val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
     val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
     val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
-    val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
+
     val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
     val parCh = FeatureBuilder.Integral[Passenger].extract(_.parCh.toIntegral).asPredictor
     val ticket = FeatureBuilder.PickList[Passenger].extract(_.ticket.map(_.toString).toPickList).asPredictor
     val fare = FeatureBuilder.Real[Passenger].extract(_.fare.toReal).asPredictor
     val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).toPickList).asPredictor
-    val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
+    val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor*/
 
     ////////////////////////////////////////////////////////////////////////////////
     // TRANSFORMED FEATURES
     /////////////////////////////////////////////////////////////////////////////////
 
     // Do some basic feature engineering using knowledge of the underlying dataset
-    val familySize = sibSp + parCh + 1
+   /* val familySize = sibSp + parCh + 1
     val estimatedCostOfTickets = familySize * fare
     val pivotedSex = sex.pivot()
-    val normedAge = age.fillMissingWithMean().zNormalize()
-    val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
+    val normedAge = age.fillMissingWithMean().zNormalize()*/
+    @lambdas val ageGroup: FeatureLike[PickList] = age.map[PickList]((x:Real)=>x.value.map((v:Double) => if (v > 18) "adult" else "child").toPickList)
 
     // Define a feature of type vector containing all the predictors you'd like to use
-    val passengerFeatures = Seq(
-      pClass, name, age, sibSp, parCh, ticket,
-      cabin, embarked, familySize, estimatedCostOfTickets,
-      pivotedSex, ageGroup, normedAge
-    ).transmogrify()
+    val passengerFeatures = Seq(age,ageGroup).transmogrify()
 
     // Optionally check the features with a sanity checker
     val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
@@ -149,14 +149,19 @@ object OpTitanicSimple {
     val workflow = new OpWorkflow().setResultFeatures(survived, prediction).setReader(dataReader)
 
     // Fit the workflow to the data
+    workflow.getResultFeatures().map(_.)
     val model = workflow.train()
     println(s"Model summary:\n${model.summaryPretty()}")
 
     // Manifest the result features of the workflow
     println("Scoring the model")
     val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
-
-    println("Metrics:\n" + metrics)
+    model.save("/tmp/m4")
+    println(model.getStages().mkString(","))
+    import com.salesforce.op.stages._
+    val r = new OpPipelineStageWriter(model.getStages().head).writeToJsonString("/tmp/xx1")
+    println(r)
+    //println("Metrics:\n" + metrics)
 
     // Stop Spark gracefully
     spark.stop()

@@ -235,6 +235,18 @@ object ReflectionUtils {
     })
   }
 
+
+  def tmp[T]()= {
+
+
+
+  }
+
+  def typeTagForName(rtm: Mirror = runtimeMirror(), n: String): TypeTag[_] = {
+    val clazz = classForName(n)
+    typeTagForType(rtm, rtm.classSymbol(clazz).toType)
+  }
+
   /**
    * Create a ClassTag for a WeakTypeTag
    *

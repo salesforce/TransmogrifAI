@@ -41,11 +41,10 @@ import org.scalatest.junit.JUnitRunner
 class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
 
   override val hasOutputName = false
-
   val stage: OpPipelineStageBase =
     new UnaryLambdaTransformer[Real, Real](
       operationName = "test",
-      transformFn = _.v.map(_ * 0.1234).toReal,
+      transformFn = Lambdas.fnc0,
       uid = UID[UnaryLambdaTransformer[_, _]]
     ).setInput(weight).setMetadata(meta)
 
