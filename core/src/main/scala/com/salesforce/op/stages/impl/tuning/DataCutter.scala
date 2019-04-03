@@ -171,25 +171,29 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
 
+    val labelCol = labelCounts.columns(0)
     val colCount = labelCounts.columns(1)
     val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
     val labelsKeep = labelCounts
+      .sort(col(colCount).desc, col(labelCol))
       .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
-      .sort(col(colCount).desc)
       .take(maxLabels)
       .map(_.getDouble(0))
 
     val labelSet = labelsKeep.toSet
-    val labelsDropped = labelCounts.filter(r => !labelSet.contains(r.getDouble(0))).collect().map(_.getDouble(0)).toSet
+    val labelsDropped = labelCounts
+      .filter(r => !labelSet.contains(r.getDouble(0)))
+      .take(100)
+      .map(_.getDouble(0))
 
     if (labelSet.nonEmpty) {
-      log.info(s"DataCutter is keeping labels: $labelSet and dropping labels: $labelsDropped")
+      log.info(s"DataCutter is keeping labels: $labelsKeep and dropping labels: $labelsDropped")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
         s"Label counts were: ${labelCounts.collect().toSeq}")
     }
-    labelSet -> labelsDropped
+    labelSet -> labelsDropped.toSet
   }
 
   override def copy(extra: ParamMap): DataCutter = {
