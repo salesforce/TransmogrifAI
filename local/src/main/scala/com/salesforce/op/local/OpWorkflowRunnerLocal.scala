@@ -53,11 +53,12 @@ class OpWorkflowRunnerLocal(val workflow: OpWorkflow) extends Serializable {
    *   SparkSession.builder().getOrCreate().stop()
    *
    * @param params params to use during scoring
-   * @param spark  spark session needed for preparing scoring function.
-   *               Once scoring function is returned the session then can be shutdown as it's not used during scoring
+   * @param spark  Spark Session needed for preparing scoring function.
+   *               Once scoring function is returned the Spark Session can be shutdown
+   *               since it's not required during local scoring.
    * @return score function for local scoring
    */
-  def score(params: OpParams)(implicit spark: SparkSession): ScoreFunction = {
+  def scoreFunction(params: OpParams)(implicit spark: SparkSession): ScoreFunction = {
     require(params.modelLocation.isDefined, "Model location must be set in params")
     val model = workflow.loadModel(params.modelLocation.get)
     model.scoreFunction

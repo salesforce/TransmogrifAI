@@ -39,7 +39,7 @@ import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.utils.spark.RichDataset._
 
 @RunWith(classOf[JUnitRunner])
-class OpStringIndexerTest extends FlatSpec with TestSparkContext{
+class OpStringIndexerTest extends FlatSpec with TestSparkContext {
 
   val txtData = Seq("a", "b", "c", "a", "a", "c").map(_.toText)
   val (ds, txtF) = TestFeatureBuilder(txtData)

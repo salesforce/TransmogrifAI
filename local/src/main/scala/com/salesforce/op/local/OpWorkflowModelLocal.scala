@@ -87,8 +87,9 @@ trait OpWorkflowModelLocal extends Serializable {
     /**
      * Prepares a score function for local scoring
      *
-     * @param spark spark session needed for preparing scoring function,
-     *              Once scoring function is returned the session then can be shutdown as it's not used during scoring
+     * @param spark Spark Session needed for preparing scoring function,
+     *              Once scoring function is returned the Spark Session can be shutdown
+     *              since it's not required during local scoring.
      * @return score function for local scoring
      */
     def scoreFunction(implicit spark: SparkSession): ScoreFunction = {

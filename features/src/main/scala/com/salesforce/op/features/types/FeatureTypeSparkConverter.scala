@@ -168,6 +168,7 @@ case object FeatureTypeSparkConverter {
           case null => None
           case v: Float => Some(v.toDouble)
           case v: Double => Some(v)
+          case v: Number => Some(v.doubleValue())
           case v => throw new IllegalArgumentException(s"RealNN type mapping is not defined for ${v.getClass}")
         }
       case wt if wt <:< weakTypeOf[t.Real] => (value: Any) =>
@@ -175,6 +176,7 @@ case object FeatureTypeSparkConverter {
           case null => FeatureTypeDefaults.Real.value
           case v: Float => Some(v.toDouble)
           case v: Double => Some(v)
+          case v: Number => Some(v.doubleValue())
           case v => throw new IllegalArgumentException(s"Real type mapping is not defined for ${v.getClass}")
         }
       case wt if wt <:< weakTypeOf[t.Integral] => (value: Any) =>

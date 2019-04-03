@@ -56,17 +56,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   val survivedNum = survived.occurs()
 
   val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
-
-  // TODO - BUG! we seem to be loosing null label in OpStringIndexerNoFilterModel
-  // val indexed = description.indexed(handleInvalid = StringIndexerHandleInvalid.Keep)
-  // val indexedNoFilter = description.indexed()
-
-  //  TODO - BUG! might be the same problem!
-  // val indexed = description.indexed()
-  // val deindexed = indexed.deindexed(handleInvalid = IndexToStringHandleInvalid.Error)
-
-  //  TODO - try to reproduce the same bug as in E1
-  // ? HOW ?
+  val deindexed = indexed.deindexed()
 
   val logReg = BinaryClassificationModelSelector.Defaults.modelsAndParams.collect {
     case (lg: OpLogisticRegression, _) => lg -> new ParamGridBuilder().build()
@@ -77,7 +67,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   ).setInput(survivedNum, features).getOutput()
 
   val workflow = new OpWorkflow().setReader(dataReader)
-    .setResultFeatures(prediction, survivedNum, indexed)
+    .setResultFeatures(prediction, survivedNum, indexed, deindexed)
 
   lazy val model = workflow.train()
   lazy val modelLocation = {
@@ -86,12 +76,12 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     path
   }
   lazy val rawData = dataReader.generateDataFrame(model.rawFeatures).sort(KeyFieldName).collect().map(_.toMap)
-  lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed)
+  lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
 
 
   Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
     val params = new OpParams().withValues(modelLocation = Some(modelLocation))
-    val scoreFn = new OpWorkflowRunnerLocal(workflow).score(params)
+    val scoreFn = new OpWorkflowRunnerLocal(workflow).scoreFunction(params)
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
     assert(scores, expectedScores)
@@ -116,15 +106,16 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   private def assert(
     scores: Array[Map[String, Any]],
-    expectedScores: Array[(Prediction, RealNN, RealNN)]
+    expectedScores: Array[(Prediction, RealNN, RealNN, Text)]
   ): Unit = {
     scores.length shouldBe expectedScores.length
     for {
-      ((score, (predV, survivedV, indexedV)), i) <- scores.zip(expectedScores).zipWithIndex
+      ((score, (predV, survivedV, indexedV, deindexedV)), i) <- scores.zip(expectedScores).zipWithIndex
       expected = Map(
         prediction.name -> predV.value,
         survivedNum.name -> survivedV.value.get,
-        indexed.name -> indexedV.value.get
+        indexed.name -> indexedV.value.get,
+        deindexed.name -> deindexedV.value.orNull
       )
     } withClue(s"Record index $i: ") {
       score shouldBe expected
