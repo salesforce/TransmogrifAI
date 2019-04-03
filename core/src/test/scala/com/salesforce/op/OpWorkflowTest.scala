@@ -244,10 +244,10 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+
     val wf = new OpWorkflow()
       .setResultFeatures(pred)
-      .withRawFeatureFilter(Option(dataReader), Option(simpleReader),
-        maxFillRatioDiff = 1.0) // only height and the female key of maps should meet this criteria
+      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), maxFillRatioDiff = 1.0, minScoringRows = 0)
     val data = wf.computeDataUpTo(weight)
 
     data.schema.fields.map(_.name).toSet shouldEqual

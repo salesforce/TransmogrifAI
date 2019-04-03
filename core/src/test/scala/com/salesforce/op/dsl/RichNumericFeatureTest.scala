@@ -134,15 +134,55 @@ class RichNumericFeatureTest extends FlatSpec with FeatureTestBase with RichNume
     // TODO: add vectorize() test
   }
 
-  Spec[RichRealNNFeature] should "have tests" in {
-    // TODO: add tests
+  Spec[RichRealNNFeature] should "perform math functions correctly" in {
+    val checkAddition = testOp[RealNN, RealNN, Real](x => y => x + y)
+    checkAddition of(5.0.toRealNN, 2.0.toRealNN) expecting 7.0.toReal
+
+    val checkSubtraction = testOp[RealNN, RealNN, Real](x => y => x - y)
+    checkSubtraction of(5.0.toRealNN, 2.0.toRealNN) expecting 3.0.toReal
+
+    val checkMultiplication = testOp[RealNN, RealNN, Real](x => y => x * y)
+    checkMultiplication of(5.0.toRealNN, 2.0.toRealNN) expecting 10.toReal
+    checkMultiplication of(Double.NaN.toRealNN, 2.0.toRealNN) expecting Real.empty
+
+    val checkDivision = testOp[RealNN, RealNN, Real](x => y => x / y)
+    checkDivision of(5.0.toRealNN, 2.0.toRealNN) expecting 2.5.toReal
+    checkDivision of(2.0.toRealNN, 0.0.toRealNN) expecting Real.empty
   }
 
-  Spec[RichBinaryFeature] should "have tests" in {
-    // TODO: add tests
+  Spec[RichBinaryFeature] should "perform math functions" in {
+    val checkAddition = testOp[Binary, Binary, Real](x => y => x + y)
+    checkAddition of(true.toBinary, true.toBinary) expecting 2.0.toReal
+    checkAddition of(true.toBinary, Binary.empty) expecting 1.0.toReal
+
+    val checkSubtraction = testOp[Binary, Binary, Real](x => y => x - y)
+    checkSubtraction of(true.toBinary, true.toBinary) expecting 0.0.toReal
+    checkSubtraction of(true.toBinary, Binary.empty) expecting 1.0.toReal
+
+    val checkMultiplication = testOp[Binary, Binary, Real](x => y => x * y)
+    checkMultiplication of(true.toBinary, true.toBinary) expecting 1.0.toReal
+    checkMultiplication of(true.toBinary, Binary.empty) expecting Real.empty
+
+    val checkDivision = testOp[Binary, Binary, Real](x => y => x / y)
+    checkDivision of(true.toBinary, true.toBinary) expecting 1.0.toReal
+    checkDivision of(true.toBinary, false.toBinary) expecting Real.empty
   }
 
-  Spec[RichIntegralFeature[_]] should "have tests" in {
-    // TODO: add tests
+  Spec[RichIntegralFeature[_]] should "perform math functions" in {
+    val checkAddition = testOp[Integral, Integral, Real](x => y => x + y)
+    checkAddition of(5.toIntegral, 2.toIntegral) expecting 7.0.toReal
+    checkAddition of(Integral.empty, 2.toIntegral) expecting 2.0.toReal
+
+    val checkSubtraction = testOp[Integral, Integral, Real](x => y => x - y)
+    checkSubtraction of(5.toIntegral, 2.toIntegral) expecting 3.0.toReal
+    checkSubtraction of(Integral.empty, 2.toIntegral) expecting (-2.0).toReal
+
+    val checkMultiplication = testOp[Integral, Integral, Real](x => y => x * y)
+    checkMultiplication of(5.toIntegral, 2.toIntegral) expecting 10.toReal
+    checkMultiplication of(Integral.empty, 2.toIntegral) expecting Real.empty
+
+    val checkDivision = testOp[Integral, Integral, Real](x => y => x / y)
+    checkDivision of(5.toIntegral, 2.toIntegral) expecting 2.5.toReal
+    checkDivision of(2.toIntegral, 0.toIntegral) expecting Real.empty
   }
 }

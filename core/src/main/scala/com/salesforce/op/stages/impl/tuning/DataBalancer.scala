@@ -72,7 +72,6 @@ case object DataBalancer {
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-  @transient private[op] var summary: Option[DataBalancerSummary] = None
 
   /**
    * Computes the upSample and downSample proportions.
@@ -116,26 +115,39 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     }
   }
 
+
   /**
-   * Split into a training set and a test set and balance the training set
+   * Function to set parameters before passing into the validation step
+   * eg - do data balancing or dropping based on the labels
    *
-   * @param data to prepare for model training. first column must be the label as a double
-   * @return balanced training set and a test set
+   * @param data
+   * @return Parameters set in examining data
    */
-  def prepare(data: Dataset[Row]): ModelData = {
+  override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
     val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
     val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
     val negativeCount = negativeData.count()
     val positiveCount = positiveData.count()
     val seed = getSeed
 
-    if (!(isSet(isPositiveSmall) ||
-      isSet(downSampleFraction) ||
-      isSet(upSampleFraction) ||
-      isSet(alreadyBalancedFraction))
-    ) {
-      estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = seed)
-    }
+    estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = seed)
+
+    summary
+  }
+
+  /**
+   * Rebalance the training data within the validation step
+   *
+   * @param data to prepare for model training. first column must be the label as a double
+   * @return balanced training set and a test set
+   */
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+
+    val dataPrep = super.validationPrepare(data)
+
+    val negativeData = dataPrep.filter(_.getDouble(0) == 0.0).persist()
+    val positiveData = dataPrep.filter(_.getDouble(0) == 1.0).persist()
+    val seed = getSeed
 
     // If these conditions are met, that means that we have enough information to balance the data : upSample,
     // downSample and which class is in minority
@@ -159,14 +171,14 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
         sampleBalancedData(
           fraction = fraction,
           seed = seed,
-          data = data,
+          data = dataPrep,
           positiveData = positiveData,
           negativeData = negativeData
         )
       }
     }
 
-    ModelData(balanced.persist(), summary)
+    balanced.persist()
   }
 
   override def copy(extra: ParamMap): DataBalancer = {

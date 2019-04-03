@@ -52,25 +52,29 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "vecCatMap", uid = uid)
     with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
-    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam {
+    with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
+    with MaxPctCardinalityParams with MaxPctCardinalityFun {
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
 
-    def convertToMapOfMaps(mapIn: Map[String, Set[String]]): MapMap = {
+    // Throw out values above max percent cardinality
+    val finalDataset: Dataset[Seq[T#Value]] =
+      filterByMaxCardinality(dataset, maxPctCardinality = $(maxPctCardinality), size = inN.length, bits = $(hllBits))
+
+    def convertToMapOfMaps(mapIn: Map[String, Set[String]]): MapMap =
       mapIn.map { case (k, cats) =>
         k -> cats.map(_ -> 1L).groupBy(_._1).map { case (c, a) => c -> a.map(_._2).sum }
       }
-    }
 
     val categoryMaps: Dataset[SeqMapMap] =
-      getCategoryMaps(dataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
+      getCategoryMaps(finalDataset, convertToMapOfMaps, shouldCleanKeys, shouldCleanValues)
 
-    val topValues: Seq[Seq[(String, Array[String])]] = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
+    val topValues: SeqSeqTupArr = getTopValues(categoryMaps, inN.length, $(topK), $(minSupport))
 
-    val vectorMeta = makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName,
-      stageName, $(trackNulls))
+    val vectorMeta =
+      makeOutputVectorMetadata(topValues, inN, operationName, getOutputFeatureName, stageName, $(trackNulls))
     setMetadata(vectorMeta.toMetadata)
 
     new MultiPickListMapVectorizerModel(
