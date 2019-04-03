@@ -351,7 +351,7 @@ class LogTransformer[I <: OPNumeric[_]]
 /**
  * Power transformer
  *
- * @param power     base for log value
+ * @param power    power to multiply feature to
  * @param uid      uid for instance
  * @param tti      type tag for input
  * @param n        value converter
