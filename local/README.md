@@ -32,7 +32,7 @@ Or using the local runner:
 ```scala
 val scoreFn = new OpWorkflowRunnerLocal(workflow).scoreFunction(opParams)
 ```
-Note: Spark Session is only required for loading the model & preparing the scoring function. Once scoring function is returned the Spark Session can be shutdown since it's not required during local scoring.
+**Note**: *Spark Session is only required for loading the model & preparing the scoring function. Once scoring function is returned the Spark Session can be shutdown since it's not required during local scoring.*
 
 ## Performance Results
 
