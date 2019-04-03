@@ -33,7 +33,6 @@ package com.salesforce.op.evaluators
 import com.salesforce.op.evaluators.BinaryClassEvalMetrics._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression}
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.evaluation._
@@ -167,7 +166,7 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
 
     val (tp, tn, fp, fn, precision, recall, f1) = getPosNegValues(
       transformedData2.select(prediction.name, test_label.name).rdd
-        .map( r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)) )
+        .map(r => Row(r.getMap[String, Double](0).toMap.toPrediction.prediction, r.getDouble(1)))
     )
 
     tp.toDouble shouldBe metrics.TP
@@ -195,7 +194,6 @@ class OpBinaryClassificationEvaluatorTest extends FlatSpec with TestSparkContext
     metricsZero.Recall shouldBe 0.0
     metricsZero.Error shouldBe 0.0
   }
-
 
 
   it should "evaluate the metrics on dataset with only the label and prediction 1" in {

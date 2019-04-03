@@ -34,6 +34,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize
 import com.salesforce.op.UID
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Tuple4Semigroup
+import org.apache.spark.rdd.RDD
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.DoubleType
@@ -46,8 +47,8 @@ import org.slf4j.LoggerFactory
  * This evaluator creates the specified number of bins and computes the statistics for each bin
  * and returns [[BinaryClassificationBinMetrics]].
  *
- * @param numOfBins number of bins to produce
- * @param uid       uid for instance
+ * @param numOfBins       number of bins to produce
+ * @param uid             uid for instance
  */
 private[op] class OpBinScoreEvaluator
 (
@@ -66,60 +67,69 @@ private[op] class OpBinScoreEvaluator
     val labelColumnName = getLabelCol
     val dataToUse = makeDataToUse(data, labelColumnName)
       .select(col(getProbabilityCol), col(labelColumnName).cast(DoubleType)).rdd
+    val scoreAndLabels = dataToUse.map {
+      case Row(prob: Vector, label: Double) => (prob(1), label)
+      case Row(prob: Double, label: Double) => (prob, label)
+    }
+    evaluateScoreAndLabels(scoreAndLabels)
+  }
 
-    if (dataToUse.isEmpty()) {
-      log.warn("The dataset is empty. Returning empty metrics.")
-      BinaryClassificationBinMetrics(0.0, Seq(), Seq(), Seq(), Seq())
-    } else {
-      val scoreAndLabels = dataToUse.map {
-        case Row(prob: Vector, label: Double) => (prob(1), label)
-        case Row(prob: Double, label: Double) => (prob, label)
+  def evaluateScoreAndLabels(scoreAndLabels: RDD[(Double, Double)]): BinaryClassificationBinMetrics = {
+
+    val (maxScore, minScore) = scoreAndLabels.map {
+      case (score, _) => (score, score)
+    }.fold(1.0, 0.0) {
+      case ((maxVal, minVal), (scoreMax, scoreMin)) =>
+        (math.max(maxVal, scoreMax), math.min(minVal, scoreMin))
+    }
+
+    // Finding stats per bin -> avg score, avg conv rate,
+    // total num of data points and overall brier score.
+    implicit val sg = new Tuple4Semigroup[Double, Long, Long, Double]()
+    val stats = scoreAndLabels.map {
+      case (score, label) =>
+        (getBinIndex(score, minScore, maxScore),
+          (score, if (label > 0.0) 1L else 0L, 1L, math.pow(score - label, 2)))
+    }.reduceByKey(_ + _).map {
+      case (bin, (scoreSum, positiveCount, count, squaredError)) =>
+        (bin, scoreSum, positiveCount, count, squaredError)
+    }.collect()
+
+    stats.toList match {
+      case Nil => BinaryClassificationBinMetrics.empty
+      case _ => {
+        val zero = (new Array[Double](numOfBins), new Array[Double](numOfBins),
+          new Array[Long](numOfBins), new Array[Long](numOfBins), 0.0, 0L)
+        val (averageScore, averageConversionRate, numberOfDataPoints, positiveLabels, brierScoreSum, numberOfPoints) =
+          stats.foldLeft(zero) {
+            case ((score, convRate, dataPoints, positiveLabels, brierScoreSum, totalPoints),
+            (binIndex, scoreSum, positiveCount, counts, squaredError)) =>
+              score(binIndex) = scoreSum / counts
+              convRate(binIndex) = positiveCount.toDouble / counts
+              dataPoints(binIndex) = counts
+              positiveLabels(binIndex) = positiveCount
+              (score, convRate, dataPoints, positiveLabels, brierScoreSum + squaredError, totalPoints + counts)
+          }
+
+        // binCenters is the center point in each bin.
+        // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
+        val diff = maxScore - minScore
+        val binCenters = for {i <- 0 until numOfBins}
+          yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
+
+        val metrics = BinaryClassificationBinMetrics(
+          BrierScore = brierScoreSum / numberOfPoints,
+          binSize = diff / numOfBins,
+          binCenters = binCenters,
+          numberOfDataPoints = numberOfDataPoints,
+          numberOfPositiveLabels = positiveLabels,
+          averageScore = averageScore,
+          averageConversionRate = averageConversionRate
+        )
+
+        log.info("Evaluated metrics: {}", metrics.toString)
+        metrics
       }
-
-      val (maxScore, minScore) = scoreAndLabels.map {
-        case (score, _) => (score, score)
-      }.fold(1.0, 0.0) {
-        case ((maxVal, minVal), (scoreMax, scoreMin)) =>
-          (math.max(maxVal, scoreMax), math.min(minVal, scoreMin))
-      }
-
-      // Finding stats per bin -> avg score, avg conv rate,
-      // total num of data points and overall brier score.
-      implicit val sg = new Tuple4Semigroup[Double, Double, Long, Double]()
-      val stats = scoreAndLabels.map {
-        case (score, label) =>
-          (getBinIndex(score, minScore, maxScore), (score, label, 1L, math.pow(score - label, 2)))
-      }.reduceByKey(_ + _).map {
-        case (bin, (scoreSum, labelSum, count, squaredError)) =>
-          (bin, scoreSum / count, labelSum / count, count, squaredError)
-      }.collect()
-
-      val zero = (new Array[Double](numOfBins), new Array[Double](numOfBins), new Array[Long](numOfBins), 0.0, 0L)
-      val (averageScore, averageConversionRate, numberOfDataPoints, brierScoreSum, numberOfPoints) =
-        stats.foldLeft(zero) {
-          case ((score, convRate, dataPoints, brierScoreSum, totalPoints),
-          (binIndex, avgScore, avgConvRate, counts, squaredError)) =>
-            score(binIndex) = avgScore
-            convRate(binIndex) = avgConvRate
-            dataPoints(binIndex) = counts
-            (score, convRate, dataPoints, brierScoreSum + squaredError, totalPoints + counts)
-        }
-
-      // binCenters is the center point in each bin.
-      // e.g., for bins [(0.0 - 0.5), (0.5 - 1.0)], bin centers are [0.25, 0.75].
-      val diff = maxScore - minScore
-      val binCenters = for {i <- 0 until numOfBins} yield minScore + ((diff * i) / numOfBins) + (diff / (2 * numOfBins))
-
-      val metrics = BinaryClassificationBinMetrics(
-        BrierScore = brierScoreSum / numberOfPoints,
-        binCenters = binCenters,
-        numberOfDataPoints = numberOfDataPoints,
-        averageScore = averageScore,
-        averageConversionRate = averageConversionRate
-      )
-
-      log.info("Evaluated metrics: {}", metrics.toString)
-      metrics
     }
   }
 
@@ -133,21 +143,31 @@ private[op] class OpBinScoreEvaluator
 /**
  * Metrics of BinaryClassificationBinMetrics
  *
- * @param BrierScore            brier score for overall dataset
- * @param binCenters            center of each bin
- * @param numberOfDataPoints    total number of data points in each bin
- * @param averageScore          average score in each bin
- * @param averageConversionRate average conversion rate in each bin
+ * @param BrierScore             brier score for overall dataset
+ * @param binSize                size of each bin
+ * @param binCenters             center of each bin
+ * @param numberOfDataPoints     total number of data points in each bin
+ * @param numberOfPositiveLabels count of labels > 0 in each bin
+ * @param averageScore           average score in each bin
+ * @param averageConversionRate  average conversion rate in each bin
  */
 case class BinaryClassificationBinMetrics
 (
   BrierScore: Double,
+  binSize: Double,
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   binCenters: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Long])
   numberOfDataPoints: Seq[Long],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
+  numberOfPositiveLabels: Seq[Long],
+  @JsonDeserialize(contentAs = classOf[java.lang.Double])
   averageScore: Seq[Double],
   @JsonDeserialize(contentAs = classOf[java.lang.Double])
   averageConversionRate: Seq[Double]
 ) extends EvaluationMetrics
+
+object BinaryClassificationBinMetrics {
+  def empty: BinaryClassificationBinMetrics =
+    BinaryClassificationBinMetrics(0.0, 0.0, Seq(), Seq(), Seq(), Seq(), Seq())
+}
