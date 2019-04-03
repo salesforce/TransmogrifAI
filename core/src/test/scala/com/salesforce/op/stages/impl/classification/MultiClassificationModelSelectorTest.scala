@@ -36,10 +36,11 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
+import com.salesforce.op.stages.impl.feature.OpStringIndexerNoFilter
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
@@ -66,27 +67,44 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   import spark.implicits._
 
+  val txtLabelName = "txtLabel"
+  val featuresColName = "features"
+  val labelName = "label"
+  val txtData = Seq("zero", "one", "two").map(_.toText)
+  val (txtDs, txtF) = TestFeatureBuilder(txtLabelName, txtData)
+
   // Generate observations of label 1 following a distribution ~ N((-100.0, -100.0, -100.0), I_3)
   val label0Data =
     normalVectorRDD(sc, label0Count, 3, seed = seed)
-      .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ - 100.0)))
+      .map(v => "zero" -> Vectors.dense(v.toArray.map(_ - 100.0)))
 
   // Generate  observations of label 0 following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val label1Data =
     normalVectorRDD(sc, label1Count, 3, seed = seed)
-      .map(v => 1.0 -> Vectors.dense(v.toArray))
+      .map(v => "one" -> Vectors.dense(v.toArray))
 
   // Generate observations of label 2 following a distribution ~ N((100.0, 100.0, 100.0), I_3)
   val label2Data =
     normalVectorRDD(sc, label2Count, 3, seed = seed)
-      .map(v => 2.0 -> Vectors.dense(v.toArray.map(_ + 100.0)))
+      .map(v => "two" -> Vectors.dense(v.toArray.map(_ + 100.0)))
+
+  val nonIndexedData = label0Data
+    .union(label1Data)
+    .union(label2Data)
+    .toDF(txtLabelName, featuresColName)
+
+  val data = new OpStringIndexerNoFilter[Text]()
+    .setInput(txtF)
+    .setOutputFeatureName(labelName)
+    .fit(nonIndexedData)
+    .transform(nonIndexedData)
+    .drop(txtLabelName)
+    .select(labelName, featuresColName)
 
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")
 
-  val data = label0Data.union(label1Data).union(label2Data).toDF("label", "features")
-
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
-    data, response = "label", nonNullable = Set("features")
+    data, response = labelName, nonNullable = Set(featuresColName)
   )
 
   val lr = new OpLogisticRegression()

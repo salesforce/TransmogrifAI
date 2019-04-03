@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.tuning
 
+import akka.actor.FSM.Failure
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.attribute.NominalAttribute
@@ -39,7 +40,7 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
-import scala.util.Try
+import scala.util.{Success, Try}
 
 case object DataCutter {
 
@@ -99,6 +100,24 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     summary
   }
 
+
+  private def getLabelsFromMetadata(data: DataFrame): Array[String] =
+    Try {
+      val labelSF = data.schema.head
+      val labelColMetadata = labelSF.metadata
+      log.info(s"Raw label column metadata: $labelColMetadata")
+      labelColMetadata
+        .getMetadata("ml_attr")
+        .getStringArray("vals")
+    }
+    .recoverWith {
+      case nonFatal =>
+        log.warn("Recovering non-fatal exception", nonFatal)
+        Success(Array.empty[String])
+    }
+    .getOrElse(Array.empty[String])
+
+
   /**
    * Removes labels that should not be used in modeling
    *
@@ -107,41 +126,39 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    */
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
     val dataPrep = super.validationPrepare(data)
-    Try {
-      val labelSF: StructField = dataPrep.schema.head
-      val labelColMeta = labelSF.metadata
-      log.info(s"Label column metadata ${labelSF.name} $labelColMeta")
-      labelColMeta
-        .getMetadata("ml_attr")
-        .getStringArray("vals")
-        .map(_.toDouble)
-    }
-      .map(_.toSet)
-      .recover { case nonFatal =>
-        log.warn(s"Recovering non-fatal exception: $nonFatal", nonFatal)
-        Set.empty
+    val labelMetaArr = getLabelsFromMetadata(dataPrep)
+    val labelSet = getLabelsToKeep.toSet
+
+    // discount unseen label
+    val integralLabelSet = 0.until(labelMetaArr.size - 1)
+      .map(_.toDouble)
+      .toSet
+
+    if (integralLabelSet == labelSet) {
+      log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
+      dataPrep
+    } else {
+      log.info(s"Dropping rows with columns not in $labelSet")
+      val labelColName = dataPrep.columns(0)
+
+      val newLabelCol = if (labelMetaArr.isEmpty) {
+        dataPrep
+          .col(labelColName)
+      } else {
+        // trim the metadata
+        val metadata = NominalAttribute.defaultAttr
+          .withName(labelColName)
+          .withValues(labelMetaArr.take(labelSet.size))
+          .toMetadata()
+        dataPrep.col(labelColName)
+          .as("_", metadata)
       }
-      .map { valSet =>
 
-        val labelSet = getLabelsToKeep.toSet
-        if (valSet == labelSet) {
-          log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
-          dataPrep
-        } else {
-          log.info(s"Dropping rows with columns not in $labelSet")
-
-          val labelColName = dataPrep.columns(0)
-          val labelCol = dataPrep.col(labelColName)
-          val metadata = NominalAttribute.defaultAttr
-            .withName(labelColName)
-            .withValues(getLabelsToKeep.map(_.toString))
-            .toMetadata()
-          dataPrep
-            .filter(r => labelSet.contains(r.getDouble(0)))
-            .withColumn(labelColName, labelCol.as("_", metadata))
-        }
+      // trim dataframe
+      dataPrep
+        .filter(r => labelSet.contains(r.getDouble(0)))
+        .withColumn(labelColName, newLabelCol)
     }
-      .get
   }
 
   /**
