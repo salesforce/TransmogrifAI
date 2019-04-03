@@ -42,10 +42,11 @@ import org.scalatest.junit.JUnitRunner
 class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummaryAsserts {
   import spark.implicits._
 
-  val labels = RandomIntegral.integrals(0, 1000).withProbabilityOfEmpty(0).limit(100000)
+  private val numIntLabels = 1000
+  val labels = RandomIntegral.integrals(0, numIntLabels).withProbabilityOfEmpty(0).limit(100000)
   val labelsBiased = {
     RandomIntegral.integrals(0, 3).withProbabilityOfEmpty(0).limit(80000) ++
-      RandomIntegral.integrals(3, 1000).withProbabilityOfEmpty(0).limit(20000)
+      RandomIntegral.integrals(3, numIntLabels).withProbabilityOfEmpty(0).limit(20000)
   }
   val vectors = RandomVector.sparse(RandomReal.poisson(2), 10).limit(100000)
 
@@ -62,7 +63,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
     split1.count() shouldBe dataSize
     assertDataCutterSummary(s1) { s =>
-      s.labelsKept.length shouldBe 1000
+      s.labelsKept.length shouldBe numIntLabels
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(dc1.getLabelsToKeep, dc1.getLabelsToDrop)
     }
@@ -73,7 +74,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
 
     split2.count() shouldBe dataSize
     assertDataCutterSummary(s2) { s =>
-      s.labelsKept.length shouldBe 1000
+      s.labelsKept.length shouldBe numIntLabels
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(dc2.getLabelsToKeep, dc2.getLabelsToDrop)
     }
@@ -98,7 +99,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     findDistinct(split1).count() shouldBe 100
     assertDataCutterSummary(s1) { s =>
       s.labelsKept.length shouldBe 100
-      s.labelsDropped.length shouldBe 900
+      s.labelsDropped.length shouldBe 100
       s shouldBe DataCutterSummary(dc1.getLabelsToKeep, dc1.getLabelsToDrop)
     }
 
@@ -109,7 +110,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     findDistinct(split2).collect().toSet shouldEqual Set(0.0, 1.0, 2.0)
     assertDataCutterSummary(s2) { s =>
       s.labelsKept.length shouldBe 3
-      s.labelsDropped.length shouldBe 997
+      s.labelsDropped.length shouldBe 100
       s shouldBe DataCutterSummary(dc2.getLabelsToKeep, dc2.getLabelsToDrop)
     }
   }
@@ -124,7 +125,6 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     distTrain.count() < distinct shouldBe true
     distTrain.count() > 0 shouldBe true
     assertDataCutterSummary(s1) { s =>
-      s.labelsKept.length + s.labelsDropped.length shouldBe distinct
       s shouldBe DataCutterSummary(dc1.getLabelsToKeep, dc1.getLabelsToDrop)
     }
 
@@ -134,7 +134,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     findDistinct(split2).count() shouldBe 3
     assertDataCutterSummary(s2) { s =>
       s.labelsKept.length shouldBe 3
-      s.labelsDropped.length shouldBe 997
+      s.labelsDropped.length shouldBe 100
       s shouldBe DataCutterSummary(dc2.getLabelsToKeep, dc2.getLabelsToDrop)
     }
   }
