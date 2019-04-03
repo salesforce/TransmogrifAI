@@ -49,6 +49,11 @@ import scala.collection.mutable.PriorityQueue
  * Creates record level insights for model predictions. Takes the model to explain as a constructor argument.
  * The input feature is the feature vector fed into the model.
  *
+ * The map's contents are different regarding the value of the topKStrategy param (only for Binary Classification
+ * and Regression) :
+ * - If PositiveNegative, returns at most 2 * topK elements : the topK most positive and the topK most negative
+ * derived features based on the LOCO insight.
+ * - If Abs, returns at most topK elements : the topK derived features having highest absolute value of LOCO score.
  * @param model model instance that you wish to explain
  * @param uid   uid for instance
  */
@@ -71,7 +76,8 @@ class RecordInsightsLOCO[T <: Model[T]]
   setDefault(topK -> 20)
 
   final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
-    doc = "Whether returning topK based on absolute value or topKpositive and negatives"
+    doc = "Whether returning topK based on absolute value or topK positives and negatives. Only for Binary " +
+      "Classification and Regression."
   )
 
   def setTopKStrategy(strat: TopKStrategy): this.type = set(topKStrategy, strat.entryName)
@@ -89,11 +95,14 @@ class RecordInsightsLOCO[T <: Model[T]]
 
   private lazy val vectorDummy = Array.fill(featureInfo.length)(0.0).toOPVector
 
-  private lazy val problemType = modelApply(labelDummy, vectorDummy).score.length match {
+  private[insights] lazy val problemType = modelApply(labelDummy, vectorDummy).score.length match {
     case 0 => ProblemType.Unknown
     case 1 => ProblemType.Regression
     case 2 => ProblemType.BinaryClassification
-    case n if (n > 2) => ProblemType.MultiClassification
+    case n if (n > 2) => {
+      log.info("MultiClassification Problem : Top K LOCOs by absolute value")
+      ProblemType.MultiClassification
+    }
   }
 
   private def computeDiffs(i: Int, oldInd: Int, featureArray: Array[(Int, Double)], featureSize: Int,
@@ -116,7 +125,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     val k = $(topK)
     var i = 0
     val top = $(topKStrategy) match {
-      case s if s == TopKStrategy.Abs.entryName => {
+      case s if s == TopKStrategy.Abs.entryName || problemType == ProblemType.MultiClassification => {
         val absoluteMaxHeap = PriorityQueue.empty(AbsScore)
         var count = 0
         while (i < filledSize) {
