@@ -104,33 +104,6 @@ class RecordInsightsLOCO[T <: Model[T]]
     diffs
   }
 
-  private def returnTopAbs(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
-    baseScore: Array[Double], k: Int): Seq[(Int, Double, Array[Double])] = {
-    var i = 0
-    val absoluteMaxHeap = PriorityQueue.empty(AbsScore)
-    var count = 0
-    while (i < filledSize) {
-      val (oldInd, oldVal) = featureArray(i)
-      featureArray.update(i, (oldInd, 0))
-      val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
-      val diffs = baseScore.zip(score).map { case (b, s) => b - s }
-      val max = diffs.maxBy(math.abs)
-      if (max != 0) { // Not keeping LOCOs with value 0.0
-        absoluteMaxHeap.enqueue((i, max, diffs))
-        count += 1
-        if (count > k) absoluteMaxHeap.dequeue()
-      }
-      featureArray.update(i, (oldInd, oldVal))
-      i += 1
-    }
-
-    val topAbs = absoluteMaxHeap.dequeueAll
-
-
-    topAbs.sortBy { case (_, v, _) => -math.abs(v) }
-
-  }
-
   private def returnTopPosNeg(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double], k: Int, indexToExamine: Int): Seq[(Int, Double, Array[Double])] = {
     // Heap that will contain the top K positive LOCO values
@@ -166,7 +139,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
     val topPositive = positiveMaxHeap.dequeueAll
     val topNegative = negativeMaxHeap.dequeueAll
-    (topPositive ++ topNegative).sortBy { case (_, v, _) => -v }
+    (topPositive ++ topNegative)
   }
 
   override def transformFn: OPVector => TextMap = (features) => {
@@ -180,31 +153,23 @@ class RecordInsightsLOCO[T <: Model[T]]
     val featureSize = featuresSparse.size
 
     val k = $(topK)
-    val top = getTopKStrategy match {
-      case s if s == TopKStrategy.Abs => returnTopAbs(filledSize, featureArray, featureSize, baseScore, k)
-      case s if s == TopKStrategy.PositiveNegative => {
-        val indexToExamine = baseScore.length match {
-          case 0 => throw new RuntimeException("model does not produce scores for insights")
-          case 1 => 0
-          case 2 => 1
-          case n if (n > 2) => baseResult.prediction.toInt
-        }
-        returnTopPosNeg(filledSize, featureArray, featureSize, baseScore,
-          k, indexToExamine)
-      }
+    val indexToExamine = baseScore.length match {
+      case 0 => throw new RuntimeException("model does not produce scores for insights")
+      case 1 => 0
+      case 2 => 1
+      case n if (n > 2) => baseResult.prediction.toInt
     }
-
+    val topPosNeg = returnTopPosNeg(filledSize, featureArray, featureSize, baseScore, k, indexToExamine)
+    val top = getTopKStrategy match {
+      case s if s == TopKStrategy.Abs => topPosNeg.sortBy { case (_, v, _) => -math.abs(v) }.take(k)
+      case s if s == TopKStrategy.PositiveNegative => topPosNeg.sortBy { case (_, v, _) => -v }
+    }
 
     top.map { case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
       .toMap.toTextMap
   }
 }
 
-
-private[insights] object AbsScore extends Ordering[(Int, Double, Array[Double])] {
-  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
-    math.abs(y._2) compare math.abs(x._2)
-}
 
 /**
  * Ordering of the heap that removes lowest score
