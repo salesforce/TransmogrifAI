@@ -36,7 +36,6 @@ import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRan
 import com.salesforce.op.stages.impl.insights.TopKStrategy.PositiveNegative
 import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
 import com.salesforce.op.stages.impl.regression.OpLinearRegression
-import com.salesforce.op.stages.impl.selector.ProblemType
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomText, RandomVector}
@@ -100,7 +99,6 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     // val model = sparkModel.getSparkMlStage().get
     val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
-    insightsTransformer.problemType shouldBe ProblemType.BinaryClassification
 
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -117,10 +115,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
 
     val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
-      .setTopKStrategy(PositiveNegative)
 
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
-    insightsTransformer.problemType shouldBe ProblemType.MultiClassification
     insights.foreach(_.value.size shouldBe 2)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
     parsed.map( _.count{ case (_, v) => v.exists(_._1 == 5) } shouldBe 0 ) // no 6th column of insights
@@ -144,7 +140,6 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
-    insightsTransformer.problemType shouldBe ProblemType.Regression
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
     parsed.foreach(_.values.foreach(i => i.foreach(v => v._1 shouldBe 0))) // has only one pred column

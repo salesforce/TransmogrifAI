@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.impl.selector.{ProblemType, SelectedModel}
+import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
@@ -52,7 +52,8 @@ import scala.collection.mutable.PriorityQueue
  * The map's contents are different regarding the value of the topKStrategy param (only for Binary Classification
  * and Regression) :
  * - If PositiveNegative, returns at most 2 * topK elements : the topK most positive and the topK most negative
- * derived features based on the LOCO insight.
+ * derived features based on the LOCO insight.For MultiClassification, the value is from the predicted class
+ * (i.e. the class having the highest probability)
  * - If Abs, returns at most topK elements : the topK derived features having highest absolute value of LOCO score.
  * @param model model instance that you wish to explain
  * @param uid   uid for instance
@@ -76,8 +77,8 @@ class RecordInsightsLOCO[T <: Model[T]]
   setDefault(topK -> 20)
 
   final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
-    doc = "Whether returning topK based on absolute value or topK positives and negatives. Only for Binary " +
-      "Classification and Regression."
+    doc = "Whether returning topK based on absolute value or topK positives and negatives. For MultiClassification," +
+      " the value is from the predicted class (i.e. the class having the highest probability)"
   )
 
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
@@ -94,18 +95,6 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val labelDummy = RealNN(0.0)
 
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))
-
-  private lazy val vectorDummy = Array.fill(featureInfo.length)(0.0).toOPVector
-
-  private[insights] lazy val problemType = modelApply(labelDummy, vectorDummy).score.length match {
-    case 0 => ProblemType.Unknown
-    case 1 => ProblemType.Regression
-    case 2 => ProblemType.BinaryClassification
-    case n if (n > 2) => {
-      log.info("MultiClassification Problem : Top K LOCOs by absolute value")
-      ProblemType.MultiClassification
-    }
-  }
 
   private def computeDiffs(i: Int, oldInd: Int, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double]): Array[Double] = {
@@ -143,7 +132,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   private def returnTopPosNeg(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
-    baseScore: Array[Double], k: Int): Seq[(Int, Double, Array[Double])] = {
+    baseScore: Array[Double], k: Int, indexToExamine: Int): Seq[(Int, Double, Array[Double])] = {
     // Heap that will contain the top K positive LOCO values
     val positiveMaxHeap = PriorityQueue.empty(MinScore)
     // Heap that will contain the top K negative LOCO values
@@ -157,7 +146,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
       val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
-      val max = if (problemType == ProblemType.Regression) diffs(0) else diffs(1)
+      val max = diffs(indexToExamine)
 
       if (max > 0.0) { // if positive LOCO then add it to positive heap
         positiveMaxHeap.enqueue((i, max, diffs))
@@ -181,8 +170,9 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   override def transformFn: OPVector => TextMap = (features) => {
-    val baseScore = modelApply(labelDummy, features).score
-
+    val baseResult = modelApply(labelDummy, features)
+    val baseScore = baseResult.score
+      modelApply(labelDummy, features).prediction
     // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
     val featureArray = featuresSparse.indices.zip(featuresSparse.values)
@@ -191,10 +181,17 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     val k = $(topK)
     val top = getTopKStrategy match {
-      case s if s == TopKStrategy.Abs || problemType == ProblemType.MultiClassification =>  returnTopAbs(filledSize,
-        featureArray, featureSize, baseScore, k)
-      case s if s == TopKStrategy.PositiveNegative => returnTopPosNeg(filledSize, featureArray, featureSize, baseScore,
-        k)
+      case s if s == TopKStrategy.Abs => returnTopAbs(filledSize, featureArray, featureSize, baseScore, k)
+      case s if s == TopKStrategy.PositiveNegative => {
+        val indexToExamine = baseScore.length match {
+          case 0 => throw new RuntimeException("model does not produce scores for insights")
+          case 1 => 0
+          case 2 => 1
+          case n if (n > 2) => baseResult.prediction.toInt
+        }
+        returnTopPosNeg(filledSize, featureArray, featureSize, baseScore,
+          k, indexToExamine)
+      }
     }
 
 
