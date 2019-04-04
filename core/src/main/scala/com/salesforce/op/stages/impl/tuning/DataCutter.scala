@@ -89,8 +89,8 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     import data.sparkSession.implicits._
 
-    val labels = data.map(r => r.getDouble(0) -> 1L)
-    val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
+    val labels = data.map(r => r.getDouble(0))
+    val labelCounts = labels.groupBy(labels.columns(0)).count().persist()
     val res = estimate(labelCounts)
     labelCounts.unpersist()
     setLabels(res.labelsKept.toSet, res.labelsDropped.toSet, res.labelsDroppedTotal)
@@ -143,18 +143,23 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       log.info(s"Dropping rows with columns not in $labelSet")
       val labelColName = dataPrep.columns(0)
 
-      val na = NominalAttribute.defaultAttr.withName(labelColName)
-      val metadataNA = if (labelMetaArr.isEmpty) {
-        na.withNumValues(labelSet.size)
+      val newLabelCol = if (labelMetaArr.isEmpty) {
+        dataPrep
+          .col(labelColName)
       } else {
         // trim the metadata
-        na.withValues(labelMetaArr.take(labelSet.size))
+        val metadata = NominalAttribute.defaultAttr
+          .withName(labelColName)
+          .withValues(labelMetaArr.take(labelSet.size))
+          .toMetadata()
+        dataPrep.col(labelColName)
+          .as("_", metadata)
       }
 
       // trim dataframe
       dataPrep
         .filter(r => labelSet.contains(r.getDouble(0)))
-        .withColumn(labelColName, dataPrep.col(labelColName).as("_", metadataNA.toMetadata))
+        .withColumn(labelColName, newLabelCol)
     }
   }
 
@@ -172,17 +177,32 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     val labelCol = labelCounts.columns(0)
     val colCount = labelCounts.columns(1)
-    val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
-    val labelsKeepAndDrop = labelCounts
-      .sort(col(colCount).desc, col(labelCol))
-      .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
-      .limit(maxLabels + numDroppedToRecord)
-      .collect()
-      .map(_.getDouble(0))
 
-    val labelsKept = labelsKeepAndDrop.take(maxLabels)
-    val labelsDropped = labelsKeepAndDrop.slice(maxLabels + 1, labelsKeepAndDrop.size)
-    val labelsDroppedTotal = totalValues - labelsKept.size
+    // select the labels to retain and the most frequent labels being dropped
+    //
+    val numLabels = labelCounts.count()
+    val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
+
+    val labelsSortedByCount = labelCounts
+      .sort(col(colCount).desc, col(labelCol))
+
+    val filterFraction: Row => Boolean = (r: Row) => (r.getLong(1) / totalValues) >= minLabelFract
+
+    val labelsKeptDF = labelsSortedByCount
+      .filter(filterFraction)
+      .limit(maxLabels)
+      .persist()
+
+    val labelsKept = labelsKeptDF.collect().map(_.getDouble(0))
+
+    val labelsDroppedDF = labelsSortedByCount
+      .except(labelsKeptDF)
+      .limit(numDroppedToRecord)
+
+    labelsKeptDF.unpersist()
+
+    val labelsDropped = labelsDroppedDF.collect().map(_.getDouble(0))
+    val labelsDroppedTotal = numLabels - labelsKept.size
 
     if (labelsKept.nonEmpty) {
       log.info(s"DataCutter is keeping labels: ${labelsKept.mkString}" +
