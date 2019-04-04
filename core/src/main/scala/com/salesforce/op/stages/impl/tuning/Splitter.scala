@@ -146,7 +146,8 @@ private[op] object SplitterSummary {
       )
       case s if s == classOf[DataCutterSummary].getName => DataCutterSummary(
         labelsKept = metadata.getDoubleArray(ModelSelectorNames.LabelsKept),
-        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped)
+        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped),
+        labelsDroppedTotal = metadata.getLong(ModelSelectorNames.LabelsDroppedTotal)
       )
       case s =>
         throw new RuntimeException(s"Unknown splitter summary class '$s'")
