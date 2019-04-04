@@ -80,7 +80,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       "Classification and Regression."
   )
 
-  def setTopKStrategy(strat: TopKStrategy): this.type = set(topKStrategy, strat.entryName)
+  def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
 
   setDefault(topKStrategy, TopKStrategy.Abs.entryName)
 
