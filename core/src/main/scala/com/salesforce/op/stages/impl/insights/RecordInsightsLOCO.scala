@@ -82,6 +82,8 @@ class RecordInsightsLOCO[T <: Model[T]]
 
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
 
+  def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
+
   setDefault(topKStrategy, TopKStrategy.Abs.entryName)
 
   private val modelApply = model match {
@@ -113,6 +115,69 @@ class RecordInsightsLOCO[T <: Model[T]]
     diffs
   }
 
+  private def returnTopAbs(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
+    baseScore: Array[Double], k: Int): Seq[(Int, Double, Array[Double])] = {
+    var i = 0
+    val absoluteMaxHeap = PriorityQueue.empty(AbsScore)
+    var count = 0
+    while (i < filledSize) {
+      val (oldInd, oldVal) = featureArray(i)
+      featureArray.update(i, (oldInd, 0))
+      val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
+      val diffs = baseScore.zip(score).map { case (b, s) => b - s }
+      val max = diffs.maxBy(math.abs)
+      if (max != 0) { // Not keeping LOCOs with value 0.0
+        absoluteMaxHeap.enqueue((i, max, diffs))
+        count += 1
+        if (count > k) absoluteMaxHeap.dequeue()
+      }
+      featureArray.update(i, (oldInd, oldVal))
+      i += 1
+    }
+
+    val topAbs = absoluteMaxHeap.dequeueAll
+
+
+    topAbs.sortBy { case (_, v, _) => -math.abs(v) }
+
+  }
+
+  private def returnTopPosNeg(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
+    baseScore: Array[Double], k: Int): Seq[(Int, Double, Array[Double])] = {
+    // Heap that will contain the top K positive LOCO values
+    val positiveMaxHeap = PriorityQueue.empty(MinScore)
+    // Heap that will contain the top K negative LOCO values
+    val negativeMaxHeap = PriorityQueue.empty(MaxScore)
+    // for each element of the feature vector != 0.0
+    // Size of positive heap
+    var positiveCount = 0
+    // Size of negative heap
+    var negativeCount = 0
+    for {i <- 0 until filledSize} {
+      val (oldInd, oldVal) = featureArray(i)
+      val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
+      val max = if (problemType == ProblemType.Regression) diffs(0) else diffs(1)
+
+      if (max > 0.0) { // if positive LOCO then add it to positive heap
+        positiveMaxHeap.enqueue((i, max, diffs))
+        positiveCount += 1
+        if (positiveCount > k) { // remove the lowest element if the heap size goes from 5 to 6
+          positiveMaxHeap.dequeue()
+        }
+      } else if (max < 0.0) { // if negative LOCO then add it to negative heap
+        negativeMaxHeap.enqueue((i, max, diffs))
+        negativeCount += 1
+        if (negativeCount > k) { // remove the highest element if the heap size goes from 5 to 6
+          negativeMaxHeap.dequeue()
+        } // Not keeping LOCOs with value 0
+      }
+      featureArray.update(i, (oldInd, oldVal))
+    }
+    val topPositive = positiveMaxHeap.dequeueAll
+    val topNegative = negativeMaxHeap.dequeueAll
+    (topPositive ++ topNegative).sortBy { case (_, v, _) => -v }
+  }
+
   override def transformFn: OPVector => TextMap = (features) => {
     val baseScore = modelApply(labelDummy, features).score
 
@@ -123,66 +188,11 @@ class RecordInsightsLOCO[T <: Model[T]]
     val featureSize = featuresSparse.size
 
     val k = $(topK)
-    var i = 0
-    val top = $(topKStrategy) match {
-      case s if s == TopKStrategy.Abs.entryName || problemType == ProblemType.MultiClassification => {
-        val absoluteMaxHeap = PriorityQueue.empty(AbsScore)
-        var count = 0
-        while (i < filledSize) {
-          val (oldInd, oldVal) = featureArray(i)
-          featureArray.update(i, (oldInd, 0))
-          val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
-          val diffs = baseScore.zip(score).map { case (b, s) => b - s }
-          val max = diffs.maxBy(math.abs)
-          if (max != 0) { // Not keeping LOCOs with value 0.0
-            absoluteMaxHeap.enqueue((i, max, diffs))
-            count += 1
-            if (count > k) absoluteMaxHeap.dequeue()
-          }
-          featureArray.update(i, (oldInd, oldVal))
-          i += 1
-        }
-
-        val topAbs = absoluteMaxHeap.dequeueAll
-
-
-        topAbs.sortBy { case (_, v, _) => -math.abs(v) }
-
-      }
-      case s if s == TopKStrategy.PositiveNegative.entryName => {
-        // Heap that will contain the top K positive LOCO values
-        val positiveMaxHeap = PriorityQueue.empty(MinScore)
-        // Heap that will contain the top K negative LOCO values
-        val negativeMaxHeap = PriorityQueue.empty(MaxScore)
-        // for each element of the feature vector != 0.0
-        // Size of positive heap
-        var positiveCount = 0
-        // Size of negative heap
-        var negativeCount = 0
-        for {i <- 0 until filledSize} {
-          val (oldInd, oldVal) = featureArray(i)
-          val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
-          val max = if (problemType == ProblemType.Regression) diffs(0) else diffs(1)
-
-          if (max > 0.0) { // if positive LOCO then add it to positive heap
-            positiveMaxHeap.enqueue((i, max, diffs))
-            positiveCount += 1
-            if (positiveCount > k) { // remove the lowest element if the heap size goes from 5 to 6
-              positiveMaxHeap.dequeue()
-            }
-          } else if (max < 0.0) { // if negative LOCO then add it to negative heap
-            negativeMaxHeap.enqueue((i, max, diffs))
-            negativeCount += 1
-            if (negativeCount > k) { // remove the highest element if the heap size goes from 5 to 6
-              negativeMaxHeap.dequeue()
-            } // Not keeping LOCOs with value 0
-          }
-          featureArray.update(i, (oldInd, oldVal))
-        }
-        val topPositive = positiveMaxHeap.dequeueAll
-        val topNegative = negativeMaxHeap.dequeueAll
-        (topPositive ++ topNegative).sortBy { case (_, v, _) => -v }
-      }
+    val top = getTopKStrategy match {
+      case s if s == TopKStrategy.Abs || problemType == ProblemType.MultiClassification =>  returnTopAbs(filledSize,
+        featureArray, featureSize, baseScore, k)
+      case s if s == TopKStrategy.PositiveNegative => returnTopPosNeg(filledSize, featureArray, featureSize, baseScore,
+        k)
     }
 
 
