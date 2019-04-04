@@ -118,17 +118,17 @@ class RecordInsightsLOCO[T <: Model[T]]
     var i = 0
     while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
-      val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
-      val max = diffs(indexToExamine)
+      val diffToExamine = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
+      val max = diffToExamine(indexToExamine)
 
       if (max > 0.0) { // if positive LOCO then add it to positive heap
-        positiveMaxHeap.enqueue((i, max, diffs))
+        positiveMaxHeap.enqueue((i, max, diffToExamine))
         positiveCount += 1
         if (positiveCount > k) { // remove the lowest element if the heap size goes from 5 to 6
           positiveMaxHeap.dequeue()
         }
       } else if (max < 0.0) { // if negative LOCO then add it to negative heap
-        negativeMaxHeap.enqueue((i, max, diffs))
+        negativeMaxHeap.enqueue((i, max, diffToExamine))
         negativeCount += 1
         if (negativeCount > k) { // remove the highest element if the heap size goes from 5 to 6
           negativeMaxHeap.dequeue()
