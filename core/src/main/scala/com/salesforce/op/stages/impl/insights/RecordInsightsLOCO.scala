@@ -153,7 +153,8 @@ class RecordInsightsLOCO[T <: Model[T]]
     var positiveCount = 0
     // Size of negative heap
     var negativeCount = 0
-    for {i <- 0 until filledSize} {
+    var i = 0
+    while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
       val diffs = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
       val max = if (problemType == ProblemType.Regression) diffs(0) else diffs(1)
@@ -172,6 +173,7 @@ class RecordInsightsLOCO[T <: Model[T]]
         } // Not keeping LOCOs with value 0
       }
       featureArray.update(i, (oldInd, oldVal))
+      i += 1
     }
     val topPositive = positiveMaxHeap.dequeueAll
     val topNegative = negativeMaxHeap.dequeueAll
