@@ -41,13 +41,6 @@ class AddTransformerTest extends OpTransformerSpec[Real, AddTransformer[Real, Re
     (Real(5.0), Real.empty), (Real(2.0), Real(0.0)))
   val (inputData, f1, f2) = TestFeatureBuilder(sample)
   val transformer: AddTransformer[Real, Real] = new AddTransformer[Real, Real]().setInput(f1, f2)
-  override val expectedResult: Seq[Real] = Seq(Real(3.0), Real(8.0), Real(5.0), Real(5.0), Real(2.0))
+  val expectedResult: Seq[Real] = Seq(Real(3.0), Real(8.0), Real(5.0), Real(5.0), Real(2.0))
 }
-
-
-
-
-
-
-
 

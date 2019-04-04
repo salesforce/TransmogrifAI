@@ -41,6 +41,6 @@ class MultiplyTransformerTest extends OpTransformerSpec[Real, MultiplyTransforme
     (Real(5.0), Real.empty), (Real(2.0), Real(0.0)))
   val (inputData, f1, f2) = TestFeatureBuilder(sample)
   val transformer: MultiplyTransformer[Real, Real] = new MultiplyTransformer[Real, Real]().setInput(f1, f2)
-  override val expectedResult: Seq[Real] = Seq(Real(2.0), Real(16.0), Real.empty, Real.empty, Real(0.0))
+  val expectedResult: Seq[Real] = Seq(Real(2.0), Real(16.0), Real.empty, Real.empty, Real(0.0))
 }
 

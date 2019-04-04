@@ -42,6 +42,6 @@ class DivideTransformerTest extends OpTransformerSpec[Real, DivideTransformer[Re
     (Real(5.0), Real.empty), (Real(2.0), Real(0.0)))
   val (inputData, f1, f2) = TestFeatureBuilder(sample)
   val transformer: DivideTransformer[Real, Real] = new DivideTransformer[Real, Real]().setInput(f1, f2)
-  override val expectedResult: Seq[Real] = Seq(Real(0.5), Real(1.0), Real.empty, Real.empty, Real.empty)
+  val expectedResult: Seq[Real] = Seq(Real(0.5), Real(1.0), Real.empty, Real.empty, Real.empty)
 }
 
