@@ -149,4 +149,5 @@ final class BinarySequenceLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType
   tti2: TypeTag[I2],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends BinarySequenceTransformer[I1, I2, O](operationName = operationName, uid = uid) with LambdaTransformer[O, (I1, Seq[I2]) => O]
+) extends BinarySequenceTransformer[I1, I2, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, Seq[I2]) => O]

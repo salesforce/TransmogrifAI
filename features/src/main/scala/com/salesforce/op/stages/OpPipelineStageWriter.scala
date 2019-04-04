@@ -75,7 +75,8 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    *
    * @return stage metadata json
    */
-  def writeToJson(path: String, writeLambdas: Boolean = false): JObject = jsonSerialize(writeToMap(path, writeLambdas)).asInstanceOf[JObject]
+  def writeToJson(path: String, writeLambdas: Boolean = false): JObject =
+    jsonSerialize(writeToMap(path, writeLambdas)).asInstanceOf[JObject]
 
   /**
    * Stage metadata map
@@ -146,7 +147,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
 
       }
-      //I didn't want to nest third match here...
+      // I didn't want to nest third match here...
       case _ => mutable.Map()
     }
 

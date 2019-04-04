@@ -64,7 +64,11 @@ object ReflectionUtils {
    * @param classLoader class loader to use
    * @return Try of class instance
    */
-  def newLambdaInstance(className: String, args: Array[AnyRef] = Array(), classLoader: ClassLoader = defaultClassLoader): Try[Any] = {
+  def newLambdaInstance(
+    className: String,
+    args: Array[AnyRef] = Array(),
+    classLoader: ClassLoader = defaultClassLoader
+  ): Try[Any] = {
     Try {
       val clazz = classLoader.loadClass(className)
       val constructor = clazz.getConstructors.head
@@ -255,11 +259,13 @@ object ReflectionUtils {
   }
 
 
-  def tmp[T]() = {
-
-
-  }
-
+  /**
+   * Returns a Type Tag by string name
+   *
+   * @param rtm runtime mirror
+   * @param n   class name
+   * @return TypeTag[_]
+   */
   def typeTagForName(rtm: Mirror = runtimeMirror(), n: String): TypeTag[_] = {
     val clazz = classForName(n)
     typeTagForType(rtm, rtm.classSymbol(clazz).toType)

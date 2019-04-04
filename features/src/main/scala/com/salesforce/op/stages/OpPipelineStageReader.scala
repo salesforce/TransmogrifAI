@@ -31,7 +31,8 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared.{FieldNames, _}
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
 import com.salesforce.op.stages.base.sequence.{BinarySequenceLambdaTransformer, SequenceLambdaTransformer}
@@ -85,6 +86,10 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
   private[this] val ClassTernaryLambdaTransformerName = classOf[TernaryLambdaTransformer[_, _, _, _]].getName
   private[this] val ClassQuaternaryLambdaTransformerName = classOf[QuaternaryLambdaTransformer[_, _, _, _, _]].getName
 
+  @inline private def getFeatureTypeTag(metadataJson: JValue, fieldName: FieldNames) =
+    ReflectionUtils.typeTagForName(n = (metadataJson \ fieldName.entryName).extract[String])
+      .asInstanceOf[TypeTag[FeatureType]]
+
 
   private def loadLambdaTransformer(metadataJson: JValue, className: String): Option[Try[OpPipelineStageBase]] = {
     val lambdaClassNameOpt = (metadataJson \ FieldNames.LambdaClassName.entryName).extractOpt[String]
@@ -94,30 +99,29 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
         ReflectionUtils.newLambdaInstance(name, Array()) map {
           lambdaInst =>
             val uid = (metadataJson \ FieldNames.Uid.entryName).extract[String]
-            val tti = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-            val tto = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeO.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-            val ttov = FeatureType.featureValueTypeTag((metadataJson \ FieldNames.LambdaTypeOV.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType#Value]]
+            val tto = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeO)
+            val tti1 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI1)
+            val ttov = FeatureType.featureValueTypeTag((metadataJson \ FieldNames.LambdaTypeOV.entryName)
+              .extract[String]).asInstanceOf[TypeTag[FeatureType#Value]]
             val opName = (metadataJson \ FieldNames.OperationName.entryName).extract[String]
+
             className match {
               case ClassUnaryLambdaTransformerName => {
-                val tti = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
                 new UnaryLambdaTransformer[FeatureType, FeatureType](uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[FeatureType => FeatureType]
-                )(tti, tto, ttov)
+                )(tti1, tto, ttov)
               }
 
               case ClassSequenceLambdaTransformerName => {
-                val tti = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
                 new SequenceLambdaTransformer[FeatureType, FeatureType](uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[Seq[FeatureType] => FeatureType]
-                )(tti, tto, ttov)
+                )(tti1, tto, ttov)
               }
 
               case ClassBinaryLambdaTransformerName => {
-                val tti1 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti2 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI2.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
+                val tti2 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI2)
                 new BinaryLambdaTransformer[FeatureType, FeatureType, FeatureType](uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[(FeatureType, FeatureType) => FeatureType]
@@ -125,8 +129,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
               }
 
               case ClassBinarySequenceLambdaTransformerName => {
-                val tti1 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti2 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI2.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
+                val tti2 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI2)
                 new BinarySequenceLambdaTransformer[FeatureType, FeatureType, FeatureType](uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[(FeatureType, Seq[FeatureType]) => FeatureType]
@@ -134,24 +137,26 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
               }
 
               case ClassTernaryLambdaTransformerName => {
-                val tti1 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti2 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI2.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti3 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI3.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
+                val tti2 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI2)
+                val tti3 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI3)
                 new TernaryLambdaTransformer[FeatureType, FeatureType, FeatureType, FeatureType](uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[(FeatureType, FeatureType, FeatureType) => FeatureType]
                 )(tti1, tti2, tti3, tto, ttov)
               }
+              // scalastyle:off
               case ClassQuaternaryLambdaTransformerName => {
-                val tti1 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti2 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI2.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti3 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI3.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                val tti4 = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI4.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]
-                new QuaternaryLambdaTransformer[FeatureType, FeatureType, FeatureType, FeatureType, FeatureType](uid = uid,
+                val tti2 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI2)
+                val tti3 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI3)
+                val tti4 = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeI4)
+                new QuaternaryLambdaTransformer[FeatureType, FeatureType, FeatureType, FeatureType, FeatureType](
+                  uid = uid,
                   operationName = opName,
                   transformFn = lambdaInst.asInstanceOf[(FeatureType, FeatureType, FeatureType, FeatureType) => FeatureType]
                 )(tti1, tti2, tti3, tti4, tto, ttov)
               }
+              // scalastyle:on
+
               case _ => throw new IllegalArgumentException(s"Don't know how to instantinate ${name}")
             }
         }
@@ -182,6 +187,8 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
       case Some(Success(s)) => s
       case Some(Failure(e)) => throw e
       case _ if isModel => loadModel(className, metadataJson)
+      case _: LambdaTransformer[_, _] if loadLambdas =>
+        throw new RuntimeException("Loaded transformer stage from workflow instead of from JSON!")
       case _ => originalStage
     }
 
@@ -214,8 +221,6 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     val ctorArgsJson = (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj
     val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
     // Get the model class
-    println("LOAD MODEL")
-    println(ctorArgsJson, modelClassName)
 
     // Make the ctor function used for creating a model instance
     def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = Try {

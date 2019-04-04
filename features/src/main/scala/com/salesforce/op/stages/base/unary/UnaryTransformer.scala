@@ -132,7 +132,7 @@ final class UnaryLambdaTransformer[I <: FeatureType, O <: FeatureType]
   operationName: String,
   val transformFn: I => O,
   uid: String = UID[UnaryLambdaTransformer[I, O]],
-  val lambdaCtorArgs:Array[_] = Array()
+  val lambdaCtorArgs: Array[_] = Array()
 )(
   implicit tti: TypeTag[I],
   tto: TypeTag[O],

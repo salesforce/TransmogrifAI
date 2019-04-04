@@ -140,10 +140,11 @@ final class BinaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: F
   operationName: String,
   val transformFn: (I1, I2) => O,
   uid: String = UID[BinaryLambdaTransformer[I1, I2, O]],
-  override val lambdaCtorArgs: Array[_] = Array()
+  val lambdaCtorArgs: Array[_] = Array()
 )(
   implicit tti1: TypeTag[I1],
   tti2: TypeTag[I2],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends BinaryTransformer[I1, I2, O](operationName = operationName, uid = uid) with LambdaTransformer[O, (I1, I2) => O]
+) extends BinaryTransformer[I1, I2, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, I2) => O]

@@ -153,4 +153,5 @@ final class TernaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <:
   tti3: TypeTag[I3],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends TernaryTransformer[I1, I2, I3, O](operationName = operationName, uid = uid) with LambdaTransformer[O, (I1, I2, I3) => O]
+) extends TernaryTransformer[I1, I2, I3, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, I2, I3) => O]
