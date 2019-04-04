@@ -63,6 +63,7 @@ trait SplitterSummaryAsserts {
       meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
       meta.getDoubleArray(ModelSelectorNames.LabelsKept).foreach(_ should be >= 0.0)
       meta.getDoubleArray(ModelSelectorNames.LabelsDropped).foreach(_ should be >= 0.0)
+      meta.getLong(ModelSelectorNames.LabelsDroppedTotal) should be >= 0L
       assert(s)
     case x =>
       fail(s"Unexpected data cutter summary: $x")
