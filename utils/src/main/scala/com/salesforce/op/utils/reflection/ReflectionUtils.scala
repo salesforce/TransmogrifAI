@@ -33,7 +33,7 @@ package com.salesforce.op.utils.reflection
 import scala.reflect._
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => runtimeUniverse}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -54,6 +54,22 @@ object ReflectionUtils {
    */
   def runtimeMirror(classLoader: ClassLoader = defaultClassLoader): Mirror = {
     runtimeUniverse.runtimeMirror(classLoader)
+  }
+
+  /**
+   * Create a new instance of class by its String name and Constructor args
+   *
+   * @param className   name of the class
+   * @param args        array of arguments
+   * @param classLoader class loader to use
+   * @return Try of class instance
+   */
+  def newLambdaInstance(className: String, args: Array[AnyRef] = Array(), classLoader: ClassLoader = defaultClassLoader): Try[Any] = {
+    Try {
+      val clazz = classLoader.loadClass(className)
+      val constructor = clazz.getConstructors.head
+      constructor.newInstance(args: _*)
+    }
   }
 
   /**
@@ -130,12 +146,14 @@ object ReflectionUtils {
       if (getterOpt.isDefined) getterOpt.get.apply()
       else instanceMirror.reflectField(vals(paramName)).get
     }
+
     bestCtor(klazz, classType, classMirror, ctorArgs)
   }
 
 
   /**
    * Find setter methods for the provided method name
+   *
    * @param instance    class to find method for
    * @param setterName  name of method to find
    * @param args        argument values
@@ -156,6 +174,7 @@ object ReflectionUtils {
 
   /**
    * Find setter methods for the provided method name
+   *
    * @param instance    class to find method for
    * @param methodName  name of method to find
    * @param argsCount   optional number of arguments to match
@@ -236,8 +255,7 @@ object ReflectionUtils {
   }
 
 
-  def tmp[T]()= {
-
+  def tmp[T]() = {
 
 
   }
@@ -335,7 +353,7 @@ object ReflectionUtils {
    * the param value by name. If a param extraction has failed a RuntimeException will be
    * thrown
    *
-   * @param klazz instance class
+   * @param klazz       instance class
    * @param paramLists  param list to try and get values for
    * @param paramGetter lambda function to extract the param value by name.
    * @return List of tuples with the param name and it's value

@@ -34,7 +34,6 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import OpPipelineStageReadWriteShared._
-import com.salesforce.op.ClassInstantinator
 import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
@@ -116,7 +115,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
       case t: LambdaTransformer[_, _] => {
 
         val n = t.transformFn.getClass.getName
-        ClassInstantinator.instantinateRaw(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
+        ReflectionUtils.newLambdaInstance(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
           case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n}")
           case _ =>
             // TODO: @mt

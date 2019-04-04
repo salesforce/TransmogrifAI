@@ -59,10 +59,10 @@ trait RichFeature {
      * @param f map A => B
      * @return feature of type B
      */
-    // scalastyle:off
-    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map")(implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
+    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map")
+      (implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
       feature.transformWith(
-        new UnaryLambdaTransformer[A, B](operationName = operationName, transformFn = f, uid = UID.fromLambdaClass(f))
+        new UnaryLambdaTransformer[A, B](operationName = operationName, transformFn = f)
       )
     }
 

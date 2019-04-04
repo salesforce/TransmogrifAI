@@ -30,7 +30,6 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.ClassInstantinator
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
@@ -92,7 +91,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
 
     lambdaClassNameOpt map {
       name =>
-        ClassInstantinator.instantinateRaw(name, Array()) map {
+        ReflectionUtils.newLambdaInstance(name, Array()) map {
           lambdaInst =>
             val uid = (metadataJson \ FieldNames.Uid.entryName).extract[String]
             val tti = ReflectionUtils.typeTagForName(n = (metadataJson \ FieldNames.LambdaTypeI1.entryName).extract[String]).asInstanceOf[TypeTag[FeatureType]]

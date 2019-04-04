@@ -78,29 +78,6 @@ case object UID {
   }
 
   /**
-    * Generate UID from lambda class
-    *
-    * @param f a lambda function
-    * @throws IllegalArgumentException (See code for description)
-    * @return String
-    */
-  def fromLambdaClass(f: AnyRef,
-                      constructorArgs: Array[_] = Array()): String = {
-    val n = f.getClass.getName
-
-
-      println(s"YY:${n} ${constructorArgs.map(_.toString).mkString(",")}")
-
-    ClassInstantinator.instantinateRaw(n, constructorArgs.map(_.asInstanceOf[AnyRef])) match {
-      case Success(_) => n + ":" + constructorArgs.map(_.toString).mkString(":")
-      case Failure(e) =>
-        throw new IllegalArgumentException(
-          s"Unable to instantiate lambda: $n (Make sure it is stored in object and not in class/trait) [${e.getMessage}]"
-        )
-    }
-  }
-
-  /**
    * Resets the UID counter back to specified count.
    * Can be useful when generating workflows programmatically, but the UIDs needs to be the same.
    *
