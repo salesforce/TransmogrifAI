@@ -96,11 +96,12 @@ class RecordInsightsLOCO[T <: Model[T]]
 
   private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))
 
-  private def computeDiffs(i: Int, oldInd: Int, featureArray: Array[(Int, Double)], featureSize: Int,
+  private def computeDiffs(i: Int, oldInd: Int, oldVal: Double, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double]): Array[Double] = {
     featureArray.update(i, (oldInd, 0))
     val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
     val diffs = baseScore.zip(score).map { case (b, s) => b - s }
+    featureArray.update(i, (oldInd, oldVal))
     diffs
   }
 
@@ -118,7 +119,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     var i = 0
     while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
-      val diffToExamine = computeDiffs(i, oldInd, featureArray, featureSize, baseScore)
+      val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val max = diffToExamine(indexToExamine)
 
       if (max > 0.0) { // if positive LOCO then add it to positive heap
@@ -134,7 +135,6 @@ class RecordInsightsLOCO[T <: Model[T]]
           negativeMaxHeap.dequeue()
         } // Not keeping LOCOs with value 0
       }
-      featureArray.update(i, (oldInd, oldVal))
       i += 1
     }
     val topPositive = positiveMaxHeap.dequeueAll
@@ -145,7 +145,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   override def transformFn: OPVector => TextMap = (features) => {
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
-      modelApply(labelDummy, features).prediction
+
     // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
     val featureArray = featuresSparse.indices.zip(featuresSparse.values)
