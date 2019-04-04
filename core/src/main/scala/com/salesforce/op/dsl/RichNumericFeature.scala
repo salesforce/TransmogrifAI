@@ -99,8 +99,6 @@ trait RichNumericFeature {
    */
   implicit class RichNumericFeature[I <: OPNumeric[_] : TypeTag : ClassTag](val f: FeatureLike[I]) {
 
-    //import RichNumericFeatureLambdas._
-
     /**
      * Apply Divide transformer shortcut function
      *

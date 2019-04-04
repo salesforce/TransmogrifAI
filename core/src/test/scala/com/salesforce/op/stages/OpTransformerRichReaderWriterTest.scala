@@ -37,17 +37,11 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpTransformerRichReaderWriterTest extends OpPipelineStageReaderWriterTest with RichNumericFeature{
-  val k = (height *  10.0) + 10
-  val stage:OpPipelineStageBase = k.originStage
+class OpTransformerRichReaderWriterTest extends OpPipelineStageReaderWriterTest with RichNumericFeature {
+
+  val stage: OpPipelineStageBase = (height + 10.0).originStage
 
   override val hasOutputName = false
- /* val stage: OpPipelineStageBase =
-    new UnaryLambdaTransformer[Real, Real](
-      operationName = "test",
-      transformFn = Lambdas.fncUnary,
-      uid = "uid_1234"
-    ).setInput(weight).setMetadata(meta)*/
 
-  val expected = Array(21.2248.toReal)
+  val expected = Array(373.toReal, 10.toReal, 10.toReal, 10.toReal, 196.toReal, 178.toReal)
 }

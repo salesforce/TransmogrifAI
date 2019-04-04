@@ -87,19 +87,18 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
   private[this] val ClassQuaternaryLambdaTransformerName = classOf[QuaternaryLambdaTransformer[_, _, _, _, _]].getName
 
 
-
   @inline private def getFeatureTypeTag(metadataJson: JValue, fieldName: FieldNames) =
     ReflectionUtils.typeTagForName(n = (metadataJson \ fieldName.entryName).extract[String])
       .asInstanceOf[TypeTag[FeatureType]]
 
   private def loadCtorArgs(metadataJson: JValue): Array[AnyRef] = {
-    metadataJson.extract[Array[JValue]].map  {
-          case JInt(x) => x
-          case JDouble(x) => x
-          case JString(x) => x
-          case JBool(x) => x
-          case x => throw new Exception(s"Unknown type:${x}")
-      } map {
+    metadataJson.extract[Array[JValue]].map {
+      case JInt(x) => x
+      case JDouble(x) => x
+      case JString(x) => x
+      case JBool(x) => x
+      case x => throw new Exception(s"Unknown type:${x}")
+    } map {
       _.asInstanceOf[AnyRef]
     }
   }
@@ -205,7 +204,6 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
       case _ => originalStage
     }
 
-    //println(s"LOADING: ${metadataJson} [$originalStage]")
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
 
