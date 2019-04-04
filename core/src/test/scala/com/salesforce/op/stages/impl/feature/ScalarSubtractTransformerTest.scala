@@ -40,5 +40,5 @@ class ScalarSubtractTransformerTest extends OpTransformerSpec[Real, ScalarSubtra
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: ScalarSubtractTransformer[Real, Double] = new ScalarSubtractTransformer[Real, Double](5.0)
     .setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(-4.0), Real(-1.0), Real.empty, Real(-6.0), Real(-3.0))
+  val expectedResult: Seq[Real] = Seq(Real(-4.0), Real(-1.0), Real.empty, Real(-6.0), Real(-3.0))
 }
