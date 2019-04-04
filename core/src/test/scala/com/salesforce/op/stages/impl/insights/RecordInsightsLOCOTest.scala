@@ -158,9 +158,6 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return the most predictive features" in {
-
-
-
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
@@ -171,9 +168,13 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
     val parsed = insights.map(RecordInsightsParser.parseInsights)
     // the highest corr that value that is not zero should be the top feature
-    parsed.foreach { case in => Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true }
-    // the scores should be the same but opposite in sign
-    parsed.foreach { case in => math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true }
+    parsed.foreach { case in =>
+      withClue(s"top features : ${in.map(_._1.columnName)}") {
+        Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true
+        // the scores should be the same but opposite in sign
+        math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true
+      }
+    }
   }
 
   it should "return the most predictive features when using top K Positives + top K negatives strat" in {
@@ -187,7 +188,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val parsed = insights.collect(name, transformer.getOutput())
       .map { case (n, i) => n -> RecordInsightsParser.parseInsights(i) }
     parsed.foreach { case (_, in) =>
-      in.head._1.columnName == "1_1_1_1" || in.last._1.columnName == "3_3_3_3" shouldBe true
+      withClue(s"top features : ${in.map(_._1.columnName)}") {
+        in.head._1.columnName == "1_1_1_1" || in.last._1.columnName == "3_3_3_3" shouldBe true
+      }
     }
   }
 
