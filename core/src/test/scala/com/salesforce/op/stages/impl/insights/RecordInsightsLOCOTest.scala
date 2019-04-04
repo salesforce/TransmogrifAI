@@ -171,7 +171,6 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val testDataMeta = addMetaData(testData, "features", 5)
     val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
 
-
     val transformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector)
 
     val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
@@ -187,11 +186,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
     val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
-
-
     val transformer = new RecordInsightsLOCO(sparkModel).setTopKStrategy(TopKStrategy.PositiveNegative)
       .setInput(featureVector)
-
     val insights = transformer.transform(testDataMeta)
     val parsed = insights.collect(name, transformer.getOutput())
       .map { case (n, i) => n -> RecordInsightsParser.parseInsights(i) }
