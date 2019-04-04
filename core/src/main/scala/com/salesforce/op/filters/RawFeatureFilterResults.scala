@@ -30,8 +30,9 @@
 
 package com.salesforce.op.filters
 
+import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.preparators.CorrelationType
-import org.json4s.Extraction
+import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -55,7 +56,10 @@ case class RawFeatureFilterResults
 
 object RawFeatureFilterResults {
 
-  implicit val jsonFormats: Formats = DefaultFormats
+  implicit val jsonFormats: Formats = DefaultFormats +
+    new SpecialDoubleSerializer +
+    EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
 
   /**
    * RawFeatureFilterResults to json
@@ -92,34 +96,16 @@ case class RawFeatureFilterConfig
 ) {
 
   /**
-   * Marshall RawFeatureFilterConfig to map
+   * Converts case class constructor to a Map; values converted to String
    *
-   * @return Map[String, Map[String, Object]]
+   * @return Map[String, String]
    */
-  def toMap: Map[String, Any] = RawFeatureFilterConfig.toMap(this)
-
-  /**
-   * Summarize RawFeatureFilterConfig in format of stageInfo
-   *
-   * @return Map[String, Map[String, Object]]
-   */
-  def getInfo: Map[String, Map[String, Object]] = RawFeatureFilterConfig.getInfo(this)
-
-}
-
-/**
- * This object is used to output Raw Feature Filter configuration settings alongside stage info in ModelInsights
- */
-object RawFeatureFilterConfig {
-
-  implicit val formats = DefaultFormats
-
-  /**
-   * Marshall RawFeatureFilterConfig to map
-   *
-   * @return Map[String, Map[String, Object]]
-   */
-  def toMap(b: RawFeatureFilterConfig): Map[String, Any] = Extraction.decompose(b).extract[Map[String, Any]]
+  def toStringMap(): Map[String, String] = {
+    (Map[String, String]() /: this.getClass.getDeclaredFields) { (key, value) =>
+      value.setAccessible(true)
+      key + (value.getName -> value.get(this).toString())
+    }
+  }
 
   /**
    * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
@@ -127,10 +113,10 @@ object RawFeatureFilterConfig {
    *
    * @return Map[String, Map[String, Object]]
    */
-  def getInfo(b: RawFeatureFilterConfig): Map[String, Map[String, Object]] = {
+  def toStageInfo(): Map[String, Map[String, Object]] = {
     val stageName = "rawFeatureFilter"
     val uid = "rawFeatureFilter"
-    Map(stageName -> Map("uid" -> uid, "params" -> b.toMap))
+    Map(stageName -> Map("uid" -> uid, "params" -> this.toStringMap()))
   }
 
 }

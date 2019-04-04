@@ -33,7 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.filters.{ExclusionReasons, FeatureDistribution, RawFeatureFilterMetrics, RawFeatureFilterResults}
+import com.salesforce.op.filters._
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
 import com.salesforce.op.stages.impl.preparators._
@@ -484,15 +484,13 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val rawFeatureFilterConfigInfo = rawFeatureFilterResults.rawFeatureFilterConfig.getInfo
-
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
         blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
-      stageInfo = rawFeatureFilterConfigInfo ++ getStageInfo(stages)
+      stageInfo = rawFeatureFilterResults.rawFeatureFilterConfig.toStageInfo() ++ getStageInfo(stages)
     )
   }
 

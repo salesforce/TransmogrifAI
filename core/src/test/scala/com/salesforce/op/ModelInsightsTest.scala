@@ -370,6 +370,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         }
         insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
         insights.stageInfo.keys shouldEqual deser.stageInfo.keys
+
     }
   }
 
@@ -408,19 +409,27 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
         insights.stageInfo.keys shouldEqual deser.stageInfo.keys
 
-        // check that config is correctly serialized and deserialized
+        // check that raw feature filter config is correctly serialized and deserialized
 
-        def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, Any] = {
+        def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
           modelInsights.stageInfo("rawFeatureFilter") match {
-            case configInfo: Map[String, Map[String, Any]] => configInfo.getOrElse("params", Map.empty[String, Any])
-            case _ => Map.empty[String, Any]
+            case configInfo: Map[String, Map[String, String]] =>
+              configInfo.getOrElse("params", Map.empty[String, String])
+            case _ => Map.empty[String, String]
           }
         }
 
         (getRawFeatureFilterConfig(insights), getRawFeatureFilterConfig(deser)) match {
           case (paramsMapI, paramsMapD) =>
             paramsMapI.keys shouldEqual paramsMapD.keys
-            paramsMapI.keys.foreach { `key` => paramsMapI(key) shouldEqual paramsMapD(key) }
+            paramsMapI("minFill") shouldEqual paramsMapD("minFill")
+            paramsMapI("maxFillDifference") shouldEqual paramsMapD("maxFillDifference")
+            paramsMapI("maxFillRatioDiff") shouldEqual paramsMapD("maxFillRatioDiff")
+            paramsMapI("maxJSDivergence") shouldEqual paramsMapD("maxJSDivergence")
+            paramsMapI("maxCorrelation") shouldEqual paramsMapD("maxCorrelation")
+            paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
+            paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
+            paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
           }
     }
   }
