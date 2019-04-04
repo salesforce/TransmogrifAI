@@ -140,8 +140,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.features.isEmpty shouldBe true
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.slice(1,2).toList.head shouldEqual // head will be RFF so accessing 2nd element
+
+    // head will be RFF so accessing 2nd element
+    insights.stageInfo.keys.slice(1, 2).toList.head shouldEqual
       s"${density.originStage.operationName}_${density.originStage.uid}"
+
   }
 
   it should "return only feature insights when no selector, label, or model are found" in {
