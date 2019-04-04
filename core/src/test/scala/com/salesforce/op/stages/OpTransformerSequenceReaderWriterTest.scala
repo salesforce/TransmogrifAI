@@ -32,21 +32,23 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
+import com.salesforce.op.stages.base.sequence.SequenceLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
-
+class OpTransformerSequenceReaderWriterTest extends OpPipelineStageReaderWriterTest {
+  override val expectedFeaturesLength = 1
   override val hasOutputName = false
   val stage: OpPipelineStageBase =
-    new UnaryLambdaTransformer[Real, Real](
+    new SequenceLambdaTransformer[DateList, Real](
       operationName = "test",
-      transformFn = Lambdas.fncUnary,
+      transformFn = Lambdas.fncSequence,
       uid = "uid_1234"
-    ).setInput(weight).setMetadata(meta)
+    ).setInput(boarded).setMetadata(meta)
 
-  val expected = Array(21.2248.toReal, 8.2678.toReal, Real.empty, 9.6252.toReal, 11.8464.toReal, 8.2678.toReal)
+  val expected = Array(2942.toReal, 1471.toReal, 0.toReal, 1471.toReal, 1471.toReal, 1471.toReal)
 }

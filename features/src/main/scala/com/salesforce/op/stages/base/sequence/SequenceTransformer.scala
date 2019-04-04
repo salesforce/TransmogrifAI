@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.sequence
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStageN, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.functions._
@@ -131,9 +132,10 @@ final class SequenceLambdaTransformer[I <: FeatureType, O <: FeatureType]
 (
   operationName: String,
   val transformFn: Seq[I] => O,
-  uid: String = UID[SequenceLambdaTransformer[I, O]]
+  uid: String = UID[SequenceLambdaTransformer[I, O]],
+  val lambdaCtorArgs:Array[_] = Array()
 )(
   implicit tti: TypeTag[I],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends SequenceTransformer[I, O](operationName = operationName, uid = uid)
+) extends SequenceTransformer[I, O](operationName = operationName, uid = uid) with LambdaTransformer[O, Seq[I] => O]

@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.quaternary
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStage4, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.functions._
@@ -155,7 +156,8 @@ I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
 (
   operationName: String,
   val transformFn: (I1, I2, I3, I4) => O,
-  uid: String = UID[QuaternaryLambdaTransformer[I1, I2, I3, I4, O]]
+  uid: String = UID[QuaternaryLambdaTransformer[I1, I2, I3, I4, O]],
+  val lambdaCtorArgs: Array[_] = Array()
 )(
   implicit tti1: TypeTag[I1],
   tti2: TypeTag[I2],
@@ -163,5 +165,5 @@ I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
   tti4: TypeTag[I4],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends QuaternaryTransformer[I1, I2, I3, I4, O](operationName = operationName, uid = uid)
+) extends QuaternaryTransformer[I1, I2, I3, I4, O](operationName = operationName, uid = uid) with LambdaTransformer[O, (I1, I2, I3, I4) => O]
 

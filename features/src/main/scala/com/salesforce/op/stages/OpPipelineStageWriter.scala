@@ -38,7 +38,7 @@ import com.salesforce.op.ClassInstantinator
 import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
-import com.salesforce.op.stages.base.sequence.SequenceLambdaTransformer
+import com.salesforce.op.stages.base.sequence.{BinarySequenceLambdaTransformer, SequenceLambdaTransformer}
 import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
@@ -152,15 +152,32 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     }
 
     stage match {
+      case t: SequenceLambdaTransformer[_, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti.tpe))
+
       case t: UnaryLambdaTransformer[_, _] =>
         m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti.tpe))
-      case t: BinaryLambdaTransformer[_, _, _] => {
+
+      case t: BinaryLambdaTransformer[_, _, _] =>
         m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
         m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
-      }
-      case t: TernaryLambdaTransformer[_, _, _, _] => throw new Exception("Not supported")
-      case t: QuaternaryLambdaTransformer[_, _, _, _, _] => throw new Exception("Not supported")
-      case t: SequenceLambdaTransformer[_, _] => throw new Exception("Not supported")
+
+      case t: BinarySequenceLambdaTransformer[_, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+
+      case t: TernaryLambdaTransformer[_, _, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+        m.update(FieldNames.LambdaTypeI3.entryName, ReflectionUtils.dealisedTypeName(t.tti3.tpe))
+
+      case t: QuaternaryLambdaTransformer[_, _, _, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+        m.update(FieldNames.LambdaTypeI3.entryName, ReflectionUtils.dealisedTypeName(t.tti3.tpe))
+        m.update(FieldNames.LambdaTypeI4.entryName, ReflectionUtils.dealisedTypeName(t.tti4.tpe))
+
+
       case _ => Map()
     }
 

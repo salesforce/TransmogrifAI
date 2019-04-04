@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.sequence
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStage2N, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -49,7 +50,7 @@ import scala.util.Try
  *
  * @tparam I1 input feature of singular type
  * @tparam I2 input feature of sequence type
- * @tparam O output feature type
+ * @tparam O  output feature type
  */
 trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
   extends Transformer with OpPipelineStage2N[I1, I2, O] with OpTransformer {
@@ -85,6 +86,7 @@ trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
   }
 
   private lazy val transformNFn = FeatureSparkTypes.transform2N[I1, I2, O](transformFn)
+
   override def transformKeyValue: KeyValue => Any = {
     val inName1 = in1.name
     val inNames = inN.map(_.name)
@@ -107,7 +109,7 @@ trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
  * @param ttov          type tag for output value
  * @tparam I1 input single feature type
  * @tparam I2 input sequence feature type
- * @tparam O output feature type
+ * @tparam O  output feature type
  */
 abstract class BinarySequenceTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
 (
@@ -134,16 +136,17 @@ abstract class BinarySequenceTransformer[I1 <: FeatureType, I2 <: FeatureType, O
  * @param ttov          type tag for output value
  * @tparam I1 input single feature type
  * @tparam I2 input sequence feature type
- * @tparam O output feature type
+ * @tparam O  output feature type
  */
 final class BinarySequenceLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
 (
   operationName: String,
   val transformFn: (I1, Seq[I2]) => O,
-  uid: String = UID[BinarySequenceLambdaTransformer[I1, I2, O]]
+  uid: String = UID[BinarySequenceLambdaTransformer[I1, I2, O]],
+  val lambdaCtorArgs: Array[_] = Array()
 )(
   implicit tti1: TypeTag[I1],
   tti2: TypeTag[I2],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends BinarySequenceTransformer[I1, I2, O](operationName = operationName, uid = uid)
+) extends BinarySequenceTransformer[I1, I2, O](operationName = operationName, uid = uid) with LambdaTransformer[O, (I1, Seq[I2]) => O]

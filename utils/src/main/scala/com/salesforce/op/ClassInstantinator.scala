@@ -11,12 +11,8 @@ object ClassInstantinator {
 
   def instantinateRaw(className: String, args: Array[AnyRef]): Try[Any] = {
     Try {
-      println(s"XX: $className")
-
       val clazz = getClass.getClassLoader.loadClass(className)
       val constructor = clazz.getConstructors.head
-      println( constructor.getParameterTypes.mkString(","))
-      println( args.mkString(","))
       constructor.newInstance(args: _*)
     }
   }
