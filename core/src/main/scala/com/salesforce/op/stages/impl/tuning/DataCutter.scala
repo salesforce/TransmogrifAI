@@ -30,13 +30,12 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import akka.actor.FSM.Failure
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.attribute.NominalAttribute
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
@@ -92,11 +91,14 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     val labels = data.map(r => r.getDouble(0) -> 1L)
     val labelCounts = labels.groupBy(labels.columns(0)).sum(labels.columns(1)).persist()
-    val (resKeep, resDrop) = estimate(labelCounts)
+    val res = estimate(labelCounts)
     labelCounts.unpersist()
-    setLabels(resKeep, resDrop)
+    setLabels(res.labelsKept.toSet, res.labelsDropped.toSet, res.labelsDroppedTotal)
 
-    summary = Option(DataCutterSummary(labelsKept = getLabelsToKeep, labelsDropped = getLabelsToDrop))
+    summary = Option(DataCutterSummary(
+      labelsKept = getLabelsToKeep,
+      labelsDropped = getLabelsToDrop,
+      labelsDroppedTotal = getLabelsDroppedTotal))
     summary
   }
 
@@ -162,34 +164,35 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param labelCounts
    * @return Set of labels to keep & to drop
    */
-  private[op] def estimate(labelCounts: DataFrame): (Set[Double], Set[Double]) = {
+  private[op] def estimate(labelCounts: DataFrame): DataCutterSummary = {
+    val numDroppedToRecord = 10
+
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
 
     val labelCol = labelCounts.columns(0)
     val colCount = labelCounts.columns(1)
     val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
-    val labelsKeep = labelCounts
+    val labelsKeepAndDrop = labelCounts
       .sort(col(colCount).desc, col(labelCol))
       .filter(r => (r.getLong(1) / totalValues) >= minLabelFract)
-      .take(maxLabels)
+      .limit(maxLabels + numDroppedToRecord)
+      .collect()
       .map(_.getDouble(0))
 
-    val labelSet = labelsKeep.toSet
-    val labelsDropped = labelCounts
-      .filter(r => !labelSet.contains(r.getDouble(0)))
-      .take(100)
-      .map(_.getDouble(0))
+    val labelsKept = labelsKeepAndDrop.take(maxLabels)
+    val labelsDropped = labelsKeepAndDrop.slice(maxLabels + 1, labelsKeepAndDrop.size)
+    val labelsDroppedTotal = totalValues - labelsKept.size
 
-    if (labelSet.nonEmpty) {
-      log.info(s"DataCutter is keeping labels: ${labelsKeep.mkString}" +
+    if (labelsKept.nonEmpty) {
+      log.info(s"DataCutter is keeping labels: ${labelsKept.mkString}" +
         s" and dropping labels: ${labelsDropped.mkString}")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
         s"Label counts were: ${labelCounts.collect().toSeq}")
     }
-    labelSet -> labelsDropped.toSet
+    DataCutterSummary(labelsKept.toSeq, labelsDropped.toSeq, labelsDroppedTotal.toLong)
   }
 
   override def copy(extra: ParamMap): DataCutter = {
@@ -224,18 +227,23 @@ private[impl] trait DataCutterParams extends Params {
   private[op] final val labelsToKeep = new DoubleArrayParam(this, "labelsToKeep",
     "labels to keep when applying the data cutter")
 
-  private[op] def setLabels(keep: Set[Double], drop: Set[Double]): this.type = {
+  private[op] def setLabels(keep: Set[Double], dropTop10: Set[Double], labelsDropped: Long): this.type = {
     set(labelsToKeep, keep.toArray.sorted)
-    set(labelsToDrop, drop.toArray.sorted)
+      .set(labelsToDrop, dropTop10.toArray.sorted)
+      .set(labelsDroppedTotal, labelsDropped)
   }
 
   private[op] def getLabelsToKeep: Array[Double] = $(labelsToKeep)
 
   private[op] final val labelsToDrop = new DoubleArrayParam(this, "labelsDropped",
-    "labels to drop when applying the data cutter")
+    "the top of the labels to drop when applying the data cutter")
 
   private[op] def getLabelsToDrop: Array[Double] = $(labelsToDrop)
 
+  private[op] final val labelsDroppedTotal = new LongParam(this, "labelsDroppedTotal",
+    "the number of labels dropped")
+
+  private[op] def getLabelsDroppedTotal: Long = $(labelsDroppedTotal)
 }
 
 /**
@@ -247,7 +255,8 @@ private[impl] trait DataCutterParams extends Params {
 case class DataCutterSummary
 (
   labelsKept: Seq[Double],
-  labelsDropped: Seq[Double]
+  labelsDropped: Seq[Double],
+  labelsDroppedTotal: Long
 ) extends SplitterSummary {
 
   /**
@@ -262,6 +271,7 @@ case class DataCutterSummary
       .putString(SplitterSummary.ClassName, this.getClass.getName)
       .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept.toArray)
       .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped.toArray)
+      .putLong(ModelSelectorNames.LabelsDroppedTotal, labelsDroppedTotal)
       .build()
   }
 
