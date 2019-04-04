@@ -35,6 +35,11 @@ import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import OpPipelineStageReadWriteShared._
 import com.salesforce.op.ClassInstantinator
+import com.salesforce.op.stages.base.LambdaTransformer
+import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
+import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
+import com.salesforce.op.stages.base.sequence.SequenceLambdaTransformer
+import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
@@ -107,12 +112,14 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
   private def isModel: Boolean = stage.isInstanceOf[Model[_]]
 
   private def getLambdaDetails: Map[String, Any] = {
-    stage match {
-      case t: UnaryLambdaTransformer[_, _] => {
+    val m: mutable.Map[String, Any] = stage match {
+      case t: LambdaTransformer[_, _] => {
+
         val n = t.transformFn.getClass.getName
         ClassInstantinator.instantinateRaw(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
           case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n}")
-          case _ => {
+          case _ =>
+            // TODO: @mt
             val args =
               t.lambdaCtorArgs.map(
                 a =>
@@ -128,21 +135,37 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
                   })
               )
-            Map(
+            mutable.Map[String, Any](
               FieldNames.LambdaClassName.entryName -> n,
-              FieldNames.LambdaTypeI1.entryName -> ReflectionUtils.dealisedTypeName(t.tti.tpe),
               FieldNames.LambdaTypeO.entryName -> ReflectionUtils.dealisedTypeName(t.tto.tpe),
               FieldNames.LambdaTypeOV.entryName -> ReflectionUtils.dealisedTypeName(t.ttov.tpe),
               FieldNames.OperationName.entryName -> t.operationName,
               FieldNames.LambdaClassArgs.entryName -> args,
               FieldNames.Uid.entryName -> t.uid
-            ).asInstanceOf[Map[String, Any]]
-          }
+            )
         }
 
+
       }
+      //I didn't want to nest third match here...
+      case _ => mutable.Map()
+    }
+
+    stage match {
+      case t: UnaryLambdaTransformer[_, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti.tpe))
+      case t: BinaryLambdaTransformer[_, _, _] => {
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+      }
+      case t: TernaryLambdaTransformer[_, _, _, _] => throw new Exception("Not supported")
+      case t: QuaternaryLambdaTransformer[_, _, _, _, _] => throw new Exception("Not supported")
+      case t: SequenceLambdaTransformer[_, _] => throw new Exception("Not supported")
       case _ => Map()
     }
+
+    m.toMap
+
   }
 
   /**

@@ -33,6 +33,8 @@ package com.salesforce.op.stages
 import com.salesforce.op.ClassInstantinator
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.base.LambdaTransformer
+import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
@@ -76,6 +78,8 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     loadFromJsonString(jsonStr = compact(render(json)), path = path)
 
   private[this] val ClassUnaryLambdaTransformerName = classOf[UnaryLambdaTransformer[_, _]].getName
+  private[this] val ClassBinaryLambdaTransformerName = classOf[BinaryLambdaTransformer[_, _,_]].getName
+  private[this] val ClassLambdaTransformerName = classOf[LambdaTransformer[_, _]].getName
 
   /**
    * Loads from the json serialized data
@@ -96,6 +100,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     // UnaryTransformer
 
     val stage = className match {
+      case ClassBinaryLambdaTransformerName => throw new Exception("not supported")
       case ClassUnaryLambdaTransformerName if loadLambdas => {
         val lambdaClassName = (metadataJson \ FieldNames.LambdaClassName.entryName).extract[String]
         val uid = (metadataJson \ FieldNames.Uid.entryName).extract[String]
