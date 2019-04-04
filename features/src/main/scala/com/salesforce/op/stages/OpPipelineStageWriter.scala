@@ -122,19 +122,18 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
             // TODO: @mt
             val args =
               t.lambdaCtorArgs.map(
-                a =>
-                  Array(a.getClass.getName, a match {
-                    case x: Int => x
-                    case x: Double => x
-                    case x: String => x
-                    case x: Boolean => x
-                    case _ =>
-                      throw new IllegalArgumentException(
-                        s"Unsupported type [${a.getClass.getName}] for lambda: ${n}"
-                      )
+                {
+                  case x: Int => x
+                  case x: Double => x
+                  case x: String => x
+                  case x: Boolean => x
+                  case x =>
+                    throw new IllegalArgumentException(
+                      s"Unsupported type [${x.getClass.getName}] for lambda: ${n}"
+                    )
 
-                  })
-              )
+                })
+
             mutable.Map[String, Any](
               FieldNames.LambdaClassName.entryName -> n,
               FieldNames.LambdaTypeO.entryName -> ReflectionUtils.dealisedTypeName(t.tto.tpe),

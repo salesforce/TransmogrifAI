@@ -212,11 +212,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   /**
    * Save this model to a path
    *
-   * @param path      path to save the model
-   * @param overwrite should overwrite if the path exists
+   * @param path         path to save the model
+   * @param overwrite    should overwrite if the path exists
+   * @param writeLambdas set to true to write lambdas to JSON file
    */
-  def save(path: String, overwrite: Boolean = true): Unit =
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  def save(path: String, overwrite: Boolean = true, writeLambdas: Boolean = false): Unit =
+    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite, writeLambdas = writeLambdas)
 
   /**
    * Gets the fitted stage that generates the input feature

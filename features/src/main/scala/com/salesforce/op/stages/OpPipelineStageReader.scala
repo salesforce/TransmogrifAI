@@ -86,17 +86,30 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
   private[this] val ClassTernaryLambdaTransformerName = classOf[TernaryLambdaTransformer[_, _, _, _]].getName
   private[this] val ClassQuaternaryLambdaTransformerName = classOf[QuaternaryLambdaTransformer[_, _, _, _, _]].getName
 
+
+
   @inline private def getFeatureTypeTag(metadataJson: JValue, fieldName: FieldNames) =
     ReflectionUtils.typeTagForName(n = (metadataJson \ fieldName.entryName).extract[String])
       .asInstanceOf[TypeTag[FeatureType]]
 
+  private def loadCtorArgs(metadataJson: JValue): Array[AnyRef] = {
+    metadataJson.extract[Array[JValue]].map  {
+          case JInt(x) => x
+          case JDouble(x) => x
+          case JString(x) => x
+          case JBool(x) => x
+          case x => throw new Exception(s"Unknown type:${x}")
+      } map {
+      _.asInstanceOf[AnyRef]
+    }
+  }
 
   private def loadLambdaTransformer(metadataJson: JValue, className: String): Option[Try[OpPipelineStageBase]] = {
     val lambdaClassNameOpt = (metadataJson \ FieldNames.LambdaClassName.entryName).extractOpt[String]
-
+    val ctorArgs = loadCtorArgs(metadataJson \ FieldNames.LambdaClassArgs.entryName)
     lambdaClassNameOpt map {
       name =>
-        ReflectionUtils.newLambdaInstance(name, Array()) map {
+        ReflectionUtils.newLambdaInstance(name, ctorArgs) map {
           lambdaInst =>
             val uid = (metadataJson \ FieldNames.Uid.entryName).extract[String]
             val tto = getFeatureTypeTag(metadataJson, FieldNames.LambdaTypeO)
@@ -192,7 +205,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
       case _ => originalStage
     }
 
-
+    //println(s"LOADING: ${metadataJson} [$originalStage]")
     // Recover all stage spark params and it's input features
     val inputFeatures = originalStage.getInputFeatures()
 

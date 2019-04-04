@@ -44,6 +44,48 @@ import scala.language.postfixOps
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
+// scalastyle:off
+object RichNumericFeatureLambdas {
+  def divide = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
+    val result = for {
+      x <- i1.toDouble
+      y <- i2.toDouble
+    } yield x / y
+
+    result filter Number.isValid toReal
+  }
+
+  def plus = (i1: OPNumeric[_], i2: OPNumeric[_]) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
+
+  def minus = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
+    val optZ = (i1.toDouble, i2.toDouble) match {
+      case (Some(x), Some(y)) => Some(x - y)
+      case (Some(x), None) => Some(x)
+      case (None, Some(y)) => Some(-y)
+      case (None, None) => None
+    }
+    optZ.toReal
+  }
+
+  def multiply = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
+    val result = for {
+      x <- i1.toDouble
+      y <- i2.toDouble
+    } yield x * y
+
+    result filter Number.isValid toReal
+  }
+
+  def multiplyS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ * nd).filter(Number.isValid).toReal
+
+  def divideS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ / nd).filter(Number.isValid).toReal
+
+  def plusS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ + nd).filter(Number.isValid).toReal
+
+  def minusS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ - nd).filter(Number.isValid).toReal
+}
+
+// scalastyle:on
 /**
  * Enrichment functions for Numeric Feature
  */
@@ -56,6 +98,8 @@ trait RichNumericFeature {
    * @tparam I input type
    */
   implicit class RichNumericFeature[I <: OPNumeric[_] : TypeTag : ClassTag](val f: FeatureLike[I]) {
+
+    //import RichNumericFeatureLambdas._
 
     /**
      * Apply Divide transformer shortcut function
@@ -75,14 +119,7 @@ trait RichNumericFeature {
       f.transformWith[I2, Real](
         stage = new BinaryLambdaTransformer[I, I2, Real](
           operationName = "divide",
-          transformFn = (i1: I, i2: I2) => {
-            val result = for {
-              x <- i1.toDouble
-              y <- i2.toDouble
-            } yield x / y
-
-            result filter Number.isValid toReal
-          }
+          transformFn = RichNumericFeatureLambdas.divide
         ),
         f = that
       )
@@ -106,14 +143,7 @@ trait RichNumericFeature {
       f.transformWith[I2, Real](
         stage = new BinaryLambdaTransformer[I, I2, Real](
           operationName = "multiply",
-          transformFn = (i1: I, i2: I2) => {
-            val result = for {
-              x <- i1.toDouble
-              y <- i2.toDouble
-            } yield x * y
-
-            result filter Number.isValid toReal
-          }
+          transformFn = RichNumericFeatureLambdas.multiply
         ),
         f = that
       )
@@ -137,7 +167,7 @@ trait RichNumericFeature {
       f.transformWith[I2, Real](
         stage = new BinaryLambdaTransformer[I, I2, Real](
           operationName = "plus",
-          transformFn = (i1: I, i2: I2) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
+          transformFn = RichNumericFeatureLambdas.plus
         ),
         f = that
       )
@@ -161,15 +191,7 @@ trait RichNumericFeature {
       f.transformWith[I2, Real](
         stage = new BinaryLambdaTransformer[I, I2, Real](
           operationName = "minus",
-          transformFn = (i1: I, i2: I2) => {
-            val optZ = (i1.toDouble, i2.toDouble) match {
-              case (Some(x), Some(y)) => Some(x - y)
-              case (Some(x), None) => Some(x)
-              case (None, Some(y)) => Some(-y)
-              case (None, None) => None
-            }
-            optZ.toReal
-          }
+          transformFn = RichNumericFeatureLambdas.minus
         ),
         f = that
       )
@@ -184,10 +206,13 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def /[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
+      val nd = n.toDouble(v)
       f.transformWith(
         new UnaryLambdaTransformer[I, Real](
           operationName = "divideS",
-          transformFn = r => r.toDouble.map(_ / n.toDouble(v)).filter(Number.isValid).toReal)
+          transformFn = RichNumericFeatureLambdas.divideS(nd),
+          lambdaCtorArgs = Array(nd)
+        )
       )
     }
 
@@ -200,10 +225,13 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def *[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
+      val nd = n.toDouble(v)
       f.transformWith(
         new UnaryLambdaTransformer[I, Real](
           operationName = "multiplyS",
-          transformFn = r => r.toDouble.map(_ * n.toDouble(v)).filter(Number.isValid).toReal)
+          transformFn = RichNumericFeatureLambdas.multiplyS(nd),
+          lambdaCtorArgs = Array(nd)
+        )
       )
     }
 
@@ -216,10 +244,13 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def +[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
+      val nd = n.toDouble(v)
       f.transformWith(
         new UnaryLambdaTransformer[I, Real](
           operationName = "plusS",
-          transformFn = r => r.toDouble.map(_ + n.toDouble(v)).toReal)
+          transformFn = RichNumericFeatureLambdas.plusS(nd),
+          lambdaCtorArgs = Array(nd)
+        )
       )
     }
 
@@ -232,10 +263,13 @@ trait RichNumericFeature {
      * @return transformed feature
      */
     def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
+      val nd = n.toDouble(v)
       f.transformWith(
         new UnaryLambdaTransformer[I, Real](
           operationName = "minusS",
-          transformFn = r => r.toDouble.map(_ - n.toDouble(v)).toReal)
+          transformFn = RichNumericFeatureLambdas.minusS(nd),
+          lambdaCtorArgs = Array(nd)
+        )
       )
     }
 
@@ -319,8 +353,8 @@ trait RichNumericFeature {
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
      * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
      * @param label        optional label column to be passed into autoBucketizer if present
-     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
-     *                     features if a label argument is passed
+     * @return a vector feature containing the raw Features with filled missing values and the bucketized
+     *         features if a label argument is passed
      */
     def vectorize
     (
@@ -349,6 +383,7 @@ trait RichNumericFeature {
 
     /**
      * Apply ScalerTransformer shortcut.  Applies the scaling function defined by the scalingType and scalingArg params
+     *
      * @param scalingType type of scaling function
      * @param scalingArgs arguments to define the scaling function
      * @tparam O Output feature type
@@ -364,6 +399,7 @@ trait RichNumericFeature {
     /**
      * Apply DescalerTransformer shortcut.  Applies the inverse of the scaling function found in
      * the metadata of the the input feature: scaledFeature
+     *
      * @param scaledFeature the feature containing metadata for constructing the scaling used to make this column
      * @tparam I feature type of the input feature: scaledFeature
      * @tparam O output feature type
@@ -442,37 +478,37 @@ trait RichNumericFeature {
      * Apply [[SanityChecker]] estimator.
      * It checks for potential problems with computed features in a supervized learning setting.
      *
-     * @param featureVector     feature vector
-     * @param checkSample       Rate to downsample the data for statistical calculations (note: actual sampling
-     *                          will not be exact due to Spark's dataset sampling behavior)
-     * @param sampleSeed        Seed to use when sampling
-     * @param sampleLowerLimit  Lower limit on number of samples in downsampled data set (note: sample limit
-     *                          will not be exact, due to Spark's dataset sampling behavior)
-     * @param sampleUpperLimit  Upper limit on number of samples in downsampled data set (note: sample limit
-     *                          will not be exact, due to Spark's dataset sampling behavior)
-     * @param maxCorrelation    Maximum correlation (absolute value) allowed between a feature in the
-     *                          feature vector and the label
-     * @param minCorrelation    Minimum correlation (absolute value) allowed between a feature in the
-     *                          feature vector and the label
-     * @param correlationType   Which coefficient to use for computing correlation
-     * @param minVariance       Minimum amount of variance allowed for each feature and label
-     * @param removeBadFeatures If set to true, this will automatically remove all the bad features
-     *                          from the feature vector
-     * @param removeFeatureGroup      remove all features descended from a parent feature
-     * @param protectTextSharedHash   protect text shared hash from related null indicators and other hashes
-     * @param maxRuleConfidence       Maximum allowed confidence of association rules in categorical variables.
-     *                                A categorical variable will be removed if there is a choice where the maximum
-     *                                confidence is above this threshold, and the support for that choice is above the
-     *                                min rule support parameter, defined below.
-     * @param minRequiredRuleSupport  Categoricals can be removed if an association rule is found between one of the
-     *                                choices and a categorical label where the confidence of that rule is above
-     *                                maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
-     * @param featureLabelCorrOnly    If true, then only calculate correlations between features and label instead of
-     *                                the entire correlation matrix which includes all feature-feature correlations
-     * @param correlationExclusion    Setting for what categories of feature vector columns to exclude from the
-     *                                correlation calculation (eg. hashed text features)
-     * @param categoricalLabel  If true, treat label as categorical. If not set, check number of distinct labels to
-     *                          decide whether a label should be treated categorical.
+     * @param featureVector          feature vector
+     * @param checkSample            Rate to downsample the data for statistical calculations (note: actual sampling
+     *                               will not be exact due to Spark's dataset sampling behavior)
+     * @param sampleSeed             Seed to use when sampling
+     * @param sampleLowerLimit       Lower limit on number of samples in downsampled data set (note: sample limit
+     *                               will not be exact, due to Spark's dataset sampling behavior)
+     * @param sampleUpperLimit       Upper limit on number of samples in downsampled data set (note: sample limit
+     *                               will not be exact, due to Spark's dataset sampling behavior)
+     * @param maxCorrelation         Maximum correlation (absolute value) allowed between a feature in the
+     *                               feature vector and the label
+     * @param minCorrelation         Minimum correlation (absolute value) allowed between a feature in the
+     *                               feature vector and the label
+     * @param correlationType        Which coefficient to use for computing correlation
+     * @param minVariance            Minimum amount of variance allowed for each feature and label
+     * @param removeBadFeatures      If set to true, this will automatically remove all the bad features
+     *                               from the feature vector
+     * @param removeFeatureGroup     remove all features descended from a parent feature
+     * @param protectTextSharedHash  protect text shared hash from related null indicators and other hashes
+     * @param maxRuleConfidence      Maximum allowed confidence of association rules in categorical variables.
+     *                               A categorical variable will be removed if there is a choice where the maximum
+     *                               confidence is above this threshold, and the support for that choice is above the
+     *                               min rule support parameter, defined below.
+     * @param minRequiredRuleSupport Categoricals can be removed if an association rule is found between one of the
+     *                               choices and a categorical label where the confidence of that rule is above
+     *                               maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
+     * @param featureLabelCorrOnly   If true, then only calculate correlations between features and label instead of
+     *                               the entire correlation matrix which includes all feature-feature correlations
+     * @param correlationExclusion   Setting for what categories of feature vector columns to exclude from the
+     *                               correlation calculation (eg. hashed text features)
+     * @param categoricalLabel       If true, treat label as categorical. If not set, check number of distinct labels to
+     *                               decide whether a label should be treated categorical.
      * @return sanity checked feature vector
      */
     // scalastyle:off
@@ -647,8 +683,8 @@ trait RichNumericFeature {
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
      * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
      * @param label        optional label column to be passed into autoBucketizer if present
-     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
-     *                     features if a label argument is passed
+     * @return a vector feature containing the raw Features with filled missing values and the bucketized
+     *         features if a label argument is passed
      */
     def vectorize
     (

@@ -47,9 +47,10 @@ import org.json4s.{DefaultFormats, Formats}
  *
  * @note The features/stages must be sorted in topological order
  *
- * @param model workflow model to save
+ * @param model        workflow model to save
+ * @param writeLambdas set to true in order to write lambdas to json file
  */
-class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
+class OpWorkflowModelWriter(val model: OpWorkflowModel, val writeLambdas: Boolean = false) extends MLWriter {
 
   implicit val jsonFormats: Formats = DefaultFormats
 
@@ -99,7 +100,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    */
   private def stagesJArray(path: String): JArray = {
     val stages: Seq[OpPipelineStageBase] = model.stages
-    val stagesJson: Seq[JObject] = stages.map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
+    val stagesJson: Seq[JObject] = stages.map(
+      _.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path, writeLambdas)
+    )
     JArray(stagesJson.toList)
   }
 
@@ -153,12 +156,13 @@ object OpWorkflowModelWriter {
   /**
    * Save [[OpWorkflowModel]] to path
    *
-   * @param model     workflow model instance
-   * @param path      path to save the model and its stages
-   * @param overwrite should overwrite the destination
+   * @param model        workflow model instance
+   * @param path         path to save the model and its stages
+   * @param overwrite    should overwrite the destination
+   * @param writeLambdas set to true to write lambdas to JSON file
    */
-  def save(model: OpWorkflowModel, path: String, overwrite: Boolean = true): Unit = {
-    val w = new OpWorkflowModelWriter(model)
+  def save(model: OpWorkflowModel, path: String, overwrite: Boolean = true, writeLambdas: Boolean = false): Unit = {
+    val w = new OpWorkflowModelWriter(model, writeLambdas)
     val writer = if (overwrite) w.overwrite() else w
     writer.save(path)
   }
@@ -166,10 +170,11 @@ object OpWorkflowModelWriter {
   /**
    * Serialize [[OpWorkflowModel]] to json
    *
-   * @param model workflow model instance
-   * @param path  path to save the model and its stages
+   * @param model        workflow model instance
+   * @param path         path to save the model and its stages
+   * @param writeLambdas set to true to write lambdas to JSON file
    */
-  def toJson(model: OpWorkflowModel, path: String): String = {
-    new OpWorkflowModelWriter(model).toJsonString(path)
+  def toJson(model: OpWorkflowModel, path: String, writeLambdas: Boolean = false): String = {
+    new OpWorkflowModelWriter(model, writeLambdas).toJsonString(path)
   }
 }
