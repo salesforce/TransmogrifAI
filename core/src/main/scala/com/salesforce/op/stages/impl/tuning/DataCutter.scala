@@ -143,23 +143,19 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       log.info(s"Dropping rows with columns not in $labelSet")
       val labelColName = dataPrep.columns(0)
 
-      val newLabelCol = if (labelMetaArr.isEmpty) {
-        dataPrep
-          .col(labelColName)
+      val na = NominalAttribute.defaultAttr.withName(labelColName)
+      val metadataNA = if (labelMetaArr.isEmpty) {
+        na.withNumValues(labelSet.size)
       } else {
         // trim the metadata
-        val metadata = NominalAttribute.defaultAttr
-          .withName(labelColName)
-          .withValues(labelMetaArr.take(labelSet.size))
-          .toMetadata()
-        dataPrep.col(labelColName)
-          .as("_", metadata)
+        na.withValues(labelMetaArr.take(labelSet.size))
       }
+
 
       // trim dataframe
       dataPrep
         .filter(r => labelSet.contains(r.getDouble(0)))
-        .withColumn(labelColName, newLabelCol)
+        .withColumn(labelColName, dataPrep.col(labelColName).as("_", metadataNA.toMetadata))
     }
   }
 
@@ -178,8 +174,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val labelCol = labelCounts.columns(0)
     val colCount = labelCounts.columns(1)
 
-    // select the labels to retain and the most frequent labels being dropped
-    //
     val numLabels = labelCounts.count()
     val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
 
