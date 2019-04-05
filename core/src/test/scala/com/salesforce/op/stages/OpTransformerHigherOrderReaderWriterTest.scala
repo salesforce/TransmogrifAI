@@ -45,7 +45,11 @@ class OpTransformerHigherOrderReaderWriterTest extends OpPipelineStageReaderWrit
   val v2: Double = 5.5
   val v3: Long = 300L
 
-  val stage: OpPipelineStageBase = (height * 10).originStage
+  val stage: OpPipelineStageBase = height.map(
+    fnc0(v1, v2, v3),
+    lambdaCtorArgs = Array(Int.box(v1), Double.box(v2), Long.box(v3)
+    )
+  ).originStage
 
   override val hasOutputName = false
 
