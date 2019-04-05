@@ -377,8 +377,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val prettySummary = fittedWorkflow.summaryPretty()
     log.info(prettySummary)
+    prettySummary should include regex raw"area under precision-recall\s+|\s+1.0\s+|\s+0.0"
     prettySummary should include("Selected Model - OpLogisticRegression")
-    prettySummary should include("area under precision-recall | 1.0                   | 0.0")
     prettySummary should include("Model Evaluation Metrics")
     prettySummary should include("Top Model Insights")
     prettySummary should include("Top Positive Correlations")
