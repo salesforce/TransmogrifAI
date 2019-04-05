@@ -117,9 +117,8 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
         val n = t.transformFn.getClass.getName
         ReflectionUtils.newLambdaInstance(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
-          case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n}")
+          case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n} (Reason: ${e})")
           case _ =>
-            // TODO: @mt
             val args =
               t.lambdaCtorArgs.map(
                 {

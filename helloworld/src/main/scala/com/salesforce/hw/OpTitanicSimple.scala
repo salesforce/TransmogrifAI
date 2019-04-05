@@ -159,7 +159,6 @@ object OpTitanicSimple {
     val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
 
     println("Metrics:\n" + metrics)
-    model.save("/tmp/m33", writeLambdas = true)
 
     // Stop Spark gracefully
     spark.stop()
