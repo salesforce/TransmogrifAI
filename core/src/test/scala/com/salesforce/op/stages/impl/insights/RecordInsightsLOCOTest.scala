@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.{FeatureHistory, OpWorkflow}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
+import com.salesforce.op.stages.impl.insights.TopKStrategy.PositiveNegative
 import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
 import com.salesforce.op.stages.impl.regression.OpLinearRegression
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
@@ -40,7 +41,6 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomText, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.StructType
@@ -52,6 +52,42 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
+  // scalastyle:off
+  val data = Seq( // name, age, height, height_null, isBlueEyed, gender, testFeatNegCor
+    SanityCheckDataTest("a", 32, 5.0, 0, 0.9, 0.5, 0),
+    SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
+    SanityCheckDataTest("a", 32, 6.0, 0, 0.8, 0.5, 0),
+    SanityCheckDataTest("a", 32, 5.5, 0, 0.85, 0.5, 0),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.2, 0, 0.1),
+    SanityCheckDataTest("a", 32, 5.0, 0, 0.99, 0.5, 0),
+    SanityCheckDataTest("b", 32, 4.0, 0, 0.0, 0, 0.1),
+    SanityCheckDataTest("a", 32, 6.0, 1, 0.7, 0.5, 0),
+    SanityCheckDataTest("a", 32, 5.5, 0, 0.8, 0.5, 0),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.1, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
+    SanityCheckDataTest("a", 32, 5.0, 0, 1, 0.5, 0),
+    SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
+    SanityCheckDataTest("a", 32, 6.0, 1, 0.9, 0.5, 0),
+    SanityCheckDataTest("a", 32, 5.5, 0, 1, 0.5, 0),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.2, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.3, 0, 0.1),
+    SanityCheckDataTest("a", 32, 5.0, 0, 0.6, 0.5, 0),
+    SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
+    SanityCheckDataTest("a", 32, 6.0, 0, 0.9, 0.5, 0),
+    SanityCheckDataTest("a", 32, 5.5, 0, 1, 0.5, 0),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.3, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
+    SanityCheckDataTest("b", 32, 5.4, 1, 0.4, 0, 0.1)
+  ).map(data =>
+    (
+      data.name.toText,
+      data.height_null.toRealNN,
+      Seq(data.age, data.height, data.isBlueEyed, data.gender, data.testFeatNegCor).toOPVector
+    )
+  )
+  // scalastyle:on
   Spec[RecordInsightsLOCO[_]] should "work with randomly generated features and binary logistic regression" in {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
@@ -63,6 +99,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     // val model = sparkModel.getSparkMlStage().get
     val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
     parsed.map( _.count{ case (_, v) => v.exists(_._1 == 1) } shouldBe 20 ) // number insights per pred column
@@ -78,6 +115,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
 
     val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
+
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 2)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -120,60 +158,40 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
   }
 
   it should "return the most predictive features" in {
-
-    // scalastyle:off
-    val data = Seq( // name, age, height, height_null, isBlueEyed, gender, testFeatNegCor
-      SanityCheckDataTest("a", 32, 5.0, 0, 0.9, 0.5, 0),
-      SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
-      SanityCheckDataTest("a", 32, 6.0, 0, 0.8, 0.5, 0),
-      SanityCheckDataTest("a", 32, 5.5, 0, 0.85, 0.5, 0),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.2, 0, 0.1),
-      SanityCheckDataTest("a", 32, 5.0, 0, 0.99, 0.5, 0),
-      SanityCheckDataTest("b", 32, 4.0, 0, 0.0, 0, 0.1),
-      SanityCheckDataTest("a", 32, 6.0, 1, 0.7, 0.5, 0),
-      SanityCheckDataTest("a", 32, 5.5, 0, 0.8, 0.5, 0),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.1, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
-      SanityCheckDataTest("a", 32, 5.0, 0, 1, 0.5, 0),
-      SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
-      SanityCheckDataTest("a", 32, 6.0, 1, 0.9, 0.5, 0),
-      SanityCheckDataTest("a", 32, 5.5, 0, 1, 0.5, 0),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.2, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.3, 0, 0.1),
-      SanityCheckDataTest("a", 32, 5.0, 0, 0.6, 0.5, 0),
-      SanityCheckDataTest("b", 32, 4.0, 1, 0.1, 0, 0.1),
-      SanityCheckDataTest("a", 32, 6.0, 0, 0.9, 0.5, 0),
-      SanityCheckDataTest("a", 32, 5.5, 0, 1, 0.5, 0),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.3, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.05, 0, 0.1),
-      SanityCheckDataTest("b", 32, 5.4, 1, 0.4, 0, 0.1)
-    ).map(data =>
-      (
-        data.name.toText,
-        data.height_null.toRealNN,
-        Seq(data.age, data.height, data.isBlueEyed, data.gender, data.testFeatNegCor).toOPVector
-      )
-    )
-    // scalastyle:on
-
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
     val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
-    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
-      .asInstanceOf[LogisticRegressionModel]
 
-    val transformer = new RecordInsightsLOCO(model).setInput(featureVector)
+    val transformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector)
 
-    val insights = transformer.setTopK(1).transform(testDataMeta)
+    val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
+    val parsed = insights.map(RecordInsightsParser.parseInsights)
+    // the highest corr that value that is not zero should be the top feature
+    parsed.foreach { case in =>
+      withClue(s"top features : ${in.map(_._1.columnName)}") {
+        Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true
+        // the scores should be the same but opposite in sign
+        math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true
+      }
+    }
+  }
+
+  it should "return the most predictive features when using top K Positives + top K negatives strat" in {
+    val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
+    val label = labelNoRes.copy(isResponse = true)
+    val testDataMeta = addMetaData(testData, "features", 5)
+    val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+    val transformer = new RecordInsightsLOCO(sparkModel).setTopKStrategy(TopKStrategy.PositiveNegative)
+      .setInput(featureVector)
+    val insights = transformer.transform(testDataMeta)
     val parsed = insights.collect(name, transformer.getOutput())
       .map { case (n, i) => n -> RecordInsightsParser.parseInsights(i) }
-    // the highest corr that value that is not zero should be the top feature
-    parsed.foreach { case (_, in) => Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true }
-    // the scores should be the same but opposite in sign
-    parsed.foreach { case (_, in) => math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true }
+    parsed.foreach { case (_, in) =>
+      withClue(s"top features : ${in.map(_._1.columnName)}") {
+        in.head._1.columnName == "1_1_1_1" || in.last._1.columnName == "3_3_3_3" shouldBe true
+      }
+    }
   }
 
   it should "return the most predictive features for data generated with a strong relation to the label" in {
@@ -218,9 +236,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
     // one if it's not null.
     parsed.length shouldBe numRows
-    parsed.foreach(m => if (m.keySet.count(_.columnName.contains("currency_NullIndicatorValue")) > 0) {
-      m.size shouldBe 4
-    } else m.size shouldBe 3)
+    parsed.foreach(m => m.size <= 4 shouldBe true)
 
     // Want to check the average contribution strengths for each picklist response and compare them to the
     // average contribution strengths of the other features. We should have a very high contribution when choices
