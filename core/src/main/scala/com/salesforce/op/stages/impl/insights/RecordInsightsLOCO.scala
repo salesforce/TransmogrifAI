@@ -161,8 +161,8 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
     val topPosNeg = returnTopPosNeg(filledSize, featureArray, featureSize, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
-      case s if s == TopKStrategy.Abs => topPosNeg.sortBy { case (_, v, _) => -math.abs(v) }.take(k)
-      case s if s == TopKStrategy.PositiveNegative => topPosNeg.sortBy { case (_, v, _) => -v }
+      case TopKStrategy.Abs => topPosNeg.sortBy { case (_, v, _) => -math.abs(v) }.take(k)
+      case TopKStrategy.PositiveNegative => topPosNeg.sortBy { case (_, v, _) => -v }
     }
 
     top.map { case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
