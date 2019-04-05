@@ -147,9 +147,10 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
     val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithIDPre))
-    val datasetWithID = splitter.collect {
-      case dc: DataCutter => dc.validationPrepare(datasetWithIDPre)
+    val datasetWithID = splitterSummary.collect { case dc: DataCutterSummary =>
+      dc.preparedDF.getOrElse(datasetWithIDPre)
     }.getOrElse(datasetWithIDPre)
+
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
@@ -158,10 +159,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       best
     }
 
-    val preparedData = splitter.collect {
-      case _: DataCutter => datasetWithID
-      case sp => sp.validationPrepare(datasetWithID)
-    }.getOrElse(datasetWithID)
+    val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
 
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
