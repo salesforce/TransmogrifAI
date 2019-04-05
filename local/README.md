@@ -22,8 +22,20 @@ Then in your code you may load and score models as follows:
 ```scala
 import com.salesforce.op.local._
 
+// Spark Session needed for model loading & score function creation
+implicit val spark = SparkSession.builder().getOrCreate()
+
+// Create your workflow & load the model
+val workflow: OpWorkflow = ...
 val model = workflow.loadModel("/path/to/model")
-val scoreFn = model.scoreFunction // create score function once and then use it indefinitely
+
+// Create score function once and use it indefinitely
+val scoreFn = model.scoreFunction
+
+// Spark Session can be stopped now since it's not required during local scoring
+spark.stop()
+
+// Compute scores with score function
 val rawData = Seq(Map("name" -> "Peter", "age" -> 18), Map("name" -> "John", "age" -> 23))
 val scores = rawData.map(scoreFn)
 ```
