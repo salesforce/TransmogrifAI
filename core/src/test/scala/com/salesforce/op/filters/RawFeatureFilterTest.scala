@@ -35,7 +35,6 @@ import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike
 import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
-import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test._
 import com.salesforce.op.testkit.{RandomData, _}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -113,44 +112,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     RawFeatureFilterResults.fromJson(RawFeatureFilterResults.toJson(resultsRFF)) match {
       case Failure(e) => fail(e)
-      case Success(deser) =>
-        RawFeatureFilterResultsComparison.compareConfig(
-          resultsRFF.rawFeatureFilterConfig, deser.rawFeatureFilterConfig
-        )
-        RawFeatureFilterResultsComparison.compareSeqDistributions(
-          resultsRFF.rawFeatureDistributions, deser.rawFeatureDistributions
-        )
-        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
-          resultsRFF.exclusionReasons, deser.exclusionReasons
-        )
-        RawFeatureFilterResultsComparison.compareSeqMetrics(
-          resultsRFF.rawFeatureFilterMetrics, deser.rawFeatureFilterMetrics
-        )
+      case Success(deser) => RawFeatureFilterResultsComparison.compare(resultsRFF, deser)
     }
-  }
-
-  it should "correctly convert raw feature filter config to string map" in {
-    val config = RawFeatureFilterConfig(
-      minFill = 0.5,
-      maxFillDifference = Double.PositiveInfinity,
-      maxFillRatioDiff = 0.5,
-      maxJSDivergence = 0.5,
-      maxCorrelation = 0.5,
-      correlationType = CorrelationType.Pearson,
-      jsDivergenceProtectedFeatures = Set.empty,
-      protectedFeatures = Set.empty
-    )
-
-    val params = config.toStringMap()
-
-    config.minFill.toString() shouldEqual params("minFill")
-    config.maxFillDifference.toString() shouldEqual params("maxFillDifference")
-    config.maxFillRatioDiff.toString() shouldEqual params("maxFillRatioDiff")
-    config.maxJSDivergence.toString() shouldEqual params("maxJSDivergence")
-    config.maxCorrelation.toString() shouldEqual params("maxCorrelation")
-    config.correlationType.toString() shouldEqual params("correlationType")
-    config.jsDivergenceProtectedFeatures.toString() shouldEqual params("jsDivergenceProtectedFeatures")
-    config.protectedFeatures.toString() shouldEqual params("protectedFeatures")
   }
 
   it should "correctly compute and store raw feature filter metrics when correlation is unavailable " +

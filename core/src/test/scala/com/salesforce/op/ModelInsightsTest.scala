@@ -140,11 +140,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     insights.features.isEmpty shouldBe true
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-
-    // head will be RFF so accessing 2nd element
-    insights.stageInfo.keys.slice(1, 2).toList.head shouldEqual
-      s"${density.originStage.operationName}_${density.originStage.uid}"
-
+    insights.stageInfo.keys.head shouldEqual s"${density.originStage.operationName}_${density.originStage.uid}"
   }
 
   it should "return only feature insights when no selector, label, or model are found" in {
@@ -158,7 +154,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     genderInsights.derivedFeatures.size shouldBe 4
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 9
+    insights.stageInfo.keys.size shouldEqual 8
   }
 
   it should "return model insights even when correlation is turned off for some features" in {
@@ -207,7 +203,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.isEmpty shouldBe true
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 10
   }
 
   it should "find the sanity checker metadata even if the model has been serialized" in {
@@ -260,7 +256,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.get.validationType shouldBe CrossValidation
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 12
+    insights.stageInfo.keys.size shouldEqual 11
   }
 
   it should "return feature insights with label info and model info even when no sanity checker is found" in {
@@ -291,7 +287,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
     insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
     insights.trainingParams shouldEqual params
-    insights.stageInfo.keys.size shouldEqual 11
+    insights.stageInfo.keys.size shouldEqual 10
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
@@ -350,9 +346,15 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
-            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
-            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
         }
+        RawFeatureFilterResultsComparison.compareSeqDistributions(
+          insights.rawFeatureFilterResults.rawFeatureDistributions,
+          deser.rawFeatureFilterResults.rawFeatureDistributions
+        )
+        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
+          insights.rawFeatureFilterResults.exclusionReasons,
+          deser.rawFeatureFilterResults.exclusionReasons
+        )
         insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
           case (o, i) =>
             o.validationType shouldEqual i.validationType
@@ -388,9 +390,15 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
-            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
-            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
         }
+        RawFeatureFilterResultsComparison.compareSeqDistributions(
+          insights.rawFeatureFilterResults.rawFeatureDistributions,
+          deser.rawFeatureFilterResults.rawFeatureDistributions
+        )
+        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
+          insights.rawFeatureFilterResults.exclusionReasons,
+          deser.rawFeatureFilterResults.exclusionReasons
+        )
         insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
           case (o, i) =>
             o.validationType shouldEqual i.validationType
@@ -411,29 +419,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         }
         insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
         insights.stageInfo.keys shouldEqual deser.stageInfo.keys
-
-        // check that raw feature filter config is correctly serialized and deserialized
-
-        def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
-          modelInsights.stageInfo("rawFeatureFilter") match {
-            case configInfo: Map[String, Map[String, String]] =>
-              configInfo.getOrElse("params", Map.empty[String, String])
-            case _ => Map.empty[String, String]
-          }
-        }
-
-        (getRawFeatureFilterConfig(insights), getRawFeatureFilterConfig(deser)) match {
-          case (paramsMapI, paramsMapD) =>
-            paramsMapI.keys shouldEqual paramsMapD.keys
-            paramsMapI("minFill") shouldEqual paramsMapD("minFill")
-            paramsMapI("maxFillDifference") shouldEqual paramsMapD("maxFillDifference")
-            paramsMapI("maxFillRatioDiff") shouldEqual paramsMapD("maxFillRatioDiff")
-            paramsMapI("maxJSDivergence") shouldEqual paramsMapD("maxJSDivergence")
-            paramsMapI("maxCorrelation") shouldEqual paramsMapD("maxCorrelation")
-            paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
-            paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
-            paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
-          }
     }
   }
 
@@ -522,8 +507,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
     val featureInsights = ModelInsights.getFeatureInsights(
-      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      RawFeatureFilterResults()
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]]
     )
     featureInsights.size shouldBe 2
 
@@ -609,14 +593,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
      */
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
-    insights.features.foreach(f =>
-      f.distributions shouldBe wfDistributionsGrouped.getOrElse(f.featureName, Seq.empty)
+    val insightsDistributionsGrouped = insights.rawFeatureFilterResults.rawFeatureDistributions.groupBy(_.name)
+
+    insightsDistributionsGrouped.keys.foreach( name =>
+      insightsDistributionsGrouped(name) shouldBe wfDistributionsGrouped.getOrElse(name, Seq.empty)
     )
   }
 
   it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
     val insights = workflowModel.modelInsights(pred)
-    insights.features.foreach(f => f.distributions shouldBe empty)
+    insights.rawFeatureFilterResults.rawFeatureDistributions shouldBe Seq.empty
   }
 
   it should "return model insights for xgboost classification" in {

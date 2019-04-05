@@ -75,8 +75,7 @@ object RawFeatureFilterResults {
    * @param json json
    * @return raw feature filter results
    */
-  def fromJson(json: String): Try[RawFeatureFilterResults] =
-    Try { Serialization.read[RawFeatureFilterResults](json) }
+  def fromJson(json: String): Try[RawFeatureFilterResults] = Try { Serialization.read[RawFeatureFilterResults](json) }
 
 }
 
@@ -93,33 +92,7 @@ case class RawFeatureFilterConfig
   correlationType: CorrelationType = CorrelationType.Pearson,
   jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   protectedFeatures: Set[String] = Set.empty
-) {
-
-  /**
-   * Converts case class constructor to a Map; values converted to String
-   *
-   * @return Map[String, String]
-   */
-  def toStringMap(): Map[String, String] = {
-    (Map[String, String]() /: this.getClass.getDeclaredFields) { (key, value) =>
-      value.setAccessible(true)
-      key + (value.getName -> value.get(this).toString())
-    }
-  }
-
-  /**
-   * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
-   * ModelInsights
-   *
-   * @return Map[String, Map[String, Object]]
-   */
-  def toStageInfo(): Map[String, Map[String, Object]] = {
-    val stageName = "rawFeatureFilter"
-    val uid = "rawFeatureFilter"
-    Map(stageName -> Map("uid" -> uid, "params" -> this.toStringMap()))
-  }
-
-}
+)
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter
