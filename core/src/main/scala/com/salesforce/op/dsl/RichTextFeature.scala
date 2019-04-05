@@ -96,6 +96,7 @@ trait RichTextFeature {
      *
      * @param that      other text feature
      * @param nGramSize the size of the n-gram to be used to compute the string distance
+     * @param toLowerCase lowercase before computing similarity
      * @return ngrammed feature
      */
     def toNGramSimilarity(

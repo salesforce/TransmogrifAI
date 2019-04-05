@@ -41,7 +41,7 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 class ValidEmailTransformer(uid: String = UID[ValidEmailTransformer]) extends
   UnaryTransformer[Email, Binary](operationName = "isValidEmail", uid = uid) {
   override def transformFn: Email => Binary = (in: Email) => {
-    if (in.isEmpty) None
-    else Some(in.prefix.nonEmpty && in.domain.nonEmpty)
-  }.toBinary
+    if (in.isEmpty) Binary.empty
+    else (in.prefix.nonEmpty && in.domain.nonEmpty).toBinary
+  }
 }
