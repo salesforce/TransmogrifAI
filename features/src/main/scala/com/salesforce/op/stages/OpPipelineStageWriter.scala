@@ -44,8 +44,9 @@ import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
 import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
-import org.json4s.JsonAST.{JObject, JValue}
+import org.json4s.JsonAST.{JInt, JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import com.salesforce.op.stages.impl.feature._
 
 import scala.collection.mutable
 import scala.reflect.runtime.universe.TypeTag
@@ -116,23 +117,10 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
       case t: LambdaTransformer[_, _] => {
 
         val n = t.transformFn.getClass.getName
-        ReflectionUtils.newLambdaInstance(n, t.lambdaCtorArgs.map(_.asInstanceOf[AnyRef])) match {
+        ReflectionUtils.newLambdaInstance(n, t.lambdaCtorArgs) match {
           case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n} (Reason: ${e})")
           case _ =>
-            val args =
-              t.lambdaCtorArgs.map(
-                {
-                  case x: Int => x
-                  case x: Double => x
-                  case x: String => x
-                  case x: Boolean => x
-                  case x =>
-                    throw new IllegalArgumentException(
-                      s"Unsupported type [${x.getClass.getName}] for lambda: ${n}"
-                    )
-
-                })
-
+            val args = t.lambdaCtorArgs.map(valToJson)
             mutable.Map[String, Any](
               FieldNames.LambdaClassName.entryName -> n,
               FieldNames.LambdaTypeO.entryName -> ReflectionUtils.dealisedTypeName(t.tto.tpe),

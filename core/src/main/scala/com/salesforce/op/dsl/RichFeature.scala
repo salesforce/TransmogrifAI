@@ -56,13 +56,16 @@ trait RichFeature {
     /**
      * Unary transform feature[A] => feature[B]
      *
-     * @param f map A => B
+     * @param f              map A => B
+     * @param lambdaCtorArgs arguments needed to create instance of our lambda
      * @return feature of type B
      */
-    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map")
-      (implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
+    def map[B <: FeatureType : TypeTag](f: A => B, operationName: String = "map",
+      lambdaCtorArgs: Array[AnyRef] = Array())(implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
       feature.transformWith(
-        new UnaryLambdaTransformer[A, B](operationName = operationName, transformFn = f)
+        new UnaryLambdaTransformer[A, B](
+          operationName = operationName, transformFn = f, lambdaCtorArgs = lambdaCtorArgs
+        )
       )
     }
 
@@ -204,12 +207,14 @@ trait RichFeature {
 
     /**
      * Create an alias of this feature by capturing the val name (note will not work on raw features)
+     *
      * @return alias of the feature
      */
     def alias(implicit name: sourcecode.Name): FeatureLike[A] = alias(name = name.value)
 
     /**
      * Create an alias of this feature with the desired name (note will not work on raw features)
+     *
      * @param name desired feature name
      * @return alias of the feature
      */

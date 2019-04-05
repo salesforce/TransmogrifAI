@@ -32,60 +32,14 @@ package com.salesforce.op.dsl
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.stages.impl.preparators.{CorrelationType, CorrelationExclusion, SanityChecker}
+import com.salesforce.op.stages.impl.preparators.{CorrelationExclusion, CorrelationType, SanityChecker}
 import com.salesforce.op.stages.impl.regression.IsotonicRegressionCalibrator
-import com.salesforce.op.utils.tuples.RichTuple._
-import com.salesforce.op.utils.numeric.Number
 
 import scala.language.postfixOps
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
-// scalastyle:off
-object RichNumericFeatureLambdas {
-  def divide = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
-    val result = for {
-      x <- i1.toDouble
-      y <- i2.toDouble
-    } yield x / y
-
-    result filter Number.isValid toReal
-  }
-
-  def plus = (i1: OPNumeric[_], i2: OPNumeric[_]) => (i1.toDouble -> i2.toDouble).map(_ + _).toReal
-
-  def minus = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
-    val optZ = (i1.toDouble, i2.toDouble) match {
-      case (Some(x), Some(y)) => Some(x - y)
-      case (Some(x), None) => Some(x)
-      case (None, Some(y)) => Some(-y)
-      case (None, None) => None
-    }
-    optZ.toReal
-  }
-
-  def multiply = (i1: OPNumeric[_], i2: OPNumeric[_]) => {
-    val result = for {
-      x <- i1.toDouble
-      y <- i2.toDouble
-    } yield x * y
-
-    result filter Number.isValid toReal
-  }
-
-  def multiplyS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ * nd).filter(Number.isValid).toReal
-
-  def divideS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ / nd).filter(Number.isValid).toReal
-
-  def plusS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ + nd).filter(Number.isValid).toReal
-
-  def minusS(nd: Double) = (r: OPNumeric[_]) => r.toDouble.map(_ - nd).filter(Number.isValid).toReal
-}
-
-// scalastyle:on
 /**
  * Enrichment functions for Numeric Feature
  */
@@ -113,15 +67,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def /[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "divide",
-          transformFn = RichNumericFeatureLambdas.divide
-        ),
-        f = that
-      )
-    }
+    def /[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      f.transformWith(new DivideTransformer[I, I2](), that)
 
     /**
      * Apply Multiply transformer shortcut function
@@ -137,15 +84,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def *[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "multiply",
-          transformFn = RichNumericFeatureLambdas.multiply
-        ),
-        f = that
-      )
-    }
+    def *[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      f.transformWith(new MultiplyTransformer[I, I2](), that)
 
     /**
      * Apply Plus transformer shortcut function
@@ -161,15 +101,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def +[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "plus",
-          transformFn = RichNumericFeatureLambdas.plus
-        ),
-        f = that
-      )
-    }
+    def +[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      f.transformWith(new AddTransformer[I, I2](), that)
 
     /**
      * Apply Minus transformer shortcut function
@@ -185,15 +118,8 @@ trait RichNumericFeature {
      * @tparam I2 that feature output type
      * @return transformed feature
      */
-    def -[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] = {
-      f.transformWith[I2, Real](
-        stage = new BinaryLambdaTransformer[I, I2, Real](
-          operationName = "minus",
-          transformFn = RichNumericFeatureLambdas.minus
-        ),
-        f = that
-      )
-    }
+    def -[I2 <: OPNumeric[_] : TypeTag](that: FeatureLike[I2]): FeatureLike[Real] =
+      f.transformWith(new SubtractTransformer[I, I2](), that)
 
     /**
      * Apply Divide scalar transformer shortcut function
@@ -203,16 +129,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def /[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      val nd = n.toDouble(v)
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "divideS",
-          transformFn = RichNumericFeatureLambdas.divideS(nd),
-          lambdaCtorArgs = Array(nd)
-        )
-      )
-    }
+    def /[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarDivideTransformer(scalar = v))
 
     /**
      * Apply Multiply scalar transformer shortcut function
@@ -222,16 +140,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def *[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      val nd = n.toDouble(v)
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "multiplyS",
-          transformFn = RichNumericFeatureLambdas.multiplyS(nd),
-          lambdaCtorArgs = Array(nd)
-        )
-      )
-    }
+    def *[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarMultiplyTransformer(scalar = v))
 
     /**
      * Apply Plus scalar transformer shortcut function
@@ -241,16 +151,8 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def +[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      val nd = n.toDouble(v)
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "plusS",
-          transformFn = RichNumericFeatureLambdas.plusS(nd),
-          lambdaCtorArgs = Array(nd)
-        )
-      )
-    }
+    def +[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarAddTransformer[I, N](scalar = v))
 
     /**
      * Apply Minus scalar transformer shortcut function
@@ -260,16 +162,72 @@ trait RichNumericFeature {
      * @tparam N value type
      * @return transformed feature
      */
-    def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] = {
-      val nd = n.toDouble(v)
-      f.transformWith(
-        new UnaryLambdaTransformer[I, Real](
-          operationName = "minusS",
-          transformFn = RichNumericFeatureLambdas.minusS(nd),
-          lambdaCtorArgs = Array(nd)
-        )
-      )
-    }
+    def -[N](v: N)(implicit n: Numeric[N]): FeatureLike[Real] =
+      f.transformWith(new ScalarSubtractTransformer[I, N](scalar = v))
+
+    /**
+     * Take the absolute value of the feature
+     * @return transformed feature
+     */
+    def abs(): FeatureLike[Real] =
+      f.transformWith(new AbsoluteValueTransformer[I]())
+
+    /**
+     * Take the ceil of the feature value
+     * @return transformed feature
+     */
+    def ceil(): FeatureLike[Integral] =
+      f.transformWith(new CeilTransformer[I]())
+
+    /**
+     * Take the floor of the feature value
+     * @return transformed feature
+     */
+    def floor(): FeatureLike[Integral] =
+      f.transformWith(new FloorTransformer[I]())
+
+    /**
+     * Round the feature value
+     * @return transformed feature
+     */
+    def round(): FeatureLike[Integral] =
+      f.transformWith(new RoundTransformer[I]())
+
+    /**
+     * Round the feature value
+     * @return transformed feature
+     */
+    def round(digits: Int): FeatureLike[Real] =
+      f.transformWith(new RoundDigitsTransformer[I](digits = digits))
+
+    /**
+     * Exp transformer: returns Euler's number `e` raised to the power of feature value
+     * @return transformed feature
+     */
+    def exp(): FeatureLike[Real] =
+      f.transformWith(new ExpTransformer[I]())
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def sqrt(): FeatureLike[Real] =
+      f.transformWith(new SqrtTransformer[I]())
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def log(base: Double): FeatureLike[Real] =
+      f.transformWith(new LogTransformer[I](base = base))
+
+    /**
+     * Square root transformer
+     * @return transformed feature
+     */
+    def power(power: Double): FeatureLike[Real] =
+      f.transformWith(new PowerTransformer[I](power = power))
+
 
   }
 
@@ -351,8 +309,8 @@ trait RichNumericFeature {
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
      * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
      * @param label        optional label column to be passed into autoBucketizer if present
-     * @return a vector feature containing the raw Features with filled missing values and the bucketized
-     *         features if a label argument is passed
+     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
+     *                     features if a label argument is passed
      */
     def vectorize
     (
@@ -381,7 +339,6 @@ trait RichNumericFeature {
 
     /**
      * Apply ScalerTransformer shortcut.  Applies the scaling function defined by the scalingType and scalingArg params
-     *
      * @param scalingType type of scaling function
      * @param scalingArgs arguments to define the scaling function
      * @tparam O Output feature type
@@ -397,7 +354,6 @@ trait RichNumericFeature {
     /**
      * Apply DescalerTransformer shortcut.  Applies the inverse of the scaling function found in
      * the metadata of the the input feature: scaledFeature
-     *
      * @param scaledFeature the feature containing metadata for constructing the scaling used to make this column
      * @tparam I feature type of the input feature: scaledFeature
      * @tparam O output feature type
@@ -476,37 +432,37 @@ trait RichNumericFeature {
      * Apply [[SanityChecker]] estimator.
      * It checks for potential problems with computed features in a supervized learning setting.
      *
-     * @param featureVector          feature vector
-     * @param checkSample            Rate to downsample the data for statistical calculations (note: actual sampling
-     *                               will not be exact due to Spark's dataset sampling behavior)
-     * @param sampleSeed             Seed to use when sampling
-     * @param sampleLowerLimit       Lower limit on number of samples in downsampled data set (note: sample limit
-     *                               will not be exact, due to Spark's dataset sampling behavior)
-     * @param sampleUpperLimit       Upper limit on number of samples in downsampled data set (note: sample limit
-     *                               will not be exact, due to Spark's dataset sampling behavior)
-     * @param maxCorrelation         Maximum correlation (absolute value) allowed between a feature in the
-     *                               feature vector and the label
-     * @param minCorrelation         Minimum correlation (absolute value) allowed between a feature in the
-     *                               feature vector and the label
-     * @param correlationType        Which coefficient to use for computing correlation
-     * @param minVariance            Minimum amount of variance allowed for each feature and label
-     * @param removeBadFeatures      If set to true, this will automatically remove all the bad features
-     *                               from the feature vector
-     * @param removeFeatureGroup     remove all features descended from a parent feature
-     * @param protectTextSharedHash  protect text shared hash from related null indicators and other hashes
-     * @param maxRuleConfidence      Maximum allowed confidence of association rules in categorical variables.
-     *                               A categorical variable will be removed if there is a choice where the maximum
-     *                               confidence is above this threshold, and the support for that choice is above the
-     *                               min rule support parameter, defined below.
-     * @param minRequiredRuleSupport Categoricals can be removed if an association rule is found between one of the
-     *                               choices and a categorical label where the confidence of that rule is above
-     *                               maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
-     * @param featureLabelCorrOnly   If true, then only calculate correlations between features and label instead of
-     *                               the entire correlation matrix which includes all feature-feature correlations
-     * @param correlationExclusion   Setting for what categories of feature vector columns to exclude from the
-     *                               correlation calculation (eg. hashed text features)
-     * @param categoricalLabel       If true, treat label as categorical. If not set, check number of distinct labels to
-     *                               decide whether a label should be treated categorical.
+     * @param featureVector     feature vector
+     * @param checkSample       Rate to downsample the data for statistical calculations (note: actual sampling
+     *                          will not be exact due to Spark's dataset sampling behavior)
+     * @param sampleSeed        Seed to use when sampling
+     * @param sampleLowerLimit  Lower limit on number of samples in downsampled data set (note: sample limit
+     *                          will not be exact, due to Spark's dataset sampling behavior)
+     * @param sampleUpperLimit  Upper limit on number of samples in downsampled data set (note: sample limit
+     *                          will not be exact, due to Spark's dataset sampling behavior)
+     * @param maxCorrelation    Maximum correlation (absolute value) allowed between a feature in the
+     *                          feature vector and the label
+     * @param minCorrelation    Minimum correlation (absolute value) allowed between a feature in the
+     *                          feature vector and the label
+     * @param correlationType   Which coefficient to use for computing correlation
+     * @param minVariance       Minimum amount of variance allowed for each feature and label
+     * @param removeBadFeatures If set to true, this will automatically remove all the bad features
+     *                          from the feature vector
+     * @param removeFeatureGroup      remove all features descended from a parent feature
+     * @param protectTextSharedHash   protect text shared hash from related null indicators and other hashes
+     * @param maxRuleConfidence       Maximum allowed confidence of association rules in categorical variables.
+     *                                A categorical variable will be removed if there is a choice where the maximum
+     *                                confidence is above this threshold, and the support for that choice is above the
+     *                                min rule support parameter, defined below.
+     * @param minRequiredRuleSupport  Categoricals can be removed if an association rule is found between one of the
+     *                                choices and a categorical label where the confidence of that rule is above
+     *                                maxRuleConfidence and the support fraction of that choice is above minRuleSupport.
+     * @param featureLabelCorrOnly    If true, then only calculate correlations between features and label instead of
+     *                                the entire correlation matrix which includes all feature-feature correlations
+     * @param correlationExclusion    Setting for what categories of feature vector columns to exclude from the
+     *                                correlation calculation (eg. hashed text features)
+     * @param categoricalLabel  If true, treat label as categorical. If not set, check number of distinct labels to
+     *                          decide whether a label should be treated categorical.
      * @return sanity checked feature vector
      */
     // scalastyle:off
@@ -681,8 +637,8 @@ trait RichNumericFeature {
      *                     eg. NaN, -/+Inf or values that fall outside the buckets
      * @param minInfoGain  minimum info gain, one of the stopping criteria of the Decision Tree for the autoBucketizer
      * @param label        optional label column to be passed into autoBucketizer if present
-     * @return a vector feature containing the raw Features with filled missing values and the bucketized
-     *         features if a label argument is passed
+     * @return             a vector feature containing the raw Features with filled missing values and the bucketized
+     *                     features if a label argument is passed
      */
     def vectorize
     (

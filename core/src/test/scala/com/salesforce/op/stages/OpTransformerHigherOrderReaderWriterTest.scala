@@ -28,18 +28,34 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base
+package com.salesforce.op.stages
 
-import com.salesforce.op.features.types.FeatureType
-import scala.reflect.runtime.universe.TypeTag
+import com.salesforce.op.dsl.RichNumericFeature
+import com.salesforce.op.features.types._
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-/**
- * @author ksuchanek
- * @since 214
- */
-trait LambdaTransformer[O <: FeatureType, F] {
-  val tto: TypeTag[O]
-  val ttov: TypeTag[O#Value]
-  val transformFn: F
-  val lambdaCtorArgs: Array[AnyRef]
+
+@RunWith(classOf[JUnitRunner])
+class OpTransformerHigherOrderReaderWriterTest extends OpPipelineStageReaderWriterTest with RichNumericFeature {
+
+  import OpTransformerHigherOrderReaderWriterTest._
+
+  val v1: Int = 10
+  val v2: Double = 5.5
+  val v3: Long = 300L
+
+  val stage: OpPipelineStageBase = height.map(
+    fnc0(v1, v2, v3),
+    lambdaCtorArgs = Array(Int.box(v1), Double.box(v2), Long.box(v3)
+    )
+  ).originStage
+
+  override val hasOutputName = false
+
+  val expected = Array(3935.5.toReal, 305.5.toReal, 305.5.toReal, 305.5.toReal, 2165.5.toReal, 1985.5.toReal)
+}
+
+object OpTransformerHigherOrderReaderWriterTest {
+  private def fnc0(n: Int, v2: Double, v3: Long) = (x: RealNN) => x.value.map(_ * n + v2 + v3).toReal
 }

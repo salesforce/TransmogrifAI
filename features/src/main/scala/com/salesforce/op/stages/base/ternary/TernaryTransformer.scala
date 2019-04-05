@@ -146,7 +146,7 @@ final class TernaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <:
   operationName: String,
   val transformFn: (I1, I2, I3) => O,
   uid: String = UID[TernaryLambdaTransformer[I1, I2, I3, O]],
-  val lambdaCtorArgs: Array[_] = Array()
+  val lambdaCtorArgs: Array[AnyRef] = Array()
 )(
   implicit tti1: TypeTag[I1],
   tti2: TypeTag[I2],

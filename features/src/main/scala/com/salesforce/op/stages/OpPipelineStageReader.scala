@@ -91,17 +91,6 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     ReflectionUtils.typeTagForName(n = (metadataJson \ fieldName.entryName).extract[String])
       .asInstanceOf[TypeTag[FeatureType]]
 
-  private def loadCtorArgs(metadataJson: JValue): Array[AnyRef] = {
-    metadataJson.extract[Array[JValue]].map {
-      case JInt(x) => x
-      case JDouble(x) => x
-      case JString(x) => x
-      case JBool(x) => x
-      case x => throw new Exception(s"Unknown type:${x}")
-    } map {
-      _.asInstanceOf[AnyRef]
-    }
-  }
 
   private def loadLambdaTransformer(metadataJson: JValue, className: String): Option[Try[OpPipelineStageBase]] = {
     val lambdaClassNameOpt = (metadataJson \ FieldNames.LambdaClassName.entryName).extractOpt[String]
@@ -191,6 +180,8 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     val (className, metadataJson) = metadata.className -> metadata.metadata
     // Check if it's a model
     val isModel = (metadataJson \ FieldNames.IsModel.entryName).extract[Boolean]
+    val hasCtorAgrs = (metadataJson \ FieldNames.CtorArgs.entryName) != JNothing
+
     // In case we stumbled upon model we instantiate it using the class name + ctor args
     // otherwise we simply use the provided stage instance.
     // UnaryTransformer
@@ -198,7 +189,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     val stage = loadLambdaTransformer(metadataJson, className) match {
       case Some(Success(s)) => s
       case Some(Failure(e)) => throw e
-      case _ if isModel => loadModel(className, metadataJson)
+      case _ if isModel || hasCtorAgrs => loadModel(className, metadataJson)
       case _: LambdaTransformer[_, _] if loadLambdas =>
         throw new RuntimeException("Loaded transformer stage from workflow instead of from JSON!")
       case _ => originalStage

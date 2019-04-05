@@ -244,10 +244,10 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
     val survivedNum = survived.occurs()
     val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
+
     val wf = new OpWorkflow()
       .setResultFeatures(pred)
-      .withRawFeatureFilter(Option(dataReader), Option(simpleReader),
-        maxFillRatioDiff = 1.0) // only height and the female key of maps should meet this criteria
+      .withRawFeatureFilter(Option(dataReader), Option(simpleReader), maxFillRatioDiff = 1.0, minScoringRows = 0)
     val data = wf.computeDataUpTo(weight)
 
     data.schema.fields.map(_.name).toSet shouldEqual
@@ -380,8 +380,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val prettySummary = fittedWorkflow.summaryPretty()
     log.info(prettySummary)
+    prettySummary should include regex raw"area under precision-recall\s+|\s+1.0\s+|\s+0.0"
     prettySummary should include("Selected Model - OpLogisticRegression")
-    prettySummary should include("area under precision-recall | 1.0                   | 0.0")
     prettySummary should include("Model Evaluation Metrics")
     prettySummary should include("Top Model Insights")
     prettySummary should include("Top Positive Correlations")

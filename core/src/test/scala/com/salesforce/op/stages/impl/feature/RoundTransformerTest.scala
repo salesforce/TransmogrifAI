@@ -28,20 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.dsl.RichNumericFeature
 import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-
 @RunWith(classOf[JUnitRunner])
-class OpTransformerRichReaderWriterTest extends OpPipelineStageReaderWriterTest with RichNumericFeature {
+class RoundTransformerTest extends OpTransformerSpec[Integral, RoundTransformer[Real]] {
+  val sample = Seq(Real(-1.3), Real(-4.9), Real.empty, Real(5.1), Real(-5.1), Real(0.1), Real(2.5), Real(0.4))
+  val (inputData, f1) = TestFeatureBuilder(sample)
+  val transformer: RoundTransformer[Real] = new RoundTransformer[Real]().setInput(f1)
+  val expectedResult: Seq[Integral] = Seq(Integral(-1), Integral(-5), Integral.empty, Integral(5),
+    Integral(-5), Integral(0), Integral(3), Integral(0))
 
-  val stage: OpPipelineStageBase = (height + 10.0).originStage
-
-  override val hasOutputName = false
-
-  val expected = Array(373.toReal, 10.toReal, 10.toReal, 10.toReal, 196.toReal, 178.toReal)
+  it should "have a working shortcut" in {
+    val f2 = f1.round()
+    f2.originStage.isInstanceOf[RoundTransformer[_]] shouldBe true
+  }
 }
+
+
+
+
+
+
+
+

@@ -109,7 +109,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
 
-    println(stageJsonString)
     val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, loadLambdas = true)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]

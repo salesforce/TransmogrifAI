@@ -42,18 +42,13 @@ import scala.util.Try
 
 
 
-/**
- * Case class for Training & test sets
- *
- * @param train      training set is persisted at construction
- * @param summary    summary for building metadata
- */
-case class ModelData(train: Dataset[Row], summary: Option[SplitterSummary])
 
 /**
  * Abstract class that will carry on the creation of training set + test set
  */
 abstract class Splitter(val uid: String) extends SplitterParams {
+
+  @transient private[op] var summary: Option[SplitterSummary] = None
 
   /**
    * Function to use to create the training set and test set.
@@ -68,13 +63,30 @@ abstract class Splitter(val uid: String) extends SplitterParams {
   }
 
   /**
-   * Function to use to prepare the dataset for modeling
+   * Function to use to prepare the dataset for modeling within the validation step
    * eg - do data balancing or dropping based on the labels
    *
    * @param data
    * @return Training set test set
    */
-  def prepare(data: Dataset[Row]): ModelData
+  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+    checkPreconditions()
+    data
+  }
+
+
+  /**
+   * Function to set parameters before passing into the validation step
+   * eg - do data balancing or dropping based on the labels
+   *
+   * @param data
+   * @return Parameters set in examining data
+   */
+  def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary]
+
+
+  protected def checkPreconditions(): Unit =
+    require(summary.nonEmpty, "Cannot call validationPrepare until preValidationPrepare has been called")
 
 }
 

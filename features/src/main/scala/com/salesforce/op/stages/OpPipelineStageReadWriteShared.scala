@@ -34,6 +34,7 @@ import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, ScalingType, TimePeriod}
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import enumeratum._
+import org.json4s.JsonAST.{JInt, JValue}
 import org.json4s.ext.JodaTimeSerializers
 import org.json4s.{DefaultFormats, Formats}
 
@@ -50,19 +51,33 @@ object OpPipelineStageReadWriteShared {
    */
   object FieldNames extends Enum[FieldNames] {
     val values = findValues
+
     case object IsModel extends FieldNames("isModel")
+
     case object CtorArgs extends FieldNames("ctorArgs")
+
     case object Uid extends FieldNames("uid")
+
     case object Class extends FieldNames("class")
+
     case object ParamMap extends FieldNames("paramMap")
+
     case object LambdaClassName extends FieldNames("lambdaClassName")
+
     case object LambdaTypeI1 extends FieldNames("lambdaTypeI1")
+
     case object LambdaTypeI2 extends FieldNames("lambdaTypeI2")
+
     case object LambdaTypeI3 extends FieldNames("lambdaTypeI3")
+
     case object LambdaTypeI4 extends FieldNames("lambdaTypeI4")
+
     case object LambdaTypeO extends FieldNames("lambdaTypeO")
+
     case object LambdaTypeOV extends FieldNames("lambdaTypeOV")
+
     case object LambdaClassArgs extends FieldNames("lambdaClassArgs")
+
     case object OperationName extends FieldNames("operationName")
 
   }
@@ -77,9 +92,13 @@ object OpPipelineStageReadWriteShared {
    */
   object AnyValueTypes extends Enum[AnyValueTypes] {
     val values = findValues
+
     case object TypeTag extends AnyValueTypes
+
     case object SparkWrappedStage extends AnyValueTypes
+
     case object Value extends AnyValueTypes
+
   }
 
   /**
@@ -98,4 +117,49 @@ object OpPipelineStageReadWriteShared {
       EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
       new SpecialDoubleSerializer
 
+
+  /**
+   * convert known types to json
+   *
+   * @param v Any
+   * @return Array ("type","value")
+   */
+  def valToJson(v: Any): Array[Any] = {
+    v match {
+      case x: Int => Array("i", x)
+      case x: BigDecimal => Array("bd", x)
+      case x: BigInt => Array("bi", x)
+      case x: Double => Array("d", x)
+      case x: Long => Array("l", x)
+      case x: String => Array("s", x)
+      case x: Boolean => Array("b", x)
+      case _ => throw new Exception(s"Unsupported type: ${v.getClass.getName}")
+    }
+  }
+
+
+  private def jsonToVal(v: Array[JValue]): AnyRef = {
+    v.head.extract[String] match {
+      case "i" => Int.box(v.last.extract[Int])
+      case "bd" => v.last.extract[BigDecimal]
+      case "bi" => v.last.extract[BigInt]
+      case "d" => Double.box(v.last.extract[Double])
+      case "s" => v.last.extract[String]
+      case "b" => Boolean.box(v.last.extract[Boolean])
+      case "l" => Long.box(v.last.extract[Long])
+      case x => throw new Exception(s"Unsupported type: ${x}")
+    }
+  }
+
+  /**
+   * Load constructor args from known types
+   *
+   * @param metadataJson
+   * @return Array[AnyRef]
+   */
+  def loadCtorArgs(metadataJson: JValue): Array[AnyRef] = {
+    metadataJson.extract[Array[JValue]].map {
+      m => jsonToVal(m.extract[Array[JValue]])
+    }
+  }
 }
