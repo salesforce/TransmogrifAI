@@ -1,7 +1,7 @@
 # TransmogrifAI Local
 
-This module enables local scoring with TransmogrifAI models without the need for a Spark session.
-Instead it applies a combination of TransmogrifAI's transformer interface and [MLeap](https://github.com/combust/mleap) runtime on JVM. It delivers unprecedented portability and performance of TransmogrifAI models allowing the serving of scores from any JVM process.
+This module enables local scoring with TransmogrifAI models without the need for Spark Session during scoring.
+Instead it implementes local inference by applying TransmogrifAI's transformers and [MLeap](https://github.com/combust/mleap) runtime on JVM. It delivers unprecedented portability and performance of TransmogrifAI models allowing the serving of scores from any JVM process.
 
 ## Usage
 
