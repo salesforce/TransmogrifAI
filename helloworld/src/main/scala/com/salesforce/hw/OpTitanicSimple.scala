@@ -32,9 +32,8 @@ package com.salesforce.hw
 
 import com.salesforce.op._
 import com.salesforce.op.evaluators.Evaluators
-import com.salesforce.op.features.{FeatureBuilder, FeatureLike}
+import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
-import com.salesforce.op.lambda.{lambdas, materializeLambdas}
 import com.salesforce.op.readers.DataReaders
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelSelector
 import com.salesforce.op.stages.impl.classification.BinaryClassificationModelsToTry._
@@ -76,7 +75,6 @@ case class Passenger
 /**
  * A simplified TransmogrifAI example classification app using the Titanic dataset
  */
-@materializeLambdas
 object OpTitanicSimple {
 
   /**
