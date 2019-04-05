@@ -113,9 +113,9 @@ configure(allProjs) {
         compile "org.scala-lang:scala-library:$scalaVersion.$scalaVersionRevision"
 
         // Spark
-        compileOnly "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
+        compile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
         testCompile "org.apache.spark:spark-core_$scalaVersion:$sparkVersion"
-        compileOnly "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
+        compile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
         testCompile "org.apache.spark:spark-mllib_$scalaVersion:$sparkVersion"
         compileOnly "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"
         testCompile "org.apache.spark:spark-sql_$scalaVersion:$sparkVersion"

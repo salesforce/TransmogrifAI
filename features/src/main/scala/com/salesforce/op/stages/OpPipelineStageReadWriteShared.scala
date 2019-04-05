@@ -95,6 +95,8 @@ object OpPipelineStageReadWriteShared {
 
     case object TypeTag extends AnyValueTypes
 
+    case object Class extends AnyValueTypes
+
     case object SparkWrappedStage extends AnyValueTypes
 
     case object Value extends AnyValueTypes
@@ -138,7 +140,7 @@ object OpPipelineStageReadWriteShared {
   }
 
 
-  private def jsonToVal(v: Array[JValue]): AnyRef = {
+  def jsonToVal(v: Array[JValue]): AnyRef = {
     v.head.extract[String] match {
       case "i" => Int.box(v.last.extract[Int])
       case "bd" => v.last.extract[BigDecimal]

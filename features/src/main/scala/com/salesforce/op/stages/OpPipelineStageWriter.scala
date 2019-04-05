@@ -133,8 +133,10 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
 
       }
+
       // I didn't want to nest third match here...
-      case _ => mutable.Map()
+      case _ =>
+        mutable.Map[String, Any](FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap)
     }
 
     stage match {
@@ -193,14 +195,18 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
               "Only Feature and Feature Value type tags are supported for serialization."
           )
 
+        // We might consider adding more like BigDecimal etc
+        case n: Numeric[_] => AnyValue(`type` = AnyValueTypes.Class, value = n.getClass.getName)
+
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
         case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
         case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
 
         // Everything else goes as is and is handled by json4s
         case v =>
+
           // try serialize value with json4s
-          val av = AnyValue(AnyValueTypes.Value, v)
+          val av = AnyValue(AnyValueTypes.Value, valToJson(v))
           Try(jsonSerialize(av)) match {
             case Success(_) => av
             case Failure(e) =>

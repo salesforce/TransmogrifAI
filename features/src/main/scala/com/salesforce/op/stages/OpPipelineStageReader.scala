@@ -48,6 +48,7 @@ import org.json4s.jackson.JsonMethods.{compact, render}
 import org.json4s.{Extraction, _}
 
 import scala.reflect.runtime.universe._
+import scala.util.parsing.json.JSONArray
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -222,6 +223,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     // Extract all the ctor args
     val ctorArgsJson = (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj
     val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
+    val ctorArgsValues = ctorArgsJson.map { case (argName, j) => argName -> j \ "value" }.toMap
     // Get the model class
 
     // Make the ctor function used for creating a model instance
@@ -243,17 +245,30 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
               )
           }
 
+        case AnyValueTypes.Class => ReflectionUtils.newLambdaInstance(anyValue.value.toString) match {
+          case Success(ci) => ci
+          case Failure(e) => throw e
+        }
+
         // Spark wrapped stage is saved using [[SparkWrapperParams]] and loaded later using
         // [[SparkDefaultParamsReadWrite]].getAndSetParams returning 'null' here
         case AnyValueTypes.SparkWrappedStage => {
           null // yes, yes - this should be 'null'
         }
 
+
         // Everything else is read using json4s
         case AnyValueTypes.Value => Try {
-          val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
-          val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
-          Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
+          ctorArgsValues(argName) match {
+            case a: JArray => {
+              val v = jsonToVal(a.arr.toArray)
+              v
+            }
+            case _ =>
+              val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
+              val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
+              Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
+          }
         } match {
           case Success(any) => any
           case Failure(e) => throw new RuntimeException(
