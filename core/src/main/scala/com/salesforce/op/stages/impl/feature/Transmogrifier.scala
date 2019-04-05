@@ -73,6 +73,7 @@ private[op] trait TransmogrifierDefaults {
   val TrackInvalid: Boolean = false
   val TrackTextLen: Boolean = false
   val MinDocFrequency: Int = 0
+  val MaxPercentCardinality = OpOneHotVectorizer.MaxPctCardinality
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
   val DefaultGeolocation: Geolocation = Geolocation(0.0, 0.0, GeolocationAccuracy.Unknown)
   val MinInfoGain: Double = DecisionTreeNumericBucketizer.MinInfoGain
@@ -141,14 +142,14 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[Base64Map] =>
           val (f, other) = castAs[Base64Map](g) // TODO make better default
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[BinaryMap] =>
           val (f, other) = castAs[BinaryMap](g)
           f.vectorize(defaultValue = FillValue, cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
         case t if t =:= weakTypeOf[ComboBoxMap] =>
           val (f, other) = castAs[ComboBoxMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[CurrencyMap] =>
           val (f, other) = castAs[CurrencyMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
@@ -164,11 +165,11 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[EmailMap] =>
           val (f, other) = castAs[EmailMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[IDMap] =>
           val (f, other) = castAs[IDMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[IntegralMap] =>
           val (f, other) = castAs[IntegralMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMode = FillWithMode, cleanKeys = CleanKeys, others = other,
@@ -176,7 +177,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[MultiPickListMap] =>
           val (f, other) = castAs[MultiPickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PercentMap] =>
           val (f, other) = castAs[PercentMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
@@ -187,7 +188,7 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[PickListMap] =>
           val (f, other) = castAs[PickListMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[RealMap] =>
           val (f, other) = castAs[RealMap](g)
           f.vectorize(defaultValue = FillValue, fillWithMean = FillWithMean, cleanKeys = CleanKeys, others = other,
@@ -209,27 +210,27 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[URLMap] =>
           val (f, other) = castAs[URLMap](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[CountryMap] =>
           val (f, other) = castAs[CountryMap](g) // TODO make Country specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[StateMap] =>
           val (f, other) = castAs[StateMap](g) // TODO make State specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[CityMap] =>
           val (f, other) = castAs[CityMap](g) // TODO make City specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PostalCodeMap] =>
           val (f, other) = castAs[PostalCodeMap](g) // TODO make PostalCode specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[StreetMap] =>
           val (f, other) = castAs[StreetMap](g) // TODO make Street specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
-            others = other, trackNulls = TrackNulls)
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[GeolocationMap] =>
           val (f, other) = castAs[GeolocationMap](g)
           f.vectorize(cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)
@@ -270,31 +271,32 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[MultiPickList] =>
           val (f, other) = castAs[MultiPickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
 
         // Text
         case t if t =:= weakTypeOf[Base64] =>
           val (f, other) = castAs[Base64](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[ComboBox] =>
           val (f, other) = castAs[ComboBox](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Email] =>
           val (f, other) = castAs[Email](g)
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[ID] =>
           val (f, other) = castAs[ID](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Phone] =>
           val (f, other) = castAs[Phone](g)
           f.vectorize(defaultRegion = DefaultRegion, others = other)
         case t if t =:= weakTypeOf[PickList] =>
           val (f, other) = castAs[PickList](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
@@ -312,22 +314,27 @@ private[op] case object Transmogrifier {
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
-            others = other)
+            others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Country] =>
           val (f, other) = castAs[Country](g) // TODO make do something smart for Country
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[State] =>
           val (f, other) = castAs[State](g) // TODO make do something smart for State
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[City] =>
           val (f, other) = castAs[City](g) // TODO make do something smart for City
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[PostalCode] =>
           val (f, other) = castAs[PostalCode](g) // TODO make do something smart for PostalCode
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Street] =>
           val (f, other) = castAs[Street](g) // TODO make do something smart for Street
-          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, others = other,
+            maxPctCardinality = MaxPercentCardinality)
 
         // Unknown
         case t => throw new IllegalArgumentException(s"No vectorizer available for type $t")
@@ -624,22 +631,21 @@ trait MapStringPivotHelper extends SaveOthersParams {
   type SeqSeqTupArr = Seq[Seq[(String, Array[String])]]
   type SeqMapMap = SequenceAggregators.SeqMapMap
 
-  protected implicit val seqMapEncoder = Encoders.kryo[Seq[Map[String, String]]]
-  protected implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
-  protected implicit val seqSeqArrayEncoder = Encoders.kryo[SeqSeqTupArr]
-
   protected def getCategoryMaps[V]
   (
     in: Dataset[Seq[Map[String, V]]],
     convertToMapOfMaps: Map[String, V] => MapMap,
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean
-  ): Dataset[SeqMapMap] = in.map(seq =>
-    seq.map { kc =>
-      val filteredMap = filterKeys[V](kc, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
-      convertToMapOfMaps(filteredMap)
-    }
-  )
+  ): Dataset[SeqMapMap] = {
+    implicit val seqMapMapEncoder = Encoders.kryo[SeqMapMap]
+    in.map(seq =>
+      seq.map { kc =>
+        val filteredMap = filterKeys[V](kc, shouldCleanKey = shouldCleanKeys, shouldCleanValue = shouldCleanValues)
+        convertToMapOfMaps(filteredMap)
+      }
+    )
+  }
 
   protected def getTopValues(categoryMaps: Dataset[SeqMapMap], inputSize: Int, topK: Int, minSup: Int): SeqSeqTupArr = {
     val sumAggr = SequenceAggregators.SumSeqMapMap(size = inputSize)

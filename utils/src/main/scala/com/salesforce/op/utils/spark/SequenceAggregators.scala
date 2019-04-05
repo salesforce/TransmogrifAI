@@ -45,7 +45,7 @@ object SequenceAggregators {
   // TODO: try using Algebird monoid to avoid code repetition below
 
   /**
-   * Creates a TypedColumn that sums a Dataset column of type Seq[T: Numeric]
+   * Creates aggregator that sums a Dataset column of type Seq[T: Numeric]
    *
    * @param size the size of the Sequence
    * @tparam T numeric type
@@ -68,7 +68,7 @@ object SequenceAggregators {
   type SeqTupD = Seq[(Double, Int)]
 
   /**
-   * Creates a TypedColumn that computes mean on a Dataset column of type Seq[Option[Double]]
+   * Creates aggregator that computes mean on a Dataset column of type Seq[Option[Double]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -92,7 +92,7 @@ object SequenceAggregators {
   type SeqMapLL = Seq[Map[Long, Long]]
 
   /**
-   * Creates a TypedColumn that computes mode on a Dataset column of type Seq[Option[Long]]
+   * Creates aggregator that computes mode on a Dataset column of type Seq[Option[Long]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -134,7 +134,7 @@ object SequenceAggregators {
   type SeqMapMap = Seq[MapMap]
 
   /**
-   * Creates a TypedColumn that sums a Dataset column of type Seq[Map[String, Map[String, Long]]] such that the maps are
+   * Creates aggregator that sums a Dataset column of type Seq[Map[String, Map[String, Long]]] such that the maps are
    * summed with the keys preserved and the values resulting are the sum of the values for the two maps
    *
    * @param size the size of the Sequence
@@ -154,7 +154,7 @@ object SequenceAggregators {
   type SeqSet = Seq[Set[String]]
 
   /**
-   * Creates a TypedColumn that sums a Dataset column of type Seq[Set[String]]
+   * Creates aggregator that sums a Dataset column of type Seq[Set[String]]
    *
    * @param size the size of the Sequence
    * @return spark aggregator
@@ -174,7 +174,7 @@ object SequenceAggregators {
   type SeqMapTuple = Seq[Map[String, (Double, Int)]]
 
   /**
-   * Creates a TypedColumn that computes the means by key of a Dataset column of type Seq[Map[String, Double]].
+   * Creates aggregator that computes the means by key of a Dataset column of type Seq[Map[String, Double]].
    * Each map has a separate mean by key computed.
    * Because each map does not have to have all the possible keys,
    * the element counts for each map's keys can all be different.
@@ -201,7 +201,7 @@ object SequenceAggregators {
   type SeqMapMapLong = Seq[Map[String, Map[Long, Long]]]
 
   /**
-   * Creates a TypedColumn that computes the modes by key of a Dataset column of type Seq[Map[String, Long]].
+   * Creates aggregator that computes the modes by key of a Dataset column of type Seq[Map[String, Long]].
    * Each map has a separate mode by key computed.
    * Because each map does not have to have all the possible keys,
    * the element counts for each map's keys can all be different.
