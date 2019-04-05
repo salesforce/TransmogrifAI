@@ -27,20 +27,26 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.Real
+import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-@RunWith(classOf[JUnitRunner])
-class ScalarDivideTransformerTest extends OpTransformerSpec[Real, ScalarDivideTransformer[Real, Double]] {
-  val sample = Seq(Real(1.0), Real(4.0), Real.empty, Real(-1.0), Real(2.0))
-  val (inputData, f1) = TestFeatureBuilder(sample)
-  val transformer: ScalarDivideTransformer[Real, Double] = new ScalarDivideTransformer[Real, Double](2.0)
-    .setInput(f1)
-  val expectedResult: Seq[Real] = Seq(Real(0.5), Real(2.0), Real.empty, Real(-0.5), Real(1.0))
-}
 
+@RunWith(classOf[JUnitRunner])
+class RoundDigitsTransformerTest extends OpTransformerSpec[Real, RoundDigitsTransformer[Real]] {
+  val sample = Seq(Real(1.4231092), Real(4.3231), Real.empty, Real(-1.0), Real(2.03728181))
+  val (inputData, f1) = TestFeatureBuilder(sample)
+  val transformer: RoundDigitsTransformer[Real] = new RoundDigitsTransformer[Real](2)
+    .setInput(f1)
+  val expectedResult: Seq[Real] = Seq(Real(1.42), Real(4.32), Real.empty, Real(-1.0), Real(2.04))
+
+  it should "have a working shortcut" in {
+    val f2 = f1.round(4)
+    f2.originStage.isInstanceOf[RoundDigitsTransformer[_]] shouldBe true
+  }
+}
 
