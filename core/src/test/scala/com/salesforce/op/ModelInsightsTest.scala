@@ -328,7 +328,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
         pretty should not include m.modelName
       }
     }
-    pretty should include("area under precision-recall | 1.0")
+    pretty should include regex raw"area under precision-recall\s+|\s+1.0"
     pretty should include("Model Evaluation Metrics")
     pretty should include("Top Model Insights")
     pretty should include("Top Positive Correlations")
