@@ -124,214 +124,268 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   val models = Seq(lr -> lrParams, rf -> rfParams)
 
 
-  Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
-    val modelSelector = MultiClassificationModelSelector
-      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
-      .setInput(label.asInstanceOf[Feature[RealNN]], features)
+//  Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
+//    val modelSelector = MultiClassificationModelSelector
+//      .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
+//      .setInput(label.asInstanceOf[Feature[RealNN]], features)
+//
+//    modelSelector.models.size shouldBe 3
+//    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpLogisticRegression.entryName) shouldBe true
+//    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpRandomForestClassifier.entryName) shouldBe false
+//    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpNaiveBayes.entryName) shouldBe true
+//    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
+//  }
+//
+//  it should "split into training and test" in {
+//    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
+//    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+//
+//    val testFraction = 0.2
+//
+//    val (train, test) = DataSplitter(reserveTestFraction = testFraction)
+//      .split(data.withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
+//        .as[(Double, Vector, Double)])
+//
+//
+//    val trainCount = train.count()
+//    val testCount = test.count()
+//    val totalCount = label0Count + label1Count + label2Count
+//
+//    assert(math.abs(testCount - testFraction * totalCount) <= 20)
+//    assert(math.abs(trainCount - (1.0 - testFraction) * totalCount) <= 20)
+//
+//    trainCount + testCount shouldBe totalCount
+//  }
+//
+//  ignore should "fit and predict all models on by default" in {
+//    val testEstimator =
+//      MultiClassificationModelSelector
+//        .withCrossValidation(
+//          Option(DataCutter(seed = 42, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
+//          numFolds = 4,
+//          validationMetric = Evaluators.MultiClassification.precision(),
+//          seed = 10L
+//        )
+//        .setInput(label, features)
+//
+//    val model = testEstimator.fit(data)
+//
+//    log.info(model.getMetadata().prettyJson)
+//
+//    // evaluation metrics from test set should be in metadata
+//    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+//    MultiClassEvalMetrics.values.foreach(metric =>
+//      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+//        s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
+//    )
+//
+//    metaData.validationResults.length shouldEqual 26
+//
+//    // evaluation metrics from test set should be in metadata after eval run
+//    model.evaluateModel(data)
+//    val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+//    MultiClassEvalMetrics.values.foreach(metric =>
+//      assert(metaData2.holdoutEvaluation.get.toJson(false).contains(s"${metric.entryName}"),
+//        s"Metric ${metric.entryName} is not present in metadata: " + metaData2.holdoutEvaluation)
+//    )
+//
+//    val transformedData = model.transform(data)
+//    val pred = model.getOutput()
+//    val justScores = transformedData.collect(pred).map(_.prediction)
+//    justScores shouldEqual transformedData.collect(label).map(_.v.get)
+//  }
+//
+//  it should "fit and predict for default models" in {
+//    // Take one random model type each time
+//    val defaultModels = MultiClassificationModelSelector.Defaults.modelTypesToUse
+//    val modelToTry = defaultModels(scala.util.Random.nextInt(defaultModels.size))
+//
+//    val testEstimator =
+//      MultiClassificationModelSelector
+//        .withCrossValidation(
+//          Option(DataCutter(seed = 42, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
+//          numFolds = 4,
+//          validationMetric = Evaluators.MultiClassification.precision(),
+//          seed = 10L,
+//          modelTypesToUse = Seq(modelToTry)
+//        )
+//        .setInput(label, features)
+//
+//    val model = testEstimator.fit(data)
+//
+//    log.info(model.getMetadata().prettyJson)
+//
+//    // evaluation metrics from test set should be in metadata
+//    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+//    MultiClassEvalMetrics.values.foreach(metric =>
+//      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+//        s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
+//    )
+//
+//    // evaluation metrics from test set should be in metadata after eval run
+//    model.evaluateModel(data)
+//    val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+//    MultiClassEvalMetrics.values.foreach(metric =>
+//      assert(metaData2.holdoutEvaluation.get.toJson(false).contains(s"${metric.entryName}"),
+//        s"Metric ${metric.entryName} is not present in metadata: " + metaData2.holdoutEvaluation)
+//    )
+//
+//    val transformedData = model.transform(data)
+//    val pred = model.getOutput()
+//    val justScores = transformedData.collect(pred).map(_.prediction)
+//    justScores.length shouldEqual transformedData.count()
+//  }
+//
+//  it should "fit and predict with a train validation split, even if there is no split + custom evaluator" in {
+//
+//    val crossEntropy = Evaluators.MultiClassification.custom(
+//      metricName = "cross entropy",
+//      isLargerBetter = false,
+//      evaluateFn = crossEntropyFun
+//    )
+//
+//    val testEstimator =
+//      MultiClassificationModelSelector
+//        .withTrainValidationSplit(None, trainRatio = 0.8, validationMetric = crossEntropy, seed = 10L,
+//          modelsAndParameters = models)
+//        .setInput(label, features)
+//
+//    val model = testEstimator.fit(data)
+//
+//    val sparkStage = model.modelStageIn
+//    sparkStage.isInstanceOf[OpLogisticRegressionModel] shouldBe true
+//    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("maxIter")) shouldBe 10
+//    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("regParam")) shouldBe 0.1
+//
+//    val transformedData = model.transform(data)
+//    val pred = testEstimator.getOutput()
+//    val justScores = transformedData.collect(pred)
+//    val missed = justScores.zip(transformedData.collect(label))
+//      .map{ case (p, l) => math.abs(p.prediction - l.v.get) }.sum
+//    missed < 10 shouldBe true
+//  }
+//
+//  it should "fit and predict with a cross validation and compute correct metrics from evaluators" in {
+//
+//    val crossEntropy = Evaluators.MultiClassification.custom(
+//      metricName = "cross entropy",
+//      isLargerBetter = false,
+//      evaluateFn = crossEntropyFun
+//    )
+//
+//    val testEstimator =
+//      MultiClassificationModelSelector
+//        .withCrossValidation(
+//          Option(DataCutter(42, reserveTestFraction = 0.2, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
+//          numFolds = 4,
+//          validationMetric = Evaluators.MultiClassification.precision(),
+//          trainTestEvaluators = Seq(crossEntropy),
+//          seed = 10L,
+//          modelsAndParameters = models
+//        )
+//        .setInput(label, features)
+//
+//    val model = testEstimator.fit(data)
+//    model.evaluateModel(data)
+//
+//    // checking the holdOut Evaluators
+//    assert(testEstimator.evaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
+//
+//    // checking trainingEval & holdOutEval metrics
+//    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+//    val trainMetaData = metaData.trainEvaluation.toJson(false)
+//    val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
+//
+//    testEstimator.evaluators.foreach {
+//      case evaluator: OpMultiClassificationEvaluator => {
+//        MultiClassEvalMetrics.values.foreach(metric =>
+//          Seq(trainMetaData, holdOutMetaData).foreach(
+//            metadata => assert(metadata.contains(s"${metric.entryName}"),
+//              s"Metric ${metric.entryName} is not present in metadata: " + metadata)
+//          )
+//        )
+//      }
+//      case evaluator: OpMultiClassificationEvaluatorBase[_] => {
+//        Seq(trainMetaData, holdOutMetaData).foreach(
+//          metadata => assert(metadata.contains(s"${evaluator.name.humanFriendlyName}"),
+//            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata)
+//        )
+//      }
+//    }
+//  }
+//
+//  it should "fit and predict a model specified in the var bestEstimator" in {
+//    val modelSelector = MultiClassificationModelSelector().setInput(label, features)
+//    val myParam = "entropy"
+//    val myMetaName = "myMeta"
+//    val myMetaValue = 0.5
+//    val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
+//      Map.empty)
+//    val myEstimatorName = "myEstimatorIsAwesome"
+//    val myEstimator = new OpDecisionTreeClassifier().setImpurity(myParam).setInput(label, features)
+//
+//    val bestEstimator = new BestEstimator(myEstimatorName, myEstimator.asInstanceOf[EstimatorType], Seq(myMetadata))
+//    modelSelector.bestEstimator = Option(bestEstimator)
+//    val fitted = modelSelector.fit(data)
+//
+//    fitted.modelStageIn.parent.extractParamMap().toSeq
+//      .collect{ case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
+//
+//    val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
+//    meta.validationResults.head shouldBe myMetadata
+//  }
 
-    modelSelector.models.size shouldBe 3
-    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpLogisticRegression.entryName) shouldBe true
-    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpRandomForestClassifier.entryName) shouldBe false
-    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpNaiveBayes.entryName) shouldBe true
-    modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
-  }
+  Spec(MultiClassificationModelSelector.getClass) should "trim low-cardinality labels during cross validation" in {
+    val bigLabelCount = 1000
+    val rand = scala.util.Random
+    rand.setSeed(seed)
 
-  it should "split into training and test" in {
-    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
-    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+    val bigNoneIndexedData = nonIndexedData
+      .union(
+        normalVectorRDD(sc, bigLabelCount, 3, seed = seed)
+          .map(v => ("label" + (rand.nextInt(bigLabelCount))) -> Vectors.dense(v.toArray.map(_ + 100.0)))
+          .toDF(txtLabelName, featuresColName)
+      )
 
-    val testFraction = 0.2
+    val bigData = new OpStringIndexerNoFilter[Text]()
+      .setInput(txtF)
+      .setOutputFeatureName(labelName)
+      .fit(bigNoneIndexedData)
+      .transform(bigNoneIndexedData)
+      .drop(txtLabelName)
+      .select(labelName, featuresColName)
 
-    val (train, test) = DataSplitter(reserveTestFraction = testFraction)
-      .split(data.withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
-        .as[(Double, Vector, Double)])
+    println("big data unsorted")
+    bigData.show(100)
 
+    println("big data labels sorted by count")
+    bigData
+      .groupBy("label")
+      .count()
+      .sort(col("count").desc)
+      .show(100)
 
-    val trainCount = train.count()
-    val testCount = test.count()
-    val totalCount = label0Count + label1Count + label2Count
+    val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+      bigData, response = labelName, nonNullable = Set(featuresColName)
+    )
 
-    assert(math.abs(testCount - testFraction * totalCount) <= 20)
-    assert(math.abs(trainCount - (1.0 - testFraction) * totalCount) <= 20)
-
-    trainCount + testCount shouldBe totalCount
-  }
-
-  ignore should "fit and predict all models on by default" in {
+    val cutter = DataCutter(seed = 42L, maxLabelCategories = 3)
     val testEstimator =
       MultiClassificationModelSelector
         .withCrossValidation(
-          Option(DataCutter(seed = 42, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
+          Option(cutter),
           numFolds = 4,
-          validationMetric = Evaluators.MultiClassification.precision(),
-          seed = 10L
-        )
-        .setInput(label, features)
-
-    val model = testEstimator.fit(data)
-
-    log.info(model.getMetadata().prettyJson)
-
-    // evaluation metrics from test set should be in metadata
-    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
-    MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
-    )
-
-    metaData.validationResults.length shouldEqual 26
-
-    // evaluation metrics from test set should be in metadata after eval run
-    model.evaluateModel(data)
-    val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
-    MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaData2.holdoutEvaluation.get.toJson(false).contains(s"${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData2.holdoutEvaluation)
-    )
-
-    val transformedData = model.transform(data)
-    val pred = model.getOutput()
-    val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores shouldEqual transformedData.collect(label).map(_.v.get)
-  }
-
-  it should "fit and predict for default models" in {
-    // Take one random model type each time
-    val defaultModels = MultiClassificationModelSelector.Defaults.modelTypesToUse
-    val modelToTry = defaultModels(scala.util.Random.nextInt(defaultModels.size))
-
-    val testEstimator =
-      MultiClassificationModelSelector
-        .withCrossValidation(
-          Option(DataCutter(seed = 42, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
-          numFolds = 4,
-          validationMetric = Evaluators.MultiClassification.precision(),
-          seed = 10L,
-          modelTypesToUse = Seq(modelToTry)
-        )
-        .setInput(label, features)
-
-    val model = testEstimator.fit(data)
-
-    log.info(model.getMetadata().prettyJson)
-
-    // evaluation metrics from test set should be in metadata
-    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
-    MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData.trainEvaluation)
-    )
-
-    // evaluation metrics from test set should be in metadata after eval run
-    model.evaluateModel(data)
-    val metaData2 = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
-    MultiClassEvalMetrics.values.foreach(metric =>
-      assert(metaData2.holdoutEvaluation.get.toJson(false).contains(s"${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData2.holdoutEvaluation)
-    )
-
-    val transformedData = model.transform(data)
-    val pred = model.getOutput()
-    val justScores = transformedData.collect(pred).map(_.prediction)
-    justScores.length shouldEqual transformedData.count()
-  }
-
-  it should "fit and predict with a train validation split, even if there is no split + custom evaluator" in {
-
-    val crossEntropy = Evaluators.MultiClassification.custom(
-      metricName = "cross entropy",
-      isLargerBetter = false,
-      evaluateFn = crossEntropyFun
-    )
-
-    val testEstimator =
-      MultiClassificationModelSelector
-        .withTrainValidationSplit(None, trainRatio = 0.8, validationMetric = crossEntropy, seed = 10L,
-          modelsAndParameters = models)
-        .setInput(label, features)
-
-    val model = testEstimator.fit(data)
-
-    val sparkStage = model.modelStageIn
-    sparkStage.isInstanceOf[OpLogisticRegressionModel] shouldBe true
-    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("maxIter")) shouldBe 10
-    sparkStage.parent.extractParamMap()(sparkStage.parent.getParam("regParam")) shouldBe 0.1
-
-    val transformedData = model.transform(data)
-    val pred = testEstimator.getOutput()
-    val justScores = transformedData.collect(pred)
-    val missed = justScores.zip(transformedData.collect(label))
-      .map{ case (p, l) => math.abs(p.prediction - l.v.get) }.sum
-    missed < 10 shouldBe true
-  }
-
-  it should "fit and predict with a cross validation and compute correct metrics from evaluators" in {
-
-    val crossEntropy = Evaluators.MultiClassification.custom(
-      metricName = "cross entropy",
-      isLargerBetter = false,
-      evaluateFn = crossEntropyFun
-    )
-
-    val testEstimator =
-      MultiClassificationModelSelector
-        .withCrossValidation(
-          Option(DataCutter(42, reserveTestFraction = 0.2, maxLabelCategories = 1000000, minLabelFraction = 0.0)),
-          numFolds = 4,
-          validationMetric = Evaluators.MultiClassification.precision(),
-          trainTestEvaluators = Seq(crossEntropy),
           seed = 10L,
           modelsAndParameters = models
         )
         .setInput(label, features)
 
-    val model = testEstimator.fit(data)
-    model.evaluateModel(data)
-
-    // checking the holdOut Evaluators
-    assert(testEstimator.evaluators.contains(crossEntropy), "Cross entropy evaluator not present in estimator")
-
-    // checking trainingEval & holdOutEval metrics
-    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
-    val trainMetaData = metaData.trainEvaluation.toJson(false)
-    val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
-
-    testEstimator.evaluators.foreach {
-      case evaluator: OpMultiClassificationEvaluator => {
-        MultiClassEvalMetrics.values.foreach(metric =>
-          Seq(trainMetaData, holdOutMetaData).foreach(
-            metadata => assert(metadata.contains(s"${metric.entryName}"),
-              s"Metric ${metric.entryName} is not present in metadata: " + metadata)
-          )
-        )
-      }
-      case evaluator: OpMultiClassificationEvaluatorBase[_] => {
-        Seq(trainMetaData, holdOutMetaData).foreach(
-          metadata => assert(metadata.contains(s"${evaluator.name.humanFriendlyName}"),
-            s"Single Metric evaluator ${evaluator.name} is not present in metadata: " + metadata)
-        )
-      }
-    }
-  }
-
-  it should "fit and predict a model specified in the var bestEstimator" in {
-    val modelSelector = MultiClassificationModelSelector().setInput(label, features)
-    val myParam = "entropy"
-    val myMetaName = "myMeta"
-    val myMetaValue = 0.5
-    val myMetadata = ModelEvaluation(myMetaName, myMetaName, myMetaName, SingleMetric(myMetaName, myMetaValue),
-      Map.empty)
-    val myEstimatorName = "myEstimatorIsAwesome"
-    val myEstimator = new OpDecisionTreeClassifier().setImpurity(myParam).setInput(label, features)
-
-    val bestEstimator = new BestEstimator(myEstimatorName, myEstimator.asInstanceOf[EstimatorType], Seq(myMetadata))
-    modelSelector.bestEstimator = Option(bestEstimator)
-    val fitted = modelSelector.fit(data)
-
-    fitted.modelStageIn.parent.extractParamMap().toSeq
-      .collect{ case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
-
-    val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
-    meta.validationResults.head shouldBe myMetadata
+    testEstimator.fit(bigData)
+    withClue("dataset not cut")(
+      assert(cutter.summary
+        .exists(_.asInstanceOf[DataCutterSummary].preparedDF
+          .exists(_.agg(countDistinct(
+            bigData.col(bigData.columns.head))).first.getLong(0) == 3)))
+    )
   }
 }

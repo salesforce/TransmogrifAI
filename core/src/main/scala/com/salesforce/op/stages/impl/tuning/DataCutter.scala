@@ -86,19 +86,64 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
+    if (Try(getLabelsToKeep).toOption.isEmpty) {
+      import data.sparkSession.implicits._
 
-    import data.sparkSession.implicits._
+      val labels = data.map(r => r.getDouble(0))
+      val labelCounts = labels.groupBy(labels.columns(0)).count().persist()
+      val res = estimate(labelCounts)
+      labelCounts.unpersist()
+      setLabels(res.labelsKept.distinct, res.labelsDropped.distinct, res.labelsDroppedTotal)
+    }
 
-    val labels = data.map(r => r.getDouble(0))
-    val labelCounts = labels.groupBy(labels.columns(0)).count().persist()
-    val res = estimate(labelCounts)
-    labelCounts.unpersist()
-    setLabels(res.labelsKept.toSet, res.labelsDropped.toSet, res.labelsDroppedTotal)
+    val newSummary = summary
+      .collect {
+        case dcs: DataCutterSummary if dcs.preparedDF.isDefined => dcs
+      }
+      .getOrElse {
+        val labelMetaArr = getLabelsFromMetadata(data)
+        val labelSet = getLabelsToKeep.toSet
 
-    summary = Option(DataCutterSummary(
-      labelsKept = getLabelsToKeep,
-      labelsDropped = getLabelsToDrop,
-      labelsDroppedTotal = getLabelsDroppedTotal))
+        // discount unseen label
+        val integralLabelSet = 0.until(labelMetaArr.length - 1)
+          .map(_.toDouble)
+          .toSet
+
+        val dataPrep = if (integralLabelSet == labelSet) {
+          log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
+          data
+        } else {
+          log.info(s"Dropping rows with columns not in $labelSet")
+          val labelColName = data.columns(0)
+
+          // Update metadata that spark.ml Classifier is using tp determine the number of classes
+          //
+          val na = NominalAttribute.defaultAttr.withName(labelColName)
+          val metadataNA = if (labelMetaArr.isEmpty) {
+            na.withNumValues(labelSet.size)
+          } else {
+            na.withValues(labelMetaArr.take(labelSet.size))
+          }
+
+          // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
+          // it in sync with the new metadata.
+          //
+          data
+            .filter(r => labelSet.contains(r.getDouble(0)))
+            .withColumn(labelColName, data
+              .col(labelColName)
+              .as("_", metadataNA.toMetadata))
+        }
+
+        DataCutterSummary(
+          labelsKept = getLabelsToKeep,
+          labelsDropped = getLabelsToDrop,
+          labelsDroppedTotal = getLabelsDroppedTotal,
+          preparedDF = Option(dataPrep)
+        )
+      }
+
+    summary = Option(newSummary)
     summary
   }
 
@@ -127,36 +172,9 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Training set test set
    */
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
-    val dataPrep = super.validationPrepare(data)
-    val labelMetaArr = getLabelsFromMetadata(dataPrep)
-    val labelSet = getLabelsToKeep.toSet
-
-    // discount unseen label
-    val integralLabelSet = 0.until(labelMetaArr.size - 1)
-      .map(_.toDouble)
-      .toSet
-
-    if (integralLabelSet == labelSet) {
-      log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
-      dataPrep
-    } else {
-      log.info(s"Dropping rows with columns not in $labelSet")
-      val labelColName = dataPrep.columns(0)
-
-      val na = NominalAttribute.defaultAttr.withName(labelColName)
-      val metadataNA = if (labelMetaArr.isEmpty) {
-        na.withNumValues(labelSet.size)
-      } else {
-        // trim the metadata
-        na.withValues(labelMetaArr.take(labelSet.size))
-      }
-
-
-      // trim dataframe
-      dataPrep
-        .filter(r => labelSet.contains(r.getDouble(0)))
-        .withColumn(labelColName, dataPrep.col(labelColName).as("_", metadataNA.toMetadata))
-    }
+    super.validationPrepare(data)
+    summary.flatMap(_.asInstanceOf[DataCutterSummary].preparedDF)
+      .getOrElse(sys.error("No prepared dataframe available!"))
   }
 
   /**
@@ -196,7 +214,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     labelsKeptDF.unpersist()
 
     val labelsDropped = labelsDroppedDF.collect().map(_.getDouble(0))
-    val labelsDroppedTotal = numLabels - labelsKept.size
+    val labelsDroppedTotal = numLabels - labelsKept.length
 
     if (labelsKept.nonEmpty) {
       log.info(s"DataCutter is keeping labels: ${labelsKept.mkString}" +
@@ -241,9 +259,9 @@ private[impl] trait DataCutterParams extends Params {
   private[op] final val labelsToKeep = new DoubleArrayParam(this, "labelsToKeep",
     "labels to keep when applying the data cutter")
 
-  private[op] def setLabels(keep: Set[Double], dropTop10: Set[Double], labelsDropped: Long): this.type = {
-    set(labelsToKeep, keep.toArray.sorted)
-      .set(labelsToDrop, dropTop10.toArray.sorted)
+  private[op] def setLabels(keep: Seq[Double], dropTop10: Seq[Double], labelsDropped: Long): this.type = {
+    set(labelsToKeep, keep.toArray)
+      .set(labelsToDrop, dropTop10.toArray)
       .set(labelsDroppedTotal, labelsDropped)
   }
 
@@ -270,7 +288,8 @@ case class DataCutterSummary
 (
   labelsKept: Seq[Double],
   labelsDropped: Seq[Double],
-  labelsDroppedTotal: Long
+  labelsDroppedTotal: Long,
+  preparedDF: Option[DataFrame] = None
 ) extends SplitterSummary {
 
   /**
