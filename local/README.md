@@ -1,7 +1,7 @@
 # TransmogrifAI Local
 
-This module enables local scoring with TransmogrifAI models without the need for a Spark session.
-Instead it applies a combination of TransmogrifAI's transformer interface and [MLeap](https://github.com/combust/mleap) runtime on JVM. It delivers unprecedented portability and performance of TransmogrifAI models allowing the serving of scores from any JVM process.
+This module enables local scoring with TransmogrifAI models without the need for Spark Session during scoring.
+Instead it implementes local inference by applying TransmogrifAI's transformers and [MLeap](https://github.com/combust/mleap) runtime on JVM. It delivers unprecedented portability and performance of TransmogrifAI models allowing the serving of scores from any JVM process.
 
 ## Usage
 
@@ -22,17 +22,29 @@ Then in your code you may load and score models as follows:
 ```scala
 import com.salesforce.op.local._
 
+// Spark Session needed for model loading & score function creation
+implicit val spark = SparkSession.builder().getOrCreate()
+
+// Create your workflow & load the model
+val workflow: OpWorkflow = ...
 val model = workflow.loadModel("/path/to/model")
-val scoreFn = model.scoreFunction // create score function once and then use it indefinitely
+
+// Create score function once and use it indefinitely
+val scoreFn = model.scoreFunction
+
+// Spark Session can be stopped now since it's not required during local scoring
+spark.stop()
+
+// Compute scores with score function
 val rawData = Seq(Map("name" -> "Peter", "age" -> 18), Map("name" -> "John", "age" -> 23))
 val scores = rawData.map(scoreFn)
 ```
 
 Or using the local runner:
 ```scala
-val scoreFn = new OpWorkflowRunnerLocal(workflow).score(opParams)
+val scoreFn = new OpWorkflowRunnerLocal(workflow).scoreFunction(opParams)
 ```
-
+**Note**: *Spark Session is only required for loading the model & preparing the scoring function. Once scoring function is returned the Spark Session can be shutdown since it's not required during local scoring.*
 
 ## Performance Results
 

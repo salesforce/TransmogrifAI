@@ -30,19 +30,21 @@
 
 package com.salesforce.op.local
 
+
 import java.nio.file.Paths
 
 import com.github.marschall.memoryfilesystem.MemoryFileSystemBuilder
 import com.salesforce.op.OpWorkflowModel
+import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.{OPStage, OpTransformer}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import ml.combust.bundle.serializer.SerializationFormat
 import ml.combust.bundle.{BundleContext, BundleRegistry}
 import ml.combust.mleap.runtime.MleapContext
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.bundle.SparkBundleContext
-import org.apache.spark.ml.param.ParamMap
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
+import org.apache.spark.sql.{DataFrame, Row, SparkSession}
 
 import scala.collection.mutable
 
@@ -77,26 +79,35 @@ trait OpWorkflowModelLocal extends Serializable {
     (
       inputs: Array[String],
       output: String,
-      modelFn: Array[AnyRef] => AnyRef
+      modelFn: Array[Any] => Any
     )
 
     /**
      * Prepares a score function for local scoring
      *
+     * @param spark Spark Session needed for preparing scoring function,
+     *              Once scoring function is returned the Spark Session can be shutdown
+     *              since it's not required during local scoring.
      * @return score function for local scoring
      */
-    def scoreFunction: ScoreFunction = {
+    def scoreFunction(implicit spark: SparkSession): ScoreFunction = {
       // Prepare the stages for scoring
       val stagesWithIndex = model.stages.zipWithIndex
+
+      // Prepare an empty DataFrame with transformed schema & metadata (needed for loading MLeap models)
+      val transformedData = makeTransformedDataFrame(model)
+
       // Collect all OP stages
       val opStages = stagesWithIndex.collect { case (s: OpTransformer, i) => OPModel(s.getOutputFeatureName, s) -> i }
+
       // Collect all Spark wrapped stages
       val sparkStages = stagesWithIndex.filterNot(_._1.isInstanceOf[OpTransformer]).collect {
-        case (s: OPStage with SparkWrapperParams[_], i) if s.getSparkMlStage().isDefined =>
-          (s, s.getSparkMlStage().get.asInstanceOf[Transformer].copy(ParamMap.empty), i)
+        case (opStage: OPStage with SparkWrapperParams[_], i) if opStage.getSparkMlStage().isDefined =>
+          val sparkStage = opStage.getSparkMlStage().get.asInstanceOf[Transformer]
+          (opStage, sparkStage, i)
       }
       // Convert Spark wrapped stages into MLeap models
-      val mleapStages = toMLeapModels(sparkStages)
+      val mleapStages = toMLeapModels(sparkStages, transformedData)
 
       // Combine all stages and apply the original order
       val allStages = (opStages ++ mleapStages).sortBy(_._2).map(_._1)
@@ -114,22 +125,37 @@ trait OpWorkflowModelLocal extends Serializable {
           case (row, MLeapModel(inputs, output, modelFn)) =>
             val in = inputs.map(inputName => row.get(inputName) match {
               case None | Some(null) => null
-              case Some(v) => v.asInstanceOf[AnyRef]
+              case Some(v) => v
             })
             row += output -> modelFn(in)
         }
+
         // Only return the result features of the model
         transformedRow.filterKeys(resultFeatures.contains).toMap
       }
     }
 
     /**
-     * Convert Spark wrapped stages into MLeal local Models
+     * Prepares an empty DataFrame with transformed schema & metadata (needed for loading MLeap models)
+     */
+    private def makeTransformedDataFrame(model: OpWorkflowModel)(implicit spark: SparkSession): DataFrame = {
+      val rawSchema = FeatureSparkTypes.toStructType(model.rawFeatures: _*)
+      val df = spark.emptyDataset[Row](RowEncoder(rawSchema))
+      model.stages.collect { case t: Transformer => t }.foldLeft(df) { case (d, t) => t.transform(d) }
+    }
+
+    /**
+     * Convert Spark wrapped stages into MLeap local Models
      *
-     * @param sparkStages stages to convert
+     * @param sparkStages     stages to convert
+     * @param transformedData dataset with transformed schema & metadata (needed for loading MLeap models)
      * @return MLeap local stages
      */
-    private def toMLeapModels(sparkStages: Seq[(OPStage, Transformer, Int)]): Seq[(MLeapModel, Int)] = {
+    private def toMLeapModels
+    (
+      sparkStages: Seq[(OPStage, Transformer, Int)],
+      transformedData: DataFrame
+    ): Seq[(MLeapModel, Int)] = {
       // Setup a in-memory file system for MLeap model saving/loading
       val emptyPath = Paths.get("")
       val fs = MemoryFileSystemBuilder.newEmpty().build()
@@ -138,15 +164,16 @@ trait OpWorkflowModelLocal extends Serializable {
       val mleapRegistry = BundleRegistry("ml.combust.mleap.registry.default")
       val sparkRegistry = BundleRegistry("ml.combust.mleap.spark.registry.default")
 
-      // TODO - consider defining an empty Dataset with correct schema, since some Spark stages might fail to convert
       val sparkBundleContext = BundleContext[SparkBundleContext](
-        SparkBundleContext(dataset = None, sparkRegistry), SerializationFormat.Json, sparkRegistry, fs, emptyPath)
+        SparkBundleContext(Option(transformedData), sparkRegistry),
+        SerializationFormat.Json, sparkRegistry, fs, emptyPath
+      )
       val mleapBundleContext = BundleContext[MleapContext](
         MleapContext(mleapRegistry), SerializationFormat.Json, mleapRegistry, fs, emptyPath)
 
       for {
         (opStage, sparkStage, i) <- sparkStages
-      } yield {
+      } yield try {
         val model = {
           // Serialize Spark model using Spark registry
           val opModel = sparkRegistry.opForObj[SparkBundleContext, AnyRef, AnyRef](sparkStage)
@@ -157,15 +184,19 @@ trait OpWorkflowModelLocal extends Serializable {
           val mleapLocalModel = mleapRegistry.model[MleapContext, AnyRef](op = serializedModel.op)
           mleapLocalModel.load(serializedModel)(mleapBundleContext)
         }
-        // Reflect the apply method on MLeap local model
-        val applyMethodMirror = reflectMethod(model, "apply")
-        val modelFn = (x: Array[AnyRef]) => applyMethodMirror.apply(x: _*).asInstanceOf[AnyRef]
-        val inputs = opStage.getTransientFeatures().map(_.name)
-        val output = opStage.getOutputFeatureName
-
-        MLeapModel(inputs, output, modelFn) -> i
+        // Prepare and return MLeap model with inputs, output and model function
+        MLeapModel(
+          inputs = opStage.getTransientFeatures().map(_.name),
+          output = opStage.getOutputFeatureName,
+          modelFn = MLeapModelConverter.modelToFunction(model)
+        ) -> i
+      } catch {
+        case e: Exception =>
+          throw new RuntimeException(s"Failed to convert stage '${opStage.uid}' to MLeap stage", e)
       }
     }
+
+
   }
 
 }
