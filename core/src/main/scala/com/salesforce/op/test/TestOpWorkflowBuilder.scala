@@ -32,6 +32,7 @@ package com.salesforce.op.test
 
 import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.OPFeature
+import com.salesforce.op.readers.Reader
 import org.apache.spark.sql.{DataFrame, SparkSession}
 
 /**
@@ -47,7 +48,8 @@ object TestOpWorkflowBuilder {
    */
   def apply(dataFrame: DataFrame, features: OPFeature*): OpWorkflow = {
     new OpWorkflow() {
-      override def generateRawData()(implicit spark: SparkSession): DataFrame = dataFrame
+      override def generateRawData(readerAlt: Option[Reader[_]] = None)
+        (implicit spark: SparkSession): DataFrame = dataFrame
     }.setResultFeatures(features: _*)
   }
 

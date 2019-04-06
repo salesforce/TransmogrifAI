@@ -34,6 +34,7 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
+import com.salesforce.op.readers.Reader
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -89,10 +90,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    *
    * @return Dataframe with all the features generated + persisted
    */
-  protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    require(reader.nonEmpty, "Data reader must be set")
+  protected def generateRawData(readerAlt: Option[Reader[_]] = None)(
+    implicit spark: SparkSession
+  ): DataFrame = {
+    require(readerAlt.nonEmpty || reader.nonEmpty, "Data reader must be set")
     checkReadersAndFeatures()
-    reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    readerAlt.getOrElse(reader.get).generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
   }
 
   /**
@@ -255,13 +258,15 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     keepRawFeatures: Boolean = OpWorkflowModel.KeepRawFeatures,
     keepIntermediateFeatures: Boolean = OpWorkflowModel.KeepIntermediateFeatures,
     persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
-    persistScores: Boolean = OpWorkflowModel.PersistScores
+    persistScores: Boolean = OpWorkflowModel.PersistScores,
+    reader: Option[Reader[_]] = None
   )(implicit spark: SparkSession): DataFrame = {
     val (scores, _) = scoreFn(
       keepRawFeatures = keepRawFeatures,
       keepIntermediateFeatures = keepIntermediateFeatures,
       persistEveryKStages = persistEveryKStages,
-      persistScores = persistScores
+      persistScores = persistScores,
+      reader = reader
     )(spark)(path)
     scores
   }
@@ -328,7 +333,8 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
     persistScores: Boolean = OpWorkflowModel.PersistScores,
     evaluator: Option[OpEvaluatorBase[_ <: EvaluationMetrics]] = None,
-    metricsPath: Option[String] = None
+    metricsPath: Option[String] = None,
+    reader: Option[Reader[_]] = None
   )(implicit spark: SparkSession): Option[String] => (DataFrame, Option[EvaluationMetrics]) = {
     require(persistEveryKStages >= 1, s"persistEveryKStages value of $persistEveryKStages is invalid must be >= 1")
 
@@ -338,7 +344,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
 
     (path: Option[String]) => {
       // Generate the dataframe with raw features
-      val rawData: DataFrame = generateRawData()
+      val rawData: DataFrame = generateRawData(reader)
 
       // Apply the transformations DAG on raw data
       val transformedData: DataFrame = applyTransformationsDAG(rawData, dag, persistEveryKStages)

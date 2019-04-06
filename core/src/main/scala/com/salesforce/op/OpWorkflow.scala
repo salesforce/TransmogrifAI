@@ -219,8 +219,14 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *
    * @return Dataframe with all the features generated + persisted
    */
-  protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    (reader, rawFeatureFilter) match {
+  protected def generateRawData(readerAlt: Option[Reader[_]] = None)(implicit spark: SparkSession): DataFrame = {
+    val finalreader =
+      readerAlt match {
+        case Some(_) => readerAlt
+        case None => reader
+    }
+
+    (finalreader, rawFeatureFilter) match {
       case (None, None) => throw new IllegalArgumentException(
         "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
       case (Some(r), None) =>

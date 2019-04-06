@@ -261,7 +261,7 @@ private[op] trait OpWorkflowCore {
    *
    * @return Dataframe with all the features generated + persisted
    */
-  protected def generateRawData()(implicit spark: SparkSession): DataFrame
+  protected def generateRawData(readerAlt: Option[Reader[_]] = None)(implicit spark: SparkSession): DataFrame
 
   /**
    * Returns a dataframe containing all the columns generated up to the feature input
