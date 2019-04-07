@@ -148,7 +148,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   }
 
 
-  private def getLabelsFromMetadata(data: DataFrame): Array[String] =
+  def getLabelsFromMetadata(data: DataFrame): Array[String] =
     Try {
       val labelSF = data.schema.head
       val labelColMetadata = labelSF.metadata
@@ -195,13 +195,14 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val numLabels = labelCounts.count()
     val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
 
+    // sort label column descending to increase probability
+    // that we filter starting with a higher index "tail"
+    //
     val labelsSortedByCount = labelCounts
-      .sort(col(colCount).desc, col(labelCol))
-
-    val filterFraction: Row => Boolean = (r: Row) => (r.getLong(1) / totalValues) >= minLabelFract
+      .sort(col(colCount).desc, col(labelCol).desc)
 
     val labelsKeptDF = labelsSortedByCount
-      .filter(filterFraction)
+      .filter(r => r.getLong(1) / totalValues >= minLabelFract)
       .limit(maxLabels)
       .persist()
 
