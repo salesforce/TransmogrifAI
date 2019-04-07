@@ -67,11 +67,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   import spark.implicits._
 
-  val txtLabelName = "txtLabel"
-  val featuresColName = "features"
-  val labelName = "label"
   val txtData = Seq("zero", "one", "two").map(_.toText)
-  val (txtDs, txtF) = TestFeatureBuilder(txtLabelName, txtData)
+  val (txtDs, txtF) = TestFeatureBuilder("txtLabel", txtData)
 
   // Generate observations of label 1 following a distribution ~ N((-100.0, -100.0, -100.0), I_3)
   val label0Data =
@@ -91,20 +88,20 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   val nonIndexedData = label0Data
     .union(label1Data)
     .union(label2Data)
-    .toDF(txtLabelName, featuresColName)
+    .toDF("txtLabel", "features")
 
   val data = new OpStringIndexerNoFilter[Text]()
     .setInput(txtF)
-    .setOutputFeatureName(labelName)
+    .setOutputFeatureName("label")
     .fit(nonIndexedData)
     .transform(nonIndexedData)
-    .drop(txtLabelName)
-    .select(labelName, featuresColName)
+    .drop("txtLabel")
+    .select("label", "features")
 
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
-    data, response = labelName, nonNullable = Set(featuresColName)
+    data, response = "label", nonNullable = Set("features")
   )
 
   val lr = new OpLogisticRegression()
@@ -336,40 +333,36 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "trim low-cardinality labels during cross validation" in {
-    val bigLabelCount = 1000
-    val rand = scala.util.Random
-    rand.setSeed(seed)
+    val nunLabeledRecords = 1000
+    val numLabels = 10
+    val topLabelsToPick = 3
+    val labelColName = "label"
 
-    val bigNoneIndexedData = nonIndexedData
-      .union(
-        normalVectorRDD(sc, bigLabelCount, 3, seed = seed)
-          .map(v => ("label" + (rand.nextInt(bigLabelCount))) -> Vectors.dense(v.toArray.map(_ + 100.0)))
-          .toDF(txtLabelName, featuresColName)
-      )
+    val rnd = scala.util.Random
+    rnd.setSeed(seed)
+    val bigNoneIndexedData =
+      normalVectorRDD(sc, nunLabeledRecords, 3, seed = seed)
+        .map { v =>
+          ("label_" + rnd.nextInt(numLabels)) ->
+            Vectors.dense(v.toArray.map(_ + 100))
+        }
+        .toDF("txtLabel", "features")
+        .persist()  // IMPORTANT prevent recomputing the DF with Random
 
     val bigData = new OpStringIndexerNoFilter[Text]()
       .setInput(txtF)
-      .setOutputFeatureName(labelName)
+      .setOutputFeatureName(labelColName)
       .fit(bigNoneIndexedData)
       .transform(bigNoneIndexedData)
-      .drop(txtLabelName)
-      .select(labelName, featuresColName)
-
-    println("big data unsorted")
-    bigData.show(100)
-
-    println("big data labels sorted by count")
-    bigData
-      .groupBy("label")
-      .count()
-      .sort(col("count").desc)
-      .show(100)
+      .select(labelColName, "features")
+      .persist()
 
     val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
-      bigData, response = labelName, nonNullable = Set(featuresColName)
-    )
+      bigData, response = labelColName, nonNullable = Set("features"))
 
-    val cutter = DataCutter(seed = 42L, maxLabelCategories = 3)
+    assert(bigData.select(labelColName).distinct().count() === numLabels)
+
+    val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
     val testEstimator =
       MultiClassificationModelSelector
         .withCrossValidation(
@@ -379,13 +372,10 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           modelsAndParameters = models
         )
         .setInput(label, features)
-
     testEstimator.fit(bigData)
-    withClue("dataset not cut")(
-      assert(cutter.summary
-        .exists(_.asInstanceOf[DataCutterSummary].preparedDF
-          .exists(_.agg(countDistinct(
-            bigData.col(bigData.columns.head))).first.getLong(0) == 3)))
-    )
+
+    assert(cutter.summary
+      .exists(_.asInstanceOf[DataCutterSummary].preparedDF
+        .exists(xdf => xdf.select(labelColName).distinct().count() === topLabelsToPick)))
   }
 }
