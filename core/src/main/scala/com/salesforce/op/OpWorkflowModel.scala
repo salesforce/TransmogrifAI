@@ -32,12 +32,13 @@ package com.salesforce.op
 
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.features.{FeatureLike, OPFeature}
+import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
+import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, SparkSession}
@@ -417,6 +418,31 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     path.foreach(scores.saveAvro(_))
 
     scores -> metrics
+  }
+
+  /**
+   * Creates a copy of [[OpWorkflowModel]]
+   *
+   * @return copy of [[OpWorkflowModel]]
+   */
+  def copy(): OpWorkflowModel = {
+    def copyFeatures(features: Array[OPFeature]): Array[OPFeature] = features.collect { case f: Feature[_] =>
+      implicit val tt = f.wtt
+      f.copy()
+    }
+    val copy =
+      new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
+        .setFeatures(copyFeatures(resultFeatures))
+        .setRawFeatures(copyFeatures(rawFeatures))
+        .setBlacklist(copyFeatures(blacklistedFeatures))
+        .setBlacklistMapKeys(blacklistedMapKeys)
+        .setRawFeatureFilterResults(rawFeatureFilterResults.copy())
+        .setStages(stages.map(_.copy(ParamMap.empty)))
+        .setParameters(parameters.copy())
+
+    reader.foreach(copy.setReader)
+
+    if (isWorkflowCV) copy.withWorkflowCV else copy
   }
 
 }
