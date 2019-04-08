@@ -135,6 +135,7 @@ object OpPipelineStageReadWriteShared {
       case x: Long => Array("l", x)
       case x: String => Array("s", x)
       case x: Boolean => Array("b", x)
+      case x: Map[String, _] => Array("m", x.map(t => (t._1, valToJson(t._2))))
       case _ => throw new Exception(s"Unsupported type: ${v.getClass.getName}")
     }
   }
@@ -149,6 +150,8 @@ object OpPipelineStageReadWriteShared {
       case "s" => v.last.extract[String]
       case "b" => Boolean.box(v.last.extract[Boolean])
       case "l" => Long.box(v.last.extract[Long])
+      case "m" => v.last.extract[Map[String, Array[JValue]]].mapValues(jsonToVal)
+
       case x => throw new Exception(s"Unsupported type: ${x}")
     }
   }
