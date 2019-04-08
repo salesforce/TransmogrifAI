@@ -202,9 +202,9 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val labelColIdx = data.columns.indexOf(labelColName)
     val needColSwapForValidation = labelColIdx > 0
     val df = if (needColSwapForValidation) {
-      data
-    } else {
       data.select(labelColName, data.columns.drop(labelColIdx): _*)
+    } else {
+      data
     }
     df.show()
 
