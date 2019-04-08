@@ -433,7 +433,6 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     val copy =
       new OpWorkflowModel(uid = uid, trainingParams = trainingParams.copy())
         .setFeatures(copyFeatures(resultFeatures))
-        .setRawFeatures(copyFeatures(rawFeatures))
         .setBlacklist(copyFeatures(blacklistedFeatures))
         .setBlacklistMapKeys(blacklistedMapKeys)
         .setRawFeatureFilterResults(rawFeatureFilterResults.copy())

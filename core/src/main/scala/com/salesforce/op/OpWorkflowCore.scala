@@ -88,11 +88,6 @@ private[op] trait OpWorkflowCore {
     this
   }
 
-  private[op] final def setRawFeatures(features: Array[OPFeature]): this.type = {
-    rawFeatures = features
-    this
-  }
-
   private[op] final def setRawFeatureFilterResults(results: RawFeatureFilterResults): this.type = {
     rawFeatureFilterResults = results
     this
