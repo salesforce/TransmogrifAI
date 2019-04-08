@@ -48,7 +48,7 @@ import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
 
@@ -109,11 +109,10 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
    * @param spark               Spark Session
    * @return Updated Model Selector with best model along with best paramMap
    */
-  protected[op] def findBestEstimator(data: Dataset[_], dag: StagesDAG, persistEveryKStages: Int = 0)
+  protected[op] def findBestEstimator(data: DataFrame, dag: StagesDAG, persistEveryKStages: Int = 0)
     (implicit spark: SparkSession): Unit = {
-
-    splitter.foreach(_.preValidationPrepare(data.select(labelColName).toDF()))
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = data,
+    val (_, dataSet) = prepareForValidation(data)
+    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataSet,
       label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
       stratifyCondition = validator.isClassification
     )
@@ -146,11 +145,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
-    val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithIDPre))
-    val datasetWithID = splitterSummary.collect { case dc: DataCutterSummary =>
-      dc.preparedDF.getOrElse(datasetWithIDPre)
-    }.getOrElse(datasetWithIDPre)
-
+    val (splitterSummary, datasetWithID: DataFrame) = prepareForValidation(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
@@ -200,6 +195,32 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setEvaluators(evaluators)
   }
 
+  private def prepareForValidation(data: DataFrame) = {
+    println("GERA DEBUG: " + data.schema)
+
+    // ensure label is the first column
+    val labelColIdx = data.columns.indexOf(labelColName)
+    val needColSwapForValidation = labelColIdx > 0
+    val df = if (needColSwapForValidation) {
+      data
+    } else {
+      data.select(labelColName, data.columns.drop(labelColIdx): _*)
+    }
+    df.show()
+
+    val splitterSummary = splitter.flatMap(_.preValidationPrepare(df))
+    val dataFrame = splitterSummary.collect { case dc: DataCutterSummary =>
+      dc.preparedDF.getOrElse(df)
+    }.getOrElse(df)
+    (splitterSummary,
+      if (needColSwapForValidation) {
+        // restore column order
+        dataFrame.select(data.columns.head, data.columns.tail: _*) // TODO figure out a better way
+      } else {
+        dataFrame
+      }
+    )
+  }
 }
 
 /**
