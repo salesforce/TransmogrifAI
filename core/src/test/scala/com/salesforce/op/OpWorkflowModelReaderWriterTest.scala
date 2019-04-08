@@ -291,6 +291,11 @@ class OpWorkflowModelReaderWriterTest
     wfM.getBlacklist().isEmpty shouldBe true
   }
 
+  it should "error on loading a model without workflow" in {
+    the[NotImplementedError] thrownBy OpWorkflowModel.load(saveFlowPathStable) should
+      have message "Loading models without the original workflow is currently not supported"
+  }
+
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
     f1.length shouldBe f2.length
     f1.sortBy(_.uid) should contain theSameElementsAs f2.sortBy(_.uid)

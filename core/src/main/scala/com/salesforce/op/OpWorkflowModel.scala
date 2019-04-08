@@ -428,4 +428,12 @@ case object OpWorkflowModel {
   val PersistEveryKStages = 5
   val PersistScores = true
 
+  /**
+   * Load a previously trained workflow model from path
+   *
+   * @param path to the trained workflow model
+   * @return workflow model
+   */
+  def load(path: String): OpWorkflowModel = new OpWorkflowModelReader(None).load(path)
+
 }
