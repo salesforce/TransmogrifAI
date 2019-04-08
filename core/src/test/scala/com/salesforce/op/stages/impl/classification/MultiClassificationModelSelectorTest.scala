@@ -334,8 +334,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   it should "trim low-cardinality labels during cross validation" in {
     val nunLabeledRecords = 1000
-    val numLabels = 10
-    val topLabelsToPick = 3
+    val numLabels = 500
+    val topLabelsToPick = 100
     val labelColName = "label"
 
     val rnd = scala.util.Random
@@ -360,7 +360,10 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
       bigData, response = labelColName, nonNullable = Set("features"))
 
-    assert(bigData.select(labelColName).distinct().count() === numLabels)
+    val bigDataUniqs = bigData.select(labelColName).distinct().count()
+
+    withClue("Pseudo-random generation should produce labels within 25% from " + numLabels)(
+      assert(bigDataUniqs >= numLabels * 0.75 && bigDataUniqs <= numLabels))
 
     val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
     val testEstimator =
