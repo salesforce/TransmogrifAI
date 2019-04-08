@@ -62,7 +62,7 @@ object OpMinMaxEstimatorReaderWriterTest {
     val map: Map[String, Map[String, Double]],
     operationName: String, uid: String
   ) extends UnaryModel[Real, Real](operationName = operationName, uid = uid) {
-    def transformFn = f(min, max)
+    def transformFn: Real => Real = f(min, max)
   }
 
   class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
@@ -83,5 +83,5 @@ object OpMinMaxEstimatorReaderWriterTest {
     }
   }
 
-  def f(min: Double, max: Double) = (r: Real) => r.v.map(v => (v - min) / (max - min)).toReal
+  def f(min: Double, max: Double): Real => Real = (r: Real) => r.v.map(v => (v - min) / (max - min)).toReal
 }

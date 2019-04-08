@@ -138,6 +138,8 @@ object OpPipelineStageReadWriteShared {
       case x: Long => Array("l", x)
       case x: String => Array("s", x)
       case x: Boolean => Array("b", x)
+      case x: Seq[_] => Array("sq", x.map(valToJson))
+      case x: Array[_] => Array("a", x.map(valToJson))
       case x: Map[String, _] => Array("m", x.map(t => (t._1, valToJson(t._2))))
       case _ => Array("j", v)
     }
@@ -147,6 +149,8 @@ object OpPipelineStageReadWriteShared {
   def jsonToVal(v: Array[JValue], t: Option[TypeTag[Any]] = None): AnyRef = {
     v.head.extract[String] match {
       case "i" => Int.box(v.last.extract[Int])
+      case "sq" => v.last.extract[Seq[Array[JValue]]].map(x => jsonToVal(x, None))
+      case "a" => v.last.extract[Array[Array[JValue]]].map(x => jsonToVal(x, None))
       case "bd" => v.last.extract[BigDecimal]
       case "bi" => v.last.extract[BigInt]
       case "d" => Double.box(v.last.extract[Double])
