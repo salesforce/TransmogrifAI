@@ -33,11 +33,14 @@ package com.salesforce.op.stages
 import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, ScalingType, TimePeriod}
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import enumeratum._
 import org.json4s.JsonAST.{JInt, JValue}
 import org.json4s.ext.JodaTimeSerializers
 import org.json4s.{DefaultFormats, Extraction, Formats}
 
+import scala.reflect._
+import scala.reflect.runtime.universe._
 
 object OpPipelineStageReadWriteShared {
 
@@ -141,7 +144,7 @@ object OpPipelineStageReadWriteShared {
   }
 
 
-  def jsonToVal(v: Array[JValue], m: Option[Manifest[Any]] = None): AnyRef = {
+  def jsonToVal(v: Array[JValue], t: Option[TypeTag[Any]] = None): AnyRef = {
     v.head.extract[String] match {
       case "i" => Int.box(v.last.extract[Int])
       case "bd" => v.last.extract[BigDecimal]
@@ -151,7 +154,10 @@ object OpPipelineStageReadWriteShared {
       case "b" => Boolean.box(v.last.extract[Boolean])
       case "l" => Long.box(v.last.extract[Long])
       case "m" => v.last.extract[Map[String, Array[JValue]]].mapValues(x => jsonToVal(x, None))
-      case "j" if m.isDefined => Extraction.decompose(v.last).extract[Any](formats, m.get).asInstanceOf[AnyRef]
+      case "j" if t.isDefined =>
+        Extraction.decompose(v.last).extract[Any](
+          formats, ReflectionUtils.manifestForTypeTag[Any](t.get)
+        ).asInstanceOf[AnyRef]
       case x => throw new Exception(s"Unsupported type: ${x}")
     }
   }

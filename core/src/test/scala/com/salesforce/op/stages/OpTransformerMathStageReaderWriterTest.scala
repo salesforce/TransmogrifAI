@@ -40,11 +40,11 @@ import org.scalatest.junit.JUnitRunner
 class OpTransformerMathStageReaderWriterTest extends OpPipelineStageReaderWriterTest with RichNumericFeature {
 
 
-  val stage: OpPipelineStageBase = (height * 10).originStage
+  val stage: OpPipelineStageBase = (height * 10.0).originStage
 
   override val hasOutputName = false
 
-  val expected = Array(3935.5.toReal, 305.5.toReal, 305.5.toReal, 305.5.toReal, 2165.5.toReal, 1985.5.toReal)
+  val expected = Array(3630.0.toReal, 0.0.toReal, 0.0.toReal, 0.0.toReal, 1860.0.toReal, 1680.0.toReal)
 }
 
 

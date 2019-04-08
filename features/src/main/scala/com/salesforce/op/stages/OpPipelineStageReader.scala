@@ -260,11 +260,15 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
         // Everything else is read using json4s
         case AnyValueTypes.Value => Try {
           val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
-          val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
+
           ctorArgsValues(argName) match {
-            case a: JArray => jsonToVal(a.arr.toArray, Some(manifest))
-            case _ =>
+            case a: JArray => {
+              jsonToVal(a.arr.toArray, Some(ttag))
+            }
+            case _ => {
+              val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
               Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
+            }
           }
         } match {
           case Success(any) => any
