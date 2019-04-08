@@ -36,7 +36,7 @@ import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerialize
 import enumeratum._
 import org.json4s.JsonAST.{JInt, JValue}
 import org.json4s.ext.JodaTimeSerializers
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, Extraction, Formats}
 
 
 object OpPipelineStageReadWriteShared {
@@ -136,12 +136,12 @@ object OpPipelineStageReadWriteShared {
       case x: String => Array("s", x)
       case x: Boolean => Array("b", x)
       case x: Map[String, _] => Array("m", x.map(t => (t._1, valToJson(t._2))))
-      case _ => throw new Exception(s"Unsupported type: ${v.getClass.getName}")
+      case _ => Array("j", v)
     }
   }
 
 
-  def jsonToVal(v: Array[JValue]): AnyRef = {
+  def jsonToVal(v: Array[JValue], m: Option[Manifest[Any]] = None): AnyRef = {
     v.head.extract[String] match {
       case "i" => Int.box(v.last.extract[Int])
       case "bd" => v.last.extract[BigDecimal]
@@ -150,8 +150,8 @@ object OpPipelineStageReadWriteShared {
       case "s" => v.last.extract[String]
       case "b" => Boolean.box(v.last.extract[Boolean])
       case "l" => Long.box(v.last.extract[Long])
-      case "m" => v.last.extract[Map[String, Array[JValue]]].mapValues(jsonToVal)
-
+      case "m" => v.last.extract[Map[String, Array[JValue]]].mapValues(x => jsonToVal(x, None))
+      case "j" if m.isDefined => Extraction.decompose(v.last).extract[Any](formats, m.get).asInstanceOf[AnyRef]
       case x => throw new Exception(s"Unsupported type: ${x}")
     }
   }
