@@ -421,9 +421,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   }
 
   /**
-   * Creates a copy of [[OpWorkflowModel]]
+   * Creates a copy of this [[OpWorkflowModel]] instance
    *
-   * @return copy of [[OpWorkflowModel]]
+   * @return copy of this [[OpWorkflowModel]] instance
    */
   def copy(): OpWorkflowModel = {
     def copyFeatures(features: Array[OPFeature]): Array[OPFeature] = features.collect { case f: Feature[_] =>
