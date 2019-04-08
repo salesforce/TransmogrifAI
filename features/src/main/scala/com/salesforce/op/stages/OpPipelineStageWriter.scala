@@ -206,7 +206,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
         case v =>
 
           // try serialize value with json4s
-          val av = AnyValue(AnyValueTypes.Value, valToJson(v))
+          val av = AnyValue(AnyValueTypes.Value, v, Some(v.getClass.getName))
           Try(jsonSerialize(av)) match {
             case Success(_) => av
             case Failure(e) =>

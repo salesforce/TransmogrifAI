@@ -47,6 +47,7 @@ import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, render}
 import org.json4s.{Extraction, _}
 
+import scala.reflect.ManifestFactory
 import scala.reflect.runtime.universe._
 import scala.util.parsing.json.JSONArray
 import scala.util.{Failure, Success, Try}
@@ -260,16 +261,14 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
         // Everything else is read using json4s
         case AnyValueTypes.Value => Try {
           val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
-
-          ctorArgsValues(argName) match {
-            case a: JArray => {
-              jsonToVal(a.arr.toArray, Some(ttag))
-            }
-            case _ => {
-              val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
-              Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
+          val manifest = try {
+            ReflectionUtils.manifestForTypeTag[Any](ttag)
+          } catch {
+            case _ if anyValue.t.isDefined => {
+              ManifestFactory.classType(ReflectionUtils.classForName(anyValue.t.get)).asInstanceOf[Manifest[Any]]
             }
           }
+          Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
         } match {
           case Success(any) => any
           case Failure(e) => throw new RuntimeException(

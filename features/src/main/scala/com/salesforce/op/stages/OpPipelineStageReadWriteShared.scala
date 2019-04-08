@@ -109,7 +109,7 @@ object OpPipelineStageReadWriteShared {
   /**
    * A container for Any Value
    */
-  case class AnyValue(`type`: AnyValueTypes, value: Any)
+  case class AnyValue(`type`: AnyValueTypes, value: Any, t: Option[String] = None)
 
   implicit val formats: Formats =
     DefaultFormats ++
