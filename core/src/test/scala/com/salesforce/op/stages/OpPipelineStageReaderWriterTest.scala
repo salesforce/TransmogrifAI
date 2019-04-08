@@ -51,9 +51,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
 
   val meta = new MetadataBuilder().putString("foo", "bar").build()
   val expectedFeaturesLength = 1
-
   def stage: OpPipelineStageBase
-
   val expected: Array[Real]
   val hasOutputName = true
 
@@ -110,6 +108,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "load stage correctly" in {
     val reader = new OpPipelineStageReader(stage)
+
     val stageLoaded = reader.loadFromJsonString(stageJsonString, path = savePath, loadLambdas = true)
     stageLoaded shouldBe a[OpPipelineStageBase]
     stageLoaded shouldBe a[Transformer]

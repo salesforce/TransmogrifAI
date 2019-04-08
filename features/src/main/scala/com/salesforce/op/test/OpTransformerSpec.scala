@@ -104,7 +104,6 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
   }
   it should "transform data after being loaded" in {
     val loaded = writeAndRead(stage)
-
     val transformed = loaded.asInstanceOf[TransformerType].transform(inputData)
     val output = loaded.getOutput().asInstanceOf[FeatureLike[O]]
     val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
