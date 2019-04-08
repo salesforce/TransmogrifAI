@@ -292,8 +292,10 @@ class OpWorkflowModelReaderWriterTest
   }
 
   it should "error on loading a model without workflow" in {
-    the[NotImplementedError] thrownBy OpWorkflowModel.load(saveFlowPathStable) should
-      have message "Loading models without the original workflow is currently not supported"
+    val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
+    error.getMessage should startWith("Failed to load Workflow from path")
+    error.getCause.isInstanceOf[NotImplementedError] shouldBe true
+    error.getCause.getMessage shouldBe "Loading models without the original workflow is currently not supported"
   }
 
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
