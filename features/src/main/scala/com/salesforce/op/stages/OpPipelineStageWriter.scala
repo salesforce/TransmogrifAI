@@ -34,13 +34,21 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.base.LambdaTransformer
+import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
+import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
+import com.salesforce.op.stages.base.sequence.{BinarySequenceLambdaTransformer, SequenceLambdaTransformer}
+import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
 import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
-import org.json4s.JsonAST.{JObject, JValue}
+import org.json4s.JsonAST.{JInt, JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import com.salesforce.op.stages.impl.feature._
 
+import scala.collection.mutable
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Success, Try}
 
@@ -85,13 +93,82 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     // We produce stage metadata for all the Spark params
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
     // Add isModel indicator
-    val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
+    val m = mutable.Map[String, Any]()
+    m ++= parse(metadataJson).extract[Map[String, Any]]
+    m.update(FieldNames.IsModel.entryName, isModel)
+    m ++= getLambdaDetails
+
+
     // In case we stumbled upon a model instance, we also include it's ctor args
     // so we can reconstruct the model instance when loading
-    if (isModel) metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap) else metadata
+    if (isModel) {
+      m.update(FieldNames.CtorArgs.entryName, modelCtorArgs().toMap)
+    }
+    m.toMap
   }
 
   private def isModel: Boolean = stage.isInstanceOf[Model[_]]
+
+  private def getLambdaDetails: Map[String, Any] = {
+    val m: mutable.Map[String, Any] = stage match {
+      case t: LambdaTransformer[_, _] => {
+
+        val n = t.transformFn.getClass.getName
+        ReflectionUtils.newLambdaInstance(n, Array()) match {
+          case Failure(e) => throw new RuntimeException(s"Unable to instantinate lambda: ${n} (Reason: ${e})")
+          case _ =>
+            val args = Array()
+            mutable.Map[String, Any](
+              FieldNames.LambdaClassName.entryName -> n,
+              FieldNames.LambdaTypeO.entryName -> ReflectionUtils.dealisedTypeName(t.tto.tpe),
+              FieldNames.LambdaTypeOV.entryName -> ReflectionUtils.dealisedTypeName(t.ttov.tpe),
+              FieldNames.OperationName.entryName -> t.operationName,
+              FieldNames.LambdaClassArgs.entryName -> args,
+              FieldNames.Uid.entryName -> t.uid
+            )
+        }
+
+
+      }
+
+      // I didn't want to nest third match here...
+      case _ =>
+        mutable.Map[String, Any](FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap)
+    }
+
+    stage match {
+      case t: SequenceLambdaTransformer[_, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti.tpe))
+
+      case t: UnaryLambdaTransformer[_, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti.tpe))
+
+      case t: BinaryLambdaTransformer[_, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+
+      case t: BinarySequenceLambdaTransformer[_, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+
+      case t: TernaryLambdaTransformer[_, _, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+        m.update(FieldNames.LambdaTypeI3.entryName, ReflectionUtils.dealisedTypeName(t.tti3.tpe))
+
+      case t: QuaternaryLambdaTransformer[_, _, _, _, _] =>
+        m.update(FieldNames.LambdaTypeI1.entryName, ReflectionUtils.dealisedTypeName(t.tti1.tpe))
+        m.update(FieldNames.LambdaTypeI2.entryName, ReflectionUtils.dealisedTypeName(t.tti2.tpe))
+        m.update(FieldNames.LambdaTypeI3.entryName, ReflectionUtils.dealisedTypeName(t.tti3.tpe))
+        m.update(FieldNames.LambdaTypeI4.entryName, ReflectionUtils.dealisedTypeName(t.tti4.tpe))
+
+
+      case _ => Map()
+    }
+
+    m.toMap
+
+  }
 
   /**
    * Extract model ctor args values keyed by their names, so we can reconstruct the model instance when loading.
@@ -115,14 +192,18 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
               "Only Feature and Feature Value type tags are supported for serialization."
           )
 
+        // We might consider adding more like BigDecimal etc
+        case n: Numeric[_] => AnyValue(`type` = AnyValueTypes.Class, value = n.getClass.getName)
+
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
         case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
         case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
 
         // Everything else goes as is and is handled by json4s
         case v =>
+
           // try serialize value with json4s
-          val av = AnyValue(AnyValueTypes.Value, v)
+          val av = AnyValue(AnyValueTypes.Value, v, Some(v.getClass.getName))
           Try(jsonSerialize(av)) match {
             case Success(_) => av
             case Failure(e) =>

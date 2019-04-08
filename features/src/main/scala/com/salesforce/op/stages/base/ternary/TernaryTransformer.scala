@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.ternary
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStage3, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.functions._
@@ -152,3 +153,4 @@ final class TernaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <:
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
 ) extends TernaryTransformer[I1, I2, I3, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, I2, I3) => O]

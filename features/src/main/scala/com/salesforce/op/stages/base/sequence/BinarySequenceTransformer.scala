@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.sequence
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStage2N, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -147,3 +148,4 @@ final class BinarySequenceLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
 ) extends BinarySequenceTransformer[I1, I2, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, Seq[I2]) => O]

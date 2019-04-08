@@ -28,26 +28,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.stages.base
 
-import com.salesforce.op.UID
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features.types.FeatureType
+import scala.reflect.runtime.universe.TypeTag
 
-
-@RunWith(classOf[JUnitRunner])
-class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
-
-  override val hasOutputName = false
-
-  val stage: OpPipelineStageBase =
-    new UnaryLambdaTransformer[Real, Real](
-      operationName = "test",
-      transformFn = Lambdas.fncUnary,
-      uid = "uid_1234"
-    ).setInput(weight).setMetadata(meta)
-
-  val expected = Array(21.2248.toReal, 8.2678.toReal, Real.empty, 9.6252.toReal, 11.8464.toReal, 8.2678.toReal)
+/**
+ * @author ksuchanek
+ * @since 214
+ */
+trait LambdaTransformer[O <: FeatureType, F] {
+  val tto: TypeTag[O]
+  val ttov: TypeTag[O#Value]
+  val transformFn: F
 }

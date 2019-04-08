@@ -33,6 +33,7 @@ package com.salesforce.op.stages.base.unary
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.base.LambdaTransformer
 import com.salesforce.op.stages.{OpPipelineStage1, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.functions._
@@ -134,4 +135,4 @@ final class UnaryLambdaTransformer[I <: FeatureType, O <: FeatureType]
   implicit tti: TypeTag[I],
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
-) extends UnaryTransformer[I, O](operationName = operationName, uid = uid)
+) extends UnaryTransformer[I, O](operationName = operationName, uid = uid) with LambdaTransformer[O, I => O]

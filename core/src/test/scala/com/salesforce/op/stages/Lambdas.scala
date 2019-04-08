@@ -30,24 +30,46 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.UID
+import com.salesforce.op.features.types.Real
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
+/**
+ * @author ksuchanek
+ * @since 214
+ */
+object Lambdas {
+  def fncUnary: Real => Real = (x: Real) => x.v.map(_ * 0.1234).toReal
 
-@RunWith(classOf[JUnitRunner])
-class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
+  def fncSequence: Seq[DateList] => Real = (x: Seq[DateList]) => {
+    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+    Math.round(v / 1E6).toReal
+  }
 
-  override val hasOutputName = false
+  def fncBinarySequence: (Real, Seq[DateList]) => Real = (y: Real, x: Seq[DateList]) => {
+    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+    (Math.round(v / 1E6) + y.value.getOrElse(0.0)).toReal
+  }
 
-  val stage: OpPipelineStageBase =
-    new UnaryLambdaTransformer[Real, Real](
-      operationName = "test",
-      transformFn = Lambdas.fncUnary,
-      uid = "uid_1234"
-    ).setInput(weight).setMetadata(meta)
+  def fncBinary: (Real, Real) => Real = (x: Real, y: Real) => (
+    for {
+      yv <- y.value
+      xv <- x.value
+    } yield xv * yv
+    ).toReal
 
-  val expected = Array(21.2248.toReal, 8.2678.toReal, Real.empty, 9.6252.toReal, 11.8464.toReal, 8.2678.toReal)
+  def fncTernary: (Real, Real, Real) => Real = (x: Real, y: Real, z: Real) =>
+    (for {
+      xv <- x.value
+      yv <- y.value
+      zv <- z.value
+    } yield xv * yv + zv).toReal
+
+  def fncQuaternary: (Real, Real, Text, Real) => Real = (x: Real, y: Real, t: Text, z: Real) =>
+    (for {
+      xv <- x.value
+      yv <- y.value
+      tv <- t.value
+      zv <- z.value
+    } yield xv * yv + zv * tv.length).toReal
+
 }

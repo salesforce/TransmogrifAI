@@ -31,12 +31,16 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.FeatureDistributionType
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, ScalingType, TimePeriod}
+import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import enumeratum._
+import org.json4s.JsonAST.{JInt, JValue}
 import org.json4s.ext.JodaTimeSerializers
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{CustomSerializer, DefaultFormats, Extraction, Formats, JObject}
 
+import scala.reflect._
+import scala.reflect.runtime.universe._
 
 object OpPipelineStageReadWriteShared {
 
@@ -50,11 +54,35 @@ object OpPipelineStageReadWriteShared {
    */
   object FieldNames extends Enum[FieldNames] {
     val values = findValues
+
     case object IsModel extends FieldNames("isModel")
+
     case object CtorArgs extends FieldNames("ctorArgs")
+
     case object Uid extends FieldNames("uid")
+
     case object Class extends FieldNames("class")
+
     case object ParamMap extends FieldNames("paramMap")
+
+    case object LambdaClassName extends FieldNames("lambdaClassName")
+
+    case object LambdaTypeI1 extends FieldNames("lambdaTypeI1")
+
+    case object LambdaTypeI2 extends FieldNames("lambdaTypeI2")
+
+    case object LambdaTypeI3 extends FieldNames("lambdaTypeI3")
+
+    case object LambdaTypeI4 extends FieldNames("lambdaTypeI4")
+
+    case object LambdaTypeO extends FieldNames("lambdaTypeO")
+
+    case object LambdaTypeOV extends FieldNames("lambdaTypeOV")
+
+    case object LambdaClassArgs extends FieldNames("lambdaClassArgs")
+
+    case object OperationName extends FieldNames("operationName")
+
   }
 
   /**
@@ -67,15 +95,21 @@ object OpPipelineStageReadWriteShared {
    */
   object AnyValueTypes extends Enum[AnyValueTypes] {
     val values = findValues
+
     case object TypeTag extends AnyValueTypes
+
+    case object Class extends AnyValueTypes
+
     case object SparkWrappedStage extends AnyValueTypes
+
     case object Value extends AnyValueTypes
+
   }
 
   /**
    * A container for Any Value
    */
-  case class AnyValue(`type`: AnyValueTypes, value: Any)
+  case class AnyValue(`type`: AnyValueTypes, value: Any, t: Option[String] = None)
 
   implicit val formats: Formats =
     DefaultFormats ++
