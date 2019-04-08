@@ -171,7 +171,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
    * Loads from the json serialized data
    *
    * @param jsonStr json string
-   * @param path to the stored output
+   * @param path    to the stored output
    * @return OpPipelineStageBase
    */
   def loadFromJsonString(jsonStr: String, path: String): OpPipelineStageBase = {
@@ -263,7 +263,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
               ManifestFactory.classType(ReflectionUtils.classForName(anyValue.t.get)).asInstanceOf[Manifest[Any]]
             }
           }
-          println(manifest,anyValue.value)
+
           Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
         } match {
           case Success(any) => any
