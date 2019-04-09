@@ -286,6 +286,22 @@ class OpWorkflowModelReaderWriterTest
     wfM.getBlacklist().map(_.name) should contain theSameElementsAs Array("age", "description")
   }
 
+  it should "load model and allow copying it" in new VectorizedFlow {
+    val wfM = wf.loadModel(saveFlowPathStable)
+    val copy = wfM.copy()
+    copy.uid shouldBe wfM.uid
+    copy.trainingParams.toString shouldBe wfM.trainingParams.toString
+    copy.isWorkflowCV shouldBe wfM.isWorkflowCV
+    copy.reader shouldBe wfM.reader
+    copy.resultFeatures shouldBe wfM.resultFeatures
+    copy.rawFeatures shouldBe wfM.rawFeatures
+    copy.blacklistedFeatures shouldBe wfM.blacklistedFeatures
+    copy.blacklistedMapKeys shouldBe wfM.blacklistedMapKeys
+    copy.rawFeatureFilterResults shouldBe wfM.rawFeatureFilterResults
+    copy.stages.map(_.uid) shouldBe wfM.stages.map(_.uid)
+    copy.parameters.toString shouldBe wfM.parameters.toString
+  }
+
   it should "be able to load a old version of a saved model" in new VectorizedFlow {
     val wfM = wf.loadModel("src/test/resources/OldModelVersion")
     wfM.getBlacklist().isEmpty shouldBe true
