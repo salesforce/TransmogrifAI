@@ -27,41 +27,27 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.op.stages.impl.feature
 
-package com.salesforce.op.local
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 
-import com.salesforce.op.{OpParams, OpWorkflow}
-import org.apache.spark.sql.SparkSession
+@RunWith(classOf[JUnitRunner])
+class SubstringTransformerTest extends OpTransformerSpec[Binary, SubstringTransformer[Text, Text]] {
 
+  val sample = Seq((Text("a"), Text("abc")), (Text("abc"), Text("a")), (Text("no"), Text("YesNO")),
+    (Text.empty, Text("blah")), (Text.empty, Text("blah")), (Text.empty, Text.empty))
+  val (inputData, f1, f2) = TestFeatureBuilder(sample)
+  val transformer: SubstringTransformer[Text, Text] = new SubstringTransformer[Text, Text]().setInput(f1, f2)
+  val expectedResult: Seq[Binary] = Seq(Binary(true), Binary(false), Binary(true), Binary.empty,
+    Binary.empty, Binary.empty)
 
-/**
- * A class for running TransmogrifAI Workflow without Spark.
- *
- * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
- */
-class OpWorkflowRunnerLocal(val workflow: OpWorkflow) extends Serializable {
-
-  /**
-   * Load the model & prepare a score function for local scoring
-   *
-   * Note: since we use Spark native [[org.apache.spark.ml.util.MLWriter]] interface
-   * to load stages the Spark session is being created internally. So if you would not like
-   * to have an open SparkSession please make sure to stop it after creating the score function:
-   *
-   *   val scoreFunction = new OpWorkflowRunnerLocal(workflow).score(params)
-   *   // stop the session after creating the scoreFunction if needed
-   *   SparkSession.builder().getOrCreate().stop()
-   *
-   * @param params params to use during scoring
-   * @param spark  Spark Session needed for preparing scoring function.
-   *               Once scoring function is returned the Spark Session can be shutdown
-   *               since it's not required during local scoring.
-   * @return score function for local scoring
-   */
-  def scoreFunction(params: OpParams)(implicit spark: SparkSession): ScoreFunction = {
-    require(params.modelLocation.isDefined, "Model location must be set in params")
-    val model = workflow.loadModel(params.modelLocation.get)
-    model.scoreFunction
+  it should "have a working shortcut" in {
+    val f3 = f1.isSubstring(f2)
+    f3.originStage.isInstanceOf[SubstringTransformer[_, _]] shouldBe true
   }
 
 }
+

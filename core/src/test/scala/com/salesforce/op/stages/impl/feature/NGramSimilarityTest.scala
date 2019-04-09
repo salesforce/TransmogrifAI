@@ -88,7 +88,7 @@ class NGramSimilarityTest extends FlatSpec with TestSparkContext {
   }
 
   Spec[TextNGramSimilarity[_]] should "correctly compute char-n-gram similarity" in {
-    val nGramSimilarity = f1Text.toNGramSimilarity(f2Text)
+    val nGramSimilarity = f1Text.toNGramSimilarity(f2Text, toLowerCase = false)
     val transformedDs = nGramSimilarity.originStage.asInstanceOf[Transformer].transform(dsText)
     val actualOutput = transformedDs.collect(nGramSimilarity)
 
@@ -97,7 +97,7 @@ class NGramSimilarityTest extends FlatSpec with TestSparkContext {
   }
 
   Spec[TextNGramSimilarity[_]] should "correctly compute char-n-gram similarity with nondefault ngram param" in {
-    val nGramSimilarity = f1Text.toNGramSimilarity(f2Text, 4)
+    val nGramSimilarity = f1Text.toNGramSimilarity(f2Text, nGramSize = 4, toLowerCase = false)
     val transformedDs = nGramSimilarity.originStage.asInstanceOf[Transformer].transform(dsText)
     val actualOutput = transformedDs.collect(nGramSimilarity)
 
