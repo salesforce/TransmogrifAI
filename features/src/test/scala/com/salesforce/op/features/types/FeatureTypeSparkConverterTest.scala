@@ -153,11 +153,23 @@ class FeatureTypeSparkConverterTest
       FeatureTypeSparkConverter.toSpark(rn.doubleValue().toReal) shouldEqual rn
     }
   }
-  property("raises error on invalid real numbers") {
+  property("converts natural numbers to Real feature type") {
     forAll(naturalNumbers) { rn =>
-      intercept[IllegalArgumentException](FeatureTypeSparkConverter[Real]().fromSpark(rn))
+      FeatureTypeSparkConverter[Real]().fromSpark(rn) shouldBe rn.doubleValue().toReal
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toReal) shouldEqual rn
+    }
+  }
+  property("converts natural numbers to RealNN feature type") {
+    forAll(naturalNumbers) { rn =>
+      FeatureTypeSparkConverter[RealNN]().fromSpark(rn) shouldBe rn.doubleValue().toReal
+      FeatureTypeSparkConverter.toSpark(rn.doubleValue().toReal) shouldEqual rn
+    }
+  }
+  property("raises error on invalid real numbers") {
+    forAll(booleans) { b =>
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[Real]().fromSpark(b))
         .getMessage startsWith "Real type mapping is not defined"
-      intercept[IllegalArgumentException](FeatureTypeSparkConverter[RealNN]().fromSpark(rn))
+      intercept[IllegalArgumentException](FeatureTypeSparkConverter[RealNN]().fromSpark(b))
         .getMessage startsWith "RealNN type mapping is not defined"
     }
   }

@@ -465,7 +465,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param path to the trained workflow model
    * @return workflow model
    */
-  def loadModel(path: String): OpWorkflowModel = new OpWorkflowModelReader(this).load(path)
+  def loadModel(path: String): OpWorkflowModel = new OpWorkflowModelReader(Some(this)).load(path)
 
   /**
    * Returns a dataframe containing all the columns generated up to and including the feature input

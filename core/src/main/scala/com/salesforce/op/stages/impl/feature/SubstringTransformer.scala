@@ -33,68 +33,43 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryTransformer
-import org.apache.lucene.search.spell.NGramDistance
+import org.apache.spark.ml.param.{BooleanParam, Params}
 
 import scala.reflect.runtime.universe.TypeTag
 
-
 /**
- * Compute char ngram distance for MultiPickList features.
- *
- * @param nGramSize the size of the n-gram to be used to compute the string distance
+ * Checks if the first input is a substring of the second input
+ * @param uid           uid for instance
+ * @param tti1          type tag for first input
+ * @param tti2          type tag for second input
+ * @tparam I1 first input feature type
+ * @tparam I2 second input feature type
  */
-class SetNGramSimilarity
+class SubstringTransformer[I1 <: Text, I2 <: Text]
 (
-  nGramSize: Int = NGramSimilarity.nGramSize,
-  uid: String = UID[SetNGramSimilarity]
-) extends NGramSimilarity[MultiPickList](
-  operationName = "nGramSet",
-  uid = uid,
-  convertFn = _.v.mkString(" "),
-  nGramSize = nGramSize
-)
-
-/**
- * Compute char ngram distance for Text features.
- *
- * @param nGramSize the size of the n-gram to be used to compute the string distance
- */
-class TextNGramSimilarity[T <: Text]
-(
-  nGramSize: Int = NGramSimilarity.nGramSize,
-  uid: String = UID[TextNGramSimilarity[T]]
-)(implicit tti1: TypeTag[T]) extends NGramSimilarity[T](
-  operationName = "nGramText",
-  uid = uid,
-  convertFn = _.v.getOrElse(""),
-  nGramSize = nGramSize
-)
-
-private[feature] class NGramSimilarity[I <: FeatureType]
-(
-  uid: String,
-  operationName: String,
-  val convertFn: I => String,
-  val nGramSize: Int
-)(implicit tti1: TypeTag[I],
-  tto: TypeTag[Real]
-) extends BinaryTransformer[I, I, RealNN](operationName = operationName, uid = uid) with TextMatchingParams {
-
-  def transformFn: (I, I) => RealNN = (lhs: I, rhs: I) => {
-    val lc = $(toLowercase)
-    val Seq(lhString, rhString) = Seq(lhs, rhs).map(convertFn(_).trim).map{ s => if (lc) s.toLowerCase else s }
-
-    // in our case, if any of the strings are empty, we want the similarity to be minimum, not maximum,
-    // regardless of what the other string is.
-    val similarity = {
-      if (lhString.isEmpty || rhString.isEmpty) 0.0
-      else new NGramDistance(nGramSize).getDistance(lhString, rhString)
-    }
-    similarity.toRealNN
+  uid: String = UID[SubstringTransformer[_, _]]
+)(
+  implicit override val tti1: TypeTag[I1],
+  override val tti2: TypeTag[I2]
+) extends BinaryTransformer[I1, I2, Binary](operationName = "substring", uid = uid) with TextMatchingParams {
+  override def transformFn: (I1, I2) => Binary = (sub: I1, full: I2) => {
+    val (subClean, fullClean) =
+      if ($(toLowercase)) (sub.map(_.toLowerCase), full.map(_.toLowerCase))
+      else (sub.value, full.value)
+    fullClean.flatMap(f => subClean.map(f.contains(_))).toBinary
   }
-
 }
 
-object NGramSimilarity {
-  val nGramSize = 3
+
+trait TextMatchingParams extends Params {
+
+  /**
+   * Indicates whether to convert all characters to lowercase before string operation.
+   */
+  final val toLowercase =
+    new BooleanParam(this, "toLowercase", "whether to convert all characters to lowercase before string operation")
+  def setToLowercase(value: Boolean): this.type = set(toLowercase, value)
+  def getToLowercase: Boolean = $(toLowercase)
+  setDefault(toLowercase -> TextTokenizer.ToLowercase)
+
 }

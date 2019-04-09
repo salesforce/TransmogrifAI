@@ -69,7 +69,7 @@ trait LanguageDetectionParams extends Params {
 }
 
 
-trait TextTokenizerParams extends LanguageDetectionParams {
+trait TextTokenizerParams extends LanguageDetectionParams with TextMatchingParams {
 
   /**
    * Minimum token length, >= 1.
@@ -78,14 +78,6 @@ trait TextTokenizerParams extends LanguageDetectionParams {
     new IntParam(this, "minTokenLength", "minimum token length (>= 1)", ParamValidators.gtEq(1))
   def setMinTokenLength(value: Int): this.type = set(minTokenLength, value)
   def getMinTokenLength: Int = $(minTokenLength)
-
-  /**
-   * Indicates whether to convert all characters to lowercase before tokenizing.
-   */
-  final val toLowercase =
-    new BooleanParam(this, "toLowercase", "whether to convert all characters to lowercase before tokenizing")
-  def setToLowercase(value: Boolean): this.type = set(toLowercase, value)
-  def getToLowercase: Boolean = $(toLowercase)
 
   setDefault(
     minTokenLength -> TextTokenizer.MinTokenLength,
