@@ -168,5 +168,4 @@ object OpPipelineStagesTest {
     extends Pipeline with OpPipelineStage1[RealNN, RealNN] {
     override def operationName: String = "test"
   }
-
 }
