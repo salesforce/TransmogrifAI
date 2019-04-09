@@ -28,39 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base.unary
+package com.salesforce.op.stages
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.LambdaTransformer
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
+
+import scala.reflect.runtime.universe.TypeTag
 
 
-@RunWith(classOf[JUnitRunner])
-class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransformer[Real, Real]] {
-
-  /**
-   * Input Dataset to transform
-   */
-  val (inputData, f1) = TestFeatureBuilder(Seq(Some(1), Some(2), Some(3), None).map(_.toReal))
+private[op] trait HasOut[O <: FeatureType] {
+  self: OpPipelineStage[O] =>
 
   /**
-   * [[OpTransformer]] instance to be tested
+   * Type tag of the output
    */
-  val transformer = new UnaryLambdaTransformer[Real, Real](
-    operationName = "unary",
-    transformFn = r => r.v.map(_ * 2.0).toReal
-  ).setInput(f1)
+  implicit val tto: TypeTag[O]
 
   /**
-   * Expected result of the transformer applied on the Input Dataset
+   * Type tag of the output value
    */
-  val expectedResult = Seq(Real(2), Real(4), Real(6), Real.empty)
+  implicit val ttov: TypeTag[O#Value]
 
-  it should "be a lambda transformer" in {
-    transformer shouldBe a[LambdaTransformer[_, _]]
-    transformer.ttIns shouldBe Array(transformer.tti)
-  }
+  override def getOutput(): FeatureLike[O] = new Feature[O](
+    uid = outputFeatureUid,
+    name = getOutputFeatureName,
+    originStage = this,
+    isResponse = outputIsResponse,
+    parents = getInputFeatures()
+  )(tto)
 
 }

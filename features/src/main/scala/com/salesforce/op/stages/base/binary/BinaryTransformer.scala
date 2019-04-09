@@ -33,7 +33,7 @@ package com.salesforce.op.stages.base.binary
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.{OpPipelineStage2, OpTransformer}
+import com.salesforce.op.stages.{LambdaTransformer, OpPipelineStage2, OpTransformer}
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Dataset}
@@ -145,3 +145,6 @@ final class BinaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: F
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
 ) extends BinaryTransformer[I1, I2, O](operationName = operationName, uid = uid)
+  with LambdaTransformer[O, (I1, I2) => O] {
+  def ttIns: Array[TypeTag[_]] = Array(tti1, tti2)
+}

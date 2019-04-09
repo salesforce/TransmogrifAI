@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.base.quaternary
 
 import com.salesforce.op.features.types._
+import com.salesforce.op.stages.LambdaTransformer
 import com.salesforce.op.test._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -55,5 +56,10 @@ class QuaternaryTransformerTest
   ).setInput(f1, f2, f3, f4)
 
   val expectedResult = Seq(4.toReal, 6.toReal, 11.toReal)
+
+  it should "be a lambda transformer" in {
+    transformer shouldBe a[LambdaTransformer[_, _]]
+    transformer.ttIns shouldBe Array(transformer.tti1, transformer.tti2, transformer.tti3, transformer.tti4)
+  }
 
 }
