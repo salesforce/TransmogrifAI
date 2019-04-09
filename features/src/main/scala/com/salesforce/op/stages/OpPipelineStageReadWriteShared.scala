@@ -70,6 +70,7 @@ object OpPipelineStageReadWriteShared {
     case object TypeTag extends AnyValueTypes
     case object SparkWrappedStage extends AnyValueTypes
     case object Value extends AnyValueTypes
+    case object Function extends AnyValueTypes
   }
 
   /**

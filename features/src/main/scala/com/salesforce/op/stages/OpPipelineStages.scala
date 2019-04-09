@@ -41,7 +41,6 @@ import org.apache.spark.ml.{PipelineStage, Transformer}
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.StructType
 
-import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Success, Try}
 
 

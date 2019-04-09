@@ -101,7 +101,8 @@ StageType <: OpPipelineStage[O] : ClassTag]
    */
   protected def writeAndRead(stage: StageType, savePath: String = stageSavePath): OpPipelineStageBase = {
     val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
-    new OpPipelineStageReader(stage).loadFromJsonString(json, savePath)
+    val features = stage.getInputFeatures().flatMap(_.allFeatures)
+    new OpPipelineStageReader(features).loadFromJsonString(json, savePath)
   }
 
   /**

@@ -84,14 +84,11 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     }
     // We produce stage metadata for all the Spark params
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
-    // Add isModel indicator
-    val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
-    // In case we stumbled upon a model instance, we also include it's ctor args
-    // so we can reconstruct the model instance when loading
-    if (isModel) metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap) else metadata
-  }
+    val metadata = parse(metadataJson).extract[Map[String, Any]]
 
-  private def isModel: Boolean = stage.isInstanceOf[Model[_]]
+    // We also include stage it's ctor args, so we can reconstruct the model instance when loading
+    metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap)
+  }
 
   /**
    * Extract model ctor args values keyed by their names, so we can reconstruct the model instance when loading.
@@ -106,6 +103,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     // Wrap all ctor args into AnyValue container
     for {(argName, argValue) <- argsList} yield {
       val anyValue = argValue match {
+
         // Special handling for Feature Type TypeTags
         case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
           AnyValue(`type` = AnyValueTypes.TypeTag, value = ReflectionUtils.dealisedTypeName(t.tpe))
@@ -114,6 +112,14 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
             s"Unknown type tag '${t.tpe.toString}'. " +
               "Only Feature and Feature Value type tags are supported for serialization."
           )
+
+        // Special handling for function value arguments
+        case f1: Function1[_, _]
+          // Maps and other scala collections extend [[Function1]] - skipping them
+          if !f1.getClass.getPackage.getName.startsWith("scala") => serializeFunction(argName, f1)
+        case f2: Function2[_, _, _] => serializeFunction(argName, f2)
+        case f3: Function3[_, _, _, _] => serializeFunction(argName, f3)
+        case f4: Function4[_, _, _, _, _] => serializeFunction(argName, f4)
 
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
         case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
@@ -138,6 +144,20 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
       throw new RuntimeException(s"Failed to extract constructor arguments for model stage '${stage.uid}'. " +
         "Make sure your model class is a concrete final class with json4s serializable arguments.", error
       )
+  }
+
+  private def serializeFunction(argName: String, function: AnyRef): AnyValue = {
+    val functionClass = function.getClass
+    try {
+      // Test that function has no external dependencies and can be constructed without ctor args
+      functionClass.getConstructors.head.newInstance()
+    } catch {
+      case e: Exception => throw new RuntimeException(
+        s"Function argument '$argName' cannot be serialized. " +
+          "Make sure your function does not have any external dependencies, " +
+          "e.g. use any out of scope variables.", e)
+    }
+    AnyValue(`type` = AnyValueTypes.Function, value = functionClass.getName)
   }
 
   private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))
