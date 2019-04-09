@@ -258,7 +258,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val pred = testEstimator.getOutput()
     val justScores = transformedData.collect(pred)
     val missed = justScores.zip(transformedData.collect(label))
-      .map{ case (p, l) => math.abs(p.prediction - l.v.get) }.sum
+      .map { case (p, l) => math.abs(p.prediction - l.v.get) }.sum
     missed < 10 shouldBe true
   }
 
@@ -326,7 +326,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val fitted = modelSelector.fit(data)
 
     fitted.modelStageIn.parent.extractParamMap().toSeq
-      .collect{ case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
+      .collect { case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.validationResults.head shouldBe myMetadata
@@ -334,20 +334,22 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   it should "trim low-cardinality labels during cross validation" in {
     import org.scalatest.prop.TableDrivenPropertyChecks._
-
     val rnd = scala.util.Random
-    rnd.setSeed(seed)
 
     val labelColName = "label"
 
     val testTable = Table(
-      ("nunLabeledRecords", "numLabels", "topLabelsToPick"), (10000, 1000, 100), (10000, 10000, 100),
-      (10000, 1000, 5), (10000, 10000, 5), (200, 101, 5)
+      ("nunLabeledRecords", "numLabels", "topLabelsToPick"),
+      (10000, 10, 100),
+      (10000, 100, 100),
+      (10000, 10000, 100),
+      (100000, 10000, 100),
+      (200, 101, 5),
+      (200, 150, 5)
     )
 
     forAll(testTable) { (nunLabeledRecords: Int, numLabels: Int, topLabelsToPick: Int) =>
 
-      println(s"nunLabeledRecords=${nunLabeledRecords}, numLabels=${numLabels}, topLabelsToPick=$topLabelsToPick")
       val bigNoneIndexedData =
         normalVectorRDD(sc, nunLabeledRecords, 3, seed = seed)
           .map { v =>
@@ -357,34 +359,51 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           .toDF("txtLabel", "features")
           .persist() // IMPORTANT prevent recomputing the DF with Random
 
-      val bigData = new OpStringIndexerNoFilter[Text]()
-        .setInput(txtF)
-        .setOutputFeatureName(labelColName)
-        .fit(bigNoneIndexedData)
-        .transform(bigNoneIndexedData)
-        .select(labelColName, "features")
-        .persist()
+      Seq(true, false)
+        .foreach { withIndex =>
 
-      val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
-        bigData, response = labelColName, nonNullable = Set("features"))
+          println(s"nunLabeledRecords=${nunLabeledRecords}, numLabels=${numLabels}," +
+            s" topLabelsToPick=${topLabelsToPick} withIndex=${withIndex}")
 
-      val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
-      val testEstimator =
-        MultiClassificationModelSelector
-          .withCrossValidation(
-            Option(cutter),
-            numFolds = 4,
-            seed = 10L,
-            modelsAndParameters = models
+          val bigData = if (withIndex) {
+            new OpStringIndexerNoFilter[Text]()
+              .setInput(txtF)
+              .setOutputFeatureName(labelColName)
+              .fit(bigNoneIndexedData)
+              .transform(bigNoneIndexedData)
+              .select(labelColName, "features")
+              .persist()
+          } else {
+            bigNoneIndexedData
+              .drop("txtlabel")
+              .withColumn("labelInt", monotonically_increasing_id())
+              .withColumn("label", col("labelInt").cast("double"))
+              .drop("labelInt")
+              .select("label", "features")
+              .persist()
+          }
+
+          val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+            bigData, response = labelColName, nonNullable = Set("features"))
+
+          val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
+          val testEstimator =
+            MultiClassificationModelSelector
+              .withCrossValidation(
+                Option(cutter),
+                numFolds = 4,
+                seed = 10L,
+                modelsAndParameters = models
+              )
+              .setInput(label, features)
+          testEstimator.fit(bigData)
+
+          assert(cutter.summary
+            .exists(_.asInstanceOf[DataCutterSummary].preparedDF
+              .exists(xdf => xdf.select(labelColName).distinct().count() === topLabelsToPick)),
+            "label trimming has not happened, too many uniques"
           )
-          .setInput(label, features)
-      testEstimator.fit(bigData)
-
-      assert(cutter.summary
-        .exists(_.asInstanceOf[DataCutterSummary].preparedDF
-          .exists(xdf => xdf.select(labelColName).distinct().count() === topLabelsToPick)),
-        "label trimming has not happened, too many uniques"
-      )
+        }
     }
   }
 }

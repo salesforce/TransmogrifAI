@@ -104,22 +104,14 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         val labelMetaArr = getLabelsFromMetadata(data)
         val labelSet = getLabelsToKeep.toSet
 
-        // discount unseen label
-        val integralLabelSet = 0.until(labelMetaArr.length - 1)
-          .map(_.toDouble)
-          .toSet
-
-        val dataPrep = if (integralLabelSet == labelSet) {
-          log.info("Label sets identical in dataset metadata and datacutter, skipping label trim")
-          data
-        } else {
+        val dataPrep = {
           log.info(s"Dropping rows with columns not in $labelSet")
 
           // Update metadata that spark.ml Classifier is using tp determine the number of classes
           //
           val na = NominalAttribute.defaultAttr.withName(labelColName)
           val metadataNA = if (labelMetaArr.isEmpty) {
-            na.withNumValues(labelSet.size)
+            na
           } else {
             na.withValues(labelMetaArr.take(labelSet.size))
           }
