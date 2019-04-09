@@ -28,34 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base.sequence
+package com.salesforce.op.stages
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
+
+import scala.reflect.runtime.universe.TypeTag
 
 
-@RunWith(classOf[JUnitRunner])
-class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceTransformer[Real, MultiPickList]] {
+private[op] trait HasOut[O <: FeatureType] {
+  self: OpPipelineStage[O] =>
 
-  val sample = Seq(
-    1.toReal -> 1.toReal,
-    (-1).toReal -> 1.toReal,
-    15.toReal -> Real.empty,
-    1.111.toReal -> 2.222.toReal
-  )
-  val (inputData, f1, f2) = TestFeatureBuilder(sample)
+  /**
+   * Type tag of the output
+   */
+  implicit val tto: TypeTag[O]
 
-  val transformer = new SequenceLambdaTransformer[Real, MultiPickList](operationName = "realToMultiPicklist",
-    transformFn = value => MultiPickList(value.flatMap(_.v.map(_.toString)).toSet)
-  ).setInput(f1, f2)
+  /**
+   * Type tag of the output value
+   */
+  implicit val ttov: TypeTag[O#Value]
 
-  val expectedResult = Seq(
-    Set("1.0").toMultiPickList,
-    Set("-1.0", "1.0").toMultiPickList,
-    Set("15.0").toMultiPickList,
-    Set("1.111", "2.222").toMultiPickList
-  )
+  override def getOutput(): FeatureLike[O] = new Feature[O](
+    uid = outputFeatureUid,
+    name = getOutputFeatureName,
+    originStage = this,
+    isResponse = outputIsResponse,
+    parents = getInputFeatures()
+  )(tto)
 
 }
