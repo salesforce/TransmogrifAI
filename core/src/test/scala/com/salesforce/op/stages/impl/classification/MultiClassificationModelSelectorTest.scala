@@ -333,52 +333,58 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "trim low-cardinality labels during cross validation" in {
-    val nunLabeledRecords = 10000
-    val numLabels = 1000
-    val topLabelsToPick = 100
-    val labelColName = "label"
+    import org.scalatest.prop.TableDrivenPropertyChecks._
 
     val rnd = scala.util.Random
     rnd.setSeed(seed)
-    val bigNoneIndexedData =
-      normalVectorRDD(sc, nunLabeledRecords, 3, seed = seed)
-        .map { v =>
-          ("label_" + rnd.nextInt(numLabels)) ->
-            Vectors.dense(v.toArray.map(_ + 100))
-        }
-        .toDF("txtLabel", "features")
-        .persist()  // IMPORTANT prevent recomputing the DF with Random
 
-    val bigData = new OpStringIndexerNoFilter[Text]()
-      .setInput(txtF)
-      .setOutputFeatureName(labelColName)
-      .fit(bigNoneIndexedData)
-      .transform(bigNoneIndexedData)
-      .select(labelColName, "features")
-      .persist()
+    val labelColName = "label"
 
-    val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
-      bigData, response = labelColName, nonNullable = Set("features"))
+    val testTable = Table(
+      ("nunLabeledRecords", "numLabels", "topLabelsToPick"), (10000, 1000, 100), (10000, 10000, 100),
+      (10000, 1000, 5), (10000, 10000, 5), (200, 101, 5)
+    )
 
-    val bigDataUniqs = bigData.select(labelColName).distinct().count()
+    forAll(testTable) { (nunLabeledRecords: Int, numLabels: Int, topLabelsToPick: Int) =>
 
-    withClue("Pseudo-random generation should produce labels within 25% from " + numLabels)(
-      assert(bigDataUniqs >= numLabels * 0.75 && bigDataUniqs <= numLabels))
+      println(s"nunLabeledRecords=${nunLabeledRecords}, numLabels=${numLabels}, topLabelsToPick=$topLabelsToPick")
+      val bigNoneIndexedData =
+        normalVectorRDD(sc, nunLabeledRecords, 3, seed = seed)
+          .map { v =>
+            ("label_" + rnd.nextInt(numLabels)) ->
+              Vectors.dense(v.toArray.map(_ + 100))
+          }
+          .toDF("txtLabel", "features")
+          .persist() // IMPORTANT prevent recomputing the DF with Random
 
-    val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
-    val testEstimator =
-      MultiClassificationModelSelector
-        .withCrossValidation(
-          Option(cutter),
-          numFolds = 4,
-          seed = 10L,
-          modelsAndParameters = models
-        )
-        .setInput(label, features)
-    testEstimator.fit(bigData)
+      val bigData = new OpStringIndexerNoFilter[Text]()
+        .setInput(txtF)
+        .setOutputFeatureName(labelColName)
+        .fit(bigNoneIndexedData)
+        .transform(bigNoneIndexedData)
+        .select(labelColName, "features")
+        .persist()
 
-    assert(cutter.summary
-      .exists(_.asInstanceOf[DataCutterSummary].preparedDF
-        .exists(xdf => xdf.select(labelColName).distinct().count() === topLabelsToPick)))
+      val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+        bigData, response = labelColName, nonNullable = Set("features"))
+
+      val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
+      val testEstimator =
+        MultiClassificationModelSelector
+          .withCrossValidation(
+            Option(cutter),
+            numFolds = 4,
+            seed = 10L,
+            modelsAndParameters = models
+          )
+          .setInput(label, features)
+      testEstimator.fit(bigData)
+
+      assert(cutter.summary
+        .exists(_.asInstanceOf[DataCutterSummary].preparedDF
+          .exists(xdf => xdf.select(labelColName).distinct().count() === topLabelsToPick)),
+        "label trimming has not happened, too many uniques"
+      )
+    }
   }
 }
