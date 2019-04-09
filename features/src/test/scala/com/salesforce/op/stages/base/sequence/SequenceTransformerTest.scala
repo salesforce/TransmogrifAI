@@ -31,7 +31,6 @@
 package com.salesforce.op.stages.base.sequence
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.LambdaTransformer
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -59,8 +58,4 @@ class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceT
     Set("1.111", "2.222").toMultiPickList
   )
 
-  it should "be a lambda transformer" in {
-    transformer shouldBe a[LambdaTransformer[_, _]]
-    transformer.ttIns shouldBe Array(transformer.tti)
-  }
 }

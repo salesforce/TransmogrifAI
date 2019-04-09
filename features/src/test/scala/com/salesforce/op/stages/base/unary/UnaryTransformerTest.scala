@@ -31,7 +31,6 @@
 package com.salesforce.op.stages.base.unary
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.LambdaTransformer
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -57,10 +56,5 @@ class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransforme
    * Expected result of the transformer applied on the Input Dataset
    */
   val expectedResult = Seq(Real(2), Real(4), Real(6), Real.empty)
-
-  it should "be a lambda transformer" in {
-    transformer shouldBe a[LambdaTransformer[_, _]]
-    transformer.ttIns shouldBe Array(transformer.tti)
-  }
 
 }

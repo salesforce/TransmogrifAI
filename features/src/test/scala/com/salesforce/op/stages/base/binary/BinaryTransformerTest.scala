@@ -31,7 +31,6 @@
 package com.salesforce.op.stages.base.binary
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.LambdaTransformer
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -48,10 +47,5 @@ class BinaryTransformerTest extends OpTransformerSpec[Real, BinaryTransformer[Re
   ).setInput(f1, f2)
 
   val expectedResult = Seq(Real(Double.PositiveInfinity), Real(0.5), Real.empty)
-
-  it should "be a lambda transformer" in {
-    transformer shouldBe a[LambdaTransformer[_, _]]
-    transformer.ttIns shouldBe Array(transformer.tti1, transformer.tti2)
-  }
 
 }

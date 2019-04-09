@@ -557,23 +557,3 @@ private[op] trait OpTransformer {
   def transformKeyValue: KeyValue => Any
 
 }
-
-/**
- * Trait to mix into lambda transformers to allow accessing the lambda transform function,
- * input and output type tags
- */
-private[op] trait LambdaTransformer[O <: FeatureType, Function <: AnyRef] {
-  self: OpPipelineStage[O] with HasOut[O] with OpTransformer =>
-
-  /**
-   * Type tags of the inputs
-   */
-  def ttIns: Array[TypeTag[_]]
-
-  /**
-   * Transform function instance. Can be of type [[Function1]], [[Function3]], [[Function3]], [[Function4]] etc.
-   *
-   * @return transform function instance
-   */
-  val transformFn: Function
-}

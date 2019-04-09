@@ -31,7 +31,6 @@
 package com.salesforce.op.stages.base.ternary
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.LambdaTransformer
 import com.salesforce.op.test._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -53,10 +52,5 @@ class TernaryTransformerTest extends OpTransformerSpec[Real, TernaryTransformer[
   ).setInput(f1, f2, f3)
 
   val expectedResult = Seq(1.toReal, 5.toReal, 4.toReal)
-
-  it should "be a lambda transformer" in {
-    transformer shouldBe a[LambdaTransformer[_, _]]
-    transformer.ttIns shouldBe Array(transformer.tti1, transformer.tti2, transformer.tti3)
-  }
 
 }
