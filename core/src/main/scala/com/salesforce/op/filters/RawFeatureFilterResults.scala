@@ -113,8 +113,8 @@ object RawFeatureFilterConfig extends RawFeatureFilterFormats {
    * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
    * ModelInsights
    *
-   * @return Map[String, Map[String, Object]]
-   **/
+   * @return Map[String, Map[String, Any] ]
+   */
   def toStageInfo(config: RawFeatureFilterConfig): Map[String, Map[String, Any]] = {
     val stageName = "rawFeatureFilter"
     val uid = "rawFeatureFilter"
