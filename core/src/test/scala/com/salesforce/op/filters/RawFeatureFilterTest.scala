@@ -35,6 +35,7 @@ import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike
 import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
+import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test._
 import com.salesforce.op.testkit.{RandomData, _}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -112,8 +113,44 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     RawFeatureFilterResults.fromJson(RawFeatureFilterResults.toJson(resultsRFF)) match {
       case Failure(e) => fail(e)
-      case Success(deser) => RawFeatureFilterResultsComparison.compare(resultsRFF, deser)
+      case Success(deser) =>
+        RawFeatureFilterResultsComparison.compareConfig(
+          resultsRFF.rawFeatureFilterConfig, deser.rawFeatureFilterConfig
+        )
+        RawFeatureFilterResultsComparison.compareSeqDistributions(
+          resultsRFF.rawFeatureDistributions, deser.rawFeatureDistributions
+        )
+        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
+          resultsRFF.exclusionReasons, deser.exclusionReasons
+        )
+        RawFeatureFilterResultsComparison.compareSeqMetrics(
+          resultsRFF.rawFeatureFilterMetrics, deser.rawFeatureFilterMetrics
+        )
     }
+  }
+
+  it should "correctly convert raw feature filter config to string map" in {
+    val config = RawFeatureFilterConfig(
+      minFill = 0.5,
+      maxFillDifference = Double.PositiveInfinity,
+      maxFillRatioDiff = 0.5,
+      maxJSDivergence = 0.5,
+      maxCorrelation = 0.5,
+      correlationType = CorrelationType.Pearson,
+      jsDivergenceProtectedFeatures = Seq.empty,
+      protectedFeatures = Seq.empty
+    )
+
+    val params: Map[String, String] = RawFeatureFilterConfig.toStringMap(config)
+
+    config.minFill.toString shouldEqual params("minFill")
+    config.maxFillDifference.toString shouldEqual params("maxFillDifference")
+    config.maxFillRatioDiff.toString shouldEqual params("maxFillRatioDiff")
+    config.maxJSDivergence.toString shouldEqual params("maxJSDivergence")
+    config.maxCorrelation.toString shouldEqual params("maxCorrelation")
+    config.correlationType.toString shouldEqual params("correlationType")
+    config.jsDivergenceProtectedFeatures.toString shouldEqual params("jsDivergenceProtectedFeatures")
+    config.protectedFeatures.toString shouldEqual params("protectedFeatures")
   }
 
   it should "correctly compute and store raw feature filter metrics when correlation is unavailable " +
@@ -982,7 +1019,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * Right now, it is specialized to accept just one map type feature, which is hardcoded to be a CurrencyMap based
    * on current tests.
    *
-   * @param filteredRawData         FilteredRawData object prdduced by RawFeatureFilter
+   * @param filteredRawData         FilteredRawData object produced by RawFeatureFilter
    * @param mapFeatureRaw           Name of raw map feature to check keys on
    * @param featureUniverse         Set of raw feature names you start with
    * @param expectedDroppedFeatures Expected set of raw feature names to be dropped

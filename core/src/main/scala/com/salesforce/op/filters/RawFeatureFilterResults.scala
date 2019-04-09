@@ -33,10 +33,18 @@ package com.salesforce.op.filters
 import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
+import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
 import scala.util.Try
+
+trait RawFeatureFilterFormats {
+  implicit val jsonFormats: Formats = DefaultFormats +
+    new SpecialDoubleSerializer +
+    EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+}
 
 /**
  * Contains configuration and results from RawFeatureFilter
@@ -54,13 +62,7 @@ case class RawFeatureFilterResults
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
 
-object RawFeatureFilterResults {
-
-  implicit val jsonFormats: Formats = DefaultFormats +
-    new SpecialDoubleSerializer +
-    EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
-
+object RawFeatureFilterResults extends RawFeatureFilterFormats {
   /**
    * RawFeatureFilterResults to json
    *
@@ -75,7 +77,8 @@ object RawFeatureFilterResults {
    * @param json json
    * @return raw feature filter results
    */
-  def fromJson(json: String): Try[RawFeatureFilterResults] = Try { Serialization.read[RawFeatureFilterResults](json) }
+  def fromJson(json: String): Try[RawFeatureFilterResults] =
+    Try { Serialization.read[RawFeatureFilterResults](json) }
 
 }
 
@@ -90,9 +93,35 @@ case class RawFeatureFilterConfig
   maxJSDivergence: Double = 1.0,
   maxCorrelation: Double = 1.0,
   correlationType: CorrelationType = CorrelationType.Pearson,
-  jsDivergenceProtectedFeatures: Set[String] = Set.empty,
-  protectedFeatures: Set[String] = Set.empty
+  jsDivergenceProtectedFeatures: Seq[String] = Seq.empty,
+  protectedFeatures: Seq[String] = Seq.empty
 )
+
+object RawFeatureFilterConfig extends RawFeatureFilterFormats {
+    /**
+     * Converts case class constructor to a Map. Values are converted to String
+     *
+     * @return Map[String, String]
+     */
+    def toStringMap(config: RawFeatureFilterConfig): Map[String,String] = {
+      val params = parse(Serialization.write[RawFeatureFilterConfig](config)).extract[Map[String, Any]]
+      params.map { case (key, value) => (key, value.toString)}
+    }
+
+    /**
+     * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
+     * ModelInsights
+     *
+     * @return Map[String, Map[String, Object]]
+     */
+    def toStageInfo(config: RawFeatureFilterConfig): Map[String, Map[String, Any]] = {
+      val stageName = "rawFeatureFilter"
+      val uid = "rawFeatureFilter"
+      Map(stageName -> Map("uid" -> uid, "params" -> toStringMap(config))
+      )
+    }
+
+}
 
 /**
  * Contains raw feature metrics computing in Raw Feature Filter

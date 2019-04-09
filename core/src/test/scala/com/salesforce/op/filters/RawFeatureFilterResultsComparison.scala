@@ -30,24 +30,13 @@
 
 package com.salesforce.op.filters
 
-import org.scalactic.Equality
+import com.salesforce.op.DoubleEquality
 import org.scalatest.{FlatSpec, Matchers}
 
 /**
  * Contains utility functions for comparing two RawFeatureFilterResults
  */
-object RawFeatureFilterResultsComparison extends FlatSpec with Matchers {
-
-  class OptionDoubleEquality[T <: Option[Double]] extends Equality[T] {
-    def areEqual(a: T, b: Any): Boolean = b match {
-      case None => a.isEmpty
-      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
-      case _ => false
-    }
-  }
-
-  implicit val otherDoubleEquality = new OptionDoubleEquality[Option[Double]]
-  implicit val someDoubleEquality = new OptionDoubleEquality[Some[Double]]
+object RawFeatureFilterResultsComparison extends FlatSpec with Matchers with DoubleEquality{
 
   def compareConfig(c1: RawFeatureFilterConfig, c2: RawFeatureFilterConfig): Unit = {
     c1.minFill shouldBe c2.minFill
