@@ -307,6 +307,13 @@ class OpWorkflowModelReaderWriterTest
     wfM.getBlacklist().isEmpty shouldBe true
   }
 
+  it should "error on loading a model without workflow" in {
+    val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
+    error.getMessage should startWith("Failed to load Workflow from path")
+    error.getCause.isInstanceOf[NotImplementedError] shouldBe true
+    error.getCause.getMessage shouldBe "Loading models without the original workflow is currently not supported"
+  }
+
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
     f1.length shouldBe f2.length
     f1.sortBy(_.uid) should contain theSameElementsAs f2.sortBy(_.uid)
