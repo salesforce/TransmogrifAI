@@ -28,36 +28,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base.quaternary
+package com.salesforce.op.stages
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.test._
+import com.salesforce.op.stages.base.sequence.{BinarySequenceLambdaTransformer, SequenceLambdaTransformer}
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class QuaternaryTransformerTest
-  extends OpTransformerSpec[Real, QuaternaryTransformer[Real, Integral, Text, Binary, Real]] {
+class OpTransformerBinarySequenceReaderWriterTest extends OpPipelineStageReaderWriterTest {
+  override val expectedFeaturesLength = 2
+  override val hasOutputName = false
+  val stage: OpPipelineStageBase =
+    new BinarySequenceLambdaTransformer[Real, DateList, Real](
+      operationName = "test",
+      transformFn = Lambdas.fncBinarySequence,
+      uid = "uid_1234"
+    ).setInput(weight, boarded).setMetadata(meta)
 
-  val sample = Seq(
-    (Real(1.0), Integral(0), Text("abc"), Binary(false)),
-    (Real(2.0), Integral(2), Text("a"), Binary(true)),
-    (Real.empty, Integral(3), Text("abcdefg"), Binary(true))
-  )
-
-  val (inputData, f1, f2, f3, f4) = TestFeatureBuilder(sample)
-
-  val transformer = new QuaternaryLambdaTransformer[Real, Integral, Text, Binary, Real](
-    operationName = "quatro", transformFn = QuaternaryTransformerTest.fn
-  ).setInput(f1, f2, f3, f4)
-
-  val expectedResult = Seq(4.toReal, 6.toReal, 11.toReal)
-
-}
-
-object QuaternaryTransformerTest {
-  def fn: (Real, Integral, Text, Binary) => Real = (r, i, t, b) =>
-    (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
-      t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
+  val expected = Array(3114.toReal, 1538.toReal, 0.toReal, 1549.toReal, 1567.toReal, 1538.toReal)
 }

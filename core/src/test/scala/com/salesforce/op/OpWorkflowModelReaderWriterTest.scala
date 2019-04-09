@@ -34,7 +34,7 @@ import java.io.File
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.features.types.{Real, RealNN}
+import com.salesforce.op.features.types.{OPVector, Real, RealNN}
 import com.salesforce.op.filters._
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
@@ -252,7 +252,7 @@ class OpWorkflowModelReaderWriterTest
 
   trait VectorizedFlow extends UIDReset {
     val cat = Seq(gender, boarded, height, age, description).transmogrify()
-    val catHead = cat.map[Real](v => Real(v.value.toArray.headOption))
+    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.mapFnc0)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setResultFeatures(catHead)
@@ -364,4 +364,8 @@ class OpWorkflowModelReaderWriterTest
 
 trait UIDReset {
   UID.reset()
+}
+
+object OpWorkflowModelReaderWriterTest {
+  def mapFnc0: OPVector => Real = v => Real(v.value.toArray.headOption)
 }

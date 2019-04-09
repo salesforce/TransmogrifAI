@@ -28,36 +28,44 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base.quaternary
+package com.salesforce.op.stages
 
+import com.salesforce.op.features.types.Real
 import com.salesforce.op.features.types._
-import com.salesforce.op.test._
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
+object Lambdas {
+  def fncUnary: Real => Real = (x: Real) => x.v.map(_ * 0.1234).toReal
 
-@RunWith(classOf[JUnitRunner])
-class QuaternaryTransformerTest
-  extends OpTransformerSpec[Real, QuaternaryTransformer[Real, Integral, Text, Binary, Real]] {
+  def fncSequence: Seq[DateList] => Real = (x: Seq[DateList]) => {
+    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+    Math.round(v / 1E6).toReal
+  }
 
-  val sample = Seq(
-    (Real(1.0), Integral(0), Text("abc"), Binary(false)),
-    (Real(2.0), Integral(2), Text("a"), Binary(true)),
-    (Real.empty, Integral(3), Text("abcdefg"), Binary(true))
-  )
+  def fncBinarySequence: (Real, Seq[DateList]) => Real = (y: Real, x: Seq[DateList]) => {
+    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+    (Math.round(v / 1E6) + y.value.getOrElse(0.0)).toReal
+  }
 
-  val (inputData, f1, f2, f3, f4) = TestFeatureBuilder(sample)
+  def fncBinary: (Real, Real) => Real = (x: Real, y: Real) => (
+    for {
+      yv <- y.value
+      xv <- x.value
+    } yield xv * yv
+    ).toReal
 
-  val transformer = new QuaternaryLambdaTransformer[Real, Integral, Text, Binary, Real](
-    operationName = "quatro", transformFn = QuaternaryTransformerTest.fn
-  ).setInput(f1, f2, f3, f4)
+  def fncTernary: (Real, Real, Real) => Real = (x: Real, y: Real, z: Real) =>
+    (for {
+      xv <- x.value
+      yv <- y.value
+      zv <- z.value
+    } yield xv * yv + zv).toReal
 
-  val expectedResult = Seq(4.toReal, 6.toReal, 11.toReal)
+  def fncQuaternary: (Real, Real, Text, Real) => Real = (x: Real, y: Real, t: Text, z: Real) =>
+    (for {
+      xv <- x.value
+      yv <- y.value
+      tv <- t.value
+      zv <- z.value
+    } yield xv * yv + zv * tv.length).toReal
 
-}
-
-object QuaternaryTransformerTest {
-  def fn: (Real, Integral, Text, Binary) => Real = (r, i, t, b) =>
-    (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
-      t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
 }

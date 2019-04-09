@@ -50,7 +50,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   extends FlatSpec with PassengerSparkFixtureTest {
 
   val meta = new MetadataBuilder().putString("foo", "bar").build()
-
+  val expectedFeaturesLength = 1
   def stage: OpPipelineStageBase
   val expected: Array[Real]
   val hasOutputName = true
@@ -95,7 +95,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "write input features" in {
     val jArray = ((stageJson \ FN.ParamMap.entryName) \ "inputFeatures").extract[JArray]
-    jArray.values should have length 1
+    jArray.values should have length expectedFeaturesLength
     val obj = jArray(0).extract[JObject]
     obj.values.keys shouldBe Set("name", "isResponse", "isRaw", "uid", "typeName", "stages", "originFeatures")
   }

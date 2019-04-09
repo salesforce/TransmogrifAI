@@ -28,36 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.base.quaternary
+package com.salesforce.op.stages
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.test._
+import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
+import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class QuaternaryTransformerTest
-  extends OpTransformerSpec[Real, QuaternaryTransformer[Real, Integral, Text, Binary, Real]] {
+class OpTransformerQuaternaryReaderWriterTest extends OpPipelineStageReaderWriterTest {
+  override val expectedFeaturesLength = 4
+  override val hasOutputName = false
+  val stage: OpPipelineStageBase =
+    new QuaternaryLambdaTransformer[Real, Real, Text, Real, Real](
+      operationName = "test",
+      transformFn = Lambdas.fncQuaternary,
+      uid = "uid_1234"
+    ).setInput(weight, age, description, weight).setMetadata(meta)
 
-  val sample = Seq(
-    (Real(1.0), Integral(0), Text("abc"), Binary(false)),
-    (Real(2.0), Integral(2), Text("a"), Binary(true)),
-    (Real.empty, Integral(3), Text("abcdefg"), Binary(true))
-  )
-
-  val (inputData, f1, f2, f3, f4) = TestFeatureBuilder(sample)
-
-  val transformer = new QuaternaryLambdaTransformer[Real, Integral, Text, Binary, Real](
-    operationName = "quatro", transformFn = QuaternaryTransformerTest.fn
-  ).setInput(f1, f2, f3, f4)
-
-  val expectedResult = Seq(4.toReal, 6.toReal, 11.toReal)
-
-}
-
-object QuaternaryTransformerTest {
-  def fn: (Real, Integral, Text, Binary) => Real = (r, i, t, b) =>
-    (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
-      t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
+  val expected = Array(13244.toReal, Real.empty, Real.empty, 2574.toReal, Real.empty, Real.empty)
 }
