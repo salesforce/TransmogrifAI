@@ -30,12 +30,24 @@
 
 package com.salesforce.op.filters
 
+import org.scalactic.Equality
 import org.scalatest.{FlatSpec, Matchers}
 
 /**
  * Contains utility functions for comparing two RawFeatureFilterResults
  */
 object RawFeatureFilterResultsComparison extends FlatSpec with Matchers {
+
+  class OptionDoubleEquality[T <: Option[Double]] extends Equality[T] {
+    def areEqual(a: T, b: Any): Boolean = b match {
+      case None => a.isEmpty
+      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
+      case _ => false
+    }
+  }
+
+  implicit val otherDoubleEquality = new OptionDoubleEquality[Option[Double]]
+  implicit val someDoubleEquality = new OptionDoubleEquality[Some[Double]]
 
   def compareConfig(c1: RawFeatureFilterConfig, c2: RawFeatureFilterConfig): Unit = {
     c1.minFill shouldBe c2.minFill
@@ -64,11 +76,11 @@ object RawFeatureFilterResultsComparison extends FlatSpec with Matchers {
   def compareMetrics(m1: RawFeatureFilterMetrics, m2: RawFeatureFilterMetrics): Unit = {
     m1.name shouldBe m2.name
     m1.trainingFillRate shouldBe m2.trainingFillRate
-    m1.trainingNullLabelAbsoluteCorr shouldBe m2.trainingNullLabelAbsoluteCorr
-    m1.scoringFillRate shouldBe m2.scoringFillRate
-    m1.jsDivergence shouldBe m2.jsDivergence
-    m1.fillRateDiff shouldBe m2.fillRateDiff
-    m1.fillRatioDiff shouldBe m2.fillRatioDiff
+    m1.trainingNullLabelAbsoluteCorr shouldEqual m2.trainingNullLabelAbsoluteCorr
+    m1.scoringFillRate shouldEqual m2.scoringFillRate
+    m1.jsDivergence shouldEqual m2.jsDivergence
+    m1.fillRateDiff shouldEqual m2.fillRateDiff
+    m1.fillRatioDiff shouldEqual m2.fillRatioDiff
   }
 
   def compareSeqMetrics(m1: Seq[RawFeatureFilterMetrics], m2: Seq[RawFeatureFilterMetrics]): Unit = {

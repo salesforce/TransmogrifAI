@@ -61,12 +61,23 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     }
   }
 
-  implicit val doubleOptEquality = new Equality[Option[Double]] {
-    def areEqual(a: Option[Double], b: Any): Boolean = b match {
+  class OptionDoubleEquality[T <: Option[Double]] extends Equality[T] {
+    def areEqual(a: T, b: Any): Boolean = b match {
       case None => a.isEmpty
       case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
       case _ => false
     }
+  }
+
+  implicit val otherDoubleEquality = new OptionDoubleEquality[Option[Double]]
+  implicit val someDoubleEquality = new OptionDoubleEquality[Some[Double]]
+
+  it should "Correctly compare Option[Double]" in {
+    Double.NaN shouldEqual Double.NaN
+    Option(Double.NaN) shouldEqual Option(Double.NaN)
+    Some(Double.NaN) shouldEqual Some(Double.NaN)
+    Some(Double.NaN) should not equal None
+    None shouldEqual None
   }
 
   private val density = weight / height
@@ -335,6 +346,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
     pretty should include("Top Contributions")
   }
 
+
   it should "correctly serialize and deserialize from json when raw feature filter is not used" in {
     val insights = workflowModel.modelInsights(pred)
     ModelInsights.fromJson(insights.toJson()) match {
@@ -347,14 +359,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
         }
-        RawFeatureFilterResultsComparison.compareSeqDistributions(
-          insights.rawFeatureFilterResults.rawFeatureDistributions,
-          deser.rawFeatureFilterResults.rawFeatureDistributions
-        )
-        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
-          insights.rawFeatureFilterResults.exclusionReasons,
-          deser.rawFeatureFilterResults.exclusionReasons
-        )
+        RawFeatureFilterResultsComparison.compare(insights.rawFeatureFilterResults, deser.rawFeatureFilterResults)
         insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
           case (o, i) =>
             o.validationType shouldEqual i.validationType
@@ -380,6 +385,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly serialize and deserialize from json when raw feature filter is used" in {
+
     val insights = modelWithRFF.modelInsights(predWithMaps)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
@@ -391,14 +397,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest {
             i.featureType shouldEqual o.featureType
             i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
         }
-        RawFeatureFilterResultsComparison.compareSeqDistributions(
-          insights.rawFeatureFilterResults.rawFeatureDistributions,
-          deser.rawFeatureFilterResults.rawFeatureDistributions
-        )
-        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
-          insights.rawFeatureFilterResults.exclusionReasons,
-          deser.rawFeatureFilterResults.exclusionReasons
-        )
+
+        RawFeatureFilterResultsComparison.compare(insights.rawFeatureFilterResults, deser.rawFeatureFilterResults)
         insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
           case (o, i) =>
             o.validationType shouldEqual i.validationType
