@@ -577,3 +577,4 @@ private[op] trait LambdaTransformer[O <: FeatureType, Function <: AnyRef] {
    */
   val transformFn: Function
 }
+
