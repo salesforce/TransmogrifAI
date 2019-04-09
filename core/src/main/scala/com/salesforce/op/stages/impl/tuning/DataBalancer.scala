@@ -123,9 +123,11 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
-    val negativeData = data.filter(_.getDouble(0) == 0.0).persist()
-    val positiveData = data.filter(_.getDouble(0) == 1.0).persist()
+  override def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Option[SplitterSummary] = {
+    val Seq(negativeData, positiveData) = Seq(0.0, 1.0).map { labelVal =>
+      labelColNameOpt.map(labelColName => data.filter(data(labelColName) === labelVal))
+        .getOrElse(data.filter(_.getDouble(0) == labelVal))
+    }
     val negativeCount = negativeData.count()
     val positiveCount = positiveData.count()
     val seed = getSeed
@@ -141,12 +143,15 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set
    */
-  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+  override def validationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Dataset[Row] = {
 
     val dataPrep = super.validationPrepare(data)
 
-    val negativeData = dataPrep.filter(_.getDouble(0) == 0.0).persist()
-    val positiveData = dataPrep.filter(_.getDouble(0) == 1.0).persist()
+    val Seq(negativeData, positiveData) = Seq(0.0, 1.0).map { labelVal =>
+      labelColNameOpt.map(labelColName => dataPrep.filter(dataPrep(labelColName) === labelVal))
+        .getOrElse(dataPrep.filter(r => r.getDouble(0) == labelVal)).persist()
+    }
+
     val seed = getSeed
 
     // If these conditions are met, that means that we have enough information to balance the data : upSample,

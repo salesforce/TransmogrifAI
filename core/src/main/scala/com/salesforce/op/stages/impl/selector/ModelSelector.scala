@@ -196,30 +196,12 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   }
 
   private def prepareForValidation(data: DataFrame) = {
-    println("GERA DEBUG: " + data.schema)
+    val splitterSummary = splitter.flatMap(_.preValidationPrepare(data, Some(labelColName)))
+    val resultDF = splitterSummary.collect { case dc: DataCutterSummary =>
+      dc.preparedDF.getOrElse(data)
+    }.getOrElse(data)
 
-    // ensure label is the first column
-    val labelColIdx = data.columns.indexOf(labelColName)
-    val needColSwapForValidation = labelColIdx > 0
-    val df = if (needColSwapForValidation) {
-      data.select(labelColName, data.columns.drop(labelColIdx): _*)
-    } else {
-      data
-    }
-    df.show()
-
-    val splitterSummary = splitter.flatMap(_.preValidationPrepare(df))
-    val dataFrame = splitterSummary.collect { case dc: DataCutterSummary =>
-      dc.preparedDF.getOrElse(df)
-    }.getOrElse(df)
-    (splitterSummary,
-      if (needColSwapForValidation) {
-        // restore column order
-        dataFrame.select(data.columns.head, data.columns.tail: _*) // TODO figure out a better way
-      } else {
-        dataFrame
-      }
-    )
+    splitterSummary -> resultDF
   }
 }
 
