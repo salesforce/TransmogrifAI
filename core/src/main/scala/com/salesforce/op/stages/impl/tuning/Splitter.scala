@@ -32,7 +32,6 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.stages.impl.MetadataLike
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
-import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{Dataset, Row}
@@ -69,7 +68,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Training set test set
    */
-  def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+  def validationPrepare(data: Dataset[Row], labelColNameOpt: Option[String] = None): Dataset[Row] = {
     checkPreconditions()
     data
   }
@@ -82,7 +81,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Parameters set in examining data
    */
-  def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary]
+  def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String] = None): Option[SplitterSummary]
 
 
   protected def checkPreconditions(): Unit =

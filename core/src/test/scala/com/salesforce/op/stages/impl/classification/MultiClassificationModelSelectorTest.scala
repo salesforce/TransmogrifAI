@@ -333,8 +333,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "trim low-cardinality labels during cross validation" in {
-    val nunLabeledRecords = 1000
-    val numLabels = 500
+    val nunLabeledRecords = 10000
+    val numLabels = 1000
     val topLabelsToPick = 100
     val labelColName = "label"
 

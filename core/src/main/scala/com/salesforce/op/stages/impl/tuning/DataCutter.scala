@@ -85,12 +85,12 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary] = {
-    if (Try(getLabelsToKeep).toOption.isEmpty) {
-      import data.sparkSession.implicits._
+  override def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Option[SplitterSummary] = {
+    val labelColName = labelColNameOpt.getOrElse(data.columns(0))
+    val labelColIdx = data.columns.indexOf(labelColName)
 
-      val labels = data.map(r => r.getDouble(0))
-      val labelCounts = labels.groupBy(labels.columns(0)).count().persist()
+    if (Try(getLabelsToKeep).toOption.isEmpty) {
+      val labelCounts = data.groupBy(labelColName).count().persist()
       val res = estimate(labelCounts)
       labelCounts.unpersist()
       setLabels(res.labelsKept.distinct, res.labelsDropped.distinct, res.labelsDroppedTotal)
@@ -114,7 +114,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
           data
         } else {
           log.info(s"Dropping rows with columns not in $labelSet")
-          val labelColName = data.columns(0)
 
           // Update metadata that spark.ml Classifier is using tp determine the number of classes
           //
@@ -129,7 +128,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
           // it in sync with the new metadata.
           //
           data
-            .filter(r => labelSet.contains(r.getDouble(0)))
+            .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
             .withColumn(labelColName, data
               .col(labelColName)
               .as("_", metadataNA.toMetadata))
@@ -171,7 +170,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data first column must be the label as a double
    * @return Training set test set
    */
-  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+  override def validationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Dataset[Row] = {
     super.validationPrepare(data)
     summary.flatMap(_.asInstanceOf[DataCutterSummary].preparedDF)
       .getOrElse(sys.error("No prepared dataframe available!"))
@@ -190,26 +189,22 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val maxLabels = getMaxLabelCategories
 
     val labelCol = labelCounts.columns(0)
-    val colCount = labelCounts.columns(1)
+    val countCol = labelCounts.columns(1)
 
     val numLabels = labelCounts.count()
-    val totalValues = labelCounts.agg(sum(colCount)).first().getLong(0).toDouble
+    val totalValues = labelCounts.agg(sum(countCol)).first().getLong(0).toDouble
 
-    // sort label column descending to increase probability
-    // that we filter starting with a higher index "tail"
-    //
-    val labelsSortedByCount = labelCounts
-      .sort(col(colCount).desc, col(labelCol).desc)
-
-    val labelsKeptDF = labelsSortedByCount
-      .filter(r => r.getLong(1) / totalValues >= minLabelFract)
+    val labelsKeptDF = labelCounts
+      .filter(r => r.getLong(1).toDouble / totalValues >= minLabelFract)
+      .sort(col(countCol).desc, col(labelCol))
       .limit(maxLabels)
       .persist()
 
     val labelsKept = labelsKeptDF.collect().map(_.getDouble(0))
 
-    val labelsDroppedDF = labelsSortedByCount
+    val labelsDroppedDF = labelCounts
       .except(labelsKeptDF)
+      .sort(col(countCol).desc, col(labelCol))
       .limit(numDroppedToRecord)
 
     labelsKeptDF.unpersist()
