@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.base.binary
 
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{Real, _}
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -43,9 +43,13 @@ class BinaryTransformerTest extends OpTransformerSpec[Real, BinaryTransformer[Re
   val (inputData, f1, f2) = TestFeatureBuilder(sample)
 
   val transformer = new BinaryLambdaTransformer[Real, RealNN, Real](operationName = "bmi",
-    transformFn = (i1, i2) => new Real(for { v1 <- i1.value; v2 <- i2.value } yield v1 / (v2 * v2))
+    transformFn = BinaryTransformerTest.fnc
   ).setInput(f1, f2)
 
   val expectedResult = Seq(Real(Double.PositiveInfinity), Real(0.5), Real.empty)
 
+}
+
+object BinaryTransformerTest {
+  def fnc: (Real, RealNN) => Real = (i1, i2) => new Real(for {v1 <- i1.value; v2 <- i2.value} yield v1 / (v2 * v2))
 }

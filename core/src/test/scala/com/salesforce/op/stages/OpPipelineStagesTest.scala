@@ -47,6 +47,8 @@ import scala.reflect.runtime.universe.TypeTag
 class OpPipelineStagesTest
   extends FlatSpec with PassengerSparkFixtureTest with BeforeAndAfterEach with Serializable {
 
+  import OpPipelineStagesTest._
+
   val tfParam = new TransientFeatureArrayParam(name = "foo", parent = "null", doc = "nothing")
 
   var stage: TestStage = _
@@ -78,8 +80,12 @@ class OpPipelineStagesTest
     features(0).isResponse && features(0).isRaw shouldBe true
     features(1).isResponse || features(1).isRaw shouldBe false
 
-    assertThrows[RuntimeException] { features(0).getFeature() }
-    assertThrows[RuntimeException] { features(1).getFeature() }
+    assertThrows[RuntimeException] {
+      features(0).getFeature()
+    }
+    assertThrows[RuntimeException] {
+      features(1).getFeature()
+    }
   }
 
   it should "encode json properly" in {
@@ -89,8 +95,12 @@ class OpPipelineStagesTest
     tfsRecovered should have length 2
     compare(tfsRecovered(0), weight)
     compare(tfsRecovered(1), height)
-    assertThrows[RuntimeException] { tfsRecovered(0).getFeature() }
-    assertThrows[RuntimeException] { tfsRecovered(1).getFeature() }
+    assertThrows[RuntimeException] {
+      tfsRecovered(0).getFeature()
+    }
+    assertThrows[RuntimeException] {
+      tfsRecovered(1).getFeature()
+    }
   }
 
   "Stage" should "set Transient Features properly as an input feature" in {
@@ -103,7 +113,9 @@ class OpPipelineStagesTest
   }
 
   it should "be robust when getting features by index" in {
-    assertThrows[RuntimeException] { stage.getInputFeature(0) }
+    assertThrows[RuntimeException] {
+      stage.getInputFeature(0)
+    }
     stage.getTransientFeature(0) shouldBe None
 
     stage.setInput(height)
@@ -122,7 +134,7 @@ class OpPipelineStagesTest
 
   val testOp = new com.salesforce.op.stages.base.unary.UnaryLambdaTransformer[Real, Real](
     operationName = "test",
-    transformFn = (i: Real) => i,
+    transformFn = OpPipelineStagesTest.fnc0,
     uid = "myID"
   )
 
@@ -149,7 +161,12 @@ class OpPipelineStagesTest
   }
 }
 
-class TestStage(implicit val tto: TypeTag[RealNN], val ttov: TypeTag[RealNN#Value])
-  extends Pipeline with OpPipelineStage1[RealNN, RealNN] {
-  override def operationName: String = "test"
+object OpPipelineStagesTest {
+  def fnc0: Real => Real = x => x
+
+  class TestStage(implicit val tto: TypeTag[RealNN], val ttov: TypeTag[RealNN#Value])
+    extends Pipeline with OpPipelineStage1[RealNN, RealNN] {
+    override def operationName: String = "test"
+  }
+
 }

@@ -48,7 +48,7 @@ class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceT
   val (inputData, f1, f2) = TestFeatureBuilder(sample)
 
   val transformer = new SequenceLambdaTransformer[Real, MultiPickList](operationName = "realToMultiPicklist",
-    transformFn = value => MultiPickList(value.flatMap(_.v.map(_.toString)).toSet)
+    transformFn = SequenceTransformerTest.fnc
   ).setInput(f1, f2)
 
   val expectedResult = Seq(
@@ -57,4 +57,8 @@ class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceT
     Set("15.0").toMultiPickList,
     Set("1.111", "2.222").toMultiPickList
   )
+}
+
+object SequenceTransformerTest {
+  def fnc: Seq[Real] => MultiPickList = value => MultiPickList(value.flatMap(_.v.map(_.toString)).toSet)
 }
