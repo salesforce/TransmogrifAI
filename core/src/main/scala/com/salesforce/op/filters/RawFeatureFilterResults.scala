@@ -98,28 +98,29 @@ case class RawFeatureFilterConfig
 )
 
 object RawFeatureFilterConfig extends RawFeatureFilterFormats {
-    /**
-     * Converts case class constructor to a Map. Values are converted to String
-     *
-     * @return Map[String, String]
-     */
-    def toStringMap(config: RawFeatureFilterConfig): Map[String,String] = {
-      val params = parse(Serialization.write[RawFeatureFilterConfig](config)).extract[Map[String, Any]]
-      params.map { case (key, value) => (key, value.toString)}
-    }
 
-    /**
-     * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
-     * ModelInsights
-     *
-     * @return Map[String, Map[String, Object]]
-     */
-    def toStageInfo(config: RawFeatureFilterConfig): Map[String, Map[String, Any]] = {
-      val stageName = "rawFeatureFilter"
-      val uid = "rawFeatureFilter"
-      Map(stageName -> Map("uid" -> uid, "params" -> toStringMap(config))
-      )
-    }
+  /**
+   * Converts case class constructor to a Map. Values are converted to String
+   *
+   * @return Map[String, String]
+   */
+  def toStringMap(config: RawFeatureFilterConfig): Map[String, String] = {
+    val params = parse(Serialization.write[RawFeatureFilterConfig](config)).extract[Map[String, Any]]
+    params.map { case (key, value) => (key, value.toString) }
+  }
+
+  /**
+   * Summarize RawFeatureFilterConfig in format of stageInfo; this info will be passed alongside stage info in
+   * ModelInsights
+   *
+   * @return Map[String, Map[String, Object]]
+   **/
+  def toStageInfo(config: RawFeatureFilterConfig): Map[String, Map[String, Any]] = {
+    val stageName = "rawFeatureFilter"
+    val uid = "rawFeatureFilter"
+    Map(stageName -> Map("uid" -> uid, "params" -> toStringMap(config))
+    )
+  }
 
 }
 
