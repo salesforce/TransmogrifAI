@@ -45,7 +45,8 @@ import scala.reflect.runtime.universe.TypeTag
  * @tparam I1 first input feature type
  * @tparam I2 second input feature type
  */
-class SubstringTransformer[I1 <: Text, I2 <: Text](
+class SubstringTransformer[I1 <: Text, I2 <: Text]
+(
   uid: String = UID[SubstringTransformer[_, _]]
 )(
   implicit override val tti1: TypeTag[I1],
