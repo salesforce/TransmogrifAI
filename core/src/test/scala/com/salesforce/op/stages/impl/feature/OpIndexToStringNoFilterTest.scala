@@ -66,7 +66,7 @@ class OpIndexToStringNoFilterTest extends FlatSpec with TestSparkContext {
     strs2 shouldBe expected
   }
 
-  it should "correctly deindex even if the lables list does not match the number of indicies" in {
+  it should "correctly deindex even if the labels list does not match the number of indicies" in {
     val indexToStr = new OpIndexToStringNoFilter().setInput(indF).setLabels(labelsNew)
     val strs = indexToStr.transform(ds).collect(indexToStr.getOutput())
 

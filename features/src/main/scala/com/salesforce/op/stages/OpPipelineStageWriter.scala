@@ -106,7 +106,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
         // Special handling for Feature Type TypeTags
         case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
-          AnyValue(`type` = AnyValueTypes.TypeTag, value = ReflectionUtils.dealisedTypeName(t.tpe))
+          new AnyValue(AnyValueTypes.TypeTag, ReflectionUtils.dealisedTypeName(t.tpe))
         case t: TypeTag[_] =>
           throw new RuntimeException(
             s"Unknown type tag '${t.tpe.toString}'. " +
@@ -121,14 +121,17 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
         case f3: Function3[_, _, _, _] => serializeFunction(argName, f3)
         case f4: Function4[_, _, _, _, _] => serializeFunction(argName, f4)
 
+        // Special handling for [[Numeric]]
+        case n: Numeric[_] => new AnyValue(AnyValueTypes.ClassInstance, n.getClass.getName, n.getClass.getName)
+
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
-        case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
-        case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
+        case Some(v: PipelineStage) => new AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
+        case v: PipelineStage => new AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
 
         // Everything else goes as is and is handled by json4s
         case v =>
           // try serialize value with json4s
-          val av = AnyValue(AnyValueTypes.Value, v)
+          val av = new AnyValue(AnyValueTypes.Value, v)
           Try(jsonSerialize(av)) match {
             case Success(_) => av
             case Failure(e) =>
@@ -157,7 +160,8 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
           "Make sure your function does not have any external dependencies, " +
           "e.g. use any out of scope variables.", e)
     }
-    AnyValue(`type` = AnyValueTypes.Function, value = functionClass.getName)
+    new AnyValue(
+      `type` = AnyValueTypes.ClassInstance, value = functionClass.getName, valueClass = functionClass.getName)
   }
 
   private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))

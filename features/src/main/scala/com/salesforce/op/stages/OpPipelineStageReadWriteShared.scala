@@ -69,14 +69,16 @@ object OpPipelineStageReadWriteShared {
     val values = findValues
     case object TypeTag extends AnyValueTypes
     case object SparkWrappedStage extends AnyValueTypes
+    case object ClassInstance extends AnyValueTypes
     case object Value extends AnyValueTypes
-    case object Function extends AnyValueTypes
   }
 
   /**
    * A container for Any Value
    */
-  case class AnyValue(`type`: AnyValueTypes, value: Any)
+  case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: String) {
+    def this(t: AnyValueTypes, v: Any) = this(t, v, v.getClass.getName)
+  }
 
   implicit val formats: Formats =
     DefaultFormats ++
