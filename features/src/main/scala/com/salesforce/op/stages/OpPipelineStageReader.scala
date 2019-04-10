@@ -172,14 +172,13 @@ final class OpPipelineStageReader private
             // Everything else is read using json4s
             case AnyValue(AnyValueTypes.Value, value, valueClass) =>
               // Create type manifest either using the reflected type tag or serialized value class
-              val manifest =
-                try {
-                  val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
-                  ReflectionUtils.manifestForTypeTag[Any](ttag)
-                } catch {
-                  case _ if valueClass.isDefined =>
-                    ManifestFactory.classType[Any](ReflectionUtils.classForName(valueClass.get))
-                }
+              val manifest = try {
+                val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
+                ReflectionUtils.manifestForTypeTag[Any](ttag)
+              } catch {
+                case _ if valueClass.isDefined =>
+                  ManifestFactory.classType[Any](ReflectionUtils.classForName(valueClass.get))
+              }
               Extraction.decompose(value).extract[Any](formats, manifest)
 
           }
