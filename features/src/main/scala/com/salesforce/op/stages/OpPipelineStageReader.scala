@@ -165,9 +165,9 @@ final class OpPipelineStageReader private
             case AnyValue(AnyValueTypes.ClassInstance, value, _) =>
               ReflectionUtils.classForName(value.toString).getConstructors.head.newInstance()
 
-            // Simple value with no ctor argument should be instantiable by class name
+            // Value with no ctor arguments should be instantiable by class name
             case AnyValue(AnyValueTypes.Value, m: Map[_, _], Some(className)) if m.isEmpty =>
-              ReflectionUtils.classForName(className).getConstructors.head.newInstance()
+              ReflectionUtils.classForName(className).getConstructors.find(_.getParameterCount == 0).head.newInstance()
 
             // Everything else is read using json4s
             case AnyValue(AnyValueTypes.Value, value, valueClass) =>

@@ -372,19 +372,10 @@ trait RichTextFeature {
       minTokenLength: Int = TextTokenizer.MinTokenLength,
       toLowercase: Boolean = TextTokenizer.ToLowercase
     ): FeatureLike[TextList] = {
-      require(Try(Pattern.compile(pattern)).isSuccess, s"Invalid regex pattern: $pattern")
 
-      // A simple Lucene analyzer with regex Pattern Tokenizer
-      val analyzer = new LuceneTextAnalyzer(analyzers = lang => new Analyzer {
-        def createComponents(fieldName: String): TokenStreamComponents = {
-          val regex = Pattern.compile(pattern)
-          val source = new PatternTokenizer(regex, group)
-          new TokenStreamComponents(source)
-        }
-      })
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
-        analyzer = analyzer,
+        analyzer = new LuceneRegexTextAnalyzer(pattern, group),
         autoDetectLanguage = false,
         autoDetectThreshold = 1.0,
         defaultLanguage = Language.Unknown,
