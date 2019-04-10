@@ -592,6 +592,9 @@ object RawFeatureFilter {
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
 
+  val stageName = classOf[RawFeatureFilter[_]].getSimpleName
+
+  val uid = s"${stageName}_100000000000"
 }
 
 /**

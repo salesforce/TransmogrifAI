@@ -403,7 +403,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         // check that raw feature filter config is correctly serialized and deserialized
 
         def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
-          modelInsights.stageInfo("rawFeatureFilter") match {
+          modelInsights.stageInfo(RawFeatureFilter.stageName) match {
             case configInfo: Map[String, Map[String, String]] =>
               configInfo.getOrElse("params", Map.empty[String, String])
             case _ => Map.empty[String, String]
