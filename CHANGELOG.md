@@ -3,7 +3,6 @@
 ## 0.5.2
 
 Bug fixes:
-Bug fixes:
 - Fixed local scoring with multipicklist features [#243](https://github.com/salesforce/TransmogrifAI/pull/243)
 - Fixed error messages in `DataCutter` and `DataBalancer` [#256](https://github.com/salesforce/TransmogrifAI/pull/256)
 - Fixed bug in in model selector fit method [#251](https://github.com/salesforce/TransmogrifAI/pull/251)
