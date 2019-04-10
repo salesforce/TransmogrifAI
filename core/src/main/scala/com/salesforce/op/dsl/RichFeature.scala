@@ -30,13 +30,14 @@
 
 package com.salesforce.op.dsl
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.binary.BinaryLambdaTransformer
 import com.salesforce.op.stages.base.quaternary.QuaternaryLambdaTransformer
 import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.{AliasTransformer, ToOccurTransformer}
+import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
+import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 
 import scala.reflect.runtime.universe.TypeTag
@@ -132,40 +133,9 @@ trait RichFeature {
      * @return feature of type A
      */
     def filter(p: A => Boolean, default: A): FeatureLike[A] = {
-      feature.transformWith(
-        new UnaryLambdaTransformer[A, A](operationName = "filter", transformFn = a => if (p(a)) a else default)
-      )
+      feature.transformWith(new FilterTransformer[A](p, default))
     }
 
-    /**
-     * Filter feature[A] using the NOT predicate.
-     * Filtered out values are replaced with a default.
-     *
-     * @param p       predicate A => Boolean
-     * @param default default value if predicate returns false
-     * @return feature of type A
-     */
-    def filterNot(p: A => Boolean, default: A): FeatureLike[A] = {
-      filter(a => !p(a), default)
-    }
-
-    /**
-     * Filter & transform feature[A] => feature[B] using the partial function A => B.
-     * Filtered out values are replaced with a default.
-     *
-     * @param default default value if partial function is not defined
-     * @param pf      partial function A => B
-     * @return feature of type B
-     */
-    def collect[B <: FeatureType : TypeTag](default: B)(pf: PartialFunction[A, B])
-      (implicit ttb: TypeTag[B#Value]): FeatureLike[B] = {
-      feature.transformWith(
-        new UnaryLambdaTransformer[A, B](
-          operationName = "collect",
-          transformFn = a => if (pf.isDefinedAt(a)) pf(a) else default
-        )
-      )
-    }
 
     /**
      * Tests whether a predicate holds for feature[A]
@@ -174,12 +144,7 @@ trait RichFeature {
      * @return feature[Binary]
      */
     def exists(p: A => Boolean): FeatureLike[Binary] = {
-      feature.transformWith(
-        new UnaryLambdaTransformer[A, Binary](
-          operationName = "exists",
-          transformFn = a => new Binary(p(a))
-        )
-      )
+      feature.transformWith(new ExistsTransformer[A](p))
     }
 
     /**
