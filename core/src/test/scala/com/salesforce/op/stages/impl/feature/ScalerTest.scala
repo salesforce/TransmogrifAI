@@ -42,7 +42,9 @@ class ScalerTest extends FlatSpec with TestSparkContext {
     val error = intercept[IllegalArgumentException](
       Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
     )
-    error.getMessage shouldBe "Invalid combination of scaling type 'Linear' and args type 'EmptyArgs'"
+    error.getMessage shouldBe
+      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
+        s"and args type '${EmptyScalerArgs.getClass.getSimpleName}'"
   }
 
   it should "correctly build construct a LinearScaler" in {
