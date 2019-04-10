@@ -44,7 +44,7 @@ class ScalerTest extends FlatSpec with TestSparkContext {
     )
     error.getMessage shouldBe
       s"Invalid combination of scaling type '${ScalingType.Linear}' " +
-        s"and args type '${EmptyScalerArgs.getClass.getSimpleName}'"
+        s"and args type '${EmptyScalerArgs().getClass.getSimpleName}'"
   }
 
   it should "correctly build construct a LinearScaler" in {
