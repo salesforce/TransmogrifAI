@@ -26,7 +26,7 @@ New features / updates:
 - Added Jupyter notebooks for samples #231
 
 Dependency updates:
-- Switched to MLeap runtime from Aardpfark #249, #261
+- Switched to MLeap runtime from Aardpfark for local scoring #249, #261
 
 ## 0.5.1
 
