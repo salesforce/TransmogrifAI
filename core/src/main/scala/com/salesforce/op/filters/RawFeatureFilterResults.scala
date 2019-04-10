@@ -39,13 +39,6 @@ import org.json4s.{DefaultFormats, Formats}
 
 import scala.util.Try
 
-trait RawFeatureFilterFormats {
-  implicit val jsonFormats: Formats = DefaultFormats +
-    new SpecialDoubleSerializer +
-    EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
-}
-
 /**
  * Contains configuration and results from RawFeatureFilter
  *
@@ -62,7 +55,15 @@ case class RawFeatureFilterResults
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty
 )
 
+trait RawFeatureFilterFormats {
+  implicit val jsonFormats: Formats = DefaultFormats +
+    new SpecialDoubleSerializer +
+    EnumEntrySerializer.json4s[CorrelationType](CorrelationType) +
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+}
+
 object RawFeatureFilterResults extends RawFeatureFilterFormats {
+
   /**
    * RawFeatureFilterResults to json
    *
@@ -77,8 +78,7 @@ object RawFeatureFilterResults extends RawFeatureFilterFormats {
    * @param json json
    * @return raw feature filter results
    */
-  def fromJson(json: String): Try[RawFeatureFilterResults] =
-    Try { Serialization.read[RawFeatureFilterResults](json) }
+  def fromJson(json: String): Try[RawFeatureFilterResults] = Try { Serialization.read[RawFeatureFilterResults](json) }
 
 }
 
@@ -116,10 +116,7 @@ object RawFeatureFilterConfig extends RawFeatureFilterFormats {
    * @return Map[String, Map[String, Any] ]
    */
   def toStageInfo(config: RawFeatureFilterConfig): Map[String, Map[String, Any]] = {
-    val stageName = "rawFeatureFilter"
-    val uid = "rawFeatureFilter"
-    Map(stageName -> Map("uid" -> uid, "params" -> toStringMap(config))
-    )
+    Map(RawFeatureFilter.stageName -> Map("uid" -> RawFeatureFilter.uid, "params" -> toStringMap(config)))
   }
 
 }
