@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.5.2
+
+Bug fixes:
+- Fixed local scoring with multipicklist features #243
+- Fixed error messages in `DataCutter` and `DataBalancer` #256
+- Fixed bug in in model selector fit method #251
+- Fixed some Transmogrifier defaults to be modifiable / exposed #232
+- Fixed bug in `OpXGBoostClassificationModel` #229
+- Minor fixes / cleanup on notebooks, Helloworld examples, and developer guide #226, #230, #240, #259
+
+New features / updates:
+- Added transformer classes for common math operations #255, #257
+- Added string transformers for substring search and valid email #265
+- Added scaler and descaler transformers #223
+- Added Raw Feature Filter results e.g., metrics, exclusion reasons to serialization and to `ModelInsights` #237, #252, #258, #276
+- Changed OpBinScoreEvaluator to allow for lift analysis #233
+- Added random param builder for random hyperparameter search in model selectors #238
+- Added possibility to return top K positives and top K negatives improvement for LOCO #264
+- Added a max cardinality percentage that can be set for pivot #241
+- Added minimum rows for scoring set in RawFeatureFilter #250
+- Allowed copying model instances across multiple threads #270
+- Added stub to allow loading models without workflow #269, #272
+- Made decision tree numeric bucketizer tests less flaky #225
+- Added Jupyter notebooks for samples #231
+
+Dependency updates:
+- Switched to MLeap runtime from Aardpfark #249, #261
+
 ## 0.5.1
 
 Bug fixes:
