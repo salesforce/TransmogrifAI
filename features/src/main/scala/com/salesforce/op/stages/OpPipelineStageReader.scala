@@ -161,10 +161,11 @@ final class OpPipelineStageReader private
         // Class value argument
         case AnyValueTypes.ClassInstance =>
           try {
-            ReflectionUtils.classForName(anyValue.valueClass).getConstructors.head.newInstance()
+            ReflectionUtils.classForName(anyValue.value.toString).getConstructors.head.newInstance()
           } catch {
             case e: Exception => throw new RuntimeException(
-              s"Failed to instantiate argument '$argName' from class '${anyValue.valueClass}'", e)
+              s"Failed to instantiate argument '$argName' from value '${anyValue.value}'" +
+                anyValue.valueClass.map(c => s" of class '$c'").getOrElse(""), e)
           }
 
         // Everything else is read using json4s
@@ -176,8 +177,8 @@ final class OpPipelineStageReader private
                 val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
                 ReflectionUtils.manifestForTypeTag[Any](ttag)
               } catch {
-                case _ if anyValue.valueClass != null =>
-                  ManifestFactory.classType[Any](ReflectionUtils.classForName(anyValue.valueClass))
+                case _ if anyValue.valueClass.isDefined =>
+                  ManifestFactory.classType[Any](ReflectionUtils.classForName(anyValue.valueClass.get))
               }
             Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
           } catch {

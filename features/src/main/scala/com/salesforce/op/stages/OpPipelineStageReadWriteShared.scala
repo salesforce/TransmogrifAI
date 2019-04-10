@@ -76,9 +76,7 @@ object OpPipelineStageReadWriteShared {
   /**
    * A container for Any Value
    */
-  case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: String) {
-    def this(`type`: AnyValueTypes, `value`: Any) = this(`type`, `value`, `value`.getClass.getName)
-  }
+  case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: Option[String])
 
   implicit val formats: Formats =
     DefaultFormats ++
