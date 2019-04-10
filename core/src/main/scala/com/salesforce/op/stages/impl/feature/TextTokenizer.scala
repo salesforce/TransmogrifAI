@@ -124,7 +124,7 @@ class TextTokenizer[T <: Text]
 object TextTokenizer {
   val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
   val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
-  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneTextAnalyzer(LuceneTextAnalyzer.withHtmlStripping)
+  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneHtmlStripTextAnalyzer()
   val AutoDetectLanguage = false
   val AutoDetectThreshold = 0.99
   val DefaultLanguage: Language = Language.Unknown

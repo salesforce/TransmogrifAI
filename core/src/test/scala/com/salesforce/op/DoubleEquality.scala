@@ -28,36 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.feature
+package com.salesforce.op
 
-import com.salesforce.op.test.TestSparkContext
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import org.scalactic.Equality
 
-@RunWith(classOf[JUnitRunner])
-class ScalerTest extends FlatSpec with TestSparkContext {
+/**
+ * Contains custom Equality checks for Double and Option[Double]
+ */
+trait DoubleEquality {
 
-  Spec[Scaler] should "error on invalid data" in {
-    val error = intercept[IllegalArgumentException](
-      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
-    )
-    error.getMessage shouldBe
-      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
-        s"and args type '${EmptyScalerArgs.getClass.getSimpleName}'"
+  implicit val doubleEquality = new Equality[Double] {
+    def areEqual(a: Double, b: Any): Boolean = b match {
+      case s: Double => (a.isNaN && s.isNaN) || (a == b)
+      case _ => false
+    }
   }
 
-  it should "correctly build construct a LinearScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
-      args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
-    linearScaler shouldBe a[LinearScaler]
-    linearScaler.scalingType shouldBe ScalingType.Linear
+  class OptionDoubleEquality[T <: Option[Double]] extends Equality[T] {
+    def areEqual(a: T, b: Any): Boolean = b match {
+      case None => a.isEmpty
+      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
+      case _ => false
+    }
   }
 
-  it should "correctly build construct a LogScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyScalerArgs())
-    linearScaler shouldBe a[LogScaler]
-    linearScaler.scalingType shouldBe ScalingType.Logarithmic
-  }
+  implicit val otherDoubleEquality = new OptionDoubleEquality[Option[Double]]
+  implicit val someDoubleEquality = new OptionDoubleEquality[Some[Double]]
+
 }
-
