@@ -39,7 +39,7 @@ import com.salesforce.op.utils.text.Language
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
-
+import RichMapFeatureLambdas._
 trait RichMapFeature {
 
   /**
@@ -1085,9 +1085,9 @@ trait RichMapFeature {
      * @return prediction, rawPrediction, probability
      */
     def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
-      (f.map[RealNN](_.prediction.toRealNN),
-        f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
-        f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
+      (f.map[RealNN](predictionToRealNN),
+        f.map[OPVector](predictionToRaw),
+        f.map[OPVector](predictionToProbability)
       )
     }
 
@@ -1104,6 +1104,14 @@ trait RichMapFeature {
     }
   }
 
+}
+
+object RichMapFeatureLambdas {
+  def predictionToRealNN: (Prediction => RealNN) = _.prediction.toRealNN
+
+  def predictionToRaw: (Prediction => OPVector) = p => Vectors.dense(p.rawPrediction).toOPVector
+
+  def predictionToProbability: (Prediction => OPVector) = p => Vectors.dense(p.probability).toOPVector
 }
 
 

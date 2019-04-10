@@ -55,7 +55,7 @@ trait RichTextFeature {
      *
      * @return A new MultiPickList feature
      */
-    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](_.value.toSet[String].toMultiPickList)
+    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](textToMultiPickList)
 
 
     /**
@@ -820,7 +820,7 @@ object RichTextFeatureLambdas {
 
   def emailToPrefix: Email => Text = _.prefix.toText
 
-  def emailToDomain:Email => Text = _.domain.toText
+  def emailToDomain: Email => Text = _.domain.toText
 
   def urlToPickList: URL => PickList = (v: URL) => if (v.isValid) v.domain.toPickList else PickList.empty
 
@@ -831,4 +831,6 @@ object RichTextFeatureLambdas {
   def urlIsValid: URL => Boolean = _.isValid
 
   def textToPickList: Text => PickList = _.value.toPickList
+
+  def textToMultiPickList: Text => MultiPickList = _.value.toSet[String].toMultiPickList
 }
