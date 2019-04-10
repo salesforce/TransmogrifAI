@@ -54,7 +54,9 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val (data, v) = TestFeatureBuilder(vecData)
     val meta = OpVectorMetadata(v.name, Array(TransientFeature(v).toColumnMetaData()), Map.empty).toMetadata
     val inputData = data.withColumn(v.name, col(v.name).as(v.name, meta))
-    val stage = new DropIndicesByTransformer(DropIndicesByTransformerTest.matchFn).setInput(v).setInputSchema(inputData.schema)
+    val stage = new DropIndicesByTransformer(
+      DropIndicesByTransformerTest.matchFn
+    ).setInput(v).setInputSchema(inputData.schema)
     inputData -> stage
   }
 
@@ -112,6 +114,7 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
   }
 
 }
-object DropIndicesByTransformerTest{
+
+object DropIndicesByTransformerTest {
   def matchFn: OpVectorColumnMetadata => Boolean = _.isNullIndicator
 }
