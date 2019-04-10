@@ -307,6 +307,14 @@ class OpWorkflowModelReaderWriterTest
     wfM.getBlacklist().isEmpty shouldBe true
   }
 
+  it should "be able to load a old version of a saved model (v0.5.1)" in new VectorizedFlow {
+    // note: in these old models, raw feature filter config will be set to the config defaults
+    // but we never re-initialize raw feature filter when loading a model (only scoring, no training)
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
+    wfM.getRawFeatureFilterResults().rawFeatureFilterMetrics shouldBe empty
+    wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
+  }
+
   it should "error on loading a model without workflow" in {
     val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
     error.getMessage should startWith("Failed to load Workflow from path")

@@ -30,25 +30,25 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.{OpParams, OpWorkflow}
-import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.features.types._
+import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.test._
-import com.salesforce.op.testkit._
-import com.salesforce.op.testkit.RandomData
 import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
+import com.salesforce.op.stages.impl.preparators.CorrelationType
+import com.salesforce.op.test._
+import com.salesforce.op.testkit.{RandomData, _}
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.log4j.Level
+import com.salesforce.op.{OpParams, OpWorkflow}
+import com.twitter.algebird.Operators._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
-import com.twitter.algebird.Operators._
 import org.junit.runner.RunWith
-import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{Assertion, FlatSpec}
 
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
@@ -99,6 +99,58 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     strMapM.name shouldBe stringMap.name
     if (strMapM.key.contains("Male")) strMapM.nulls shouldBe 4 else strMapM.nulls shouldBe 3
+  }
+
+  it should "correctly serialize and deserialize raw feature filter results with fixed data" in {
+    val params = new OpParams()
+    val survPred = survived.copy(isResponse = false)
+    val features: Array[OPFeature] =
+      Array(survPred, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.0, 1.0,
+      Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
+    val FilteredRawData(_, _, _, resultsRFF) =
+      filter.generateFilteredRaw(features, params)
+
+    RawFeatureFilterResults.fromJson(RawFeatureFilterResults.toJson(resultsRFF)) match {
+      case Failure(e) => fail(e)
+      case Success(deser) =>
+        RawFeatureFilterResultsComparison.compareConfig(
+          resultsRFF.rawFeatureFilterConfig, deser.rawFeatureFilterConfig
+        )
+        RawFeatureFilterResultsComparison.compareSeqDistributions(
+          resultsRFF.rawFeatureDistributions, deser.rawFeatureDistributions
+        )
+        RawFeatureFilterResultsComparison.compareSeqExclusionReasons(
+          resultsRFF.exclusionReasons, deser.exclusionReasons
+        )
+        RawFeatureFilterResultsComparison.compareSeqMetrics(
+          resultsRFF.rawFeatureFilterMetrics, deser.rawFeatureFilterMetrics
+        )
+    }
+  }
+
+  it should "correctly convert raw feature filter config to string map" in {
+    val config = RawFeatureFilterConfig(
+      minFill = 0.5,
+      maxFillDifference = Double.PositiveInfinity,
+      maxFillRatioDiff = 0.5,
+      maxJSDivergence = 0.5,
+      maxCorrelation = 0.5,
+      correlationType = CorrelationType.Pearson,
+      jsDivergenceProtectedFeatures = Seq.empty,
+      protectedFeatures = Seq.empty
+    )
+
+    val params: Map[String, String] = RawFeatureFilterConfig.toStringMap(config)
+
+    config.minFill.toString shouldEqual params("minFill")
+    config.maxFillDifference.toString shouldEqual params("maxFillDifference")
+    config.maxFillRatioDiff.toString shouldEqual params("maxFillRatioDiff")
+    config.maxJSDivergence.toString shouldEqual params("maxJSDivergence")
+    config.maxCorrelation.toString shouldEqual params("maxCorrelation")
+    config.correlationType.toString shouldEqual params("correlationType")
+    config.jsDivergenceProtectedFeatures.toString shouldEqual params("jsDivergenceProtectedFeatures")
+    config.protectedFeatures.toString shouldEqual params("protectedFeatures")
   }
 
   it should "correctly compute and store raw feature filter metrics when correlation is unavailable " +
@@ -291,6 +343,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     )
 
     val filteredRawData = filter.generateFilteredRaw(features, params)
+
     filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
       Seq(DataFrameFieldNames.KeyFieldName, survived.name, boardedTime.name, boardedTimeAsDateTime.name)
@@ -966,7 +1019,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
    * Right now, it is specialized to accept just one map type feature, which is hardcoded to be a CurrencyMap based
    * on current tests.
    *
-   * @param filteredRawData         FilteredRawData object prdduced by RawFeatureFilter
+   * @param filteredRawData         FilteredRawData object produced by RawFeatureFilter
    * @param mapFeatureRaw           Name of raw map feature to check keys on
    * @param featureUniverse         Set of raw feature names you start with
    * @param expectedDroppedFeatures Expected set of raw feature names to be dropped
