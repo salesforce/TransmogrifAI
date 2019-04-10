@@ -544,8 +544,8 @@ class RawFeatureFilter[T]
       maxJSDivergence = maxJSDivergence,
       maxCorrelation = maxCorrelation,
       correlationType = correlationType,
-      jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures,
-      protectedFeatures = protectedFeatures
+      jsDivergenceProtectedFeatures = jsDivergenceProtectedFeatures.toSeq,
+      protectedFeatures = protectedFeatures.toSeq
     )
 
     val featureDistributions =
