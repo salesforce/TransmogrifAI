@@ -31,11 +31,12 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.FeatureDistributionType
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, HashSpaceStrategy, ScalingType, TimePeriod}
+import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
 import enumeratum._
 import org.json4s.ext.JodaTimeSerializers
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.jackson.Serialization
+import org.json4s.{DefaultFormats, Formats, FullTypeHints}
 
 
 object OpPipelineStageReadWriteShared {
@@ -78,8 +79,12 @@ object OpPipelineStageReadWriteShared {
    */
   case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: Option[String])
 
+  val typeHints = FullTypeHints(List(
+    classOf[EmptyScalerArgs], classOf[LinearScalerArgs]
+  ))
+
   implicit val formats: Formats =
-    DefaultFormats ++
+    Serialization.formats(typeHints) ++
       JodaTimeSerializers.all +
       EnumEntrySerializer.json4s[AnyValueTypes](AnyValueTypes) +
       EnumEntrySerializer.json4s[HashAlgorithm](HashAlgorithm) +
