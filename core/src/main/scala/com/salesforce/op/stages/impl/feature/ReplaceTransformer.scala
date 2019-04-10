@@ -36,13 +36,14 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 
 import scala.reflect.runtime.universe.TypeTag
 
-class ExistsTransformer[A <: FeatureType]
+class ReplaceTransformer[A <: FeatureType]
 (
-  p: A => Boolean,
+  oldVal: A,
+  newVal: A,
   uid: String = UID[ScalarSubtractTransformer[_, _]],
-  operationName: String = "exists"
-)(implicit tta: TypeTag[A])
-  extends UnaryTransformer[A, Binary](uid = uid, operationName = operationName) {
-  override def transformFn: A => Binary = a => new Binary(p(a))
+  operationName: String = "replaceWith"
+)(implicit tti: TypeTag[A], ttov: TypeTag[A#Value])
+  extends UnaryTransformer[A, A](uid = uid, operationName = operationName) {
+  override def transformFn: A => A = a => if (oldVal == a) newVal else a
 
 }

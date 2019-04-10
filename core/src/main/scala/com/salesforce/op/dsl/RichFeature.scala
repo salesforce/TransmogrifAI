@@ -74,7 +74,7 @@ trait RichFeature {
      * @return feature of type A
      */
     def replaceWith(oldVal: A, newVal: A): FeatureLike[A] = {
-      map[A](a => if (oldVal == a) newVal else a)
+      feature.transformWith(new ReplaceTransformer[A](oldVal, newVal))
     }
 
     /**

@@ -35,7 +35,9 @@ import com.salesforce.op.features.types.{Binary, FeatureType}
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import scala.reflect.runtime.universe.TypeTag
 
-class FilterTransformer[A <: FeatureType](p: A => Boolean,
+class FilterTransformer[A <: FeatureType]
+(
+  p: A => Boolean,
   default: A,
   uid: String = UID[ScalarSubtractTransformer[_, _]],
   operationName: String = "filter"
