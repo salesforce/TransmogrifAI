@@ -67,9 +67,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     log.info(pretty(stageJson))
     (stageJson \ FN.Uid.entryName).extract[String] shouldBe stage.uid
   }
-  it should "write isModel" in {
-    (stageJson \ FN.IsModel.entryName).extract[Boolean] shouldBe isModel
-  }
   it should "write class name" in {
     (stageJson \ FN.Class.entryName).extract[String] shouldBe stage.getClass.getName
   }
