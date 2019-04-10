@@ -33,10 +33,10 @@ package com.salesforce.op.stages
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
-import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
+import org.apache.spark.ml.{PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
