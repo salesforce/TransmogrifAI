@@ -84,11 +84,6 @@ trait OpPipelineStageBase extends OpPipelineStageParams with MLWritable {
   }
 
   /**
-   * Function to be called on setInput
-   */
-  protected def onSetInput(): Unit = {}
-
-  /**
    * Output features that will be created by this stage
    *
    * @return feature of type OutputFeatures
