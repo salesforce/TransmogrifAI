@@ -164,4 +164,3 @@ I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
   tto: TypeTag[O],
   ttov: TypeTag[O#Value]
 ) extends QuaternaryTransformer[I1, I2, I3, I4, O](operationName = operationName, uid = uid)
-
