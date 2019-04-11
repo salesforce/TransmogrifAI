@@ -3,13 +3,13 @@
 Start up your spark shell and add the [TransmogrifAI package](https://spark-packages.org/package/salesforce/TransmogrifAI):
 
 ```bash
-$SPARK_HOME/bin/spark-shell --packages com.salesforce.transmogrifai:transmogrifai-core_2.11:0.5.1
+$SPARK_HOME/bin/spark-shell --packages com.salesforce.transmogrifai:transmogrifai-core_2.11:0.5.2
 ```
 
 Or if you'd like to use the latest version from master:
 ```bash
 cd TransmogrifAI && ./gradlew core:shadowJar
-$SPARK_HOME/bin/spark-shell --jars core/build/libs/transmogrifai-x.y.z-all.jar
+$SPARK_HOME/bin/spark-shell --jars core/build/libs/transmogrifai-x.y.z.jar
 ```
 
 Once the `spark-shell` starts up, create your spark session:

@@ -57,4 +57,5 @@ class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceT
     Set("15.0").toMultiPickList,
     Set("1.111", "2.222").toMultiPickList
   )
+
 }

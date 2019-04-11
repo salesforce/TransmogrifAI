@@ -28,48 +28,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.feature
+package com.salesforce.op.stages
 
-import com.salesforce.op.UID
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.binary.BinaryTransformer
-import org.apache.spark.ml.param.{BooleanParam, Params}
+import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
 
 import scala.reflect.runtime.universe.TypeTag
 
-/**
- * Checks if the first input is a substring of the second input
- * @param uid           uid for instance
- * @param tti1          type tag for first input
- * @param tti2          type tag for second input
- * @tparam I1 first input feature type
- * @tparam I2 second input feature type
- */
-class SubstringTransformer[I1 <: Text, I2 <: Text]
-(
-  uid: String = UID[SubstringTransformer[_, _]]
-)(
-  implicit override val tti1: TypeTag[I1],
-  override val tti2: TypeTag[I2]
-) extends BinaryTransformer[I1, I2, Binary](operationName = "substring", uid = uid) with TextMatchingParams {
-  override def transformFn: (I1, I2) => Binary = (sub: I1, full: I2) => {
-    val (subClean, fullClean) =
-      if ($(toLowercase)) (sub.map(_.toLowerCase), full.map(_.toLowerCase))
-      else (sub.value, full.value)
-    fullClean.flatMap(f => subClean.map(f.contains(_))).toBinary
-  }
-}
 
-
-trait TextMatchingParams extends Params {
+private[op] trait HasOut[O <: FeatureType] {
+  self: OpPipelineStage[O] =>
 
   /**
-   * Indicates whether to convert all characters to lowercase before string operation.
+   * Type tag of the output
    */
-  final val toLowercase =
-    new BooleanParam(this, "toLowercase", "whether to convert all characters to lowercase before string operation")
-  def setToLowercase(value: Boolean): this.type = set(toLowercase, value)
-  def getToLowercase: Boolean = $(toLowercase)
-  setDefault(toLowercase -> TextTokenizer.ToLowercase)
+  implicit val tto: TypeTag[O]
+
+  /**
+   * Type tag of the output value
+   */
+  implicit val ttov: TypeTag[O#Value]
+
+  override def getOutput(): FeatureLike[O] = new Feature[O](
+    uid = outputFeatureUid,
+    name = getOutputFeatureName,
+    originStage = this,
+    isResponse = outputIsResponse,
+    parents = getInputFeatures()
+  )(tto)
 
 }
