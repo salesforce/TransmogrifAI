@@ -49,7 +49,7 @@ import scala.util.{Failure, Success, Try}
  *
  * @param stage a stage to save
  */
-final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWriter {
+final class OpPipelineStageWriter(val stage: AnyRef) extends MLWriter {
 
   override protected def saveImpl(path: String): Unit = {
     val metadataPath = new Path(path, "metadata").toString
@@ -82,12 +82,23 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
       case s: SparkWrapperParams[_] => s.setStageSavePath(path)
       case s => s
     }
-    // We produce stage metadata for all the Spark params
-    val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
-    val metadata = parse(metadataJson).extract[Map[String, Any]]
 
-    // We also include stage it's ctor args, so we can reconstruct the model instance when loading
-    metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap)
+    stage match {
+      case s: OpPipelineStageBase => {
+        // We produce stage metadata for all the Spark params
+        val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(s)
+        val metadata = parse(metadataJson).extract[Map[String, Any]]
+
+        // We also include stage it's ctor args, so we can reconstruct the model instance when loading
+        metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap)
+      }
+      case _ => Map[String, Any](
+        FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap,
+        FieldNames.Class.entryName -> stage.getClass.getName
+
+      )
+    }
+
   }
 
   /**
@@ -128,6 +139,30 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
         case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid, None)
         case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid, None)
 
+        case s: List[_] => {
+          val x = s.map(x => new OpPipelineStageWriter(x.asInstanceOf[AnyRef]).writeToMap("/tmp")).toArray
+          AnyValue(AnyValueTypes.Seq, x, None)
+        }
+
+        case a: Array[_] => {
+          val x = a.map(x => new OpPipelineStageWriter(x.asInstanceOf[AnyRef]).writeToMap("/tmp"))
+          AnyValue(AnyValueTypes.Seq, x, Some(a.getClass.getName))
+
+        }
+
+        case m: Map[_, _] => {
+          val x = m.mapValues(x => new OpPipelineStageWriter(x.asInstanceOf[AnyRef]).writeToMap("/tmp"))
+          AnyValue(AnyValueTypes.Map, x, Some(m.getClass.getName))
+        }
+
+        case c: java.lang.Object if (
+          !c.getClass.getName.startsWith("java.lang") && !c.getClass.getName.startsWith("scala")
+          ) || c.getClass.getName.startsWith("scala.Some") => {
+          val v = new OpPipelineStageWriter(c).writeToMap("/tmp")
+          AnyValue(AnyValueTypes.OpClass, v, Some(c.getClass.getName))
+
+        }
+
         // Everything else goes as is and is handled by json4s
         case v =>
           // try serialize value with json4s
@@ -144,7 +179,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
   } match {
     case Success(args) => args
     case Failure(error) =>
-      throw new RuntimeException(s"Failed to extract constructor arguments for model stage '${stage.uid}'. " +
+      throw new RuntimeException(s"Failed to extract constructor arguments for model stage '${stage}'. " +
         "Make sure your model class is a concrete final class with json4s serializable arguments.", error
       )
   }

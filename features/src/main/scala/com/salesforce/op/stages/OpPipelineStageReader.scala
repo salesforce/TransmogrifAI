@@ -44,6 +44,7 @@ import org.json4s.{Extraction, _}
 
 import scala.reflect.ManifestFactory
 import scala.reflect.runtime.universe._
+import scala.util.parsing.json.JSONObject
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -89,7 +90,7 @@ final class OpPipelineStageReader private
    * Loads from the json serialized data
    *
    * @param jsonStr json string
-   * @param path to the stored output
+   * @param path    to the stored output
    * @return OpPipelineStageBase
    */
   def loadFromJsonString(jsonStr: String, path: String): OpPipelineStageBase = {
@@ -132,11 +133,10 @@ final class OpPipelineStageReader private
   /**
    * Load the stage instance from the metadata by instantiating it using a class name + ctor args
    */
-  private def loadStage(stageClassName: String, metadataJson: JValue): OpPipelineStageBase = {
+  private def loadStage[T](stageClassName: String, metadataJson: JValue, m: Option[Map[String, AnyValue]] = None): T = {
     // Extract all the ctor args
-    val ctorArgsJson = (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj
-    val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
-
+    val ctorArgsJson = if (m.isEmpty) (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj else Nil
+    val ctorArgsMap = m.getOrElse(ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap)
     // Make the ctor function used for creating a stage instance
     def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = {
       for {
@@ -166,6 +166,47 @@ final class OpPipelineStageReader private
               ReflectionUtils.classForName(value.toString).getConstructors.head.newInstance()
 
             // Value with no ctor arguments should be instantiable by class name
+
+            case AnyValue(AnyValueTypes.Seq, l, _) => {
+              val kl = l.asInstanceOf[List[Map[String, _]]]
+              kl.map { k =>
+                val cA = k("ctorArgs").asInstanceOf[Map[String, Map[String, _]]]
+                val parsed = cA.mapValues(AnyValueTypes.fromMap)
+                loadStage[AnyRef](
+                  k(FieldNames.Class.entryName).asInstanceOf[String],
+                  JNothing,
+                  Some(parsed)
+                )
+              }
+
+            }
+
+            case AnyValue(AnyValueTypes.Map, l, _) => {
+              val kl = l.asInstanceOf[Map[String, Map[String, _]]]
+              kl.mapValues { k =>
+                val cA = k("ctorArgs").asInstanceOf[Map[String, Map[String, _]]]
+                val parsed = cA.mapValues(AnyValueTypes.fromMap)
+                loadStage[AnyRef](
+                  k(FieldNames.Class.entryName).asInstanceOf[String],
+                  JNothing,
+                  Some(parsed)
+                )
+              }
+
+            }
+
+            case AnyValue(AnyValueTypes.OpClass, v, Some(className)) => {
+              val k = v.asInstanceOf[Map[String, _]]
+              val cA = k("ctorArgs").asInstanceOf[Map[String, Map[String, _]]]
+              val parsed = cA.mapValues(AnyValueTypes.fromMap)
+              loadStage[AnyRef](
+                k(FieldNames.Class.entryName).asInstanceOf[String],
+                JNothing,
+                Some(parsed)
+              )
+
+            }
+
             case AnyValue(AnyValueTypes.Value, m: Map[_, _], Some(className)) if m.isEmpty =>
               ReflectionUtils.classForName(className).getConstructors.find(_.getParameterCount == 0).head.newInstance()
 
@@ -186,17 +227,18 @@ final class OpPipelineStageReader private
         res <- argInstance match {
           case Failure(e) =>
             throw new RuntimeException(
-              s"Failed to parse argument '$argName' from value '${anyValue.value}'" +
-                anyValue.valueClass.map(c => s" of class '$c'").getOrElse(""), e)
+              s"Failed to parse argument '$argName' from value '${anyValue}'", e)
           case ok => ok
         }
       } yield res
     }
 
     // Reflect stage class instance by class + ctor args
-    val stageClass = ReflectionUtils.classForName(stageClassName)
-    val stage = ReflectionUtils.newInstance[OpPipelineStageBase](stageClass, ctorArgs)
-    stage
+
+      val stageClass = ReflectionUtils.classForName(stageClassName)
+      val stage = ReflectionUtils.newInstance[T](stageClass, ctorArgs)
+      stage
+
   }
 
 }

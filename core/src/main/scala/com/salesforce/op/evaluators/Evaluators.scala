@@ -34,6 +34,11 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.OPVector
 import org.apache.spark.sql.Dataset
 
+class AuPR  extends OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR, isLargerBetter = true) {
+  override def evaluate(dataset: Dataset[_]): Double =
+    getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuPR, dataset, default = 0.0)
+}
+
 /**
  * Just a handy factory for evaluators
  */
@@ -64,14 +69,13 @@ object Evaluators {
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuROC, dataset, default = 0.0)
       }
 
+
+
+
     /**
      * Area under Precision/Recall curve
      */
-    def auPR(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR, isLargerBetter = true) {
-        override def evaluate(dataset: Dataset[_]): Double =
-          getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuPR, dataset, default = 0.0)
-      }
+    def auPR(): OpBinaryClassificationEvaluator = new AuPR
 
     /**
      * Precision

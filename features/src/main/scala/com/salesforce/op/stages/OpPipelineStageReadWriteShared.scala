@@ -69,9 +69,17 @@ object OpPipelineStageReadWriteShared {
   object AnyValueTypes extends Enum[AnyValueTypes] {
     val values = findValues
     case object TypeTag extends AnyValueTypes
+    case object OpClass extends AnyValueTypes
     case object SparkWrappedStage extends AnyValueTypes
     case object ClassInstance extends AnyValueTypes
     case object Value extends AnyValueTypes
+    case object Seq extends AnyValueTypes
+    case object Map extends AnyValueTypes
+
+    def fromMap(t: Map[String, _]): AnyValue = AnyValue(AnyValueTypes.namesToValuesMap(
+      t("type").toString),
+      t("value"),
+      t.get("valueClass").map(_.toString))
   }
 
   /**
