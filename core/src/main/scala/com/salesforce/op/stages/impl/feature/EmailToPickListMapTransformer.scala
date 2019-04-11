@@ -30,11 +30,9 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.{Binary, Email, EmailMap, PickList, PickListMap}
-
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer}
+import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 
 
 class EmailToPickListMapTransformer(uid: String = UID[EmailToPickListMapTransformer])
@@ -43,7 +41,10 @@ class EmailToPickListMapTransformer(uid: String = UID[EmailToPickListMapTransfor
     operationName = "emailToPickListMap",
     transformer = new UnaryLambdaTransformer[Email, PickList](
       operationName = "emailToPickList",
-      transformFn = _.domain.toPickList
+      transformFn = EmailToPickListMapTransformer.emailToPickList
     )
   )
 
+object EmailToPickListMapTransformer {
+  def emailToPickList: Email => PickList = email => email.domain.toPickList
+}

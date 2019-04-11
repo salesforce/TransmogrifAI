@@ -36,13 +36,14 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 
 import scala.reflect.runtime.universe.TypeTag
 
-class ExistsTransformer[A <: FeatureType]
-(
-  p: A => Boolean,
-  uid: String = UID[ScalarSubtractTransformer[_, _]],
-  operationName: String = "exists"
-)(implicit tta: TypeTag[A])
-  extends UnaryTransformer[A, Binary](uid = uid, operationName = operationName) {
-  override def transformFn: A => Binary = a => new Binary(p(a))
 
+class ExistsTransformer[I <: FeatureType]
+(
+  p: I => Boolean,
+  uid: String = UID[ExistsTransformer[_]],
+  operationName: String = "exists"
+)(implicit tti: TypeTag[I])
+  extends UnaryTransformer[I, Binary](uid = uid, operationName = operationName) {
+
+  override def transformFn: I => Binary = a => new Binary(p(a))
 }

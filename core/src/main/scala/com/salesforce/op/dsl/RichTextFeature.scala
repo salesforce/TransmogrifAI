@@ -30,20 +30,13 @@
 
 package com.salesforce.op.dsl
 
-import java.util.regex.Pattern
-
+import com.salesforce.op.dsl.RichTextFeatureLambdas._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.text._
-import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
-import org.apache.lucene.analysis.pattern.PatternTokenizer
 
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.Try
-
-import RichTextFeatureLambdas._
 trait RichTextFeature {
   self: RichFeature =>
 
@@ -807,6 +800,7 @@ trait RichTextFeature {
 }
 
 object RichTextFeatureLambdas {
+
   def emailToPickList: Email => PickList = _.domain.toPickList
 
   def emailToPrefix: Email => Text = _.prefix.toText
@@ -824,4 +818,5 @@ object RichTextFeatureLambdas {
   def textToPickList: Text => PickList = _.value.toPickList
 
   def textToMultiPickList: Text => MultiPickList = _.value.toSet[String].toMultiPickList
+
 }

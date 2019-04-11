@@ -30,16 +30,16 @@
 
 package com.salesforce.op.dsl
 
-import com.salesforce.op.UID
+import com.salesforce.op.dsl.RichMapFeatureLambdas._
 import com.salesforce.op.features.FeatureLike
-import com.salesforce.op.features.types.{BinaryMap, _}
-import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
-import RichMapFeatureLambdas._
+
+
 trait RichMapFeature {
 
   /**
@@ -1015,8 +1015,7 @@ trait RichMapFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
-        val transformer = new EmailToPickListMapTransformer()
-        transformer.setInput(e).getOutput()
+        new EmailToPickListMapTransformer().setInput(e).getOutput()
       }
 
       domains.head.vectorize(
@@ -1061,8 +1060,7 @@ trait RichMapFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
-        val transformer = new UrlMapToPickListMapTransformer()
-        transformer.setInput(e).getOutput()
+        new UrlMapToPickListMapTransformer().setInput(e).getOutput()
       }
 
       domains.head.vectorize(
@@ -1107,11 +1105,13 @@ trait RichMapFeature {
 }
 
 object RichMapFeatureLambdas {
-  def predictionToRealNN: (Prediction => RealNN) = _.prediction.toRealNN
 
-  def predictionToRaw: (Prediction => OPVector) = p => Vectors.dense(p.rawPrediction).toOPVector
+  def predictionToRealNN: Prediction => RealNN = _.prediction.toRealNN
 
-  def predictionToProbability: (Prediction => OPVector) = p => Vectors.dense(p.probability).toOPVector
+  def predictionToRaw: Prediction => OPVector = p => Vectors.dense(p.rawPrediction).toOPVector
+
+  def predictionToProbability: Prediction => OPVector = p => Vectors.dense(p.probability).toOPVector
+
 }
 
 

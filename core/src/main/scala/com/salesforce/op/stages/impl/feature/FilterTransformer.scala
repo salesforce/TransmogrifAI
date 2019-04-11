@@ -35,14 +35,15 @@ import com.salesforce.op.features.types.{Binary, FeatureType}
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import scala.reflect.runtime.universe.TypeTag
 
-class FilterTransformer[A <: FeatureType]
-(
-  p: A => Boolean,
-  default: A,
-  uid: String = UID[ScalarSubtractTransformer[_, _]],
-  operationName: String = "filter"
-)(implicit tti: TypeTag[A], ttioa: TypeTag[A#Value])
-  extends UnaryTransformer[A, A](uid = uid, operationName = operationName) {
-  override def transformFn: A => A = a => if (p(a)) a else default
 
+class FilterTransformer[I <: FeatureType]
+(
+  p: I => Boolean,
+  default: I,
+  uid: String = UID[FilterTransformer[_]],
+  operationName: String = "filter"
+)(implicit tti: TypeTag[I], ttov: TypeTag[I#Value])
+  extends UnaryTransformer[I, I](uid = uid, operationName = operationName) {
+
+  override def transformFn: I => I = a => if (p(a)) a else default
 }

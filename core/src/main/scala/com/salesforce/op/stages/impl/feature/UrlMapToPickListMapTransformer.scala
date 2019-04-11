@@ -34,13 +34,11 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{Email, EmailMap, PickList, PickListMap, _}
 import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
 
-
 class UrlMapToPickListMapTransformer(uid: String = UID[UrlMapToPickListMapTransformer])
-  extends UnaryTransformer[URLMap, PickListMap](
-    operationName = "urlMapToPickListMap",
-    uid = uid
-  ) {
+  extends UnaryTransformer[URLMap, PickListMap](operationName = "urlMapToPickListMap", uid = uid) {
+
   override def transformFn: URLMap => PickListMap = _.value
     .mapValues(v => if (v.toURL.isValid) v.toURL.domain else None)
     .collect { case (k, Some(v)) => k -> v }.toPickListMap
+
 }
