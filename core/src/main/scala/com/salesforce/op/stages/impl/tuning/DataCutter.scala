@@ -39,7 +39,7 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
-import scala.util.{Success, Try}
+import scala.util.Try
 
 case object DataCutter {
 
@@ -89,7 +89,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val labelColName = labelColNameOpt.getOrElse(data.columns(0))
     val labelColIdx = data.columns.indexOf(labelColName)
 
-    if (Try(getLabelsToKeep).toOption.isEmpty) {
+    if (!isSet(labelsToKeep)) {
       val labelCounts = data.groupBy(labelColName).count().persist()
       val res = estimate(labelCounts)
       labelCounts.unpersist()
@@ -111,9 +111,16 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
           //
           val na = NominalAttribute.defaultAttr.withName(labelColName)
           val metadataNA = if (labelMetaArr.isEmpty) {
-            na
+            log.info("setting num vals " + labelSet.max.toInt + 1)
+            na.withNumValues(labelSet.max.toInt + 1)
           } else {
-            na.withValues(labelMetaArr.take(labelSet.size))
+            val newLabelMetaArr = labelMetaArr
+              .zipWithIndex
+              .collect {
+                case (label: String, idx: Int) if labelSet.contains(idx.toDouble) => label
+              }
+
+            na.withValues(newLabelMetaArr)
           }
 
           // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
@@ -139,21 +146,30 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   }
 
 
-  def getLabelsFromMetadata(data: DataFrame): Array[String] =
+  def getLabelsFromMetadata(data: DataFrame): Array[String] = {
+    val labelSF = data.schema.head
+    val labelColMetadata = labelSF.metadata
+    log.info(s"Raw label column metadata: $labelColMetadata")
+
     Try {
-      val labelSF = data.schema.head
-      val labelColMetadata = labelSF.metadata
-      log.info(s"Raw label column metadata: $labelColMetadata")
       labelColMetadata
         .getMetadata("ml_attr")
         .getStringArray("vals")
     }
-    .recoverWith {
+    .recover { case nonFatal =>
+      log.warn("Recovering non-fatal exception using num_vals", nonFatal)
+      val numVals = labelColMetadata
+        .getMetadata("ml_attr")
+        .getLong("num_vals")
+      (0 until numVals.toInt).map(_.toDouble.toString).toArray
+    }
+    .recover {
       case nonFatal =>
         log.warn("Recovering non-fatal exception", nonFatal)
-        Success(Array.empty[String])
+        Array.empty[String]
     }
     .getOrElse(Array.empty[String])
+  }
 
 
   /**
@@ -186,27 +202,25 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val numLabels = labelCounts.count()
     val totalValues = labelCounts.agg(sum(countCol)).first().getLong(0).toDouble
 
-    val labelsKeptDF = labelCounts
+    val labelsKept = labelCounts
       .filter(r => r.getLong(1).toDouble / totalValues >= minLabelFract)
       .sort(col(countCol).desc, col(labelCol))
-      .limit(maxLabels)
-      .persist()
+      .take(maxLabels)
+      .map(_.getDouble(0))
 
-    val labelsKept = labelsKeptDF.collect().map(_.getDouble(0))
+    val labelsKeptSet = labelsKept.toSet
 
-    val labelsDroppedDF = labelCounts
-      .except(labelsKeptDF)
+    val labelsDropped = labelCounts
+      .filter(r => !labelsKeptSet.contains(r.getDouble(0)))
       .sort(col(countCol).desc, col(labelCol))
-      .limit(numDroppedToRecord)
+      .take(numDroppedToRecord)
+      .map(_.getDouble(0))
 
-    labelsKeptDF.unpersist()
-
-    val labelsDropped = labelsDroppedDF.collect().map(_.getDouble(0))
     val labelsDroppedTotal = numLabels - labelsKept.length
 
     if (labelsKept.nonEmpty) {
-      log.info(s"DataCutter is keeping labels: ${labelsKept.mkString}" +
-        s" and dropping labels: ${labelsDropped.mkString}")
+      log.info(s"DataCutter is keeping labels: ${labelsKept.mkString(", ")}" +
+        s" and dropping labels: ${labelsDropped.mkString(", ")}")
     } else {
       throw new RuntimeException(s"DataCutter dropped all labels with param settings:" +
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
@@ -295,5 +309,4 @@ case class DataCutterSummary
       .putLong(ModelSelectorNames.LabelsDroppedTotal, labelsDroppedTotal)
       .build()
   }
-
 }
