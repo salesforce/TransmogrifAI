@@ -31,12 +31,12 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import OpPipelineStageReadWriteShared._
-import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
-import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
+import org.apache.spark.ml.{Estimator, Model, PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
@@ -79,8 +79,9 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]]
     // so they can save
     stage match {
+      case _: Estimator[_] => return Map.empty[String, Any] // no need to serialize estimators
       case s: SparkWrapperParams[_] => s.setStageSavePath(path)
-      case s => s
+      case _ =>
     }
     // We produce stage metadata for all the Spark params
     val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)

@@ -37,6 +37,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.ml.Transformer
 import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.catalyst.encoders.RowEncoder
 
 import scala.reflect._
 import scala.reflect.runtime.universe._
@@ -70,6 +71,10 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
   final override lazy val stage = transformer
   protected val convert = FeatureTypeSparkConverter[O]()
 
+  it should "be json writable/readable" in {
+    val loaded = writeAndRead(stage)
+    assert(loaded, stage)
+  }
   it should "transform schema" in {
     val transformedSchema = transformer.transformSchema(inputData.schema)
     val output = transformer.getOutput()
@@ -84,6 +89,13 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
     val output = transformer.getOutput()
     val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
     res shouldEqual expectedResult
+  }
+  it should "transform empty data" in {
+    val empty = spark.emptyDataset(RowEncoder(inputData.schema))
+    val transformed = transformer.transform(empty)
+    val output = transformer.getOutput()
+    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
+    res.size shouldBe 0
   }
   it should "transform rows" in {
     val rows = inputData.toDF().collect()
@@ -110,6 +122,25 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
     res shouldEqual expectedResult
   }
 
-  // TODO: test metadata
+  // TODO: test metadata on stages
+
+
+  /**
+   * A helper function to write and read stage into savePath
+   *
+   * @param stage stage instance to write and then read
+   * @param savePath Spark stage save path
+   * @return read stage
+   */
+  protected def writeAndRead(stage: TransformerType, savePath: String = stageSavePath): OpPipelineStageBase = {
+    val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
+    val features = stage.getInputFeatures().flatMap(_.allFeatures)
+    new OpPipelineStageReader(features).loadFromJsonString(json, savePath)
+  }
+
+  /**
+   * Spark stage save path
+   */
+  protected def stageSavePath: String = s"$tempDir/${specName.filter(_.isLetterOrDigit)}-${System.currentTimeMillis()}"
 
 }
