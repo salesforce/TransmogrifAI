@@ -33,10 +33,10 @@ package com.salesforce.op.stages
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
-import OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.spark.ml.util.MLWriter
-import org.apache.spark.ml.{Model, PipelineStage, SparkDefaultParamsReadWrite}
+import org.apache.spark.ml.{PipelineStage, SparkDefaultParamsReadWrite}
 import org.json4s.Extraction
 import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.jackson.JsonMethods.{compact, parse, render}
@@ -106,7 +106,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
         // Special handling for Feature Type TypeTags
         case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
-          new AnyValue(AnyValueTypes.TypeTag, ReflectionUtils.dealisedTypeName(t.tpe))
+          AnyValue(AnyValueTypes.TypeTag, ReflectionUtils.dealisedTypeName(t.tpe), None)
         case t: TypeTag[_] =>
           throw new RuntimeException(
             s"Unknown type tag '${t.tpe.toString}'. " +
@@ -115,23 +115,23 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
 
         // Special handling for function value arguments
         case f1: Function1[_, _]
-          // Maps and other scala collections extend [[Function1]] - skipping them
+          // Maps and other scala collections extend [[Function1]] - skipping them by filtering by package name
           if !f1.getClass.getPackage.getName.startsWith("scala") => serializeFunction(argName, f1)
         case f2: Function2[_, _, _] => serializeFunction(argName, f2)
         case f3: Function3[_, _, _, _] => serializeFunction(argName, f3)
         case f4: Function4[_, _, _, _, _] => serializeFunction(argName, f4)
 
         // Special handling for [[Numeric]]
-        case n: Numeric[_] => new AnyValue(AnyValueTypes.ClassInstance, n.getClass.getName, n.getClass.getName)
+        case n: Numeric[_] => AnyValue(AnyValueTypes.ClassInstance, n.getClass.getName, Option(n.getClass.getName))
 
         // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
-        case Some(v: PipelineStage) => new AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
-        case v: PipelineStage => new AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
+        case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid, None)
+        case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid, None)
 
         // Everything else goes as is and is handled by json4s
         case v =>
           // try serialize value with json4s
-          val av = new AnyValue(AnyValueTypes.Value, v)
+          val av = AnyValue(AnyValueTypes.Value, v, Option(v).map(_.getClass.getName))
           Try(jsonSerialize(av)) match {
             case Success(_) => av
             case Failure(e) =>
@@ -160,8 +160,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
           "Make sure your function does not have any external dependencies, " +
           "e.g. use any out of scope variables.", e)
     }
-    new AnyValue(
-      `type` = AnyValueTypes.ClassInstance, value = functionClass.getName, valueClass = functionClass.getName)
+    AnyValue(AnyValueTypes.ClassInstance, functionClass.getName, Option(functionClass.getName))
   }
 
   private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))

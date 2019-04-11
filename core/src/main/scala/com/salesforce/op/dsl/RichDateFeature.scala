@@ -49,11 +49,15 @@ trait RichDateFeature {
 
     /**
      * Convert to DateList feature
+     *
      * @return
      */
     def toDateList(): FeatureLike[DateList] = {
       f.transformWith(
-        new UnaryLambdaTransformer[Date, DateList](operationName = "dateToList", _.value.toSeq.toDateList)
+        new UnaryLambdaTransformer[Date, DateList](
+          operationName = "dateToList",
+          RichDateFeatureLambdas.toDateList
+        )
       )
     }
 
@@ -63,7 +67,7 @@ trait RichDateFeature {
      *
      * @param timePeriod The time period to extract from the timestamp
      * @param others     Other features of same type
-     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     *                   enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
     def toUnitCircle
     (
@@ -119,13 +123,14 @@ trait RichDateFeature {
 
     /**
      * Convert to DateTimeList feature
+     *
      * @return
      */
     def toDateTimeList(): FeatureLike[DateTimeList] = {
       f.transformWith(
         new UnaryLambdaTransformer[DateTime, DateTimeList](
           operationName = "dateTimeToList",
-          _.value.toSeq.toDateTimeList
+          RichDateFeatureLambdas.toDateTimeList
         )
       )
     }
@@ -136,7 +141,7 @@ trait RichDateFeature {
      *
      * @param timePeriod The time period to extract from the timestamp
      * @param others     Other features of same type
-     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     *                   enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
     def toUnitCircle(
       timePeriod: TimePeriod = TimePeriod.HourOfDay,
@@ -182,4 +187,10 @@ trait RichDateFeature {
 
   }
 
+}
+
+object RichDateFeatureLambdas {
+  def toDateList: Date => DateList = (x: Date) => x.value.toSeq.toDateList
+
+  def toDateTimeList: DateTime => DateTimeList = (x: DateTime) => x.value.toSeq.toDateTimeList
 }

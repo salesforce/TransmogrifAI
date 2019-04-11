@@ -138,53 +138,59 @@ final class OpPipelineStageReader private
     val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
 
     // Make the ctor function used for creating a stage instance
-    def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = Try {
-      val anyValue = ctorArgsMap.getOrElse(argName,
-        throw new RuntimeException(s"Ctor argument '$argName' was not found for stage class '$stageClassName'")
-      )
-      anyValue.`type` match {
-        // Special handling for Feature Type TypeTags
-        case AnyValueTypes.TypeTag =>
-          Try(FeatureType.featureTypeTag(anyValue.value.toString)).recoverWith[TypeTag[_]] { case _ =>
-            Try(FeatureType.featureValueTypeTag(anyValue.value.toString))
-          } match {
-            case Success(featureTypeTag) => featureTypeTag
-            case Failure(e) => throw new RuntimeException(
-              s"Unknown type tag '${anyValue.value.toString}' for ctor argument '$argName'. " +
-                "Only Feature and Feature Value type tags are supported for serialization.", e)
-          }
+    def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = {
+      for {
+        anyValue <- Try {
+          ctorArgsMap.getOrElse(argName,
+            throw new RuntimeException(s"Ctor argument '$argName' was not found for stage class '$stageClassName'"))
+        }
+        argInstance = Try {
+          anyValue match {
+            // Special handling for Feature Type TypeTags
+            case AnyValue(AnyValueTypes.TypeTag, value, _) =>
+              Try(FeatureType.featureTypeTag(value.toString)).recoverWith[TypeTag[_]] { case _ =>
+                Try(FeatureType.featureValueTypeTag(value.toString))
+              } match {
+                case Success(featureTypeTag) => featureTypeTag
+                case Failure(e) => throw new RuntimeException(
+                  s"Unknown type tag '${value.toString}' for ctor argument '$argName'. " +
+                    "Only Feature and Feature Value type tags are supported for serialization.", e)
+              }
 
-        // Spark wrapped stage is saved using [[SparkWrapperParams]] and loaded later using
-        // [[SparkDefaultParamsReadWrite]].getAndSetParams returning 'null' here
-        case AnyValueTypes.SparkWrappedStage => null // yes, yes - this should be 'null'
+            // Spark wrapped stage is saved using [[SparkWrapperParams]] and loaded later using
+            // [[SparkDefaultParamsReadWrite]].getAndSetParams returning 'null' here
+            case AnyValue(AnyValueTypes.SparkWrappedStage, _, _) => null // yes, yes - this should be 'null'
 
-        // Class value argument
-        case AnyValueTypes.ClassInstance =>
-          try {
-            ReflectionUtils.classForName(anyValue.valueClass).getConstructors.head.newInstance()
-          } catch {
-            case e: Exception => throw new RuntimeException(
-              s"Failed to instantiate argument '$argName' from class '${anyValue.valueClass}'", e)
-          }
+            // Class value argument, e.g. [[Function1]], [[Numeric]] etc.
+            case AnyValue(AnyValueTypes.ClassInstance, value, _) =>
+              ReflectionUtils.classForName(value.toString).getConstructors.head.newInstance()
 
-        // Everything else is read using json4s
-        case AnyValueTypes.Value =>
-          try {
-            // Create type manifest either using the reflected type tag or serialized value class
-            val manifest =
-              try {
+            // Value with no ctor arguments should be instantiable by class name
+            case AnyValue(AnyValueTypes.Value, m: Map[_, _], Some(className)) if m.isEmpty =>
+              ReflectionUtils.classForName(className).getConstructors.find(_.getParameterCount == 0).head.newInstance()
+
+            // Everything else is read using json4s
+            case AnyValue(AnyValueTypes.Value, value, valueClass) =>
+              // Create type manifest either using the reflected type tag or serialized value class
+              val manifest = try {
                 val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
                 ReflectionUtils.manifestForTypeTag[Any](ttag)
               } catch {
-                case _ if anyValue.valueClass != null =>
-                  ManifestFactory.classType[Any](ReflectionUtils.classForName(anyValue.valueClass))
+                case _ if valueClass.isDefined =>
+                  ManifestFactory.classType[Any](ReflectionUtils.classForName(valueClass.get))
               }
-            Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
-          } catch {
-            case e: Throwable => throw new RuntimeException(
-              s"Failed to parse argument '$argName' from value '${anyValue.value}'", e)
+              Extraction.decompose(value).extract[Any](formats, manifest)
+
           }
-      }
+        }
+        res <- argInstance match {
+          case Failure(e) =>
+            throw new RuntimeException(
+              s"Failed to parse argument '$argName' from value '${anyValue.value}'" +
+                anyValue.valueClass.map(c => s" of class '$c'").getOrElse(""), e)
+          case ok => ok
+        }
+      } yield res
     }
 
     // Reflect stage class instance by class + ctor args
@@ -192,4 +198,5 @@ final class OpPipelineStageReader private
     val stage = ReflectionUtils.newInstance[OpPipelineStageBase](stageClass, ctorArgs)
     stage
   }
+
 }

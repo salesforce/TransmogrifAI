@@ -30,34 +30,23 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.test.TestSparkContext
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.utils.json.JsonLike
 
-@RunWith(classOf[JUnitRunner])
-class ScalerTest extends FlatSpec with TestSparkContext {
 
-  Spec[Scaler] should "error on invalid data" in {
-    val error = intercept[IllegalArgumentException](
-      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
-    )
-    error.getMessage shouldBe
-      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
-        s"and args type '${EmptyScalerArgs().getClass.getSimpleName}'"
-  }
+/**
+ * A trait to be extended by a case class containing the args needed to define a family of scaling & descaling functions
+ */
+trait ScalingArgs extends JsonLike
 
-  it should "correctly build construct a LinearScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
-      args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
-    linearScaler shouldBe a[LinearScaler]
-    linearScaler.scalingType shouldBe ScalingType.Linear
-  }
+/**
+ * Case class for Scaling families that take no parameters
+ */
+case class EmptyScalerArgs() extends ScalingArgs
 
-  it should "correctly build construct a LogScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyScalerArgs())
-    linearScaler shouldBe a[LogScaler]
-    linearScaler.scalingType shouldBe ScalingType.Logarithmic
-  }
-}
-
+/**
+ * Parameters need to uniquely define a linear scaling function
+ *
+ * @param slope     the slope of the linear scaler
+ * @param intercept the x axis intercept of the linear scaler
+ */
+case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs

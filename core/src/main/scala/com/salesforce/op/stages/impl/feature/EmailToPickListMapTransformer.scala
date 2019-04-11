@@ -30,34 +30,20 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.test.TestSparkContext
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features.types.{Binary, Email, EmailMap, PickList, PickListMap}
 
-@RunWith(classOf[JUnitRunner])
-class ScalerTest extends FlatSpec with TestSparkContext {
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer}
 
-  Spec[Scaler] should "error on invalid data" in {
-    val error = intercept[IllegalArgumentException](
-      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
+
+class EmailToPickListMapTransformer(uid: String = UID[EmailToPickListMapTransformer])
+  extends OPMapTransformer[Email, PickList, EmailMap, PickListMap](
+    uid = uid,
+    operationName = "emailToPickListMap",
+    transformer = new UnaryLambdaTransformer[Email, PickList](
+      operationName = "emailToPickList",
+      transformFn = _.domain.toPickList
     )
-    error.getMessage shouldBe
-      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
-        s"and args type '${EmptyScalerArgs().getClass.getSimpleName}'"
-  }
-
-  it should "correctly build construct a LinearScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
-      args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
-    linearScaler shouldBe a[LinearScaler]
-    linearScaler.scalingType shouldBe ScalingType.Linear
-  }
-
-  it should "correctly build construct a LogScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyScalerArgs())
-    linearScaler shouldBe a[LogScaler]
-    linearScaler.scalingType shouldBe ScalingType.Logarithmic
-  }
-}
+  )
 

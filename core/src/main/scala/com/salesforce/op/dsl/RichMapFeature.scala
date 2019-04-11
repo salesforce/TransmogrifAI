@@ -30,15 +30,16 @@
 
 package com.salesforce.op.dsl
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{BinaryMap, _}
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
+import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
 import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.text.Language
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
-
+import RichMapFeatureLambdas._
 trait RichMapFeature {
 
   /**
@@ -1014,13 +1015,7 @@ trait RichMapFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
-        val transformer = new OPMapTransformer[Email, PickList, EmailMap, PickListMap](
-          operationName = "emailToPickListMap",
-          transformer = new UnaryLambdaTransformer[Email, PickList](
-            operationName = "emailToPickList",
-            transformFn = _.domain.toPickList
-          )
-        )
+        val transformer = new EmailToPickListMapTransformer()
         transformer.setInput(e).getOutput()
       }
 
@@ -1066,13 +1061,7 @@ trait RichMapFeature {
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
-        val transformer =
-          new UnaryLambdaTransformer[URLMap, PickListMap](
-            operationName = "urlMapToPickListMap",
-            transformFn = _.value
-              .mapValues(v => if (v.toURL.isValid) v.toURL.domain else None)
-              .collect { case (k, Some(v)) => k -> v }.toPickListMap
-          )
+        val transformer = new UrlMapToPickListMapTransformer()
         transformer.setInput(e).getOutput()
       }
 
@@ -1096,9 +1085,9 @@ trait RichMapFeature {
      * @return prediction, rawPrediction, probability
      */
     def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
-      (f.map[RealNN](_.prediction.toRealNN),
-        f.map[OPVector]{ p => Vectors.dense(p.rawPrediction).toOPVector },
-        f.map[OPVector]{ p => Vectors.dense(p.probability).toOPVector }
+      (f.map[RealNN](predictionToRealNN),
+        f.map[OPVector](predictionToRaw),
+        f.map[OPVector](predictionToProbability)
       )
     }
 
@@ -1116,3 +1105,13 @@ trait RichMapFeature {
   }
 
 }
+
+object RichMapFeatureLambdas {
+  def predictionToRealNN: (Prediction => RealNN) = _.prediction.toRealNN
+
+  def predictionToRaw: (Prediction => OPVector) = p => Vectors.dense(p.rawPrediction).toOPVector
+
+  def predictionToProbability: (Prediction => OPVector) = p => Vectors.dense(p.probability).toOPVector
+}
+
+

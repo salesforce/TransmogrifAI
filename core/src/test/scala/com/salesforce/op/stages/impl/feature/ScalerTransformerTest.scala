@@ -66,7 +66,7 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
 
   it should "log scale numeric fields and produce correct metadata" in {
     val logScaler = new ScalerTransformer[Real, Real](
-      scalingType = ScalingType.Logarithmic, scalingArgs = EmptyArgs()
+      scalingType = ScalingType.Logarithmic, scalingArgs = EmptyScalerArgs()
     ).setInput(f1)
 
     val scaled: FeatureLike[Real] = logScaler.getOutput()
@@ -78,7 +78,7 @@ class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[R
     ScalerMetadata(transformed.schema(scaled.name).metadata) match {
       case Failure(err) => fail(err)
       case Success(meta) =>
-        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyArgs())
+        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyScalerArgs())
     }
   }
 

@@ -30,34 +30,19 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.test.TestSparkContext
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.UID
+import com.salesforce.op.features.types.{Binary, FeatureType}
+import com.salesforce.op.stages.base.unary.UnaryTransformer
+import scala.reflect.runtime.universe.TypeTag
 
-@RunWith(classOf[JUnitRunner])
-class ScalerTest extends FlatSpec with TestSparkContext {
+class FilterTransformer[A <: FeatureType]
+(
+  p: A => Boolean,
+  default: A,
+  uid: String = UID[ScalarSubtractTransformer[_, _]],
+  operationName: String = "filter"
+)(implicit tti: TypeTag[A], ttioa: TypeTag[A#Value])
+  extends UnaryTransformer[A, A](uid = uid, operationName = operationName) {
+  override def transformFn: A => A = a => if (p(a)) a else default
 
-  Spec[Scaler] should "error on invalid data" in {
-    val error = intercept[IllegalArgumentException](
-      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
-    )
-    error.getMessage shouldBe
-      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
-        s"and args type '${EmptyScalerArgs().getClass.getSimpleName}'"
-  }
-
-  it should "correctly build construct a LinearScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Linear,
-      args = LinearScalerArgs(slope = 1.0, intercept = 2.0))
-    linearScaler shouldBe a[LinearScaler]
-    linearScaler.scalingType shouldBe ScalingType.Linear
-  }
-
-  it should "correctly build construct a LogScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyScalerArgs())
-    linearScaler shouldBe a[LogScaler]
-    linearScaler.scalingType shouldBe ScalingType.Logarithmic
-  }
 }
-
