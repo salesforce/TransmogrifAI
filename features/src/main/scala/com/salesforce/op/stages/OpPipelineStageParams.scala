@@ -59,6 +59,13 @@ trait InputParams extends Params {
    */
   protected def checkInputLength(features: Array[_]): Boolean
 
+
+  /**
+   * Function to be called on setInput
+   */
+  protected def onSetInput(): Unit = {}
+
+
   /**
    * Sets input features
    *
@@ -75,11 +82,6 @@ trait InputParams extends Params {
     onSetInput()
     this
   }
-
-  /**
-   * Function to be called on setInput
-   */
-  protected def onSetInput(): Unit = {}
 
 
   private[op] def setInputFeatureArray[S <: OPFeature](features: Array[S]): this.type = setInputFeatures(features)
