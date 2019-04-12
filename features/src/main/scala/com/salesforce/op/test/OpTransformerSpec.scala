@@ -134,8 +134,7 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
    */
   protected def writeAndRead(stage: TransformerType, savePath: String = stageSavePath): OpPipelineStageBase = {
     val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
-    val features = stage.getInputFeatures().flatMap(_.allFeatures)
-    new OpPipelineStageReader(features).loadFromJsonString(json, savePath)
+    new OpPipelineStageReader(stage).loadFromJsonString(json, savePath)
   }
 
   /**
