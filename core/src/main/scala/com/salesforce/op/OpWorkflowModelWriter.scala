@@ -99,7 +99,9 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    */
   private def stagesJArray(path: String): JArray = {
     val stages: Seq[OpPipelineStageBase] = model.stages
-    val stagesJson: Seq[JObject] = stages.map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
+    val stagesJson: Seq[JObject] = stages
+      .map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
+      .filter(_.children.nonEmpty)
     JArray(stagesJson.toList)
   }
 
