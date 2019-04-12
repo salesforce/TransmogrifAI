@@ -175,7 +175,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
   it should "filter out using labels to keep/drop params" in {
     val keep = Seq(0.0, 1.0)
     val drop = Seq(5.0, 7.0)
-    val dc = DataCutter(seed = seed).setLabels(keep = keep, dropTop10 = drop, labelsDropped = 2)
+    val dc = DataCutter(seed = seed).setLabels(keep = keep, dropTopK = drop, labelsDropped = 2)
     dc.preValidationPrepare(randDF)
     val split = dc.validationPrepare(randDF)
 

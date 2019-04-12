@@ -191,7 +191,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Set of labels to keep & to drop
    */
   private[op] def estimate(labelCounts: DataFrame): DataCutterSummary = {
-    val numDroppedToRecord = 10
+    val numDroppedToRecord = getNumDroppedLabelsForLogging
 
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
@@ -261,9 +261,9 @@ private[impl] trait DataCutterParams extends Params {
   private[op] final val labelsToKeep = new DoubleArrayParam(this, "labelsToKeep",
     "labels to keep when applying the data cutter")
 
-  private[op] def setLabels(keep: Seq[Double], dropTop10: Seq[Double], labelsDropped: Long): this.type = {
+  private[op] def setLabels(keep: Seq[Double], dropTopK: Seq[Double], labelsDropped: Long): this.type = {
     set(labelsToKeep, keep.toArray)
-      .set(labelsToDrop, dropTop10.toArray)
+      .set(labelsToDrop, dropTopK.toArray)
       .set(labelsDroppedTotal, labelsDropped)
   }
 
@@ -278,6 +278,15 @@ private[impl] trait DataCutterParams extends Params {
     "the number of labels dropped")
 
   private[op] def getLabelsDroppedTotal: Long = $(labelsDroppedTotal)
+
+  final val maxLabelsDroppedForDiagnostics = new IntParam(this, "maxLabelsDroppedForDiagnostics",
+    "maximum number of dropped label categories to retain for logging",
+    ParamValidators.inRange(lowerBound = 0, upperBound = 100, lowerInclusive = true, upperInclusive = true)
+  )
+  setDefault(maxLabelsDroppedForDiagnostics, 10)
+
+  private[op] def getNumDroppedLabelsForLogging: Int = $(maxLabelsDroppedForDiagnostics)
+
 }
 
 /**
