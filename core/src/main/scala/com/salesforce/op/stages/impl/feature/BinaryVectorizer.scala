@@ -85,7 +85,10 @@ class BinaryVectorizer
     super.onGetMetadata()
     if ($(trackNulls)) {
       setMetadata(vectorMetadataWithNullIndicators.toMetadata)
+    } else {
+      setMetadata(vectorMetadataFromInputFeatures.toMetadata)
     }
+
   }
 }
 
