@@ -42,7 +42,7 @@ import org.scalatest.junit.JUnitRunner
 class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest {
   private val minMax = new MinMaxNormEstimator().setInput(weight).setMetadata(meta)
 
-  val stage: OpPipelineStageBase = minMax.fit(passengersDataSet)
+  lazy val stage = minMax.fit(passengersDataSet)
 
   val expected =
     Array(1.0.toReal, 0.0.toReal, Real.empty, 0.10476190476190476.toReal, 0.2761904761904762.toReal, 0.0.toReal)
