@@ -76,11 +76,11 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    * @return stage metadata map
    */
   def writeToMap(path: String): Map[String, Any] = {
-    // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]]
-    // so they can save
     stage match {
       case _: Estimator[_] => return Map.empty[String, Any] // no need to serialize estimators
-      case s: SparkWrapperParams[_] => s.setStageSavePath(path)
+      case s: SparkWrapperParams[_] =>
+        // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]] so they can save
+      s.setStageSavePath(path)
       case _ =>
     }
     // We produce stage metadata for all the Spark params
