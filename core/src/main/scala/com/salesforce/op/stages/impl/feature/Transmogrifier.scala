@@ -40,7 +40,7 @@ import com.salesforce.op.utils.text.TextUtils
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.{Metadata, StructField}
 import org.apache.spark.sql.{Dataset, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
@@ -368,7 +368,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
   // TODO once track nulls is everywhere put track nulls param here and avoid making the metadata twice
   abstract override def onSetInput(): Unit = {
     super.onSetInput()
-    setMetadata(vectorMetadataFromInputFeatures.toMetadata)
+    if (getMetadata() == Metadata.empty) setMetadata(vectorMetadataFromInputFeatures.toMetadata)
   }
 
   private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {

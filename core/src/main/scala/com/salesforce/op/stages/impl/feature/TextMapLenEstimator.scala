@@ -66,10 +66,10 @@ class TextMapLenEstimator[T <: OPMap[String]](uid: String = UID[TextMapLenEstima
       grouping = Option(key),
       descriptorValue = Option(OpVectorColumnMetadata.TextLenString)
     )
+    val metadata = OpVectorMetadata(vectorOutputName, colMeta, Transmogrifier.inputFeaturesToHistory(transFeat, stageName))
+      .toMetadata
 
-    setMetadata(
-      OpVectorMetadata(vectorOutputName, colMeta, Transmogrifier.inputFeaturesToHistory(transFeat, stageName))
-        .toMetadata)
+    setMetadata(metadata)
     new TextMapLenModel[T](allKeys, shouldCleanKeys, shouldCleanValues, operationName = operationName, uid = uid)
   }
 }
