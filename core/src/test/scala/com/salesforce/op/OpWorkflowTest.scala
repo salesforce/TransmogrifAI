@@ -44,6 +44,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.linalg.DenseVector
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
@@ -164,7 +165,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val wfM = wf.train()
     val data = wfM.score()
-    data.first().size shouldEqual OpVectorMetadata("", data.schema(1).metadata).columns
+    data.first().getAs[DenseVector](1).size shouldEqual OpVectorMetadata("", data.schema(1).metadata).columns.size
   }
 
   it should "allow you to interact with updated features when things are blacklisted and" +
