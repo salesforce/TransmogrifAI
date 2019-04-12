@@ -404,7 +404,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
         def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
           modelInsights.stageInfo(RawFeatureFilter.stageName) match {
-            case configInfo: Map[String, Map[String, String]] =>
+            case configInfo: Map[String, Map[String, String]]@unchecked =>
               configInfo.getOrElse("params", Map.empty[String, String])
             case _ => Map.empty[String, String]
           }
