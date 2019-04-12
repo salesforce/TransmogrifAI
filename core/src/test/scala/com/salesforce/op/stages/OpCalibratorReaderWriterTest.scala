@@ -40,7 +40,7 @@ import org.scalatest.junit.JUnitRunner
 class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
   private val calibrator = new PercentileCalibrator().setInput(height)
 
-  lazy val stage: OpPipelineStageBase = calibrator.fit(passengersDataSet)
+  lazy val stage = calibrator.fit(passengersDataSet)
 
   val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
 }

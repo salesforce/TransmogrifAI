@@ -33,14 +33,16 @@ package com.salesforce.op
 import java.io.File
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
-import com.salesforce.op.features.OPFeature
-import com.salesforce.op.features.types.{OPVector, Real, RealNN}
+import com.salesforce.op.features.types.{OPVector, Real}
+import com.salesforce.op.features.{FeatureBuilder, FeatureSparkTypes, OPFeature}
 import com.salesforce.op.filters._
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
-import com.salesforce.op.stages.sparkwrappers.generic.SwUnaryEstimator
+import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import org.apache.spark.ml.feature.{StandardScaler, StandardScalerModel}
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.Row
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats, JArray, JValue}
@@ -48,6 +50,8 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 import org.slf4j.LoggerFactory
+
+import scala.collection.JavaConverters._
 
 
 @RunWith(classOf[JUnitRunner])
@@ -141,14 +145,13 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
+    val vec = FeatureBuilder.OPVector[Passenger].extract(_ => OPVector.empty).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
-    val swEstimator = new SwUnaryEstimator[RealNN, RealNN, StandardScalerModel, StandardScaler](
-      inputParamName = "foo",
-      outputParamName = "foo2",
-      operationName = "foo3",
-      sparkMlStageIn = Some(scaler)
-    )
-    val scaled = height.transformWith(swEstimator)
+    val schema = FeatureSparkTypes.toStructType(vec)
+    val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
+    val swEstimatorModel = new OpEstimatorWrapper[OPVector, OPVector, StandardScaler, StandardScalerModel](scaler)
+      .setInput(vec).fit(data)
+    val scaled = vec.transformWith(swEstimatorModel)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setReader(dummyReader)

@@ -51,7 +51,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
 
   val meta = new MetadataBuilder().putString("foo", "bar").build()
   val expectedFeaturesLength = 1
-  def stage: OpPipelineStageBase
+  def stage: OpPipelineStageBase with Transformer
   val expected: Array[Real]
   val hasOutputName = true
 

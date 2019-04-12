@@ -42,7 +42,7 @@ class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
 
   override val hasOutputName = false
 
-  val stage: OpPipelineStageBase =
+  lazy val stage =
     new UnaryLambdaTransformer[Real, Real](
       operationName = "test",
       transformFn = Lambdas.fncUnary,

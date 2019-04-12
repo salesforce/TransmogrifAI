@@ -87,28 +87,6 @@ StageType <: OpPipelineStage[O] : ClassTag]
       case _ =>
     }
   }
-  it should "be json writable/readable" in {
-    val loaded = writeAndRead(stage)
-    assert(loaded, stage)
-  }
-
-  /**
-   * A helper function to write and read stage into savePath
-   *
-   * @param stage stage instance to write and then read
-   * @param savePath Spark stage save path
-   * @return read stage
-   */
-  protected def writeAndRead(stage: StageType, savePath: String = stageSavePath): OpPipelineStageBase = {
-    val json = new OpPipelineStageWriter(stage).overwrite().writeToJsonString(savePath)
-    val features = stage.getInputFeatures().flatMap(_.allFeatures)
-    new OpPipelineStageReader(features).loadFromJsonString(json, savePath)
-  }
-
-  /**
-   * Spark stage save path
-   */
-  protected def stageSavePath: String = s"$tempDir/${specName.filter(_.isLetterOrDigit)}-${System.currentTimeMillis()}"
 
 }
 
