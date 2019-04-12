@@ -40,7 +40,7 @@ import com.salesforce.op.utils.text.TextUtils
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.types.StructField
+import org.apache.spark.sql.types.{Metadata, StructField}
 import org.apache.spark.sql.{Dataset, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
