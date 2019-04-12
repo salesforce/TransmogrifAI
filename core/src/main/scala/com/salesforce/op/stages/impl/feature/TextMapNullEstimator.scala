@@ -48,7 +48,7 @@ class TextMapNullEstimator[T <: OPMap[String]]
 (
   uid: String = UID[TextMapNullEstimator[_]]
 )(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
-  operationName = "textMapNull", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
+  operationName = "textMapNull", uid = uid) with MapVectorizerFuns[String, T] {
 
   protected val shouldCleanValues = true
 
@@ -91,7 +91,7 @@ final class TextMapNullModel[T <: OPMap[String]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun with TextTokenizerParams {
+    with CleanTextMapFun with TextTokenizerParams {
 
   def transformFn: Seq[T] => OPVector = row => {
     row.zipWithIndex.flatMap {

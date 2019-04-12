@@ -588,7 +588,8 @@ class SanityChecker(uid: String = UID[SanityChecker])
     }
 
     require(featureSize == vectorMeta.size,
-      "Number of columns in vector metadata did not match number of columns in data, check your vectorizers")
+      s"Number of columns in vector metadata (${vectorMeta.size}) did not match number of columns in data" +
+        s"($featureSize), check your vectorizers \n metadata=$vectorMeta")
     val vectorMetaColumns = vectorMeta.columns
     val featureNames = vectorMetaColumns.map(_.makeColName())
 

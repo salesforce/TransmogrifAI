@@ -368,7 +368,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
   // TODO once track nulls is everywhere put track nulls param here and avoid making the metadata twice
   abstract override def onSetInput(): Unit = {
     super.onSetInput()
-    if (!isSet(outputMetadata)) setMetadata(vectorMetadataFromInputFeatures.toMetadata)
+    setMetadata(vectorMetadataFromInputFeatures.toMetadata)
   }
 
   private def vectorMetadata(withNullTracking: Boolean): OpVectorMetadata = {

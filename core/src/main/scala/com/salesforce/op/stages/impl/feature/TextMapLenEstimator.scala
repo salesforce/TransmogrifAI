@@ -43,7 +43,7 @@ import scala.reflect.runtime.universe.TypeTag
  */
 class TextMapLenEstimator[T <: OPMap[String]](uid: String = UID[TextMapLenEstimator[_]])
   (implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
-  operationName = "textLenMap", uid = uid) with VectorizerDefaults with MapVectorizerFuns[String, T] {
+  operationName = "textLenMap", uid = uid) with MapVectorizerFuns[String, T] {
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     val shouldCleanKeys = $(cleanKeys)
@@ -86,7 +86,7 @@ final class TextMapLenModel[T <: OPMap[String]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun with TextTokenizerParams {
+    with CleanTextMapFun with TextTokenizerParams {
 
   def transformFn: Seq[T] => OPVector = row => {
     row.zip(allKeys).flatMap {
