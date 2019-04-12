@@ -30,12 +30,11 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
-import com.salesforce.op.stages.{OpPipelineStageReader, _}
+import com.salesforce.op.stages._
 import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
@@ -133,14 +132,16 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
 
   private def loadStages(workflow: OpWorkflow, json: JValue, path: String): Seq[OPStage] = {
     val stagesJs = (json \ Stages.entryName).extract[JArray].arr
-    val recoveredStages = stagesJs.map(j => {
-      val stageUid = (j \ FieldNames.Uid.entryName).extract[String]
-      val originalStage = workflow.stages.find(_.uid == stageUid)
-      originalStage match {
-        case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
-        case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
+    val recoveredStages = stagesJs.flatMap { j =>
+      val stageUidOpt = (j \ Uid.entryName).extractOpt[String]
+      stageUidOpt.map { stageUid =>
+        val originalStage = workflow.stages.find(_.uid == stageUid)
+        originalStage match {
+          case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
+          case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
+        }
       }
-    })
+    }
     val generators = workflow.rawFeatures.map(_.originStage)
     generators ++ recoveredStages
   }
