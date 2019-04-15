@@ -86,7 +86,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS)
+      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS).summaryOpt
     }
   }
 
@@ -111,7 +111,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS)
+      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS).summaryOpt
     }
   }
 
