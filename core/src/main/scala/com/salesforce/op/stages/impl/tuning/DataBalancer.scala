@@ -33,8 +33,8 @@ package com.salesforce.op.stages.impl.tuning
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
 case object DataBalancer {
@@ -123,18 +123,15 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Option[SplitterSummary] = {
-    val Seq(negativeData, positiveData) = Seq(0.0, 1.0).map { labelVal =>
-      labelColNameOpt.map(labelColName => data.filter(data(labelColName) === labelVal))
-        .getOrElse(data.filter(_.getDouble(0) == labelVal))
-    }
+  override def preValidationPrepare(data: Dataset[Row]): PrevalidationVal = {
+    val Seq(negativeData, positiveData) = splitNegativePositive(data)
     val negativeCount = negativeData.count()
     val positiveCount = positiveData.count()
     val seed = getSeed
 
     estimate(positiveCount = positiveCount, negativeCount = negativeCount, seed = seed)
 
-    summary
+    PrevalidationVal(summary, None)
   }
 
   /**
@@ -143,15 +140,10 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
    * @param data to prepare for model training. first column must be the label as a double
    * @return balanced training set and a test set
    */
-  override def validationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Dataset[Row] = {
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
 
     val dataPrep = super.validationPrepare(data)
-
-    val Seq(negativeData, positiveData) = Seq(0.0, 1.0).map { labelVal =>
-      labelColNameOpt.map(labelColName => dataPrep.filter(dataPrep(labelColName) === labelVal))
-        .getOrElse(dataPrep.filter(r => r.getDouble(0) == labelVal)).persist()
-    }
-
+    val Seq(negativeData, positiveData) = splitNegativePositive(dataPrep)
     val seed = getSeed
 
     // If these conditions are met, that means that we have enough information to balance the data : upSample,
@@ -184,6 +176,22 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     }
 
     balanced.persist()
+  }
+
+  private def splitNegativePositive(data: Dataset[Row]): Seq[DataFrame] = {
+    val labelColOpt = if (isSet(labelColumnName)) {
+      Some(data($(labelColumnName)))
+    } else if (data.columns.length > 0) {
+      Some(data(data.columns(0)))
+    } else {
+      None
+    }
+
+    Seq(0.0, 1.0).flatMap { labelVal =>
+      labelColOpt
+        .map(labelCol => data.filter(labelCol === labelVal))
+        .orElse(Some(data)) // empty data frame
+    }
   }
 
   override def copy(extra: ParamMap): DataBalancer = {
