@@ -295,7 +295,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
 
     testEstimator.evaluators.foreach {
-      case evaluator: OpMultiClassificationEvaluator => {
+      case _: OpMultiClassificationEvaluator => {
         MultiClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
             metadata => assert(metadata.contains(s"${metric.entryName}"),
@@ -339,12 +339,11 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val labelColName = "label"
     val testTable = Table(
       ("nunLabeledRecords", "numLabels", "topLabelsToPick"),
-//      (1000, 10, 100),
-//      (1000, 100, 100),
-      (2000, 1000, 100)
-//      ,
-//      (200, 101, 100),
-//      (200, 101, 50)
+      (1000, 10, 100),
+      (1000, 100, 100),
+      (2000, 1000, 100),
+      (200, 101, 100),
+      (200, 101, 50)
     )
 
     forAll(testTable) { (numLabeledRecords: Int, numLabels: Int, topLabelsToPick: Int) =>
