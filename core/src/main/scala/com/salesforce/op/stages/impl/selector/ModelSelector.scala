@@ -156,7 +156,6 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     }
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
-
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
     val bestEst = bestModel.parent
     log.info(s"Selected model : ${bestEst.getClass.getSimpleName}")
