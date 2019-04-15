@@ -124,9 +124,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     //
     val dataPrep = data
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
-      .withColumn(labelColName, data
-        .col(labelColName)
-        .as("_", metadataNA.toMetadata))
+      .withColumn(labelColName, data(labelColName).as("_", metadataNA.toMetadata))
 
     summary = Option(DataCutterSummary(
       labelsKept = getLabelsToKeep,
