@@ -42,7 +42,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class OpLdaTest extends FlatSpec with TestSparkContext {
+class OpLDATest extends FlatSpec with TestSparkContext {
 
   val inputData = Seq(
     (0.0, Vectors.sparse(11, Array(0, 1, 2, 4, 5, 6, 7, 10), Array(1.0, 2.0, 6.0, 2.0, 3.0, 1.0, 1.0, 3.0))),
