@@ -68,9 +68,9 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Option[SplitterSummary] = {
+  override def preValidationPrepare(data: Dataset[Row]): PrevalidationVal = {
     summary = Option(DataSplitterSummary())
-    summary
+    PrevalidationVal(summary, None)
   }
 
   override def copy(extra: ParamMap): DataSplitter = {

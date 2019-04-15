@@ -61,14 +61,13 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     val split1 = dc1.validationPrepare(randDF)
 
     split1.count() shouldBe dataSize
-    assertDataCutterSummary(s1) { s =>
+    assertDataCutterSummary(s1.summaryOpt) { s =>
       s.labelsKept.length shouldBe 1000
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
-        dc1.getLabelsDroppedTotal,
-        Option(split1)
+        dc1.getLabelsDroppedTotal
       )
     }
 
@@ -77,14 +76,13 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     val split2 = dc2.validationPrepare(biasDF)
 
     split2.count() shouldBe dataSize
-    assertDataCutterSummary(s2) { s =>
+    assertDataCutterSummary(s2.summaryOpt) { s =>
       s.labelsKept.length shouldBe 1000
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
-        dc2.getLabelsDroppedTotal,
-        Option(split2)
+        dc2.getLabelsDroppedTotal
       )
     }
   }
@@ -103,35 +101,33 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
   it should "filter out all but the top N label categories" in {
     val dc1 = DataCutter(seed = seed, minLabelFraction = 0.0, maxLabelCategories = 100, reserveTestFraction = 0.5)
     val s1 = dc1.preValidationPrepare(randDF)
-    val split1 = dc1.validationPrepare(randDF)
+    val split1 = dc1.validationPrepare(s1.dataFrame.get)
 
     findDistinct(split1).count() shouldBe 100
-    assertDataCutterSummary(s1) { s =>
+    assertDataCutterSummary(s1.summaryOpt) { s =>
       s.labelsKept.length shouldBe 100
       s.labelsDropped.length shouldBe 10
       s.labelsDroppedTotal shouldBe 900
       s shouldBe DataCutterSummary(
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
-        dc1.getLabelsDroppedTotal,
-        Option(split1)
+        dc1.getLabelsDroppedTotal
       )
     }
 
     val dc2 = DataCutter(seed = seed).setMaxLabelCategories(3)
     val s2 = dc2.preValidationPrepare(biasDF)
-    val split2 = dc2.validationPrepare(biasDF)
+    val split2 = dc2.validationPrepare(s2.dataFrame.get)
 
     findDistinct(split2).collect().toSet shouldEqual Set(0.0, 1.0, 2.0)
-    assertDataCutterSummary(s2) { s =>
+    assertDataCutterSummary(s2.summaryOpt) { s =>
       s.labelsKept.length shouldBe 3
       s.labelsDropped.length shouldBe 10
       s.labelsDroppedTotal shouldBe 997
       s shouldBe DataCutterSummary(
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
-        dc2.getLabelsDroppedTotal,
-        Option(split2)
+        dc2.getLabelsDroppedTotal
       )
     }
   }
@@ -139,35 +135,33 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
   it should "filter out anything that does not have at least the specified data fraction" in {
     val dc1 = DataCutter(seed = seed, minLabelFraction = 0.0012, maxLabelCategories = 100000, reserveTestFraction = 0.5)
     val s1 = dc1.preValidationPrepare(randDF)
-    val split1 = dc1.validationPrepare(randDF)
+    val split1 = dc1.validationPrepare(s1.dataFrame.get)
 
     val distinct = findDistinct(randDF).count()
     val distTrain = findDistinct(split1)
     distTrain.count() < distinct shouldBe true
     distTrain.count() > 0 shouldBe true
-    assertDataCutterSummary(s1) { s =>
+    assertDataCutterSummary(s1.summaryOpt) { s =>
       s.labelsKept.length + s.labelsDroppedTotal shouldBe distinct
       s shouldBe DataCutterSummary(
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
-        dc1.getLabelsDroppedTotal,
-        Option(split1)
+        dc1.getLabelsDroppedTotal
       )
     }
 
     val dc2 = DataCutter(seed = seed, minLabelFraction = 0.2, reserveTestFraction = 0.5)
     val s2 = dc2.preValidationPrepare(biasDF)
-    val split2 = dc2.validationPrepare(biasDF)
+    val split2 = dc2.validationPrepare(s2.dataFrame.get)
     findDistinct(split2).count() shouldBe 3
-    assertDataCutterSummary(s2) { s =>
+    assertDataCutterSummary(s2.summaryOpt) { s =>
       s.labelsKept.length shouldBe 3
       s.labelsDroppedTotal shouldBe 997
       s.labelsDropped.length shouldBe 10
       s shouldBe DataCutterSummary(
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
-        dc2.getLabelsDroppedTotal,
-        Option(split2)
+        dc2.getLabelsDroppedTotal
       )
     }
   }
@@ -176,8 +170,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     val keep = Seq(0.0, 1.0)
     val drop = Seq(5.0, 7.0)
     val dc = DataCutter(seed = seed).setLabels(keep = keep, dropTopK = drop, labelsDropped = 2)
-    dc.preValidationPrepare(randDF)
-    val split = dc.validationPrepare(randDF)
+    val s1 = dc.preValidationPrepare(randDF)
+    val split = dc.validationPrepare(s1.dataFrame.get)
 
     findDistinct(split).collect().sorted shouldBe Array(0.0, 1.0)
     dc.getLabelsToKeep shouldBe keep.toArray

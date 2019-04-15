@@ -111,8 +111,8 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
    */
   protected[op] def findBestEstimator(data: DataFrame, dag: StagesDAG, persistEveryKStages: Int = 0)
     (implicit spark: SparkSession): Unit = {
-    val (_, dataSet) = prepareForValidation(data)
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataSet,
+    val PrevalidationVal(_, dataSetOpt) = prepareForValidation(data, in1.name)
+    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataSetOpt.getOrElse(data),
       label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
       stratifyCondition = validator.isClassification
     )
@@ -145,7 +145,8 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
-    val (splitterSummary, datasetWithID: DataFrame) = prepareForValidation(datasetWithIDPre)
+    val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
+    val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
@@ -195,13 +196,10 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setEvaluators(evaluators)
   }
 
-  private def prepareForValidation(data: DataFrame) = {
-    val splitterSummary = splitter.flatMap(_.preValidationPrepare(data, Some(labelColName)))
-    val resultDF = splitterSummary.collect { case dc: DataCutterSummary =>
-      dc.preparedDF.getOrElse(data)
-    }.getOrElse(data)
-
-    splitterSummary -> resultDF
+  private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
+    splitter
+      .map(_.withLabelColumnName(labelColName).preValidationPrepare(data))
+      .getOrElse(PrevalidationVal(None, Option(data)))
   }
 }
 

@@ -34,9 +34,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.attribute.NominalAttribute
 import org.apache.spark.ml.param._
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
 import scala.util.Try
@@ -78,6 +78,8 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
+  var cachedDataFrameForTesting: Option[DataFrame] = None
+
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
@@ -85,8 +87,8 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @param data
    * @return Parameters set in examining data
    */
-  override def preValidationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Option[SplitterSummary] = {
-    val labelColName = labelColNameOpt.getOrElse(data.columns(0))
+  override def preValidationPrepare(data: DataFrame): PrevalidationVal = {
+    val labelColName = if (isSet(labelColumnName)) getLabelColumnName else data.columns(0)
     val labelColIdx = data.columns.indexOf(labelColName)
 
     if (!isSet(labelsToKeep)) {
@@ -96,53 +98,47 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       setLabels(res.labelsKept.distinct, res.labelsDropped.distinct, res.labelsDroppedTotal)
     }
 
-    val newSummary = summary
-      .collect {
-        case dcs: DataCutterSummary if dcs.preparedDF.isDefined => dcs
-      }
-      .getOrElse {
-        val labelMetaArr = getLabelsFromMetadata(data)
-        val labelSet = getLabelsToKeep.toSet
+    val labelMetaArr = getLabelsFromMetadata(data)
+    val labelSet = getLabelsToKeep.toSet
 
-        val dataPrep = {
-          log.info(s"Dropping rows with columns not in $labelSet")
+    log.info(s"Dropping rows with columns not in $labelSet")
 
-          // Update metadata that spark.ml Classifier is using tp determine the number of classes
-          //
-          val na = NominalAttribute.defaultAttr.withName(labelColName)
-          val metadataNA = if (labelMetaArr.isEmpty) {
-            log.info("setting num vals " + labelSet.max.toInt + 1)
-            na.withNumValues(labelSet.max.toInt + 1)
-          } else {
-            val newLabelMetaArr = labelMetaArr
-              .zipWithIndex
-              .collect {
-                case (label: String, idx: Int) if labelSet.contains(idx.toDouble) => label
-              }
-
-            na.withValues(newLabelMetaArr)
-          }
-
-          // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
-          // it in sync with the new metadata.
-          //
-          data
-            .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
-            .withColumn(labelColName, data
-              .col(labelColName)
-              .as("_", metadataNA.toMetadata))
+    // Update metadata that spark.ml Classifier is using tp determine the number of classes
+    //
+    val na = NominalAttribute.defaultAttr.withName(labelColName)
+    val metadataNA = if (labelMetaArr.isEmpty) {
+      log.info("setting num vals " + labelSet.max.toInt + 1)
+      na.withNumValues(labelSet.max.toInt + 1)
+    } else {
+      val newLabelMetaArr = labelMetaArr
+        .zipWithIndex
+        .collect {
+          case (label: String, idx: Int) if labelSet.contains(idx.toDouble) => label
         }
 
-        DataCutterSummary(
-          labelsKept = getLabelsToKeep,
-          labelsDropped = getLabelsToDrop,
-          labelsDroppedTotal = getLabelsDroppedTotal,
-          preparedDF = Option(dataPrep)
-        )
-      }
+      na.withValues(newLabelMetaArr)
+    }
 
-    summary = Option(newSummary)
-    summary
+    // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
+    // it in sync with the new metadata.
+    //
+    val dataPrep = data
+      .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
+      .withColumn(labelColName, data
+        .col(labelColName)
+        .as("_", metadataNA.toMetadata))
+
+    summary = Option(DataCutterSummary(
+      labelsKept = getLabelsToKeep,
+      labelsDropped = getLabelsToDrop,
+      labelsDroppedTotal = getLabelsDroppedTotal
+    ))
+
+    if (isSet(cacheValidatedDFForTesting) && $(cacheValidatedDFForTesting)) {
+      cachedDataFrameForTesting = Option(dataPrep)
+    }
+
+    PrevalidationVal(summary, Option(dataPrep))
   }
 
 
@@ -169,19 +165,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         Array.empty[String]
     }
     .getOrElse(Array.empty[String])
-  }
-
-
-  /**
-   * Removes labels that should not be used in modeling
-   *
-   * @param data first column must be the label as a double
-   * @return Training set test set
-   */
-  override def validationPrepare(data: Dataset[Row], labelColNameOpt: Option[String]): Dataset[Row] = {
-    super.validationPrepare(data)
-    summary.flatMap(_.asInstanceOf[DataCutterSummary].preparedDF)
-      .getOrElse(sys.error("No prepared dataframe available!"))
   }
 
   /**
@@ -235,7 +218,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   }
 }
 
-private[impl] trait DataCutterParams extends Params {
+private[impl] trait DataCutterParams extends SplitterParams {
 
   final val maxLabelCategories = new IntParam(this, "maxLabelCategories",
     "maximum number of label categories for multiclass classification",
@@ -287,6 +270,13 @@ private[impl] trait DataCutterParams extends Params {
 
   private[op] def getNumDroppedLabelsForLogging: Int = $(maxLabelsDroppedForDiagnostics)
 
+  final val cacheValidatedDFForTesting = new BooleanParam(this, "cacheValidatedDFForTesting",
+    doc = "parameter to verify label trimming")
+  setDefault(cacheValidatedDFForTesting, false)
+
+  def setCacheValidatedDFForTesting(value: Boolean): this.type = {
+    set(cacheValidatedDFForTesting, value)
+  }
 }
 
 /**
@@ -299,8 +289,7 @@ case class DataCutterSummary
 (
   labelsKept: Seq[Double],
   labelsDropped: Seq[Double],
-  labelsDroppedTotal: Long,
-  preparedDF: Option[DataFrame] = None
+  labelsDroppedTotal: Long
 ) extends SplitterSummary {
 
   /**
