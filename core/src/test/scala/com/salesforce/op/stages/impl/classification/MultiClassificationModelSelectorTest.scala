@@ -386,6 +386,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
 
         val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
+        cutter.setCacheValidatedDFForTesting(true)
+
         val testEstimator =
           MultiClassificationModelSelector
             .withCrossValidation(
@@ -398,8 +400,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         testEstimator.fit(bigDataWithMeta)
 
-        val numLabelsInCutter = cutter.summary
-          .flatMap(_.asInstanceOf[DataCutterSummary].preparedDF)
+        val numLabelsInCutter = cutter.cachedDataFrameForTesting
           .map(_.select(labelColName).distinct().count())
 
         bigData.unpersist()

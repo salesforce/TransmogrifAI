@@ -99,7 +99,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS))(_ => succeed)
+    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS).summaryOpt)(_ => succeed)
   }
 
   Spec[OpTrainValidationSplit[_, _]] should "stratify binary class data" in {
@@ -123,7 +123,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS))(_ => succeed)
+    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS).summaryOpt)(_ => succeed)
   }
 
   /**
