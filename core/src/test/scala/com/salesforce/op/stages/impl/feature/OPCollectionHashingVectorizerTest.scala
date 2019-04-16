@@ -44,7 +44,7 @@ import org.apache.spark.ml.linalg.Vectors
 class OPCollectionHashingVectorizerTest extends OpTransformerSpec[OPVector, OPCollectionHashingVectorizer[TextList]]
   with AttributeAsserts {
 
-  val (dataList, f1) =
+  val (inputData, f1) =
     TestFeatureBuilder("textList1", Seq[TextList](TextList(Seq("x", "y"))))
 
   /**
@@ -52,10 +52,6 @@ class OPCollectionHashingVectorizerTest extends OpTransformerSpec[OPVector, OPCo
    */
   override val transformer: OPCollectionHashingVectorizer[TextList] = new OPCollectionHashingVectorizer().setInput(f1)
 
-  /**
-   * Input Dataset to transform
-   */
-  override val inputData: Dataset[_] = dataList
   /**
    * Expected result of the transformer applied on the Input Dataset
    */
