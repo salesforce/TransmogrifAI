@@ -42,6 +42,7 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import OPListTransformerTest._
+
 /**
  * @author ksuchanek
  * @since 214
@@ -49,7 +50,7 @@ import OPListTransformerTest._
 @RunWith(classOf[JUnitRunner])
 class OPListTransformerTest extends OpTransformerSpec[TextList, TransformerType] {
   lazy val (dataEmailMap, top) = TestFeatureBuilder("name",
-   Seq(TextList(Seq("A","B")))
+    Seq(TextList(Seq("A", "B")))
   )
 
   /**
@@ -67,7 +68,7 @@ class OPListTransformerTest extends OpTransformerSpec[TextList, TransformerType]
    * Expected result of the transformer applied on the Input Dataset
    */
   override val expectedResult: Seq[TextList] = Seq(
-    TextList(Seq("a","b"))
+    TextList(Seq("a", "b"))
   )
 }
 

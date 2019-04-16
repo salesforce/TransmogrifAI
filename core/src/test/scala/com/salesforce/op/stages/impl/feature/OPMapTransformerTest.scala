@@ -48,7 +48,9 @@ import org.scalatest.junit.JUnitRunner
  */
 @RunWith(classOf[JUnitRunner])
 class OPMapTransformerTest extends OpTransformerSpec[IntegralMap, TransformerType] {
+
   import OPMapTransformerTest._
+
   lazy val (dataEmailMap, top) = TestFeatureBuilder("name",
     Seq(
       Map("p1" -> "a@abcd.com", "p2" -> "xy@abcd.com")

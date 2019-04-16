@@ -42,6 +42,7 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import OPSetTransformerTest._
+
 /**
  * @author ksuchanek
  * @since 214
@@ -49,7 +50,7 @@ import OPSetTransformerTest._
 @RunWith(classOf[JUnitRunner])
 class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, TransformerType] {
   lazy val (dataEmailMap, top) = TestFeatureBuilder("name",
-   Seq(MultiPickList(Set("A","B")))
+    Seq(MultiPickList(Set("A", "B")))
   )
 
   /**
@@ -67,7 +68,7 @@ class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, TransformerT
    * Expected result of the transformer applied on the Input Dataset
    */
   override val expectedResult: Seq[MultiPickList] = Seq(
-    MultiPickList(Set("a","b"))
+    MultiPickList(Set("a", "b"))
   )
 }
 
