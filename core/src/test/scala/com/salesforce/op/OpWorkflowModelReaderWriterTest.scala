@@ -33,14 +33,16 @@ package com.salesforce.op
 import java.io.File
 
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
-import com.salesforce.op.features.OPFeature
-import com.salesforce.op.features.types.{Real, RealNN}
+import com.salesforce.op.features.types.{OPVector, Real}
+import com.salesforce.op.features.{FeatureBuilder, FeatureSparkTypes, OPFeature}
 import com.salesforce.op.filters._
 import com.salesforce.op.readers.{AggregateAvroReader, DataReaders}
 import com.salesforce.op.stages.OPStage
-import com.salesforce.op.stages.sparkwrappers.generic.SwUnaryEstimator
+import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import org.apache.spark.ml.feature.{StandardScaler, StandardScalerModel}
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.Row
 import org.joda.time.DateTime
 import org.json4s.jackson.JsonMethods._
 import org.json4s.{DefaultFormats, Formats, JArray, JValue}
@@ -48,6 +50,8 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 import org.slf4j.LoggerFactory
+
+import scala.collection.JavaConverters._
 
 
 @RunWith(classOf[JUnitRunner])
@@ -141,14 +145,13 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
+    val vec = FeatureBuilder.OPVector[Passenger].extract(_ => OPVector.empty).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
-    val swEstimator = new SwUnaryEstimator[RealNN, RealNN, StandardScalerModel, StandardScaler](
-      inputParamName = "foo",
-      outputParamName = "foo2",
-      operationName = "foo3",
-      sparkMlStageIn = Some(scaler)
-    )
-    val scaled = height.transformWith(swEstimator)
+    val schema = FeatureSparkTypes.toStructType(vec)
+    val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
+    val swEstimatorModel = new OpEstimatorWrapper[OPVector, OPVector, StandardScaler, StandardScalerModel](scaler)
+      .setInput(vec).fit(data)
+    val scaled = vec.transformWith(swEstimatorModel)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setReader(dummyReader)
@@ -286,9 +289,40 @@ class OpWorkflowModelReaderWriterTest
     wfM.getBlacklist().map(_.name) should contain theSameElementsAs Array("age", "description")
   }
 
+  it should "load model and allow copying it" in new VectorizedFlow {
+    val wfM = wf.loadModel(saveFlowPathStable)
+    val copy = wfM.copy()
+    copy.uid shouldBe wfM.uid
+    copy.trainingParams.toString shouldBe wfM.trainingParams.toString
+    copy.isWorkflowCV shouldBe wfM.isWorkflowCV
+    copy.reader shouldBe wfM.reader
+    copy.resultFeatures shouldBe wfM.resultFeatures
+    copy.rawFeatures shouldBe wfM.rawFeatures
+    copy.blacklistedFeatures shouldBe wfM.blacklistedFeatures
+    copy.blacklistedMapKeys shouldBe wfM.blacklistedMapKeys
+    copy.rawFeatureFilterResults shouldBe wfM.rawFeatureFilterResults
+    copy.stages.map(_.uid) shouldBe wfM.stages.map(_.uid)
+    copy.parameters.toString shouldBe wfM.parameters.toString
+  }
+
   it should "be able to load a old version of a saved model" in new VectorizedFlow {
     val wfM = wf.loadModel("src/test/resources/OldModelVersion")
     wfM.getBlacklist().isEmpty shouldBe true
+  }
+
+  it should "be able to load a old version of a saved model (v0.5.1)" in new VectorizedFlow {
+    // note: in these old models, raw feature filter config will be set to the config defaults
+    // but we never re-initialize raw feature filter when loading a model (only scoring, no training)
+    val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
+    wfM.getRawFeatureFilterResults().rawFeatureFilterMetrics shouldBe empty
+    wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
+  }
+
+  it should "error on loading a model without workflow" in {
+    val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
+    error.getMessage should startWith("Failed to load Workflow from path")
+    error.getCause.isInstanceOf[NotImplementedError] shouldBe true
+    error.getCause.getMessage shouldBe "Loading models without the original workflow is currently not supported"
   }
 
   def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {

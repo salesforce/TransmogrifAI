@@ -44,6 +44,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
@@ -149,6 +150,25 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       Array(boarded, booleanMap, height, survived, weight)
     wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
+  }
+
+  it should "make the correct metadata even when features are removed by the raw feature filter" in {
+    val sim = gender.toNGramSimilarity(description.toMultiPickList)
+    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap, sim,
+      whyNotNormed, density, densityNormed).transmogrify()
+    val survivedNum = survived.occurs()
+    val checked = survivedNum.sanityCheck(fv)
+    val wf = new OpWorkflow()
+      .setResultFeatures(checked)
+      .withRawFeatureFilter(
+        trainingReader = Option(dataReader),
+        scoringReader = None,
+        minFillRate = 0.5
+      )
+
+    val wfM = wf.train()
+    val data = wfM.score()
+    data.first().getAs[Vector](1).size shouldEqual OpVectorMetadata("", data.schema(1).metadata).columns.size
   }
 
   it should "allow you to interact with updated features when things are blacklisted and" +
@@ -380,8 +400,8 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
 
     val prettySummary = fittedWorkflow.summaryPretty()
     log.info(prettySummary)
+    prettySummary should include regex raw"area under precision-recall\s+|\s+1.0\s+|\s+0.0"
     prettySummary should include("Selected Model - OpLogisticRegression")
-    prettySummary should include("area under precision-recall | 1.0                   | 0.0")
     prettySummary should include("Model Evaluation Metrics")
     prettySummary should include("Top Model Insights")
     prettySummary should include("Top Positive Correlations")

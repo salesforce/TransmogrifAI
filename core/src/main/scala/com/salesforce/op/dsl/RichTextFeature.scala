@@ -96,10 +96,15 @@ trait RichTextFeature {
      *
      * @param that      other text feature
      * @param nGramSize the size of the n-gram to be used to compute the string distance
+     * @param toLowerCase lowercase before computing similarity
      * @return ngrammed feature
      */
-    def toNGramSimilarity(that: FeatureLike[T], nGramSize: Int = NGramSimilarity.nGramSize): FeatureLike[RealNN] =
-      f.transformWith(new TextNGramSimilarity[T](nGramSize), that)
+    def toNGramSimilarity(
+      that: FeatureLike[T],
+      nGramSize: Int = NGramSimilarity.nGramSize,
+      toLowerCase: Boolean = TextTokenizer.ToLowercase
+    ): FeatureLike[RealNN] =
+      f.transformWith(new TextNGramSimilarity[T](nGramSize).setToLowercase(toLowerCase), that)
 
     /**
      * Vectorize text features by first tokenizing each using [[TextTokenizer]] and then
@@ -429,6 +434,19 @@ trait RichTextFeature {
           .setDefaultLanguage(defaultLanguage)
       )
     }
+
+    /**
+     * Check if feature is a substring of the companion feature
+     * @param f2 feature which would contain the first input as a substring
+     * @param toLowercase lowercase before checking for substrings
+     * @tparam T2 type tag of second feature
+     * @return Binary feature indicating if substring was found
+     */
+    def isSubstring[T2 <: Text : TypeTag](
+      f2: FeatureLike[T2],
+      toLowercase: Boolean = TextTokenizer.ToLowercase
+    ): FeatureLike[Binary] =
+      f.transformWith(new SubstringTransformer[T, T2]().setToLowercase(toLowercase), f2)
   }
 
   implicit class RichPhoneFeature(val f: FeatureLike[Phone]) {
@@ -565,6 +583,13 @@ trait RichTextFeature {
      * @return email domain
      */
     def toEmailDomain: FeatureLike[Text] = f.map[Text](_.domain.toText, "domain")
+
+    /**
+     * Check if email is valid
+     * @return binary feature containing boolean value of whether email was valid format
+     */
+    def isValidEmail: FeatureLike[Binary] = f.transformWith(new ValidEmailTransformer())
+
 
     /**
      * Converts a sequence of [[Email]] features into a vector, extracting the domains of the e-mails

@@ -42,6 +42,6 @@ class ScalarAddTransformerTest extends OpTransformerSpec[Real, ScalarAddTransfor
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: ScalarAddTransformer[Real, Double] = new ScalarAddTransformer[Real, Double](5.0)
     .setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(6.0), Real(9.0), Real.empty, Real(4.0), Real(7.0))
+  val expectedResult: Seq[Real] = Seq(Real(6.0), Real(9.0), Real.empty, Real(4.0), Real(7.0))
 }
 

@@ -78,11 +78,11 @@ private[feature] class NGramSimilarity[I <: FeatureType]
   val nGramSize: Int
 )(implicit tti1: TypeTag[I],
   tto: TypeTag[Real]
-) extends BinaryTransformer[I, I, RealNN](operationName = operationName, uid = uid) {
+) extends BinaryTransformer[I, I, RealNN](operationName = operationName, uid = uid) with TextMatchingParams {
 
   def transformFn: (I, I) => RealNN = (lhs: I, rhs: I) => {
-    val lhString = convertFn(lhs).trim
-    val rhString = convertFn(rhs).trim
+    val lc = $(toLowercase)
+    val Seq(lhString, rhString) = Seq(lhs, rhs).map(convertFn(_).trim).map{ s => if (lc) s.toLowerCase else s }
 
     // in our case, if any of the strings are empty, we want the similarity to be minimum, not maximum,
     // regardless of what the other string is.

@@ -41,5 +41,5 @@ class ScalarMultiplyTransformerTest extends OpTransformerSpec[Real, ScalarMultip
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: ScalarMultiplyTransformer[Real, Double] = new ScalarMultiplyTransformer[Real, Double](5.0)
     .setInput(f1)
-  override val expectedResult: Seq[Real] = Seq(Real(5.0), Real(20.0), Real.empty, Real(-5.0), Real(10.0))
+  val expectedResult: Seq[Real] = Seq(Real(5.0), Real(20.0), Real.empty, Real(-5.0), Real(10.0))
 }
