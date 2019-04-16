@@ -44,8 +44,6 @@ class RealNNVectorizerTest extends OpTransformerSpec[OPVector, RealNNVectorizer]
 
   val expectedResult: Seq[OPVector] = Array(-1.0, -4.0, 5.0, -5.5, 0.1, 2.0, 0.0).map(Array(_).toOPVector)
 
-  behavior of "RealNNVectorizerTest"
-
   it should "be applied via shortcut" in {
     val f2 = f1.vectorize()
     f2.originStage.isInstanceOf[RealNNVectorizer] shouldBe true
