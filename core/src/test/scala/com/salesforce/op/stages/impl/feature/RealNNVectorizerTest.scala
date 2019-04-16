@@ -44,7 +44,8 @@ class RealNNVectorizerTest extends OpTransformerSpec[OPVector, RealNNVectorizer]
 
   behavior of "RealNNVectorizerTest"
 
-  it should "transformFn" in {
-
+  it should "be applied via shortcut" in {
+    val f2 = f1.vectorize()
+    f2.originStage.isInstanceOf[RealNNVectorizer] shouldBe true
   }
 }
