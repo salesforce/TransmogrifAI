@@ -31,17 +31,22 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
 @RunWith(classOf[JUnitRunner])
-class ToOccurTransformerTest extends FlatSpec with TestSparkContext {
+class ToOccurTransformerTest extends OpTransformerSpec[RealNN, ToOccurTransformer[Real]] {
 
-  val testData = Seq(
+  val testData = Seq(2.0.toReal, 0.0.toReal, Real(None))
+  val (inputData, f1) = TestFeatureBuilder(testData)
+  val expectedResult = Seq(1.0.toRealNN, 0.0.toRealNN, 0.0.toRealNN)
+
+  val transformer: ToOccurTransformer[Real] = new ToOccurTransformer[Real]().setInput(f1)
+
+  val extendedTestData = Seq(
     ("001", 0, None, Option(true), None),
     ("002", 1, None, None, Option(2.0)),
     ("003", 2, Option("abc"), Option(false), Option(0.0)),
@@ -57,9 +62,9 @@ class ToOccurTransformerTest extends FlatSpec with TestSparkContext {
   }
 
   lazy val (ds, leadId, numEmails, opptyId, doNotContact, numFormSubmits) =
-    TestFeatureBuilder("leadId", "numEmails", "opptyId", "doNotContact", "numFormSubmits", testData)
+    TestFeatureBuilder("leadId", "numEmails", "opptyId", "doNotContact", "numFormSubmits", extendedTestData)
 
-  Spec[ToOccurTransformer[_]] should "convert features to doolean using shortcuts" in {
+  Spec[ToOccurTransformer[_]] should "convert features to boolean using shortcuts" in {
     val occurEmailOutput = numEmails.occurs(_.value.exists(_ > 1))
     val toOccurEmail = occurEmailOutput.originStage.asInstanceOf[Transformer]
     val occurFormOutput = numFormSubmits.occurs()
