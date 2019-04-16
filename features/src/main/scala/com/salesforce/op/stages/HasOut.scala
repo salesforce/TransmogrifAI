@@ -30,17 +30,31 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.PercentileCalibrator
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
+
+import scala.reflect.runtime.universe.TypeTag
 
 
-@RunWith(classOf[JUnitRunner])
-class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val calibrator = new PercentileCalibrator().setInput(height)
+private[op] trait HasOut[O <: FeatureType] {
+  self: OpPipelineStage[O] =>
 
-  lazy val stage = calibrator.fit(passengersDataSet)
+  /**
+   * Type tag of the output
+   */
+  implicit val tto: TypeTag[O]
 
-  val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
+  /**
+   * Type tag of the output value
+   */
+  implicit val ttov: TypeTag[O#Value]
+
+  override def getOutput(): FeatureLike[O] = new Feature[O](
+    uid = outputFeatureUid,
+    name = getOutputFeatureName,
+    originStage = this,
+    isResponse = outputIsResponse,
+    parents = getInputFeatures()
+  )(tto)
+
 }

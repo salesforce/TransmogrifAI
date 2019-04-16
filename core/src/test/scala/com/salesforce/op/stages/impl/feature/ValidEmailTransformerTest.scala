@@ -27,20 +27,25 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.op.stages.impl.feature
 
-package com.salesforce.op.stages
-
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.PercentileCalibrator
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 
 @RunWith(classOf[JUnitRunner])
-class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val calibrator = new PercentileCalibrator().setInput(height)
+class ValidEmailTransformerTest extends OpTransformerSpec[Binary, ValidEmailTransformer] {
 
-  lazy val stage = calibrator.fit(passengersDataSet)
+  val sample = Seq(Email("abc"), Email("a@b"), Email("a@"), Email("@blah"), Email.empty, Email("real@stuff"))
+  val (inputData, f1) = TestFeatureBuilder(sample)
+  val transformer: ValidEmailTransformer = new ValidEmailTransformer().setInput(f1)
+  val expectedResult: Seq[Binary] = Seq(Binary(false), Binary(true), Binary(false), Binary(false),
+    Binary.empty, Binary(true))
 
-  val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
+  it should "have a working shortcut" in {
+    val f2 = f1.isValidEmail
+    f2.originStage.isInstanceOf[ValidEmailTransformer] shouldBe true
+  }
+
 }

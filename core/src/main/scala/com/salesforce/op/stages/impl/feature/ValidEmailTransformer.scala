@@ -28,19 +28,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.PercentileCalibrator
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import com.salesforce.op.stages.base.unary.UnaryTransformer
 
-
-@RunWith(classOf[JUnitRunner])
-class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val calibrator = new PercentileCalibrator().setInput(height)
-
-  lazy val stage = calibrator.fit(passengersDataSet)
-
-  val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
+/**
+ * Checks if an email is valid
+ * @param uid           uid for instance
+ */
+class ValidEmailTransformer(uid: String = UID[ValidEmailTransformer]) extends
+  UnaryTransformer[Email, Binary](operationName = "isValidEmail", uid = uid) {
+  override def transformFn: Email => Binary = (in: Email) => {
+    if (in.isEmpty) Binary.empty
+    else (in.prefix.nonEmpty && in.domain.nonEmpty).toBinary
+  }
 }

@@ -28,19 +28,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages
+package com.salesforce.op
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.PercentileCalibrator
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import org.scalactic.Equality
 
+/**
+ * Contains custom Equality checks for Double and Option[Double]
+ */
+trait DoubleEquality {
 
-@RunWith(classOf[JUnitRunner])
-class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val calibrator = new PercentileCalibrator().setInput(height)
+  implicit val doubleEquality = new Equality[Double] {
+    def areEqual(a: Double, b: Any): Boolean = b match {
+      case s: Double => (a.isNaN && s.isNaN) || (a == b)
+      case _ => false
+    }
+  }
 
-  lazy val stage = calibrator.fit(passengersDataSet)
+  class OptionDoubleEquality[T <: Option[Double]] extends Equality[T] {
+    def areEqual(a: T, b: Any): Boolean = b match {
+      case None => a.isEmpty
+      case Some(d: Double) => (a.exists(_.isNaN) && d.isNaN) || a.contains(d)
+      case _ => false
+    }
+  }
 
-  val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
+  implicit val otherDoubleEquality = new OptionDoubleEquality[Option[Double]]
+  implicit val someDoubleEquality = new OptionDoubleEquality[Some[Double]]
+
 }

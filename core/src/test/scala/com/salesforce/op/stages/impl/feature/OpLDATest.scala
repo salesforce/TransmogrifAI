@@ -42,7 +42,7 @@ import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class OpLdaTest extends FlatSpec with TestSparkContext {
+class OpLDATest extends FlatSpec with TestSparkContext {
 
   val inputData = Seq(
     (0.0, Vectors.sparse(11, Array(0, 1, 2, 4, 5, 6, 7, 10), Array(1.0, 2.0, 6.0, 2.0, 3.0, 1.0, 1.0, 3.0))),
@@ -78,7 +78,7 @@ class OpLdaTest extends FlatSpec with TestSparkContext {
     .toSeq
     .map(_.getAs[Vector](0))
 
-  Spec[OpLdaTest] should "convert document term vectors into topic vectors" in {
+  Spec[OpLDA] should "convert document term vectors into topic vectors" in {
     val f2Vec = new OpLDA().setInput(f2).setK(k).setSeed(seed).setMaxIter(maxIter)
     val testTransformedData = f2Vec.fit(inputDS).transform(inputDS)
     val output = f2Vec.getOutput()

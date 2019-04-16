@@ -27,20 +27,27 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.op.stages.impl.feature
 
-package com.salesforce.op.stages
-
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.impl.feature.PercentileCalibrator
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 
 @RunWith(classOf[JUnitRunner])
-class OpCalibratorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val calibrator = new PercentileCalibrator().setInput(height)
+class SubstringTransformerTest extends OpTransformerSpec[Binary, SubstringTransformer[Text, Text]] {
 
-  lazy val stage = calibrator.fit(passengersDataSet)
+  val sample = Seq((Text("a"), Text("abc")), (Text("abc"), Text("a")), (Text("no"), Text("YesNO")),
+    (Text.empty, Text("blah")), (Text.empty, Text("blah")), (Text.empty, Text.empty))
+  val (inputData, f1, f2) = TestFeatureBuilder(sample)
+  val transformer: SubstringTransformer[Text, Text] = new SubstringTransformer[Text, Text]().setInput(f1, f2)
+  val expectedResult: Seq[Binary] = Seq(Binary(true), Binary(false), Binary(true), Binary.empty,
+    Binary.empty, Binary.empty)
 
-  val expected = Array(99.0.toReal, 25.0.toReal, 25.0.toReal, 25.0.toReal, 74.0.toReal, 50.0.toReal)
+  it should "have a working shortcut" in {
+    val f3 = f1.isSubstring(f2)
+    f3.originStage.isInstanceOf[SubstringTransformer[_, _]] shouldBe true
+  }
+
 }
+

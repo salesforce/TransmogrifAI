@@ -45,7 +45,7 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpStandardScalerTest extends FlatSpec with TestSparkContext {
+class OpScalarStandardScalerTest extends FlatSpec with TestSparkContext {
   import spark.implicits._
 
   // TODO: use TestFeatureBuilder instead
