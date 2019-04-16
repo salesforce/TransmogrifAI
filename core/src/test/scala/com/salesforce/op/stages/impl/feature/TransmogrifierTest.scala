@@ -42,7 +42,7 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TransmogrifyTest extends FlatSpec with PassengerSparkFixtureTest with AttributeAsserts {
+class TransmogrifierTest extends FlatSpec with PassengerSparkFixtureTest with AttributeAsserts {
 
   val inputFeatures = Array[OPFeature](heightNoWindow, weight, gender)
 

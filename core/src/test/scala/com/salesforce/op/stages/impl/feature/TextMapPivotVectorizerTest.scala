@@ -44,9 +44,9 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextMapPivotVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
-  val log = LoggerFactory.getLogger(classOf[TextMapVectorizerTest])
+  val log = LoggerFactory.getLogger(classOf[TextMapPivotVectorizerTest])
 
   lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
     Seq(
