@@ -40,8 +40,7 @@ class RealNNVectorizerTest extends OpTransformerSpec[OPVector, RealNNVectorizer]
   val (inputData, f1) = TestFeatureBuilder(sample)
   val transformer: RealNNVectorizer = new RealNNVectorizer().setInput(f1)
 
-  val expectedResult: Seq[OPVector] =
-    Seq(Array(-1.0, -4.0, 5.0, -5.5, 0.1, 2.0, 0.0).toOPVector)
+  val expectedResult: Seq[OPVector] = Array(-1.0, -4.0, 5.0, -5.5, 0.1, 2.0, 0.0).map(Array(_).toOPVector)
 
   behavior of "RealNNVectorizerTest"
 
