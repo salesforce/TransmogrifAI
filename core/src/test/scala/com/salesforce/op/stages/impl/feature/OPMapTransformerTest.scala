@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.UID
 import com.salesforce.op.features.types.{Email, EmailMap, Integral, IntegralMap, Real, _}
 import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
 import com.salesforce.op.features.types._
@@ -51,7 +52,7 @@ class OPMapTransformerTest extends OpTransformerSpec[IntegralMap, TransformerTyp
 
   import OPMapTransformerTest._
 
-  lazy val (dataEmailMap, top) = TestFeatureBuilder("name",
+  lazy val (inputData, top) = TestFeatureBuilder("name",
     Seq(
       Map("p1" -> "a@abcd.com", "p2" -> "xy@abcd.com")
     ).map(EmailMap(_))
@@ -65,10 +66,6 @@ class OPMapTransformerTest extends OpTransformerSpec[IntegralMap, TransformerTyp
     operationName = "testUnaryMapWrap").setInput(top)
 
   /**
-   * Input Dataset to transform
-   */
-  override val inputData: Dataset[_] = dataEmailMap
-  /**
    * Expected result of the transformer applied on the Input Dataset
    */
   override val expectedResult: Seq[IntegralMap] = Seq(
@@ -81,7 +78,7 @@ object OPMapTransformerTest {
 
   class BaseTransformer extends UnaryTransformer[Email, Integral](
     operationName = "testUnary",
-    uid = "1234"
+    uid = UID[BaseTransformer]
   ) {
     override def transformFn: (Email => Integral) = (input: Email) => input.value.map(_.length).toIntegral
   }

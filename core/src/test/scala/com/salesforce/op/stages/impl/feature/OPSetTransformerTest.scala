@@ -42,6 +42,7 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import OPSetTransformerTest._
+import com.salesforce.op.UID
 
 /**
  * @author ksuchanek
@@ -49,7 +50,7 @@ import OPSetTransformerTest._
  */
 @RunWith(classOf[JUnitRunner])
 class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, TransformerType] {
-  lazy val (dataEmailMap, top) = TestFeatureBuilder("name",
+  lazy val (inputData, top) = TestFeatureBuilder("name",
     Seq(MultiPickList(Set("A", "B")))
   )
 
@@ -60,10 +61,6 @@ class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, TransformerT
     transformer = new BaseTransformer(),
     operationName = "testUnaryMapWrap").setInput(top)
 
-  /**
-   * Input Dataset to transform
-   */
-  override val inputData: Dataset[_] = dataEmailMap
   /**
    * Expected result of the transformer applied on the Input Dataset
    */
@@ -77,7 +74,7 @@ object OPSetTransformerTest {
 
   class BaseTransformer extends UnaryTransformer[Text, Text](
     operationName = "testUnary",
-    uid = "1234"
+    uid = UID[BaseTransformer]
   ) {
     override def transformFn: (Text => Text) = (input: Text) => input.value.map(_.toLowerCase()).toText
   }
