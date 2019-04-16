@@ -44,6 +44,7 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import org.apache.log4j.Level
 import org.apache.spark.ml.attribute.NominalAttribute
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
@@ -63,6 +64,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   with CompareParamGrid with OpXGBoostQuietLogging {
 
   val log = LoggerFactory.getLogger(this.getClass)
+  // loggingLevel(Level.INFO)
 
   val (seed, label0Count, label1Count, label2Count) = (1234L, 5, 7, 10)
 
@@ -123,6 +125,10 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
 
   Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
+    data.show(truncate = false)
+    data.printSchema()
+    data.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
+
     val modelSelector = MultiClassificationModelSelector
       .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
       .setInput(label.asInstanceOf[Feature[RealNN]], features)
@@ -370,8 +376,17 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           .select(labelColName, "features")
           .persist()
 
+        println(s"Using numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
+          s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
+        println(s"Before filtering")
+        bigData.show(truncate = false)
+        bigData.printSchema()
+        bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
+        println()
+
         val countDistinct = bigData.select(labelColName).distinct().count()
         log.info(s"bigdata uniqs $countDistinct")
+        println(s"bigdata uniqs $countDistinct")
         val bigDataWithMeta = if (metaDataMode == "withNumVals") {
           val na = NominalAttribute.defaultAttr
             .withName(labelColName) // no vals, no num_vals
@@ -380,6 +395,10 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         } else {
           bigData
         }
+        println(s"After filtering")
+        bigData.show(truncate = false)
+        bigData.printSchema()
+        bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
 
         val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
           bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
@@ -397,7 +416,17 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
               modelsAndParameters = models
             )
             .setInput(label, features)
-        testEstimator.fit(bigDataWithMeta)
+        val prediction = testEstimator.getOutput()
+        val model = testEstimator.fit(bigDataWithMeta)
+        val transformedBigData = model.transform(bigDataWithMeta)
+
+        val evaluatorMulti = new OpMultiClassificationEvaluator()
+          .setLabelCol(label)
+          .setPredictionCol(prediction)
+
+        val metricsMulti = evaluatorMulti.evaluateAll(transformedBigData)
+
+
 
         val numLabelsInCutter = cutter.cachedDataFrameForTesting
           .map(_.select(labelColName).distinct().count())
