@@ -146,7 +146,7 @@ abstract class OpOneHotVectorizerModel[T <: FeatureType]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextFun with OneHotModelFun[T] {
+    with CleanTextFun with OneHotModelFun[T] {
 
   def transformFn: Seq[T] => OPVector = pivotFn(topValues, shouldCleanText, shouldTrackNulls)
 

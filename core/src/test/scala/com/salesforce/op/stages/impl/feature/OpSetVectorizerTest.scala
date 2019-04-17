@@ -49,7 +49,8 @@ import org.slf4j.LoggerFactory
 
 @RunWith(classOf[JUnitRunner])
 class OpSetVectorizerTest extends
-  OpEstimatorSpec[OPVector, SequenceModel[MultiPickList, OPVector], OpSetVectorizer[MultiPickList]] with AttributeAsserts {
+  OpEstimatorSpec[OPVector, SequenceModel[MultiPickList, OPVector], OpSetVectorizer[MultiPickList]]
+  with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(this.getClass)
 

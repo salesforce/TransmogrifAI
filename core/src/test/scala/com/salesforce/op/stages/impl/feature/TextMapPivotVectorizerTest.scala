@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
@@ -44,13 +44,11 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapPivotVectorizerTest
-  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], TextMapPivotVectorizer[TextMap]]
-  with AttributeAsserts {
+class TextMapPivotVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(classOf[TextMapPivotVectorizerTest])
 
-  lazy val (inputData, top, bot) = TestFeatureBuilder("top", "bot",
+  lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
     Seq(
       (Map("a" -> "d", "b" -> "d"), Map("x" -> "W")),
       (Map("a" -> "e"), Map("z" -> "w", "y" -> "v")),
@@ -74,34 +72,26 @@ class TextMapPivotVectorizerTest
   ).map(v => v._1.toTextMap -> v._2.toTextMap)
   )
 
-  val estimator = new TextMapPivotVectorizer[TextMap]().setCleanKeys(true).setMinSupport(0).setTopK(10)
+  val vectorizer = new TextMapPivotVectorizer[TextMap]().setCleanKeys(true).setMinSupport(0).setTopK(10)
     .setTrackNulls(false).setInput(top, bot)
-
-  val expectedResult = Seq(
-    Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
-  ).map(_.toOPVector)
-
-  val vector = estimator.getOutput()
+  val vector = vectorizer.getOutput()
 
   val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
 
 
   Spec[TextMapPivotVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vector = estimator.getOutput()
-    vector.name shouldBe estimator.getOutputFeatureName
+    val vector = vectorizer.getOutput()
+    vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
 
   it should "return the a fitted vectorizer with the correct parameters" in {
-    val fitted = estimator.fit(inputData)
+    val fitted = vectorizer.fit(dataSet)
     fitted.isInstanceOf[SequenceModel[_, _]]
     val vectorMetadata = fitted.getMetadata()
-    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual
-      TestOpVectorMetadataBuilder(estimator,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
           IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"), IndColWithGroup(Some("D"), "A"),
           IndColWithGroup(Some("E"), "A"), IndColWithGroup(Some("OTHER"), "A"),
@@ -114,26 +104,32 @@ class TextMapPivotVectorizerTest
         )
       )
     fitted.getInputFeatures() shouldBe Array(top, bot)
-    fitted.parent shouldBe estimator
+    fitted.parent shouldBe vectorizer
   }
 
   it should "return the expected vector with the default param settings" in {
-    val fitted = estimator.fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
+    val expected = Array(
+      Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(vector)
-    assertNominal(field, Array.fill(expectedResult.head.value.size)(true), result)
-    result shouldBe expectedResult
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
   it should "track nulls" in {
-    val fitted = estimator.setTrackNulls(true).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(20, Array(2, 3, 7, 10, 15, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(20, Array(2, 4, 9, 12, 13, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -148,10 +144,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "not clean the variable names when clean text is set to false" in {
-    val fitted = estimator.setCleanText(false).setCleanKeys(false).setTrackNulls(false).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(false).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(17, Array(3, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(4, 12, 15), Array(1.0, 1.0, 1.0)),
@@ -162,8 +158,8 @@ class TextMapPivotVectorizerTest
     val result = transformed.collect(vector)
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
-    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual
-      TestOpVectorMetadataBuilder(estimator,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
           IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
           IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -179,10 +175,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls when clean text is set to false" in {
-    val fitted = estimator.setCleanText(false).setCleanKeys(false).setTrackNulls(true).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(true).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(23, Array(3, 4, 8, 11, 18, 22), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(23, Array(3, 5, 10, 14, 16, 20), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -193,8 +189,8 @@ class TextMapPivotVectorizerTest
     val result = transformed.collect(vector)
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
-    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual
-      TestOpVectorMetadataBuilder(estimator,
+    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
           IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
           IndColWithGroup(nullIndicatorValue, "c"), IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -212,10 +208,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "return only the specified number of elements when top K is set" in {
-    val fitted = estimator.setCleanText(true).setTrackNulls(false).setTopK(1).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(1).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(12, Array(2, 4, 6), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(3, 8, 11), Array(1.0, 1.0, 1.0)),
@@ -229,10 +225,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls the specified number of elements when top K is set" in {
-    val fitted = estimator.setCleanText(true).setTrackNulls(true).setTopK(1).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setTopK(1).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(18, Array(2, 3, 6, 9, 14, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(18, Array(2, 4, 8, 11, 12, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -246,8 +242,8 @@ class TextMapPivotVectorizerTest
   }
 
   it should "return only the elements that exceed the minimum support requirement when minSupport is set" in {
-    val fitted = estimator.setCleanText(true).setTopK(10).setTrackNulls(false).setMinSupport(2).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(false).setMinSupport(2).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val expected = Array(
       Vectors.sparse(10, Array(2, 4, 5), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(3, 7, 9), Array(1.0, 1.0, 1.0)),
@@ -261,8 +257,8 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls the elements that exceed the minimum support requirement when minSupport is set" in {
-    val fitted = estimator.setCleanText(true).setTopK(10).setTrackNulls(true).setMinSupport(2).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(true).setMinSupport(2).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val expected = Array(
       Vectors.sparse(16, Array(2, 3, 6, 8, 13, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(16, Array(2, 4, 7, 10, 11, 14), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -276,10 +272,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "behave correctly when passed empty maps and not throw errors when passed data it was not trained with" in {
-    val fitted = estimator.setCleanText(true).setTrackNulls(false).setMinSupport(0).fit(dataSetEmpty)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setMinSupport(0).fit(dataSetEmpty)
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
@@ -290,7 +286,7 @@ class TextMapPivotVectorizerTest
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
 
-    val transformed2 = fitted.transform(inputData)
+    val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
@@ -304,10 +300,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls when passed empty maps and not throw errors when passed data it was not trained with" in {
-    val fitted = estimator.setCleanText(true).setTrackNulls(true).setMinSupport(0).fit(dataSetEmpty)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setMinSupport(0).fit(dataSetEmpty)
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
@@ -318,7 +314,7 @@ class TextMapPivotVectorizerTest
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
 
-    val transformed2 = fitted.transform(inputData)
+    val transformed2 = fitted.transform(dataSet)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
@@ -333,7 +329,7 @@ class TextMapPivotVectorizerTest
 
 
   it should "behave correctly when passed only empty maps" in {
-    val fitted = estimator.setCleanText(true).setTrackNulls(false).setTopK(10).fit(dataSetAllEmpty)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(10).fit(dataSetAllEmpty)
     val transformed = fitted.transform(dataSetAllEmpty)
     val expected = Array(
       Vectors.dense(Array.empty[Double]),
@@ -347,10 +343,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "correctly whitelist keys" in {
-    val fitted = estimator.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(5, Array(0, 3), Array(1.0, 1.0)),
       Vectors.sparse(5, Array(1), Array(1.0)),
@@ -364,10 +360,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls with whitelist keys" in {
-    val fitted = estimator.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(7, Array(0, 4), Array(1.0, 1.0)),
       Vectors.sparse(7, Array(1, 6), Array(1.0, 1.0)),
@@ -381,11 +377,11 @@ class TextMapPivotVectorizerTest
   }
 
   it should "correctly blacklist keys" in {
-    val fitted = estimator.setTrackNulls(false).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
-      .fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setTrackNulls(false).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
+      .fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(9, Array(2), Array(1.0)),
       Vectors.sparse(9, Array(5, 7), Array(1.0, 1.0)),
@@ -399,11 +395,11 @@ class TextMapPivotVectorizerTest
   }
 
   it should "track nulls with blacklist keys" in {
-    val fitted = estimator.setTrackNulls(true).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
-      .fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setTrackNulls(true).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
+      .fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       Vectors.sparse(13, Array(2, 3, 9, 12), Array(1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(13, Array(2, 5, 7, 10), Array(1.0, 1.0, 1.0, 1.0)),
@@ -417,10 +413,10 @@ class TextMapPivotVectorizerTest
   }
 
   it should "drop features with max cardinality" in {
-    val fitted = estimator.setMaxPctCardinality(0.2).fit(inputData)
-    val transformed = fitted.transform(inputData)
+    val fitted = vectorizer.setMaxPctCardinality(0.2).fit(dataSet)
+    val transformed = fitted.transform(dataSet)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array.fill(4)(OPVector.empty)
     val field = transformed.schema(vector.name)
     val result = transformed.collect(fitted.getOutput())
