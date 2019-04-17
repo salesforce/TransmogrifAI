@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -45,4 +46,10 @@ class OpIndexToStringNoFilterTest extends OpTransformerSpec[Text, OpIndexToStrin
 
   override val expectedResult: Seq[Text] =
     Array("a", OpIndexToStringNoFilter.unseenDefault, "c", "a", "a", "c").map(_.toText)
+
+   it should "correctly deindex a numeric column using shortcut" in {
+       val str2 = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.NoFilter)
+       val strs2 = str2.originStage.asInstanceOf[OpIndexToStringNoFilter].transform(inputData).collect(str2)
+       strs2 shouldBe expectedResult
+     }
 }

@@ -31,19 +31,32 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.utils.spark.RichDataset._
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class OpIndexToStringTest extends OpTransformerSpec[Text, OpIndexToString] {
+class OpIndexToStringTest extends FlatSpec with TestSparkContext {
 
   val (inputData, indF) = TestFeatureBuilder(Seq(0.0, 2.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN))
   val labels = Array("a", "c", "b")
 
-  override val expectedResult: Seq[Text] = Array("a", "b", "c", "a", "a", "c").map(_.toText)
+  val expectedResult: Seq[Text] = Array("a", "b", "c", "a", "a", "c").map(_.toText)
 
-  override val transformer: OpIndexToString = new OpIndexToString().setInput(indF).setLabels(labels)
+  val transformer: OpIndexToString = new OpIndexToString().setInput(indF).setLabels(labels)
+
+   Spec[OpIndexToString] should "correctly deindex a numeric column" in {
+     val strs = transformer.transform(inputData).collect(transformer.getOutput())
+       strs shouldBe expectedResult
+     }
+
+   it should "correctly deindex a numeric column (shortcut)" in {
+     val str = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.Error)
+     val strs = str.originStage.asInstanceOf[OpIndexToString].transform(inputData).collect(str)
+     strs shouldBe expectedResult
+   }
 
   it should "getLabels" in {
     transformer.getLabels shouldBe labels
