@@ -125,10 +125,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
 
   Spec(MultiClassificationModelSelector.getClass) should "properly select models to try" in {
-    data.show(truncate = false)
-    data.printSchema()
-    data.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
-
     val modelSelector = MultiClassificationModelSelector
       .withCrossValidation(modelTypesToUse = Seq(MTT.OpLogisticRegression, MTT.OpNaiveBayes, MTT.OpXGBoostClassifier))
       .setInput(label.asInstanceOf[Feature[RealNN]], features)
@@ -358,8 +354,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
         log.info(s"numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
           s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
-        println(s"Using numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
-          s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
 
         val bigNoneIndexedData =
           normalVectorRDD(sc, numLabeledRecords, 3, seed = seed)
@@ -370,12 +364,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .toDF("txtLabel", "features")
             .persist() // IMPORTANT prevent recomputing the DF with Random
 
-        println(s"Before label indexing")
-        bigNoneIndexedData.show(truncate = false)
-        bigNoneIndexedData.printSchema()
-        bigNoneIndexedData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
-        println()
-
         val bigData = new OpStringIndexerNoFilter[Text]()
           .setInput(txtF)
           .setOutputFeatureName(labelColName)
@@ -384,15 +372,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           .select(labelColName, "features")
           .persist()
 
-        println(s"After label indexing")
-        bigData.show(truncate = false)
-        bigData.printSchema()
-        bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
-        println()
-
         val countDistinct = bigData.select(labelColName).distinct().count()
         log.info(s"bigdata uniqs $countDistinct")
-        println(s"bigdata uniqs $countDistinct")
         val bigDataWithMeta = if (metaDataMode == "withNumVals") {
           val na = NominalAttribute.defaultAttr
             .withName(labelColName) // no vals, no num_vals
@@ -401,11 +382,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         } else {
           bigData
         }
-        println(s"After filtering")
-        bigData.show(truncate = false)
-        bigData.printSchema()
-        bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
-        println()
 
         val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
           bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
@@ -425,23 +401,13 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         val prediction = testEstimator.getOutput()
         val model = testEstimator.fit(bigDataWithMeta)
-        model.evaluateModel(bigDataWithMeta)
         val transformedBigData = model.transform(bigDataWithMeta)
-
-        println(s"cutter.labelsToKeep: ${cutter.getLabelsToKeep.toList}")
-        println(s"cutter.labelsToDrop: ${cutter.getLabelsToDrop.toList}")
-        println()
-
-        println(s"transformedBigData:")
-        transformedBigData.show(truncate = false)
-        transformedBigData.printSchema()
-        transformedBigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
 
         // Verify that multiclass metrics can be computed even when unseen labels may be present
         val evaluatorMulti = new OpMultiClassificationEvaluator()
           .setLabelCol(label)
           .setPredictionCol(prediction)
-        val metricsMulti = evaluatorMulti.evaluateAll(transformedBigData)
+        noException should be thrownBy evaluatorMulti.evaluateAll(transformedBigData)
 
         val numLabelsInCutter = cutter.cachedDataFrameForTesting
           .map(_.select(labelColName).distinct().count())
