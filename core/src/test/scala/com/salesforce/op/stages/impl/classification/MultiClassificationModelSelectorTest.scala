@@ -49,7 +49,7 @@ import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
-import org.apache.spark.sql.Encoders
+import org.apache.spark.sql.{DataFrame, Encoders}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
@@ -384,8 +384,16 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
           bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
 
-        val cutter = DataCutter(seed = 42L, maxLabelCategories = topLabelsToPick)
-        cutter.setCacheValidatedDFForTesting(true)
+        val cutter = new DataCutter() {
+          var prevalidationValForTest: Option[PrevalidationVal] = None
+          override def preValidationPrepare(df: DataFrame): PrevalidationVal = {
+            val res = super.preValidationPrepare(df)
+            prevalidationValForTest = Option(res)
+            res
+          }
+        }
+          .setSeed(42L)
+          .setMaxLabelCategories(topLabelsToPick)
 
         val testEstimator =
           MultiClassificationModelSelector
@@ -399,17 +407,20 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         testEstimator.fit(bigDataWithMeta)
 
-        val numLabelsInCutter = cutter.cachedDataFrameForTesting
-          .map(_.select(labelColName).distinct().count())
+        val numLabelsInCutter = {
+          import scala.language.reflectiveCalls
+          cutter.prevalidationValForTest
+            .flatMap(_.dataFrame)
+            .map(_.select(labelColName).distinct().count())
+            .getOrElse(Int.MaxValue.toLong)
+        }
 
         bigData.unpersist()
         bigNoneIndexedData.unpersist()
 
         val maxUniqs = math.min(numLabels, topLabelsToPick)
-        numLabelsInCutter.foreach { x =>
-          x <= maxUniqs shouldBe true
-          x > 0 shouldBe true
-        }
+        numLabelsInCutter <= maxUniqs shouldBe true
+        numLabelsInCutter > 0 shouldBe true
       }
     }
   }

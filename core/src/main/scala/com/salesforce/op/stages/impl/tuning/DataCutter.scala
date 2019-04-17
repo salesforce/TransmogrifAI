@@ -78,8 +78,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  var cachedDataFrameForTesting: Option[DataFrame] = None
-
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
@@ -131,11 +129,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       labelsDropped = getLabelsToDrop,
       labelsDroppedTotal = getLabelsDroppedTotal
     ))
-
-    if (isSet(cacheValidatedDFForTesting) && $(cacheValidatedDFForTesting)) {
-      cachedDataFrameForTesting = Option(dataPrep)
-    }
-
     PrevalidationVal(summary, Option(dataPrep))
   }
 
@@ -267,14 +260,6 @@ private[impl] trait DataCutterParams extends SplitterParams {
   setDefault(maxLabelsDroppedForDiagnostics, 10)
 
   private[op] def getNumDroppedLabelsForLogging: Int = $(maxLabelsDroppedForDiagnostics)
-
-  final val cacheValidatedDFForTesting = new BooleanParam(this, "cacheValidatedDFForTesting",
-    doc = "parameter to verify label trimming")
-  setDefault(cacheValidatedDFForTesting, false)
-
-  def setCacheValidatedDFForTesting(value: Boolean): this.type = {
-    set(cacheValidatedDFForTesting, value)
-  }
 }
 
 /**
