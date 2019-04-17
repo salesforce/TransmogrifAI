@@ -51,7 +51,7 @@ class MultiPickListMapVectorizer[T <: OPMap[Set[String]]]
   uid: String = UID[MultiPickListMapVectorizer[T]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = "vecCatMap", uid = uid)
-    with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
+    with PivotParams with MapPivotParams with TextParams
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
     with MaxPctCardinalityParams with MaxPctCardinalityFun {
 
