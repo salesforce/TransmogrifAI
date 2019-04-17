@@ -448,5 +448,4 @@ class OpSetVectorizerTest extends
     val metaMap = transformed.metadata(vectorized)
     log.info(metaMap.toString)
   }
-
 }

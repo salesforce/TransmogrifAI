@@ -39,7 +39,8 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpTextPivotVectorizerTest extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], OpTextPivotVectorizer[Text]]{
+class OpTextPivotVectorizerTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[Text, OPVector], OpTextPivotVectorizer[Text]] {
 
   lazy val (inputData, f1, f2) = TestFeatureBuilder("text1", "text2",
     Seq[(Text, Text)](
@@ -63,10 +64,10 @@ class OpTextPivotVectorizerTest extends OpEstimatorSpec[OPVector, SequenceModel[
    * Expected result of the transformer applied on the Input Dataset
    */
   override val expectedResult: Seq[OPVector] = Seq(
-    Vectors.sparse(8, Array(0,4), Array(1.0,1.0)),
-    Vectors.sparse(8, Array(0,6), Array(1.0,1.0)),
-    Vectors.sparse(8, Array(1,5), Array(1.0,1.0)),
-    Vectors.sparse(8, Array(0,6), Array(1.0,1.0)),
-    Vectors.sparse(8, Array(3,7), Array(1.0,1.0))
+    Vectors.sparse(8, Array(0, 4), Array(1.0, 1.0)),
+    Vectors.sparse(8, Array(0, 6), Array(1.0, 1.0)),
+    Vectors.sparse(8, Array(1, 5), Array(1.0, 1.0)),
+    Vectors.sparse(8, Array(0, 6), Array(1.0, 1.0)),
+    Vectors.sparse(8, Array(3, 7), Array(1.0, 1.0))
   ).map(_.toOPVector)
 }
