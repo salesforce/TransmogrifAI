@@ -33,22 +33,23 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class TextMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class TextMapPivotVectorizerTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], TextMapPivotVectorizer[TextMap]]
+    with TestSparkContext with AttributeAsserts {
 
-  val log = LoggerFactory.getLogger(classOf[TextMapVectorizerTest])
+  val log = LoggerFactory.getLogger(classOf[TextMapPivotVectorizerTest])
 
-  lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
+  lazy val (inputData, top, bot) = TestFeatureBuilder("top", "bot",
     Seq(
       (Map("a" -> "d", "b" -> "d"), Map("x" -> "W")),
       (Map("a" -> "e"), Map("z" -> "w", "y" -> "v")),
@@ -65,21 +66,29 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     ).map(v => v._1.toTextMap -> v._2.toTextMap)
   )
 
-  lazy val (dataSetAllEmpty, _, _) = TestFeatureBuilder(top.name, bot.name, Seq(
-    (Map[String, String](), Map[String, String]()),
-    (Map[String, String](), Map[String, String]()),
-    (Map[String, String](), Map[String, String]())
-  ).map(v => v._1.toTextMap -> v._2.toTextMap)
+  lazy val (dataSetAllEmpty, _, _) = TestFeatureBuilder(top.name, bot.name,
+    Seq(
+      (Map[String, String](), Map[String, String]()),
+      (Map[String, String](), Map[String, String]()),
+      (Map[String, String](), Map[String, String]())
+    ).map(v => v._1.toTextMap -> v._2.toTextMap)
   )
 
-  val vectorizer = new TextMapPivotVectorizer[TextMap]().setCleanKeys(true).setMinSupport(0).setTopK(10)
-    .setTrackNulls(false).setInput(top, bot)
+  val estimator = new TextMapPivotVectorizer[TextMap]().setInput(top, bot)
+
+  val expectedResult: Seq[OPVector] = Array(
+    Vectors.sparse(12, Array(1, 2, 4, 6, 9, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(12, Array(1, 2, 5, 7, 8, 10), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(12, Array(0, 3, 5, 6, 8, 11), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(12, Array(0, 2, 5, 7, 9, 10), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
+  ).map(_.toOPVector)
+
+  val vectorizer = new TextMapPivotVectorizer[TextMap]().setInput(top, bot)
+    .setCleanKeys(true).setMinSupport(0).setTopK(10).setTrackNulls(false)
   val vector = vectorizer.getOutput()
 
-  val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
 
-
-  Spec[TextMapPivotVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
+  it should "take an array of features as input and return a single vector feature" in {
     val vector = vectorizer.getOutput()
     vector.name shouldBe vectorizer.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
@@ -87,7 +96,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "return the a fitted vectorizer with the correct parameters" in {
-    val fitted = vectorizer.fit(dataSet)
+    val fitted = vectorizer.fit(inputData)
     fitted.isInstanceOf[SequenceModel[_, _]]
     val vectorMetadata = fitted.getMetadata()
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
@@ -108,8 +117,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "return the expected vector with the default param settings" in {
-    val fitted = vectorizer.fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -126,8 +135,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "track nulls" in {
-    val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setTrackNulls(true).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -144,8 +153,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "not clean the variable names when clean text is set to false" in {
-    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(false).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(false).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -175,8 +184,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "track nulls when clean text is set to false" in {
-    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(true).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(false).setCleanKeys(false).setTrackNulls(true).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -189,6 +198,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     val result = transformed.collect(vector)
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
+
+    val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
     OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
       TestOpVectorMetadataBuilder(vectorizer,
         top -> List(
@@ -208,8 +219,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "return only the specified number of elements when top K is set" in {
-    val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(1).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(1).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -225,8 +236,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "track nulls the specified number of elements when top K is set" in {
-    val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setTopK(1).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(true).setTrackNulls(true).setTopK(1).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -242,8 +253,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "return only the elements that exceed the minimum support requirement when minSupport is set" in {
-    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(false).setMinSupport(2).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(false).setMinSupport(2).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val expected = Array(
       Vectors.sparse(10, Array(2, 4, 5), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(10, Array(3, 7, 9), Array(1.0, 1.0, 1.0)),
@@ -257,8 +268,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "track nulls the elements that exceed the minimum support requirement when minSupport is set" in {
-    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(true).setMinSupport(2).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setCleanText(true).setTopK(10).setTrackNulls(true).setMinSupport(2).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val expected = Array(
       Vectors.sparse(16, Array(2, 3, 6, 8, 13, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(16, Array(2, 4, 7, 10, 11, 14), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -286,7 +297,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
 
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
@@ -314,7 +325,7 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
 
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
@@ -326,7 +337,6 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     assertNominal(field2, Array.fill(expected.head.value.size)(true), result2)
     result2 shouldBe expected2
   }
-
 
   it should "behave correctly when passed only empty maps" in {
     val fitted = vectorizer.setCleanText(true).setTrackNulls(false).setTopK(10).fit(dataSetAllEmpty)
@@ -343,8 +353,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "correctly whitelist keys" in {
-    val fitted = vectorizer.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setTopK(10).setTrackNulls(false).setWhiteListKeys(Array("a", "x")).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -360,8 +370,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "track nulls with whitelist keys" in {
-    val fitted = vectorizer.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setTopK(10).setTrackNulls(true).setWhiteListKeys(Array("a", "x")).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -378,8 +388,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
 
   it should "correctly blacklist keys" in {
     val fitted = vectorizer.setTrackNulls(false).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
-      .fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+      .fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -396,8 +406,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
 
   it should "track nulls with blacklist keys" in {
     val fitted = vectorizer.setTrackNulls(true).setWhiteListKeys(Array()).setBlackListKeys(Array("a", "x"))
-      .fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+      .fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
@@ -413,8 +423,8 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "drop features with max cardinality" in {
-    val fitted = vectorizer.setMaxPctCardinality(0.2).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = vectorizer.setMaxPctCardinality(0.2).fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array.fill(4)(OPVector.empty)
@@ -423,4 +433,5 @@ class TextMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
     result shouldBe expected
   }
+
 }

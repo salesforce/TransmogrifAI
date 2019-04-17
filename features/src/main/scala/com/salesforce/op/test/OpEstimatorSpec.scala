@@ -110,7 +110,7 @@ EstimatorType <: Estimator[ModelType] with OpPipelineStage[O] : ClassTag]
     val modelSpec = new OpTransformerSpec[O, ModelType] {
       override implicit val featureTypeEquality: Equality[O] = OpEstimatorSpec.this.featureTypeEquality
       override implicit val seqEquality: Equality[Seq[O]] = OpEstimatorSpec.this.seqEquality
-      lazy val transformer: ModelType = model.setInputFeatureArray(estimator.getInputFeatures())
+      lazy val transformer: ModelType = OpEstimatorSpec.this.model
       lazy val inputData: Dataset[_] = OpEstimatorSpec.this.inputData
       lazy val expectedResult: Seq[O] = OpEstimatorSpec.this.expectedResult
       override implicit lazy val spark = OpEstimatorSpec.this.spark
