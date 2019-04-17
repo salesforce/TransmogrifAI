@@ -35,11 +35,12 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.IndCol
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestOpWorkflowBuilder, TestSparkContext}
+import com.salesforce.op.test._
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.{Estimator, Transformer}
+import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -47,7 +48,8 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class OpSetVectorizerTest extends
+  OpEstimatorSpec[OPVector, SequenceModel[MultiPickList, OPVector], OpSetVectorizer[MultiPickList]] with AttributeAsserts {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -57,15 +59,25 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     (Seq("c"), Seq("x", "y")),
     (Seq("C ", "A."), Seq("Z", "Z", "Z"))
   )
-  val expectedData = Array(
+
+  override val expectedResult = Seq(
+    Vectors.sparse(10, Array(0, 2, 5), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(10, Array(0, 6, 7), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(10, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(10, Array(0, 1, 7), Array(1.0, 1.0, 1.0))
+  ).map(_.toOPVector)
+
+  val expectedData = Seq(
     Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0, 0.0),
     Vectors.dense(1.0, 0.0, 0.0, 0.0, 2.0, 0.0),
     Vectors.dense(0.0, 1.0, 0.0, 1.0, 1.0, 0.0),
     Vectors.dense(1.0, 1.0, 0.0, 0.0, 1.0, 0.0)
   ).map(_.toOPVector)
 
-  val (dataSet, top, bot) = TestFeatureBuilder("top", "bot", data.map(v =>
+
+  val (inputData, top, bot) = TestFeatureBuilder("top", "bot", data.map(v =>
     v._1.toMultiPickList -> v._2.toMultiPickList))
+
   val (dataSetEmpty, _, _) = TestFeatureBuilder(top.name, bot.name,
     Seq[(MultiPickList, MultiPickList)](
       (Seq("a", "b").toMultiPickList, MultiPickList.empty),
@@ -77,38 +89,37 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
   val (dataSetAllEmpty, _) =
     TestFeatureBuilder(top.name, Seq[MultiPickList](MultiPickList.empty, MultiPickList.empty, MultiPickList.empty))
 
-  val vectorizer = new OpSetVectorizer[MultiPickList]().setInput(top, bot).setMinSupport(0).setTopK(10)
-
+  val estimator = new OpSetVectorizer[MultiPickList]().setInput(top, bot).setMinSupport(0).setTopK(10)
 
   Spec[OpSetVectorizer[_]] should "take an array of features as input and return a single vector feature" in {
-    val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.getOutputFeatureName
+    val vector = estimator.getOutput()
+    vector.name shouldBe estimator.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
-    vector.originStage shouldBe vectorizer
+    vector.originStage shouldBe estimator
     vector.parents should contain theSameElementsAs Array(top, bot)
   }
 
   it should "return the a fitted vectorizer with the correct parameters" in {
-    val fitted = vectorizer.fit(dataSet)
+    val fitted = estimator.fit(inputData)
     fitted.isInstanceOf[SequenceModel[_, _]]
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
+      estimator,
       top -> List(IndCol(Some("A")), IndCol(Some("C")), IndCol(Some("B")), IndCol(Some("OTHER")),
         IndCol(Some(TransmogrifierDefaults.NullString))),
       bot -> List(IndCol(Some("X")), IndCol(Some("Y")), IndCol(Some("Z")), IndCol(Some("OTHER")),
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     fitted.getInputFeatures() shouldBe Array(top, bot)
-    fitted.parent shouldBe vectorizer
+    fitted.parent shouldBe estimator
   }
 
   it should "return the expected vector with the default param settings" in {
-    val fitted = vectorizer.fit(dataSet)
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val fitted = estimator.fit(inputData)
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(10, Array(0, 2, 5), Array(1.0, 1.0, 1.0)),
@@ -124,9 +135,9 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
   }
 
   it should "not clean the variable names when clean text is set to false" in {
-    val fitted = vectorizer.setCleanText(false).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val fitted = estimator.setCleanText(false).fit(inputData)
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(13, Array(0, 3, 7), Array(1.0, 1.0, 1.0)),
@@ -140,36 +151,36 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
+      estimator,
       top -> List(IndCol(Some("a")), IndCol(Some("A.")), IndCol(Some("C ")), IndCol(Some("b")), IndCol(Some("c")),
         IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString))),
       bot -> List(IndCol(Some("x")), IndCol(Some("y")), IndCol(Some("Z")), IndCol(Some("z")), IndCol(Some("OTHER")),
         IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "throw an error if you try to set the topK to 0 or a negative number" in {
-    intercept[java.lang.IllegalArgumentException](vectorizer.setTopK(0))
-    intercept[java.lang.IllegalArgumentException](vectorizer.setTopK(-1))
+    intercept[java.lang.IllegalArgumentException](estimator.setTopK(0))
+    intercept[java.lang.IllegalArgumentException](estimator.setTopK(-1))
   }
 
   it should "return only the specified number of elements when top K is set" in {
-    val fitted = vectorizer.setCleanText(true).setTopK(1).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val fitted = estimator.setCleanText(true).setTopK(1).fit(inputData)
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expectedData
-    vectorizer.setTopK(10)
+    estimator.setTopK(10)
   }
 
   it should "return only elements that exceed the min support value" in {
-    val fitted = vectorizer.setCleanText(true).setMinSupport(3).fit(dataSet)
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val fitted = estimator.setCleanText(true).setMinSupport(3).fit(inputData)
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     transformed.collect(vector) shouldBe Array(
       Vectors.dense(1.0, 1.0, 0.0, 1.0, 0.0),
@@ -184,7 +195,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
 
   it should "return a vector with elements only in the other & null columns and not throw errors when passed data" +
     " it was not trained with" in {
-    val fitted = vectorizer.setMinSupport(0).setTopK(10).fit(dataSetEmpty)
+    val fitted = estimator.setMinSupport(0).setTopK(10).fit(dataSetEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetEmpty)
     val result = transformed.collect(vector)
@@ -199,20 +210,20 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
+      estimator,
       top -> List(
         IndCol(Some("A")), IndCol(Some("B")), IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString))
       ),
       bot -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
     val expected2 = Array(
       Vectors.dense(1.0, 1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 2.0, 0.0),
       Vectors.dense(0.0, 0.0, 1.0, 0.0, 2.0, 0.0),
       Vectors.dense(1.0, 0.0, 1.0, 0.0, 1.0, 0.0)
     ).map(_.toOPVector)
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     transformed2.collect(vector) shouldBe expected2
   }
 
@@ -246,12 +257,12 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       Vectors.dense(0.0, 0.0, 1.0, 2.0),
       Vectors.dense(1.0, 0.0, 1.0, 1.0)
     ).map(_.toOPVector)
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     transformed2.collect(vector) shouldBe expected2
   }
 
   it should "work even if all features passed in are empty" in {
-    val fitted = vectorizer.setInput(top).setTopK(10).fit(dataSetAllEmpty)
+    val fitted = estimator.setInput(top).setTopK(10).fit(dataSetAllEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetAllEmpty)
     val expected = Array(Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0), Vectors.dense(0.0, 1.0)).map(_.toOPVector)
@@ -262,17 +273,17 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     result shouldBe expected
     val vectorMetadata = fitted.getMetadata()
     val expectedMeta = TestOpVectorMetadataBuilder(
-      vectorizer,
+      estimator,
       top -> List(IndCol(Some("OTHER")), IndCol(Some(TransmogrifierDefaults.NullString)))
     )
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual expectedMeta
   }
 
   it should "be implemented as 'pivot' shortcut" in {
     val result = top.pivot(others = Array(bot), topK = 1, cleanText = true, minSupport = 0, trackNulls = true)
     val df = result.originStage
-      .asInstanceOf[Estimator[_]].fit(dataSet)
-      .asInstanceOf[Transformer].transform(dataSet)
+      .asInstanceOf[Estimator[_]].fit(inputData)
+      .asInstanceOf[Transformer].transform(inputData)
 
     result.originStage shouldBe a[OpSetVectorizer[_]]
     val actual = df.collect(result)
@@ -410,7 +421,7 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
       .map(c => !(c.isOtherIndicator && c.parentFeatureType.head == FeatureType.typeName[MultiPickList]))
     assertNominal(field, expect, result)
     val expected = Array.fill(6)(OPVector.empty)
-    result should contain theSameElementsAs  expected
+    result should contain theSameElementsAs expected
   }
 
   it should "process multiple columns of numerics, PickLists, and MultiPickLists using the vectorize shortcut" in {
@@ -436,4 +447,5 @@ class OpSetVectorizerTest extends FlatSpec with TestSparkContext with AttributeA
     val metaMap = transformed.metadata(vectorized)
     log.info(metaMap.toString)
   }
+
 }
