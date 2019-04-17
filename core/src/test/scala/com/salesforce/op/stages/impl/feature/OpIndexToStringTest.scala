@@ -35,14 +35,17 @@ import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-
 @RunWith(classOf[JUnitRunner])
-class OpIndexToStringNoFilterTest extends OpTransformerSpec[Text, OpIndexToStringNoFilter] {
+class OpIndexToStringTest extends OpTransformerSpec[Text, OpIndexToString] {
+
   val (inputData, indF) = TestFeatureBuilder(Seq(0.0, 2.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN))
-  val labels = Array("a", "c")
+  val labels = Array("a", "c", "b")
 
-  override val transformer: OpIndexToStringNoFilter = new OpIndexToStringNoFilter().setInput(indF).setLabels(labels)
+  override val expectedResult: Seq[Text] = Array("a", "b", "c", "a", "a", "c").map(_.toText)
 
-  override val expectedResult: Seq[Text] =
-    Array("a", OpIndexToStringNoFilter.unseenDefault, "c", "a", "a", "c").map(_.toText)
+  override val transformer: OpIndexToString = new OpIndexToString().setInput(indF).setLabels(labels)
+
+  it should "getLabels" in {
+    transformer.getLabels shouldBe labels
+  }
 }
