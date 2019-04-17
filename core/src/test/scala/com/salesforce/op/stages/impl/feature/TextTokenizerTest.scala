@@ -32,19 +32,18 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.text.Language
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class TextTokenizerTest extends FlatSpec with TestSparkContext {
+class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]] {
 
   // scalastyle:off
-  val (data, english, japanese, french) = TestFeatureBuilder(
+  val (inputData, english, japanese, french) = TestFeatureBuilder(
     Seq(
       ("I've got a lovely bunch of coconuts".toText,
         "古池や蛙飛び込む水の音".toText,
@@ -66,6 +65,16 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
     )
   )
   // scalastyle:on
+
+  val transformer = new TextTokenizer[Text]().setInput(english)
+
+  val expectedResult: Seq[TextList] = Array(
+    List("got", "lovely", "bunch", "coconuts").toTextList,
+    List("standing", "row").toTextList,
+    List("big", "ones", "small", "ones", "big", "head").toTextList,
+    List("body", "big", "ones", "small", "h1", "ones", "h1", "big", "head", "body").toTextList,
+    TextList.empty
+  )
 
   trait English {
     val expected = Array(
@@ -124,7 +133,7 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
     // scalastyle:on
   }
 
-  Spec[TextTokenizer[_]] should "tokenize text correctly [English]" in new English {
+  it should "tokenize text correctly [English]" in new English {
     assertTextTokenizer(
       input = english, expected = expected,
       tokenizer = new TextTokenizer[Text]().setDefaultLanguage(Language.English)
@@ -237,9 +246,8 @@ class TextTokenizerTest extends FlatSpec with TestSparkContext {
     val emptyInput = Text.empty
     tokenizer.transformFn(emptyInput) shouldBe TextList.empty
 
-    val transformed = tokenizer.transform(data)
+    val transformed = tokenizer.transform(inputData)
     val actualOutput = transformed.collect(output)
     actualOutput should contain theSameElementsInOrderAs expected
   }
-
 }
