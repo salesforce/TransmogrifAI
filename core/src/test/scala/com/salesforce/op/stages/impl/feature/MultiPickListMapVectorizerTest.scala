@@ -51,10 +51,10 @@ class MultiPickListMapVectorizerTest extends
   with AttributeAsserts {
 
   val expectedResult = Seq(
-    Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
+    Vectors.sparse(20, Array(2, 3, 7, 10, 15, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(20, Array(2, 4, 9, 12, 13, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(20, Array(0, 6, 9, 10, 13, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
+    Vectors.sparse(20, Array(0, 3, 9, 12, 15, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
   ).map(_.toOPVector)
 
   val log = LoggerFactory.getLogger(this.getClass)
@@ -169,11 +169,16 @@ class MultiPickListMapVectorizerTest extends
     val result = transformed.collect(vector)
     val vectorMetadata = fitted.getMetadata()
     printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
-
+    val expected = Seq(
+      Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
+      Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
+    ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
-    result shouldBe expectedResult
+    result shouldBe expected
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
@@ -184,16 +189,10 @@ class MultiPickListMapVectorizerTest extends
     val result = transformed.collect(vector)
     val vectorMetadata = fitted.getMetadata()
     printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
-    val expected = Array(
-      Vectors.sparse(20, Array(2, 3, 7, 10, 15, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
-      Vectors.sparse(20, Array(2, 4, 9, 12, 13, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
-      Vectors.sparse(20, Array(0, 6, 9, 10, 13, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
-      Vectors.sparse(20, Array(0, 3, 9, 12, 15, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0))
-    ).map(_.toOPVector)
     val field = transformed.schema(vector.name)
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
-    result shouldBe expected
+    result shouldBe expectedResult
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 

@@ -94,8 +94,7 @@ final class MultiPickListMapVectorizerModel[T <: OPMap[Set[String]]] private[op]
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
-  extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextMapFun {
+  extends SequenceModel[T, OPVector](operationName = operationName, uid = uid) with CleanTextMapFun {
 
   def transformFn: (Seq[T]) => OPVector = row => {
     // Combine top values for each feature with map feature
