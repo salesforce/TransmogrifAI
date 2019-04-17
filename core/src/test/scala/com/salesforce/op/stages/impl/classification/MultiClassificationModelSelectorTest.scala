@@ -358,6 +358,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
         log.info(s"numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
           s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
+        println(s"Using numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
+          s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
 
         val bigNoneIndexedData =
           normalVectorRDD(sc, numLabeledRecords, 3, seed = seed)
@@ -368,6 +370,12 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .toDF("txtLabel", "features")
             .persist() // IMPORTANT prevent recomputing the DF with Random
 
+        println(s"Before label indexing")
+        bigNoneIndexedData.show(truncate = false)
+        bigNoneIndexedData.printSchema()
+        bigNoneIndexedData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
+        println()
+
         val bigData = new OpStringIndexerNoFilter[Text]()
           .setInput(txtF)
           .setOutputFeatureName(labelColName)
@@ -376,9 +384,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
           .select(labelColName, "features")
           .persist()
 
-        println(s"Using numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
-          s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
-        println(s"Before filtering")
+        println(s"After label indexing")
         bigData.show(truncate = false)
         bigData.printSchema()
         bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
@@ -399,6 +405,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         bigData.show(truncate = false)
         bigData.printSchema()
         bigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
+        println()
 
         val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
           bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
@@ -418,15 +425,23 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         val prediction = testEstimator.getOutput()
         val model = testEstimator.fit(bigDataWithMeta)
+        model.evaluateModel(bigDataWithMeta)
         val transformedBigData = model.transform(bigDataWithMeta)
 
+        println(s"cutter.labelsToKeep: ${cutter.getLabelsToKeep.toList}")
+        println(s"cutter.labelsToDrop: ${cutter.getLabelsToDrop.toList}")
+        println()
+
+        println(s"transformedBigData:")
+        transformedBigData.show(truncate = false)
+        transformedBigData.printSchema()
+        transformedBigData.schema.foreach(x => println(s"structfield: $x, metadata: ${x.metadata}"))
+
+        // Verify that multiclass metrics can be computed even when unseen labels may be present
         val evaluatorMulti = new OpMultiClassificationEvaluator()
           .setLabelCol(label)
           .setPredictionCol(prediction)
-
         val metricsMulti = evaluatorMulti.evaluateAll(transformedBigData)
-
-
 
         val numLabelsInCutter = cutter.cachedDataFrameForTesting
           .map(_.select(labelColName).distinct().count())

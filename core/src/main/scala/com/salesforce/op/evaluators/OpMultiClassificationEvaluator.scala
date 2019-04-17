@@ -188,7 +188,8 @@ private[op] class OpMultiClassificationEvaluator
     def computeMetrics(scoresAndLabels: (Array[Double], Double)): MetricsMap = {
       val scores: Array[Double] = scoresAndLabels._1
       val label: Label = scoresAndLabels._2.toInt
-      val trueClassScore: Double = scores(label)
+      // The label may be unseen during model training, so treat scores for unseen classes as all being zero
+      val trueClassScore: Double = if (scores.isDefinedAt(label)) scores(label) else 0.0
       val topNsAndScores: Map[Label, Array[(Double, Int)]] = topNs.map(t => t -> scores.zipWithIndex.sortBy(-_._1)
         .take(t)).toMap
       val topNScores: Map[Label, Array[Double]] = topNsAndScores.mapValues(_.map(_._1))
