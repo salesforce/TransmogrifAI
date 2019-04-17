@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.TestOpVectorColumnType.IndColWithGroup
-import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestOpVectorMetadataBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
@@ -46,11 +46,20 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
+class MultiPickListMapVectorizerTest extends
+  OpEstimatorSpec[OPVector, SequenceModel[MultiPickListMap, OPVector], MultiPickListMapVectorizer[MultiPickListMap]]
+  with AttributeAsserts {
+
+  val expectedResult = Seq(
+    Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
+  ).map(_.toOPVector)
 
   val log = LoggerFactory.getLogger(this.getClass)
 
-  lazy val (dataSet, top, bot) = TestFeatureBuilder("top", "bot",
+  lazy val (inputData, top, bot) = TestFeatureBuilder("top", "bot",
     Seq(
       (Map("a" -> Set("d"), "b" -> Set("d")), Map("x" -> Set("W"))),
       (Map("a" -> Set("e")), Map("z" -> Set("w"), "y" -> Set("v"))),
@@ -70,7 +79,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   lazy val (dataSetAllEmpty, _) = TestFeatureBuilder(top.name,
     Seq(MultiPickListMap.empty, MultiPickListMap.empty, MultiPickListMap.empty))
 
-  val vectorizer = new MultiPickListMapVectorizer().setCleanKeys(true).setMinSupport(0).setTopK(10).setInput(top, bot)
+  val estimator:MultiPickListMapVectorizer[MultiPickListMap]
+  = new MultiPickListMapVectorizer().setCleanKeys(true).setMinSupport(0).setTopK(10).setInput(top, bot)
 
   lazy val (ds, tech, cnty) = TestFeatureBuilder(
     Seq(
@@ -83,27 +93,26 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
 
   val nullIndicatorValue = Some(OpVectorColumnMetadata.NullString)
 
-  Spec[MultiPickListMapVectorizer[_]] should
-    "take an array of features as input and return a single vector feature" in {
-    val vector = vectorizer.getOutput()
-    vector.name shouldBe vectorizer.getOutputFeatureName
+  it should "take an array of features as input and return a single vector feature" in {
+    val vector = estimator.getOutput()
+    vector.name shouldBe estimator.getOutputFeatureName
     vector.typeName shouldBe FeatureType.typeName[OPVector]
     vector.isResponse shouldBe false
   }
 
   it should "return the a fitted vectorizer with the correct default parameters" in {
-    val fitted = vectorizer.setTrackNulls(false).fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).fit(inputData)
     fitted shouldBe a[SequenceModel[_, _]]
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
     val vectorMetadata = fitted.getMetadata()
-    val meta = OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata)
+    val meta = OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata)
     val expect = meta.columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     meta shouldEqual
-      TestOpVectorMetadataBuilder(vectorizer,
+      TestOpVectorMetadataBuilder(estimator,
         top -> List(
           IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"), IndColWithGroup(Some("D"), "A"),
           IndColWithGroup(Some("E"), "A"), IndColWithGroup(Some("OTHER"), "A"),
@@ -116,22 +125,22 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
         )
       )
     fitted.getInputFeatures() shouldBe Array(top, bot)
-    fitted.parent shouldBe vectorizer
+    fitted.parent shouldBe estimator
   }
 
   it should "track nulls with the correct default parameters" in {
-    val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).fit(inputData)
     fitted shouldBe a[SequenceModel[_, _]]
-    val transformed = fitted.transform(dataSet)
-    val vector = vectorizer.getOutput()
+    val transformed = fitted.transform(inputData)
+    val vector = estimator.getOutput()
     val result = transformed.collect(vector)
     val field = transformed.schema(vector.name)
     val vectorMetadata = fitted.getMetadata()
-    val meta = OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata)
+    val meta = OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata)
     val expect = meta.columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     meta shouldEqual
-      TestOpVectorMetadataBuilder(vectorizer,
+      TestOpVectorMetadataBuilder(estimator,
         top -> List(
           IndColWithGroup(Some("D"), "C"), IndColWithGroup(Some("OTHER"), "C"),
           IndColWithGroup(nullIndicatorValue, "C"),
@@ -150,36 +159,31 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
         )
       )
     fitted.getInputFeatures() shouldBe Array(top, bot)
-    fitted.parent shouldBe vectorizer
+    fitted.parent shouldBe estimator
   }
 
   it should "return the expected vector with the default param settings" in {
-    val fitted = vectorizer.setTrackNulls(false).fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val result = transformed.collect(vector)
     val vectorMetadata = fitted.getMetadata()
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
-    val expected = Array(
-      Vectors.sparse(14, Array(2, 5, 7), Array(1.0, 1.0, 1.0)),
-      Vectors.sparse(14, Array(3, 9, 12), Array(1.0, 1.0, 1.0)),
-      Vectors.sparse(14, Array(0, 7, 9), Array(1.0, 1.0, 1.0)),
-      Vectors.sparse(14, Array(0, 2, 11), Array(1.0, 1.0, 1.0))
-    ).map(_.toOPVector)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
+
     val field = transformed.schema(vector.name)
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
-    result shouldBe expected
+    result shouldBe expectedResult
     fitted.getMetadata() shouldBe transformed.schema.fields(2).metadata
   }
 
   it should "track nulls with the default param settings" in {
-    val fitted = vectorizer.setTrackNulls(true).fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val result = transformed.collect(vector)
     val vectorMetadata = fitted.getMetadata()
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.sparse(20, Array(2, 3, 7, 10, 15, 19), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(20, Array(2, 4, 9, 12, 13, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -194,12 +198,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "not clean the variable names when clean text is set to false" in {
-    val fitted = vectorizer.setTrackNulls(false).setCleanText(false).setCleanKeys(false).fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).setCleanText(false).setCleanKeys(false).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val result = transformed.collect(vector)
     val vectorMetadata = fitted.getMetadata()
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.sparse(17, Array(3, 6, 8), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(17, Array(4, 12, 15), Array(1.0, 1.0, 1.0)),
@@ -210,8 +214,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
-      TestOpVectorMetadataBuilder(vectorizer,
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(estimator,
         top -> List(
           IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
           IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -227,12 +231,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls when clean text is set to false" in {
-    val fitted = vectorizer.setTrackNulls(true).setCleanText(false).setCleanKeys(false).fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).setCleanText(false).setCleanKeys(false).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.sparse(23, Array(3, 4, 8, 11, 18, 22), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(23, Array(3, 5, 10, 14, 16, 20), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -243,8 +247,8 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     val expect = OpVectorMetadata("", field.metadata).columns.map(c => !c.isOtherIndicator)
     assertNominal(field, expect, result)
     result shouldBe expected
-    OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata) shouldEqual
-      TestOpVectorMetadataBuilder(vectorizer,
+    OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata) shouldEqual
+      TestOpVectorMetadataBuilder(estimator,
         top -> List(
           IndColWithGroup(Some("D"), "c"), IndColWithGroup(Some("d"), "c"), IndColWithGroup(Some("OTHER"), "c"),
           IndColWithGroup(nullIndicatorValue, "c"), IndColWithGroup(Some("d"), "a"), IndColWithGroup(Some("e"), "a"),
@@ -262,12 +266,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "return only the specified number of elements when top K is set" in {
-    val fitted = vectorizer.setTrackNulls(false).setCleanText(true).setTopK(1).fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).setCleanText(true).setTopK(1).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.sparse(12, Array(2, 4, 6), Array(1.0, 1.0, 1.0)),
       Vectors.sparse(12, Array(3, 8, 11), Array(1.0, 1.0, 1.0)),
@@ -281,12 +285,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls when top K is set" in {
-    val fitted = vectorizer.setTrackNulls(true).setCleanText(true).setTopK(1).fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).setCleanText(true).setTopK(1).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.sparse(18, Array(2, 3, 6, 9, 14, 17), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
       Vectors.sparse(18, Array(2, 4, 8, 11, 12, 16), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -300,9 +304,9 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "return only the elements that exceed the minimum support requirement when minSupport is set" in {
-    val fitted = vectorizer.setTrackNulls(false).setCleanText(true).setTopK(10).setMinSupport(2).fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).setCleanText(true).setTopK(10).setMinSupport(2).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(10, Array(2, 4, 5), Array(1.0, 1.0, 1.0)),
@@ -317,9 +321,9 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls when minSupport is set" in {
-    val fitted = vectorizer.setTrackNulls(true).setCleanText(true).setTopK(10).setMinSupport(2).fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).setCleanText(true).setTopK(10).setMinSupport(2).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val result = transformed.collect(vector)
     val expected = Array(
       Vectors.sparse(16, Array(2, 3, 6, 8, 13, 15), Array(1.0, 1.0, 1.0, 1.0, 1.0, 1.0)),
@@ -334,12 +338,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "behave correctly when passed empty maps and not throw errors when passed data it was not trained with" in {
-    val fitted = vectorizer.setTrackNulls(false).setCleanText(true).setMinSupport(0).fit(dataSetEmpty)
+    val fitted = estimator.setTrackNulls(false).setCleanText(true).setMinSupport(0).fit(dataSetEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0),
@@ -351,7 +355,7 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
 
     result shouldBe expected
 
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     val result2 = transformed2.collect(vector)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 1.0, 0.0),
@@ -366,12 +370,12 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls when passed empty maps and not throw errors when passed data it was not trained with" in {
-    val fitted = vectorizer.setTrackNulls(true).setCleanText(true).setMinSupport(0).fit(dataSetEmpty)
+    val fitted = estimator.setTrackNulls(true).setCleanText(true).setMinSupport(0).fit(dataSetEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetEmpty)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
     val expected = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
       Vectors.dense(0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0),
@@ -383,7 +387,7 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
 
     result shouldBe expected
 
-    val transformed2 = fitted.transform(dataSet)
+    val transformed2 = fitted.transform(inputData)
     val result2 = transformed2.collect(vector)
     val expected2 = Array(
       Vectors.dense(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0),
@@ -398,7 +402,7 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "behave correctly when passed only empty maps" in {
-    val fitted = vectorizer.setInput(top).setTrackNulls(false).setCleanText(true).setTopK(10).fit(dataSetAllEmpty)
+    val fitted = estimator.setInput(top).setTrackNulls(false).setCleanText(true).setTopK(10).fit(dataSetAllEmpty)
     val vector = fitted.getOutput()
     val transformed = fitted.transform(dataSetAllEmpty)
     val result = transformed.collect(vector)
@@ -414,13 +418,13 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "correctly whitelist keys" in {
-    val fitted = vectorizer.setTrackNulls(false).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
-      .fit(dataSet)
+    val fitted = estimator.setTrackNulls(false).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
+      .fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
 
     val expected = Array(
       Vectors.sparse(5, Array(0, 3), Array(1.0, 1.0)),
@@ -435,13 +439,13 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls with whitelist keys" in {
-    val fitted = vectorizer.setTrackNulls(true).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
-      .fit(dataSet)
+    val fitted = estimator.setTrackNulls(true).setInput(top, bot).setTopK(10).setWhiteListKeys(Array("a", "x"))
+      .fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
 
     val expected = Array(
       Vectors.sparse(7, Array(0, 4), Array(1.0, 1.0)),
@@ -456,13 +460,13 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "correctly blacklist keys" in {
-    val fitted = vectorizer.setWhiteListKeys(Array()).setTrackNulls(false)
-      .setBlackListKeys(Array("a", "x")).fit(dataSet)
+    val fitted = estimator.setWhiteListKeys(Array()).setTrackNulls(false)
+      .setBlackListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
 
     val expected = Array(
       Vectors.sparse(9, Array(2), Array(1.0)),
@@ -477,13 +481,13 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "track nulls with blacklist keys" in {
-    val fitted = vectorizer.setWhiteListKeys(Array()).setTrackNulls(true)
-      .setBlackListKeys(Array("a", "x")).fit(dataSet)
+    val fitted = estimator.setWhiteListKeys(Array()).setTrackNulls(true)
+      .setBlackListKeys(Array("a", "x")).fit(inputData)
     val vector = fitted.getOutput()
-    val transformed = fitted.transform(dataSet)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
     val result = transformed.collect(vector)
-    printRes(transformed, vectorMetadata, vectorizer.getOutputFeatureName)
+    printRes(transformed, vectorMetadata, estimator.getOutputFeatureName)
 
     val expected = Array(
       Vectors.sparse(13, Array(2, 3, 9, 12), Array(1.0, 1.0, 1.0, 1.0)),
@@ -544,18 +548,18 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
   }
 
   it should "drop features with max cardinality" in {
-    val fitted = vectorizer.setMaxPctCardinality(0.01)
-      .fit(dataSet)
-    val transformed = fitted.transform(dataSet)
+    val fitted = estimator.setMaxPctCardinality(0.01)
+      .fit(inputData)
+    val transformed = fitted.transform(inputData)
     val vectorMetadata = fitted.getMetadata()
-    log.info(OpVectorMetadata(vectorizer.getOutputFeatureName, vectorMetadata).toString)
+    log.info(OpVectorMetadata(estimator.getOutputFeatureName, vectorMetadata).toString)
     val expected = Array(
       OPVector.empty,
       OPVector.empty,
       OPVector.empty,
       OPVector.empty
     )
-    val vector = vectorizer.getOutput()
+    val vector = estimator.getOutput()
     val field = transformed.schema(vector.name)
     val result = transformed.collect(fitted.getOutput())
     assertNominal(field, Array.fill(expected.head.value.size)(true), result)
@@ -566,4 +570,6 @@ class MultiPickListMapVectorizerTest extends FlatSpec with TestSparkContext with
     if (log.isInfoEnabled) df.show(false)
     log.info("Metadata: {}", OpVectorMetadata(outName, meta).toString)
   }
+
+
 }
