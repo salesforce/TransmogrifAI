@@ -55,7 +55,7 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
   uid: String = UID[TextMapPivotVectorizer[T]]
 )(implicit tti: TypeTag[T])
   extends SequenceEstimator[T, OPVector](operationName = "vecPivotTextMap", uid = uid)
-    with VectorizerDefaults with PivotParams with MapPivotParams with TextParams
+    with PivotParams with MapPivotParams with TextParams
     with MapStringPivotHelper with CleanTextMapFun with MinSupportParam with TrackNullsParam
     with MaxPctCardinalityParams with MaxPctCardinalityFun {
 
@@ -101,7 +101,7 @@ final class TextMapPivotVectorizerModel[T <: OPMap[String]] private[op]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with TextMapPivotVectorizerModelFun[T] {
+    with TextMapPivotVectorizerModelFun[T] {
 
   def transformFn: Seq[T] => OPVector = pivotFn(
     topValues = topValues,
