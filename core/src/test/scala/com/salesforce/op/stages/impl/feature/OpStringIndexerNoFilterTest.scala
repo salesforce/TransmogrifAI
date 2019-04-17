@@ -43,7 +43,8 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpStringIndexerNoFilterTest extends OpEstimatorSpec[RealNN, UnaryModel[Text, RealNN], OpStringIndexerNoFilter[Text]] {
+class OpStringIndexerNoFilterTest extends
+  OpEstimatorSpec[RealNN, UnaryModel[Text, RealNN], OpStringIndexerNoFilter[Text]] {
 
   val txtData = Seq("a", "b", "c", "a", "a", "c").map(_.toText)
   val (inputData, txtF) = TestFeatureBuilder(txtData)
@@ -57,7 +58,8 @@ class OpStringIndexerNoFilterTest extends OpEstimatorSpec[RealNN, UnaryModel[Tex
 
   it should "correctly index a text column (shortcut)" in {
     val indexed = txtF.indexed()
-    val indices = indexed.originStage.asInstanceOf[OpStringIndexerNoFilter[_]].fit(inputData).transform(inputData).collect(indexed)
+    val indices = indexed.originStage.asInstanceOf[OpStringIndexerNoFilter[_]]
+      .fit(inputData).transform(inputData).collect(indexed)
     indices shouldBe expectedResult
 
     val indexed2 = txtF.indexed(handleInvalid = Skip)

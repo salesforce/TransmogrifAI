@@ -47,9 +47,9 @@ class OpIndexToStringNoFilterTest extends OpTransformerSpec[Text, OpIndexToStrin
   override val expectedResult: Seq[Text] =
     Array("a", OpIndexToStringNoFilter.unseenDefault, "c", "a", "a", "c").map(_.toText)
 
-   it should "correctly deindex a numeric column using shortcut" in {
-       val str2 = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.NoFilter)
-       val strs2 = str2.originStage.asInstanceOf[OpIndexToStringNoFilter].transform(inputData).collect(str2)
-       strs2 shouldBe expectedResult
-     }
+  it should "correctly deindex a numeric column using shortcut" in {
+    val str2 = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.NoFilter)
+    val strs2 = str2.originStage.asInstanceOf[OpIndexToStringNoFilter].transform(inputData).collect(str2)
+    strs2 shouldBe expectedResult
+  }
 }

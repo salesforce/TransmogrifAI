@@ -47,16 +47,16 @@ class OpIndexToStringTest extends FlatSpec with TestSparkContext {
 
   val transformer: OpIndexToString = new OpIndexToString().setInput(indF).setLabels(labels)
 
-   Spec[OpIndexToString] should "correctly deindex a numeric column" in {
-     val strs = transformer.transform(inputData).collect(transformer.getOutput())
-       strs shouldBe expectedResult
-     }
+  Spec[OpIndexToString] should "correctly deindex a numeric column" in {
+    val strs = transformer.transform(inputData).collect(transformer.getOutput())
+    strs shouldBe expectedResult
+  }
 
-   it should "correctly deindex a numeric column (shortcut)" in {
-     val str = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.Error)
-     val strs = str.originStage.asInstanceOf[OpIndexToString].transform(inputData).collect(str)
-     strs shouldBe expectedResult
-   }
+  it should "correctly deindex a numeric column (shortcut)" in {
+    val str = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.Error)
+    val strs = str.originStage.asInstanceOf[OpIndexToString].transform(inputData).collect(str)
+    strs shouldBe expectedResult
+  }
 
   it should "getLabels" in {
     transformer.getLabels shouldBe labels
