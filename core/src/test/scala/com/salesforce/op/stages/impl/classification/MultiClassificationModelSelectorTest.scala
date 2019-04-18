@@ -412,7 +412,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .getOrElse(spark.emptyDataFrame)
 
           (df.select(labelColName).distinct().count(),
-            MetadataHelper.metadtaUtils.getNumClasses(df.schema.head).getOrElse(-1)))
+            MetadataHelper.metadtaUtils.getNumClasses(df.schema.head).getOrElse(-1))
         }
 
         val maxUniqs = math.min(numLabels, topLabelsToPick)
