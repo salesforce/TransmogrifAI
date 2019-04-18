@@ -146,9 +146,11 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         .getStringArray(MetadataHelper.attributeKeys.VALUES)
     }
     .recover { case nonFatal =>
-      log.warn(s"Cannot retrieve categories from metadata using " +
+      log.warn("Cannot retrieve categories from metadata using " +
         s"${MetadataHelper.attributeKeys.ML_ATTR}.${MetadataHelper.attributeKeys.VALUES}, " +
-        s"retrieving number of categories using ${MetadataHelper.attributeKeys.NUM_VALUES}", nonFatal)
+        "retrieving number of categories using " +
+        s"${MetadataHelper.attributeKeys.ML_ATTR}.${MetadataHelper.attributeKeys.NUM_VALUES}",
+        nonFatal)
       val numVals = labelColMetadata
         .getMetadata(MetadataHelper.attributeKeys.ML_ATTR)
         .getLong(MetadataHelper.attributeKeys.NUM_VALUES)
