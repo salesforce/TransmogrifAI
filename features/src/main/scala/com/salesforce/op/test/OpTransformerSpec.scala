@@ -94,7 +94,7 @@ private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: O
   self: OpPipelineStageSpec[O, TransformerType] =>
 
   /**
-   * Transfotmer instance to be tested
+   * Transformer instance to be tested
    */
   val transformer: TransformerType
 
