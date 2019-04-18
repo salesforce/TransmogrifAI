@@ -38,7 +38,7 @@ import org.apache.spark.ml.param.{Params, StringArrayParam}
 /**
  * Object to allow generic string based access to parameters of wrapped spark class
  *
- * @tparam S type of spark object to wrap
+ * @tparam S type of Spark stage to wrap
  */
 trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   self: PipelineStage =>
@@ -46,17 +46,18 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
   final val sparkInputColParamNames = new StringArrayParam(
     parent = this,
     name = "sparkInputColParamNames",
-    doc = "names of parameters that control input columns for spark stage"
+    doc = "names of parameters that control input columns for Spark stage"
   )
 
   final val sparkOutputColParamNames = new StringArrayParam(
     parent = this,
     name = "sparkOutputColParamNames",
-    doc = "names of parameters that control output columns for spark stage"
+    doc = "names of parameters that control output columns for Spark stage"
   )
 
   final val sparkMlStage = new SparkStageParam[S](
-    parent = this, name = "sparkMlStage", doc = "the spark stage that is being wrapped for TransmogrifAI"
+    parent = this, name = SparkWrapperParams.SparkStageParamName,
+    doc = "the spark stage that is being wrapped for TransmogrifAI"
   )
 
   setDefault(sparkMlStage, None)
@@ -87,6 +88,16 @@ trait SparkWrapperParams[S <: PipelineStage with Params] extends Params {
    * Gets a save path for wrapped spark stage
    */
   def getStageSavePath(): Option[String] = sparkMlStage.savePath
+
+  /**
+   * Gets names of parameters that control input columns for Spark stage
+   */
+  def getInputColParamNames(): Array[String] = $(sparkInputColParamNames)
+
+  /**
+   * Gets names of parameters that control output columns for Spark stage
+   */
+  def getOutputColParamNames(): Array[String] = $(sparkOutputColParamNames)
 }
 
 object SparkWrapperParams {

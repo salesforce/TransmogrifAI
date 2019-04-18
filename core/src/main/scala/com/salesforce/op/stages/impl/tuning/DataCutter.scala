@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
-import org.apache.spark.ml.attribute.NominalAttribute
+import org.apache.spark.ml.attribute.{MetadataHelper, NominalAttribute}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -88,8 +88,11 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: DataFrame): PrevalidationVal = {
-    val labelColName = if (isSet(labelColumnName)) getLabelColumnName else data.columns(0)
-    val labelColIdx = data.columns.indexOf(labelColName)
+    val labelColName = if (isSet(labelColumnName)) {
+      getLabelColumnName
+    } else {
+      data.columns(0)
+    }
 
     if (!isSet(labelsToKeep)) {
       val labelCounts = data.groupBy(labelColName).count().persist()
@@ -104,7 +107,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     log.info(s"Dropping rows with columns not in $labelSet")
 
     // Update metadata that spark.ml Classifier is using tp determine the number of classes
-    //
     val na = NominalAttribute.defaultAttr.withName(labelColName)
     val metadataNA = if (labelMetaArr.isEmpty) {
       log.info("setting num vals " + labelSet.max.toInt + 1)
@@ -121,21 +123,16 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
     // it in sync with the new metadata.
-    //
+    val labelColIdx = data.columns.indexOf(labelColName)
     val dataPrep = data
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
-      .withColumn(labelColName, data(labelColName).as("_", metadataNA.toMetadata))
+      .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
 
     summary = Option(DataCutterSummary(
       labelsKept = getLabelsToKeep,
       labelsDropped = getLabelsToDrop,
       labelsDroppedTotal = getLabelsDroppedTotal
     ))
-
-    if (isSet(cacheValidatedDFForTesting) && $(cacheValidatedDFForTesting)) {
-      cachedDataFrameForTesting = Option(dataPrep)
-    }
-
     PrevalidationVal(summary, Option(dataPrep))
   }
 
@@ -147,19 +144,23 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     Try {
       labelColMetadata
-        .getMetadata("ml_attr")
-        .getStringArray("vals")
+        .getMetadata(MetadataHelper.attributeKeys.ML_ATTR)
+        .getStringArray(MetadataHelper.attributeKeys.VALUES)
     }
     .recover { case nonFatal =>
-      log.warn("Recovering non-fatal exception using num_vals", nonFatal)
+      log.warn("Cannot retrieve categories from metadata using " +
+        s"${MetadataHelper.attributeKeys.ML_ATTR}.${MetadataHelper.attributeKeys.VALUES}, " +
+        "retrieving number of categories using " +
+        s"${MetadataHelper.attributeKeys.ML_ATTR}.${MetadataHelper.attributeKeys.NUM_VALUES}",
+        nonFatal)
       val numVals = labelColMetadata
-        .getMetadata("ml_attr")
-        .getLong("num_vals")
+        .getMetadata(MetadataHelper.attributeKeys.ML_ATTR)
+        .getLong(MetadataHelper.attributeKeys.NUM_VALUES)
       (0 until numVals.toInt).map(_.toDouble.toString).toArray
     }
     .recover {
       case nonFatal =>
-        log.warn("Recovering non-fatal exception", nonFatal)
+        log.warn("Using an empty label array", nonFatal)
         Array.empty[String]
     }
     .getOrElse(Array.empty[String])
@@ -177,25 +178,25 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
 
-    val labelCol = labelCounts.columns(0)
-    val countCol = labelCounts.columns(1)
+    val Seq(labelColIdx, countColIdx) = Seq(0, 1)
+    val Seq(labelCol, countCol) = Seq(labelColIdx, countColIdx).map(idx => labelCounts.columns(idx))
 
     val numLabels = labelCounts.count()
-    val totalValues = labelCounts.agg(sum(countCol)).first().getLong(0).toDouble
+    val totalValues = labelCounts.agg(sum(countCol)).first().getLong(labelColIdx).toDouble
 
     val labelsKept = labelCounts
-      .filter(r => r.getLong(1).toDouble / totalValues >= minLabelFract)
+      .filter(r => r.getLong(countColIdx).toDouble / totalValues >= minLabelFract)
       .sort(col(countCol).desc, col(labelCol))
       .take(maxLabels)
-      .map(_.getDouble(0))
+      .map(_.getDouble(labelColIdx))
 
     val labelsKeptSet = labelsKept.toSet
 
     val labelsDropped = labelCounts
-      .filter(r => !labelsKeptSet.contains(r.getDouble(0)))
+      .filter(r => !labelsKeptSet.contains(r.getDouble(labelColIdx)))
       .sort(col(countCol).desc, col(labelCol))
       .take(numDroppedToRecord)
-      .map(_.getDouble(0))
+      .map(_.getDouble(labelColIdx))
 
     val labelsDroppedTotal = numLabels - labelsKept.length
 
@@ -260,21 +261,13 @@ private[impl] trait DataCutterParams extends SplitterParams {
 
   private[op] def getLabelsDroppedTotal: Long = $(labelsDroppedTotal)
 
-  final val maxLabelsDroppedForDiagnostics = new IntParam(this, "maxLabelsDroppedForDiagnostics",
+  final val maxNamesForDroppedLabels = new IntParam(this, "maxNamesForDroppedLabels",
     "maximum number of dropped label categories to retain for logging",
     ParamValidators.inRange(lowerBound = 0, upperBound = 100, lowerInclusive = true, upperInclusive = true)
   )
-  setDefault(maxLabelsDroppedForDiagnostics, 10)
+  setDefault(maxNamesForDroppedLabels, 10)
 
-  private[op] def getNumDroppedLabelsForLogging: Int = $(maxLabelsDroppedForDiagnostics)
-
-  final val cacheValidatedDFForTesting = new BooleanParam(this, "cacheValidatedDFForTesting",
-    doc = "parameter to verify label trimming")
-  setDefault(cacheValidatedDFForTesting, false)
-
-  def setCacheValidatedDFForTesting(value: Boolean): this.type = {
-    set(cacheValidatedDFForTesting, value)
-  }
+  private[op] def getNumDroppedLabelsForLogging: Int = $(maxNamesForDroppedLabels)
 }
 
 /**

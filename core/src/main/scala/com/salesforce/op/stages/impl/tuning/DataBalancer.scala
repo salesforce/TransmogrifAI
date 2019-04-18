@@ -37,6 +37,8 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.slf4j.LoggerFactory
 
+import scala.util.Try
+
 case object DataBalancer {
 
   /**
@@ -178,19 +180,18 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     balanced.persist()
   }
 
-  private def splitNegativePositive(data: Dataset[Row]): Seq[DataFrame] = {
+  private def splitNegativePositive(data: DataFrame): Seq[DataFrame] = {
     val labelColOpt = if (isSet(labelColumnName)) {
-      Some(data($(labelColumnName)))
-    } else if (data.columns.length > 0) {
-      Some(data(data.columns(0)))
+      Option(data($(labelColumnName)))
     } else {
-      None
+      // empty dataframes in tests don't have schema
+      Try(data(data.columns(0))).toOption
     }
 
     Seq(0.0, 1.0).flatMap { labelVal =>
       labelColOpt
         .map(labelCol => data.filter(labelCol === labelVal))
-        .orElse(Some(data)) // empty data frame
+        .orElse(Option(data)) // empty data frame
     }
   }
 
