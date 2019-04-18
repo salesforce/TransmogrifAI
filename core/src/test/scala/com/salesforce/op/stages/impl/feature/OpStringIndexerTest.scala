@@ -68,7 +68,7 @@ class OpStringIndexerTest extends FlatSpec with TestSparkContext {
     indices shouldBe expected
   }
 
-  it should "correctly deinxed a numeric column" in {
+  it should "correctly deindex a numeric column" in {
     val indexedStage = new OpStringIndexer[Text]().setInput(txtF)
     val indexed = indexedStage.getOutput()
     val indices = indexedStage.fit(ds).transform(ds)

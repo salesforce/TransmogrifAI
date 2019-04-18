@@ -43,8 +43,8 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpStringIndexerNoFilterTest extends
-  OpEstimatorSpec[RealNN, UnaryModel[Text, RealNN], OpStringIndexerNoFilter[Text]] {
+class OpStringIndexerNoFilterTest
+  extends OpEstimatorSpec[RealNN, UnaryModel[Text, RealNN], OpStringIndexerNoFilter[Text]] {
 
   val txtData = Seq("a", "b", "c", "a", "a", "c").map(_.toText)
   val (inputData, txtF) = TestFeatureBuilder(txtData)
