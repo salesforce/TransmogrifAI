@@ -35,7 +35,6 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
-import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
@@ -72,8 +71,6 @@ case object DataBalancer {
  * @param uid
  */
 class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) with DataBalancerParams {
-
-  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Computes the upSample and downSample proportions.

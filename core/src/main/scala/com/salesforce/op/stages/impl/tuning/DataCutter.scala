@@ -37,7 +37,6 @@ import org.apache.spark.ml.param._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
@@ -75,8 +74,6 @@ case object DataCutter {
  * @param uid
  */
 class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
-
-  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Function to set parameters before passing into the validation step
