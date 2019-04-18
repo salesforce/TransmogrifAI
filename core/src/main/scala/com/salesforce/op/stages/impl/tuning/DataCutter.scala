@@ -261,7 +261,7 @@ private[impl] trait DataCutterParams extends SplitterParams {
 
   final val maxNamesForDroppedLabels = new IntParam(this, "maxNamesForDroppedLabels",
     "maximum number of dropped label categories to retain for logging",
-    ParamValidators.inRange(lowerBound = 0, upperBound = 100, lowerInclusive = true, upperInclusive = true)
+    ParamValidators.inRange(lowerBound = 0, upperBound = 1000, lowerInclusive = true, upperInclusive = true)
   )
   setDefault(maxNamesForDroppedLabels, 10)
 
