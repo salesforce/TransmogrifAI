@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
-import org.apache.spark.ml.attribute.NominalAttribute
+import org.apache.spark.ml.attribute.{MetadataHelper, NominalAttribute}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
@@ -86,8 +86,11 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: DataFrame): PrevalidationVal = {
-    val labelColName = if (isSet(labelColumnName)) getLabelColumnName else data.columns(0)
-    val labelColIdx = data.columns.indexOf(labelColName)
+    val labelColName = if (isSet(labelColumnName)) {
+      getLabelColumnName
+    } else {
+      data.columns(0)
+    }
 
     if (!isSet(labelsToKeep)) {
       val labelCounts = data.groupBy(labelColName).count().persist()
@@ -102,7 +105,6 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     log.info(s"Dropping rows with columns not in $labelSet")
 
     // Update metadata that spark.ml Classifier is using tp determine the number of classes
-    //
     val na = NominalAttribute.defaultAttr.withName(labelColName)
     val metadataNA = if (labelMetaArr.isEmpty) {
       log.info("setting num vals " + labelSet.max.toInt + 1)
@@ -119,10 +121,10 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     // filter low cardinality labels out of the dataframe to reduce the volume and  to keep
     // it in sync with the new metadata.
-    //
+    val labelColIdx = data.columns.indexOf(labelColName)
     val dataPrep = data
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
-      .withColumn(labelColName, data(labelColName).as("_", metadataNA.toMetadata))
+      .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
 
     summary = Option(DataCutterSummary(
       labelsKept = getLabelsToKeep,
@@ -140,19 +142,21 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
 
     Try {
       labelColMetadata
-        .getMetadata("ml_attr")
-        .getStringArray("vals")
+        .getMetadata(MetadataHelper.attributeKeys.ML_ATTR)
+        .getStringArray(MetadataHelper.attributeKeys.VALUES)
     }
     .recover { case nonFatal =>
-      log.warn("Recovering non-fatal exception using num_vals", nonFatal)
+      log.warn(s"Cannot retrieve categories from metadata using " +
+        s"${MetadataHelper.attributeKeys.ML_ATTR}.${MetadataHelper.attributeKeys.VALUES}, " +
+        s"retrieving number of categories using ${MetadataHelper.attributeKeys.NUM_VALUES}", nonFatal)
       val numVals = labelColMetadata
-        .getMetadata("ml_attr")
-        .getLong("num_vals")
+        .getMetadata(MetadataHelper.attributeKeys.ML_ATTR)
+        .getLong(MetadataHelper.attributeKeys.NUM_VALUES)
       (0 until numVals.toInt).map(_.toDouble.toString).toArray
     }
     .recover {
       case nonFatal =>
-        log.warn("Recovering non-fatal exception", nonFatal)
+        log.warn("Using an empty label array", nonFatal)
         Array.empty[String]
     }
     .getOrElse(Array.empty[String])

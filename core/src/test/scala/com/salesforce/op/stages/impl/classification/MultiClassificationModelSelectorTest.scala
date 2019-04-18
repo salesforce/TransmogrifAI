@@ -44,23 +44,24 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
-import org.apache.spark.ml.attribute.NominalAttribute
+import org.apache.spark.ml.attribute.{MetadataHelper, NominalAttribute}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
-import org.apache.spark.sql.{DataFrame, Encoders}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Encoders}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.PropertyChecks
 import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext
-  with CompareParamGrid with OpXGBoostQuietLogging {
+  with CompareParamGrid with OpXGBoostQuietLogging with PropertyChecks {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -334,7 +335,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "trim low-cardinality labels during cross validation" in {
-    import org.scalatest.prop.TableDrivenPropertyChecks._
 
     val labelColName = "label"
     val testTable = Table(
@@ -373,10 +373,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
         val countDistinct = bigData.select(labelColName).distinct().count()
         log.info(s"bigdata uniqs $countDistinct")
         val bigDataWithMeta = if (metaDataMode == "withNumVals") {
-          val na = NominalAttribute.defaultAttr
-            .withName(labelColName) // no vals, no num_vals
-          bigData.drop("_").withColumn(labelColName, col(labelColName).as("_",
-            na.toMetadata))
+          val na = NominalAttribute.defaultAttr.withName(labelColName) // no vals, no num_vals
+          bigData.withColumn(labelColName, col(labelColName).as(labelColName, na.toMetadata))
         } else {
           bigData
         }
@@ -407,20 +405,24 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         testEstimator.fit(bigDataWithMeta)
 
-        val numLabelsInCutter = {
+        val (numLabelsInCutter, numLabelsInCutterMetadata) = {
           import scala.language.reflectiveCalls
-          cutter.prevalidationValForTest
+          val df = cutter.prevalidationValForTest
             .flatMap(_.dataFrame)
-            .map(_.select(labelColName).distinct().count())
-            .getOrElse(Int.MaxValue.toLong)
-        }
+            .getOrElse(spark.emptyDataFrame)
 
-        bigData.unpersist()
-        bigNoneIndexedData.unpersist()
+          (df.select(labelColName).distinct().count(),
+            MetadataHelper.metadtaUtils.getNumClasses(df.schema.head).getOrElse(-1)))
+        }
 
         val maxUniqs = math.min(numLabels, topLabelsToPick)
         numLabelsInCutter <= maxUniqs shouldBe true
         numLabelsInCutter > 0 shouldBe true
+        numLabelsInCutterMetadata shouldBe numLabelsInCutter
+
+        bigData.unpersist()
+        bigNoneIndexedData.unpersist()
+
       }
     }
   }
