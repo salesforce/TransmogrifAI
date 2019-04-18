@@ -422,7 +422,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
         bigData.unpersist()
         bigNoneIndexedData.unpersist()
-
       }
     }
   }
