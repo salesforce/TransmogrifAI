@@ -72,10 +72,10 @@ TransformerType <: OpPipelineStage[O] with Transformer with Params with SparkWra
         }
     }
   }
-  it should "have inputs column names set" in {
+  it should "have input column names set" in {
     transformer.getInputColParamNames() should not be empty
   }
-  it should "have output column names set" in {
+  it should "have output column name set" in {
     transformer.getOutputColParamNames() should not be empty
   }
   it should "have inputs set on Spark stage" in {
