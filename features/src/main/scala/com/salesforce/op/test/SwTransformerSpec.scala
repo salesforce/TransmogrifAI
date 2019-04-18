@@ -49,8 +49,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
  * @tparam TransformerType      type of Spark transformer wrapper being tested,
  *                              e.g. [[SwUnaryTransformer]], [[SwBinaryTransformer]] etc.
  */
-abstract class SwTransformerSpec[
-O <: FeatureType,
+abstract class SwTransformerSpec[O <: FeatureType,
 SparkTransformerType <: Transformer with Params,
 TransformerType <: OpPipelineStage[O] with Transformer with Params with SparkWrapperParams[SparkTransformerType]]
 (
