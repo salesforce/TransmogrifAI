@@ -35,10 +35,11 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{Text, _}
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, PassengerSparkFixtureTest, TestFeatureBuilder}
-import com.salesforce.op.testkit.{RandomReal, RandomVector}
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.attribute.MetadataHelper
 import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -92,7 +93,9 @@ class VectorsCombinerTest
     val outputData = new OpWorkflow().setReader(dataReader)
       .setResultFeatures(vector, inputs1, inputs2, inputs3)
       .train().score()
-    outputData.schema(inputs1.name).metadata.wrapped.getAny("ml_attr").toString shouldBe "Some({\"num_attrs\":5})"
+    outputData.schema(inputs1.name).metadata.wrapped
+      .get[Metadata](MetadataHelper.attributeKeys.ML_ATTR)
+      .getLong(MetadataHelper.attributeKeys.NUM_ATTRIBUTES) shouldBe 5
 
     val inputMetadata = OpVectorMetadata.flatten(vector.name,
       Array(TransientFeature(inputs1).toVectorMetaData(5, Option(inputs1.name)),
