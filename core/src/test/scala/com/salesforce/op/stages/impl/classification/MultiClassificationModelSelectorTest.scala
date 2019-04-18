@@ -335,7 +335,6 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
   }
 
   it should "trim low-cardinality labels during cross validation" in {
-    import org.scalatest.prop.TableDrivenPropertyChecks._
 
     val labelColName = "label"
     val testTable = Table(
