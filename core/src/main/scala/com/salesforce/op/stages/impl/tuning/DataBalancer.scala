@@ -191,7 +191,7 @@ class DataBalancer(uid: String = UID[DataBalancer]) extends Splitter(uid = uid) 
     Seq(0.0, 1.0).flatMap { labelVal =>
       labelColOpt
         .map(labelCol => data.filter(labelCol === labelVal))
-        .orElse(Some(data)) // empty data frame
+        .orElse(Option(data)) // empty data frame
     }
   }
 

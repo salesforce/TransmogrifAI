@@ -174,25 +174,25 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val minLabelFract = getMinLabelFraction
     val maxLabels = getMaxLabelCategories
 
-    val labelCol = labelCounts.columns(0)
-    val countCol = labelCounts.columns(1)
+    val Seq(labelColIdx, countColIdx) = Seq(0, 1)
+    val Seq(labelCol, countCol) = Seq(labelColIdx, countColIdx).map(idx => labelCounts.columns(idx))
 
     val numLabels = labelCounts.count()
-    val totalValues = labelCounts.agg(sum(countCol)).first().getLong(0).toDouble
+    val totalValues = labelCounts.agg(sum(countCol)).first().getLong(labelColIdx).toDouble
 
     val labelsKept = labelCounts
-      .filter(r => r.getLong(1).toDouble / totalValues >= minLabelFract)
+      .filter(r => r.getLong(countColIdx).toDouble / totalValues >= minLabelFract)
       .sort(col(countCol).desc, col(labelCol))
       .take(maxLabels)
-      .map(_.getDouble(0))
+      .map(_.getDouble(labelColIdx))
 
     val labelsKeptSet = labelsKept.toSet
 
     val labelsDropped = labelCounts
-      .filter(r => !labelsKeptSet.contains(r.getDouble(0)))
+      .filter(r => !labelsKeptSet.contains(r.getDouble(labelColIdx)))
       .sort(col(countCol).desc, col(labelCol))
       .take(numDroppedToRecord)
-      .map(_.getDouble(0))
+      .map(_.getDouble(labelColIdx))
 
     val labelsDroppedTotal = numLabels - labelsKept.length
 
