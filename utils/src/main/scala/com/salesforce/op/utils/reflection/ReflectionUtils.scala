@@ -34,7 +34,6 @@ import scala.reflect._
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => runtimeUniverse}
 import scala.util.{Failure, Success}
-import scala.util.Try
 
 /**
  * Various Reflection helpers
