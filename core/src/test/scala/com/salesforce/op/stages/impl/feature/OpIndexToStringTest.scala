@@ -31,23 +31,24 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.feature.IndexToString
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+
 @RunWith(classOf[JUnitRunner])
-class OpIndexToStringTest extends FlatSpec with TestSparkContext {
+class OpIndexToStringTest extends SwTransformerSpec[Text, IndexToString, OpIndexToString] {
 
   val (inputData, indF) = TestFeatureBuilder(Seq(0.0, 2.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN))
   val labels = Array("a", "c", "b")
 
+  val transformer = new OpIndexToString().setInput(indF).setLabels(labels)
+
   val expectedResult: Seq[Text] = Array("a", "b", "c", "a", "a", "c").map(_.toText)
 
-  val transformer: OpIndexToString = new OpIndexToString().setInput(indF).setLabels(labels)
-
-  Spec[OpIndexToString] should "correctly deindex a numeric column" in {
+  it should "correctly deindex a numeric column" in {
     val strs = transformer.transform(inputData).collect(transformer.getOutput())
     strs shouldBe expectedResult
   }
@@ -58,7 +59,7 @@ class OpIndexToStringTest extends FlatSpec with TestSparkContext {
     strs shouldBe expectedResult
   }
 
-  it should "getLabels" in {
+  it should "get labels" in {
     transformer.getLabels shouldBe labels
   }
 }
