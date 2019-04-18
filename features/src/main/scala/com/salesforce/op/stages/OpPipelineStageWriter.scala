@@ -75,6 +75,7 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     // We produce stage metadata for all the Spark params
     val metadata = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
 
+
     // Write out the stage using the specified writer instance
     val writer = readerWriterFor[OpPipelineStageBase](stage.getClass.asInstanceOf[Class[OpPipelineStageBase]])
     val stageJson: JValue = writer.write(stage) match {

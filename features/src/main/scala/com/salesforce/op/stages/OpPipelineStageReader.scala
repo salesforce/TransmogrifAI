@@ -100,8 +100,8 @@ final class OpPipelineStageReader private
     val stageClass = ReflectionUtils.classForName(className).asInstanceOf[Class[OpPipelineStageBase]]
 
     val stageTry: Try[OpPipelineStageBase] = isModelOpt match {
-      // Legacy mode
       case Some(isModel) =>
+        // *** Legacy mode ***
         // In case we stumbled upon model we instantiate it using the class name + ctor args
         // otherwise we simply use the provided stage instance.
         if (isModel) new DefaultOpPipelineStageJsonReaderWriter[OpPipelineStageBase]().read(stageClass, ctorArgsJson)

@@ -37,6 +37,8 @@ import enumeratum._
 import org.json4s.ext.JodaTimeSerializers
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, FullTypeHints}
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -105,8 +107,6 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
 
 
 trait OpPipelineStageReadWriteFormats {
-
-  import OpPipelineStageReadWriteShared._
 
   val typeHints = FullTypeHints(List(
     classOf[EmptyScalerArgs], classOf[LinearScalerArgs]

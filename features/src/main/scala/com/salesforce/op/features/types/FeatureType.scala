@@ -330,7 +330,6 @@ object FeatureType {
     val typeTags = Seq(
       // Vector
       typeTag[Vector],
-      typeTag[Double],
       // Lists
       typeTag[Seq[Double]],
       typeTag[Seq[Long]],
