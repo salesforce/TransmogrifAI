@@ -36,10 +36,13 @@ import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerialize
 import enumeratum._
 import org.json4s.ext.JodaTimeSerializers
 import org.json4s.jackson.Serialization
-import org.json4s.{DefaultFormats, Formats, FullTypeHints}
+import org.json4s.{Formats, FullTypeHints}
+
+import scala.reflect.ClassTag
+import scala.util.Try
 
 
-object OpPipelineStageReadWriteShared {
+object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
 
   /**
    * Stage json field names
@@ -78,6 +81,32 @@ object OpPipelineStageReadWriteShared {
    * A container for Any Value
    */
   case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: Option[String])
+
+  /**
+   * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
+   * or the default one [[DefaultOpPipelineStageJsonReaderWriter]]
+   *
+   * @param stageClass stage class
+   * @tparam StageType stage type
+   * @return reader/writer implementation
+   */
+  private[stages] def readerWriterFor[StageType <: OpPipelineStageBase : ClassTag]
+  (
+    stageClass: Class[StageType]
+  ): OpPipelineStageJsonReaderWriter[StageType] = {
+    Try {
+      val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
+      val readerWriter = readerWriterClass.getConstructors.head.newInstance()
+      readerWriter.asInstanceOf[OpPipelineStageJsonReaderWriter[StageType]]
+    }.toOption.getOrElse(new DefaultOpPipelineStageJsonReaderWriter[StageType]())
+  }
+
+}
+
+
+trait OpPipelineStageReadWriteFormats {
+
+  import OpPipelineStageReadWriteShared._
 
   val typeHints = FullTypeHints(List(
     classOf[EmptyScalerArgs], classOf[LinearScalerArgs]
