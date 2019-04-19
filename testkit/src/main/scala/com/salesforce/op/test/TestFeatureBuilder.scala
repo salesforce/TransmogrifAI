@@ -420,58 +420,10 @@ case object TestFeatureBuilder {
         street = vals(50).asInstanceOf[Street]
       )
     }
-    val features = Array[Feature[_ <: FeatureType]](
-      feature[OPVector]("vector"),
-      feature[TextList]("textList"),
-      feature[DateList]("dateList"),
-      feature[DateList]("dateTimeList"),
-      feature[Geolocation]("geoLocation"),
-      feature[Base64Map]("base64Map"),
-      feature[BinaryMap]("binaryMap"),
-      feature[ComboBoxMap]("comboBoxMap"),
-      feature[CurrencyMap]("currencyMap"),
-      feature[DateMap]("dateMap"),
-      feature[DateTimeMap]("dateTimeMap"),
-      feature[EmailMap]("emailMap"),
-      feature[IDMap]("idMap"),
-      feature[IntegralMap]("integralMap"),
-      feature[MultiPickListMap]("multiPickListMap"),
-      feature[PercentMap]("percentMap"),
-      feature[PhoneMap]("phoneMap"),
-      feature[PickListMap]("pickListMap"),
-      feature[RealMap]("realMap"),
-      feature[TextAreaMap]("textAreaMap"),
-      feature[TextMap]("textMap"),
-      feature[URLMap]("urlMap"),
-      feature[CountryMap]("countryMap"),
-      feature[StateMap]("stateMap"),
-      feature[CityMap]("cityMap"),
-      feature[PostalCodeMap]("postalCodeMap"),
-      feature[StreetMap]("streetMap"),
-      feature[GeolocationMap]("geoLocationMap"),
-      feature[Binary]("binary"),
-      feature[Currency]("currency"),
-      feature[Date]("date"),
-      feature[DateTime]("dateTime"),
-      feature[Integral]("integral"),
-      feature[Percent]("percent"),
-      feature[Real]("real"),
-      feature[RealNN]("realNN"),
-      feature[MultiPickList]("multiPickList"),
-      feature[Base64]("base64"),
-      feature[ComboBox]("comboBox"),
-      feature[Email]("email"),
-      feature[ID]("id"),
-      feature[Phone]("phone"),
-      feature[PickList]("pickList"),
-      feature[Text]("text"),
-      feature[TextArea]("textArea"),
-      feature[URL]("url"),
-      feature[Country]("country"),
-      feature[State]("state"),
-      feature[City]("city"),
-      feature[PostalCode]("postalCode"),
-      feature[Street]("street"))
+    val features: Array[Feature[_ <: FeatureType]] = data.head.getClass.getDeclaredFields.map { f =>
+      val wtt = FeatureType.featureTypeTag(f.getType.getName).asInstanceOf[WeakTypeTag[FeatureType]]
+      feature[FeatureType](name = f.getName)(wtt)
+    }
 
     val schema = StructType(features.map(FeatureSparkTypes.toStructField(_)))
     dataframe(schema, data) -> features
