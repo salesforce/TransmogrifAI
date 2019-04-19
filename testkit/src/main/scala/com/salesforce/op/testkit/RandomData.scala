@@ -30,7 +30,7 @@
 
 package com.salesforce.op.testkit
 
-import com.salesforce.op.features.types.{FeatureType}
+import com.salesforce.op.features.types.FeatureType
 
 import scala.language.postfixOps
 import scala.util.Random
