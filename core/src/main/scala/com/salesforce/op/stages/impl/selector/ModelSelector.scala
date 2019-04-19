@@ -37,6 +37,7 @@ import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames.ModelType
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
@@ -44,14 +45,12 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.param._
-import org.apache.spark.ml.{Estimator, Model, PipelineStage, PredictionModel}
+import org.apache.spark.ml.{Estimator, Model, PredictionModel}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 
 /**
@@ -110,11 +109,10 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
    * @param spark               Spark Session
    * @return Updated Model Selector with best model along with best paramMap
    */
-  protected[op] def findBestEstimator(data: Dataset[_], dag: StagesDAG, persistEveryKStages: Int = 0)
+  protected[op] def findBestEstimator(data: DataFrame, dag: StagesDAG, persistEveryKStages: Int = 0)
     (implicit spark: SparkSession): Unit = {
-
-    splitter.foreach(_.preValidationPrepare(data.select(labelColName).toDF()))
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = data,
+    val PrevalidationVal(_, dataSetOpt) = prepareForValidation(data, in1.name)
+    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataSetOpt.getOrElse(data),
       label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
       stratifyCondition = validator.isClassification
     )
@@ -138,16 +136,17 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     implicit val spark = dataset.sparkSession
 
-    val datasetWithID =
+    val datasetWithIDPre =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
       } else {
         dataset.select(in1.name, in2.name)
           .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
       }
-    require(!datasetWithID.isEmpty, "Dataset cannot be empty")
+    require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
-    val splitterSummary = splitter.flatMap(_.preValidationPrepare(datasetWithID))
+    val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
+    val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
       val best = validator
@@ -196,6 +195,11 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setEvaluators(evaluators)
   }
 
+  private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
+    splitter
+      .map(_.withLabelColumnName(labelColName).preValidationPrepare(data))
+      .getOrElse(PrevalidationVal(None, Option(data)))
+  }
 }
 
 /**

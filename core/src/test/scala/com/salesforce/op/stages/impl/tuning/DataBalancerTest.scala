@@ -113,7 +113,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     balancer.getUpSampleFraction shouldBe upSample
     balancer.getDownSampleFraction shouldBe downSample
     balancer.getIsPositiveSmall shouldBe false
-    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.4, 2.0, 0.75))
+    checkRecurringPrepare(balancer, res1, s1.summaryOpt, DataBalancerSummary(800, 200, 0.4, 2.0, 0.75))
   }
 
   it should "throw an error if you try to prepare before examining" in {
@@ -130,7 +130,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val res1 = balancer.validationPrepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe 1.0
-    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
+    checkRecurringPrepare(balancer, res1, s1.summaryOpt, DataBalancerSummary(800, 200, 0.01, 0.0, 1.0))
   }
 
   it should "remember that data is already balanced, but needs to be sample because too big" in {
@@ -141,7 +141,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val res1 = balancer.validationPrepare(data)
 
     balancer.getAlreadyBalancedFraction shouldBe maxSize.toDouble / (smallCount + bigCount)
-    checkRecurringPrepare(balancer, res1, s1, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
+    checkRecurringPrepare(balancer, res1, s1.summaryOpt, DataBalancerSummary(800, 200, 0.01, 0.0, 0.1))
   }
 
   private def checkRecurringPrepare(
@@ -166,7 +166,7 @@ class DataBalancerTest extends FlatSpec with TestSparkContext with SplitterSumma
     val s2 = balancer.preValidationPrepare(data)
     val res2 = balancer.validationPrepare(data)
     res2.collect() shouldBe previousResult.collect()
-    s2 shouldBe summary
+    s2.summaryOpt shouldBe summary
     balancer.summary shouldBe Some(expectedSummary)
   }
 
