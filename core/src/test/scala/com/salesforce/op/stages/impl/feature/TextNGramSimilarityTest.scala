@@ -39,7 +39,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TextNGramSimilarityTest extends OpTransformerSpec[RealNN, NGramSimilarity[Text]]{
+class TextNGramSimilarityTest extends OpTransformerSpec[RealNN, TextNGramSimilarity[Text]]{
   val(inputData, f1, f2) = TestFeatureBuilder(
     Seq[(Text, Text)](
       (Text("Hamlet: To be or not to be - that is the question."), Text("I like like Hamlet")),
@@ -58,7 +58,7 @@ class TextNGramSimilarityTest extends OpTransformerSpec[RealNN, NGramSimilarity[
   val expectedResult = Seq(0.12666672468185425, 0.6083333492279053, 0.15873020887374878,
     0.9629629850387573, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
   val nGramSimilarity = f1.toNGramSimilarity(f2, toLowerCase = false)
-  val transformer = nGramSimilarity.originStage.asInstanceOf[NGramSimilarity[Text]]
+  val transformer = nGramSimilarity.originStage.asInstanceOf[TextNGramSimilarity[Text]]
 
   it should "correctly compute char-n-gram similarity with nondefault ngram param" in {
     val nGramSimilarity = f1.toNGramSimilarity(f2, nGramSize = 4, toLowerCase = false)

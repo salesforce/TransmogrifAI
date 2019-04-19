@@ -39,7 +39,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class SetNGramSimilarityTest extends OpTransformerSpec[RealNN, NGramSimilarity[MultiPickList]] {
+class SetNGramSimilarityTest extends OpTransformerSpec[RealNN, SetNGramSimilarity] {
 
   val (inputData, f1, f2) = TestFeatureBuilder(
     Seq(
@@ -56,7 +56,7 @@ class SetNGramSimilarityTest extends OpTransformerSpec[RealNN, NGramSimilarity[M
 
   val expectedResult = Seq(0.3333333134651184, 0.09722214937210083, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
   val catNGramSimilarity = f1.toNGramSimilarity(f2)
-  val transformer = catNGramSimilarity.originStage.asInstanceOf[NGramSimilarity[MultiPickList]]
+  val transformer = catNGramSimilarity.originStage.asInstanceOf[SetNGramSimilarity]
 
   it should "correctly compute char-n-gram similarity with nondefault ngram param" in {
     val cat5GramSimilarity = f1.toNGramSimilarity(f2, 5)
