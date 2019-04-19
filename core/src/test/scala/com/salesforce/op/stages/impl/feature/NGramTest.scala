@@ -32,49 +32,44 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
 import org.apache.spark.ml.feature.NGram
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class NGramTest extends FlatSpec with TestSparkContext {
-
+class NGramTest extends SwTransformerSpec[TextList, NGram, OpTransformerWrapper[TextList, TextList, NGram]] {
   val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
-  lazy val (ds, f1) = TestFeatureBuilder(data)
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
 
-  Spec[NGram] should "generate bigrams by default" in {
-    val bigrams = f1.ngram()
-    val transformedData = bigrams.originStage.asInstanceOf[Transformer].transform(ds)
-    val results = transformedData.collect(bigrams)
+  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
 
-    bigrams.name shouldBe bigrams.originStage.getOutputFeatureName
-    results(0) shouldBe Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList
-  }
+  val bigrams = textListFeature.ngram()
+  val transformer = bigrams.originStage.asInstanceOf[OpTransformerWrapper[TextList, TextList, NGram]]
 
   it should "generate unigrams" in {
-    val bigrams = f1.ngram(n = 1)
-    val transformedData = bigrams.originStage.asInstanceOf[Transformer].transform(ds)
-    val results = transformedData.collect(bigrams)
+    val unigrams = textListFeature.ngram(n = 1)
+    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(unigrams)
 
     results(0) shouldBe data.head
   }
 
   it should "generate trigrams" in {
-    val trigrams = f1.ngram(n = 3)
-    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(ds)
+    val trigrams = textListFeature.ngram(n = 3)
+    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
     val results = transformedData.collect(trigrams)
 
     results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
   }
 
   it should "not allow n < 1" in {
-    the[IllegalArgumentException] thrownBy f1.ngram(n = 0)
-    the[IllegalArgumentException] thrownBy f1.ngram(n = -1)
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
   }
 
 }
