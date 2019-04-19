@@ -74,7 +74,7 @@ case object DataCutter {
  * @param uid
  */
 class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
-  
+
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
