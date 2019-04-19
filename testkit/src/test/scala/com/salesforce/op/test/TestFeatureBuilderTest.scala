@@ -122,6 +122,26 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext with Feature
     assertResults(ds, res, expected = Seq(("one", 1, 1.0, -1, List("1", "2")), ("two", 2, 2.3, 1, List("3", "4"))))
   }
 
+  it should "create a dataset with arbitrary amount of features" in {
+    val (ds, features) = TestFeatureBuilder(
+      Seq(Real(0.0)), Seq(Text("a")), Seq(Integral(5L)), Seq(Real(1.0)), Seq(Text("b")),
+      Seq(MultiPickList(Set("3", "4"))), Seq(Real(-3.0))
+    )
+    features.length shouldBe 7
+    ds.count() shouldBe 1
+    ds.schema.fields.map(f => f.name -> f.dataType) should contain theSameElementsInOrderAs
+      features.map(f => f.name -> FeatureSparkTypes.sparkTypeOf(f.wtt))
+
+    assertFeature(features(0).asInstanceOf[FeatureLike[Real]])(name = "f1", in = ds.head(), out = Real(0.0))
+    assertFeature(features(1).asInstanceOf[FeatureLike[Text]])(name = "f2", in = ds.head(), out = Text("a"))
+    assertFeature(features(2).asInstanceOf[FeatureLike[Integral]])(name = "f3", in = ds.head(), out = Integral(5L))
+    assertFeature(features(3).asInstanceOf[FeatureLike[Real]])(name = "f4", in = ds.head(), out = Real(1.0))
+    assertFeature(features(4).asInstanceOf[FeatureLike[Text]])(name = "f5", in = ds.head(), out = Text("b"))
+    assertFeature(features(5).asInstanceOf[FeatureLike[MultiPickList]])(
+      name = "f6", in = ds.head(), out = MultiPickList(Set("3", "4")))
+    assertFeature(features(6).asInstanceOf[FeatureLike[Real]])(name = "f7", in = ds.head(), out = Real(-3.0))
+  }
+
   it should "create a dataset with all random features" in {
     val numOfRows = 15
     val (ds, features) = TestFeatureBuilder.random(numOfRows = numOfRows)()

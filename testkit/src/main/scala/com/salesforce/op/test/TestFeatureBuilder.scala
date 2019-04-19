@@ -350,151 +350,65 @@ case object TestFeatureBuilder {
 
     require(numOfRows > 0, "Number of rows must be positive")
 
-    val iterators = Array(
-      vectors.iterator, textLists.iterator, dateLists.iterator, dateTimeLists.iterator, geoLocations.iterator,
-      base64Maps.iterator, binaryMaps.iterator, comboBoxMaps.iterator, currencyMaps.iterator, dateMaps.iterator,
-      dateTimeMaps.iterator, emailMaps.iterator, idMaps.iterator, integralMaps.iterator, multiPickListMaps.iterator,
-      percentMaps.iterator, phoneMaps.iterator, pickListMaps.iterator, realMaps.iterator, textAreaMaps.iterator,
-      textMaps.iterator, urlMaps.iterator, countryMaps.iterator, stateMaps.iterator, cityMaps.iterator,
-      postalCodeMaps.iterator, streetMaps.iterator, geoLocationMaps.iterator, binaries.iterator, currencies.iterator,
-      dates.iterator, dateTimes.iterator, integrals.iterator, percents.iterator, reals.iterator, realNNs.iterator,
-      multiPickLists.iterator, base64s.iterator, comboBoxes.iterator, emails.iterator, ids.iterator, phones.iterator,
-      pickLists.iterator, texts.iterator, textAreas.iterator, urls.iterator, countries.iterator, states.iterator,
-      cities.iterator, postalCodes.iterator, streets.iterator)
+    val data: Array[Seq[FeatureType]] = Array(
+      vectors, textLists, dateLists, dateTimeLists, geoLocations,
+      base64Maps, binaryMaps, comboBoxMaps, currencyMaps, dateMaps,
+      dateTimeMaps, emailMaps, idMaps, integralMaps, multiPickListMaps,
+      percentMaps, phoneMaps, pickListMaps, realMaps, textAreaMaps,
+      textMaps, urlMaps, countryMaps, stateMaps, cityMaps,
+      postalCodeMaps, streetMaps, geoLocationMaps, binaries, currencies,
+      dates, dateTimes, integrals, percents, reals, realNNs,
+      multiPickLists, base64s, comboBoxes, emails, ids, phones,
+      pickLists, texts, textAreas, urls, countries, states,
+      cities, postalCodes, streets)
 
-    val data = ArrayBuffer.empty[AllFeatureTypesRow]
+    this.apply(data: _*)(spark)
+  }
+
+  // scalastyle:on
+
+  /**
+   * Build a dataset with arbitrary amount features of specified types
+   *
+   * @param data  data
+   * @param spark spark session
+   * @return dataset with arbitrary amount  features of specified types
+   */
+  def apply(data: Seq[FeatureType]*)(implicit spark: SparkSession): (DataFrame, Array[Feature[_ <: FeatureType]]) = {
+    val iterators = data.map(_.iterator).toArray
+    val rows = ArrayBuffer.empty[Row]
+    val featureValues = ArrayBuffer.empty[Array[FeatureType]]
 
     while (iterators.forall(_.hasNext)) {
       val vals: Array[FeatureType] = iterators.map(_.next())
-      data += AllFeatureTypesRow(
-        vector = vals(0).asInstanceOf[OPVector],
-        textList = vals(1).asInstanceOf[TextList],
-        dateList = vals(2).asInstanceOf[DateList],
-        dateTimeList = vals(3).asInstanceOf[DateTimeList],
-        geoLocation = vals(4).asInstanceOf[Geolocation],
-        base64Map = vals(5).asInstanceOf[Base64Map],
-        binaryMap = vals(6).asInstanceOf[BinaryMap],
-        comboBoxMap = vals(7).asInstanceOf[ComboBoxMap],
-        currencyMap = vals(8).asInstanceOf[CurrencyMap],
-        dateMap = vals(9).asInstanceOf[DateMap],
-        dateTimeMap = vals(10).asInstanceOf[DateTimeMap],
-        emailMap = vals(11).asInstanceOf[EmailMap],
-        idMap = vals(12).asInstanceOf[IDMap],
-        integralMap = vals(13).asInstanceOf[IntegralMap],
-        multiPickListMap = vals(14).asInstanceOf[MultiPickListMap],
-        percentMap = vals(15).asInstanceOf[PercentMap],
-        phoneMap = vals(16).asInstanceOf[PhoneMap],
-        pickListMap = vals(17).asInstanceOf[PickListMap],
-        realMap = vals(18).asInstanceOf[RealMap],
-        textAreaMap = vals(19).asInstanceOf[TextAreaMap],
-        textMap = vals(20).asInstanceOf[TextMap],
-        urlMap = vals(21).asInstanceOf[URLMap],
-        countryMap = vals(22).asInstanceOf[CountryMap],
-        stateMap = vals(23).asInstanceOf[StateMap],
-        cityMap = vals(24).asInstanceOf[CityMap],
-        postalCodeMap = vals(25).asInstanceOf[PostalCodeMap],
-        streetMap = vals(26).asInstanceOf[StreetMap],
-        geoLocationMap = vals(27).asInstanceOf[GeolocationMap],
-        binary = vals(28).asInstanceOf[Binary],
-        currency = vals(29).asInstanceOf[Currency],
-        date = vals(30).asInstanceOf[Date],
-        dateTime = vals(31).asInstanceOf[DateTime],
-        integral = vals(32).asInstanceOf[Integral],
-        percent = vals(33).asInstanceOf[Percent],
-        real = vals(34).asInstanceOf[Real],
-        realNN = vals(35).asInstanceOf[RealNN],
-        multiPickList = vals(36).asInstanceOf[MultiPickList],
-        base64 = vals(37).asInstanceOf[Base64],
-        comboBox = vals(38).asInstanceOf[ComboBox],
-        email = vals(39).asInstanceOf[Email],
-        id = vals(40).asInstanceOf[ID],
-        phone = vals(41).asInstanceOf[Phone],
-        pickList = vals(42).asInstanceOf[PickList],
-        text = vals(43).asInstanceOf[Text],
-        textArea = vals(44).asInstanceOf[TextArea],
-        url = vals(45).asInstanceOf[URL],
-        country = vals(46).asInstanceOf[Country],
-        state = vals(47).asInstanceOf[State],
-        city = vals(48).asInstanceOf[City],
-        postalCode = vals(49).asInstanceOf[PostalCode],
-        street = vals(50).asInstanceOf[Street]
-      )
+      val sparkVals = vals.map(FeatureTypeSparkConverter.toSpark)
+      rows += Row.fromSeq(sparkVals)
+      featureValues += vals
     }
-    val features: Array[Feature[_ <: FeatureType]] = data.head.getClass.getDeclaredFields.map { f =>
-      val wtt = FeatureType.featureTypeTag(f.getType.getName).asInstanceOf[WeakTypeTag[FeatureType]]
-      feature[FeatureType](name = f.getName)(wtt)
-    }
+
+    val features: Array[Feature[_ <: FeatureType]] = featureValues.head.zipWithIndex.map { case (f, i) =>
+      val wtt = FeatureType.featureTypeTag(f.getClass.getName).asInstanceOf[WeakTypeTag[FeatureType]]
+      feature[FeatureType](name = s"f${i + 1}")(wtt)
+    }.toArray
 
     val schema = StructType(features.map(FeatureSparkTypes.toStructField(_)))
-    dataframe(schema, data) -> features
+    dataframeOfRows(schema, rows) -> features
   }
-  // scalastyle:on
-
 
   private def dataframe[T <: Product](schema: StructType, data: Seq[T])(implicit spark: SparkSession): DataFrame = {
+    val rows = data.map(p => Row.fromSeq(
+      p.productIterator.toSeq.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
+    ))
+    dataframeOfRows(schema, rows)
+  }
+
+  private def dataframeOfRows(schema: StructType, data: Seq[Row])(implicit spark: SparkSession): DataFrame = {
     import spark.implicits._
     implicit val rowEncoder = RowEncoder(schema)
-
-    data.map(p => Row.fromSeq(
-      p.productIterator.toSeq.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
-    )).toDF()
+    data.toDF()
   }
 
   private def feature[T <: FeatureType](name: String)(implicit tt: WeakTypeTag[T]) =
     FeatureBuilder.fromRow[T](name)(tt).asPredictor
 
-  private case class AllFeatureTypesRow
-  (
-    vector: OPVector,
-    textList: TextList,
-    dateList: DateList,
-    dateTimeList: DateList,
-    geoLocation: Geolocation,
-    base64Map: Base64Map,
-    binaryMap: BinaryMap,
-    comboBoxMap: ComboBoxMap,
-    currencyMap: CurrencyMap,
-    dateMap: DateMap,
-    dateTimeMap: DateTimeMap,
-    emailMap: EmailMap,
-    idMap: IDMap,
-    integralMap: IntegralMap,
-    multiPickListMap: MultiPickListMap,
-    percentMap: PercentMap,
-    phoneMap: PhoneMap,
-    pickListMap: PickListMap,
-    realMap: RealMap,
-    textAreaMap: TextAreaMap,
-    textMap: TextMap,
-    urlMap: URLMap,
-    countryMap: CountryMap,
-    stateMap: StateMap,
-    cityMap: CityMap,
-    postalCodeMap: PostalCodeMap,
-    streetMap: StreetMap,
-    geoLocationMap: GeolocationMap,
-    binary: Binary,
-    currency: Currency,
-    date: Date,
-    dateTime: DateTime,
-    integral: Integral,
-    percent: Percent,
-    real: Real,
-    realNN: RealNN,
-    multiPickList: MultiPickList,
-    base64: Base64,
-    comboBox: ComboBox,
-    email: Email,
-    id: ID,
-    phone: Phone,
-    pickList: PickList,
-    text: Text,
-    textArea: TextArea,
-    url: URL,
-    country: Country,
-    state: State,
-    city: City,
-    postalCode: PostalCode,
-    street: Street
-  )
 }
