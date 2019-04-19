@@ -72,7 +72,7 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
     val summary = dataSplitter.preValidationPrepare(data)
     val train = dataSplitter.validationPrepare(data)
     train.collect().zip(data.collect()).foreach { case (a, b) => a shouldBe b }
-    assertDataSplitterSummary(summary) { s => s shouldBe DataSplitterSummary() }
+    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary() }
   }
 
 }
