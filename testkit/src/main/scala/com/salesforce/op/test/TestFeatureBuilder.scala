@@ -386,6 +386,8 @@ case object TestFeatureBuilder {
       featureValues += vals
     }
 
+    require(rows.nonEmpty && featureValues.nonEmpty, "Number of rows must be positive")
+
     val features: Array[Feature[_ <: FeatureType]] = featureValues.head.zipWithIndex.map { case (f, i) =>
       val wtt = FeatureType.featureTypeTag(f.getClass.getName).asInstanceOf[WeakTypeTag[FeatureType]]
       feature[FeatureType](name = s"f${i + 1}")(wtt)

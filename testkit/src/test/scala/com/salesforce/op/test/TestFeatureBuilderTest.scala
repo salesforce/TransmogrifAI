@@ -156,6 +156,8 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext with Feature
   it should "error creating a dataset with invalid number of rows" in {
     the[IllegalArgumentException] thrownBy TestFeatureBuilder.random(numOfRows = 0)()
     the[IllegalArgumentException] thrownBy TestFeatureBuilder.random(numOfRows = -1)()
+    the[IllegalArgumentException] thrownBy TestFeatureBuilder(Seq.empty[Real],
+      Seq.empty[Real], Seq.empty[Real], Seq.empty[Real], Seq.empty[Real], Seq.empty[Real])
   }
 
   private def assertResults(ds: DataFrame, res: Product, expected: Traversable[Any]): Unit = {
