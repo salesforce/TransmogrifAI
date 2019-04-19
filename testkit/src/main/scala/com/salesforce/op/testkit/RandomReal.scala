@@ -133,7 +133,6 @@ object RandomReal {
   ): RandomReal[DataType] =
     RandomReal[DataType](new GammaGenerator(shape, scale))
 
-
   /**
    * Generator of real-number feature types with log-normal distribution
    *
@@ -155,8 +154,10 @@ object RandomReal {
    * @tparam DataType the type of data
    * @return a generator of reals
    */
-  def weibull[DataType <: Real : WeakTypeTag](alpha: Double = 1.0, beta: Double = 5.0):
-  RandomReal[DataType] = RandomReal[DataType](new WeibullGenerator(alpha, beta))
+  def weibull[DataType <: Real : WeakTypeTag](
+    alpha: Double = 1.0, beta: Double = 5.0
+  ): RandomReal[DataType] =
+    RandomReal[DataType](new WeibullGenerator(alpha, beta))
 
   class UniformDistribution(min: Double, max: Double) extends RandomDataGenerator[Double] {
     private val source = new UniformGenerator
