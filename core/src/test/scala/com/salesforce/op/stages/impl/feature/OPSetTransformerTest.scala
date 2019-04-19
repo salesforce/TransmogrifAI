@@ -39,7 +39,8 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, OPSetTransformer[Text, Text, MultiPickList, MultiPickList]] {
+class OPSetTransformerTest
+  extends OpTransformerSpec[MultiPickList, OPSetTransformer[Text, Text, MultiPickList, MultiPickList]] {
 
   lazy val (inputData, top) = TestFeatureBuilder("name", Seq(
     Set("A", "B").toMultiPickList
