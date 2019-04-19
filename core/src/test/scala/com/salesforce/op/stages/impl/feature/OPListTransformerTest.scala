@@ -65,13 +65,9 @@ class LowerCaseTransformer extends UnaryTransformer[Text, Text](
 class LowerCaseListTransformer
 (
   uid: String = UID[LowerCaseListTransformer],
-  operationName: String = "lowerCaseListWrap"
+  operationName: String = "lowerCaseList"
 ) extends OPListTransformer[Text, Text, TextList, TextList](
   uid = uid,
   operationName = operationName,
   transformer = new LowerCaseTransformer
 )
-
-
-
-
