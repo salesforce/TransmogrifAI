@@ -33,18 +33,15 @@ package com.salesforce.op.test
 import java.text.SimpleDateFormat
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureSparkTypes, OPFeature}
+import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureSparkTypes}
 import com.salesforce.op.testkit.RandomList.UniformGeolocation
-import com.salesforce.op.testkit.{RandomBinary, RandomIntegral, RandomList, RandomMap, RandomMultiPickList, RandomReal, RandomStream, RandomText, RandomVector}
+import com.salesforce.op.testkit._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.StructType
 
-import scala.reflect.runtime.universe._
-import shapeless._
-import shapeless.syntax.sized._
-
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.runtime.universe._
 
 
 /**
