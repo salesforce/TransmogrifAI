@@ -255,6 +255,36 @@ case object TestFeatureBuilder {
       f5name = DefaultFeatureNames.f5, data)
   }
 
+  /**
+   * Build a dataset with arbitrary amount of features of specified types
+   *
+   * @param data  data
+   * @param spark spark session
+   * @return dataset with arbitrary amount of features of specified types
+   */
+  def apply(data: Seq[FeatureType]*)(implicit spark: SparkSession): (DataFrame, Array[Feature[_ <: FeatureType]]) = {
+    val iterators = data.map(_.iterator).toArray
+    val rows = ArrayBuffer.empty[Row]
+    val featureValues = ArrayBuffer.empty[Array[FeatureType]]
+
+    while (iterators.forall(_.hasNext)) {
+      val vals: Array[FeatureType] = iterators.map(_.next())
+      val sparkVals = vals.map(FeatureTypeSparkConverter.toSpark)
+      rows += Row.fromSeq(sparkVals)
+      featureValues += vals
+    }
+
+    require(rows.nonEmpty && featureValues.nonEmpty, "Number of rows must be positive")
+
+    val features: Array[Feature[_ <: FeatureType]] = featureValues.head.zipWithIndex.map { case (f, i) =>
+      val wtt = FeatureType.featureTypeTag(f.getClass.getName).asInstanceOf[WeakTypeTag[FeatureType]]
+      feature[FeatureType](name = s"f${i + 1}")(wtt)
+    }.toArray
+
+    val schema = StructType(features.map(FeatureSparkTypes.toStructField(_)))
+    dataframeOfRows(schema, rows) -> features
+  }
+
   private val InitDate = new SimpleDateFormat("dd/MM/yy").parse("18/04/19")
 
   /**
@@ -364,38 +394,7 @@ case object TestFeatureBuilder {
 
     this.apply(data: _*)(spark)
   }
-
   // scalastyle:on
-
-  /**
-   * Build a dataset with arbitrary amount features of specified types
-   *
-   * @param data  data
-   * @param spark spark session
-   * @return dataset with arbitrary amount  features of specified types
-   */
-  def apply(data: Seq[FeatureType]*)(implicit spark: SparkSession): (DataFrame, Array[Feature[_ <: FeatureType]]) = {
-    val iterators = data.map(_.iterator).toArray
-    val rows = ArrayBuffer.empty[Row]
-    val featureValues = ArrayBuffer.empty[Array[FeatureType]]
-
-    while (iterators.forall(_.hasNext)) {
-      val vals: Array[FeatureType] = iterators.map(_.next())
-      val sparkVals = vals.map(FeatureTypeSparkConverter.toSpark)
-      rows += Row.fromSeq(sparkVals)
-      featureValues += vals
-    }
-
-    require(rows.nonEmpty && featureValues.nonEmpty, "Number of rows must be positive")
-
-    val features: Array[Feature[_ <: FeatureType]] = featureValues.head.zipWithIndex.map { case (f, i) =>
-      val wtt = FeatureType.featureTypeTag(f.getClass.getName).asInstanceOf[WeakTypeTag[FeatureType]]
-      feature[FeatureType](name = s"f${i + 1}")(wtt)
-    }.toArray
-
-    val schema = StructType(features.map(FeatureSparkTypes.toStructField(_)))
-    dataframeOfRows(schema, rows) -> features
-  }
 
   private def dataframe[T <: Product](schema: StructType, data: Seq[T])(implicit spark: SparkSession): DataFrame = {
     val rows = data.map(p => Row.fromSeq(
