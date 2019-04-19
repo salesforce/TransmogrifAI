@@ -35,6 +35,7 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
@@ -44,6 +45,7 @@ case class PrevalidationVal(summaryOpt: Option[SplitterSummary], dataFrame: Opti
  * Abstract class that will carry on the creation of training set + test set
  */
 abstract class Splitter(val uid: String) extends SplitterParams {
+  @transient private[tuning] lazy val log = LoggerFactory.getLogger(this.getClass)
 
   @transient private[op] var summary: Option[SplitterSummary] = None
 
@@ -93,6 +95,7 @@ abstract class Splitter(val uid: String) extends SplitterParams {
     if (!isSet(labelColumnName)) {
       set(labelColumnName, label)
     } else {
+      log.warn(s"$labelColumnName on an existing Splitter instance can be set only once")
       this
     }
   }

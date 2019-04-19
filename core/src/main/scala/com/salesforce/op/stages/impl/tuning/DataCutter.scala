@@ -37,7 +37,6 @@ import org.apache.spark.ml.param._
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
@@ -75,11 +74,6 @@ case object DataCutter {
  * @param uid
  */
 class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with DataCutterParams {
-
-  @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
-
-  var cachedDataFrameForTesting: Option[DataFrame] = None
-
   /**
    * Function to set parameters before passing into the validation step
    * eg - do data balancing or dropping based on the labels
@@ -263,7 +257,7 @@ private[impl] trait DataCutterParams extends SplitterParams {
 
   final val maxNamesForDroppedLabels = new IntParam(this, "maxNamesForDroppedLabels",
     "maximum number of dropped label categories to retain for logging",
-    ParamValidators.inRange(lowerBound = 0, upperBound = 100, lowerInclusive = true, upperInclusive = true)
+    ParamValidators.inRange(lowerBound = 0, upperBound = 1000, lowerInclusive = true, upperInclusive = true)
   )
   setDefault(maxNamesForDroppedLabels, 10)
 
