@@ -55,6 +55,7 @@ case object ModelSelectorNames {
   val idColName = "rowId"
   val LabelsKept = "labelsKept"
   val LabelsDropped = "labelsDropped"
+  val LabelsDroppedTotal = "labelsDroppedTotal"
 
   type ModelType = Model[_ <: Model[_]] with OpTransformer2[RealNN, OPVector, Prediction]
   type EstimatorType = Estimator[_ <: Model[_]] with OpPipelineStage2[RealNN, OPVector, Prediction]
