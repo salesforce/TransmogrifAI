@@ -133,7 +133,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   private def loadStages(workflow: OpWorkflow, json: JValue, path: String): Seq[OPStage] = {
     val stagesJs = (json \ Stages.entryName).extract[JArray].arr
     val recoveredStages = stagesJs.flatMap { j =>
-      val stageUidOpt = (j \ Uid.entryName).extractOpt[String]
+      val stageUidOpt = (j \ Uid.entryName).extractOpt[String].filterNot(_.startsWith("FeatureGeneratorStage_"))
       stageUidOpt.map { stageUid =>
         val originalStage = workflow.stages.find(_.uid == stageUid)
         originalStage match {

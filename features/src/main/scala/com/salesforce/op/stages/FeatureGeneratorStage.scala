@@ -63,7 +63,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   val extractFn: I => O,
   val extractSource: String,
   val aggregator: MonoidAggregator[Event[O], _, O],
-  outputName: String,
+  val outputName: String,
   override val outputIsResponse: Boolean,
   val aggregateWindow: Option[Duration] = None,
   val uid: String = UID[FeatureGeneratorStage[I, O]]

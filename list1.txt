@@ -1,0 +1,285 @@
+Found matches for pattern 'Transformer' in [Classes]
+Unclassified usage
+com.salesforce.transmogrifai.core.main
+com.salesforce.op.stages.impl.feature
+AliasTransformer.scala
+class AliasTransformer[I <: FeatureType](val name: String, uid: String = UID[AliasTransformer[_]])
+DateToUnitCircleTransformer.scala
+class DateToUnitCircleTransformer[T <: Date]
+DescalerTransformer.scala
+final class DescalerTransformer[I1 <: Real, I2 <: Real, O <: Real]
+DropIndicesByTransformer.scala
+class DropIndicesByTransformer
+MathTransformers.scala
+class AddTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
+class ScalarAddTransformer[I <: OPNumeric[_], N]
+class SubtractTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
+class ScalarSubtractTransformer[I <: OPNumeric[_], N]
+class MultiplyTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
+class ScalarMultiplyTransformer[I <: OPNumeric[_], N]
+class DivideTransformer[I1 <: OPNumeric[_], I2 <: OPNumeric[_]]
+class ScalarDivideTransformer[I <: OPNumeric[_], N]
+class AbsoluteValueTransformer[I <: OPNumeric[_]]
+class CeilTransformer[I <: OPNumeric[_]]
+class FloorTransformer[I <: OPNumeric[_]]
+class RoundTransformer[I <: OPNumeric[_]]
+class ExpTransformer[I <: OPNumeric[_]]
+class SqrtTransformer[I <: OPNumeric[_]]
+class LogTransformer[I <: OPNumeric[_]]
+class PowerTransformer[I <: OPNumeric[_]]
+class RoundDigitsTransformer[I <: OPNumeric[_]]
+OPCollectionTransformer.scala
+sealed abstract class OPCollectionTransformer[I <: FeatureType, O <: FeatureType,
+private[op] class OPMapTransformer[I <: FeatureType, O <: FeatureType, IMap <: OPMap[_], OMap <: OPMap[_]]
+private[op] class OPSetTransformer[I <: FeatureType, O <: FeatureType, ISet <: OPSet[_], OSet <: OPSet[_]]
+private[op] class OPListTransformer[I <: FeatureType, O <: FeatureType, IList <: OPList[_], OList <: OPList[_]]
+ScalerTransformer.scala
+final class ScalerTransformer[I <: Real, O <: Real]
+SubstringTransformer.scala
+class SubstringTransformer[I1 <: Text, I2 <: Text]
+TextLenTransformer.scala
+class TextLenTransformer[T <: TextList](uid: String = UID[TextLenTransformer[_]])
+TextListNullTransformer.scala
+class TextListNullTransformer[T <: TextList]
+ToOccurTransformer.scala
+object ToOccurTransformer {
+class ToOccurTransformer[I <: FeatureType]
+ValidEmailTransformer.scala
+class ValidEmailTransformer(uid: String = UID[ValidEmailTransformer]) extends
+com.salesforce.op.stages.sparkwrappers.generic
+SwBinaryTransformer.scala
+private[stages] trait SwTransformer2[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType,
+class SwBinaryTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType, T <: Transformer with Params]
+SwQuaternaryTransformer.scala
+private[stages] trait SwTransformer4[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType,
+class SwQuaternaryTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType,
+SwSequenceTransformer.scala
+private[stages] trait SwTransformerN[I <: FeatureType, O <: FeatureType, T <: Transformer with Params]
+class SwSequenceTransformer[I <: FeatureType, O <: FeatureType, T <: Transformer with Params]
+SwTernaryTransformer.scala
+private[stages] trait SwTransformer3[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType,
+class SwTernaryTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType,
+SwUnaryTransformer.scala
+private[stages] trait SwTransformer1[I <: FeatureType, O <: FeatureType, T <: Transformer with Params]
+class SwUnaryTransformer[I <: FeatureType, O <: FeatureType, T <: Transformer with Params]
+com.salesforce.op.stages.sparkwrappers.specific
+OpTransformerWrapper.scala
+class OpTransformerWrapper[I <: FeatureType, O <: FeatureType, T <: InOutTransformer]
+com.salesforce.transmogrifai.core.test
+com.salesforce.op.stages
+OpTransformerReaderWriterTest.scala
+class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
+TransformersTest.scala
+class TransformersTest extends FlatSpec with Matchers with PassengerFeaturesTest {
+com.salesforce.op.stages.impl.feature
+AbsoluteValueTransformerTest.scala
+class AbsoluteValueTransformerTest extends OpTransformerSpec[Real, AbsoluteValueTransformer[Real]] {
+AddTransformerTest.scala
+class AddTransformerTest extends OpTransformerSpec[Real, AddTransformer[Real, Real]] {
+AliasTransformerTest.scala
+class AliasTransformerTest extends OpTransformerSpec[RealNN, AliasTransformer[RealNN]] {
+CeilTransformerTest.scala
+class CeilTransformerTest extends OpTransformerSpec[Integral, CeilTransformer[Real]] {
+DateToUnitCircleTransformerTest.scala
+class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateToUnitCircleTransformer[Date]]
+DescalerTransformerTest.scala
+class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransformer[Real, Real, Real]] {
+DivideTransformerTest.scala
+class DivideTransformerTest extends OpTransformerSpec[Real, DivideTransformer[Real, Real]] {
+DropIndicesByTransformerTest.scala
+class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndicesByTransformer] with AttributeAsserts {
+ExpTransformerTest.scala
+class ExpTransformerTest extends OpTransformerSpec[Real, ExpTransformer[Real]] {
+FloorTransformerTest.scala
+class FloorTransformerTest extends OpTransformerSpec[Integral, FloorTransformer[Real]] {
+LogTransformerTest.scala
+class LogTransformerTest extends OpTransformerSpec[Real, LogTransformer[Real]] {
+MultiplyTransformerTest.scala
+class MultiplyTransformerTest extends OpTransformerSpec[Real, MultiplyTransformer[Real, Real]] {
+OPCollectionTransformerTest.scala
+class OPCollectionTransformerTest extends FlatSpec with TestSparkContext {
+PowerTransformerTest.scala
+class PowerTransformerTest extends OpTransformerSpec[Real, PowerTransformer[Real]] {
+PredictionDescalerTransformerTest.scala
+class PredictionDescalerTransformerTest extends OpTransformerSpec[Real, PredictionDescaler[Real, Real]] {
+RoundDigitsTransformerTest.scala
+class RoundDigitsTransformerTest extends OpTransformerSpec[Real, RoundDigitsTransformer[Real]] {
+RoundTransformerTest.scala
+class RoundTransformerTest extends OpTransformerSpec[Integral, RoundTransformer[Real]] {
+ScalarAddTransformerTest.scala
+class ScalarAddTransformerTest extends OpTransformerSpec[Real, ScalarAddTransformer[Real, Double]] {
+ScalarDivideTransformerTest.scala
+class ScalarDivideTransformerTest extends OpTransformerSpec[Real, ScalarDivideTransformer[Real, Double]] {
+ScalarMultiplyTransformerTest.scala
+class ScalarMultiplyTransformerTest extends OpTransformerSpec[Real, ScalarMultiplyTransformer[Real, Double]] {
+ScalarSubtractTransformerTest.scala
+class ScalarSubtractTransformerTest extends OpTransformerSpec[Real, ScalarSubtractTransformer[Real, Double]] {
+ScalerTransformerTest.scala
+class  ScalerTransformerTest extends OpTransformerSpec[Real, ScalerTransformer[Real, Real]] {
+SqrtTransformerTest.scala
+class SqrtTransformerTest extends OpTransformerSpec[Real, SqrtTransformer[Real]] {
+SubstringTransformerTest.scala
+class SubstringTransformerTest extends OpTransformerSpec[Binary, SubstringTransformer[Text, Text]] {
+SubtractTransformerTest.scala
+class SubtractTransformerTest extends OpTransformerSpec[Real, SubtractTransformer[Real, Real]] {
+TextLenTransformerTest.scala
+class TextLenTransformerTest extends OpTransformerSpec[OPVector, TextLenTransformer[_]]
+TextListNullTransformerTest.scala
+class TextListNullTransformerTest
+ToOccurTransformerTest.scala
+class ToOccurTransformerTest extends FlatSpec with TestSparkContext {
+ValidEmailTransformerTest.scala
+class ValidEmailTransformerTest extends OpTransformerSpec[Binary, ValidEmailTransformer] {
+com.salesforce.op.stages.sparkwrappers.specific
+OpTransformerWrapperTest.scala
+class OpTransformerWrapperTest extends FlatSpec with TestSparkContext {
+com.salesforce.transmogrifai.features.main
+com.salesforce.op.stages
+OpPipelineStages.scala
+private[op] trait OpTransformer {
+com.salesforce.op.stages.base.binary
+BinaryTransformer.scala
+trait OpTransformer2[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+abstract class BinaryTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+final class BinaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.quaternary
+QuaternaryTransformer.scala
+trait OpTransformer4[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType, O <: FeatureType]
+abstract class QuaternaryTransformer[I1 <: FeatureType,
+final class QuaternaryLambdaTransformer[I1 <: FeatureType,
+com.salesforce.op.stages.base.sequence
+BinarySequenceTransformer.scala
+trait OpTransformer2N[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+abstract class BinarySequenceTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+final class BinarySequenceLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+SequenceTransformer.scala
+trait OpTransformerN[I <: FeatureType, O <: FeatureType]
+abstract class SequenceTransformer[I <: FeatureType, O <: FeatureType]
+final class SequenceLambdaTransformer[I <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.ternary
+TernaryTransformer.scala
+trait OpTransformer3[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType]
+abstract class TernaryTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType]
+final class TernaryLambdaTransformer[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.unary
+UnaryTransformer.scala
+trait OpTransformer1[I <: FeatureType, O <: FeatureType]
+abstract class UnaryTransformer[I <: FeatureType, O <: FeatureType]
+final class UnaryLambdaTransformer[I <: FeatureType, O <: FeatureType]
+com.salesforce.op.test
+OpTransformerSpec.scala
+abstract class OpTransformerSpec[O <: FeatureType : WeakTypeTag : ClassTag,
+com.salesforce.transmogrifai.features.test
+com.salesforce.op.stages.base.binary
+BinaryTransformerTest.scala
+class BinaryTransformerTest extends OpTransformerSpec[Real, BinaryTransformer[Real, RealNN, Real]] {
+com.salesforce.op.stages.base.quaternary
+QuaternaryTransformerTest.scala
+class QuaternaryTransformerTest
+com.salesforce.op.stages.base.sequence
+BinarySequenceTransformerTest.scala
+class BinarySequenceTransformerTest
+SequenceTransformerTest.scala
+class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceTransformer[Real, MultiPickList]] {
+com.salesforce.op.stages.base.ternary
+TernaryTransformerTest.scala
+class TernaryTransformerTest extends OpTransformerSpec[Real, TernaryTransformer[Real, Integral, Binary, Real]] {
+com.salesforce.op.stages.base.unary
+UnaryTransformerTest.scala
+class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransformer[Real, Real]] {
+Found matches for pattern 'Estimator' in [Classes]
+Unclassified usage
+com.salesforce.transmogrifai.core.main
+com.salesforce.op.stages.impl.feature
+TextMapLenEstimator.scala
+class TextMapLenEstimator[T <: OPMap[String]](uid: String = UID[TextMapLenEstimator[_]])
+TextMapNullEstimator.scala
+class TextMapNullEstimator[T <: OPMap[String]]
+com.salesforce.op.stages.impl.tuning
+OpValidator.scala
+case class BestEstimator[E <: Estimator[_]](name: String, estimator: E, summary: Seq[ModelEvaluation])
+com.salesforce.op.stages.sparkwrappers.generic
+SwBinaryEstimator.scala
+class SwBinaryEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType,
+SwQuaternaryEstimator.scala
+class SwQuaternaryEstimator[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, I4 <: FeatureType,
+SwSequenceEstimator.scala
+class SwSequenceEstimator[I <: FeatureType, O <: FeatureType, M <: Model[M], E <: Estimator[M] with Params]
+SwTernaryEstimator.scala
+class SwTernaryEstimator[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType,
+SwUnaryEstimator.scala
+class SwUnaryEstimator[I <: FeatureType, O <: FeatureType, M <: Model[M], E <: Estimator[M] with Params]
+com.salesforce.op.stages.sparkwrappers.specific
+OpBinaryEstimatorWrapper.scala
+class OpBinaryEstimatorWrapper[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType, E <: Estimator[M], M <: Model[M]]
+OpEstimatorWrapper.scala
+class OpEstimatorWrapper[I <: FeatureType, O <: FeatureType, E <: Estimator[M], M <: Model[M]]
+com.salesforce.transmogrifai.core.test
+com.salesforce.op
+OpWorkflowTest.scala
+class NormEstimatorTest[I <: Real](uid: String = UID[NormEstimatorTest[_]])
+final class NormEstimatorTestModel[I <: Real] private[op]
+object NormEstimatorTest {
+com.salesforce.op.stages
+OpMinMaxEstimatorReaderWriterTest.scala
+class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest {
+class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
+final class MinMaxNormEstimatorModel private[op]
+com.salesforce.op.stages.impl.feature
+TextMapLenEstimatorTest.scala
+class TextMapLenEstimatorTest
+TextMapNullEstimatorTest.scala
+class TextMapNullEstimatorTest
+com.salesforce.op.stages.impl.selector
+ModelSelectorTest.scala
+class TestEstimator extends BinaryEstimator[RealNN, OPVector, Prediction]("test", UID[TestEstimator]) {
+com.salesforce.op.stages.sparkwrappers.specific
+OpEstimatorWrapperTest.scala
+class OpEstimatorWrapperTest extends FlatSpec with TestSparkContext with PrestigeData {
+com.salesforce.transmogrifai.features.main
+com.salesforce.op.stages.base.binary
+BinaryEstimator.scala
+abstract class BinaryEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.quaternary
+QuaternaryEstimator.scala
+abstract class QuaternaryEstimator[I1 <: FeatureType,
+com.salesforce.op.stages.base.sequence
+BinarySequenceEstimator.scala
+abstract class BinarySequenceEstimator[I1 <: FeatureType, I2 <: FeatureType, O <: FeatureType]
+SequenceEstimator.scala
+abstract class SequenceEstimator[I <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.ternary
+TernaryEstimator.scala
+abstract class TernaryEstimator[I1 <: FeatureType, I2 <: FeatureType, I3 <: FeatureType, O <: FeatureType]
+com.salesforce.op.stages.base.unary
+UnaryEstimator.scala
+abstract class UnaryEstimator[I <: FeatureType, O <: FeatureType]
+com.salesforce.op.test
+OpEstimatorSpec.scala
+abstract class OpEstimatorSpec[O <: FeatureType : WeakTypeTag : ClassTag,
+com.salesforce.transmogrifai.features.test
+com.salesforce.op.stages.base.binary
+BinaryEstimatorTest.scala
+class BinaryEstimatorTest
+class TestPivotEstimator(uid: String = UID[TestPivotEstimator])
+com.salesforce.op.stages.base.quaternary
+QuaternaryEstimatorTest.scala
+class QuaternaryEstimatorTest
+class FantasticFourEstimator(uid: String = UID[FantasticFourEstimator])
+com.salesforce.op.stages.base.sequence
+BinarySequenceEstimatorTest.scala
+class BinarySequenceEstimatorTest
+class WeightedFractionOfResponsesEstimator(uid: String = UID[WeightedFractionOfResponsesEstimator])
+SequenceEstimatorTest.scala
+class SequenceEstimatorTest
+class FractionOfResponsesEstimator(uid: String = UID[FractionOfResponsesEstimator])
+com.salesforce.op.stages.base.ternary
+TernaryEstimatorTest.scala
+class TernaryEstimatorTest
+class TripleInteractionsEstimator(uid: String = UID[TripleInteractionsEstimator])
+com.salesforce.op.stages.base.unary
+UnaryEstimatorTest.scala
+class UnaryEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], UnaryEstimator[Real, Real]] {
+class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
+final class MinMaxNormEstimatorModel private[op](val min: Double, val max: Double, operationName: String, uid: String)
+}

@@ -32,7 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
-import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageWriter}
+import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpPipelineStageBase, OpPipelineStageWriter}
 import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.util.MLWriter
@@ -98,11 +98,20 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @return array of serialized stages
    */
   private def stagesJArray(path: String): JArray = {
-    val stages: Seq[OpPipelineStageBase] = model.stages
+    val stages: Seq[OpPipelineStageBase] = getFeatureGenStages(model.stages) ++ model.stages
     val stagesJson: Seq[JObject] = stages
       .map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
       .filter(_.children.nonEmpty)
     JArray(stagesJson.toList)
+  }
+
+  private def getFeatureGenStages(stages:Seq[OPStage]): Seq[OpPipelineStageBase] = {
+    for {
+      stage <- stages
+      inputFeatures <- stage.getInputFeatures()
+      orgStage = inputFeatures.originStage
+      if orgStage.isInstanceOf[FeatureGeneratorStage[_,_]]
+    } yield orgStage
   }
 
   /**
