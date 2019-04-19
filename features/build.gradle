@@ -1,5 +1,6 @@
 dependencies {
     compile project(':utils')
+    testCompile project(':testkit')
 
     // Scala graph
     compile "org.scala-graph:graph-core_$scalaVersion:$scalaGraphVersion"

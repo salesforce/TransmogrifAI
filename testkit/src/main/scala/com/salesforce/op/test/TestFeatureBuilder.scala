@@ -30,13 +30,19 @@
 
 package com.salesforce.op.test
 
-import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
+import java.text.SimpleDateFormat
+
+import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder, FeatureSparkTypes}
+import com.salesforce.op.testkit.RandomList.UniformGeolocation
+import com.salesforce.op.testkit._
 import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.types.StructType
 
+import scala.collection.mutable.ArrayBuffer
 import scala.reflect.runtime.universe._
+
 
 /**
  * Test Feature Builder is a factory for creating datasets and features for tests
@@ -249,15 +255,161 @@ case object TestFeatureBuilder {
       f5name = DefaultFeatureNames.f5, data)
   }
 
+  /**
+   * Build a dataset with arbitrary amount of features of specified types
+   *
+   * @param data  data
+   * @param spark spark session
+   * @return dataset with arbitrary amount of features of specified types
+   */
+  def apply(data: Seq[FeatureType]*)(implicit spark: SparkSession): (DataFrame, Array[Feature[_ <: FeatureType]]) = {
+    val iterators = data.map(_.iterator).toArray
+    val rows = ArrayBuffer.empty[Row]
+    val featureValues = ArrayBuffer.empty[Array[FeatureType]]
+
+    while (iterators.forall(_.hasNext)) {
+      val vals: Array[FeatureType] = iterators.map(_.next())
+      val sparkVals = vals.map(FeatureTypeSparkConverter.toSpark)
+      rows += Row.fromSeq(sparkVals)
+      featureValues += vals
+    }
+
+    require(rows.nonEmpty && featureValues.nonEmpty, "Number of rows must be positive")
+
+    val features: Array[Feature[_ <: FeatureType]] = featureValues.head.zipWithIndex.map { case (f, i) =>
+      val wtt = FeatureType.featureTypeTag(f.getClass.getName).asInstanceOf[WeakTypeTag[FeatureType]]
+      feature[FeatureType](name = s"f${i + 1}")(wtt)
+    }.toArray
+
+    val schema = StructType(features.map(FeatureSparkTypes.toStructField(_)))
+    dataframeOfRows(schema, rows) -> features
+  }
+
+  private val InitDate = new SimpleDateFormat("dd/MM/yy").parse("18/04/19")
+
+  /**
+   * Build a dataset with random features of specified size
+   *
+   * @param numOfRows number of rows to generate (must be positive)
+   * @param spark     spark session
+   * @return dataset with random features of specified size
+   */
+  // scalastyle:off parameter.number
+  def random
+  (
+    numOfRows: Int = 10
+  )(
+    vectors: => Seq[OPVector] = RandomVector.sparse(RandomReal.normal[Real](), 10).limit(numOfRows),
+    textLists: => Seq[TextList] = RandomList.ofTexts(RandomText.strings(0, 10), maxLen = 10).limit(numOfRows),
+    dateLists: => Seq[DateList] = RandomList.ofDates(
+      RandomIntegral.dates(InitDate, 1000, 1000000), maxLen = 10
+    ).limit(numOfRows),
+    dateTimeLists: => Seq[DateList] = RandomList.ofDateTimes(
+      RandomIntegral.datetimes(InitDate, 1000, 1000000), maxLen = 10
+    ).limit(numOfRows),
+    geoLocations: => Seq[Geolocation] = RandomList.ofGeolocations.limit(numOfRows),
+    base64Maps: => Seq[Base64Map] = RandomMap.of[Base64, Base64Map](RandomText.base64(5, 10), 0, 5).limit(numOfRows),
+    binaryMaps: => Seq[BinaryMap] = RandomMap.ofBinaries(0.5, 0, 5).limit(numOfRows),
+    comboBoxMaps: => Seq[ComboBoxMap] = RandomMap.of[ComboBox, ComboBoxMap](
+      RandomText.comboBoxes(List("choice1", "choice2", "choice3")), 0, 5
+    ).limit(numOfRows),
+    currencyMaps: => Seq[CurrencyMap] = RandomMap.ofReals[Currency, CurrencyMap](
+      RandomReal.poisson[Currency](5.0), 0, 5
+    ).limit(numOfRows),
+    dateMaps: => Seq[DateMap] = RandomMap.of(
+      RandomIntegral.dates(InitDate, 1000, 1000000), 0, 5
+    ).limit(numOfRows),
+    dateTimeMaps: => Seq[DateTimeMap] = RandomMap.of(
+      RandomIntegral.datetimes(InitDate, 1000, 1000000), 0, 5
+    ).limit(numOfRows),
+    emailMaps: => Seq[EmailMap] = RandomMap.of(
+      RandomText.emailsOn(RandomStream.of(List("example.com", "test.com"))), 0, 5
+    ).limit(numOfRows),
+    idMaps: => Seq[IDMap] = RandomMap.of[ID, IDMap](RandomText.ids, 0, 5).limit(numOfRows),
+    integralMaps: => Seq[IntegralMap] = RandomMap.of(RandomIntegral.integrals, 0, 5).limit(numOfRows),
+    multiPickListMaps: => Seq[MultiPickListMap] = RandomMap.ofMultiPickLists(
+      RandomMultiPickList.of(RandomText.countries, maxLen = 5), 0, 5
+    ).limit(numOfRows),
+    percentMaps: => Seq[PercentMap] = RandomMap.ofReals[Percent, PercentMap](
+      RandomReal.normal[Percent](50, 5), 0, 5
+    ).limit(numOfRows),
+    phoneMaps: => Seq[PhoneMap] = RandomMap.of[Phone, PhoneMap](RandomText.phones, 0, 5).limit(numOfRows),
+    pickListMaps: => Seq[PickListMap] = RandomMap.of[PickList, PickListMap](
+      RandomText.pickLists(List("pick1", "pick2", "pick3")), 0, 5
+    ).limit(numOfRows),
+    realMaps: => Seq[RealMap] = RandomMap.ofReals[Real, RealMap](RandomReal.normal[Real](), 0, 5).limit(numOfRows),
+    textAreaMaps: => Seq[TextAreaMap] = RandomMap.of[TextArea, TextAreaMap](
+      RandomText.textAreas(0, 50), 0, 5
+    ).limit(numOfRows),
+    textMaps: => Seq[TextMap] = RandomMap.of[Text, TextMap](RandomText.strings(0, 10), 0, 5).limit(numOfRows),
+    urlMaps: => Seq[URLMap] = RandomMap.of[URL, URLMap](RandomText.urls, 0, 5).limit(numOfRows),
+    countryMaps: => Seq[CountryMap] = RandomMap.of[Country, CountryMap](RandomText.countries, 0, 5).limit(numOfRows),
+    stateMaps: => Seq[StateMap] = RandomMap.of[State, StateMap](RandomText.states, 0, 5).limit(numOfRows),
+    cityMaps: => Seq[CityMap] = RandomMap.of[City, CityMap](RandomText.cities, 0, 5).limit(numOfRows),
+    postalCodeMaps: => Seq[PostalCodeMap] = RandomMap.of[PostalCode, PostalCodeMap](
+      RandomText.postalCodes, 0, 5
+    ).limit(numOfRows),
+    streetMaps: => Seq[StreetMap] = RandomMap.of[Street, StreetMap](RandomText.streets, 0, 5).limit(numOfRows),
+    geoLocationMaps: => Seq[GeolocationMap] = RandomMap.ofGeolocations[UniformGeolocation](
+      RandomList.ofGeolocations, 0, 5
+    ).limit(numOfRows),
+    binaries: => Seq[Binary] = RandomBinary(0.5).limit(numOfRows),
+    currencies: => Seq[Currency] = RandomReal.poisson[Currency](5.0).limit(numOfRows),
+    dates: => Seq[Date] = RandomIntegral.dates(InitDate, 1000, 1000000).limit(numOfRows),
+    dateTimes: => Seq[DateTime] = RandomIntegral.datetimes(InitDate, 1000, 1000000).limit(numOfRows),
+    integrals: => Seq[Integral] = RandomIntegral.integrals.limit(numOfRows),
+    percents: => Seq[Percent] = RandomReal.normal[Percent](50, 5).limit(numOfRows),
+    reals: => Seq[Real] = RandomReal.normal[Real]().limit(numOfRows),
+    realNNs: => Seq[RealNN] = RandomReal.normal[RealNN]().limit(numOfRows),
+    multiPickLists: => Seq[MultiPickList] = RandomMultiPickList.of(RandomText.countries, maxLen = 5).limit(numOfRows),
+    base64s: => Seq[Base64] = RandomText.base64(5, 10).limit(numOfRows),
+    comboBoxes: => Seq[ComboBox] = RandomText.comboBoxes(List("choice1", "choice2", "choice3")).limit(numOfRows),
+    emails: => Seq[Email] = RandomText.emailsOn(RandomStream.of(List("example.com", "test.com"))).limit(numOfRows),
+    ids: => Seq[ID] = RandomText.ids.limit(numOfRows),
+    phones: => Seq[Phone] = RandomText.phones.limit(numOfRows),
+    pickLists: => Seq[PickList] = RandomText.pickLists(List("pick1", "pick2", "pick3")).limit(numOfRows),
+    texts: => Seq[Text] = RandomText.base64(5, 10).limit(numOfRows),
+    textAreas: => Seq[TextArea] = RandomText.textAreas(0, 50).limit(numOfRows),
+    urls: => Seq[URL] = RandomText.urls.limit(numOfRows),
+    countries: => Seq[Country] = RandomText.countries.limit(numOfRows),
+    states: => Seq[State] = RandomText.states.limit(numOfRows),
+    cities: => Seq[City] = RandomText.cities.limit(numOfRows),
+    postalCodes: => Seq[PostalCode] = RandomText.postalCodes.limit(numOfRows),
+    streets: => Seq[Street] = RandomText.streets.limit(numOfRows)
+  )(implicit spark: SparkSession): (DataFrame, Array[Feature[_ <: FeatureType]]) = {
+
+    require(numOfRows > 0, "Number of rows must be positive")
+
+    val data: Array[Seq[FeatureType]] = Array(
+      vectors, textLists, dateLists, dateTimeLists, geoLocations,
+      base64Maps, binaryMaps, comboBoxMaps, currencyMaps, dateMaps,
+      dateTimeMaps, emailMaps, idMaps, integralMaps, multiPickListMaps,
+      percentMaps, phoneMaps, pickListMaps, realMaps, textAreaMaps,
+      textMaps, urlMaps, countryMaps, stateMaps, cityMaps,
+      postalCodeMaps, streetMaps, geoLocationMaps, binaries, currencies,
+      dates, dateTimes, integrals, percents, reals, realNNs,
+      multiPickLists, base64s, comboBoxes, emails, ids, phones,
+      pickLists, texts, textAreas, urls, countries, states,
+      cities, postalCodes, streets)
+
+    this.apply(data: _*)(spark)
+  }
+  // scalastyle:on
+
   private def dataframe[T <: Product](schema: StructType, data: Seq[T])(implicit spark: SparkSession): DataFrame = {
+    val rows = data.map(p => Row.fromSeq(
+      p.productIterator.toSeq.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
+    ))
+    dataframeOfRows(schema, rows)
+  }
+
+  private def dataframeOfRows(schema: StructType, data: Seq[Row])(implicit spark: SparkSession): DataFrame = {
     import spark.implicits._
     implicit val rowEncoder = RowEncoder(schema)
-
-    data.map(p => Row.fromSeq(
-      p.productIterator.toSeq.map { case f: FeatureType => FeatureTypeSparkConverter.toSpark(f) }
-    )).toDF()
+    data.toDF()
   }
 
   private def feature[T <: FeatureType](name: String)(implicit tt: WeakTypeTag[T]) =
     FeatureBuilder.fromRow[T](name)(tt).asPredictor
+
 }
