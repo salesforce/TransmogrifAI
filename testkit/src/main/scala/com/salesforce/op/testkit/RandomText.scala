@@ -121,8 +121,8 @@ object RandomText {
    * Produces emails in the specified collection of random domains
    * domains can be provided with probabilities, e.g.
    * {{{
-   * emails(RandomStream of List("gitmo.mil", "kremlin.ru"))
-   * emails(RandomStream of List("gitmo.mil", "kremlin.ru") distributedAs List(0.9, 1.0))
+   * emailsOn(RandomStream of List("gitmo.mil", "kremlin.ru"))
+   * emailsOn(RandomStream of List("gitmo.mil", "kremlin.ru") distributedAs List(0.9, 1.0))
    * }}}
    *
    * @param domains producer of random email domains
