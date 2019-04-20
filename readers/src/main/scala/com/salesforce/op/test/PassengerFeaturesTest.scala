@@ -70,7 +70,7 @@ trait PassengerFeaturesTest {
 }
 
 object TestMonoidAggregator
-  extends CustomMonoidAggregator[Real](0.toReal.value, (l, r) => (l -> r).map(breeze.linalg.max(_, _)))
+  extends CustomMonoidAggregator[Real](None, (l, r) => (l -> r).map(breeze.linalg.max(_, _)))
 
 object PassengerFeaturesTestLambdas {
   def genderFnc: (Passenger => MultiPickList) = p => Set(p.getGender).toMultiPickList
