@@ -133,11 +133,13 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   private def loadStages(workflow: OpWorkflow, json: JValue, path: String): Seq[OPStage] = {
     val stagesJs = (json \ Stages.entryName).extract[JArray].arr
     val recoveredStages = stagesJs.flatMap { j =>
-      val stageUidOpt = (j \ Uid.entryName).extractOpt[String].filterNot(_.startsWith("FeatureGeneratorStage_"))
+      val stageUidOpt = (j \ Uid.entryName).extractOpt[String]
       stageUidOpt.map { stageUid =>
         val originalStage = workflow.stages.find(_.uid == stageUid)
         originalStage match {
           case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
+          case None if stageUid.startsWith("FeatureGeneratorStage_") =>
+            new OpPipelineStageReader(Seq()).loadFromJson(j, path).asInstanceOf[OPStage]
           case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
         }
       }

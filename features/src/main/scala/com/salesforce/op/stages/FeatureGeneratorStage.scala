@@ -33,7 +33,7 @@ package com.salesforce.op.stages
 import com.salesforce.op.UID
 import com.salesforce.op.aggregators.{Event, FeatureAggregator, GenericFeatureAggregator}
 import com.salesforce.op.features.types.{FeatureType, Text}
-import com.salesforce.op.features.{Feature, FeatureLike, FeatureUID, OPFeature}
+import com.salesforce.op.features._
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.twitter.algebird.MonoidAggregator
 import org.apache.spark.ml.PipelineStage
@@ -116,6 +116,9 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
 
 class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
   extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with LambdaSerializer {
+
+  private val FromRowExtractFnName = classOf[FromRowExtractFn[_]].getName
+
   /**
    * Read stage from json
    *
@@ -126,15 +129,24 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
   override def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
     Try {
       val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
-      val tti = FeatureType.featureTypeTag((json \ "tti").extract[String]).asInstanceOf[WeakTypeTag[I]]
+      val ttiName = (json \ "tti").extract[String]
+      val tti = ReflectionUtils.typeTagForName(n = ttiName).asInstanceOf[WeakTypeTag[I]]
 
-      val extractFn = ReflectionUtils.classForName((json \ "extractFn").extract[String])
-        .getConstructors.head.newInstance()
-        .asInstanceOf[Function1[I, O]]
+      val extractFnStr = (json \ "extractFn").extract[String]
 
-      val aggregator = ReflectionUtils.classForName((json \ "aggregator").extract[String]).
-        getConstructors.head.newInstance()
-        .asInstanceOf[MonoidAggregator[Event[O], _, O]]
+      val extractFn = extractFnStr match {
+        case FromRowExtractFnName => {
+          val extractFnName = (json \ "extractFnName").extract[String]
+          val extractFnIdx = (json \ "extractFnIdx").extractOpt[Int]
+          ReflectionUtils.classForName(extractFnStr)
+            .getConstructors.head.newInstance(extractFnIdx, extractFnName, tto)
+            .asInstanceOf[Function1[I, O]]
+        }
+        case _ => ReflectionUtils.getInstanceOfObject[Function1[I, O]](extractFnStr)
+      }
+
+      val aggregator = ReflectionUtils.
+        getInstanceOfObject[MonoidAggregator[Event[O], _, O]]((json \ "aggregator").extract[String])
 
       val outputName = (json \ "outputName").extract[String]
       val extractSource = (json \ "extractSource").extract[String]
@@ -156,18 +168,28 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    */
   override def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
     for {
-      extractFn <- Try(serializeFunction("extractFn", stage.extractFn))
+      extractFn <- Try {
+        stage.extractFn match {
+          case c: FromRowExtractFn[_] => c.getClass.getName
+          case _ => serializeFunction("extractFn", stage.extractFn).value.toString
+        }
+      }
       aggregatorFn <- Try(serializeFunction("aggregator", stage.aggregator))
     } yield {
-      ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
+      val res = ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
         ("tto" -> FeatureType.typeName(stage.tto)) ~
         ("aggregator" -> aggregatorFn.value.toString) ~
-        ("extractFn" -> extractFn.value.toString) ~
-        ("outputName" -> stage.outputName)
-      ("aggregateWindow" -> stage.aggregateWindow.map(_.toStandardSeconds.getSeconds)) ~
+        ("extractFn" -> extractFn) ~
+        ("outputName" -> stage.outputName) ~
+        ("aggregateWindow" -> stage.aggregateWindow.map(_.toStandardSeconds.getSeconds)) ~
         ("uid" -> stage.uid) ~
         ("extractSource" -> stage.extractSource) ~
         ("outputIsResponse" -> stage.outputIsResponse)
+
+      stage.extractFn match {
+        case x: FromRowExtractFn[_] => res ~ ("extractFnIdx" -> x.index) ~ ("extractFnName" -> x.name)
+        case _ => res
+      }
     }
 
   }

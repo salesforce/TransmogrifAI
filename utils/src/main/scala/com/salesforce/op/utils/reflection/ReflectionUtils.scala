@@ -234,6 +234,36 @@ object ReflectionUtils {
     })
   }
 
+
+  /**
+   * Returns a Type Tag by string name
+   *
+   * @param rtm runtime mirror
+   * @param n   class name
+   * @return TypeTag[_]
+   */
+  def typeTagForName(rtm: Mirror = runtimeMirror(), n: String): TypeTag[_] = {
+    val clazz = classForName(n)
+    typeTagForType(rtm, rtm.classSymbol(clazz).toType)
+  }
+
+  /**
+   * A helper function to get instance of lambda function or object
+   * @param name full name
+   * @return
+   */
+  def getInstanceOfObject[T](name: String): T = {
+    val clazz = ReflectionUtils.classForName(name)
+
+    val res = clazz.getConstructors.headOption match {
+      case Some(c) => c.newInstance()
+      case _ => {
+        clazz.getField("MODULE$").get(clazz)
+      }
+    }
+    res.asInstanceOf[T]
+  }
+
   /**
    * Create a ClassTag for a WeakTypeTag
    *

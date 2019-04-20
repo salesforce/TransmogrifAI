@@ -315,15 +315,22 @@ object FeatureBuilder {
   def fromRow[O <: FeatureType : WeakTypeTag](index: Int)(implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, Some(index))
 
   def fromRow[O <: FeatureType : WeakTypeTag](name: String, index: Option[Int]): FeatureBuilderWithExtract[Row, O] = {
-    val c = FeatureTypeSparkConverter[O]()
+
     new FeatureBuilderWithExtract[Row, O](
       name = name,
-      extractFn = (r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name))),
-      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))"
+      extractFn = FromRowExtractFn(index, name),
+      extractSource = s"FromRowExtractFn($index, $name)"
     )
   }
 
   // scalastyle:on
+}
+
+case class FromRowExtractFn[O <: FeatureType](index: Option[Int], name: String)
+  (implicit tto: WeakTypeTag[O]) extends Function1[Row, O] with Serializable {
+  val c = FeatureTypeSparkConverter[O]()
+
+  override def apply(r: Row): O = c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))
 }
 
 /**

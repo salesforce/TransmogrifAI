@@ -166,9 +166,13 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
         val anyValue = argValue match {
 
           // Special handling for Feature Type TypeTags
-          // this is required for custom TypeTags e.g. Passenger (for FeatureGeneratorStage)
-          case t: TypeTag[_] =>
+          case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
             AnyValue(AnyValueTypes.TypeTag, ReflectionUtils.dealisedTypeName(t.tpe), None)
+          case t: TypeTag[_] =>
+            throw new RuntimeException(
+              s"Unknown type tag '${t.tpe.toString}'. " +
+                "Only Feature and Feature Value type tags are supported for serialization."
+            )
 
           // Special handling for function value arguments
           case f1: Function1[_, _]

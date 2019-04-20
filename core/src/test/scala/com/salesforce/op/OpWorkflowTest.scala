@@ -44,6 +44,7 @@ import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vector
 import org.apache.spark.ml.param.{BooleanParam, ParamMap}
 import org.apache.spark.ml.tuning.ParamGridBuilder
