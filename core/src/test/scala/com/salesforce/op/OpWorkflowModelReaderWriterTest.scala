@@ -379,5 +379,6 @@ trait UIDReset {
 
 object OpWorkflowModelReaderWriterTest {
   def mapFnc0: OPVector => Real = v => Real(v.value.toArray.headOption)
-  def emptyVectFnc:(Passenger => OPVector) = _ => OPVector.empty
+
+  def emptyVectFnc: (Passenger => OPVector) = _ => OPVector.empty
 }

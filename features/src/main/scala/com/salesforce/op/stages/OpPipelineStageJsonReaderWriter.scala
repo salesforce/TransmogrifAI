@@ -47,7 +47,7 @@ import scala.util.{Failure, Success, Try}
  *
  * @tparam StageType stage type to read/write
  */
-trait OpPipelineStageJsonReaderWriter[StageType <: AnyRef] extends OpPipelineStageReadWriteFormats with LambdaSerializer {
+trait OpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageBase] extends OpPipelineStageReadWriteFormats {
 
   /**
    * Read stage from json
@@ -76,7 +76,7 @@ trait OpPipelineStageJsonReaderWriter[StageType <: AnyRef] extends OpPipelineSta
 final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageBase]
 (
   implicit val ct: ClassTag[StageType]
-) extends OpPipelineStageJsonReaderWriter[StageType] {
+) extends OpPipelineStageJsonReaderWriter[StageType] with LambdaSerializer {
 
   /**
    * Read stage from json
@@ -166,13 +166,9 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
         val anyValue = argValue match {
 
           // Special handling for Feature Type TypeTags
+          // this is required for custom TypeTags e.g. Passenger (for FeatureGeneratorStage)
           case t: TypeTag[_] =>
             AnyValue(AnyValueTypes.TypeTag, ReflectionUtils.dealisedTypeName(t.tpe), None)
-         /* case t: TypeTag[_] =>
-            throw new RuntimeException(
-              s"Unknown type tag '${t.tpe.toString}'. " +
-                "Only Feature and Feature Value type tags are supported for serialization."
-            )*/
 
           // Special handling for function value arguments
           case f1: Function1[_, _]
@@ -206,17 +202,15 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
   }
 
 
-
   private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))
 }
 
-
-trait LambdaSerializer{
+trait LambdaSerializer {
   protected def serializeFunction(argName: String, function: AnyRef): AnyValue = {
     try {
       val functionClass = function.getClass
       // Test that function has no external dependencies and can be constructed without ctor args
-      functionClass.getConstructors.head.newInstance()
+      functionClass.getConstructors.headOption.foreach(_.newInstance())
       AnyValue(AnyValueTypes.ClassInstance, functionClass.getName, Option(functionClass.getName))
     } catch {
       case error: Exception => throw new RuntimeException(

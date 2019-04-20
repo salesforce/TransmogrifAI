@@ -31,7 +31,7 @@
 package com.salesforce.op.readers
 
 import com.salesforce.op.OpParams
-import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.aggregators.{CustomMonoidAggregator, CutOffTime}
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.test._
@@ -62,7 +62,7 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
 
   val survivedResponse = FeatureBuilder.Binary[PassengerCaseClass]
     .extract(_.survived.toBinary)
-    .aggregate(zero = Some(true), (l, r) => Some(l.getOrElse(false) && r.getOrElse(false)))
+    .aggregate(TestCustomMonoidAggregator)
     .asResponse
 
   val aggregateParameters = AggregateParams(
@@ -175,7 +175,7 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
     }
   }
 
-  aggReaders.foreach( reader =>
+  aggReaders.foreach(reader =>
     Spec(reader.getClass) should "read and aggregate data correctly" in {
       val data = reader.readDataset().collect()
       data.foreach(_ shouldBe a[PassengerCaseClass])
@@ -183,13 +183,13 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
 
       val aggregatedData = reader.generateDataFrame(rawFeatures = Array(agePredictor, survivedResponse)).collect()
       aggregatedData.length shouldBe 6
-      aggregatedData.collect { case r if r.get(0) == "4" => r} shouldEqual Array(Row("4", 60, false))
+      aggregatedData.collect { case r if r.get(0) == "4" => r } shouldEqual Array(Row("4", 60, false))
 
       reader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
     }
   )
 
-  conditionalReaders.foreach( reader =>
+  conditionalReaders.foreach(reader =>
     Spec(reader.getClass) should "read and conditionally aggregate data correctly" in {
       val data = reader.readDataset().collect()
       data.foreach(_ shouldBe a[PassengerCaseClass])
@@ -204,3 +204,5 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
   )
 }
 
+object TestCustomMonoidAggregator extends CustomMonoidAggregator[Binary](zero = Some(true),
+  (l, r) => Some(l.getOrElse(false) && r.getOrElse(false)))

@@ -32,15 +32,18 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.UID
 import com.salesforce.op.aggregators.{Event, FeatureAggregator, GenericFeatureAggregator}
-import com.salesforce.op.features.types.FeatureType
+import com.salesforce.op.features.types.{FeatureType, Text}
 import com.salesforce.op.features.{Feature, FeatureLike, FeatureUID, OPFeature}
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.twitter.algebird.MonoidAggregator
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.util.ClosureUtils
 import org.joda.time.Duration
+import org.json4s.JValue
+import org.json4s.JsonDSL._
 
 import scala.reflect.runtime.universe.WeakTypeTag
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  * Origin stage for first features in workflow
@@ -58,6 +61,8 @@ import scala.util.Try
  * @tparam I input data type
  * @tparam O output feature type
  */
+
+@ReaderWriter(classOf[FeatureGeneratorStageReaderWriter[_, _ <: FeatureType]])
 final class FeatureGeneratorStage[I, O <: FeatureType]
 (
   val extractFn: I => O,
@@ -106,4 +111,64 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
    * @return Failure if not serializable
    */
   override def checkSerializable: Try[Unit] = ClosureUtils.checkSerializable(extractFn)
+}
+
+
+class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
+  extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with LambdaSerializer {
+  /**
+   * Read stage from json
+   *
+   * @param stageClass stage class
+   * @param json       json to read stage from
+   * @return read result
+   */
+  override def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
+    Try {
+      val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
+      val tti = FeatureType.featureTypeTag((json \ "tti").extract[String]).asInstanceOf[WeakTypeTag[I]]
+
+      val extractFn = ReflectionUtils.classForName((json \ "extractFn").extract[String])
+        .getConstructors.head.newInstance()
+        .asInstanceOf[Function1[I, O]]
+
+      val aggregator = ReflectionUtils.classForName((json \ "aggregator").extract[String]).
+        getConstructors.head.newInstance()
+        .asInstanceOf[MonoidAggregator[Event[O], _, O]]
+
+      val outputName = (json \ "outputName").extract[String]
+      val extractSource = (json \ "extractSource").extract[String]
+      val uid = (json \ "uid").extract[String]
+      val outputIsResponse = (json \ "outputIsResponse").extract[Boolean]
+      val aggregateWindow = (json \ "aggregateWindow").extractOpt[Int].map(x => Duration.standardSeconds(x))
+
+      new FeatureGeneratorStage(extractFn, extractSource, aggregator,
+        outputName, outputIsResponse, aggregateWindow, uid)(tti, tto)
+    }
+
+  }
+
+  /**
+   * Write stage to json
+   *
+   * @param stage stage instance to write
+   * @return write result
+   */
+  override def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
+    for {
+      extractFn <- Try(serializeFunction("extractFn", stage.extractFn))
+      aggregatorFn <- Try(serializeFunction("aggregator", stage.aggregator))
+    } yield {
+      ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
+        ("tto" -> FeatureType.typeName(stage.tto)) ~
+        ("aggregator" -> aggregatorFn.value.toString) ~
+        ("extractFn" -> extractFn.value.toString) ~
+        ("outputName" -> stage.outputName)
+      ("aggregateWindow" -> stage.aggregateWindow.map(_.toStandardSeconds.getSeconds)) ~
+        ("uid" -> stage.uid) ~
+        ("extractSource" -> stage.extractSource) ~
+        ("outputIsResponse" -> stage.outputIsResponse)
+    }
+
+  }
 }

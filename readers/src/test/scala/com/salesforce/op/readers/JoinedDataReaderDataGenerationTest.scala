@@ -30,7 +30,7 @@
 
 package com.salesforce.op.readers
 
-import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.aggregators.{CustomMonoidAggregator, CutOffTime}
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import com.salesforce.op.test._
@@ -51,13 +51,13 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
   val newWeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getWeight.toDouble.toRealNN)
-      .aggregate(zero = Some(Double.MaxValue), (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(TestMinCustomMonoidAggregator)
       .asPredictor
 
   val newHeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getHeight.toDouble.toRealNN)
-      .aggregate(zero = Some(0.0), (a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(TestMaxCustomMonoidAggregator)
       .asPredictor
 
   val recordTime = FeatureBuilder.DateTime[PassengerCSV].extract(_.getRecordDate.toLong.toDateTime).asPredictor
@@ -323,3 +323,10 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
   }
 
 }
+
+object TestMinCustomMonoidAggregator extends CustomMonoidAggregator[RealNN](zero = Some(Double.MaxValue),
+  (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+
+
+object TestMaxCustomMonoidAggregator extends CustomMonoidAggregator[RealNN](
+  zero = Some(0.0), (a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))

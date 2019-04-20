@@ -373,28 +373,6 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
   var aggregateWindow: Option[Duration] = None
 
   /**
-   * Feature aggregation function with zero value
-   *
-   * @param zero a zero element for aggregation
-   * @param fn   aggregation function
-   */
-  def aggregate(zero: O#Value, fn: (O#Value, O#Value) => O#Value): this.type = {
-    aggregator = new CustomMonoidAggregator[O](associativeFn = fn, zero = zero)(tto, ttov)
-    this
-  }
-
-  /**
-   * Feature aggregation function with zero value of [[FeatureTypeDefaults.default[O].value]]
-   *
-   * @param fn aggregation function
-   */
-  def aggregate(fn: (O#Value, O#Value) => O#Value): this.type = {
-    val zero = FeatureTypeDefaults.default[O](tto).value
-    aggregator = new CustomMonoidAggregator[O](associativeFn = fn, zero = zero)(tto, ttov)
-    this
-  }
-
-  /**
    * Feature aggregation with a monoid aggregator
    *
    * @param monoid a monoid aggregator

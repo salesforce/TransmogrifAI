@@ -160,7 +160,7 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
     val feature =
       FeatureBuilder.Real[Passenger]
         .extract(p => Option(p.getAge).map(_.toDouble).toReal)
-        .aggregate((v1, _) => v1)
+        .aggregate(TestCustomMonoidAggregator)
         .asPredictor
 
     assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
@@ -171,7 +171,7 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
   it should "build an aggregated feature with a custom aggregate function with zero" in {
     val feature = FeatureBuilder.Real[Passenger]
       .extract(p => Option(p.getAge).map(_.toDouble).toReal)
-      .aggregate(Real.empty.v, (v1, _) => v1)
+      .aggregate(TestCustomMonoidAggregator)
       .asPredictor
 
     assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
@@ -180,6 +180,9 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
   }
 
 }
+
+object TestCustomMonoidAggregator extends CustomMonoidAggregator[Real](zero = Real.empty.v,
+  associativeFn = (v1, _) => v1)
 
 /**
  * Assert feature instance on a given input/output

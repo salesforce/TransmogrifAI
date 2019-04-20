@@ -105,12 +105,12 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
     JArray(stagesJson.toList)
   }
 
-  private def getFeatureGenStages(stages:Seq[OPStage]): Seq[OpPipelineStageBase] = {
+  private def getFeatureGenStages(stages: Seq[OPStage]): Seq[OpPipelineStageBase] = {
     for {
       stage <- stages
       inputFeatures <- stage.getInputFeatures()
       orgStage = inputFeatures.originStage
-      if orgStage.isInstanceOf[FeatureGeneratorStage[_,_]]
+      if orgStage.isInstanceOf[FeatureGeneratorStage[_, _]]
     } yield orgStage
   }
 
@@ -143,14 +143,23 @@ private[op] object OpWorkflowModelReadWriteShared {
    */
   object FieldNames extends Enum[FieldNames] {
     val values = findValues
+
     case object Uid extends FieldNames("uid")
+
     case object ResultFeaturesUids extends FieldNames("resultFeaturesUids")
+
     case object BlacklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
+
     case object Stages extends FieldNames("stages")
+
     case object AllFeatures extends FieldNames("allFeatures")
+
     case object Parameters extends FieldNames("parameters")
+
     case object TrainParameters extends FieldNames("trainParameters")
+
     case object RawFeatureFilterResultsFieldName extends FieldNames("rawFeatureFilterResults")
+
   }
 
 }
