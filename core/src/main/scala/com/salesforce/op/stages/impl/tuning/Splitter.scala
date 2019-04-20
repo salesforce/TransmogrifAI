@@ -32,21 +32,20 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.stages.impl.MetadataLike
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
-import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.Metadata
-import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
+import org.slf4j.LoggerFactory
 
 import scala.util.Try
 
-
-
-
+case class PrevalidationVal(summaryOpt: Option[SplitterSummary], dataFrame: Option[DataFrame])
 
 /**
  * Abstract class that will carry on the creation of training set + test set
  */
 abstract class Splitter(val uid: String) extends SplitterParams {
+  @transient private[tuning] lazy val log = LoggerFactory.getLogger(this.getClass)
 
   @transient private[op] var summary: Option[SplitterSummary] = None
 
@@ -82,12 +81,24 @@ abstract class Splitter(val uid: String) extends SplitterParams {
    * @param data
    * @return Parameters set in examining data
    */
-  def preValidationPrepare(data: Dataset[Row]): Option[SplitterSummary]
-
+  def preValidationPrepare(data: Dataset[Row]): PrevalidationVal
 
   protected def checkPreconditions(): Unit =
     require(summary.nonEmpty, "Cannot call validationPrepare until preValidationPrepare has been called")
 
+  /**
+    * Add a splitter parameter to name the label column
+    * @param label
+    * @return
+    */
+  def withLabelColumnName(label: String): Splitter = {
+    if (!isSet(labelColumnName)) {
+      set(labelColumnName, label)
+    } else {
+      log.warn(s"$labelColumnName on an existing Splitter instance can be set only once")
+      this
+    }
+  }
 }
 
 trait SplitterParams extends Params {
@@ -116,6 +127,10 @@ trait SplitterParams extends Params {
 
   def setReserveTestFraction(value: Double): this.type = set(reserveTestFraction, value)
   def getReserveTestFraction: Double = $(reserveTestFraction)
+
+  final val labelColumnName = new Param[String](this, "labelColumnName",
+    "label column name, column 0 if not specified")
+  private[op] def getLabelColumnName = $(labelColumnName)
 }
 
 object SplitterParamsDefault {
@@ -146,7 +161,8 @@ private[op] object SplitterSummary {
       )
       case s if s == classOf[DataCutterSummary].getName => DataCutterSummary(
         labelsKept = metadata.getDoubleArray(ModelSelectorNames.LabelsKept),
-        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped)
+        labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped),
+        labelsDroppedTotal = metadata.getLong(ModelSelectorNames.LabelsDroppedTotal)
       )
       case s =>
         throw new RuntimeException(s"Unknown splitter summary class '$s'")

@@ -28,51 +28,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.tuning
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.test.TestSparkContext
-import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.mllib.random.RandomRDDs
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSummaryAsserts {
-  import spark.implicits._
+class SetNGramSimilarityTest extends OpTransformerSpec[RealNN, SetNGramSimilarity] {
 
-  val seed = 1234L
-  val dataCount = 1000
+  val (inputData, f1, f2) = TestFeatureBuilder(
+    Seq(
+      (Seq("Red", "Green"), Seq("Red")),
+      (Seq("Red", "Green"), Seq("Yellow, Blue")),
+      (Seq("Red", "Yellow"), Seq("Red", "Yellow")),
+      (Seq[String](), Seq("Red", "Yellow")),
+      (Seq[String](), Seq[String]()),
+      (Seq[String](""), Seq[String]("asdf")),
+      (Seq[String](""), Seq[String]("")),
+      (Seq[String]("", ""), Seq[String]("", ""))
+    ).map(v => v._1.toMultiPickList -> v._2.toMultiPickList)
+  )
 
-  val data =
-    RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
-      .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
+  val expectedResult = Seq(0.3333333134651184, 0.09722214937210083, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
+  val catNGramSimilarity = f1.toNGramSimilarity(f2)
+  val transformer = catNGramSimilarity.originStage.asInstanceOf[SetNGramSimilarity]
 
-  val dataSplitter = DataSplitter(seed = seed)
+  it should "correctly compute char-n-gram similarity with nondefault ngram param" in {
+    val cat5GramSimilarity = f1.toNGramSimilarity(f2, 5)
+    val transformedDs = cat5GramSimilarity.originStage.asInstanceOf[Transformer].transform(inputData)
+    val actualOutput = transformedDs.collect(cat5GramSimilarity)
 
-  Spec[DataSplitter] should "split the data in the appropriate proportion - 0.0" in {
-    val (train, test) = dataSplitter.setReserveTestFraction(0.0).split(data)
-    test.count() shouldBe 0
-    train.count() shouldBe dataCount
+    actualOutput shouldBe Seq(0.3333333432674408, 0.12361115217208862, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
   }
-
-  it should "split the data in the appropriate proportion - 0.2" in {
-    val (train, test) = dataSplitter.setReserveTestFraction(0.2).split(data)
-    math.abs(test.count() - 200) < 30 shouldBe true
-    math.abs(train.count() - 800) < 30 shouldBe true
-  }
-
-  it should "split the data in the appropriate proportion - 0.6" in {
-    val (train, test) = dataSplitter.setReserveTestFraction(0.6).split(data)
-    math.abs(test.count() - 600) < 30 shouldBe true
-    math.abs(train.count() - 400) < 30 shouldBe true
-  }
-
-  it should "keep the data unchanged when prepare is called" in {
-    val summary = dataSplitter.preValidationPrepare(data)
-    val train = dataSplitter.validationPrepare(data)
-    train.collect().zip(data.collect()).foreach { case (a, b) => a shouldBe b }
-    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary() }
-  }
-
 }
+

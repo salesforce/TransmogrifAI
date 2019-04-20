@@ -86,7 +86,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS)
+      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS).summaryOpt
     }
   }
 
@@ -99,7 +99,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS))(_ => succeed)
+    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS).summaryOpt)(_ => succeed)
   }
 
   Spec[OpTrainValidationSplit[_, _]] should "stratify binary class data" in {
@@ -111,7 +111,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(Array(1 - p, p), validate)
     }
     assertDataBalancerSummary(balancer.summary) { s =>
-      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS)
+      Some(s) shouldBe new DataBalancer().preValidationPrepare(binaryDS).summaryOpt
     }
   }
 
@@ -123,7 +123,7 @@ class OpValidatorTest extends FlatSpec with TestSparkContext with SplitterSummar
       assertFractions(multiClassProbabilities, train)
       assertFractions(multiClassProbabilities, validate)
     }
-    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS))(_ => succeed)
+    assertDataCutterSummary(new DataCutter().preValidationPrepare(multiDS).summaryOpt)(_ => succeed)
   }
 
   /**

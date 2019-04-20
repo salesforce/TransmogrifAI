@@ -56,7 +56,11 @@ class OpStringIndexerNoFilter[I <: Text]
   def fitFn(data: Dataset[I#Value]): UnaryModel[I, RealNN] = {
     val unseen = $(unseenName)
     val counts = data.rdd.countByValue()
-    val labels = counts.toSeq.sortBy(-_._2).map(_._1).toArray
+    val labels = counts.toSeq
+      .sortBy { case (label, count) => (-count, label) }
+      .map { case (label, _) => label }
+      .toArray
+
     val otherPos = labels.length
 
     val cleanedLabels = labels.map(_.getOrElse("null")) :+ unseen
