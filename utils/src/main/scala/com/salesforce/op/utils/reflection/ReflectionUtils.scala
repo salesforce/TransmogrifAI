@@ -234,6 +234,22 @@ object ReflectionUtils {
     })
   }
 
+  /**
+   * Create a WeakTypeTag for Type
+   *
+   * @param rtm runtime mirror
+   * @param tpe type
+   * @tparam T type T
+   * @return TypeTag[T]
+   */
+  def weakTypeTagForType[T](tpe: Type): WeakTypeTag[T] = {
+    WeakTypeTag(runtimeMirror(), new api.TypeCreator {
+      def apply[U <: api.Universe with Singleton](m: api.Mirror[U]): U#Type =
+        if (m eq runtimeMirror()) tpe.asInstanceOf[U#Type]
+        else throw new IllegalArgumentException(s"Type tag defined in  cannot be migrated to other mirrors.")
+    })
+  }
+
 
   /**
    * Returns a Type Tag by string name
@@ -246,6 +262,19 @@ object ReflectionUtils {
     val clazz = classForName(n)
     typeTagForType(rtm, rtm.classSymbol(clazz).toType)
   }
+
+  /**
+   * Returns a Weak Type Tag by string name
+   *
+   * @param rtm runtime mirror
+   * @param n   class name
+   * @return TypeTag[_]
+   */
+  def weakTypeTagForName(n: String): WeakTypeTag[_] = {
+    val clazz = classForName(n)
+    weakTypeTagForType(runtimeMirror().classSymbol(clazz).toType)
+  }
+
 
   /**
    * A helper function to get instance of lambda function or object

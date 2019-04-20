@@ -422,7 +422,7 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
         outputName = name,
         outputIsResponse = isResponse,
         aggregateWindow = aggregateWindow
-      )(tti, tto)
+      )(Left(tti), tto)
 
     originStage.getOutput().asInstanceOf[Feature[O]]
   }

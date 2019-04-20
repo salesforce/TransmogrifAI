@@ -73,9 +73,16 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   val aggregateWindow: Option[Duration] = None,
   val uid: String = UID[FeatureGeneratorStage[I, O]]
 )(
-  implicit val tti: WeakTypeTag[I],
+  implicit val _tti: Either[WeakTypeTag[I], String],
   val tto: WeakTypeTag[O]
 ) extends PipelineStage with OpPipelineStage[O] with HasIn1 {
+
+  // this hack is required as Spark can't serialize run-time created
+  // TypeTags (because it is following the ReflectionUtils...)
+  def tti: WeakTypeTag[I] = _tti match {
+    case Left(x) => x
+    case Right(n) => ReflectionUtils.weakTypeTagForName(n).asInstanceOf[WeakTypeTag[I]]
+  }
 
   setOutputFeatureName(outputName)
 
@@ -130,8 +137,6 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
     Try {
       val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
       val ttiName = (json \ "tti").extract[String]
-      val tti = ReflectionUtils.typeTagForName(n = ttiName).asInstanceOf[WeakTypeTag[I]]
-
       val extractFnStr = (json \ "extractFn").extract[String]
 
       val extractFn = extractFnStr match {
@@ -155,7 +160,7 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
       val aggregateWindow = (json \ "aggregateWindow").extractOpt[Int].map(x => Duration.standardSeconds(x))
 
       new FeatureGeneratorStage(extractFn, extractSource, aggregator,
-        outputName, outputIsResponse, aggregateWindow, uid)(tti, tto)
+        outputName, outputIsResponse, aggregateWindow, uid)(_tti = Right(ttiName), tto)
     }
 
   }
