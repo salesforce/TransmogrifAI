@@ -529,6 +529,10 @@ class RawFeatureFilter[T]
           case None => row.getAny(fn)
         }
       }
+
+      require(kept.length > 0,
+        "The raw feature filter has dropped all of your features, check your input data quality")
+
       Row.fromSeq(kept)
     }
 
