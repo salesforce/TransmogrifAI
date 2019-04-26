@@ -521,6 +521,9 @@ class RawFeatureFilter[T]
     val (featuresToDrop, featuresToKeep) = rawFeatures.partition(rf => featuresToDropNames.contains(rf.name))
     val featuresToKeepNames = Array(DataFrameFieldNames.KeyFieldName) ++ featuresToKeep.map(_.name)
 
+    require(featuresToKeep.count(!_.isResponse) > 0,
+      "The raw feature filter has dropped all of your features, check your input data quality")
+
     val featuresDropped = trainData.drop(featuresToDropNames: _*)
     val mapsCleaned = featuresDropped.rdd.map { row =>
       val kept = featuresToKeepNames.map { fn =>
@@ -529,10 +532,6 @@ class RawFeatureFilter[T]
           case None => row.getAny(fn)
         }
       }
-
-      require(kept.length > 0,
-        "The raw feature filter has dropped all of your features, check your input data quality")
-
       Row.fromSeq(kept)
     }
 
