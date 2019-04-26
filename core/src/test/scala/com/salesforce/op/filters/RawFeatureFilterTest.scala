@@ -864,6 +864,14 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     assertFeatureDistributions(filteredRawData, total = 14)
   }
 
+  it should "throw an exception when all features are removed" in {
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 1.0, 0.0,
+      0.0, 0.0, 0.0, minScoringRows = 0)
+    assertThrows[java.lang.IllegalArgumentException](filter.generateFilteredRaw(features, new OpParams()))
+  }
+
   /**
    * Generates a random dataframe and OPFeatures from supplied data generators and their types. The names of the
    * columns of the dataframe are fixed to be myF1, myF2, myF3, and myF4 so that the same OPFeatures can be used to
