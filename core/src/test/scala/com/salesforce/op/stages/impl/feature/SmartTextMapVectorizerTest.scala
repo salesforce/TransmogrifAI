@@ -77,7 +77,6 @@ class SmartTextMapVectorizerTest
    * Estimator instance to be tested
    */
   override val estimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
-    .setCleanKeys(false)
     .setInput(m1, m2)
 
   /**
