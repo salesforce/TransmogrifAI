@@ -73,6 +73,33 @@ trait RichDateFeature {
       new DateToUnitCircleTransformer[Date]().setTimePeriod(timePeriod).setInput(f +: others).getOutput()
     }
 
+    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = {
+      val periodFun: Long => Int = period match {
+        case TimePeriod.DayOfMonth => t => new JDateTime(t).dayOfMonth.get
+        case TimePeriod.DayOfWeek => t => new JDateTime(t).dayOfWeek.get
+        case TimePeriod.DayOfYear => t => new JDateTime(t).dayOfYear.get
+        case TimePeriod.HourOfDay => t => new JDateTime(t).hourOfDay.get
+        case TimePeriod.MonthOfYear => t => new JDateTime(t).monthOfYear.get
+        case TimePeriod.WeekOfMonth => t => {
+          val dt = new JDateTime(t)
+          dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
+        }
+        case TimePeriod.WeekOfYear => t => new JDateTime(t).weekyear.get
+      }
+      f.transformWith(
+        new UnaryLambdaTransformer[Date, Integral](operationName = "dateToTimePeriod",
+          transformFn = _.value.map(t => periodFun(t).toLong).toIntegral)
+      )
+    }
+
+    def toDayOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfMonth)
+    def toDayOfWeek(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfWeek)
+    def toDayOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfYear)
+    def toHourOfDay(): FeatureLike[Integral] = toTimePeriod(TimePeriod.HourOfDay)
+    def toMonthOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.MonthOfYear)
+    def toWeekOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfMonth)
+    def toWeekOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfYear)
+
     /**
      * Converts DateTime features into cartesian coordinate representation of an extracted time periods
      * (specified in circularDateRepresentations as seq of: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay,
