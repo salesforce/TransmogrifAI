@@ -405,6 +405,16 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
             .setInput(label, features)
         testEstimator.fit(bigDataWithMeta)
 
+        val prediction = testEstimator.getOutput()
+        val model = testEstimator.fit(bigDataWithMeta)
+        val transformedBigData = model.transform(bigDataWithMeta)
+
+        // Verify that multiclass metrics can be computed even when unseen labels may be present
+        val evaluatorMulti = new OpMultiClassificationEvaluator()
+          .setLabelCol(label)
+          .setPredictionCol(prediction)
+        noException should be thrownBy evaluatorMulti.evaluateAll(transformedBigData)
+
         val (numLabelsInCutter, numLabelsInCutterMetadata) = {
           import scala.language.reflectiveCalls
           val df = cutter.prevalidationValForTest
