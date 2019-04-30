@@ -77,7 +77,6 @@ class SmartTextMapVectorizerTest
    * Estimator instance to be tested
    */
   override val estimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
-    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
     .setCleanKeys(false)
     .setInput(m1, m2)
 
@@ -85,11 +84,11 @@ class SmartTextMapVectorizerTest
    * Expected result of the transformer applied on the Input Dataset
    */
   override val expectedResult: Seq[OPVector] = Seq(
-    Vectors.sparse(9, Array(0, 5, 7), Array(1.0, 1.0, 1.0)),
-    Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
-    Vectors.sparse(9, Array(1, 4), Array(1.0, 1.0)),
-    Vectors.sparse(9, Array(0, 4), Array(1.0, 2.0)),
-    Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(0.0, 1.0, 0.0, 1.0))
   ).map(_.toOPVector)
 
 
@@ -116,6 +115,10 @@ class SmartTextMapVectorizerTest
   }
 
   it should "detect one categorical and one non-categorical text feature" in {
+    val estimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setInput(m1, m2)
     val smartMapVectorized = estimator.getOutput()
 
     val smartVectorized = new SmartTextVectorizer()
