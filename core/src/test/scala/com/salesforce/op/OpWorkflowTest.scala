@@ -518,23 +518,20 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     // Generate features of all possible types
     val numOfRows = 100
     val (ds, features) = TestFeatureBuilder.random(numOfRows)(
-      // TextList vectorization does not handle empty text lists well - setting the minLen to 1 for now
+      // HashingTF transformer used in vectorization of text lists does not handle nulls well,
+      // therefore setting minLen = 1 for now
       textLists = RandomList.ofTexts(RandomText.strings(0, 10), minLen = 1, maxLen = 10).limit(numOfRows)
     )
     // Prepare the label feature
-    val label = {
-      val f = features.find(_.isSubtypeOf[RealNN]).head.asInstanceOf[Feature[RealNN]]
-      Feature[RealNN](name = f.name, isResponse = true, originStage = f.originStage,
-        parents = f.parents, uid = f.uid, distributions = f.distributions)
-    }.transformWith(new Labelizer)
+    val label = features.find(_.isSubtypeOf[RealNN]).head.asInstanceOf[Feature[RealNN]].transformWith(new Labelizer)
 
     // Transmogrify all the features using default settings
-    val vector = features.filterNot(_.uid == label.uid).transmogrify()
+    val featureVector = features.transmogrify()
 
     // Create a binary classification model selector with a single model type for simplicity
     val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
       modelsAndParameters = Seq(new OpLogisticRegression() -> new ParamGridBuilder().build())
-    ).setInput(label, vector).getOutput()
+    ).setInput(label, featureVector).getOutput()
 
     // Use id feature as row key
     val id = features.find(_.isSubtypeOf[ID]).head.asInstanceOf[Feature[ID]].name
@@ -566,6 +563,7 @@ class NoUidTest extends UnaryTransformer[Real, Real]("blarg", UID[NoUidTest]) {
 }
 
 class Labelizer(uid: String = UID[Labelizer]) extends UnaryTransformer[RealNN, RealNN]("labelizer", uid) {
+  override def outputIsResponse: Boolean = true
   def transformFn: RealNN => RealNN = v => v.value.map(x => if (x > 0.0) 1.0 else 0.0).toRealNN(0.0)
 }
 
