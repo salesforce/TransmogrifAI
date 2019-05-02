@@ -87,10 +87,11 @@ abstract class Splitter(val uid: String) extends SplitterParams {
     require(summary.nonEmpty, "Cannot call validationPrepare until preValidationPrepare has been called")
 
   /**
-    * Add a splitter parameter to name the label column
-    * @param label
-    * @return
-    */
+   * Add a splitter parameter to name the label column
+   *
+   * @param label
+   * @return
+   */
   def withLabelColumnName(label: String): Splitter = {
     if (!isSet(labelColumnName)) {
       set(labelColumnName, label)
