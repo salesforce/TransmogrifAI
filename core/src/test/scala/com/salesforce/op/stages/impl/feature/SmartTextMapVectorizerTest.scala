@@ -31,19 +31,21 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.RichMetadata._
+import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-
+import com.salesforce.op.features.types._
 
 @RunWith(classOf[JUnitRunner])
-class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
-  lazy val (data, m1, m2, f1, f2) = TestFeatureBuilder("textMap1", "textMap2", "text1", "text2",
+class SmartTextMapVectorizerTest
+  extends OpEstimatorSpec[OPVector, SequenceModel[TextMap, OPVector], SmartTextMapVectorizer[TextMap]]
+    with AttributeAsserts {
+
+  lazy val (inputData, m1, m2, f1, f2) = TestFeatureBuilder("textMap1", "textMap2", "text1", "text2",
     Seq[(TextMap, TextMap, Text, Text)](
       (TextMap(Map("text1" -> "hello world", "text2" -> "Hello world!")), TextMap.empty,
         "hello world".toText, "Hello world!".toText),
@@ -71,6 +73,24 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     )
   )
 
+  /**
+   * Estimator instance to be tested
+   */
+  override val estimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
+    .setInput(m1, m2)
+
+  /**
+   * Expected result of the transformer applied on the Input Dataset
+   */
+  override val expectedResult: Seq[OPVector] = Seq(
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(1.0, 0.0, 1.0, 0.0)),
+    Vectors.dense(Array(0.0, 1.0, 0.0, 1.0))
+  ).map(_.toOPVector)
+
+
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
       TextMapStats(Map(
@@ -93,17 +113,18 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
     )))
   }
 
-  Spec[SmartTextMapVectorizer[_]] should "detect one categorical and one non-categorical text feature" in {
-    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+  it should "detect one categorical and one non-categorical text feature" in {
+    val estimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setCleanKeys(false)
-      .setInput(m1, m2).getOutput()
+      .setInput(m1, m2)
+    val smartMapVectorized = estimator.getOutput()
 
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
@@ -136,7 +157,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setMaxCardinality(10).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     val rSmart = transformed.collect(smartVectorized)
@@ -171,7 +192,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setHashSpaceStrategy(HashSpaceStrategy.Separate)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     assertNominal(field, Array.fill(8)(false) ++ Array(true, true), transformed.collect(smartVectorized))
@@ -205,7 +226,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setNumFeatures(4).setHashSpaceStrategy(HashSpaceStrategy.Shared)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     assertNominal(field, Array.fill(4)(false) ++ Array(true, true), transformed.collect(smartVectorized))
@@ -242,7 +263,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setNumFeatures(TransmogrifierDefaults.MaxNumOfFeatures).setHashSpaceStrategy(HashSpaceStrategy.Auto)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
     val field = transformed.schema(smartVectorized.name)
     val rSmart = transformed.collect(smartVectorized)
@@ -282,7 +303,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       others = Array(m2)
     )
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, shortcutMapVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, shortcutMapVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, shortcutMapVectorized)
     val field = transformed.schema(shortcutMapVectorized.name)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
@@ -316,7 +337,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setCleanKeys(false)
       .setInput(m3, m4).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(textMapVectorized, textAreaMapVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(textMapVectorized, textAreaMapVectorized).transform(inputData)
     val result = transformed.collect(textMapVectorized, textAreaMapVectorized)
     val field = transformed.schema(textMapVectorized.name)
     assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true,
@@ -352,7 +373,7 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
       .setTrackTextLen(true)
       .setInput(f1, f2).getOutput()
 
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(data)
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, smartVectorized).transform(inputData)
     val result = transformed.collect(smartMapVectorized, smartVectorized)
 
     val field = transformed.schema(smartVectorized.name)
@@ -376,4 +397,5 @@ class SmartTextMapVectorizerTest extends FlatSpec with TestSparkContext with Att
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
+
 }
