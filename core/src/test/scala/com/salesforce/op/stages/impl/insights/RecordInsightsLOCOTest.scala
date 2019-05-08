@@ -33,8 +33,9 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.{FeatureHistory, OpWorkflow}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
-import com.salesforce.op.stages.impl.insights.TopKStrategy.PositiveNegative
-import com.salesforce.op.stages.impl.preparators.SanityCheckDataTest
+import com.salesforce.op._
+import com.salesforce.op.features.FeatureLike
+import com.salesforce.op.stages.impl.preparators.{SanityCheckDataTest, SanityChecker}
 import com.salesforce.op.stages.impl.regression.OpLinearRegression
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
@@ -42,8 +43,10 @@ import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomText, Random
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.regression.LinearRegressionModel
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.{DataFrame, Encoder, Row}
 import org.apache.spark.sql.types.StructType
+import org.apache.spark.ml.linalg._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -102,7 +105,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     insights.foreach(_.value.size shouldBe 20)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 1) } shouldBe 20 ) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 20) // number insights per pred column
     parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
   }
 
@@ -119,12 +122,12 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
     insights.foreach(_.value.size shouldBe 2)
     val parsed = insights.map(RecordInsightsParser.parseInsights)
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 5) } shouldBe 0 ) // no 6th column of insights
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 4) } shouldBe 2 ) // number insights per pred column
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 3) } shouldBe 2 ) // number insights per pred column
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 2) } shouldBe 2 ) // number insights per pred column
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 1) } shouldBe 2 ) // number insights per pred column
-    parsed.map( _.count{ case (_, v) => v.exists(_._1 == 0) } shouldBe 2 ) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 5) } shouldBe 0) // no 6th column of insights
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 4) } shouldBe 2) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 3) } shouldBe 2) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 2) } shouldBe 2) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 2) // number insights per pred column
+    parsed.map(_.count { case (_, v) => v.exists(_._1 == 0) } shouldBe 2) // number insights per pred column
   }
 
 
@@ -261,7 +264,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
       m.foreach { case (k, v) => if (abcIndices.contains(k.index)) {
         res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - abcAvg, 2), res(k.index)._2 + 1))
-      } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))}
+      } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))
+      }
       res
     }).map(x => if (x._2 > 1) x._1 / x._2 else Double.NaN)
     val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
@@ -270,23 +274,99 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
     assert(abcAvg > 4 * otherAvg,
       "Average feature strengths for features involved in label formula should be " +
-      "much larger than the average feature strengths of other features")
+        "much larger than the average feature strengths of other features")
     // There should be a really large t-value when comparing the two avg feature strengths
-    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar)/numRows) > 10,
+    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar) / numRows) > 10,
       "The t-value comparing the average feature strengths between important and other features should be large")
 
     // Record insights averaged across all records should be similar to the feature importances from Spark's RF
     val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
     val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
     val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
-    val avgRecordInsightRatio = math.abs(abcAvg/otherAvg)
-    val featureImportanceRatio = math.abs(abcAvgRF/otherAvgRF)
+    val avgRecordInsightRatio = math.abs(abcAvg / otherAvg)
+    val featureImportanceRatio = math.abs(abcAvgRF / otherAvgRF)
 
     // Compare the ratio of importances between "important" and "other" features in both paradigms
-    assert(math.abs(avgRecordInsightRatio - featureImportanceRatio)*2 /
+    assert(math.abs(avgRecordInsightRatio - featureImportanceRatio) * 2 /
       (avgRecordInsightRatio + featureImportanceRatio) < 0.8,
       "The ratio of feature strengths between important and other features should be similar to the ratio of " +
         "feature importances from Spark's RandomForest")
   }
 
+  it should "aggregate text derived features" in {
+    val numRows = 1000
+    val textData: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.3).take(numRows).toList
+    val text2Data: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.5).take(numRows).toList
+    val countryData: Seq[Text] = RandomText.textFromDomain(List("USA", "Mexico", "Canada")).withProbabilityOfEmpty(0.2)
+      .take(numRows).toList
+    val labels = RandomIntegral.integrals(0, 2).limit(numRows).map(_.value.get.toRealNN)
+
+
+    val generatedData: Seq[(Text, Text, Text, RealNN)] = countryData.zip(textData).zip(text2Data).zip(labels).map {
+      case (((c, t), t2), l) => (c, t, t2, l)
+    }
+
+    val (testData, country, text, text2, labelNoRes) = TestFeatureBuilder("country", "text", "text2", "label",
+      generatedData)
+    val label = labelNoRes.copy(isResponse = true)
+    val featureVector = text.smartVectorize(50,
+      50,
+      false,
+      1,
+      false,
+      others = Array(text2, country))
+
+    val vectorized = new OpWorkflow().setResultFeatures(featureVector).transform(testData)
+
+    val checker = new SanityChecker().setInput(label, featureVector)
+
+    val checked = checker.fit(vectorized).transform(vectorized)
+
+    val f = checker.getOutput()
+
+    val sparkModel = new OpLogisticRegression().setInput(label, f).fit(checked)
+
+    val transformer = new RecordInsightsLOCO(sparkModel).setInput(f)
+
+    val insights = transformer.transform(checked)
+    val parsed = insights.collect(transformer.getOutput()).map { case i => RecordInsightsParser.parseInsights(i) }
+    parsed.map(_.size shouldBe 3)
+    parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
+      && r.indicatorValue.isDefined), "non aggregated country LOCO should be in top LOCOs"))
+    parsed.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
+
+    val meta = OpVectorMetadata.apply(checked.schema(f.name))
+
+    implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
+    implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
+
+    def assertAggregatedText(textFeature: FeatureLike[Text]): Unit = {
+      val textIndices = meta.columns.filter(c => c.parentFeatureName == Seq(textFeature.name)
+        && c.indicatorValue.isEmpty && c.descriptorValue.isEmpty).map(_.index)
+
+      val expectedLocos = checked.select(label, f).map { case Row(l: Double, v: Vector) =>
+        val featureArray = v.toArray
+        textIndices.map { i =>
+          val oldVal = v(i)
+          val baseScore = sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score
+          featureArray.update(i, 0.0)
+          val newScore = sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score
+          featureArray.update(i, oldVal)
+          baseScore.zip(newScore).map { case (b, n) => b - n } -> 1L
+        }.reduce((a, b) => a._1.zip(b._1).map { case (v1, v2) => v1 + v2 } -> (a._2 + b._2))
+      }.map { case (a: Array[Double], n: Long) => a.map(_ / n).toSeq }
+      val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
+
+      val actual = parsed.map(_.find(_._1.parentFeatureOrigins == Seq(textFeature.name)).get)
+        .filter(_._1.indicatorValue.isEmpty).map(_._2.map(_._2)).toSeq
+      val zip = actual.zip(expected)
+      zip.foreach { case (a, e) => a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
+        "expected aggregated LOCO should be the same as actual")
+      }
+      }
+    }
+
+    assertAggregatedText(text)
+    assertAggregatedText(text2)
+  }
 }

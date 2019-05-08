@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
+import com.salesforce.op.stages.impl.feature.SmartTextVectorizer
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
@@ -93,8 +94,12 @@ class RecordInsightsLOCO[T <: Model[T]]
     case m => toOPUnchecked(m).transformFn
   }
   private val labelDummy = RealNN(0.0)
+  private lazy val vectorMetadata = OpVectorMetadata(getInputSchema()(in1.name))
+  private lazy val histories = vectorMetadata.getColumnHistory()
+  private lazy val featureInfo = histories.map(_.toJson(false))
 
-  private lazy val featureInfo = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory().map(_.toJson(false))
+  private val textClassName = SmartTextVectorizer.getClass.getSimpleName.split("\\$").last
+  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(_.contains(textClassName))).map(_.index)
 
   private def computeDiffs(i: Int, oldInd: Int, oldVal: Double, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double]): Array[Double] = {
@@ -104,6 +109,15 @@ class RecordInsightsLOCO[T <: Model[T]]
     featureArray.update(i, (oldInd, oldVal))
     diffs
   }
+
+  private def sumArray(left: Array[Double], right: Array[Double]): Array[Double] = {
+    if (left.isEmpty) {
+      right
+    } else if (right.isEmpty) {
+      left
+    } else left.zip(right).map { case (l, r) => l + r }
+  }
+
 
   private def returnTopPosNeg(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double], k: Int, indexToExamine: Int): Seq[(Int, Double, Array[Double])] = {
@@ -116,11 +130,8 @@ class RecordInsightsLOCO[T <: Model[T]]
     var positiveCount = 0
     // Size of negative heap
     var negativeCount = 0
-    var i = 0
-    while (i < filledSize) {
-      val (oldInd, oldVal) = featureArray(i)
-      val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
-      val max = diffToExamine(indexToExamine)
+
+    def addToHeaps(i: Int, max: Double, diffToExamine: Array[Double]): Unit = {
 
       if (max > 0.0) { // if positive LOCO then add it to positive heap
         positiveMaxHeap.enqueue((i, max, diffToExamine))
@@ -135,8 +146,37 @@ class RecordInsightsLOCO[T <: Model[T]]
           negativeMaxHeap.dequeue()
         } // Not keeping LOCOs with value 0
       }
+    }
+
+    var i = 0
+    val aggregationMap = scala.collection.mutable.Map.empty[String, (Array[Int], Array[Double])]
+    while (i < filledSize) {
+      val (oldInd, oldVal) = featureArray(i)
+      val history = histories(oldInd)
+      val rawName = history.parentFeatureOrigins.head
+      val parentStages = history.parentFeatureStages
+      val indValue = history.indicatorValue
+      val descValue = history.descriptorValue
+      val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
+      val max = diffToExamine(indexToExamine)
+      if (parentStages.exists(_.contains(textClassName)) && indValue.isEmpty && descValue.isEmpty) {
+        val (indices, array) = aggregationMap.getOrElse(rawName, (Array.empty[Int], Array.empty[Double]))
+        aggregationMap(rawName) = (indices :+ i, sumArray(array, diffToExamine))
+      } else {
+        addToHeaps(i, max, diffToExamine)
+      }
       i += 1
     }
+    aggregationMap.foreach {
+      case (_, (indices, ar)) => {
+        val i = indices.head
+        val n = indices.length
+        val diffToExamine = ar.map(_ / n)
+        val max = diffToExamine(indexToExamine)
+        addToHeaps(i, max, diffToExamine)
+      }
+    }
+
     val topPositive = positiveMaxHeap.dequeueAll
     val topNegative = negativeMaxHeap.dequeueAll
     (topPositive ++ topNegative)
@@ -148,10 +188,11 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
-    val featureArray = featuresSparse.indices.zip(featuresSparse.values)
-    val filledSize = featureArray.length
-    val featureSize = featuresSparse.size
+    val indices = (featuresSparse.indices ++ textIndices).toSet
+    val filledSize = indices.size
+    val featureArray = indices.map(i => i -> features.value(i)).toArray
 
+    val featureSize = featuresSparse.size
     val k = $(topK)
     val indexToExamine = baseScore.length match {
       case 0 => throw new RuntimeException("model does not produce scores for insights")
