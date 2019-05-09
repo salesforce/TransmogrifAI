@@ -94,7 +94,7 @@ object ReflectionUtils {
    * @tparam T type T
    * @return new instance of T
    */
-  def newInstance[T](className: String, classLoader: ClassLoader): T = {
+  def newInstance[T](className: String, classLoader: ClassLoader): T = try {
     val klazz = ReflectionUtils.classForName(className, classLoader)
     // Try to create an instance only if it has a single no-args ctor or fall back to object
     val res = klazz.getConstructors.find(_.getParameterCount == 0) match {
@@ -102,6 +102,11 @@ object ReflectionUtils {
       case _ => klazz.getField("MODULE$").get(klazz)
     }
     res.asInstanceOf[T]
+  } catch {
+    case e: Exception => throw new RuntimeException(
+      s"Failed to create an instance of class '$className'. " +
+        "Class has to either have a no-args ctor or be an object.", e
+    )
   }
 
   /**
