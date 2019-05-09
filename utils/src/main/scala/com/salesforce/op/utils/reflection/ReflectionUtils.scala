@@ -261,15 +261,17 @@ object ReflectionUtils {
   }
 
   /**
-   * Returns a Type Tag by string name
+   * Returns a Type Tag by Type name
    *
-   * @param className class name
-   * @param rtm       runtime mirror
-   * @return TypeTag[_]
+   * @param typeName type name
+   * @param rtm      runtime mirror
+   * @tparam T type T
+   * @return TypeTag[T]
    */
-  def typeTagForTypeName(className: String, rtm: Mirror = runtimeMirror()): TypeTag[_] = {
-    val clazz = classForName(className)
-    typeTagForType(rtm.classSymbol(clazz).toType, rtm)
+  def typeTagForTypeName[T](typeName: String, rtm: Mirror = runtimeMirror()): TypeTag[T] = {
+    val clazz = classForName(typeName)
+    val typee = rtm.classSymbol(clazz).toType
+    typeTagForType[T](typee, rtm)
   }
 
   /**

@@ -82,7 +82,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   // TypeTags (because it is following the ReflectionUtils...)
   def tti: WeakTypeTag[I] = _tti match {
     case Left(x) => x
-    case Right(n) => ReflectionUtils.typeTagForTypeName(n).asInstanceOf[WeakTypeTag[I]]
+    case Right(n) => ReflectionUtils.typeTagForTypeName[I](n)
   }
 
   setOutputFeatureName(outputName)
