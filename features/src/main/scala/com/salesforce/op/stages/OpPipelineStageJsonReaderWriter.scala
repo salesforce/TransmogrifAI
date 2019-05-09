@@ -91,7 +91,7 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
       .map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
 
     // Make the ctor function used for creating a stage instance
-    def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = {
+    val ctorArgs: (String, Symbol) => Try[Any] = (argName, argSymbol) => {
       for {
         anyValue <- Try {
           ctorArgsMap.getOrElse(argName, throw new RuntimeException(
@@ -210,6 +210,7 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
 }
 
 trait LambdaSerializer {
+
   protected def serializeFunction(argName: String, function: AnyRef): AnyValue = {
     try {
       val functionClass = function.getClass
@@ -223,4 +224,5 @@ trait LambdaSerializer {
           "e.g. use any out of scope variables.", error)
     }
   }
+
 }

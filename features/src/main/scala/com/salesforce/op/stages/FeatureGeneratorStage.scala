@@ -32,18 +32,19 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.UID
 import com.salesforce.op.aggregators.{Event, FeatureAggregator, GenericFeatureAggregator}
-import com.salesforce.op.features.types.{FeatureType, Text}
 import com.salesforce.op.features._
+import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.twitter.algebird.MonoidAggregator
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.util.ClosureUtils
 import org.joda.time.Duration
 import org.json4s.JValue
+import org.json4s.JsonAST.JObject
 import org.json4s.JsonDSL._
 
 import scala.reflect.runtime.universe.WeakTypeTag
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
 
 /**
  * Origin stage for first features in workflow
@@ -81,7 +82,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   // TypeTags (because it is following the ReflectionUtils...)
   def tti: WeakTypeTag[I] = _tti match {
     case Left(x) => x
-    case Right(n) => ReflectionUtils.weakTypeTagForName(n).asInstanceOf[WeakTypeTag[I]]
+    case Right(n) => ReflectionUtils.typeTagForName(className = n).asInstanceOf[WeakTypeTag[I]]
   }
 
   setOutputFeatureName(outputName)
@@ -147,11 +148,11 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
             .getConstructors.head.newInstance(extractFnIdx, extractFnName, tto)
             .asInstanceOf[Function1[I, O]]
         }
-        case _ => ReflectionUtils.getInstanceOfObject[Function1[I, O]](extractFnStr)
+        case _ => ReflectionUtils.newInstance[Function1[I, O]](extractFnStr)
       }
 
       val aggregator = ReflectionUtils.
-        getInstanceOfObject[MonoidAggregator[Event[O], _, O]]((json \ "aggregator").extract[String])
+        newInstance[MonoidAggregator[Event[O], _, O]]((json \ "aggregator").extract[String])
 
       val outputName = (json \ "outputName").extract[String]
       val extractSource = (json \ "extractSource").extract[String]
@@ -175,27 +176,23 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
     for {
       extractFn <- Try {
         stage.extractFn match {
-          case c: FromRowExtractFn[_] => c.getClass.getName
-          case _ => serializeFunction("extractFn", stage.extractFn).value.toString
+          case e: FromRowExtractFn[_] =>
+            ("className" -> e.getClass.getName) ~ ("index" -> e.index) ~ ("name" -> e.name)
+          case e =>
+            ("className" -> serializeFunction("extractFn", e).value.toString) ~ JObject()
         }
       }
-      aggregatorFn <- Try(serializeFunction("aggregator", stage.aggregator))
+      aggregator <- Try(serializeFunction("aggregator", stage.aggregator).value.toString)
     } yield {
-      val res = ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
+      ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
         ("tto" -> FeatureType.typeName(stage.tto)) ~
-        ("aggregator" -> aggregatorFn.value.toString) ~
+        ("aggregator" -> aggregator) ~
         ("extractFn" -> extractFn) ~
         ("outputName" -> stage.outputName) ~
         ("aggregateWindow" -> stage.aggregateWindow.map(_.toStandardSeconds.getSeconds)) ~
         ("uid" -> stage.uid) ~
         ("extractSource" -> stage.extractSource) ~
         ("outputIsResponse" -> stage.outputIsResponse)
-
-      stage.extractFn match {
-        case x: FromRowExtractFn[_] => res ~ ("extractFnIdx" -> x.index) ~ ("extractFnName" -> x.name)
-        case _ => res
-      }
     }
-
   }
 }

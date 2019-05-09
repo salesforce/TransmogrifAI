@@ -78,6 +78,33 @@ object ReflectionUtils {
   }
 
   /**
+   * Create a new of type T given it's class name
+   *
+   * @param className instance class
+   * @tparam T type T
+   * @return new instance of T
+   */
+  def newInstance[T](className: String): T = newInstance[T](className, defaultClassLoader)
+
+  /**
+   * Create a new of type T given it's class name
+   *
+   * @param className   instance class
+   * @param classLoader class loader to use
+   * @tparam T type T
+   * @return new instance of T
+   */
+  def newInstance[T](className: String, classLoader: ClassLoader): T = {
+    val klazz = ReflectionUtils.classForName(className, classLoader)
+    // Try to create an instance only if it has a single no arg ctor or fall back to object
+    val res = klazz.getConstructors.find(_.getParameterCount == 0) match {
+      case Some(c) => c.newInstance()
+      case _ => klazz.getField("MODULE$").get(klazz)
+    }
+    res.asInstanceOf[T]
+  }
+
+  /**
    * Copy any instance using reflection.
    *
    * Note: all the implicit type values must be explicitly mentioned in the ctor.
@@ -198,7 +225,6 @@ object ReflectionUtils {
    */
   def classForName(name: String, classLoader: ClassLoader = defaultClassLoader): Class[_] = classLoader.loadClass(name)
 
-
   /**
    * Fully dealiased type name for [[Type]].
    * This method performs a recursive dealising vs a regular type.dealias, which does on one level only.
@@ -235,62 +261,15 @@ object ReflectionUtils {
   }
 
   /**
-   * Create a WeakTypeTag for Type
-   *
-   * @param rtm runtime mirror
-   * @param tpe type
-   * @tparam T type T
-   * @return TypeTag[T]
-   */
-  def weakTypeTagForType[T](tpe: Type): WeakTypeTag[T] = {
-    WeakTypeTag(runtimeMirror(), new api.TypeCreator {
-      def apply[U <: api.Universe with Singleton](m: api.Mirror[U]): U#Type =
-        if (m eq runtimeMirror()) tpe.asInstanceOf[U#Type]
-        else throw new IllegalArgumentException(s"Type tag defined in  cannot be migrated to other mirrors.")
-    })
-  }
-
-
-  /**
    * Returns a Type Tag by string name
    *
-   * @param rtm runtime mirror
-   * @param n   class name
+   * @param rtm       runtime mirror
+   * @param className class name
    * @return TypeTag[_]
    */
-  def typeTagForName(rtm: Mirror = runtimeMirror(), n: String): TypeTag[_] = {
-    val clazz = classForName(n)
+  def typeTagForName(rtm: Mirror = runtimeMirror(), className: String): TypeTag[_] = {
+    val clazz = classForName(className)
     typeTagForType(rtm, rtm.classSymbol(clazz).toType)
-  }
-
-  /**
-   * Returns a Weak Type Tag by string name
-   *
-   * @param rtm runtime mirror
-   * @param n   class name
-   * @return TypeTag[_]
-   */
-  def weakTypeTagForName(n: String): WeakTypeTag[_] = {
-    val clazz = classForName(n)
-    weakTypeTagForType(runtimeMirror().classSymbol(clazz).toType)
-  }
-
-
-  /**
-   * A helper function to get instance of lambda function or object
-   * @param name full name
-   * @return
-   */
-  def getInstanceOfObject[T](name: String): T = {
-    val clazz = ReflectionUtils.classForName(name)
-
-    val res = clazz.getConstructors.headOption match {
-      case Some(c) => c.newInstance()
-      case _ => {
-        clazz.getField("MODULE$").get(clazz)
-      }
-    }
-    res.asInstanceOf[T]
   }
 
   /**
