@@ -138,8 +138,6 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
         val originalStage = workflow.stages.find(_.uid == stageUid)
         originalStage match {
           case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
-          case None if stageUid.startsWith("FeatureGeneratorStage_") =>
-            new OpPipelineStageReader(Seq()).loadFromJson(j, path).asInstanceOf[OPStage]
           case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
         }
       }

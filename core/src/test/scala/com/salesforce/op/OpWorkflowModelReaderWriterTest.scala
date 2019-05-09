@@ -52,7 +52,7 @@ import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConverters._
-import OpWorkflowModelReaderWriterTest._
+
 
 @RunWith(classOf[JUnitRunner])
 class OpWorkflowModelReaderWriterTest
@@ -145,7 +145,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
-    val vec = FeatureBuilder.OPVector[Passenger].extract(emptyVectFnc).asPredictor
+    val vec = FeatureBuilder.OPVector[Passenger].extract(OpWorkflowModelReaderWriterTest.emptyVectorFn).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
     val schema = FeatureSparkTypes.toStructType(vec)
     val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
@@ -172,7 +172,7 @@ class OpWorkflowModelReaderWriterTest
 
   it should "have a single stage" in new SingleStageFlow {
     val stagesM = (jsonModel \ Stages.entryName).extract[JArray]
-    stagesM.values.size shouldBe 3
+    stagesM.values.size shouldBe 1
   }
 
   it should "have 3 features" in new SingleStageFlow {
@@ -193,7 +193,7 @@ class OpWorkflowModelReaderWriterTest
 
   "MultiStage OpWorkflowWriter" should "recover all relevant stages" in new MultiStageFlow {
     val stagesM = (jsonModel \ Stages.entryName).extract[JArray]
-    stagesM.values.size shouldBe 5
+    stagesM.values.size shouldBe 2
   }
 
   it should "recover all relevant features" in new MultiStageFlow {
@@ -255,7 +255,7 @@ class OpWorkflowModelReaderWriterTest
 
   trait VectorizedFlow extends UIDReset {
     val cat = Seq(gender, boarded, height, age, description).transmogrify()
-    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.mapFnc0)
+    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.catHeadFn)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setResultFeatures(catHead)
@@ -378,7 +378,6 @@ trait UIDReset {
 }
 
 object OpWorkflowModelReaderWriterTest {
-  def mapFnc0: OPVector => Real = v => Real(v.value.toArray.headOption)
-
-  def emptyVectFnc: (Passenger => OPVector) = _ => OPVector.empty
+  def catHeadFn: OPVector => Real = v => Real(v.value.toArray.headOption)
+  def emptyVectorFn: (Passenger => OPVector) = _ => OPVector.empty
 }

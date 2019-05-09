@@ -32,7 +32,7 @@ package com.salesforce.op
 
 import com.salesforce.op.features.FeatureJsonHelper
 import com.salesforce.op.filters.RawFeatureFilterResults
-import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpPipelineStageBase, OpPipelineStageWriter}
+import com.salesforce.op.stages.{OpPipelineStageBase, OpPipelineStageWriter}
 import enumeratum._
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.util.MLWriter
@@ -98,8 +98,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @return array of serialized stages
    */
   private def stagesJArray(path: String): JArray = {
-    val featureGenerators = model.rawFeatures.map(_.originStage).collect { case fg: FeatureGeneratorStage[_, _] => fg }
-    val stages: Seq[OpPipelineStageBase] = featureGenerators ++ model.stages
+    val stages: Seq[OpPipelineStageBase] = model.stages
     val stagesJson: Seq[JObject] = stages
       .map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
       .filter(_.children.nonEmpty)
@@ -135,23 +134,14 @@ private[op] object OpWorkflowModelReadWriteShared {
    */
   object FieldNames extends Enum[FieldNames] {
     val values = findValues
-
     case object Uid extends FieldNames("uid")
-
     case object ResultFeaturesUids extends FieldNames("resultFeaturesUids")
-
     case object BlacklistedFeaturesUids extends FieldNames("blacklistedFeaturesUids")
-
     case object Stages extends FieldNames("stages")
-
     case object AllFeatures extends FieldNames("allFeatures")
-
     case object Parameters extends FieldNames("parameters")
-
     case object TrainParameters extends FieldNames("trainParameters")
-
     case object RawFeatureFilterResultsFieldName extends FieldNames("rawFeatureFilterResults")
-
   }
 
 }
