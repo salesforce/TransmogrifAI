@@ -32,44 +32,38 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.feature.NGram
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-
 @RunWith(classOf[JUnitRunner])
-class NGramTest extends SwTransformerSpec[TextList, NGram, OpTransformerWrapper[TextList, TextList, NGram]] {
-  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
-  val (inputData, textListFeature) = TestFeatureBuilder(data)
+class SetNGramSimilarityTest extends OpTransformerSpec[RealNN, SetNGramSimilarity] {
 
-  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
+  val (inputData, f1, f2) = TestFeatureBuilder(
+    Seq(
+      (Seq("Red", "Green"), Seq("Red")),
+      (Seq("Red", "Green"), Seq("Yellow, Blue")),
+      (Seq("Red", "Yellow"), Seq("Red", "Yellow")),
+      (Seq[String](), Seq("Red", "Yellow")),
+      (Seq[String](), Seq[String]()),
+      (Seq[String](""), Seq[String]("asdf")),
+      (Seq[String](""), Seq[String]("")),
+      (Seq[String]("", ""), Seq[String]("", ""))
+    ).map(v => v._1.toMultiPickList -> v._2.toMultiPickList)
+  )
 
-  val bigrams = textListFeature.ngram()
-  val transformer = bigrams.originStage.asInstanceOf[OpTransformerWrapper[TextList, TextList, NGram]]
+  val expectedResult = Seq(0.3333333134651184, 0.09722214937210083, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
+  val catNGramSimilarity = f1.toNGramSimilarity(f2)
+  val transformer = catNGramSimilarity.originStage.asInstanceOf[SetNGramSimilarity]
 
-  it should "generate unigrams" in {
-    val unigrams = textListFeature.ngram(n = 1)
-    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(unigrams)
+  it should "correctly compute char-n-gram similarity with nondefault ngram param" in {
+    val cat5GramSimilarity = f1.toNGramSimilarity(f2, 5)
+    val transformedDs = cat5GramSimilarity.originStage.asInstanceOf[Transformer].transform(inputData)
+    val actualOutput = transformedDs.collect(cat5GramSimilarity)
 
-    results(0) shouldBe data.head
+    actualOutput shouldBe Seq(0.3333333432674408, 0.12361115217208862, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
   }
-
-  it should "generate trigrams" in {
-    val trigrams = textListFeature.ngram(n = 3)
-    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(trigrams)
-
-    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
-  }
-
-  it should "not allow n < 1" in {
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
-  }
-
 }
+

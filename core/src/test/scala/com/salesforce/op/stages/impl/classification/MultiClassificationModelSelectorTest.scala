@@ -36,29 +36,32 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.classification.FunctionalityForClassificationTests._
 import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
+import com.salesforce.op.stages.impl.feature.OpStringIndexerNoFilter
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{ModelEvaluation, ModelSelectorNames, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning._
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import org.apache.spark.ml.attribute.{MetadataHelper, NominalAttribute}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.mllib.random.RandomRDDs._
-import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{DataFrame, Encoders}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.PropertyChecks
 import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
 class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContext
-  with CompareParamGrid with OpXGBoostQuietLogging {
+  with CompareParamGrid with OpXGBoostQuietLogging with PropertyChecks {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -66,24 +69,38 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
   import spark.implicits._
 
+  val txtData = Seq("zero", "one", "two").map(_.toText)
+  val (txtDs, txtF) = TestFeatureBuilder("txtLabel", txtData)
+
   // Generate observations of label 1 following a distribution ~ N((-100.0, -100.0, -100.0), I_3)
   val label0Data =
     normalVectorRDD(sc, label0Count, 3, seed = seed)
-      .map(v => 0.0 -> Vectors.dense(v.toArray.map(_ - 100.0)))
+      .map(v => "zero" -> Vectors.dense(v.toArray.map(_ - 100.0)))
 
   // Generate  observations of label 0 following a distribution ~ N((0.0, 0.0, 0.0), I_3)
   val label1Data =
     normalVectorRDD(sc, label1Count, 3, seed = seed)
-      .map(v => 1.0 -> Vectors.dense(v.toArray))
+      .map(v => "one" -> Vectors.dense(v.toArray))
 
   // Generate observations of label 2 following a distribution ~ N((100.0, 100.0, 100.0), I_3)
   val label2Data =
     normalVectorRDD(sc, label2Count, 3, seed = seed)
-      .map(v => 2.0 -> Vectors.dense(v.toArray.map(_ + 100.0)))
+      .map(v => "two" -> Vectors.dense(v.toArray.map(_ + 100.0)))
+
+  val nonIndexedData = label0Data
+    .union(label1Data)
+    .union(label2Data)
+    .toDF("txtLabel", "features")
+
+  val data = new OpStringIndexerNoFilter[Text]()
+    .setInput(txtF)
+    .setOutputFeatureName("label")
+    .fit(nonIndexedData)
+    .transform(nonIndexedData)
+    .drop("txtLabel")
+    .select("label", "features")
 
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")
-
-  val data = label0Data.union(label1Data).union(label2Data).toDF("label", "features")
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
     data, response = "label", nonNullable = Set("features")
@@ -243,7 +260,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val pred = testEstimator.getOutput()
     val justScores = transformedData.collect(pred)
     val missed = justScores.zip(transformedData.collect(label))
-      .map{ case (p, l) => math.abs(p.prediction - l.v.get) }.sum
+      .map { case (p, l) => math.abs(p.prediction - l.v.get) }.sum
     missed < 10 shouldBe true
   }
 
@@ -279,7 +296,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val holdOutMetaData = metaData.holdoutEvaluation.get.toJson(false)
 
     testEstimator.evaluators.foreach {
-      case evaluator: OpMultiClassificationEvaluator => {
+      case _: OpMultiClassificationEvaluator => {
         MultiClassEvalMetrics.values.foreach(metric =>
           Seq(trainMetaData, holdOutMetaData).foreach(
             metadata => assert(metadata.contains(s"${metric.entryName}"),
@@ -311,9 +328,111 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     val fitted = modelSelector.fit(data)
 
     fitted.modelStageIn.parent.extractParamMap().toSeq
-      .collect{ case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
+      .collect { case p: ParamPair[_] if p.param.name == "impurity" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.validationResults.head shouldBe myMetadata
+  }
+
+  it should "trim low-cardinality labels during cross validation" in {
+
+    val labelColName = "label"
+    val testTable = Table(
+      ("nunLabeledRecords", "numLabels", "topLabelsToPick"),
+      (1000, 10, 100),
+      (1000, 100, 100),
+      (2000, 1000, 100),
+      (200, 101, 100),
+      (200, 101, 50)
+    )
+
+    forAll(testTable) { (numLabeledRecords: Int, numLabels: Int, topLabelsToPick: Int) =>
+
+      Seq("withNumVals", "withValues").foreach { metaDataMode =>
+
+        log.info(s"numLabeledRecords=${numLabeledRecords}, numLabels=${numLabels}, " +
+          s"topLabelsToPick=${topLabelsToPick} metaMode=$metaDataMode")
+
+        val bigNoneIndexedData =
+          normalVectorRDD(sc, numLabeledRecords, 3, seed = seed)
+            .map { v =>
+              val denseVec = Vectors.dense(v.toArray.map(_ + 100))
+              ("label_" + (math.abs(denseVec.hashCode()) % numLabels)) -> denseVec
+            }
+            .toDF("txtLabel", "features")
+            .persist() // IMPORTANT prevent recomputing the DF with Random
+
+        val bigData = new OpStringIndexerNoFilter[Text]()
+          .setInput(txtF)
+          .setOutputFeatureName(labelColName)
+          .fit(bigNoneIndexedData)
+          .transform(bigNoneIndexedData)
+          .select(labelColName, "features")
+          .persist()
+
+        val countDistinct = bigData.select(labelColName).distinct().count()
+        log.info(s"bigdata uniqs $countDistinct")
+        val bigDataWithMeta = if (metaDataMode == "withNumVals") {
+          val na = NominalAttribute.defaultAttr.withName(labelColName) // no vals, no num_vals
+          bigData.withColumn(labelColName, col(labelColName).as(labelColName, na.toMetadata))
+        } else {
+          bigData
+        }
+
+        val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
+          bigDataWithMeta, response = labelColName, nonNullable = Set("features"))
+
+        val cutter = new DataCutter() {
+          var prevalidationValForTest: Option[PrevalidationVal] = None
+          override def preValidationPrepare(df: DataFrame): PrevalidationVal = {
+            val res = super.preValidationPrepare(df)
+            prevalidationValForTest = Option(res)
+            res
+          }
+        }
+          .setSeed(42L)
+          .setMaxLabelCategories(topLabelsToPick)
+
+        val testEstimator =
+          MultiClassificationModelSelector
+            .withCrossValidation(
+              splitter = Option(cutter),
+              validationMetric = Evaluators.MultiClassification.f1().setTopNs(Array(1000)),
+              numFolds = 4,
+              seed = 10L,
+              modelsAndParameters = models
+            )
+            .setInput(label, features)
+        testEstimator.fit(bigDataWithMeta)
+
+        val prediction = testEstimator.getOutput()
+        val model = testEstimator.fit(bigDataWithMeta)
+        val transformedBigData = model.transform(bigDataWithMeta)
+
+        // Verify that multiclass metrics can be computed even when unseen labels may be present
+        val evaluatorMulti = new OpMultiClassificationEvaluator()
+          .setLabelCol(label)
+          .setPredictionCol(prediction)
+        noException should be thrownBy evaluatorMulti.evaluateAll(transformedBigData)
+
+        val (numLabelsInCutter, numLabelsInCutterMetadata) = {
+          import scala.language.reflectiveCalls
+          val df = cutter.prevalidationValForTest
+            .flatMap(_.dataFrame)
+            .getOrElse(spark.emptyDataFrame)
+
+          (df.select(labelColName).distinct().count(),
+            MetadataHelper.metadtaUtils.getNumClasses(df.schema.head).getOrElse(-1))
+        }
+
+        val maxUniqs = math.min(numLabels, topLabelsToPick)
+        numLabelsInCutter <= maxUniqs shouldBe true
+        numLabelsInCutter > 0 shouldBe true
+        numLabelsInCutterMetadata shouldBe numLabelsInCutter
+
+        bigData.unpersist()
+        bigNoneIndexedData.unpersist()
+      }
+    }
   }
 }

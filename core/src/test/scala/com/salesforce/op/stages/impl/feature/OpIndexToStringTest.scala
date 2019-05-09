@@ -30,46 +30,36 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
 import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.feature.NGram
+import org.apache.spark.ml.feature.IndexToString
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class NGramTest extends SwTransformerSpec[TextList, NGram, OpTransformerWrapper[TextList, TextList, NGram]] {
-  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
-  val (inputData, textListFeature) = TestFeatureBuilder(data)
+class OpIndexToStringTest extends SwTransformerSpec[Text, IndexToString, OpIndexToString] {
 
-  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
+  val (inputData, indF) = TestFeatureBuilder(Seq(0.0, 2.0, 1.0, 0.0, 0.0, 1.0).map(_.toRealNN))
+  val labels = Array("a", "c", "b")
 
-  val bigrams = textListFeature.ngram()
-  val transformer = bigrams.originStage.asInstanceOf[OpTransformerWrapper[TextList, TextList, NGram]]
+  val transformer = new OpIndexToString().setInput(indF).setLabels(labels)
 
-  it should "generate unigrams" in {
-    val unigrams = textListFeature.ngram(n = 1)
-    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(unigrams)
+  val expectedResult: Seq[Text] = Array("a", "b", "c", "a", "a", "c").map(_.toText)
 
-    results(0) shouldBe data.head
+  it should "correctly deindex a numeric column" in {
+    val strs = transformer.transform(inputData).collect(transformer.getOutput())
+    strs shouldBe expectedResult
   }
 
-  it should "generate trigrams" in {
-    val trigrams = textListFeature.ngram(n = 3)
-    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(trigrams)
-
-    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
+  it should "correctly deindex a numeric column (shortcut)" in {
+    val str = indF.deindexed(labels, handleInvalid = IndexToStringHandleInvalid.Error)
+    val strs = str.originStage.asInstanceOf[OpIndexToString].transform(inputData).collect(str)
+    strs shouldBe expectedResult
   }
 
-  it should "not allow n < 1" in {
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
+  it should "get labels" in {
+    transformer.getLabels shouldBe labels
   }
-
 }

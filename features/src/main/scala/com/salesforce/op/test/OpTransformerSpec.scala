@@ -49,54 +49,12 @@ import scala.reflect.runtime.universe._
  * @tparam O               output feature type
  * @tparam TransformerType type of the transformer being tested
  */
-abstract class OpTransformerSpec[O <: FeatureType : WeakTypeTag : ClassTag,
-TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : ClassTag]
-  extends OpPipelineStageSpec[O, TransformerType] {
+abstract class OpTransformerSpec[O <: FeatureType,
+TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer]
+(
+  implicit val cto: ClassTag[O], val wto: WeakTypeTag[O], val ttc: ClassTag[TransformerType]
+) extends OpPipelineStageSpec[O, TransformerType] with TransformerSpecCommon[O, TransformerType] {
 
-  /**
-   * [[OpTransformer]] instance to be tested
-   */
-  val transformer: TransformerType
-
-  /**
-   * Input Dataset to transform
-   */
-  val inputData: Dataset[_]
-
-  /**
-   * Expected result of the transformer applied on the Input Dataset
-   */
-  val expectedResult: Seq[O]
-
-  final override lazy val stage = transformer
-  protected val convert = FeatureTypeSparkConverter[O]()
-
-  it should "be json writable/readable" in {
-    val loaded = writeAndRead(stage)
-    assert(loaded, stage)
-  }
-  it should "transform schema" in {
-    val transformedSchema = transformer.transformSchema(inputData.schema)
-    val output = transformer.getOutput()
-    val validationResults =
-      FeatureSparkTypes.validateSchema(transformedSchema, transformer.getInputFeatures() :+ output)
-    if (validationResults.nonEmpty) {
-      fail("Dataset schema is invalid. Errors: " + validationResults.mkString("'", "','", "'"))
-    }
-  }
-  it should "transform data" in {
-    val transformed = transformer.transform(inputData)
-    val output = transformer.getOutput()
-    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
-    res shouldEqual expectedResult
-  }
-  it should "transform empty data" in {
-    val empty = spark.emptyDataset(RowEncoder(inputData.schema))
-    val transformed = transformer.transform(empty)
-    val output = transformer.getOutput()
-    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
-    res.size shouldBe 0
-  }
   it should "transform rows" in {
     val rows = inputData.toDF().collect()
     val res: Seq[O] = rows.view.map(row => transformer.transformRow(row)).map(convert.fromSpark)
@@ -124,11 +82,69 @@ TransformerType <: OpPipelineStage[O] with Transformer with OpTransformer : Clas
 
   // TODO: test metadata on stages
 
+}
+
+/**
+ * Common test transformer functionality for [[OpTransformerSpec]] and [[SwTransformerSpec]] specs
+ *
+ * @tparam O               output feature type
+ * @tparam TransformerType type of the transformer being tested
+ */
+private[test] trait TransformerSpecCommon[O <: FeatureType, TransformerType <: OpPipelineStage[O] with Transformer] {
+  self: OpPipelineStageSpec[O, TransformerType] =>
+
+  /**
+   * Transformer instance to be tested
+   */
+  val transformer: TransformerType
+
+  /**
+   * Input Dataset to transform
+   */
+  val inputData: Dataset[_]
+
+  /**
+   * Expected result of the transformer applied on the Input Dataset
+   */
+  val expectedResult: Seq[O]
+
+  implicit def cto: ClassTag[O]
+  implicit def wto: WeakTypeTag[O]
+  protected lazy val convert: FeatureTypeSparkConverter[O] = FeatureTypeSparkConverter[O]()
+
+  final override lazy val stage = transformer
+
+  it should "be json writable/readable" in {
+    val loaded = writeAndRead(transformer)
+    assert(loaded, transformer)
+  }
+  it should "transform schema" in {
+    val transformedSchema = transformer.transformSchema(inputData.schema)
+    val output = transformer.getOutput()
+    val validationResults =
+      FeatureSparkTypes.validateSchema(transformedSchema, transformer.getInputFeatures() :+ output)
+    if (validationResults.nonEmpty) {
+      fail("Dataset schema is invalid. Errors: " + validationResults.mkString("'", "','", "'"))
+    }
+  }
+  it should "transform data" in {
+    val transformed = transformer.transform(inputData)
+    val output = transformer.getOutput()
+    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
+    res shouldEqual expectedResult
+  }
+  it should "transform empty data" in {
+    val empty = spark.emptyDataset(RowEncoder(inputData.schema))
+    val transformed = transformer.transform(empty)
+    val output = transformer.getOutput()
+    val res: Seq[O] = transformed.collect(output)(convert, classTag[O]).toSeq
+    res.size shouldBe 0
+  }
 
   /**
    * A helper function to write and read stage into savePath
    *
-   * @param stage stage instance to write and then read
+   * @param stage    stage instance to write and then read
    * @param savePath Spark stage save path
    * @return read stage
    */

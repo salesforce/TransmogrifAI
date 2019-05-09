@@ -23,6 +23,7 @@ gradlew.bat
 
 .env
 .gradletasknamecache
+.metals
 
 derby.log
 metastore_db/
