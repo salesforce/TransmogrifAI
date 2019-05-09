@@ -312,7 +312,7 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Array(Date.empty, Date.empty, Date(1471046100L), Date(1471046400L), Date(1471046400L), Date(1471046600L))
 
     aggregatedData.collect(newHeight) should contain theSameElementsAs
-      Seq(186.0, 168.0, 0.0, 0.0, 186.0, 172.0).toRealNN
+      Seq(186.0, 168.0, Double.NegativeInfinity, Double.NegativeInfinity, 186.0, 172.0).toRealNN
 
     aggregatedData.collect(newWeight) should contain theSameElementsAs
       Seq(96.0, 67.0, Double.PositiveInfinity, Double.PositiveInfinity, 76.0, 78.0).toRealNN
