@@ -39,7 +39,7 @@ import com.salesforce.op.aggregators.CustomMonoidAggregator
 
 trait PassengerFeaturesTest {
 
-  val age = FeatureBuilder.Real[Passenger].extract(ageFn).aggregate(TestMonoidAggregator).asPredictor
+  val age = FeatureBuilder.Real[Passenger].extract(ageFn).aggregate(MaxRealAggregator).asPredictor
   val gender = FeatureBuilder.MultiPickList[Passenger].extract(genderFn).asPredictor
   val genderPL = FeatureBuilder.PickList[Passenger].extract(genderPLFn).asPredictor
   val height = FeatureBuilder.RealNN[Passenger].extract(heightFn).window(Duration.millis(300)).asPredictor
@@ -60,9 +60,7 @@ trait PassengerFeaturesTest {
 
 }
 
-object TestMonoidAggregator
-  extends CustomMonoidAggregator[Real](None, (l, r) => (l -> r).map(breeze.linalg.max(_, _)))
-    with Serializable
+object MaxRealAggregator extends CustomMonoidAggregator[Real](None, (l, r) => (l -> r).map(breeze.linalg.max(_, _)))
 
 object PassengerFeaturesTestLambdas {
   def genderFn: Passenger => MultiPickList = p => Set(p.getGender).toMultiPickList
