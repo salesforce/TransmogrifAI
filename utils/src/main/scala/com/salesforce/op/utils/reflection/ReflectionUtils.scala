@@ -247,12 +247,12 @@ object ReflectionUtils {
   /**
    * Create a TypeTag for Type
    *
-   * @param rtm runtime mirror
    * @param tpe type
+   * @param rtm runtime mirror
    * @tparam T type T
    * @return TypeTag[T]
    */
-  def typeTagForType[T](rtm: Mirror = runtimeMirror(), tpe: Type): TypeTag[T] = {
+  def typeTagForType[T](tpe: Type, rtm: Mirror = runtimeMirror()): TypeTag[T] = {
     TypeTag(rtm, new api.TypeCreator {
       def apply[U <: api.Universe with Singleton](m: api.Mirror[U]): U#Type =
         if (m eq rtm) tpe.asInstanceOf[U#Type]
@@ -263,13 +263,13 @@ object ReflectionUtils {
   /**
    * Returns a Type Tag by string name
    *
-   * @param rtm       runtime mirror
    * @param className class name
+   * @param rtm       runtime mirror
    * @return TypeTag[_]
    */
-  def typeTagForName(rtm: Mirror = runtimeMirror(), className: String): TypeTag[_] = {
+  def typeTagForTypeName(className: String, rtm: Mirror = runtimeMirror()): TypeTag[_] = {
     val clazz = classForName(className)
-    typeTagForType(rtm, rtm.classSymbol(clazz).toType)
+    typeTagForType(rtm.classSymbol(clazz).toType, rtm)
   }
 
   /**

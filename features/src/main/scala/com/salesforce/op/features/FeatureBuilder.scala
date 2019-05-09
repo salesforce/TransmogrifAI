@@ -284,7 +284,7 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
   val name: String,
   val extractFn: I => O,
   val extractSource: String
-)(implicit val tti: WeakTypeTag[I], val tto: WeakTypeTag[O], val ttov: WeakTypeTag[O#Value]) {
+)(implicit val tti: WeakTypeTag[I], val tto: WeakTypeTag[O]) {
 
   var aggregator: MonoidAggregator[Event[O], _, O] = MonoidAggregatorDefaults.aggregatorOf[O](tto)
   var aggregateWindow: Option[Duration] = None
