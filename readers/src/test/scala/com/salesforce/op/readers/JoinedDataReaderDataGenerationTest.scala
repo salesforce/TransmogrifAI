@@ -30,7 +30,7 @@
 
 package com.salesforce.op.readers
 
-import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.aggregators.{CutOffTime, MaxRealNN, MinRealNN}
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import com.salesforce.op.test._
@@ -38,8 +38,8 @@ import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.sql.Row
 import org.joda.time.Duration
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 
@@ -51,13 +51,13 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
   val newWeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getWeight.toDouble.toRealNN)
-      .aggregate(zero = Some(Double.MaxValue), (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(MinRealNN)
       .asPredictor
 
   val newHeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getHeight.toDouble.toRealNN)
-      .aggregate(zero = Some(0.0), (a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(MaxRealNN)
       .asPredictor
 
   val recordTime = FeatureBuilder.DateTime[PassengerCSV].extract(_.getRecordDate.toLong.toDateTime).asPredictor
