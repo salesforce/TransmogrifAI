@@ -39,14 +39,12 @@ import com.salesforce.op.readers._
 import com.salesforce.op.stages.base.unary._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators.SanityChecker
-import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.tuning._
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.ml.param.{BooleanParam, ParamMap}
+import org.apache.spark.ml.param.BooleanParam
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.types.{DoubleType, StringType}

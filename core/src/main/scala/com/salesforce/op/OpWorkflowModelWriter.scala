@@ -98,20 +98,12 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @return array of serialized stages
    */
   private def stagesJArray(path: String): JArray = {
-    val stages: Seq[OpPipelineStageBase] = getFeatureGenStages(model.stages) ++ model.stages
+    val featureGenerators = model.rawFeatures.map(_.originStage).collect { case fg: FeatureGeneratorStage[_, _] => fg }
+    val stages: Seq[OpPipelineStageBase] = featureGenerators ++ model.stages
     val stagesJson: Seq[JObject] = stages
       .map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
       .filter(_.children.nonEmpty)
     JArray(stagesJson.toList)
-  }
-
-  private def getFeatureGenStages(stages: Seq[OPStage]): Seq[OpPipelineStageBase] = {
-    for {
-      stage <- stages
-      inputFeatures <- stage.getInputFeatures()
-      orgStage = inputFeatures.originStage
-      if orgStage.isInstanceOf[FeatureGeneratorStage[_, _]]
-    } yield orgStage
   }
 
   /**

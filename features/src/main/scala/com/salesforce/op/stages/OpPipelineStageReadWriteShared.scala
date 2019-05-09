@@ -39,12 +39,15 @@ import org.json4s.jackson.Serialization
 import org.json4s.{Formats, FullTypeHints}
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
 import scala.util.Try
 
 
 object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
+
+  private val log = LoggerFactory.getLogger(OpPipelineStageReadWriteShared.getClass)
 
   /**
    * Stage json field names
@@ -96,11 +99,16 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
   (
     stageClass: Class[StageType]
   ): OpPipelineStageJsonReaderWriter[StageType] = {
-    Try {
+    val readerWriter = Try {
       val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
       val readerWriter = ReflectionUtils.newInstance(readerWriterClass.getName)
       readerWriter.asInstanceOf[OpPipelineStageJsonReaderWriter[StageType]]
     }.toOption.getOrElse(new DefaultOpPipelineStageJsonReaderWriter[StageType]())
+    if (log.isDebugEnabled) {
+      log.debug(s"Using reader/writer of type '${readerWriter.getClass.getName}'"
+        + s"to (de)serialize stage of type '${stageClass.getName}'")
+    }
+    readerWriter
   }
 
 }
