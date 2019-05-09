@@ -122,6 +122,9 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
 }
 
 
+/**
+ * Stage reader/writer implementation used to (de)serialize [[FeatureGeneratorStage]]
+ */
 class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
   extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with SerializationFuns {
 
@@ -132,7 +135,7 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    * @param json       json to read stage from
    * @return read result
    */
-  override def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
+  def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
     Try {
       val ttiName = (json \ "tti").extract[String]
       val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
@@ -169,7 +172,7 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    * @param stage stage instance to write
    * @return write result
    */
-  override def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
+  def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
     for {
       extractFn <- Try {
         stage.extractFn match {
