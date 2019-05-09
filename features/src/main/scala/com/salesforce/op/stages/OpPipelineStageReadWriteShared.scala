@@ -38,7 +38,7 @@ import org.json4s.ext.JodaTimeSerializers
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, FullTypeHints}
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
-
+import com.salesforce.op.utils.reflection.ReflectionUtils
 
 import scala.reflect.ClassTag
 import scala.util.Try
@@ -98,7 +98,7 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
   ): OpPipelineStageJsonReaderWriter[StageType] = {
     Try {
       val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
-      val readerWriter = readerWriterClass.getConstructors.head.newInstance()
+      val readerWriter = ReflectionUtils.newInstance(readerWriterClass.getName)
       readerWriter.asInstanceOf[OpPipelineStageJsonReaderWriter[StageType]]
     }.toOption.getOrElse(new DefaultOpPipelineStageJsonReaderWriter[StageType]())
   }

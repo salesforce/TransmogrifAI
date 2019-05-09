@@ -82,7 +82,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   // TypeTags (because it is following the ReflectionUtils...)
   def tti: WeakTypeTag[I] = _tti match {
     case Left(x) => x
-    case Right(n) => ReflectionUtils.typeTagForName(className = n).asInstanceOf[WeakTypeTag[I]]
+    case Right(n) => ReflectionUtils.typeTagForTypeName(n).asInstanceOf[WeakTypeTag[I]]
   }
 
   setOutputFeatureName(outputName)
@@ -123,9 +123,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
 
 
 class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
-  extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with LambdaSerializer {
-
-  private val FromRowExtractFnName = classOf[FromRowExtractFn[_]].getName
+  extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with SerializationFuns {
 
   /**
    * Read stage from json
@@ -136,31 +134,30 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    */
   override def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
     Try {
-      val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
       val ttiName = (json \ "tti").extract[String]
-      val extractFnStr = (json \ "extractFn").extract[String]
+      val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
 
-      val extractFn = extractFnStr match {
-        case FromRowExtractFnName => {
-          val extractFnName = (json \ "extractFnName").extract[String]
-          val extractFnIdx = (json \ "extractFnIdx").extractOpt[Int]
-          ReflectionUtils.classForName(extractFnStr)
-            .getConstructors.head.newInstance(extractFnIdx, extractFnName, tto)
-            .asInstanceOf[Function1[I, O]]
-        }
-        case _ => ReflectionUtils.newInstance[Function1[I, O]](extractFnStr)
+      val extractFnJson = json \ "extractFn"
+      val extractFnClassName = (extractFnJson \ "className").extract[String]
+      val extractFn = extractFnClassName match {
+        case c if classOf[FromRowExtractFn[_]].getName == c =>
+          val index = (extractFnJson \ "index").extractOpt[Int]
+          val name = (extractFnJson \ "name").extract[String]
+          FromRowExtractFn[O](index, name)(tto).asInstanceOf[Function1[I, O]]
+        case c =>
+          ReflectionUtils.newInstance[Function1[I, O]](c)
       }
 
-      val aggregator = ReflectionUtils.
-        newInstance[MonoidAggregator[Event[O], _, O]]((json \ "aggregator").extract[String])
+      val aggregatorClassName = (json \ "aggregator" \ "className").extract[String]
+      val aggregator = ReflectionUtils.newInstance[MonoidAggregator[Event[O], _, O]](aggregatorClassName)
 
       val outputName = (json \ "outputName").extract[String]
       val extractSource = (json \ "extractSource").extract[String]
       val uid = (json \ "uid").extract[String]
       val outputIsResponse = (json \ "outputIsResponse").extract[Boolean]
-      val aggregateWindow = (json \ "aggregateWindow").extractOpt[Int].map(x => Duration.standardSeconds(x))
+      val aggregateWindow = (json \ "aggregateWindow").extractOpt[Long].map(Duration.millis)
 
-      new FeatureGeneratorStage(extractFn, extractSource, aggregator,
+      new FeatureGeneratorStage[I, O](extractFn, extractSource, aggregator,
         outputName, outputIsResponse, aggregateWindow, uid)(_tti = Right(ttiName), tto)
     }
 
@@ -179,17 +176,19 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
           case e: FromRowExtractFn[_] =>
             ("className" -> e.getClass.getName) ~ ("index" -> e.index) ~ ("name" -> e.name)
           case e =>
-            ("className" -> serializeFunction("extractFn", e).value.toString) ~ JObject()
+            ("className" -> serializeArgument("extractFn", e).value.toString) ~ JObject()
         }
       }
-      aggregator <- Try(serializeFunction("aggregator", stage.aggregator).value.toString)
+      aggregator <- Try(
+        ("className" -> serializeArgument("aggregator", stage.aggregator).value.toString) ~ JObject()
+      )
     } yield {
       ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
         ("tto" -> FeatureType.typeName(stage.tto)) ~
         ("aggregator" -> aggregator) ~
         ("extractFn" -> extractFn) ~
         ("outputName" -> stage.outputName) ~
-        ("aggregateWindow" -> stage.aggregateWindow.map(_.toStandardSeconds.getSeconds)) ~
+        ("aggregateWindow" -> stage.aggregateWindow.map(_.getMillis)) ~
         ("uid" -> stage.uid) ~
         ("extractSource" -> stage.extractSource) ~
         ("outputIsResponse" -> stage.outputIsResponse)

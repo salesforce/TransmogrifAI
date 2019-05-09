@@ -76,7 +76,7 @@ trait OpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageBase] extends 
 final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageBase]
 (
   implicit val ct: ClassTag[StageType]
-) extends OpPipelineStageJsonReaderWriter[StageType] with LambdaSerializer {
+) extends OpPipelineStageJsonReaderWriter[StageType] with SerializationFuns {
 
   /**
    * Read stage from json
@@ -116,11 +116,11 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
 
             // Class value argument, e.g. [[Function1]], [[Numeric]] etc.
             case AnyValue(AnyValueTypes.ClassInstance, value, _) =>
-              ReflectionUtils.classForName(value.toString).getConstructors.head.newInstance()
+              ReflectionUtils.newInstance(value.toString)
 
             // Value with no ctor arguments should be instantiable by class name
             case AnyValue(AnyValueTypes.Value, m: Map[_, _], Some(className)) if m.isEmpty =>
-              ReflectionUtils.classForName(className).getConstructors.find(_.getParameterCount == 0).head.newInstance()
+              ReflectionUtils.newInstance(className)
 
             // Everything else is read using json4s
             case AnyValue(AnyValueTypes.Value, value, valueClass) =>
@@ -177,13 +177,13 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
           // Special handling for function value arguments
           case f1: Function1[_, _]
             // Maps and other scala collections extend [[Function1]] - skipping them by filtering by package name
-            if !f1.getClass.getPackage.getName.startsWith("scala") => serializeFunction(argName, f1)
-          case f2: Function2[_, _, _] => serializeFunction(argName, f2)
-          case f3: Function3[_, _, _, _] => serializeFunction(argName, f3)
-          case f4: Function4[_, _, _, _, _] => serializeFunction(argName, f4)
+            if !f1.getClass.getPackage.getName.startsWith("scala") => serializeArgument(argName, f1)
+          case f2: Function2[_, _, _] => serializeArgument(argName, f2)
+          case f3: Function3[_, _, _, _] => serializeArgument(argName, f3)
+          case f4: Function4[_, _, _, _, _] => serializeArgument(argName, f4)
 
           // Special handling for [[Numeric]]
-          case n: Numeric[_] => AnyValue(AnyValueTypes.ClassInstance, n.getClass.getName, Option(n.getClass.getName))
+          case n: Numeric[_] => serializeArgument(argName, n)
 
           // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
           case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid, None)
@@ -209,19 +209,19 @@ final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageB
   private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))
 }
 
-trait LambdaSerializer {
+private[op] trait SerializationFuns {
 
-  protected def serializeFunction(argName: String, function: AnyRef): AnyValue = {
+  def serializeArgument(argName: String, value: AnyRef): AnyValue = {
     try {
-      val functionClass = function.getClass
-      // Test that function has no external dependencies and can be constructed without ctor args
-      functionClass.getConstructors.headOption.foreach(_.newInstance())
-      AnyValue(AnyValueTypes.ClassInstance, functionClass.getName, Option(functionClass.getName))
+      val valueClass = value.getClass
+      // Test that value has no external dependencies and can be constructed without ctor args or is an object
+      ReflectionUtils.newInstance(valueClass.getName)
+      AnyValue(AnyValueTypes.ClassInstance, valueClass.getName, Option(valueClass.getName))
     } catch {
       case error: Exception => throw new RuntimeException(
-        s"Function argument '$argName' [${function.getClass.getName}] cannot be serialized. " +
-          "Make sure your function does not have any external dependencies, " +
-          "e.g. use any out of scope variables.", error)
+        s"Argument '$argName' [${value.getClass.getName}] cannot be serialized. " +
+          s"Make sure ${value.getClass.getName} has either no-args ctor or is an object, " +
+          "and does not have any external dependencies, e.g. use any out of scope variables.", error)
     }
   }
 

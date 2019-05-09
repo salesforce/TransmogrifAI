@@ -96,7 +96,7 @@ object ReflectionUtils {
    */
   def newInstance[T](className: String, classLoader: ClassLoader): T = {
     val klazz = ReflectionUtils.classForName(className, classLoader)
-    // Try to create an instance only if it has a single no arg ctor or fall back to object
+    // Try to create an instance only if it has a single no-args ctor or fall back to object
     val res = klazz.getConstructors.find(_.getParameterCount == 0) match {
       case Some(c) => c.newInstance()
       case _ => klazz.getField("MODULE$").get(klazz)
