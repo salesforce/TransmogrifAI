@@ -192,6 +192,10 @@ class RandomTextTest extends FlatSpec with TestCommon with Assertions {
     check(g,
       (s: String) => s.length > 0 && s.length < 60 && (s matches "\\w+"))
   }
+  it should "not produce empty IDs by default" in {
+    val g = RandomText.ids.limit(10000)
+    g.forall(id => !id.value.isEmpty && !id.value.contains("")) shouldBe true
+  }
 
   "UniqueID generator" should "generate IDs" in {
     val g = RandomText.uniqueIds
