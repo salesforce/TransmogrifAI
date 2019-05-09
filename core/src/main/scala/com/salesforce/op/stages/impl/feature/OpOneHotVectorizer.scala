@@ -64,7 +64,7 @@ abstract class OpOneHotVectorizer[T <: FeatureType]
   uid: String = UID[OpOneHotVectorizer[_]]
 )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value])
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with PivotParams with CleanTextFun with SaveOthersParams
+    with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with OneHotFun with MaxPctCardinalityParams {
 
   protected def convertToSeqOfMaps(dataset: Dataset[Seq[T#Value]]): RDD[Seq[Map[String, Int]]]
@@ -146,7 +146,7 @@ abstract class OpOneHotVectorizerModel[T <: FeatureType]
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
-    with VectorizerDefaults with CleanTextFun with OneHotModelFun[T] {
+    with CleanTextFun with OneHotModelFun[T] {
 
   def transformFn: Seq[T] => OPVector = pivotFn(topValues, shouldCleanText, shouldTrackNulls)
 

@@ -28,11 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.features
+package com.salesforce.op.test
 
-
+import com.salesforce.op.features.{FeatureLike, FeatureSparkTypes}
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -40,11 +39,8 @@ import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 
-case class FeatureBuilderContainerTest(s: String, l: Long, d: Double)
-
-
 @RunWith(classOf[JUnitRunner])
-class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
+class TestFeatureBuilderTest extends FlatSpec with TestSparkContext with FeatureAsserts {
 
   Spec(TestFeatureBuilder.getClass)  should "create a dataset with one feature" in {
     val res@(ds, f1) = TestFeatureBuilder[Real](Seq(Real(1), Real(2L), Real(3.1f), Real(4.5)))
@@ -126,6 +122,44 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
     assertResults(ds, res, expected = Seq(("one", 1, 1.0, -1, List("1", "2")), ("two", 2, 2.3, 1, List("3", "4"))))
   }
 
+  it should "create a dataset with arbitrary amount of features" in {
+    val (ds, features) = TestFeatureBuilder(
+      Seq(Real(0.0)), Seq(Text("a")), Seq(Integral(5L)), Seq(Real(1.0)), Seq(Text("b")),
+      Seq(MultiPickList(Set("3", "4"))), Seq(Real(-3.0))
+    )
+    features.length shouldBe 7
+    ds.count() shouldBe 1
+    ds.schema.fields.map(f => f.name -> f.dataType) should contain theSameElementsInOrderAs
+      features.map(f => f.name -> FeatureSparkTypes.sparkTypeOf(f.wtt))
+
+    assertFeature(features(0).asInstanceOf[FeatureLike[Real]])(name = "f1", in = ds.head(), out = Real(0.0))
+    assertFeature(features(1).asInstanceOf[FeatureLike[Text]])(name = "f2", in = ds.head(), out = Text("a"))
+    assertFeature(features(2).asInstanceOf[FeatureLike[Integral]])(name = "f3", in = ds.head(), out = Integral(5L))
+    assertFeature(features(3).asInstanceOf[FeatureLike[Real]])(name = "f4", in = ds.head(), out = Real(1.0))
+    assertFeature(features(4).asInstanceOf[FeatureLike[Text]])(name = "f5", in = ds.head(), out = Text("b"))
+    assertFeature(features(5).asInstanceOf[FeatureLike[MultiPickList]])(
+      name = "f6", in = ds.head(), out = MultiPickList(Set("3", "4")))
+    assertFeature(features(6).asInstanceOf[FeatureLike[Real]])(name = "f7", in = ds.head(), out = Real(-3.0))
+  }
+
+  it should "create a dataset with all random features" in {
+    val numOfRows = 15
+    val (ds, features) = TestFeatureBuilder.random(numOfRows = numOfRows)()
+    features.length shouldBe 51
+
+    ds.schema.fields.map(f => f.name -> f.dataType) should contain theSameElementsInOrderAs
+      features.map(f => f.name -> FeatureSparkTypes.sparkTypeOf(f.wtt))
+
+    ds.count() shouldBe numOfRows
+  }
+
+  it should "error creating a dataset with invalid number of rows" in {
+    the[IllegalArgumentException] thrownBy TestFeatureBuilder.random(numOfRows = 0)()
+    the[IllegalArgumentException] thrownBy TestFeatureBuilder.random(numOfRows = -1)()
+    the[IllegalArgumentException] thrownBy TestFeatureBuilder(Seq.empty[Real],
+      Seq.empty[Real], Seq.empty[Real], Seq.empty[Real], Seq.empty[Real], Seq.empty[Real])
+  }
+
   private def assertResults(ds: DataFrame, res: Product, expected: Traversable[Any]): Unit = {
     val features = res.productIterator.collect { case f: FeatureLike[_] => f }.toArray
 
@@ -133,7 +167,7 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext {
       features.map(f => f.name -> FeatureSparkTypes.sparkTypeOf(f.wtt))
 
     ds.collect().map(row => features.map(f => row.getAny(f.name))) should contain theSameElementsInOrderAs
-      expected.map{ case v: Product => v; case v => Tuple1(v) }.map(_.productIterator.toArray)
+      expected.map { case v: Product => v; case v => Tuple1(v) }.map(_.productIterator.toArray)
   }
 
 }

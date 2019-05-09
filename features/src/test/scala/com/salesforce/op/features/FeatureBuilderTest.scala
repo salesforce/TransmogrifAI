@@ -35,19 +35,18 @@ import java.util
 import com.salesforce.op.aggregators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.FeatureGeneratorStage
-import com.salesforce.op.test.{Passenger, TestSparkContext}
-import com.twitter.algebird.MonoidAggregator
+import com.salesforce.op.test.{FeatureAsserts, Passenger, TestSparkContext}
 import org.apache.spark.sql.{DataFrame, Row}
 import org.joda.time.Duration
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 
-import scala.reflect.runtime.universe._
 
+case class FeatureBuilderContainerTest(s: String, l: Long, d: Double)
 
 @RunWith(classOf[JUnitRunner])
-class FeatureBuilderTest extends FlatSpec with TestSparkContext {
+class FeatureBuilderTest extends FlatSpec with TestSparkContext with FeatureAsserts {
   private val name = "feature"
   private val passenger =
     Passenger.newBuilder()
@@ -183,51 +182,3 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext {
 
 object TestCustomMonoidAggregator extends CustomMonoidAggregator[Real](zero = Real.empty.v,
   associativeFn = (v1, _) => v1)
-
-/**
- * Assert feature instance on a given input/output
- */
-object assertFeature extends Matchers {
-
-  /**
-   * Assert feature instance on a given input/output
-   *
-   * @param f               feature to assert
-   * @param in              input value
-   * @param out             expected output value
-   * @param name            expected name
-   * @param isResponse      is expected to be a response
-   * @param aggregator      expected aggregator
-   * @param aggregateWindow expected aggregate window
-   * @param tti             expected input typetag
-   * @param wtt             expected output typetag
-   * @tparam I input type
-   * @tparam O output feature type
-   */
-  def apply[I, O <: FeatureType](f: FeatureLike[O])(
-    in: I, out: O, name: String, isResponse: Boolean = false,
-    aggregator: WeakTypeTag[O] => MonoidAggregator[Event[O], _, O] =
-    (wtt: WeakTypeTag[O]) => MonoidAggregatorDefaults.aggregatorOf[O](wtt),
-    aggregateWindow: Option[Duration] = None
-  )(implicit tti: WeakTypeTag[I], wtt: WeakTypeTag[O]): Unit = {
-    f.name shouldBe name
-    f.isResponse shouldBe isResponse
-    f.parents shouldBe Nil
-    f.uid.startsWith(wtt.tpe.dealias.toString.split("\\.").last) shouldBe true
-    f.wtt.tpe =:= wtt.tpe shouldBe true
-    f.isRaw shouldBe true
-    f.typeName shouldBe wtt.tpe.typeSymbol.fullName
-
-    f.originStage shouldBe a[FeatureGeneratorStage[_, _ <: FeatureType]]
-    val fg = f.originStage.asInstanceOf[FeatureGeneratorStage[I, O]]
-    fg.tti shouldBe tti
-    fg.aggregator shouldBe aggregator(wtt)
-    fg.extractFn(in) shouldBe out
-    fg.extractSource.nonEmpty shouldBe true // TODO we should eval the code here: eval(fg.extractSource)(in)
-    fg.getOutputFeatureName shouldBe name
-    fg.outputIsResponse shouldBe isResponse
-    fg.aggregateWindow shouldBe aggregateWindow
-    fg.uid.startsWith(classOf[FeatureGeneratorStage[I, O]].getSimpleName) shouldBe true
-  }
-
-}
