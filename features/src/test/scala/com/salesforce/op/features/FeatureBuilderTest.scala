@@ -34,7 +34,6 @@ import java.util
 
 import com.salesforce.op.aggregators._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.FeatureGeneratorStage
 import com.salesforce.op.test.{FeatureAsserts, Passenger, TestSparkContext}
 import org.apache.spark.sql.{DataFrame, Row}
 import org.joda.time.Duration
@@ -153,29 +152,6 @@ class FeatureBuilderTest extends FlatSpec with TestSparkContext with FeatureAsse
         .asPredictor
 
     assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal, aggregator = _ => MaxReal)
-  }
-
-  it should "build an aggregated feature with a custom aggregate function" in {
-    val feature =
-      FeatureBuilder.Real[Passenger]
-        .extract(p => Option(p.getAge).map(_.toDouble).toReal)
-        .aggregate((v1, _) => v1)
-        .asPredictor
-
-    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
-      aggregator = _ => feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
-    )
-  }
-
-  it should "build an aggregated feature with a custom aggregate function with zero" in {
-    val feature = FeatureBuilder.Real[Passenger]
-      .extract(p => Option(p.getAge).map(_.toDouble).toReal)
-      .aggregate(Real.empty.v, (v1, _) => v1)
-      .asPredictor
-
-    assertFeature[Passenger, Real](feature)(name = name, in = passenger, out = 1.toReal,
-      aggregator = _ => feature.originStage.asInstanceOf[FeatureGeneratorStage[Passenger, Real]].aggregator
-    )
   }
 
 }

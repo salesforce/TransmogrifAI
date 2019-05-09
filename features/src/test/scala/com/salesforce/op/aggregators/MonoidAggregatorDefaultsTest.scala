@@ -534,8 +534,8 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   }
 
   Spec[CustomMonoidAggregator[_]] should "work" in {
-    val customAgg = new CustomMonoidAggregator[Real](zero = None, associativeFn = (r1, r2) => (r1 -> r2).map(_ + _))
-    assertAggr(customAgg, realTestSeq, Option(doubleBase.flatten.sum))
+    val customSum = new CustomMonoidAggregator[Real](zero = None, associativeFn = (r1, r2) => (r1 -> r2).map(_ + _)){}
+    assertAggr(customSum, realTestSeq, Option(doubleBase.flatten.sum))
   }
 
 
