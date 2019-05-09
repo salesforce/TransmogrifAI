@@ -200,7 +200,7 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     val instance = ReflectionUtils.newInstance[TestClassNoArgs](classOf[TestClassNoArgs].getName)
     instance.x shouldBe 123
   }
-
+  OpPipelineStageReader
   it should "return object instance by its class name" in {
     val instance = ReflectionUtils.newInstance[TestObject.type](TestObject.getClass.getName)
     instance.x shouldBe 456
