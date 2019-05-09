@@ -290,8 +290,27 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
   var aggregateWindow: Option[Duration] = None
 
   /**
+   * Feature aggregation function with zero value
+   * @param zero a zero element for aggregation
+   * @param fn   aggregation function
+   */
+  def aggregate(zero: O#Value, fn: (O#Value, O#Value) => O#Value): this.type = {
+    aggregator = new CustomMonoidAggregator[O](associativeFn = fn, zero = zero)(tto)
+    this
+  }
+
+  /**
+   * Feature aggregation function with zero value of [[FeatureTypeDefaults.default[O].value]]
+   * @param fn aggregation function
+   */
+  def aggregate(fn: (O#Value, O#Value) => O#Value): this.type = {
+    val zero = FeatureTypeDefaults.default[O](tto).value
+    aggregator = new CustomMonoidAggregator[O](associativeFn = fn, zero = zero)(tto)
+    this
+  }
+
+  /**
    * Feature aggregation with a monoid aggregator
-   *
    * @param monoid a monoid aggregator
    */
   def aggregate(monoid: MonoidAggregator[Event[O], _, O]): this.type = {
@@ -301,7 +320,6 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
 
   /**
    * Aggregation time window
-   *
    * @param time a time period during which to include features in aggregation
    */
   def window(time: Duration): this.type = {
@@ -311,14 +329,12 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
 
   /**
    * Make a predictor feature
-   *
    * @return a predictor feature
    */
   def asPredictor: Feature[O] = makeFeature(isResponse = false)
 
   /**
    * Make a response feature
-   *
    * @return a response feature
    */
   def asResponse: Feature[O] = makeFeature(isResponse = true)
