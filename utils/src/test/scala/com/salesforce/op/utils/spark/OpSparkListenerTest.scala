@@ -74,11 +74,14 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
   it should "capture app stage metrics" in {
     val stageMetrics = listener.metrics.stageMetrics
     stageMetrics.size should be > 0
-    val firstStage = stageMetrics.head
-    firstStage.name should startWith("csv at OpSparkListenerTest.scala")
-    firstStage.stageId shouldBe 0
-    firstStage.numTasks shouldBe 1
-    firstStage.status shouldBe "succeeded"
+    val stage = stageMetrics.find(_.name.startsWith("csv at OpSparkListenerTest.scala"))
+    stage match {
+      case None => fail("Expected stage was not found")
+      case Some(s) =>
+        s.name should startWith("csv at OpSparkListenerTest.scala")
+        s.numTasks shouldBe 1
+        s.status shouldBe "succeeded"
+    }
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {

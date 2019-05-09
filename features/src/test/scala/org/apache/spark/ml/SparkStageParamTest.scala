@@ -46,6 +46,8 @@ import org.scalatest.{BeforeAndAfterEach, FlatSpec}
 class SparkStageParamTest extends FlatSpec with TestSparkContext with BeforeAndAfterEach {
   import SparkStageParam._
 
+  val _ = spark // param.jsonEncode accesses spark session internally, we need initialize it before
+
   var savePath: String = _
   var param: SparkStageParam[StandardScaler] = _
   var stage: StandardScaler = _
