@@ -64,7 +64,8 @@ import scala.util.Try
  */
 
 @ReaderWriter(classOf[FeatureGeneratorStageReaderWriter[_, _ <: FeatureType]])
-final class FeatureGeneratorStage[I, O <: FeatureType](
+final class FeatureGeneratorStage[I, O <: FeatureType]
+(
   val extractFn: I => O,
   val extractSource: String,
   val aggregator: MonoidAggregator[Event[O], _, O],
@@ -76,8 +77,10 @@ final class FeatureGeneratorStage[I, O <: FeatureType](
 )(implicit val tto: WeakTypeTag[O])
   extends PipelineStage with OpPipelineStage[O] with HasIn1 {
 
-  // This hack is required as Spark can't serialize run-time created TypeTags,
-  // because it tries to serialize Scala RuntimeMirror which is not serializable)
+  // This hack is required as Spark can't serialize run-time created TypeTags
+  // when the stage is recovered on model loading.
+  // Since Spark tries to serialize Scala RuntimeMirror which is not serializable,
+  // we recover type tag from its type name upon request
   @transient implicit lazy val tti: WeakTypeTag[I] = inputType match {
     case Right(typeName) => ReflectionUtils.typeTagForTypeName[I](typeName)
     case Left(ttag) => ttag
