@@ -57,32 +57,30 @@ import scala.util.Try
  *                         (used to determine aggregation window)
  * @param aggregateWindow  time period during which to include features in aggregation
  * @param uid              unique id for stage
- * @param tti              weak type tag for input feature type
+ * @param inputType        input weak type tag or type name
  * @param tto              weak type tag for output feature type
  * @tparam I input data type
  * @tparam O output feature type
  */
 
 @ReaderWriter(classOf[FeatureGeneratorStageReaderWriter[_, _ <: FeatureType]])
-final class FeatureGeneratorStage[I, O <: FeatureType]
-(
+final class FeatureGeneratorStage[I, O <: FeatureType](
   val extractFn: I => O,
   val extractSource: String,
   val aggregator: MonoidAggregator[Event[O], _, O],
   val outputName: String,
   override val outputIsResponse: Boolean,
   val aggregateWindow: Option[Duration] = None,
-  val uid: String = UID[FeatureGeneratorStage[I, O]]
-)(
-  implicit val _tti: Either[WeakTypeTag[I], String],
-  val tto: WeakTypeTag[O]
-) extends PipelineStage with OpPipelineStage[O] with HasIn1 {
+  val uid: String = UID[FeatureGeneratorStage[I, O]],
+  val inputType: Either[WeakTypeTag[I], String]
+)(implicit val tto: WeakTypeTag[O])
+  extends PipelineStage with OpPipelineStage[O] with HasIn1 {
 
-  // this hack is required as Spark can't serialize run-time created
-  // TypeTags (because it is following the ReflectionUtils...)
-  def tti: WeakTypeTag[I] = _tti match {
-    case Left(x) => x
-    case Right(n) => ReflectionUtils.typeTagForTypeName[I](n)
+  // This hack is required as Spark can't serialize run-time created TypeTags,
+  // because it tries to serialize Scala RuntimeMirror which is not serializable)
+  @transient implicit lazy val tti: WeakTypeTag[I] = inputType match {
+    case Right(typeName) => ReflectionUtils.typeTagForTypeName[I](typeName)
+    case Left(ttag) => ttag
   }
 
   setOutputFeatureName(outputName)
@@ -137,7 +135,7 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    */
   def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
     Try {
-      val ttiName = (json \ "tti").extract[String]
+      val tti = (json \ "tti").extract[String]
       val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
 
       val extractFnJson = json \ "extractFn"
@@ -161,7 +159,7 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
       val aggregateWindow = (json \ "aggregateWindow").extractOpt[Long].map(Duration.millis)
 
       new FeatureGeneratorStage[I, O](extractFn, extractSource, aggregator,
-        outputName, outputIsResponse, aggregateWindow, uid)(_tti = Right(ttiName), tto)
+        outputName, outputIsResponse, aggregateWindow, uid, Right(tti))(tto)
     }
 
   }
