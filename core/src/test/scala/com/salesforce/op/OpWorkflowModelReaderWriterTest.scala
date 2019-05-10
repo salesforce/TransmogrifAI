@@ -145,7 +145,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
-    val vec = FeatureBuilder.OPVector[Passenger].extract(_ => OPVector.empty).asPredictor
+    val vec = FeatureBuilder.OPVector[Passenger].extract(OpWorkflowModelReaderWriterTest.emptyVectorFn).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
     val schema = FeatureSparkTypes.toStructType(vec)
     val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
@@ -255,7 +255,7 @@ class OpWorkflowModelReaderWriterTest
 
   trait VectorizedFlow extends UIDReset {
     val cat = Seq(gender, boarded, height, age, description).transmogrify()
-    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.mapFnc0)
+    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.catHeadFn)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setResultFeatures(catHead)
@@ -378,5 +378,6 @@ trait UIDReset {
 }
 
 object OpWorkflowModelReaderWriterTest {
-  def mapFnc0: OPVector => Real = v => Real(v.value.toArray.headOption)
+  def catHeadFn: OPVector => Real = v => Real(v.value.toArray.headOption)
+  def emptyVectorFn: (Passenger => OPVector) = _ => OPVector.empty
 }

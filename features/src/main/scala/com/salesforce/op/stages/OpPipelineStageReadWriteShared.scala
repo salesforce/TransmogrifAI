@@ -38,13 +38,16 @@ import org.json4s.ext.JodaTimeSerializers
 import org.json4s.jackson.Serialization
 import org.json4s.{Formats, FullTypeHints}
 import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
-
+import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 
 object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
+
+  private val log = LoggerFactory.getLogger(OpPipelineStageReadWriteShared.getClass)
 
   /**
    * Stage json field names
@@ -96,11 +99,24 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
   (
     stageClass: Class[StageType]
   ): OpPipelineStageJsonReaderWriter[StageType] = {
-    Try {
-      val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
-      val readerWriter = readerWriterClass.getConstructors.head.newInstance()
-      readerWriter.asInstanceOf[OpPipelineStageJsonReaderWriter[StageType]]
-    }.toOption.getOrElse(new DefaultOpPipelineStageJsonReaderWriter[StageType]())
+    if (!stageClass.isAnnotationPresent(classOf[ReaderWriter])) {
+      new DefaultOpPipelineStageJsonReaderWriter[StageType]()
+    }
+    else {
+      Try {
+        val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
+        ReflectionUtils.newInstance[OpPipelineStageJsonReaderWriter[StageType]](readerWriterClass.getName)
+      } match {
+        case Success(readerWriter) =>
+          if (log.isDebugEnabled) {
+            log.debug(s"Using reader/writer of type '${readerWriter.getClass.getName}'"
+              + s"to (de)serialize stage of type '${stageClass.getName}'")
+          }
+          readerWriter
+        case Failure(e) => throw new RuntimeException(
+          s"Failed to create reader/writer instance for stage class ${stageClass.getName}", e)
+      }
+    }
   }
 
 }
