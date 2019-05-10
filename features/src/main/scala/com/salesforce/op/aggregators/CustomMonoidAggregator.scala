@@ -42,7 +42,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
  * @param associativeFn associative function to combine values
  * @tparam O type of feature
  */
-case class CustomMonoidAggregator[O <: FeatureType]
+abstract class CustomMonoidAggregator[O <: FeatureType]
 (
   zero: O#Value,
   associativeFn: (O#Value, O#Value) => O#Value

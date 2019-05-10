@@ -31,7 +31,7 @@
 package com.salesforce.op.readers
 
 import com.salesforce.op.OpParams
-import com.salesforce.op.aggregators.{CustomMonoidAggregator, CutOffTime}
+import com.salesforce.op.aggregators.{CutOffTime, LogicalAnd}
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.test._
@@ -62,7 +62,7 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
 
   val survivedResponse = FeatureBuilder.Binary[PassengerCaseClass]
     .extract(_.survived.toBinary)
-    .aggregate(TestCustomMonoidAggregator)
+    .aggregate(LogicalAnd)
     .asResponse
 
   val aggregateParameters = AggregateParams(
@@ -203,6 +203,3 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
     }
   )
 }
-
-object TestCustomMonoidAggregator extends CustomMonoidAggregator[Binary](zero = Some(true),
-  (l, r) => Some(l.getOrElse(false) && r.getOrElse(false)))
