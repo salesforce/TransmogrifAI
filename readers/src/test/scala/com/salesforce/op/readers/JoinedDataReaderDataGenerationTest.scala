@@ -30,7 +30,7 @@
 
 package com.salesforce.op.readers
 
-import com.salesforce.op.aggregators.CutOffTime
+import com.salesforce.op.aggregators.{CutOffTime, MaxRealNN, MinRealNN}
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import com.salesforce.op.test._
@@ -38,8 +38,8 @@ import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.sql.Row
 import org.joda.time.Duration
 import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Matchers}
 import org.slf4j.LoggerFactory
 
 
@@ -51,13 +51,13 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
   val newWeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getWeight.toDouble.toRealNN)
-      .aggregate(zero = Some(Double.MaxValue), (a, b) => Some(math.min(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(MinRealNN)
       .asPredictor
 
   val newHeight =
     FeatureBuilder.RealNN[PassengerCSV]
       .extract(_.getHeight.toDouble.toRealNN)
-      .aggregate(zero = Some(0.0), (a, b) => Some(math.max(a.v.getOrElse(0.0), b.v.getOrElse(0.0))))
+      .aggregate(MaxRealNN)
       .asPredictor
 
   val recordTime = FeatureBuilder.DateTime[PassengerCSV].extract(_.getRecordDate.toLong.toDateTime).asPredictor
@@ -312,10 +312,10 @@ class JoinedDataReaderDataGenerationTest extends FlatSpec with PassengerSparkFix
       Array(Date.empty, Date.empty, Date(1471046100L), Date(1471046400L), Date(1471046400L), Date(1471046600L))
 
     aggregatedData.collect(newHeight) should contain theSameElementsAs
-      Seq(186.0, 168.0, 0.0, 0.0, 186.0, 172.0).toRealNN
+      Seq(186.0, 168.0, Double.NegativeInfinity, Double.NegativeInfinity, 186.0, 172.0).toRealNN
 
     aggregatedData.collect(newWeight) should contain theSameElementsAs
-      Seq(96.0, 67.0, Double.MaxValue, Double.MaxValue, 76.0, 78.0).toRealNN
+      Seq(96.0, 67.0, Double.PositiveInfinity, Double.PositiveInfinity, 76.0, 78.0).toRealNN
 
     aggregatedData.collect(recordTime) should contain theSameElementsAs
       Array(DateTime(None), DateTime(None), DateTime(1471045900L), DateTime(1471046000L),

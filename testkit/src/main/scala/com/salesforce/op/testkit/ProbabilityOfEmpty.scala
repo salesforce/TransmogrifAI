@@ -30,10 +30,6 @@
 
 package com.salesforce.op.testkit
 
-import com.salesforce.op.features.types.FeatureType
-
-import scala.util.Random
-
 /**
  * This trait allows the value to be empty
  */

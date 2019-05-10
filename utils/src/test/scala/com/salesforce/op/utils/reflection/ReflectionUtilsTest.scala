@@ -71,6 +71,13 @@ class TestClass[T]
 
 class TestShouldFailClass(val x: Int, y: String)
 
+class TestClassNoArgs() {
+  val x = 123
+}
+
+object TestObject {
+  val x = 456
+}
 
 class TestClassVar {
   var myVar: Option[String] = None
@@ -99,6 +106,14 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   it should "return a TypeTag of a type" in {
     val ttag = typeTag[List[String]]
     val resttag = ReflectionUtils.typeTagForType[List[String]](tpe = ttag.tpe)
+    resttag shouldBe ttag
+    resttag.tpe =:= ttag.tpe shouldBe true
+  }
+
+  it should "return a TypeTag of a type name" in {
+    val ttag = typeTag[TestValClass]
+    val typeName = ttag.tpe.typeSymbol.fullName
+    val resttag = ReflectionUtils.typeTagForTypeName[TestValClass](typeName)
     resttag shouldBe ttag
     resttag.tpe =:= ttag.tpe shouldBe true
   }
@@ -181,9 +196,24 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
     instance.y shouldBe 2
   }
 
+  it should "create a new instance by a class name" in {
+    val instance = ReflectionUtils.newInstance[TestClassNoArgs](classOf[TestClassNoArgs].getName)
+    instance.x shouldBe 123
+  }
+
+  it should "return object instance by its class name" in {
+    val instance = ReflectionUtils.newInstance[TestObject.type](TestObject.getClass.getName)
+    instance.x shouldBe 456
+  }
+
+  it should "fail to create a class if neither args ctor is not present nor it's an object" in {
+    a[RuntimeException] should be thrownBy
+      ReflectionUtils.newInstance[TestShouldFailClass](classOf[TestShouldFailClass].getName)
+  }
+
   it should "fail to copy an instance that has a private ctor argument" in {
     val orig = new TestShouldFailClass(x = 1, y = "private ctor arg")
-    an[RuntimeException] should be thrownBy ReflectionUtils.copy(orig)
+    a[RuntimeException] should be thrownBy ReflectionUtils.copy(orig)
   }
 
   it should "return a class for name" in {
