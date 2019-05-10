@@ -81,7 +81,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
   // when the stage is recovered on model loading.
   // Since Spark tries to serialize Scala RuntimeMirror which is not serializable,
   // we recover type tag from its type name upon request
-  @transient implicit lazy val tti: WeakTypeTag[I] = inputType match {
+  @transient implicit val tti: WeakTypeTag[I] = inputType match {
     case Right(typeName) => ReflectionUtils.typeTagForTypeName[I](typeName)
     case Left(ttag) => ttag
   }

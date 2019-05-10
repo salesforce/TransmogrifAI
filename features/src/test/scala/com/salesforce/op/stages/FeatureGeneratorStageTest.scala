@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages
 
+import com.salesforce.op.aggregators.{CutOffTime, Event, MonoidAggregatorDefaults}
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
@@ -39,11 +40,13 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.reflect.runtime.universe.WeakTypeTag
+
 
 @RunWith(classOf[JUnitRunner])
 class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
 
-  val (ds, features) = TestFeatureBuilder.random()()
+  val (ds, features) = TestFeatureBuilder.random(numOfRows = 10)()
 
   type FeaturesAndGenerators = Array[(Feature[_ <: FeatureType], FeatureGeneratorStage[Row, _ <: FeatureType])]
 
@@ -85,12 +88,17 @@ class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
   }
 
   def assertAggregateFeatures(fgs: FeaturesAndGenerators): Unit = {
-    for {(feature, featureGenerator) <- fgs} {
-      rows.map { row =>
-        val featureValue = featureGenerator.extractFn(row)
-        featureValue shouldBe a[FeatureType]
-        row.getAny(feature.name) shouldBe FeatureTypeSparkConverter.toSpark(featureValue)
-      }
+    for {(feature, featureGenerator) <- featuresAndGenerators} {
+      val fa = featureGenerator.featureAggregator
+      val expectedValue = fa.extract(rows, timeStampFn = None, cutOffTime = CutOffTime.NoCutoff())
+
+      val ftt = feature.wtt.asInstanceOf[WeakTypeTag[FeatureType]]
+      val rowVals = rows.map(r => FeatureTypeSparkConverter()(ftt).fromSpark(r.getAny(feature.name)))
+      val events = rowVals.map(Event(0L, _))
+      val aggr = MonoidAggregatorDefaults.aggregatorOf(ftt)
+      val aggregatedValue = aggr(events)
+
+      aggregatedValue shouldEqual expectedValue
     }
   }
 
