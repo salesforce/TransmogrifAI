@@ -223,7 +223,8 @@ object FeatureBuilder {
     new FeatureBuilderWithExtract[Row, O](
       name = name,
       extractFn = FromRowExtractFn[O](index, name),
-      extractSource = s"${classOf[FromRowExtractFn[O]].getName}[${FeatureType.shortTypeName[O]}]($index, $name)"
+      extractSource =
+        s"""${classOf[FromRowExtractFn[O]].getName}[${FeatureType.shortTypeName[O]}]($index, "$name")"""
     )
   }
 
