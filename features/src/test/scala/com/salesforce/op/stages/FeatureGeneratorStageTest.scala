@@ -46,7 +46,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
 @RunWith(classOf[JUnitRunner])
 class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
 
-  val (ds, features) = TestFeatureBuilder.random(numOfRows = 10)()
+  val (ds, features) = TestFeatureBuilder.random()()
 
   type FeaturesAndGenerators = Array[(Feature[_ <: FeatureType], FeatureGeneratorStage[Row, _ <: FeatureType])]
 
