@@ -59,6 +59,11 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
   implicit lazy val spark: SparkSession = SparkSession.builder.config(conf).getOrCreate()
   implicit lazy val sc: SparkContext = spark.sparkContext
 
+  override def beforeAll: Unit = {
+    super[TempDirectoryTest].beforeAll()
+    val _ = sc // triggers initialization of spark session
+  }
+
 }
 
 /**
