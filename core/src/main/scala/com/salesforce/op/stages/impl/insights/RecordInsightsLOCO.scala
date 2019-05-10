@@ -111,11 +111,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   private def sumArray(left: Array[Double], right: Array[Double]): Array[Double] = {
-    if (left.isEmpty) {
-      right
-    } else if (right.isEmpty) {
-      left
-    } else left.zip(right).map { case (l, r) => l + r }
+    left.zipAll(right, 0.0, 0.0).map { case (l, r) => l + r }
   }
 
 
