@@ -37,6 +37,7 @@ import com.salesforce.op.stages.impl.feature.{DateListPivot, DateToUnitCircleTra
 import com.salesforce.op.utils.date.DateTimeUtils
 import org.joda.time.{DateTime => JDateTime}
 
+import scala.reflect.runtime.universe.TypeTag
 
 trait RichDateFeature {
   self: RichFeature with RichListFeature =>
@@ -46,7 +47,7 @@ trait RichDateFeature {
    *
    * @param f Date Feature
    */
-  implicit class RichDateFeature(val f: FeatureLike[Date]) {
+  implicit class RichDateFeature(val f: FeatureLike[Date]) extends TimePeriodTransformers[Date] {
 
     /**
      * Convert to DateList feature
@@ -108,34 +109,6 @@ trait RichDateFeature {
         trackNulls = trackNulls, others = others.map(_.toDateList()))
       if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
-
-    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = {
-      val periodFun: Long => Int = period match {
-        case TimePeriod.DayOfMonth => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfMonth.get
-        case TimePeriod.DayOfWeek => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfWeek.get
-        case TimePeriod.DayOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfYear.get
-        case TimePeriod.HourOfDay => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).hourOfDay.get
-        case TimePeriod.MonthOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).monthOfYear.get
-        case TimePeriod.WeekOfMonth => t => {
-          val dt = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-          dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-        }
-        case TimePeriod.WeekOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).weekOfWeekyear.get
-      }
-      f.transformWith(
-        new UnaryLambdaTransformer[Date, Integral](operationName = "dateToTimePeriod",
-          transformFn = _.value.map(t => periodFun(t).toLong).toIntegral)
-      )
-    }
-
-    def toDayOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfMonth)
-    def toDayOfWeek(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfWeek)
-    def toDayOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfYear)
-    def toHourOfDay(): FeatureLike[Integral] = toTimePeriod(TimePeriod.HourOfDay)
-    def toMonthOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.MonthOfYear)
-    def toWeekOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfMonth)
-    def toWeekOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfYear)
-
   }
 
   /**
@@ -143,7 +116,7 @@ trait RichDateFeature {
    *
    * @param f DateTime Feature
    */
-  implicit class RichDateTimeFeature(val f: FeatureLike[DateTime]) {
+  implicit class RichDateTimeFeature(val f: FeatureLike[DateTime]) extends TimePeriodTransformers[DateTime] {
 
     /**
      * Convert to DateTimeList feature
@@ -212,28 +185,27 @@ trait RichDateFeature {
 
 }
 
-/*
-trait TimePeriodTransformers[T <: Date] {
+abstract class TimePeriodTransformers[T <: Date : TypeTag] {
   val f: FeatureLike[T]
 
   /**
    * Converts a Date or DateTime feature into a selected time period.
    *
    * @param period type of [[TimePeriod]] to convert date feature to
-   * @return Integer value of time period
+   * @return Integer feature of time period value
    */
   def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = {
     val periodFun: Long => Int = period match {
-      case TimePeriod.DayOfMonth => t => new JDateTime(t).dayOfMonth.get
-      case TimePeriod.DayOfWeek => t => new JDateTime(t).dayOfWeek.get
-      case TimePeriod.DayOfYear => t => new JDateTime(t).dayOfYear.get
-      case TimePeriod.HourOfDay => t => new JDateTime(t).hourOfDay.get
-      case TimePeriod.MonthOfYear => t => new JDateTime(t).monthOfYear.get
+      case TimePeriod.DayOfMonth => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfMonth.get
+      case TimePeriod.DayOfWeek => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfWeek.get
+      case TimePeriod.DayOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfYear.get
+      case TimePeriod.HourOfDay => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).hourOfDay.get
+      case TimePeriod.MonthOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).monthOfYear.get
       case TimePeriod.WeekOfMonth => t => {
-        val dt = new JDateTime(t)
+        val dt = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
         dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
       }
-      case TimePeriod.WeekOfYear => t => new JDateTime(t).weekyear.get
+      case TimePeriod.WeekOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).weekOfWeekyear.get
     }
     f.transformWith(
       new UnaryLambdaTransformer[T, Integral](operationName = "dateToTimePeriod",
@@ -249,4 +221,3 @@ trait TimePeriodTransformers[T <: Date] {
   def toWeekOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfMonth)
   def toWeekOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfYear)
 }
- */

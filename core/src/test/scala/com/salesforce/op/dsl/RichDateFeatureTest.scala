@@ -5,6 +5,7 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
 import org.joda.time.{DateTime => JDateTime}
@@ -15,9 +16,9 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class RichDateFeatureTest extends FlatSpec with TestSparkContext {
 
-  val testDate: Long = JDateTime.parse("2019-04-30T13:23:00.000-00:00").getMillis
-  val (inputData, testDateFeature) = TestFeatureBuilder(Seq(Date(testDate)))
-  val (inputData2, testDateTimeFeature) = TestFeatureBuilder(Seq(DateTime(testDate)))
+  val testDate: Long = new JDateTime(2019, 4, 30, 13, 0, DateTimeUtils.DefaultTimeZone).getMillis
+  val (_, testDateFeature) = TestFeatureBuilder(Seq(Date(testDate)))
+  val (inputData, testDateTimeFeature) = TestFeatureBuilder(Seq(DateTime(testDate)))
 
   def checkFeature(feature: FeatureLike[Integral], expected: Int): Unit = {
     val transformed = feature.originStage.asInstanceOf[Transformer].transform(inputData)
@@ -46,7 +47,6 @@ class RichDateFeatureTest extends FlatSpec with TestSparkContext {
   }
 
   it should "make RichDateTimeFeature time period transformations" in {
-    /*
     checkFeature(testDateTimeFeature.toTimePeriod(TimePeriod.DayOfMonth), 30)
     checkFeature(testDateTimeFeature.toTimePeriod(TimePeriod.DayOfWeek), 2)
     checkFeature(testDateTimeFeature.toTimePeriod(TimePeriod.DayOfYear), 120)
@@ -62,7 +62,5 @@ class RichDateFeatureTest extends FlatSpec with TestSparkContext {
     checkFeature(testDateTimeFeature.toMonthOfYear(), 4)
     checkFeature(testDateTimeFeature.toWeekOfMonth(), 4)
     checkFeature(testDateTimeFeature.toWeekOfYear(), 18)
-     */
   }
-
 }
