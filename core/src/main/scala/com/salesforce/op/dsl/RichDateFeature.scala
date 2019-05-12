@@ -109,6 +109,7 @@ trait RichDateFeature {
         trackNulls = trackNulls, others = others.map(_.toDateList()))
       if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
+
   }
 
   /**
