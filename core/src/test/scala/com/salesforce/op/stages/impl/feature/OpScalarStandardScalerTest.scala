@@ -33,7 +33,8 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.FeatureBuilder
 import com.salesforce.op.features.types._
 import com.salesforce.op.readers._
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.stages.base.unary.UnaryModel
+import com.salesforce.op.test.{OpEstimatorSpec, OpPipelineStageSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.{OpWorkflow, _}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
@@ -45,14 +46,28 @@ import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class OpScalarStandardScalerTest extends FlatSpec with TestSparkContext {
+class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN, RealNN], OpScalarStandardScaler] {
   import spark.implicits._
 
-  // TODO: use TestFeatureBuilder instead
-  lazy val testData: Dataset[StdScTestData] = DataStdScTest.input.toDS()
+  /**
+   * Expected result of the transformer applied on the Input Dataset
+   */
+  override val expectedResult: Seq[RealNN] = Array(
+    (-0.6575959492214292).toRealNN,
+    (-0.4931969619160719).toRealNN,
+    1.150792911137501.toRealNN
+  )
+
+  val txtData = Seq(10, 100, 1000).map(_.toRealNN)
+
+  val (inputData, testF) = TestFeatureBuilder(txtData)
+
+  override val estimator: OpScalarStandardScaler = new OpScalarStandardScaler().setInput(testF)
 
   // create the feature to which the normalizer transformer will be applied
   val someNumericFeature = FeatureBuilder.RealNN[StdScTestData].extract(_.someNumericFeature.toRealNN).asPredictor
+
+  lazy val testData: Dataset[StdScTestData] = DataStdScTest.input.toDS()
 
   Spec[OpScalarStandardScaler] should
     "scale scalars properly outside a pipeline (by itself); setWithMean(false).setWithStd(false)" in {
