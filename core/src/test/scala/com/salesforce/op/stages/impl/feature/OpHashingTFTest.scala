@@ -31,20 +31,20 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.types._
 import com.salesforce.op.features.Feature
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
-import org.apache.spark.mllib.feature.HashingTF
+import org.apache.spark.ml.feature.HashingTF
+import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
 
 
 @RunWith(classOf[JUnitRunner])
-class HashingTFTest extends FlatSpec with TestSparkContext {
+class OpHashingTFTest extends SwTransformerSpec[OPVector, HashingTF, OpHashingTF] {
 
   // scalastyle:off
   val testData = Seq(
@@ -55,19 +55,27 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
   ).map(_.toLowerCase.split(" ").toSeq.toTextList)
   // scalastyle:on
 
-  lazy val (ds, f1): (DataFrame, Feature[TextList]) = TestFeatureBuilder(testData)
+  val (inputData, f1): (DataFrame, Feature[TextList]) = TestFeatureBuilder(testData)
+
+  val hashed = f1.tf(numTerms = 5)
+  val transformer = hashed.originStage.asInstanceOf[OpHashingTF]
+
+  val expectedResult: Seq[OPVector] = Seq(
+    Vectors.sparse(5, Array(0, 1, 2, 3, 4), Array(2.0, 4.0, 2.0, 3.0, 1.0)),
+    Vectors.sparse(5, Array(0, 1, 2, 3, 4), Array(4.0, 1.0, 3.0, 1.0, 1.0)),
+    Vectors.sparse(5, Array(0, 2, 3, 4), Array(2.0, 2.0, 2.0, 2.0)),
+    Vectors.sparse(5, Array(0, 1, 2, 4), Array(3.0, 5.0, 1.0, 2.0))
+  ).map(_.toOPVector)
 
   def hash(
     s: String,
     numOfFeatures: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
     binary: Boolean = false
-  ): Int = {
-    new HashingTF(numOfFeatures).setBinary(binary).indexOf(s)
-  }
+  ): Int = new org.apache.spark.mllib.feature.HashingTF(numOfFeatures).setBinary(binary).indexOf(s)
 
-  Spec[HashingTF] should "hash categorical data" in {
+  it should "hash categorical data" in {
     val hashed = f1.tf()
-    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(ds)
+    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(inputData)
     val results = transformedData.select(hashed.name).collect(hashed)
 
     hashed.name shouldBe hashed.originStage.getOutputFeatureName
@@ -86,7 +94,7 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
     val numFeatures = 100
 
     val hashed = f1.tf(numTerms = numFeatures)
-    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(ds)
+    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(inputData)
     val results = transformedData.select(hashed.name).collect(hashed)
 
     // scalastyle:off
@@ -101,7 +109,7 @@ class HashingTFTest extends FlatSpec with TestSparkContext {
     val binary = true
 
     val hashed = f1.tf(binary = binary)
-    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(ds)
+    val transformedData = hashed.originStage.asInstanceOf[Transformer].transform(inputData)
     val results = transformedData.select(hashed.name).collect(hashed)
 
     // scalastyle:off

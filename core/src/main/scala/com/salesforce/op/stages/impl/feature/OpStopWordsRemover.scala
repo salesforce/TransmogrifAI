@@ -33,50 +33,38 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import enumeratum._
-import org.apache.spark.ml.feature.IndexToString
+import org.apache.spark.ml.feature.StopWordsRemover
 
 /**
- * Wrapper for [[org.apache.spark.ml.feature.IndexToString]]
+ * Wrapper for [[org.apache.spark.ml.feature.StopWordsRemover]]
  *
- * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
+ * A feature transformer that filters out stop words from input.
  *
- * A transformer that maps a feature of indices back to a new feature of corresponding text values.
- * The index-string mapping is either from the ML attributes of the input feature,
- * or from user-supplied labels (which take precedence over ML attributes).
+ * @note null values from input array are preserved unless adding null to stopWords explicitly.
  *
- * @see [[OpStringIndexer]] for converting text into indices
+ * @see <a href="http://en.wikipedia.org/wiki/Stop_words">Stop words (Wikipedia)</a>
+ * @see [[StopWordsRemover]] for more info
  */
-class OpIndexToString(uid: String = UID[OpIndexToString])
-  extends OpTransformerWrapper[RealNN, Text, IndexToString](
-    transformer = new IndexToString(), uid = uid
-  ) {
+class OpStopWordsRemover(uid: String = UID[StopWordsRemover])
+  extends OpTransformerWrapper[TextList, TextList, StopWordsRemover](transformer = new StopWordsRemover(), uid = uid) {
 
   /**
-   * Optional array of labels specifying index-string mapping.
-   * If not provided or if empty, then metadata from input feature is used instead.
+   * The words to be filtered out.
+   * Default: English stop words
    *
-   * @param value array of labels
-   * @return
+   * @see `StopWordsRemover.loadDefaultStopWords()`
    */
-  def setLabels(value: Array[String]): this.type = {
-    getSparkMlStage().get.setLabels(value)
+  def setStopWords(value: Array[String]): this.type = {
+    getSparkMlStage().get.setStopWords(value)
     this
   }
 
   /**
-   * Array of labels
-   *
-   * @return Array of labels
+   * Whether to do a case sensitive comparison over the stop words.
+   * Default: false
    */
-  def getLabels: Array[String] = getSparkMlStage().get.getLabels
-}
-
-
-sealed trait IndexToStringHandleInvalid extends EnumEntry with Serializable
-
-object IndexToStringHandleInvalid extends Enum[IndexToStringHandleInvalid] {
-  val values = findValues
-  case object NoFilter extends IndexToStringHandleInvalid
-  case object Error extends IndexToStringHandleInvalid
+  def setCaseSensitive(value: Boolean): this.type = {
+    getSparkMlStage().get.setCaseSensitive(value)
+    this
+  }
 }

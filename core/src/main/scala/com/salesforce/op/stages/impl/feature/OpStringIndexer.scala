@@ -40,7 +40,7 @@ import org.apache.spark.ml.feature.{StringIndexer, StringIndexerModel}
 import scala.reflect.runtime.universe.TypeTag
 
 /**
- * OP wrapper for [[org.apache.spark.ml.feature.StringIndexer]]
+ * Wrapper for [[org.apache.spark.ml.feature.StringIndexer]]
  *
  * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
  *

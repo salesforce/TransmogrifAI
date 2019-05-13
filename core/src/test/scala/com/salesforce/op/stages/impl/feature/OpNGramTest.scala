@@ -30,53 +30,46 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
+import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import enumeratum._
-import org.apache.spark.ml.feature.IndexToString
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
+import org.apache.spark.ml.feature.NGram
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-/**
- * Wrapper for [[org.apache.spark.ml.feature.IndexToString]]
- *
- * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
- *
- * A transformer that maps a feature of indices back to a new feature of corresponding text values.
- * The index-string mapping is either from the ML attributes of the input feature,
- * or from user-supplied labels (which take precedence over ML attributes).
- *
- * @see [[OpStringIndexer]] for converting text into indices
- */
-class OpIndexToString(uid: String = UID[OpIndexToString])
-  extends OpTransformerWrapper[RealNN, Text, IndexToString](
-    transformer = new IndexToString(), uid = uid
-  ) {
 
-  /**
-   * Optional array of labels specifying index-string mapping.
-   * If not provided or if empty, then metadata from input feature is used instead.
-   *
-   * @param value array of labels
-   * @return
-   */
-  def setLabels(value: Array[String]): this.type = {
-    getSparkMlStage().get.setLabels(value)
-    this
+@RunWith(classOf[JUnitRunner])
+class OpNGramTest extends SwTransformerSpec[TextList, NGram, OpNGram] {
+  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
+
+  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
+
+  val bigrams = textListFeature.ngram()
+  val transformer = bigrams.originStage.asInstanceOf[OpNGram]
+
+  it should "generate unigrams" in {
+    val unigrams = textListFeature.ngram(n = 1)
+    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(unigrams)
+
+    results(0) shouldBe data.head
   }
 
-  /**
-   * Array of labels
-   *
-   * @return Array of labels
-   */
-  def getLabels: Array[String] = getSparkMlStage().get.getLabels
-}
+  it should "generate trigrams" in {
+    val trigrams = textListFeature.ngram(n = 3)
+    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(trigrams)
 
+    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
+  }
 
-sealed trait IndexToStringHandleInvalid extends EnumEntry with Serializable
+  it should "not allow n < 1" in {
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
+  }
 
-object IndexToStringHandleInvalid extends Enum[IndexToStringHandleInvalid] {
-  val values = findValues
-  case object NoFilter extends IndexToStringHandleInvalid
-  case object Error extends IndexToStringHandleInvalid
 }
