@@ -60,8 +60,7 @@ trait RichListFeature {
       numTerms: Int = TransmogrifierDefaults.DefaultNumOfFeatures,
       binary: Boolean = TransmogrifierDefaults.BinaryFreq
     ): FeatureLike[OPVector] = {
-      val htf = new HashingTF().setNumFeatures(numTerms).setBinary(binary)
-      val tr = new OpTransformerWrapper[TextList, OPVector, HashingTF](htf, UID[HashingTF])
+      val tr = new OpHashingTF().setNumFeatures(numTerms).setBinary(binary)
       f.transformWith(tr)
     }
 
@@ -151,8 +150,7 @@ trait RichListFeature {
      * @return
      */
     def ngram(n: Int = 2): FeatureLike[TextList] = {
-      val ngrm = new NGram().setN(n)
-      val tr = new OpTransformerWrapper[TextList, TextList, NGram](ngrm, UID[NGram])
+      val tr = new OpNGram().setN(n)
       f.transformWith(tr)
     }
 
@@ -169,9 +167,8 @@ trait RichListFeature {
       stopWords: Array[String] = StopWordsRemover.loadDefaultStopWords("english"),
       caseSensitive: Boolean = false
     ): FeatureLike[TextList] = {
-      val remover = new StopWordsRemover().setStopWords(stopWords).setCaseSensitive(caseSensitive)
-      val tr = new OpTransformerWrapper[TextList, TextList, StopWordsRemover](remover, UID[StopWordsRemover])
-      f.transformWith(tr)
+      val remover = new OpStopWordsRemover().setStopWords(stopWords).setCaseSensitive(caseSensitive)
+      f.transformWith(remover)
     }
 
 
