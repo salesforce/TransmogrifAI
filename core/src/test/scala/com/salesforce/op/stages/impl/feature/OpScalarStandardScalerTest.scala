@@ -47,6 +47,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN, RealNN], OpScalarStandardScaler] {
+
   import spark.implicits._
 
   /**
@@ -58,9 +59,8 @@ class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[Real
     1.150792911137501.toRealNN
   )
 
-  val txtData = Seq(10, 100, 1000).map(_.toRealNN)
 
-  val (inputData, testF) = TestFeatureBuilder(txtData)
+  val (inputData, testF) = TestFeatureBuilder(Seq(10, 100, 1000).map(_.toRealNN))
 
   override val estimator: OpScalarStandardScaler = new OpScalarStandardScaler().setInput(testF)
 
@@ -69,7 +69,7 @@ class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[Real
 
   lazy val testData: Dataset[StdScTestData] = DataStdScTest.input.toDS()
 
-  Spec[OpScalarStandardScaler] should
+  it should
     "scale scalars properly outside a pipeline (by itself); setWithMean(false).setWithStd(false)" in {
 
     val featureNormalizer = new OpScalarStandardScaler().setWithMean(false).setWithStd(false)
