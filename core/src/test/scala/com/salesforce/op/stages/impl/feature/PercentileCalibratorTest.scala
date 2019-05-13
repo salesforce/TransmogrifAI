@@ -34,7 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.stages.base.unary.UnaryModel
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.{Estimator, Transformer}
@@ -49,8 +49,22 @@ import org.scalatest.FlatSpec
 import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
-class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
+class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN, RealNN], PercentileCalibrator] {
   import spark.implicits._
+
+  val testData = Seq(10, 100, 1000).map(_.toRealNN)
+
+  val (inputData, testF) = TestFeatureBuilder(testData)
+
+  /**
+   * Estimator instance to be tested
+   */
+  override val estimator: PercentileCalibrator = new PercentileCalibrator().setInput(testF)
+
+  /**
+   * Expected result of the transformer applied on the Input Dataset
+   */
+  override val expectedResult: Seq[RealNN] = Seq(33.toRealNN, 66.toRealNN, 99.toRealNN)
 
   Spec[PercentileCalibrator] should "return a minimum calibrated score of 0 and max of 99 when buckets is 100" in {
     val data = (0 until 1000).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
@@ -151,4 +165,5 @@ class PercentileCalibratorTest extends FlatSpec with TestSparkContext {
     val indicesByPerc = scoresTransformed.orderBy(percentile.name, f2.name).collect(f1).deep
     indicesByProb should equal (indicesByPerc)
   }
+
 }
