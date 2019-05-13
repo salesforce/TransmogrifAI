@@ -30,53 +30,39 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
+import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import enumeratum._
-import org.apache.spark.ml.feature.IndexToString
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import org.apache.spark.ml.feature.StopWordsRemover
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-/**
- * Wrapper for [[org.apache.spark.ml.feature.IndexToString]]
- *
- * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
- *
- * A transformer that maps a feature of indices back to a new feature of corresponding text values.
- * The index-string mapping is either from the ML attributes of the input feature,
- * or from user-supplied labels (which take precedence over ML attributes).
- *
- * @see [[OpStringIndexer]] for converting text into indices
- */
-class OpIndexToString(uid: String = UID[OpIndexToString])
-  extends OpTransformerWrapper[RealNN, Text, IndexToString](
-    transformer = new IndexToString(), uid = uid
-  ) {
 
-  /**
-   * Optional array of labels specifying index-string mapping.
-   * If not provided or if empty, then metadata from input feature is used instead.
-   *
-   * @param value array of labels
-   * @return
-   */
-  def setLabels(value: Array[String]): this.type = {
-    getSparkMlStage().get.setLabels(value)
-    this
+@RunWith(classOf[JUnitRunner])
+class OpStopWordsRemoverTest extends SwTransformerSpec[TextList, StopWordsRemover, OpStopWordsRemover] {
+  val data = Seq(
+    "I AM groot", "Groot call me human", "or I will crush you"
+  ).map(_.split(" ").toSeq.toTextList)
+
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
+
+  val bigrams = textListFeature.removeStopWords()
+  val transformer = bigrams.originStage.asInstanceOf[OpStopWordsRemover]
+
+  val expectedResult = Seq(Seq("groot"), Seq("Groot", "call", "human"), Seq("crush")).map(_.toTextList)
+
+  it should "allow case sensitivity" in {
+    val noStopWords = textListFeature.removeStopWords(caseSensitive = true)
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("I", "AM", "groot"), Seq("Groot", "call", "human"), Seq("I", "crush")).map(_.toTextList)
   }
 
-  /**
-   * Array of labels
-   *
-   * @return Array of labels
-   */
-  def getLabels: Array[String] = getSparkMlStage().get.getLabels
-}
-
-
-sealed trait IndexToStringHandleInvalid extends EnumEntry with Serializable
-
-object IndexToStringHandleInvalid extends Enum[IndexToStringHandleInvalid] {
-  val values = findValues
-  case object NoFilter extends IndexToStringHandleInvalid
-  case object Error extends IndexToStringHandleInvalid
+  it should "set custom stop words" in {
+    val noStopWords = textListFeature.removeStopWords(stopWords = Array("Groot", "I"))
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("AM"), Seq("call", "me", "human"), Seq("or", "will", "crush", "you")).map(_.toTextList)
+  }
 }

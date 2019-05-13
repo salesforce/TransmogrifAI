@@ -33,50 +33,32 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import enumeratum._
-import org.apache.spark.ml.feature.IndexToString
+import org.apache.spark.ml.feature.NGram
 
 /**
- * Wrapper for [[org.apache.spark.ml.feature.IndexToString]]
+ * Wrapper for [[org.apache.spark.ml.feature.NGram]]
  *
- * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
+ * A feature transformer that converts the input array of strings into an array of n-grams. Null
+ * values in the input array are ignored.
+ * It returns an array of n-grams where each n-gram is represented by a space-separated string of
+ * words.
  *
- * A transformer that maps a feature of indices back to a new feature of corresponding text values.
- * The index-string mapping is either from the ML attributes of the input feature,
- * or from user-supplied labels (which take precedence over ML attributes).
+ * When the input is empty, an empty array is returned.
+ * When the input array length is less than n (number of elements per n-gram), no n-grams are
+ * returned.
  *
- * @see [[OpStringIndexer]] for converting text into indices
+ * @see [[NGram]] for more info
  */
-class OpIndexToString(uid: String = UID[OpIndexToString])
-  extends OpTransformerWrapper[RealNN, Text, IndexToString](
-    transformer = new IndexToString(), uid = uid
-  ) {
+class OpNGram(uid: String = UID[NGram])
+  extends OpTransformerWrapper[TextList, TextList, NGram](transformer = new NGram(), uid = uid) {
 
   /**
-   * Optional array of labels specifying index-string mapping.
-   * If not provided or if empty, then metadata from input feature is used instead.
-   *
-   * @param value array of labels
-   * @return
+   * Minimum n-gram length, greater than or equal to 1.
+   * Default: 2, bigram features
    */
-  def setLabels(value: Array[String]): this.type = {
-    getSparkMlStage().get.setLabels(value)
+  def setN(value: Int): this.type = {
+    getSparkMlStage().get.setN(value)
     this
   }
 
-  /**
-   * Array of labels
-   *
-   * @return Array of labels
-   */
-  def getLabels: Array[String] = getSparkMlStage().get.getLabels
-}
-
-
-sealed trait IndexToStringHandleInvalid extends EnumEntry with Serializable
-
-object IndexToStringHandleInvalid extends Enum[IndexToStringHandleInvalid] {
-  val values = findValues
-  case object NoFilter extends IndexToStringHandleInvalid
-  case object Error extends IndexToStringHandleInvalid
 }

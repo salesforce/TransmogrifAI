@@ -39,9 +39,6 @@ import org.apache.spark.ml.param.ParamMap
 
 import scala.reflect.runtime.universe.TypeTag
 
-// TODO: all the transformers that inherit traits HasInputCol and HasOutputCol should really extend
-// org.apache.spark.ml.UnaryTransformer, so can add a PR to spark so we can then move this class to our namespace.
-
 /**
  * Wraps a spark ML transformer with setable input and output columns.  Those transformers that fall in this case,
  * include those that inherit from org.apache.spark.ml.UnaryEstimator, as well as others such as OneHotEncoder,
