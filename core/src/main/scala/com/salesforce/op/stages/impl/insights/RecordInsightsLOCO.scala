@@ -98,8 +98,9 @@ class RecordInsightsLOCO[T <: Model[T]]
   private lazy val histories = vectorMetadata.getColumnHistory()
   private lazy val featureInfo = histories.map(_.toJson(false))
 
-  private val textClassName = SmartTextVectorizer.getClass.getSimpleName.split("\\$").last
-  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(_.contains(textClassName))).map(_.index)
+  private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
+  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(_.contains(smartTextClassName)))
+    .map(_.index)
 
   private def computeDiffs(i: Int, oldInd: Int, oldVal: Double, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double]): Array[Double] = {
@@ -155,7 +156,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       val descValue = history.descriptorValue
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val max = diffToExamine(indexToExamine)
-      if (parentStages.exists(_.contains(textClassName)) && indValue.isEmpty && descValue.isEmpty) {
+      if (parentStages.exists(_.contains(smartTextClassName)) && indValue.isEmpty && descValue.isEmpty) {
         val (indices, array) = aggregationMap.getOrElse(rawName, (Array.empty[Int], Array.empty[Double]))
         aggregationMap(rawName) = (indices :+ i, sumArray(array, diffToExamine))
       } else {
