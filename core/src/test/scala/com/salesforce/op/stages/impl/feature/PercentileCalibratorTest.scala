@@ -50,6 +50,7 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN, RealNN], PercentileCalibrator] {
+
   import spark.implicits._
 
   val testData = Seq(10, 100, 1000).map(_.toRealNN)
@@ -66,7 +67,7 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
    */
   override val expectedResult: Seq[RealNN] = Seq(33.toRealNN, 66.toRealNN, 99.toRealNN)
 
-  Spec[PercentileCalibrator] should "return a minimum calibrated score of 0 and max of 99 when buckets is 100" in {
+  it should "return a minimum calibrated score of 0 and max of 99 when buckets is 100" in {
     val data = (0 until 1000).map(i => i.toLong.toIntegral -> Random.nextDouble.toRealNN)
     val (scoresDF, f1, f2): (DataFrame, Feature[Integral], Feature[RealNN]) = TestFeatureBuilder(data)
     val percentile = f2.toPercentile()
@@ -75,8 +76,8 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
     val scoresTransformed = model.asInstanceOf[Transformer].transform(scoresDF)
 
     percentile.name shouldBe percentile.originStage.getOutputFeatureName
-    scoresTransformed.select(min(percentile.name)).first.getDouble(0) should equal (0.0)
-    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal (99.0)
+    scoresTransformed.select(min(percentile.name)).first.getDouble(0) should equal(0.0)
+    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal(99.0)
   }
 
   it should "produce the calibration map metadata" in {
@@ -103,7 +104,7 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
     val model = percentile.originStage.asInstanceOf[Estimator[_]].fit(scoresDF)
     val scoresTransformed = model.asInstanceOf[Transformer].transform(scoresDF)
 
-    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal (99.0)
+    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal(99.0)
   }
 
   it should "return a maximum calibrated score of 99 when calibrating with less than 100" in {
@@ -114,7 +115,7 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
     val model = percentile.originStage.asInstanceOf[Estimator[_]].fit(scoresDF)
     val scoresTransformed = model.asInstanceOf[Transformer].transform(scoresDF)
 
-    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal (99.0)
+    scoresTransformed.select(max(percentile.name)).first.getDouble(0) should equal(99.0)
   }
 
   it should "return all scores from 0 to 99 in increments of 1" in {
@@ -131,7 +132,7 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
 
     val checkSet = (0 to 99).map(_.toReal).toSet
 
-    scoreCounts.collect(percentile).toSet should equal (checkSet)
+    scoreCounts.collect(percentile).toSet should equal(checkSet)
   }
 
   it should "return a uniform distribution of scores" in {
@@ -163,7 +164,7 @@ class PercentileCalibratorTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN
 
     val indicesByProb = scoresTransformed.orderBy(f2.name).collect(f1).deep
     val indicesByPerc = scoresTransformed.orderBy(percentile.name, f2.name).collect(f1).deep
-    indicesByProb should equal (indicesByPerc)
+    indicesByProb should equal(indicesByPerc)
   }
 
 }
