@@ -187,13 +187,18 @@ class RandomTextTest extends FlatSpec with TestCommon with Assertions {
       })
   }
 
-  "ID generator" should "generate IDs" in {
+  "id generator" should "generate IDs" in {
     val g = RandomText.ids withProbabilityOfEmpty 0.001
     check(g,
       (s: String) => s.length > 0 && s.length < 60 && (s matches "\\w+"))
   }
 
-  "UniqueID generator" should "generate IDs" in {
+  "id generator" should "not produce empty IDs by default" in {
+    val g = RandomText.ids.limit(10000)
+    g.forall(id => !id.value.isEmpty && !id.value.contains("")) shouldBe true
+  }
+
+  "unique id generator" should "generate IDs" in {
     val g = RandomText.uniqueIds
     check(g,
       (s: String) => s.length > 0 && s.length < 60 && (s matches "\\w+_[0-9a-f]+"),
@@ -211,6 +216,11 @@ class RandomTextTest extends FlatSpec with TestCommon with Assertions {
         "rSUkRzxMgIYVa_7db"
       )
     )
+  }
+
+  "unique id generator" should "not produce empty IDs by default" in {
+    val g = RandomText.uniqueIds.limit(10000)
+    g.forall(id => !id.value.isEmpty && !id.value.contains("")) shouldBe true
   }
 
   "emails generator" should "generate emails" in {

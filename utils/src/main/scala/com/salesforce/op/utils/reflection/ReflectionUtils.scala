@@ -35,7 +35,6 @@ import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => runtimeUniverse}
 import scala.util.{Failure, Success}
 
-
 /**
  * Various Reflection helpers
  */
@@ -76,6 +75,38 @@ object ReflectionUtils {
     val (ctor, args) = bestCtor(klazz, classType, classMirror, ctorArgs)
     // apply the constructor on the extracted args
     ctor.apply(args.map(_._2): _*).asInstanceOf[T]
+  }
+
+  /**
+   * Create a new of type T given it's class name
+   *
+   * @param className instance class
+   * @tparam T type T
+   * @return new instance of T
+   */
+  def newInstance[T](className: String): T = newInstance[T](className, defaultClassLoader)
+
+  /**
+   * Create a new of type T given it's class name
+   *
+   * @param className   instance class
+   * @param classLoader class loader to use
+   * @tparam T type T
+   * @return new instance of T
+   */
+  def newInstance[T](className: String, classLoader: ClassLoader): T = try {
+    val klazz = ReflectionUtils.classForName(className, classLoader)
+    // Try to create an instance only if it has a single no-args ctor or fall back to object
+    val res = klazz.getConstructors.find(_.getParameterCount == 0) match {
+      case Some(c) => c.newInstance()
+      case _ => klazz.getField("MODULE$").get(klazz)
+    }
+    res.asInstanceOf[T]
+  } catch {
+    case e: Exception => throw new RuntimeException(
+      s"Failed to create an instance of class '$className'. " +
+        "Class has to either have a no-args ctor or be an object.", e
+    )
   }
 
   /**
@@ -199,7 +230,6 @@ object ReflectionUtils {
    */
   def classForName(name: String, classLoader: ClassLoader = defaultClassLoader): Class[_] = classLoader.loadClass(name)
 
-
   /**
    * Fully dealiased type name for [[Type]].
    * This method performs a recursive dealising vs a regular type.dealias, which does on one level only.
@@ -222,17 +252,31 @@ object ReflectionUtils {
   /**
    * Create a TypeTag for Type
    *
-   * @param rtm runtime mirror
    * @param tpe type
+   * @param rtm runtime mirror
    * @tparam T type T
    * @return TypeTag[T]
    */
-  def typeTagForType[T](rtm: Mirror = runtimeMirror(), tpe: Type): TypeTag[T] = {
+  def typeTagForType[T](tpe: Type, rtm: Mirror = runtimeMirror()): TypeTag[T] = {
     TypeTag(rtm, new api.TypeCreator {
       def apply[U <: api.Universe with Singleton](m: api.Mirror[U]): U#Type =
         if (m eq rtm) tpe.asInstanceOf[U#Type]
         else throw new IllegalArgumentException(s"Type tag defined in $rtm cannot be migrated to other mirrors.")
     })
+  }
+
+  /**
+   * Returns a Type Tag by Type name
+   *
+   * @param typeName type name
+   * @param rtm      runtime mirror
+   * @tparam T type T
+   * @return TypeTag[T]
+   */
+  def typeTagForTypeName[T](typeName: String, rtm: Mirror = runtimeMirror()): TypeTag[T] = {
+    val clazz = classForName(typeName)
+    val typee = rtm.classSymbol(clazz).toType
+    typeTagForType[T](typee, rtm)
   }
 
   /**
