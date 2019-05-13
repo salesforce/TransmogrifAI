@@ -30,46 +30,43 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op._
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.feature.NGram
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import org.apache.spark.ml.feature.HashingTF
 
+/**
+ * Wrapper for [[org.apache.spark.ml.feature.HashingTF]]
+ *
+ * Maps a sequence of terms to their term frequencies using the hashing trick.
+ * Currently we use Austin Appleby's MurmurHash 3 algorithm (MurmurHash3_x86_32)
+ * to calculate the hash code value for the term object.
+ * Since a simple modulo is used to transform the hash function to a column index,
+ * it is advisable to use a power of two as the numFeatures parameter;
+ * otherwise the features will not be mapped evenly to the columns.
+ *
+ * @see [[HashingTF]] for more info
+ */
+class OpHashingTF(uid: String = UID[HashingTF])
+  extends OpTransformerWrapper[TextList, OPVector, HashingTF](transformer = new HashingTF(), uid = uid) {
 
-@RunWith(classOf[JUnitRunner])
-class NGramTest extends SwTransformerSpec[TextList, NGram, OpTransformerWrapper[TextList, TextList, NGram]] {
-  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
-  val (inputData, textListFeature) = TestFeatureBuilder(data)
-
-  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
-
-  val bigrams = textListFeature.ngram()
-  val transformer = bigrams.originStage.asInstanceOf[OpTransformerWrapper[TextList, TextList, NGram]]
-
-  it should "generate unigrams" in {
-    val unigrams = textListFeature.ngram(n = 1)
-    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(unigrams)
-
-    results(0) shouldBe data.head
+  /**
+   * Number of features. Should be greater than 0.
+   * (default = 2^18^)
+   */
+  def setNumFeatures(value: Int): this.type = {
+    getSparkMlStage().get.setNumFeatures(value)
+    this
   }
 
-  it should "generate trigrams" in {
-    val trigrams = textListFeature.ngram(n = 3)
-    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
-    val results = transformedData.collect(trigrams)
-
-    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
+  /**
+   * Binary toggle to control term frequency counts.
+   * If true, all non-zero counts are set to 1.  This is useful for discrete probabilistic
+   * models that model binary events rather than integer counts.
+   * (default = false)
+   */
+  def setBinary(value: Boolean): this.type = {
+    getSparkMlStage().get.setBinary(value)
+    this
   }
-
-  it should "not allow n < 1" in {
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
-    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
-  }
-
 }
