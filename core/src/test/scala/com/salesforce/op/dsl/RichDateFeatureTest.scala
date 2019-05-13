@@ -1,6 +1,5 @@
 package com.salesforce.op.dsl
 
-import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.TimePeriod
