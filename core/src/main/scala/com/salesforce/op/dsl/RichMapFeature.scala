@@ -703,6 +703,14 @@ trait RichMapFeature {
   implicit class RichDateMapFeature(val f: FeatureLike[DateMap]) {
 
     /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer map feature of time period values
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[IntegralMap] =
+      new TimePeriodMapTransformer[DateMap](period).setInput(f).getOutput()
+
+    /**
      * transforms a DateMap field into a series of cartesian coordinate representation
      * of an extracted time period on the unit circle
      *
@@ -781,6 +789,13 @@ trait RichMapFeature {
    */
   implicit class RichDateTimeMapFeature(val f: FeatureLike[DateTimeMap]) {
 
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer map feature of time period values
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[IntegralMap] =
+      new TimePeriodMapTransformer[DateTimeMap](period).setInput(f).getOutput()
 
     /**
      * transforms a DateTimeMap field into a series of cartesian coordinate representation
