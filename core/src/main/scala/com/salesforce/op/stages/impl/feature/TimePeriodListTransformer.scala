@@ -33,8 +33,6 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.utils.date.DateTimeUtils
-import org.joda.time.{DateTime => JDateTime}
 
 import scala.reflect.runtime.universe.TypeTag
 

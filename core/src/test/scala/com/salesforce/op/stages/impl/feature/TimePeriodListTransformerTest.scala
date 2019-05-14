@@ -46,7 +46,7 @@ class TimePeriodListTransformerTest extends OpTransformerSpec[OPVector, TimePeri
     new JDateTime(1999, 3, 8, 12, 0, DateTimeUtils.DefaultTimeZone).getMillis,
     new JDateTime(2019, 4, 30, 13, 0, DateTimeUtils.DefaultTimeZone).getMillis
   ).toDateList
-  
+
   val (inputData, f1) = TestFeatureBuilder(Seq(dateList))
 
   override val transformer: TimePeriodListTransformer[DateList] =
