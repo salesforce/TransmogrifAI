@@ -27,29 +27,30 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
-import org.joda.time.{DateTime => JDateTime}
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.unary.UnaryTransformer
 
+import scala.reflect.runtime.universe.TypeTag
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable {
-  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-  def extractFromTime(t: Long): Int
-}
+/**
+ * TimePeriodTransformer extracts one of a set of time periods from a date/datetime
+ *
+ * @param period        time period to extract from date
+ * @param uid           uid for instance
+ * @param tti           type tag for input
+ * @tparam I            input feature type
+ */
+class TimePeriodTransformer[I <: Date]
+(
+  val period: TimePeriod,
+  uid: String = UID[TimePeriodTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Integral](operationName = "dateToTimePeriod", uid = uid){
 
-object TimePeriod extends Enum[TimePeriod] {
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
-  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
-  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
-  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
-  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
-      val dt = longToDateTime(t)
-      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
-  }
-  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
+  override def transformFn: I => Integral = (i: I) => i.value.map(t => period.extractFromTime(t).toLong).toIntegral
 }
