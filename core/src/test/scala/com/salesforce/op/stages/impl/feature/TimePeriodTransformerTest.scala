@@ -46,7 +46,7 @@ class TimePeriodTransformerTest extends OpTransformerSpec[Integral, TimePeriodTr
       }
 
       withClue(s"Assertion failed for TimePeriod $tp: ") {
-        assertFeature(f1.transformWith(new TimePeriodTransformer(tp)), expected)
+        assertFeature(f1.toTimePeriod(tp), expected)
       }
     })
   }
