@@ -33,11 +33,8 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.{DateListPivot, DateToUnitCircleTransformer, TimePeriod, TransmogrifierDefaults}
-import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.stages.impl.feature._
 import org.joda.time.{DateTime => JDateTime}
-
-import scala.reflect.runtime.universe.TypeTag
 
 trait RichDateFeature {
   self: RichFeature with RichListFeature =>
@@ -47,7 +44,7 @@ trait RichDateFeature {
    *
    * @param f Date Feature
    */
-  implicit class RichDateFeature(val f: FeatureLike[Date]) extends TimePeriodTransformers[Date] {
+  implicit class RichDateFeature(val f: FeatureLike[Date]) {
 
     /**
      * Convert to DateList feature
@@ -58,6 +55,13 @@ trait RichDateFeature {
         new UnaryLambdaTransformer[Date, DateList](operationName = "dateToList", _.value.toSeq.toDateList)
       )
     }
+
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer feature of time period value
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = f.transformWith(new TimePeriodTransformer(period))
 
     /**
      * transforms a Date field into a cartesian coordinate representation
@@ -117,7 +121,7 @@ trait RichDateFeature {
    *
    * @param f DateTime Feature
    */
-  implicit class RichDateTimeFeature(val f: FeatureLike[DateTime]) extends TimePeriodTransformers[DateTime] {
+  implicit class RichDateTimeFeature(val f: FeatureLike[DateTime]) {
 
     /**
      * Convert to DateTimeList feature
@@ -131,6 +135,13 @@ trait RichDateFeature {
         )
       )
     }
+
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer feature of time period value
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = f.transformWith(new TimePeriodTransformer(period))
 
     /**
      * transforms a DateTime field into a cartesian coordinate representation
@@ -184,41 +195,4 @@ trait RichDateFeature {
 
   }
 
-}
-
-abstract class TimePeriodTransformers[T <: Date : TypeTag] {
-  val f: FeatureLike[T]
-
-  /**
-   * Converts a Date or DateTime feature into a selected time period.
-   *
-   * @param period type of [[TimePeriod]] to convert date feature to
-   * @return Integer feature of time period value
-   */
-  def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = {
-    val periodFun: Long => Int = period match {
-      case TimePeriod.DayOfMonth => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfMonth.get
-      case TimePeriod.DayOfWeek => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfWeek.get
-      case TimePeriod.DayOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfYear.get
-      case TimePeriod.HourOfDay => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).hourOfDay.get
-      case TimePeriod.MonthOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).monthOfYear.get
-      case TimePeriod.WeekOfMonth => t => {
-        val dt = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-        dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-      }
-      case TimePeriod.WeekOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).weekOfWeekyear.get
-    }
-    f.transformWith(
-      new UnaryLambdaTransformer[T, Integral](operationName = "dateToTimePeriod",
-        transformFn = _.value.map(t => periodFun(t).toLong).toIntegral)
-    )
-  }
-
-  def toDayOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfMonth)
-  def toDayOfWeek(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfWeek)
-  def toDayOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.DayOfYear)
-  def toHourOfDay(): FeatureLike[Integral] = toTimePeriod(TimePeriod.HourOfDay)
-  def toMonthOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.MonthOfYear)
-  def toWeekOfMonth(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfMonth)
-  def toWeekOfYear(): FeatureLike[Integral] = toTimePeriod(TimePeriod.WeekOfYear)
 }
