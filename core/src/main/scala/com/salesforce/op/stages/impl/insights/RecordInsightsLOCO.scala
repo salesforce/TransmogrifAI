@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.impl.feature.SmartTextVectorizer
+import com.salesforce.op.stages.impl.feature.{SmartTextMapVectorizer, SmartTextVectorizer}
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
@@ -99,8 +99,11 @@ class RecordInsightsLOCO[T <: Model[T]]
   private lazy val featureInfo = histories.map(_.toJson(false))
 
   private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
-  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(_.contains(smartTextClassName)))
+  private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
+  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName)
+    || s.contains(smartTextMapClassName)))
     .map(_.index)
+
 
   private def computeDiffs(i: Int, oldInd: Int, oldVal: Double, featureArray: Array[(Int, Double)], featureSize: Int,
     baseScore: Array[Double]): Array[Double] = {
@@ -150,15 +153,21 @@ class RecordInsightsLOCO[T <: Model[T]]
     while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
       val history = histories(oldInd)
-      val rawName = history.parentFeatureOrigins.head
       val parentStages = history.parentFeatureStages
       val indValue = history.indicatorValue
       val descValue = history.descriptorValue
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val max = diffToExamine(indexToExamine)
-      if (parentStages.exists(_.contains(smartTextClassName)) && indValue.isEmpty && descValue.isEmpty) {
-        val (indices, array) = aggregationMap.getOrElse(rawName, (Array.empty[Int], Array.empty[Double]))
-        aggregationMap(rawName) = (indices :+ i, sumArray(array, diffToExamine))
+      if (indValue.isEmpty && descValue.isEmpty) {
+        val rawName = parentStages match {
+          case s if s.exists(_.contains(smartTextClassName)) => Some(history.parentFeatureOrigins.head)
+          case s if s.exists(_.contains(smartTextMapClassName)) => history.grouping
+          case _ => None
+        }
+        rawName.map { name =>
+          val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
+          aggregationMap(name) = (indices :+ i, sumArray(array, diffToExamine))
+        }
       } else {
         addToHeaps(i, max, diffToExamine)
       }
@@ -176,10 +185,11 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     val topPositive = positiveMaxHeap.dequeueAll
     val topNegative = negativeMaxHeap.dequeueAll
-    (topPositive ++ topNegative)
+    topPositive ++ topNegative
   }
 
-  override def transformFn: OPVector => TextMap = (features) => {
+  override def transformFn: OPVector => TextMap = features => {
+
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
 
@@ -195,7 +205,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       case 0 => throw new RuntimeException("model does not produce scores for insights")
       case 1 => 0
       case 2 => 1
-      case n if (n > 2) => baseResult.prediction.toInt
+      case n if n > 2 => baseResult.prediction.toInt
     }
     val topPosNeg = returnTopPosNeg(filledSize, featureArray, featureSize, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
