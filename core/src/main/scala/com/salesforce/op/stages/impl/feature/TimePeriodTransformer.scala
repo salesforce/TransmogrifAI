@@ -24,17 +24,16 @@ class TimePeriodTransformer[I <: Date]
 )(
   implicit override val tti: TypeTag[I]
 ) extends UnaryTransformer[I, Integral](operationName = "dateToTimePeriod", uid = uid){
-  val periodFun: Long => Int = period match {
-    case TimePeriod.DayOfMonth => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfMonth.get
-    case TimePeriod.DayOfWeek => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfWeek.get
-    case TimePeriod.DayOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfYear.get
-    case TimePeriod.HourOfDay => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).hourOfDay.get
-    case TimePeriod.MonthOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).monthOfYear.get
-    case TimePeriod.WeekOfMonth => t => {
+  def periodFun(t: Long): Int = period match {
+    case TimePeriod.DayOfMonth => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfMonth.get
+    case TimePeriod.DayOfWeek => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfWeek.get
+    case TimePeriod.DayOfYear => new JDateTime(t, DateTimeUtils.DefaultTimeZone).dayOfYear.get
+    case TimePeriod.HourOfDay => new JDateTime(t, DateTimeUtils.DefaultTimeZone).hourOfDay.get
+    case TimePeriod.MonthOfYear => new JDateTime(t, DateTimeUtils.DefaultTimeZone).monthOfYear.get
+    case TimePeriod.WeekOfMonth =>
       val dt = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
       dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
-    case TimePeriod.WeekOfYear => t => new JDateTime(t, DateTimeUtils.DefaultTimeZone).weekOfWeekyear.get
+    case TimePeriod.WeekOfYear => new JDateTime(t, DateTimeUtils.DefaultTimeZone).weekOfWeekyear.get
   }
 
   override def transformFn: I => Integral = (i: I) => i.value.map(t => periodFun(t).toLong).toIntegral
