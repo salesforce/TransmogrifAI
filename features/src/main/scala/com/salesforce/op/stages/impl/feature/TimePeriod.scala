@@ -29,19 +29,27 @@
  */
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.utils.date.DateTimeUtils
 import enumeratum.{Enum, EnumEntry}
+import org.joda.time.{DateTime => JDateTime}
 
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable
+sealed abstract class TimePeriod extends EnumEntry with Serializable {
+  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
+  def extractFromTime(t: Long): Int
+}
 
 object TimePeriod extends Enum[TimePeriod] {
   val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod
-  case object DayOfWeek extends TimePeriod
-  case object DayOfYear extends TimePeriod
-  case object HourOfDay extends TimePeriod
-  case object MonthOfYear extends TimePeriod
-  case object WeekOfMonth extends TimePeriod
-  case object WeekOfYear extends TimePeriod
+  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
+  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
+  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
+  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
+  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
+  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
+      val dt = longToDateTime(t)
+      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
+    }
+  }
+  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
 }
-
