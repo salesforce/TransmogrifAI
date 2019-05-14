@@ -52,8 +52,8 @@ class TimePeriodListTransformer[I <: DateList]
   uid: String = UID[TimePeriodTransformer[_]]
 )(
   implicit override val tti: TypeTag[I]
-) extends UnaryTransformer[I, OPVector](operationName = "dateToTimePeriod", uid = uid) with TimePeriodFunction {
+) extends UnaryTransformer[I, OPVector](operationName = "dateToTimePeriod", uid = uid) {
 
   override def transformFn: I => OPVector =
-    (i: I) => i.value.map(t => periodFun(t, period).toDouble).toVector.toOPVector
+    (i: I) => i.value.map(t => period.extractFromTime(t).toDouble).toVector.toOPVector
 }

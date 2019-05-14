@@ -56,6 +56,6 @@ class TimePeriodMapTransformerTest extends OpTransformerSpec[IntegralMap, TimePe
   override val transformer: TimePeriodMapTransformer[DateMap] = new TimePeriodMapTransformer(TimePeriod.DayOfMonth).setInput(f1)
 
   override val expectedResult: Seq[IntegralMap] = Seq(
-    names.zip(Seq(Integral(14), Integral(12), Integral(8), Integral(30))).toMap.toIntegralMap
+    names.zip(Seq(14L, 12L, 8L, 30L)).toMap.toIntegralMap
   )
 }

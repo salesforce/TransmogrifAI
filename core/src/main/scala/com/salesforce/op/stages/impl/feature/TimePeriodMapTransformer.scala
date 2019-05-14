@@ -50,8 +50,8 @@ class TimePeriodMapTransformer[I <: DateMap]
   uid: String = UID[TimePeriodTransformer[_]]
 )(
   implicit override val tti: TypeTag[I]
-) extends UnaryTransformer[I, IntegralMap](operationName = "dateToTimePeriod", uid = uid) with TimePeriodFunction {
+) extends UnaryTransformer[I, IntegralMap](operationName = "dateToTimePeriod", uid = uid) {
 
   override def transformFn: I => IntegralMap =
-    (i: I) => i.value.mapValues(t => periodFun(t, period).toLong).toIntegralMap
+    (i: I) => i.value.mapValues(t => period.extractFromTime(t).toLong).toIntegralMap
 }
