@@ -36,6 +36,7 @@ import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
 import org.joda.time.{DateTime => JDateTime}
 
+
 trait RichDateFeature {
   self: RichFeature with RichListFeature =>
 
