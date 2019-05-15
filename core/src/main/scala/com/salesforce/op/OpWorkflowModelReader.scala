@@ -99,7 +99,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
         .setFeatures(resultFeatures)
         .setParameters(params)
         .setBlacklist(blacklist)
-        // .setBlacklistMapKeys(blacklistMapKeys)
+        .setBlacklistMapKeys(blacklistMapKeys)
         .setRawFeatureFilterResults(results)
   }
 
@@ -116,7 +116,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   }
 
   private def resolveBlacklistMapKeys(json: JValue): Map[String, Set[String]] = {
-    (json \ BlacklistedFeaturesUids.entryName).extractOpt[Map[String, List[String]]] match {
+    (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
       case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
       case None => Map.empty
     }
