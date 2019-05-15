@@ -131,7 +131,7 @@ private[op] trait OpWorkflowCore {
    * @return reader for workflow
    */
   final def getReader(): Reader[_] = {
-    reader.getOrElse(throw new RuntimeException("Reader is not set"))
+    reader.getOrElse(throw new IllegalArgumentException("Reader is not set"))
   }
 
   /**
