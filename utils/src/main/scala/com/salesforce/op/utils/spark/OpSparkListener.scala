@@ -71,6 +71,7 @@ class OpSparkListener
     (now, now, now)
   }
   private val stageMetrics = ArrayBuffer.empty[StageMetrics]
+  private var cumulativeStageMetrics: StageMetrics = StageMetrics.zero()
 
   val logPrefix: String = "%s:%s,RUN_TYPE:%s,APP:%s,APP_ID:%s".format(
     customTagName.getOrElse("APP_NAME"),
@@ -98,7 +99,11 @@ class OpSparkListener
   override def onStageCompleted(stageCompleted: SparkListenerStageCompleted): Unit = {
     val si = stageCompleted.stageInfo
     val tm = si.taskMetrics
-    if (collectStageMetrics) stageMetrics += StageMetrics(si)
+    if (collectStageMetrics) {
+      stageMetrics += StageMetrics(si)
+    } else {
+
+    }
     if (logStageMetrics) {
       log.info("{},STAGE:{},MEMORY_SPILLED_BYTES:{},GC_TIME_MS:{},STAGE_TIME_MS:{}",
         logPrefix, si.name, tm.memoryBytesSpilled.toString, tm.jvmGCTime.toString, tm.executorRunTime.toString
@@ -197,7 +202,46 @@ case class StageMetrics private
   shuffleWriteTime: Long,
   shuffleBytesWritten: Long,
   shuffleRecordsWritten: Long
-) extends JsonLike
+) extends JsonLike {
+  def plus(sm: StageMetrics): StageMetrics = {
+    StageMetrics(
+      stageId = stageId,
+      attemptId = attemptId,
+      name = name,
+      numTasks = numTasks + sm.numTasks,
+      parentIds = parentIds,
+      status = status,
+      numAccumulables = numAccumulables + sm.numAccumulables,
+      failureReason = failureReason,
+      submissionTime = Option(math.min(submissionTime.getOrElse(0L), sm.submissionTime.getOrElse(0L))),
+      completionTime = Option(math.max(completionTime.getOrElse(0L), sm.completionTime.getOrElse(0L))),
+      duration = duration.map(_ + sm.duration.getOrElse(0L)),
+      executorRunTime = executorRunTime + sm.executorRunTime,
+      executorCpuTime = executorCpuTime + sm.executorCpuTime,
+      executorDeserializeTime = executorDeserializeTime + sm.executorDeserializeTime,
+      executorDeserializeCpuTime = executorDeserializeCpuTime + sm.executorDeserializeCpuTime,
+      resultSerializationTime = resultSerializationTime + sm.resultSerializationTime,
+      jvmGCTime = jvmGCTime + sm.jvmGCTime,
+      resultSizeBytes = resultSizeBytes + sm.resultSizeBytes,
+      numUpdatedBlockStatuses = numUpdatedBlockStatuses + sm.numUpdatedBlockStatuses,
+      diskBytesSpilled = diskBytesSpilled + sm.diskBytesSpilled,
+      memoryBytesSpilled = memoryBytesSpilled + sm.memoryBytesSpilled,
+      peakExecutionMemory = math.max(peakExecutionMemory, sm.peakExecutionMemory),
+      recordsRead = recordsRead + sm.recordsRead,
+      bytesRead = bytesRead + sm.bytesRead,
+      recordsWritten = recordsWritten + sm.recordsWritten,
+      bytesWritten = bytesWritten + sm.bytesWritten,
+      shuffleFetchWaitTime = shuffleFetchWaitTime + sm.shuffleFetchWaitTime,
+      shuffleTotalBytesRead = shuffleTotalBytesRead + sm.shuffleTotalBytesRead,
+      shuffleTotalBlocksFetched = shuffleTotalBlocksFetched + sm.shuffleTotalBlocksFetched,
+      shuffleLocalBlocksFetched = shuffleLocalBlocksFetched + sm.shuffleLocalBlocksFetched,
+      shuffleRemoteBlocksFetched = shuffleRemoteBlocksFetched + sm.shuffleRemoteBlocksFetched,
+      shuffleWriteTime = shuffleWriteTime + sm.shuffleWriteTime,
+      shuffleBytesWritten = shuffleBytesWritten + sm.shuffleBytesWritten,
+      shuffleRecordsWritten = shuffleRecordsWritten + sm.shuffleRecordsWritten
+    )
+  }
+}
 
 object StageMetrics {
   /**
@@ -252,4 +296,38 @@ object StageMetrics {
       shuffleRecordsWritten = tm.shuffleWriteMetrics.recordsWritten
     )
   }
+  def zero(): StageMetrics = StageMetrics(0,
+    0,
+    "cumulative",
+    0,
+    Seq.empty[Int],
+    "",
+    0,
+    None,
+    None,
+    None,
+    None,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L,
+    0L)
 }
