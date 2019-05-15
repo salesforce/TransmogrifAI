@@ -27,29 +27,38 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
-import org.joda.time.{DateTime => JDateTime}
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import org.apache.spark.ml.feature.NGram
 
+/**
+ * Wrapper for [[org.apache.spark.ml.feature.NGram]]
+ *
+ * A feature transformer that converts the input array of strings into an array of n-grams. Null
+ * values in the input array are ignored.
+ * It returns an array of n-grams where each n-gram is represented by a space-separated string of
+ * words.
+ *
+ * When the input is empty, an empty array is returned.
+ * When the input array length is less than n (number of elements per n-gram), no n-grams are
+ * returned.
+ *
+ * @see [[NGram]] for more info
+ */
+class OpNGram(uid: String = UID[NGram])
+  extends OpTransformerWrapper[TextList, TextList, NGram](transformer = new NGram(), uid = uid) {
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable {
-  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-  def extractFromTime(t: Long): Int
-}
-
-object TimePeriod extends Enum[TimePeriod] {
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
-  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
-  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
-  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
-  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
-      val dt = longToDateTime(t)
-      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
+  /**
+   * Minimum n-gram length, greater than or equal to 1.
+   * Default: 2, bigram features
+   */
+  def setN(value: Int): this.type = {
+    getSparkMlStage().get.setN(value)
+    this
   }
-  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
+
 }

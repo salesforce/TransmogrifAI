@@ -27,29 +27,42 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
-import org.joda.time.{DateTime => JDateTime}
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import org.apache.spark.ml.feature.StopWordsRemover
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable {
-  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-  def extractFromTime(t: Long): Int
-}
+@RunWith(classOf[JUnitRunner])
+class OpStopWordsRemoverTest extends SwTransformerSpec[TextList, StopWordsRemover, OpStopWordsRemover] {
+  val data = Seq(
+    "I AM groot", "Groot call me human", "or I will crush you"
+  ).map(_.split(" ").toSeq.toTextList)
 
-object TimePeriod extends Enum[TimePeriod] {
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
-  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
-  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
-  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
-  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
-      val dt = longToDateTime(t)
-      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
+
+  val bigrams = textListFeature.removeStopWords()
+  val transformer = bigrams.originStage.asInstanceOf[OpStopWordsRemover]
+
+  val expectedResult = Seq(Seq("groot"), Seq("Groot", "call", "human"), Seq("crush")).map(_.toTextList)
+
+  it should "allow case sensitivity" in {
+    val noStopWords = textListFeature.removeStopWords(caseSensitive = true)
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("I", "AM", "groot"), Seq("Groot", "call", "human"), Seq("I", "crush")).map(_.toTextList)
   }
-  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
+
+  it should "set custom stop words" in {
+    val noStopWords = textListFeature.removeStopWords(stopWords = Array("Groot", "I"))
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("AM"), Seq("call", "me", "human"), Seq("or", "will", "crush", "you")).map(_.toTextList)
+  }
 }

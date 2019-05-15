@@ -37,7 +37,7 @@ import enumeratum._
 import org.apache.spark.ml.feature.IndexToString
 
 /**
- * OP wrapper for [[org.apache.spark.ml.feature.IndexToString]]
+ * Wrapper for [[org.apache.spark.ml.feature.IndexToString]]
  *
  * NOTE THAT THIS CLASS EITHER FILTERS OUT OR THROWS AN ERROR IF PREVIOUSLY UNSEEN VALUES APPEAR
  *

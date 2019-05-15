@@ -27,29 +27,49 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
-import org.joda.time.{DateTime => JDateTime}
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
+import org.apache.spark.ml.feature.NGram
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable {
-  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-  def extractFromTime(t: Long): Int
-}
+@RunWith(classOf[JUnitRunner])
+class OpNGramTest extends SwTransformerSpec[TextList, NGram, OpNGram] {
+  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
 
-object TimePeriod extends Enum[TimePeriod] {
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
-  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
-  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
-  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
-  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
-      val dt = longToDateTime(t)
-      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
+  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
+
+  val bigrams = textListFeature.ngram()
+  val transformer = bigrams.originStage.asInstanceOf[OpNGram]
+
+  it should "generate unigrams" in {
+    val unigrams = textListFeature.ngram(n = 1)
+    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(unigrams)
+
+    results(0) shouldBe data.head
   }
-  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
+
+  it should "generate trigrams" in {
+    val trigrams = textListFeature.ngram(n = 3)
+    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(trigrams)
+
+    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
+  }
+
+  it should "not allow n < 1" in {
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
+  }
+
 }
