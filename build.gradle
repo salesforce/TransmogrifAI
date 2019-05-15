@@ -50,7 +50,7 @@ configure(allProjs) {
     targetCompatibility = 1.8
 
     // The main class for the application plugin and is currently unused. Setting a dummy one.
-    mainClassName = "com.salesforce.dummy.DummyMain"
+    mainClassName = "please.main.class.in.build.gradle"
 
     ext {
         scalaVersion = '2.11'
@@ -91,8 +91,6 @@ configure(allProjs) {
         akkaSlf4jVersion = '2.3.11'
         mleapVersion = '0.13.0'
         memoryFilesystemVersion = '2.1.0'
-
-        mainClassName = 'com.salesforce.Main'
     }
 
     configurations {
