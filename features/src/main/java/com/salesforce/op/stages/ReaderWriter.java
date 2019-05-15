@@ -3,8 +3,8 @@ package com.salesforce.op.stages;
 import java.lang.annotation.*;
 
 /**
- * Stage class annotation to specify custom reader/writer implementation of [[OpPipelineStageJsonReaderWriter]].
- * Reader/writer implementation must extend [[OpPipelineStageJsonReaderWriter]] trait
+ * Stage class annotation to specify custom reader/writer implementation of [[OpPipelineStageReaderWriter]].
+ * Reader/writer implementation must extend [[OpPipelineStageReaderWriter]] trait
  * and has a single no arguments constructor.
  */
 @Retention(RetentionPolicy.RUNTIME)
@@ -13,8 +13,8 @@ import java.lang.annotation.*;
 public @interface ReaderWriter {
 
     /**
-     * Reader/writer class extending [[OpPipelineStageJsonReaderWriter]] to use when reading/writing the stage.
-     * It must extend [[OpPipelineStageJsonReaderWriter]] trait and has a single no arguments constructor.
+     * Reader/writer class extending [[OpPipelineStageReaderWriter]] to use when reading/writing the stage.
+     * It must extend [[OpPipelineStageReaderWriter]] trait and has a single no arguments constructor.
      */
     Class<?> value();
 

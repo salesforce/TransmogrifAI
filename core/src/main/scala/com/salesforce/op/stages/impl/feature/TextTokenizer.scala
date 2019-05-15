@@ -34,7 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.feature.TextTokenizer.TextTokenizerResult
-import com.salesforce.op.stages.{OpPipelineStageJsonReaderWriter, ReaderWriter}
+import com.salesforce.op.stages.{OpPipelineStageReaderWriter, ReaderWriter}
 import com.salesforce.op.utils.text.{Language, _}
 import org.apache.spark.ml.param._
 import org.json4s.{JObject, JValue}
@@ -204,7 +204,7 @@ object TextTokenizer {
 /**
  * Special reader/writer class for [[TextTokenizer]] stage
  */
-class TextTokenizerReaderWriter[T <: Text] extends OpPipelineStageJsonReaderWriter[TextTokenizer[T]] {
+class TextTokenizerReaderWriter[T <: Text] extends OpPipelineStageReaderWriter[TextTokenizer[T]] {
 
   /**
    * Read stage from json

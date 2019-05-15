@@ -32,7 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataset._
