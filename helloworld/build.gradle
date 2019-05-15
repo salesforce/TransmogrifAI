@@ -31,7 +31,7 @@ sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
 // The main class for the application plugin and is currently unused. Setting a dummy one.
-mainClassName = "please.main.class.in.build.gradle"
+mainClassName = "please.set.main.class.in.build.gradle"
 
 ext {
     scalaVersion = '2.11'
