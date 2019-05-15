@@ -92,7 +92,7 @@ class OpSparkListener
     appStartTime = appStartTime,
     appEndTime = appEndTime,
     appDuration = appEndTime - appStartTime,
-    stageMetrics = stageMetrics.toList,
+    stageMetrics = if (collectStageMetrics) stageMetrics.toList else List(cumulativeStageMetrics),
     versionInfo = VersionInfo()
   )
 
@@ -102,7 +102,7 @@ class OpSparkListener
     if (collectStageMetrics) {
       stageMetrics += StageMetrics(si)
     } else {
-
+      cumulativeStageMetrics.plus(StageMetrics(si))
     }
     if (logStageMetrics) {
       log.info("{},STAGE:{},MEMORY_SPILLED_BYTES:{},GC_TIME_MS:{},STAGE_TIME_MS:{}",
