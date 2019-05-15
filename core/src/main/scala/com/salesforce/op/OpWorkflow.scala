@@ -455,7 +455,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *         needed to generate the features not included in the fitted model
    */
   def withModelStages(model: OpWorkflowModel): this.type = {
-    val newResultFeatures = (resultFeatures ++ model.getResultFeatures()).map(_.copyWithNewStages(model.stages))
+    val newResultFeatures =
+      (resultFeatures ++ model.getResultFeatures()).map(_.copyWithNewStages(model.getStages()))
     setResultFeatures(newResultFeatures: _*)
   }
 

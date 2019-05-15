@@ -46,7 +46,8 @@ object TimePeriod extends Enum[TimePeriod] {
   case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
   case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
   case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = {
+  case object WeekOfMonth extends TimePeriod {
+    def extractFromTime(t: Long): Int = {
       val dt = longToDateTime(t)
       dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
     }
