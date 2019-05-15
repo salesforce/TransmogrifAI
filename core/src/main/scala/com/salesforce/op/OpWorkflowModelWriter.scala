@@ -115,12 +115,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @note Features should be topologically sorted
    * @return all features to be serialized
    */
-  private def allFeaturesJArray: JArray = {
-    val features = model.getRawFeatures() ++
-      model.getStages().flatMap(_.getInputFeatures()) ++
-      model.getResultFeatures()
-    JArray(features.distinct.map(FeatureJsonHelper.toJson).toList)
-  }
+  private def allFeaturesJArray: JArray =
+    JArray(model.getAllFeatures().map(FeatureJsonHelper.toJson).toList)
 
 }
 

@@ -91,9 +91,7 @@ class OpWorkflowModelReaderWriterTest
   val distributions = Array(FeatureDistribution("a", None, 1L, 1L, Array(1.0), Array(1.0)),
     FeatureDistribution("b", Option("b"), 2L, 2L, Array(2.0), Array(2.0)))
 
-  val rawFeatureFilterResults = RawFeatureFilterResults(
-    rawFeatureDistributions = distributions
-  )
+  val rawFeatureFilterResults = RawFeatureFilterResults(rawFeatureDistributions = distributions)
 
 
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
@@ -101,7 +99,7 @@ class OpWorkflowModelReaderWriterTest
       .setStages(wf.getStages())
       .setFeatures(wf.getResultFeatures())
       .setParameters(wf.getParameters())
-      .setRawFeatureFilterResults(rawFeatureFilterResults)
+      .setRawFeatureFilterResults(wf.getRawFeatureFilterResults())
       .setReader(wf.getReader())
   }
 
