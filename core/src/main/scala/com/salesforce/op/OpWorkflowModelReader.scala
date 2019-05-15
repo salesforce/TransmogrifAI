@@ -92,24 +92,33 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
         model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
         (stages, resultFeatures) <- Try(resolveFeaturesAndStages(workflow, json, path))
         blacklist <- Try(resolveBlacklist(workflow, json))
+        blacklistMapKeys <- Try(resolveBlacklistMapKeys(json))
         results <- resolveRawFeatureFilterResults(json)
       } yield model
         .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
         .setFeatures(resultFeatures)
         .setParameters(params)
         .setBlacklist(blacklist)
+        // .setBlacklistMapKeys(blacklistMapKeys)
         .setRawFeatureFilterResults(results)
   }
 
   private def resolveBlacklist(workflow: OpWorkflow, json: JValue): Array[OPFeature] = {
     if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
       val blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[JArray].arr
-      val allFeatures = workflow.rawFeatures ++ workflow.blacklistedFeatures ++
-        workflow.stages.flatMap(s => s.getInputFeatures()) ++
-        workflow.resultFeatures
+      val allFeatures = workflow.getRawFeatures() ++ workflow.getBlacklist() ++
+        workflow.getStages().flatMap(_.getInputFeatures()) ++
+        workflow.getResultFeatures()
       blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid.extract[String])).toArray
     } else {
       Array.empty[OPFeature]
+    }
+  }
+
+  private def resolveBlacklistMapKeys(json: JValue): Map[String, Set[String]] = {
+    (json \ BlacklistedFeaturesUids.entryName).extractOpt[Map[String, List[String]]] match {
+      case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
+      case None => Map.empty
     }
   }
 
@@ -135,14 +144,14 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     val recoveredStages = stagesJs.flatMap { j =>
       val stageUidOpt = (j \ Uid.entryName).extractOpt[String]
       stageUidOpt.map { stageUid =>
-        val originalStage = workflow.stages.find(_.uid == stageUid)
+        val originalStage = workflow.getStages().find(_.uid == stageUid)
         originalStage match {
           case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
           case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
         }
       }
     }
-    val generators = workflow.rawFeatures.map(_.originStage)
+    val generators = workflow.getRawFeatures().map(_.originStage)
     generators ++ recoveredStages
   }
 

@@ -97,13 +97,12 @@ class OpWorkflowModelReaderWriterTest
 
 
   def makeDummyModel(wf: OpWorkflow): OpWorkflowModel = {
-    val model = new OpWorkflowModel(wf.uid, wf.parameters)
-      .setStages(wf.stages)
-      .setFeatures(wf.resultFeatures)
-      .setParameters(wf.parameters)
+    new OpWorkflowModel(wf.uid, wf.getParameters())
+      .setStages(wf.getStages())
+      .setFeatures(wf.getResultFeatures())
+      .setParameters(wf.getParameters())
       .setRawFeatureFilterResults(rawFeatureFilterResults)
-
-    model.setReader(wf.reader.get)
+      .setReader(wf.getReader())
   }
 
   def makeModelAndJson(wf: OpWorkflow): (OpWorkflowModel, JValue) = {
@@ -295,14 +294,14 @@ class OpWorkflowModelReaderWriterTest
     copy.uid shouldBe wfM.uid
     copy.trainingParams.toString shouldBe wfM.trainingParams.toString
     copy.isWorkflowCV shouldBe wfM.isWorkflowCV
-    copy.reader shouldBe wfM.reader
-    copy.resultFeatures shouldBe wfM.resultFeatures
-    copy.rawFeatures shouldBe wfM.rawFeatures
-    copy.blacklistedFeatures shouldBe wfM.blacklistedFeatures
-    copy.blacklistedMapKeys shouldBe wfM.blacklistedMapKeys
-    copy.rawFeatureFilterResults shouldBe wfM.rawFeatureFilterResults
-    copy.stages.map(_.uid) shouldBe wfM.stages.map(_.uid)
-    copy.parameters.toString shouldBe wfM.parameters.toString
+    copy.getReader() shouldBe wfM.getReader()
+    copy.getResultFeatures() shouldBe wfM.getResultFeatures()
+    copy.getRawFeatures() shouldBe wfM.getRawFeatures()
+    copy.getBlacklist() shouldBe wfM.getBlacklist()
+    copy.getBlacklistMapKeys() shouldBe wfM.getBlacklistMapKeys()
+    copy.getRawFeatureFilterResults() shouldBe wfM.getRawFeatureFilterResults()
+    copy.getStages().map(_.uid) shouldBe wfM.getStages().map(_.uid)
+    copy.getParameters().toString shouldBe wfM.getParameters().toString
   }
 
   it should "be able to load a old version of a saved model" in new VectorizedFlow {
@@ -347,22 +346,22 @@ class OpWorkflowModelReaderWriterTest
 
   def compareWorkflows(wf1: OpWorkflow, wf2: OpWorkflow): Unit = {
     wf1.uid shouldBe wf2.uid
-    compareParams(wf1.parameters, wf2.parameters)
-    compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
-    compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
-    compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
-    compareStages(wf1.stages, wf2.stages)
+    compareParams(wf1.getParameters(), wf2.getParameters())
+    compareFeatures(wf1.getResultFeatures(), wf2.getResultFeatures())
+    compareFeatures(wf1.getBlacklist(), wf2.getBlacklist())
+    compareFeatures(wf1.getRawFeatures(), wf2.getRawFeatures())
+    compareStages(wf1.getStages(), wf2.getStages())
     RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
   def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
     wf1.uid shouldBe wf2.uid
     compareParams(wf1.trainingParams, wf2.trainingParams)
-    compareParams(wf1.parameters, wf2.parameters)
-    compareFeatures(wf1.resultFeatures, wf2.resultFeatures)
-    compareFeatures(wf1.blacklistedFeatures, wf2.blacklistedFeatures)
-    compareFeatures(wf1.rawFeatures, wf2.rawFeatures)
-    compareStages(wf1.stages, wf2.stages)
+    compareParams(wf1.getParameters(), wf2.getParameters())
+    compareFeatures(wf1.getResultFeatures(), wf2.getResultFeatures())
+    compareFeatures(wf1.getBlacklist(), wf2.getBlacklist())
+    compareFeatures(wf1.getRawFeatures(), wf2.getRawFeatures())
+    compareStages(wf1.getStages(), wf2.getStages())
     RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
