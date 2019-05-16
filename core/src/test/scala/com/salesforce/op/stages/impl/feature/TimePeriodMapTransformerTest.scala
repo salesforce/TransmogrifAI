@@ -30,9 +30,12 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
 import org.joda.time.{DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -59,4 +62,21 @@ class TimePeriodMapTransformerTest extends OpTransformerSpec[IntegralMap, TimePe
   override val expectedResult: Seq[IntegralMap] = Seq(
     names.zip(Seq(14L, 12L, 8L, 30L)).toMap.toIntegralMap
   )
+
+  it should "transform with rich shortcuts" in {
+    val n = "n1"
+    val dmap = Map(n -> new JDateTime(1879, 3, 14, 0, 0, DateTimeUtils.DefaultTimeZone).getMillis)
+    val (inputData2, d1, d2) = TestFeatureBuilder(
+      Seq[(DateMap, DateTimeMap)]((dmap.toDateMap, dmap.toDateTimeMap))
+    )
+
+    def assertFeature(feature: FeatureLike[IntegralMap], expected: Seq[IntegralMap]): Unit = {
+      val transformed = feature.originStage.asInstanceOf[Transformer].transform(inputData2)
+      val actual = transformed.collect(feature)
+      actual shouldBe expected
+    }
+
+    assertFeature(d1.toTimePeriod(TimePeriod.DayOfMonth), Seq(IntegralMap(Map(n -> 14))))
+    assertFeature(d2.toTimePeriod(TimePeriod.DayOfMonth), Seq(IntegralMap(Map(n -> 14))))
+  }
 }

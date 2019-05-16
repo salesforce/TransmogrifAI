@@ -30,9 +30,12 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.date.DateTimeUtils
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
 import org.joda.time.{DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -53,4 +56,20 @@ class TimePeriodListTransformerTest extends OpTransformerSpec[OPVector, TimePeri
     new TimePeriodListTransformer(TimePeriod.DayOfMonth).setInput(f1)
 
   override val expectedResult: Seq[OPVector] = Seq(Seq(14, 12, 8, 30).map(_.toDouble).toVector.toOPVector)
+
+  it should "transform with rich shortcuts" in {
+    val dlist = List(new JDateTime(1879, 3, 14, 0, 0, DateTimeUtils.DefaultTimeZone).getMillis)
+    val (inputData2, d1, d2) = TestFeatureBuilder(
+      Seq[(DateList, DateTimeList)]((dlist.toDateList, dlist.toDateTimeList))
+    )
+
+    def assertFeature(feature: FeatureLike[OPVector], expected: Seq[OPVector]): Unit = {
+      val transformed = feature.originStage.asInstanceOf[Transformer].transform(inputData2)
+      val actual = transformed.collect(feature)
+      actual shouldBe expected
+    }
+
+    assertFeature(d1.toTimePeriod(TimePeriod.DayOfMonth), Seq(Vector(14.0).toOPVector))
+    assertFeature(d2.toTimePeriod(TimePeriod.DayOfMonth), Seq(Vector(14.0).toOPVector))
+  }
 }
