@@ -35,7 +35,6 @@ import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.{FeatureHistory, UID}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{Param, Params}
-import org.joda.time.{DateTime => JDateTime, DateTimeZone}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -115,16 +114,12 @@ private[op] object DateToUnitCircle {
     }.getOrElse(Array(0.0, 0.0))
 
   private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
-    val dt = new JDateTime(timestamp).withZone(DateTimeZone.UTC)
-    timePeriod match {
-      case TimePeriod.DayOfMonth => (dt.dayOfMonth.get.toDouble - 1, 31)
-      case TimePeriod.DayOfWeek => (dt.dayOfWeek.get.toDouble - 1, 7)
-      case TimePeriod.DayOfYear => (dt.dayOfYear.get.toDouble - 1, 366)
-      case TimePeriod.HourOfDay => (dt.hourOfDay.get.toDouble, 24)
-      case TimePeriod.MonthOfYear => (dt.monthOfYear.get.toDouble - 1, 12)
-      case TimePeriod.WeekOfMonth =>
-        ((dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get).toDouble, 6)
-      case TimePeriod.WeekOfYear => (dt.weekOfWeekyear.get.toDouble - 1, 53)
+    val tpv = timePeriod.extractTimePeriodVal(timestamp)
+    val period = if (tpv.min == 1) {
+      tpv.value - 1
+    } else {
+      tpv.value
     }
+    (period.toDouble, tpv.max)
   }
 }
