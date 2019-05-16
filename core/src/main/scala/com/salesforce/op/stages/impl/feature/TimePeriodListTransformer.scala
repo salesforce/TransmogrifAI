@@ -47,11 +47,11 @@ import scala.reflect.runtime.universe.TypeTag
 class TimePeriodListTransformer[I <: DateList]
 (
   val period: TimePeriod,
-  uid: String = UID[TimePeriodTransformer[_]]
+  uid: String = UID[TimePeriodListTransformer[_]]
 )(
   implicit override val tti: TypeTag[I]
-) extends UnaryTransformer[I, OPVector](operationName = "dateToTimePeriod", uid = uid) {
+) extends UnaryTransformer[I, OPVector](operationName = "dateListToTimePeriod", uid = uid) {
 
   override def transformFn: I => OPVector =
-    (i: I) => i.value.map(t => period.extractFromTime(t).toDouble).toVector.toOPVector
+    (i: I) => i.value.map(t => period.extractFromTime(t).toDouble).toOPVector
 }

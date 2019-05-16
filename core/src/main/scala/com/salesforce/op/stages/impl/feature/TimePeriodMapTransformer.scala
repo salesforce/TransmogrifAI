@@ -47,10 +47,10 @@ import scala.reflect.runtime.universe.TypeTag
 class TimePeriodMapTransformer[I <: DateMap]
 (
   val period: TimePeriod,
-  uid: String = UID[TimePeriodTransformer[_]]
+  uid: String = UID[TimePeriodMapTransformer[_]]
 )(
   implicit override val tti: TypeTag[I]
-) extends UnaryTransformer[I, IntegralMap](operationName = "dateToTimePeriod", uid = uid) {
+) extends UnaryTransformer[I, IntegralMap](operationName = "dateMapToTimePeriod", uid = uid) {
 
   override def transformFn: I => IntegralMap =
     (i: I) => i.value.mapValues(t => period.extractFromTime(t).toLong).toIntegralMap
