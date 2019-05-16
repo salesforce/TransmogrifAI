@@ -29,7 +29,7 @@ apply from: 'spark.gradle'
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
 
-// The main class for the application plugin and is currently unused. Setting a dummy one.
+// The main class for the application plugin
 mainClassName = "com.salesforce.app.Simple" /* << MAIN_CLASS */
 
 ext {
@@ -40,8 +40,6 @@ ext {
     scalaTestVersion = '$scalaTestVersion'
     transmogrifaiVersion = '$transmogrifaiVersion'
     collectionsVersion = '$collectionsVersion'
-
-    mainClassName = 'com.salesforce.app.Simple' /* << MAIN_CLASS */
 }
 
 configurations {
@@ -111,7 +109,7 @@ compileTestScala { scalaCompileOptions.additionalParameters = ["-Yrangepos"] }
 
 jar {
     manifest.attributes "Main-Class": "\$mainClassName"
-    baseName="\${rootProject.name}"
+    baseName="\$rootProject.name"
 }
 
 shadowJar {
