@@ -92,7 +92,7 @@ trait OpWorkflowModelLocal extends Serializable {
      */
     def scoreFunction(implicit spark: SparkSession): ScoreFunction = {
       // Prepare the stages for scoring
-      val stagesWithIndex = model.stages.zipWithIndex
+      val stagesWithIndex = model.getStages().zipWithIndex
 
       // Prepare an empty DataFrame with transformed schema & metadata (needed for loading MLeap models)
       val transformedData = makeTransformedDataFrame(model)
@@ -139,9 +139,9 @@ trait OpWorkflowModelLocal extends Serializable {
      * Prepares an empty DataFrame with transformed schema & metadata (needed for loading MLeap models)
      */
     private def makeTransformedDataFrame(model: OpWorkflowModel)(implicit spark: SparkSession): DataFrame = {
-      val rawSchema = FeatureSparkTypes.toStructType(model.rawFeatures: _*)
+      val rawSchema = FeatureSparkTypes.toStructType(model.getRawFeatures(): _*)
       val df = spark.emptyDataset[Row](RowEncoder(rawSchema))
-      model.stages.collect { case t: Transformer => t }.foldLeft(df) { case (d, t) => t.transform(d) }
+      model.getStages().collect { case t: Transformer => t }.foldLeft(df) { case (d, t) => t.transform(d) }
     }
 
     /**
