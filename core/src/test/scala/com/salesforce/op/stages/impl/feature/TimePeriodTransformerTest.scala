@@ -41,7 +41,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class TimePeriodTransformerTest extends OpTransformerSpec[Integral, TimePeriodTransformer[Date]] {
+class ot extends OpTransformerSpec[Integral, TimePeriodTransformer[Date]] {
 
   val (inputData, f1) = TestFeatureBuilder(Seq[Date](
     new JDateTime(1879, 3, 14, 0, 0, DateTimeUtils.DefaultTimeZone).getMillis.toDate,
@@ -71,7 +71,7 @@ class TimePeriodTransformerTest extends OpTransformerSpec[Integral, TimePeriodTr
         case TimePeriod.HourOfDay => Array(Integral(0), Integral(10), Integral(12), Integral.empty, Integral(13))
         case TimePeriod.MonthOfYear => Array(Integral(3), Integral(11), Integral(3), Integral.empty, Integral(4))
         case TimePeriod.WeekOfMonth => Array(Integral(3), Integral(2), Integral(2), Integral.empty, Integral(5))
-        case TimePeriod.WeekOfYear => Array(Integral(11), Integral(45), Integral(10), Integral.empty, Integral(18))
+        case TimePeriod.WeekOfYear => Array(Integral(11), Integral(46), Integral(11), Integral.empty, Integral(18))
         case _ => throw new Exception(s"Unexpected TimePeriod encountered, $tp")
       }
 
