@@ -41,7 +41,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class ot extends OpTransformerSpec[Integral, TimePeriodTransformer[Date]] {
+class TimePeriodTransformerTest extends OpTransformerSpec[Integral, TimePeriodTransformer[Date]] {
 
   val (inputData, f1) = TestFeatureBuilder(Seq[Date](
     new JDateTime(1879, 3, 14, 0, 0, DateTimeUtils.DefaultTimeZone).getMillis.toDate,
