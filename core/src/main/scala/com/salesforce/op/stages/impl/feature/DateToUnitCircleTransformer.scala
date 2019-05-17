@@ -115,11 +115,7 @@ private[op] object DateToUnitCircle {
 
   private def getPeriodWithSize(timestamp: Long, timePeriod: TimePeriod): (Double, Int) = {
     val tpv = timePeriod.extractTimePeriodVal(timestamp)
-    val period = if (tpv.min == 1) {
-      tpv.value - 1
-    } else {
-      tpv.value
-    }
+    val period = if (tpv.min == 1) tpv.value - 1 else tpv.value
     (period.toDouble, tpv.max)
   }
 }
