@@ -200,6 +200,14 @@ trait RichListFeature {
   implicit class RichDateListFeature(val f: FeatureLike[DateList]) {
 
     /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return OPVector feature of time period values
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[OPVector] =
+      new TimePeriodListTransformer[DateList](period).setInput(f).getOutput()
+
+    /**
      * Apply DateList vectorizer: Converts a sequence of DateLists features into a vector feature.
      *
      * DateListPivot can specify:
@@ -239,6 +247,14 @@ trait RichListFeature {
    * @param f DateList Feature
    */
   implicit class RichDateTimeListFeature(val f: FeatureLike[DateTimeList]) {
+
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return OPVector feature of time period values
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[OPVector] =
+      new TimePeriodListTransformer[DateTimeList](period).setInput(f).getOutput()
 
     /**
      * Apply DateList vectorizer: Converts a sequence of DateTimeLists features into a vector feature.
