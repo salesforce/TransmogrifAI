@@ -42,7 +42,6 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomMap, RandomReal, RandomText, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorColumnMetadata, OpVectorMetadata}
-import javax.xml.crypto.dsig.keyinfo.KeyName
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{DataFrame, Encoder, Row}
@@ -294,13 +293,19 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
         "feature importances from Spark's RandomForest")
   }
 
-  it should "aggregate text derived features" in {
+  it should "aggregate LOCOS for text and textMap derived features" in {
+
+    // Generating Data
     val numRows = 1000
+    // Random Text Data
     val textData: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.3).take(numRows).toList
+    // Random Text Map Data. Keys are k0 and k1
     val textMapData: Seq[TextMap] = RandomMap.of(RandomText.strings(5, 10).withProbabilityOfEmpty(0.5),
       0, 3).take(numRows).toList
+    // Random Country Data
     val countryData: Seq[Text] = RandomText.textFromDomain(List("USA", "Mexico", "Canada")).withProbabilityOfEmpty(0.2)
       .take(numRows).toList
+    // Response variable
     val labels = RandomIntegral.integrals(0, 2).limit(numRows).map(_.value.get.toRealNN)
 
 
@@ -312,6 +317,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       generatedData)
     val label = labelNoRes.copy(isResponse = true)
 
+    // Apply SmartText(Map)Vectorizer to created features
     val maxCardinality = 50
     val numHashes = 50
     val autoDetectLanguage = false
@@ -335,35 +341,46 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val vectorized = new OpWorkflow().setResultFeatures(featureVector).transform(testData)
 
+    // Sanity Checker
     val checker = new SanityChecker().setInput(label, featureVector)
 
     val checked = checker.fit(vectorized).transform(vectorized)
 
-    val f = checker.getOutput()
+    val checkedFeatureVector = checker.getOutput()
 
-    val sparkModel = new OpLogisticRegression().setInput(label, f).fit(checked)
+    // RecordInsightsLOCO
+    val sparkModel = new OpLogisticRegression().setInput(label, checkedFeatureVector).fit(checked)
 
-    val transformer = new RecordInsightsLOCO(sparkModel).setInput(f)
+    val transformer = new RecordInsightsLOCO(sparkModel).setInput(checkedFeatureVector)
 
     val insights = transformer.transform(checked)
+
     val parsed = insights.collect(transformer.getOutput()).map { case i => RecordInsightsParser.parseInsights(i) }
+
     parsed.map(_.size shouldBe 4)
     parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
-      && r.indicatorValue.isDefined), "non aggregated country LOCO should be in top LOCOs"))
+      && r.indicatorValue.isDefined), "SmartVectorizer detects country feature as a PickList, hence no " +
+      "aggregation required for LOCO on this field."))
     parsed.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
 
-    val meta = OpVectorMetadata.apply(checked.schema(f.name))
+    val meta = OpVectorMetadata.apply(checked.schema(checkedFeatureVector.name))
 
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
+    /**
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     *
+     * @param textFeature Text(Map) Field
+     * @param predicate   predicate used by RecordInsights in order to aggregate
+     */
     def assertAggregatedWithPredicate(textFeature: FeatureLike[_],
       predicate: OpVectorColumnHistory => Boolean): Unit = {
       val textIndices = meta.getColumnHistory.filter(c => predicate(c) && c.indicatorValue.isEmpty
         && c.descriptorValue.isEmpty)
         .map(_.index)
 
-      val expectedLocos = checked.select(label, f).map { case Row(l: Double, v: Vector) =>
+      val expectedLocos = checked.select(label, checkedFeatureVector).map { case Row(l: Double, v: Vector) =>
         val featureArray = v.toArray
         textIndices.map { i =>
           val oldVal = v(i)
@@ -385,11 +402,21 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       }
     }
 
+    /**
+     * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
+     *
+     * @param textFeature Text Field
+     */
     def assertAggregatedText(textFeature: FeatureLike[Text]): Unit = {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeature.name)
       assertAggregatedWithPredicate(textFeature, predicate)
     }
 
+    /**
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     *
+     * @param textMapFeature Text Map Field
+     */
     def assertAggregatedTextMap(textMapFeature: FeatureLike[TextMap], keyName: String): Unit = {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeature.name) &&
         history.grouping == Option(keyName)

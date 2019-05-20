@@ -56,6 +56,7 @@ import scala.collection.mutable.PriorityQueue
  * derived features based on the LOCO insight.For MultiClassification, the value is from the predicted class
  * (i.e. the class having the highest probability)
  * - If Abs, returns at most topK elements : the topK derived features having highest absolute value of LOCO score.
+ *
  * @param model model instance that you wish to explain
  * @param uid   uid for instance
  */
@@ -98,8 +99,12 @@ class RecordInsightsLOCO[T <: Model[T]]
   private lazy val histories = vectorMetadata.getColumnHistory()
   private lazy val featureInfo = histories.map(_.toJson(false))
 
+  /**
+   * These are the name of the stages we want to perform an aggregation of the LOCO results over ferived features
+   */
   private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
   private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
+  // Indices of features derived from SmartText(Map)Vectorizer
   private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName)
     || s.contains(smartTextMapClassName)))
     .map(_.index)
@@ -152,19 +157,25 @@ class RecordInsightsLOCO[T <: Model[T]]
     val aggregationMap = scala.collection.mutable.Map.empty[String, (Array[Int], Array[Double])]
     while (i < filledSize) {
       val (oldInd, oldVal) = featureArray(i)
+      val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
+      val max = diffToExamine(indexToExamine)
+
+      // Let's check the indicator value and descriptor value
       val history = histories(oldInd)
       val parentStages = history.parentFeatureStages
       val indValue = history.indicatorValue
       val descValue = history.descriptorValue
-      val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
-      val max = diffToExamine(indexToExamine)
+
+      // If those values are empty, the field is likely to be a derived text feature (hashing tf output)
       if (indValue.isEmpty && descValue.isEmpty) {
+        // Name of the field
         val rawName = parentStages match {
           case s if s.exists(_.contains(smartTextClassName)) => Some(history.parentFeatureOrigins.head)
           case s if s.exists(_.contains(smartTextMapClassName)) => history.grouping
           case _ => None
         }
         rawName.map { name =>
+          // Update the aggregation map
           val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
           aggregationMap(name) = (indices :+ i, sumArray(array, diffToExamine))
         }
@@ -173,9 +184,10 @@ class RecordInsightsLOCO[T <: Model[T]]
       }
       i += 1
     }
+    // Adding LOCO results from aggregation map into heaps
     aggregationMap.foreach {
       case (_, (indices, ar)) => {
-        val i = indices.head
+        val i = indices.head // The index here is arbitrary
         val n = indices.length
         val diffToExamine = ar.map(_ / n)
         val max = diffToExamine(indexToExamine)
@@ -195,12 +207,14 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
+    // Besides non 0 values, we want to check the text features as well
     val indices = (featuresSparse.indices ++ textIndices).toSet
     val filledSize = indices.size
     val featureArray = indices.map(i => i -> features.value(i)).toArray
-
     val featureSize = featuresSparse.size
+
     val k = $(topK)
+    // Index where to examine the difference in the prediction vector
     val indexToExamine = baseScore.length match {
       case 0 => throw new RuntimeException("model does not produce scores for insights")
       case 1 => 0
