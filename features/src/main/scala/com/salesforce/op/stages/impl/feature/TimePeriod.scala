@@ -38,13 +38,12 @@ import enumeratum.{Enum, EnumEntry}
 case class TimePeriodVal(value: Int, min: Int, max: Int)
 
 sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal: Long => TimePeriodVal =
-    ((millis: Long) => Instant
+  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
+    Instant
       .ofEpochMilli(millis)
       .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
-      .andThen(extractFn)
 
-  def extractIntFromMillis: Long => Int = extractTimePeriodVal.andThen((x: TimePeriodVal) => x.value)
+  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
 }
 
 object TimePeriod extends Enum[TimePeriod] {
