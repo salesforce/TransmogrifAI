@@ -30,19 +30,15 @@
 
 package com.salesforce.op.test
 
+import com.salesforce.op.aggregators.MaxReal
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
-import com.salesforce.op.utils.tuples.RichTuple._
 import org.joda.time.Duration
 
 
 trait PassengerFeaturesTest {
 
-  val age = FeatureBuilder.Real[Passenger]
-    .extract(_.getAge.toReal)
-    .aggregate((l, r) => (l -> r).map(breeze.linalg.max(_, _)))
-    .asPredictor
-
+  val age = FeatureBuilder.Real[Passenger].extract(_.getAge.toReal).aggregate(MaxReal).asPredictor
   val gender = FeatureBuilder.MultiPickList[Passenger].extract(p => Set(p.getGender).toMultiPickList).asPredictor
   val genderPL = FeatureBuilder.PickList[Passenger].extract(p => p.getGender.toPickList).asPredictor
 

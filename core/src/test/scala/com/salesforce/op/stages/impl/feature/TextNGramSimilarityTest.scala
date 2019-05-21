@@ -32,49 +32,40 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.Transformer
-import org.apache.spark.ml.feature.NGram
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{Assertions, FlatSpec, Matchers}
-
 
 @RunWith(classOf[JUnitRunner])
-class NGramTest extends FlatSpec with TestSparkContext {
+class TextNGramSimilarityTest extends OpTransformerSpec[RealNN, TextNGramSimilarity[Text]]{
+  val(inputData, f1, f2) = TestFeatureBuilder(
+    Seq[(Text, Text)](
+      (Text("Hamlet: To be or not to be - that is the question."), Text("I like like Hamlet")),
+      (Text("that is the question"), Text("There is no question")),
+      (Text("Just some random text"), Text("I like like Hamlet")),
+      (Text("Adobe CreativeSuite 5 Master Collection from cheap 4zp"),
+        Text("Adobe CreativeSuite 5 Master Collection from cheap d1x")),
+      (Text.empty, Text.empty),
+      (Text(""), Text("")),
+      (Text(""), Text.empty),
+      (Text("asdf"), Text.empty),
+      (Text.empty, Text("asdf"))
+    )
+  )
 
-  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
-  lazy val (ds, f1) = TestFeatureBuilder(data)
+  val expectedResult = Seq(0.12666672468185425, 0.6083333492279053, 0.15873020887374878,
+    0.9629629850387573, 0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
+  val nGramSimilarity = f1.toNGramSimilarity(f2, toLowerCase = false)
+  val transformer = nGramSimilarity.originStage.asInstanceOf[TextNGramSimilarity[Text]]
 
-  Spec[NGram] should "generate bigrams by default" in {
-    val bigrams = f1.ngram()
-    val transformedData = bigrams.originStage.asInstanceOf[Transformer].transform(ds)
-    val results = transformedData.collect(bigrams)
+  it should "correctly compute char-n-gram similarity with nondefault ngram param" in {
+    val nGramSimilarity = f1.toNGramSimilarity(f2, nGramSize = 4, toLowerCase = false)
+    val transformedDs = nGramSimilarity.originStage.asInstanceOf[Transformer].transform(inputData)
+    val actualOutput = transformedDs.collect(nGramSimilarity)
 
-    bigrams.name shouldBe bigrams.originStage.getOutputFeatureName
-    results(0) shouldBe Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList
+    actualOutput shouldBe Seq(0.11500000953674316, 0.5666666626930237, 0.1547619104385376, 0.9722222089767456,
+      0.0, 0.0, 0.0, 0.0, 0.0).toRealNN
   }
-
-  it should "generate unigrams" in {
-    val bigrams = f1.ngram(n = 1)
-    val transformedData = bigrams.originStage.asInstanceOf[Transformer].transform(ds)
-    val results = transformedData.collect(bigrams)
-
-    results(0) shouldBe data.head
-  }
-
-  it should "generate trigrams" in {
-    val trigrams = f1.ngram(n = 3)
-    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(ds)
-    val results = transformedData.collect(trigrams)
-
-    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
-  }
-
-  it should "not allow n < 1" in {
-    the[IllegalArgumentException] thrownBy f1.ngram(n = 0)
-    the[IllegalArgumentException] thrownBy f1.ngram(n = -1)
-  }
-
 }

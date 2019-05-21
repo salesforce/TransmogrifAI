@@ -308,11 +308,12 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survived, age, gender, height, weight, description, boarded)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1,
-      2, 0.2, 0.9, minScoringRows = 0)
+      2, 0.2, 0.9, minScoringRows = 0,
+      protectedFeatures = Set(age.name))
     val filteredRawData = filter.generateFilteredRaw(features, params)
-    filteredRawData.featuresToDrop.toSet shouldEqual Set(age, gender, height, weight, description, boarded)
+    filteredRawData.featuresToDrop.toSet shouldEqual Set(gender, height, weight, description, boarded)
     filteredRawData.cleanedData.schema.fields.map(_.name) should contain theSameElementsAs
-      Array(DataFrameFieldNames.KeyFieldName, survived.name)
+      Array(DataFrameFieldNames.KeyFieldName, survived.name, age.name)
     assertFeatureDistributions(filteredRawData, total = 14)
 
     val filter2 = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.1, 0.1,
@@ -862,6 +863,14 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
     // There should be 14 FeatureDistributions - training and scoring for 4 raw features, one map with three keys
     assertFeatureDistributions(filteredRawData, total = 14)
+  }
+
+  it should "throw an exception when all features are removed" in {
+    val features: Array[OPFeature] =
+      Array(survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
+    val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 1.0, 0.0,
+      0.0, 0.0, 0.0, minScoringRows = 0)
+    assertThrows[java.lang.IllegalArgumentException](filter.generateFilteredRaw(features, new OpParams()))
   }
 
   /**

@@ -121,8 +121,8 @@ object RandomText {
    * Produces emails in the specified collection of random domains
    * domains can be provided with probabilities, e.g.
    * {{{
-   * emails(RandomStream of List("gitmo.mil", "kremlin.ru"))
-   * emails(RandomStream of List("gitmo.mil", "kremlin.ru") distributedAs List(0.9, 1.0))
+   * emailsOn(RandomStream of List("gitmo.mil", "kremlin.ru"))
+   * emailsOn(RandomStream of List("gitmo.mil", "kremlin.ru") distributedAs List(0.9, 1.0))
    * }}}
    *
    * @param domains producer of random email domains
@@ -213,35 +213,35 @@ object RandomText {
    *
    * @return a random comboboxes generator
    */
-  val randomComboBoxes: RandomText[ComboBox] = justText[ComboBox](1, 20)
+  def randomComboBoxes: RandomText[ComboBox] = justText[ComboBox](1, 20)
 
   /**
    * Produces random country names from a list that we keep in our resource file
    *
    * @return a random country names generator
    */
-  val countries: RandomText[Country] = selectRandom[Country](Countries)
+  def countries: RandomText[Country] = selectRandom[Country](Countries)
 
   /**
    * Produces random US state names from a list that we keep in our resource file
    *
    * @return a random state names generator
    */
-  val states: RandomText[State] = selectRandom[State](States)
+  def states: RandomText[State] = selectRandom[State](States)
 
   /**
    * Produces random California city names from a list that we keep in our resource file
    *
    * @return a random city names generator
    */
-  val cities: RandomText[City] = selectRandom(CitiesOfCalifornia)
+  def cities: RandomText[City] = selectRandom(CitiesOfCalifornia)
 
   /**
    * Produces random San Jose street names from a list that we keep in our resource file
    *
    * @return a random street names generator
    */
-  val streets: RandomText[Street] = selectRandom[Street](StreetsOfSanJose)
+  def streets: RandomText[Street] = selectRandom[Street](StreetsOfSanJose)
 
   /**
    * Produces a random Base64 strings generator
@@ -263,10 +263,10 @@ object RandomText {
     RandomText[Base64]((rng: Random) => new String(b64.encode(randomBytes(rng))))
   }
 
-  private val goodUsPhones = (rng: Random) =>
+  private def goodUsPhones = (rng: Random) =>
     RandomAreaCode(rng) + (5550000 + rng.nextInt(10000))
 
-  private val badUsPhones = (rng: Random) => {
+  private def badUsPhones = (rng: Random) => {
     val raw = 10000000000L + (rng.nextInt(199) * 10000000L + rng.nextInt(10000000)) toString
 
     raw.substring(rng.nextInt(2), 6 + rng.nextInt(raw.length - 6))
@@ -275,7 +275,7 @@ object RandomText {
   /**
    * A generator of random US phone numbers
    */
-  val phones: RandomText[Phone] = RandomText[Phone](goodUsPhones)
+  def phones: RandomText[Phone] = RandomText[Phone](goodUsPhones)
 
   /**
    * A generator of random US phone numbers with some errors
@@ -299,7 +299,7 @@ object RandomText {
   /**
    * A generator of random IDs, length from 1 to 41 char. An id consists of alphanumerics and '_'
    */
-  val ids: RandomText[ID] = {
+  def ids: RandomText[ID] = {
     val charsOfID = "_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     RandomText[ID](randomStringOfAlphabet(charsOfID, 1, 41))
   }
@@ -308,7 +308,7 @@ object RandomText {
    * A generator of random unique IDs, length at least 3, no upper limit (they are unique!).
    * A unique id consists of alphanumerics and '_', followed by an '_' and a unique serial number
    */
-  val uniqueIds: RandomText[ID] = {
+  def uniqueIds: RandomText[ID] = {
     val charsOfID = "_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
     val randoms = new RandomStream(randomStringOfAlphabet(charsOfID, 1, 20))
     val numbers = RandomStream.incrementing(1, 1, 1)
@@ -319,7 +319,7 @@ object RandomText {
   /**
    * A generator of random URLs
    */
-  val urls: RandomText[URL] = {
+  def urls: RandomText[URL] = {
     val lowerCaseAlphaNum = "abcdefghijklmnopqrstuvwxyz0123456789"
     val urlChars = lowerCaseAlphaNum + "-"
 

@@ -119,7 +119,7 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
     // Get the model class
 
     // Make the ctor function used for creating a model instance
-    def ctorArgs(argName: String, argSymbol: Symbol): Try[Any] = Try {
+    val ctorArgs: (String, Symbol) => Try[Any] = (argName, argSymbol) => Try {
       val anyValue = ctorArgsMap.getOrElse(argName,
         throw new RuntimeException(s"Ctor argument '$argName' was not found for model class '$modelClassName'")
       )

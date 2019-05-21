@@ -29,19 +29,32 @@
  */
 package com.salesforce.op.stages.impl.feature
 
+import java.time.temporal.WeekFields
+import java.time.{Instant, LocalDateTime, ZoneId}
+
+import com.salesforce.op.utils.date.DateTimeUtils
 import enumeratum.{Enum, EnumEntry}
 
+case class TimePeriodVal(value: Int, min: Int, max: Int)
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable
+sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
+  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
+    Instant
+      .ofEpochMilli(millis)
+      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
 
-object TimePeriod extends Enum[TimePeriod] {
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod
-  case object DayOfWeek extends TimePeriod
-  case object DayOfYear extends TimePeriod
-  case object HourOfDay extends TimePeriod
-  case object MonthOfYear extends TimePeriod
-  case object WeekOfMonth extends TimePeriod
-  case object WeekOfYear extends TimePeriod
+  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
 }
 
+object TimePeriod extends Enum[TimePeriod] {
+  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
+
+  val values: Seq[TimePeriod] = findValues
+  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
+  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
+  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
+  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
+  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
+  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
+  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
+}
