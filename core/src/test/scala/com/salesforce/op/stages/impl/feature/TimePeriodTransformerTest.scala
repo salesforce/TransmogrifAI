@@ -70,8 +70,8 @@ class TimePeriodTransformerTest extends OpTransformerSpec[Integral, TimePeriodTr
         case TimePeriod.DayOfYear => Array(Integral(73), Integral(316), Integral(67), Integral.empty, Integral(120))
         case TimePeriod.HourOfDay => Array(Integral(0), Integral(10), Integral(12), Integral.empty, Integral(13))
         case TimePeriod.MonthOfYear => Array(Integral(3), Integral(11), Integral(3), Integral.empty, Integral(4))
-        case TimePeriod.WeekOfMonth => Array(Integral(2), Integral(1), Integral(1), Integral.empty, Integral(4))
-        case TimePeriod.WeekOfYear => Array(Integral(11), Integral(45), Integral(10), Integral.empty, Integral(18))
+        case TimePeriod.WeekOfMonth => Array(Integral(3), Integral(2), Integral(2), Integral.empty, Integral(5))
+        case TimePeriod.WeekOfYear => Array(Integral(11), Integral(46), Integral(11), Integral.empty, Integral(18))
         case _ => throw new Exception(s"Unexpected TimePeriod encountered, $tp")
       }
 
