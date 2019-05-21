@@ -176,7 +176,7 @@ class DateToUnitCircleTransformerTest extends OpTransformerSpec[OPVector, DateTo
       new JDateTime(2017, 1, 23, 0, 0, 0, 0)
     )
     val actual = transformData(dateTimes, WeekOfYear)
-    val sampleWeeksOfYearMinusOne = Seq(51, 0, 1, 2, 3)
+    val sampleWeeksOfYearMinusOne = Seq(0, 1, 2, 3, 4)
     val expected = indexSeqToUnitCircle(sampleWeeksOfYearMinusOne, 53)
     all(actual.zip(expected).map(g => Vectors.sqdist(g._1.value, g._2.value))) should be < eps
   }

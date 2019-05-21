@@ -29,28 +29,32 @@
  */
 package com.salesforce.op.stages.impl.feature
 
+import java.time.temporal.WeekFields
+import java.time.{Instant, LocalDateTime, ZoneId}
+
 import com.salesforce.op.utils.date.DateTimeUtils
 import enumeratum.{Enum, EnumEntry}
-import org.joda.time.{DateTime => JDateTime}
 
+case class TimePeriodVal(value: Int, min: Int, max: Int)
 
-sealed abstract class TimePeriod extends EnumEntry with Serializable {
-  def longToDateTime(t: Long): JDateTime = new JDateTime(t, DateTimeUtils.DefaultTimeZone)
-  def extractFromTime(t: Long): Int
+sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
+  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
+    Instant
+      .ofEpochMilli(millis)
+      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
+
+  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
 }
 
 object TimePeriod extends Enum[TimePeriod] {
+  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
+
   val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfMonth.get }
-  case object DayOfWeek extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfWeek.get }
-  case object DayOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).dayOfYear.get }
-  case object HourOfDay extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).hourOfDay.get }
-  case object MonthOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).monthOfYear.get }
-  case object WeekOfMonth extends TimePeriod {
-    def extractFromTime(t: Long): Int = {
-      val dt = longToDateTime(t)
-      dt.weekOfWeekyear.get - dt.withDayOfMonth(1).weekOfWeekyear.get
-    }
-  }
-  case object WeekOfYear extends TimePeriod { def extractFromTime(t: Long): Int = longToDateTime(t).weekOfWeekyear.get }
+  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
+  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
+  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
+  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
+  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
+  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
+  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
 }

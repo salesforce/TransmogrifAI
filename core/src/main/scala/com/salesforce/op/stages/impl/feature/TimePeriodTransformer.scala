@@ -52,5 +52,5 @@ class TimePeriodTransformer[I <: Date]
   implicit override val tti: TypeTag[I]
 ) extends UnaryTransformer[I, Integral](operationName = "dateToTimePeriod", uid = uid){
 
-  override def transformFn: I => Integral = (i: I) => i.value.map(t => period.extractFromTime(t).toLong).toIntegral
+  override def transformFn: I => Integral = (i: I) => i.value.map(t => period.extractIntFromMillis(t).toLong).toIntegral
 }
