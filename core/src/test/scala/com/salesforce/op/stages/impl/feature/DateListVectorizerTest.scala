@@ -30,6 +30,9 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature.DateListPivot._
 import com.salesforce.op.test.TestOpVectorColumnType.IndCol
@@ -37,9 +40,7 @@ import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestOpVect
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.ml.attribute.AttributeGroup
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTime, DateTimeConstants}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -48,14 +49,14 @@ import org.scalatest.junit.JUnitRunner
 class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectorizer[DateList]] with AttributeAsserts {
 
   // Sunday July 12th 1998 at 22:45
-  val defaultDate = new DateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
-  val now = TransmogrifierDefaults.ReferenceDate.minusMillis(1).getMillis // make date time be in the past
+  val defaultDate = DateTimeUtils.getMillis(LocalDateTime.of(1998, 7, 12, 22, 45))
+  val now = DateTimeUtils.getMillis(TransmogrifierDefaults.ReferenceDate.minus(1, ChronoUnit.MILLIS))
 
-  private def daysToMilliseconds(n: Int): Long = n * DateTimeConstants.MILLIS_PER_DAY
+  private def daysToMilliseconds(n: Int): Long = n * DateTimeUtils.MILLIS_PER_DAY
 
   private def monthsToMilliseconds(n: Int): Long = n * 2628000000L
 
-  private def hoursToMilliseconds(n: Int): Long = n * DateTimeConstants.MILLIS_PER_HOUR
+  private def hoursToMilliseconds(n: Int): Long = n * DateTimeUtils.MILLIS_PER_HOUR
 
   val (testData, clicks, opens, purchases) = TestFeatureBuilder("clicks", "opens", "purchases",
     Seq(
@@ -164,7 +165,7 @@ class DateListVectorizerTest extends OpTransformerSpec[OPVector, DateListVectori
   it should "vectorize with SinceFirst and reference date in the past" in {
     val testModelTimeSinceFirst =
       testVectorizer.setInput(clicks, opens, purchases).setPivot(SinceFirst).setTrackNulls(false)
-        .setReferenceDate(TransmogrifierDefaults.ReferenceDate.minusDays(30).minusMillis(2))
+        .setReferenceDate(TransmogrifierDefaults.ReferenceDate.minusDays(30).minus(2, ChronoUnit.MILLIS))
 
     testModelTimeSinceFirst.transformFn(Seq(
       Seq(now - daysToMilliseconds(1), now).toDateList,

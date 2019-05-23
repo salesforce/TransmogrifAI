@@ -37,7 +37,6 @@ import com.github.fommil.netlib.{BLAS, LAPACK}
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.features.OPFeature
 import com.salesforce.op.readers.{Reader, StreamingReader}
-import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.{EnumEntrySerializer, JsonLike, JsonUtils}
 import com.salesforce.op.utils.spark.RichRDD._
 import com.salesforce.op.utils.spark.{AppMetrics, OpSparkListener}
@@ -250,13 +249,13 @@ class OpWorkflowRunner
     inputStream.foreachRDD(rdd => {
       // Only score non empty datasets
       if (!rdd.isEmpty()) {
-        val start = DateTimeUtils.now().getMillis
+        val start = System.currentTimeMillis()
         log.info("Scoring a records batch")
         // Set input rdd for the workflow to score
         workflowModel.setInputRDD[Any](rdd, reader.key)(reader.wtt.asInstanceOf[WeakTypeTag[Any]])
         val path = writePath(start) // Prepare write path
         scoreFn(path) // Score & save it
-        log.info("Scored a records batch in {}ms. Saved scores to {}", DateTimeUtils.now().getMillis - start, path)
+        log.info("Scored a records batch in {}ms. Saved scores to {}", System.currentTimeMillis() - start, path)
       }
     })
     new StreamingScoreResult()

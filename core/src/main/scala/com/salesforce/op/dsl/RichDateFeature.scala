@@ -30,11 +30,12 @@
 
 package com.salesforce.op.dsl
 
+import java.time.LocalDateTime
+
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import com.salesforce.op.stages.impl.feature._
-import org.joda.time.{DateTime => JDateTime}
 
 
 trait RichDateFeature {
@@ -108,7 +109,7 @@ trait RichDateFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
+      referenceDate: LocalDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[Date]] = Array.empty
@@ -188,7 +189,7 @@ trait RichDateFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: JDateTime = TransmogrifierDefaults.ReferenceDate,
+      referenceDate: LocalDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       circularDateReps: Seq[TimePeriod] = TransmogrifierDefaults.CircularDateRepresentations,
       others: Array[FeatureLike[DateTime]] = Array.empty

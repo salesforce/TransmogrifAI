@@ -30,6 +30,9 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import java.time.temporal.ChronoUnit
+import java.time.{LocalDateTime, ZoneId}
+
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPMap, _}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
@@ -40,7 +43,6 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoders}
-import org.joda.time.{DateTime, DateTimeZone, Days}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -150,10 +152,10 @@ class IntegralMapVectorizer[T <: OPMap[Long]](uid: String = UID[IntegralMapVecto
 class DateMapVectorizer[T <: OPMap[Long]](uid: String = UID[DateMapVectorizer[T]])(implicit tti: TypeTag[T])
   extends OPMapVectorizer[Long, T](uid = uid, operationName = "vecDateMap", convertFn = intMapToRealMap) {
 
-  val referenceDate = new Param[DateTime](parent = this, name = "referenceDate",
+  val referenceDate = new Param[LocalDateTime](parent = this, name = "referenceDate",
     doc = "Reference date used to compare time to")
-  def setReferenceDate(date: DateTime): this.type = set(referenceDate, date)
-  def getReferenceDate(): DateTime = $(referenceDate)
+  def setReferenceDate(date: LocalDateTime): this.type = set(referenceDate, date)
+  def getReferenceDate(): LocalDateTime = $(referenceDate)
 
   def makeModel(args: OPMapVectorizerModelArgs, operationName: String, uid: String): OPMapVectorizerModel[Long, T] =
     new DateMapVectorizerModel(
@@ -389,15 +391,15 @@ final class IntegralMapVectorizerModel[T <: OPMap[Long]] private[op]
 final class DateMapVectorizerModel[T <: OPMap[Long]] private[op]
 (
   args: OPMapVectorizerModelArgs,
-  val referenceDate: org.joda.time.DateTime,
+  val referenceDate: LocalDateTime,
   operationName: String,
   uid: String
 )(implicit tti: TypeTag[T])
   extends OPMapVectorizerModel[Long, T](args = args, operationName = operationName, uid = uid) {
-  val timeZone: DateTimeZone = DateTimeUtils.DefaultTimeZone
+  val timeZone: ZoneId = DateTimeUtils.DefaultTimeZone
 
   def convertFn: DateMap#Value => RealMap#Value = (dt: DateMap#Value) =>
-    dt.mapValues(v => Days.daysBetween(new DateTime(v, timeZone), referenceDate).getDays.toDouble)
+    dt.mapValues(v => ChronoUnit.DAYS.between(DateTimeUtils.parseUnixToDateTime(v), referenceDate))
 }
 
 final class RealMapVectorizerModel[T <: OPMap[Double]] private[op]

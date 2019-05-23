@@ -30,8 +30,11 @@
 
 package com.salesforce.op.aggregators
 
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
+
 import com.salesforce.op.utils.date.DateTimeUtils
-import org.joda.time.format.DateTimeFormat
 
 /**
  * A cut off time to be used for aggregating features extracted from the events
@@ -51,18 +54,18 @@ object CutOffTime {
 
   def DaysAgo(daysAgo: Int): CutOffTime = CutOffTime(
     cType = CutOffTimeTypes.DaysAgo,
-    timeMs = Some(DateTimeUtils.now().withTimeAtStartOfDay().minusDays(daysAgo).getMillis)
+    timeMs = Some(DateTimeUtils.getMillis(DateTimeUtils.now().minusDays(daysAgo).toLocalDate.atStartOfDay))
   )
 
   def WeeksAgo(weeksAgo: Int): CutOffTime = CutOffTime(
     cType = CutOffTimeTypes.WeeksAgo,
-    timeMs = Some(DateTimeUtils.now().withTimeAtStartOfDay().minusWeeks(weeksAgo).getMillis)
+    timeMs = Some(DateTimeUtils.getMillis(DateTimeUtils.now().minusWeeks(weeksAgo).toLocalDate.atStartOfDay))
   )
 
+  val format = DateTimeFormatter.ofPattern("ddMMyyyy", Locale.ENGLISH)
   def DDMMYYYY(ddMMyyyy: String): CutOffTime = CutOffTime(
     cType = CutOffTimeTypes.DDMMYYYY,
-    timeMs = Some(
-      DateTimeFormat.forPattern("ddMMyyyy").parseDateTime(ddMMyyyy).withZone(DateTimeUtils.DefaultTimeZone).getMillis
+    timeMs = Some(DateTimeUtils.getMillis(LocalDateTime.parse(ddMMyyyy, format))
     )
   )
 

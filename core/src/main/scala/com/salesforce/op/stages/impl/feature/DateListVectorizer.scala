@@ -31,6 +31,8 @@
 package com.salesforce.op.stages.impl.feature
 
 import java.text.DateFormatSymbols
+import java.time.temporal.ChronoUnit
+import java.time.{DayOfWeek, LocalDateTime}
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
@@ -41,7 +43,6 @@ import com.salesforce.op.utils.spark.OpVectorColumnMetadata
 import enumeratum._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, LongParam, ParamValidators}
-import org.joda.time.{DateTime, DateTimeConstants, Days}
 
 import scala.reflect.runtime.universe._
 
@@ -152,9 +153,9 @@ class DateListVectorizer[T <: OPList[Long]]
     doc = "reference date to compare against (the milliseconds from 1970-01-01T00:00:00Z in UTC)",
     isValid = ParamValidators.gtEq(0L)
   )
-  setDefault(referenceDate, TransmogrifierDefaults.ReferenceDate.getMillis)
+  setDefault(referenceDate, DateTimeUtils.getMillis(TransmogrifierDefaults.ReferenceDate))
 
-  def getReferenceDate(): DateTime = new DateTime($(referenceDate), DateTimeUtils.DefaultTimeZone)
+  def getReferenceDate(): LocalDateTime = DateTimeUtils.parseUnixToDateTime($(referenceDate))
 
   private def setAllFalse(): this.type = {
     set(first, false)
@@ -191,8 +192,8 @@ class DateListVectorizer[T <: OPList[Long]]
    * @param date reference date to compare against
    * @return this vectorizer with option set
    */
-  def setReferenceDate(date: DateTime): this.type = {
-    set(referenceDate, date.getMillis)
+  def setReferenceDate(date: LocalDateTime): this.type = {
+    set(referenceDate, DateTimeUtils.getMillis(date))
   }
 
   /**
@@ -203,7 +204,8 @@ class DateListVectorizer[T <: OPList[Long]]
       if (dt.isEmpty) Seq($(fillValue))
       else {
         val compareDate = if ($(first)) dt.v.min else dt.v.max
-        Seq(Days.daysBetween(new DateTime(compareDate, DateTimeUtils.DefaultTimeZone), getReferenceDate()).getDays)
+        Seq(ChronoUnit.DAYS
+          .between(DateTimeUtils.parseUnixToDateTime(compareDate), getReferenceDate()))
       }
     if ($(trackNulls)) days :+ (dt.isEmpty : Double) else days
   }
@@ -213,13 +215,13 @@ class DateListVectorizer[T <: OPList[Long]]
    */
   private val modeDayTransformFn: T => Seq[Double] = (dt: T) => {
     val day: Seq[Double] =
-      if (dt.isEmpty) List.fill(DateTimeConstants.DAYS_PER_WEEK)(0.0)
+      if (dt.isEmpty) List.fill(DateTimeUtils.DAYS_PER_WEEK)(0.0)
       else {
         val countDays =
-          dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getDayOfWeek)
+          dt.v.map(d => DateTimeUtils.parseUnixToDateTime(d).getDayOfWeek.getValue)
             .groupBy(identity).mapValues(_.size).toArray
         val modeDay = countDays.minBy { case (w, c) => (-c, w) }._1
-        oneHot(modeDay - 1, DateTimeConstants.DAYS_PER_WEEK) // oneHot is zero based so subtracting one
+        oneHot(modeDay - 1, DayOfWeek.values.size) // oneHot is zero based so subtracting one
       }
     if ($(trackNulls)) day :+ (dt.isEmpty : Double) else day
   }
@@ -232,7 +234,7 @@ class DateListVectorizer[T <: OPList[Long]]
       if (dt.isEmpty) List.fill(12)(0.0)
       else {
         val countMonths =
-          dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getMonthOfYear)
+          dt.v.map(d => DateTimeUtils.parseUnixToDateTime(d).getMonthValue)
             .groupBy(identity).mapValues(_.size).toArray
         val modeMonth = countMonths.minBy { case (m, c) => (-c, m) }._1
         oneHot(modeMonth - 1, 12) // oneHot is zero based so subtracting one
@@ -246,13 +248,13 @@ class DateListVectorizer[T <: OPList[Long]]
    */
   private val modeHourTransformFn: T => Seq[Double] = (dt: T) => {
     val hour: Seq[Double] =
-      if (dt.isEmpty) List.fill(DateTimeConstants.HOURS_PER_DAY)(0.0)
+      if (dt.isEmpty) List.fill(DateTimeUtils.HOURS_PER_DAY)(0.0)
       else {
         val countHours =
-          dt.v.map(d => new DateTime(d, DateTimeUtils.DefaultTimeZone).getHourOfDay)
+          dt.v.map(d => DateTimeUtils.parseUnixToDateTime(d).getHour)
             .groupBy(identity).mapValues(_.size).toArray
         val modeHour = countHours.minBy { case (h, c) => (-c, h) }._1
-        oneHot(modeHour, DateTimeConstants.HOURS_PER_DAY)
+        oneHot(modeHour, DateTimeUtils.HOURS_PER_DAY)
       }
     if ($(trackNulls)) hour :+ (dt.isEmpty : Double) else hour
   }
@@ -272,7 +274,7 @@ class DateListVectorizer[T <: OPList[Long]]
           } else if ($(withModeMonth)) {
             new DateFormatSymbols().getMonths.filterNot(_.isEmpty).toSeq
           } else {
-            (0 until DateTimeConstants.HOURS_PER_DAY).map(hours => s"$hours:00")
+            (0 until DateTimeUtils.HOURS_PER_DAY).map(hours => s"$hours:00")
           }
         val allPivotNames = if ($(trackNulls)) pivotNames :+ TransmogrifierDefaults.NullString else pivotNames
         val updatedCols = for {
@@ -298,10 +300,10 @@ class DateListVectorizer[T <: OPList[Long]]
       val inputSize = getInputFeatures().length
       val nullSize = if ($(trackNulls)) inputSize else 0
       val (replaced, vectorSize): (Seq[Double], Int) = if ($(withModeDay)) {
-        (row.flatMap(modeDayTransformFn), DateTimeConstants.DAYS_PER_WEEK * inputSize + nullSize)
+        (row.flatMap(modeDayTransformFn), DayOfWeek.values.size * inputSize + nullSize)
       } else if ($(withModeMonth)) {
         (row.flatMap(modeMonthTransformFn), 12 * inputSize + nullSize)
-      } else (row.flatMap(modeHourTransformFn), DateTimeConstants.HOURS_PER_DAY * inputSize + nullSize)
+      } else (row.flatMap(modeHourTransformFn), DateTimeUtils.HOURS_PER_DAY * inputSize + nullSize)
       Vectors.sparse(vectorSize, (0 until vectorSize).toArray, replaced.toArray).compressed
     }
   }.toOPVector

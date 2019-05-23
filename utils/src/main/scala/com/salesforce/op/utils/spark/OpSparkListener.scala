@@ -34,8 +34,6 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.version.VersionInfo
 import org.apache.spark.scheduler._
-import org.joda.time.Duration
-import org.joda.time.format.PeriodFormatterBuilder
 import org.slf4j.LoggerFactory
 
 import scala.collection.mutable.ArrayBuffer
@@ -67,7 +65,7 @@ class OpSparkListener
   private lazy val log = LoggerFactory.getLogger(classOf[OpSparkListener])
 
   private var (jobStartTime, appStartTime, appEndTime) = {
-    val now = DateTimeUtils.now().getMillis
+    val now = DateTimeUtils.getMillis(DateTimeUtils.now())
     (now, now, now)
   }
   private val stageMetrics = ArrayBuffer.empty[StageMetrics]
@@ -148,12 +146,7 @@ case class AppMetrics
 ) extends JsonLike {
 
   def appDurationPretty: String = {
-    val duration = new Duration(appDuration)
-    new PeriodFormatterBuilder()
-      .appendHours().appendSuffix("h")
-      .appendMinutes().appendSuffix("m")
-      .appendSecondsWithOptionalMillis().appendSuffix("s")
-      .toFormatter.print(duration.toPeriod())
+    appDuration + "ms"
   }
 }
 

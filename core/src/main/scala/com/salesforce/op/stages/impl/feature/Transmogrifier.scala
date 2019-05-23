@@ -30,6 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import java.time.LocalDateTime
+
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
@@ -55,7 +57,7 @@ private[op] trait TransmogrifierDefaults {
   val DefaultNumOfFeatures: Int = 512
   val MaxNumOfFeatures: Int = 16384
   val DateListDefault: DateListPivot = DateListPivot.SinceLast
-  val ReferenceDate: org.joda.time.DateTime = DateTimeUtils.now()
+  val ReferenceDate: LocalDateTime = DateTimeUtils.now()
   val TopK: Int = 20
   val MinSupport: Int = 10
   val FillValue: Int = 0

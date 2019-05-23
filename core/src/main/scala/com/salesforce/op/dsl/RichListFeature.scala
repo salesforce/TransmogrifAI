@@ -30,13 +30,12 @@
 
 package com.salesforce.op.dsl
 
-import com.salesforce.op.UID
+import java.time.LocalDateTime
+
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types.{DateList, DateTimeList, Geolocation, OPVector, TextList}
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
-import org.apache.spark.ml.feature.{HashingTF, NGram, StopWordsRemover}
-import org.joda.time.DateTime
+import org.apache.spark.ml.feature.StopWordsRemover
 
 
 trait RichListFeature {
@@ -227,7 +226,7 @@ trait RichListFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: DateTime = TransmogrifierDefaults.ReferenceDate,
+      referenceDate: LocalDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[DateList]] = Array.empty
     ): FeatureLike[OPVector] = {
@@ -276,7 +275,7 @@ trait RichListFeature {
     def vectorize
     (
       dateListPivot: DateListPivot,
-      referenceDate: DateTime = TransmogrifierDefaults.ReferenceDate,
+      referenceDate: LocalDateTime = TransmogrifierDefaults.ReferenceDate,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[DateTimeList]] = Array.empty
     ): FeatureLike[OPVector] = {

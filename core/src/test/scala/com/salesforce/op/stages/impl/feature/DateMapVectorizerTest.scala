@@ -30,15 +30,16 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op._
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
 import com.salesforce.op.features.types._
-import com.salesforce.op.OpWorkflow
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.date.DateTimeUtils
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.{OpWorkflow, _}
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTimeConstants, Days, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -47,21 +48,21 @@ import org.scalatest.junit.JUnitRunner
 class DateMapVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   // Sunday July 12th 1998 at 22:45
-  private val defaultDate = new JDateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
+  private val defaultDate = DateTimeUtils.getMillis(LocalDateTime.of(1998, 7, 12, 22, 45))
 
-  lazy val modelLocation = tempDir + "/dt-map-test-model-" + JDateTime.now().getMillis
+  lazy val modelLocation = tempDir + "/dt-map-test-model-" + DateTimeUtils.getMillis(DateTimeUtils.now())
 
-  abstract class SampleData(val moment: JDateTime) {
+  abstract class SampleData(val moment: LocalDateTime) {
     val (ds, f1) = TestFeatureBuilder(
       Seq[DateTimeMap](
-        DateTimeMap(Map("a" -> 1, "b" -> defaultDate, "c" -> 3 * DateTimeConstants.MILLIS_PER_DAY)),
+        DateTimeMap(Map("a" -> 1, "b" -> defaultDate, "c" -> 3 * DateTimeUtils.MILLIS_PER_DAY)),
         DateTimeMap(Map("a" -> 1, "c" -> 0)),
-        DateTimeMap(Map("b" -> 0, "c" -> moment.plusDays(100).plusMinutes(1).getMillis))
+        DateTimeMap(Map("b" -> 0, "c" -> DateTimeUtils.getMillis(moment.plusDays(100).plusMinutes(1))))
       )
     )
   }
 
-  def checkAt(moment: JDateTime): Unit = new SampleData(moment) {
+  def checkAt(moment: LocalDateTime): Unit = new SampleData(moment) {
     val vector = f1.vectorize(defaultValue = 0, referenceDate = moment, trackNulls = false,
       circularDateReps = Seq())
     val transformed = new OpWorkflow().setResultFeatures(vector).transform(ds)
@@ -100,15 +101,14 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     assertNominal(field3, expectedNominal, result3)
   }
 
-  private def expected(moment: JDateTime) = {
-    val nowMinusMilli = moment.minus(1L).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val now = moment.minus(0L).getMillis / DateTimeConstants.MILLIS_PER_DAY
+  private def expected(moment: LocalDateTime) = {
+    val nowMinusMilli =
+      DateTimeUtils.getMillis(moment.minus(1L, ChronoUnit.MILLIS)) / DateTimeUtils.MILLIS_PER_DAY
+    val now = DateTimeUtils.getMillis(moment.minus(0L, ChronoUnit.MILLIS)) / DateTimeUtils.MILLIS_PER_DAY
     val zero = 0
-    val threeDaysAgo = moment.minus(3 * DateTimeConstants.MILLIS_PER_DAY).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val defaultTimeAgo = moment.minus(defaultDate).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val hundredDaysAgo = Days
-      .daysBetween(new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone), moment)
-      .getDays
+    val threeDaysAgo = DateTimeUtils.getMillis(moment.minus(3, ChronoUnit.DAYS)) / DateTimeUtils.MILLIS_PER_DAY
+    val defaultTimeAgo = (DateTimeUtils.getMillis(moment) - defaultDate) / DateTimeUtils.MILLIS_PER_DAY
+    val hundredDaysAgo = ChronoUnit.DAYS.between(moment.plusDays(100), moment)
 
     Array(
       Array(nowMinusMilli, defaultTimeAgo, threeDaysAgo),
@@ -122,7 +122,7 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
   }
 
   it should "vectorize dates correctly on test date" in {
-    checkAt(new JDateTime(2017, 9, 28, 15, 45, 39, DateTimeUtils.DefaultTimeZone))
+    checkAt(LocalDateTime.of(2017, 9, 28, 15, 45, 39))
   }
 
   it should "serialize correctly" in new SampleData(DateTimeUtils.now().minusHours(1)) {
