@@ -43,6 +43,7 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{IntParam, Param}
+import com.salesforce.op.stages.impl.insights.RecordInsightsLOCO._
 
 import scala.collection.mutable
 import scala.collection.mutable.PriorityQueue
@@ -137,30 +138,22 @@ class RecordInsightsLOCO[T <: Model[T]]
     featureSize: Int,
     baseScore: Array[Double], k: Int,
     indexToExamine: Int
-  ): Seq[(Int, Double, Array[Double])] = {
+  ): Seq[LOCOValue] = {
     // Heap that will contain the top K positive LOCO values
     val positiveMaxHeap = PriorityQueue.empty(MinScore)
     // Heap that will contain the top K negative LOCO values
     val negativeMaxHeap = PriorityQueue.empty(MaxScore)
-    // for each element of the feature vector != 0.0
-    // Size of positive heap
-    var positiveCount = 0
-    // Size of negative heap
-    var negativeCount = 0
 
-    def addToHeaps(i: Int, max: Double, diffToExamine: Array[Double]): Unit = {
-      if (max > 0.0) { // if positive LOCO then add it to positive heap
-        positiveMaxHeap.enqueue((i, max, diffToExamine))
-        positiveCount += 1
-        if (positiveCount > k) { // remove the lowest element if the heap size goes from 5 to 6
-          positiveMaxHeap.dequeue()
-        }
-      } else if (max < 0.0) { // if negative LOCO then add it to negative heap
-        negativeMaxHeap.enqueue((i, max, diffToExamine))
-        negativeCount += 1
-        if (negativeCount > k) { // remove the highest element if the heap size goes from 5 to 6
-          negativeMaxHeap.dequeue()
-        } // Not keeping LOCOs with value 0
+    def addToHeaps(lv: LOCOValue): Unit = {
+      // Not keeping LOCOs with value 0, i.e. for each element of the feature vector != 0.0
+      if (lv.value > 0.0) { // if positive LOCO then add it to positive heap
+        positiveMaxHeap.enqueue(lv)
+        // remove the lowest element if the heap size goes above k
+        if (positiveMaxHeap.length > k) positiveMaxHeap.dequeue()
+      } else if (lv.value < 0.0) { // if negative LOCO then add it to negative heap
+        negativeMaxHeap.enqueue(lv)
+        // remove the highest element if the heap size goes above k
+        if (negativeMaxHeap.length > k) negativeMaxHeap.dequeue()
       }
     }
 
@@ -168,7 +161,6 @@ class RecordInsightsLOCO[T <: Model[T]]
     for {i <- featureArray.indices} {
       val (oldInd, oldVal) = featureArray(i)
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
-      val max = diffToExamine(indexToExamine)
       val history = histories(oldInd)
 
       // Let's check the indicator value and descriptor value
@@ -180,12 +172,15 @@ class RecordInsightsLOCO[T <: Model[T]]
           case s if s.exists(_.contains(smartTextMapClassName)) => history.grouping
           case _ => None
         }
-        rawName.foreach { name =>
-          // Update the aggregation map
+        // Update the aggregation map
+        for {name <- rawName} {
           val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
           aggregationMap.update(name, (indices :+ i, sumArray(array, diffToExamine)))
         }
-      } else addToHeaps(i, max, diffToExamine)
+      } else {
+        val value = diffToExamine(indexToExamine)
+        addToHeaps(LOCOValue(i, value, diffToExamine))
+      }
     }
 
     // Adding LOCO results from aggregation map into heaps
@@ -195,7 +190,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       val n = indices.length
       val diffToExamine = ar.map(_ / n)
       val max = diffToExamine(indexToExamine)
-      addToHeaps(i, max, diffToExamine)
+      addToHeaps(LOCOValue(i, max, diffToExamine))
     }
 
     val topPositive = positiveMaxHeap.dequeueAll
@@ -224,28 +219,39 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
     val topPosNeg = returnTopPosNeg(featureArray, featureSize, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
-      case TopKStrategy.Abs => topPosNeg.sortBy { case (_, v, _) => -math.abs(v) }.take(k)
-      case TopKStrategy.PositiveNegative => topPosNeg.sortBy { case (_, v, _) => -v }
+      case TopKStrategy.Abs => topPosNeg.sortBy { case LOCOValue(_, v, _) => -math.abs(v) }.take(k)
+      case TopKStrategy.PositiveNegative => topPosNeg.sortBy { case LOCOValue(_, v, _) => -v }
     }
 
-    top.map { case (f, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(f)._1), v) }.toMap.toTextMap
+    top.map { case LOCOValue(i, _, diffs) =>
+      RecordInsightsParser.insightToText(featureInfo(featureArray(i)._1), diffs)
+    }.toMap.toTextMap
   }
 
 }
+
+/**
+ * LOCO value container
+ *
+ * @param i     feature value index
+ * @param value value - min or max, depending on the ordering
+ * @param diffs scores diff
+ */
+private case class LOCOValue(i: Int, value: Double, diffs: Array[Double])
 
 
 /**
  * Ordering of the heap that removes lowest score
  */
-private object MinScore extends Ordering[(Int, Double, Array[Double])] {
-  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int = y._2 compare x._2
+private object MinScore extends Ordering[LOCOValue] {
+  def compare(x: LOCOValue, y: LOCOValue): Int = y.value compare x.value
 }
 
 /**
  * Ordering of the heap that removes highest score
  */
-private object MaxScore extends Ordering[(Int, Double, Array[Double])] {
-  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int = x._2 compare y._2
+private object MaxScore extends Ordering[LOCOValue] {
+  def compare(x: LOCOValue, y: LOCOValue): Int = x.value compare y.value
 }
 
 sealed abstract class TopKStrategy(val name: String) extends EnumEntry with Serializable
