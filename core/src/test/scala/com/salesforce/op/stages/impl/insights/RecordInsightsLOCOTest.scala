@@ -355,7 +355,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val insights = transformer.transform(checked)
 
-    val parsed = insights.collect(transformer.getOutput()).map { case i => RecordInsightsParser.parseInsights(i) }
+    val parsed = insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
 
     parsed.map(_.size shouldBe 4)
     parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
@@ -374,10 +374,12 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
      * @param textFeature Text(Map) Field
      * @param predicate   predicate used by RecordInsights in order to aggregate
      */
-    def assertAggregatedWithPredicate(textFeature: FeatureLike[_],
-      predicate: OpVectorColumnHistory => Boolean): Unit = {
-      val textIndices = meta.getColumnHistory.filter(c => predicate(c) && c.indicatorValue.isEmpty
-        && c.descriptorValue.isEmpty)
+    def assertAggregatedWithPredicate(
+      textFeature: FeatureLike[_],
+      predicate: OpVectorColumnHistory => Boolean
+    ): Unit = {
+      val textIndices = meta.getColumnHistory()
+        .filter(c => predicate(c) && c.indicatorValue.isEmpty && c.descriptorValue.isEmpty)
         .map(_.index)
 
       val expectedLocos = checked.select(label, checkedFeatureVector).map { case Row(l: Double, v: Vector) =>
@@ -396,9 +398,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       val actual = parsed.map(_.find { case (history, _) => predicate(history) }.get)
         .filter(_._1.indicatorValue.isEmpty).map(_._2.map(_._2)).toSeq
       val zip = actual.zip(expected)
-      zip.foreach { case (a, e) => a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
-        s"expected aggregated LOCO ($v2) should be the same as actual ($v1)")
-      }
+      zip.foreach { case (a, e) =>
+        a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
+          s"expected aggregated LOCO ($v2) should be the same as actual ($v1)")
+        }
       }
     }
 

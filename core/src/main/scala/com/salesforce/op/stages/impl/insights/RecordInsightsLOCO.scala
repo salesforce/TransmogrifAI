@@ -44,6 +44,7 @@ import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{IntParam, Param}
 
+import scala.collection.mutable
 import scala.collection.mutable.PriorityQueue
 
 /**
@@ -105,15 +106,22 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
   private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
   // Indices of features derived from SmartText(Map)Vectorizer
-  private lazy val textIndices = histories.filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName)
-    || s.contains(smartTextMapClassName)))
+  private lazy val textIndices = histories
+    .filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName) || s.contains(smartTextMapClassName)))
     .map(_.index)
+    .distinct
 
-
-  private def computeDiffs(i: Int, oldInd: Int, oldVal: Double, featureArray: Array[(Int, Double)], featureSize: Int,
-    baseScore: Array[Double]): Array[Double] = {
-    featureArray.update(i, (oldInd, 0))
-    val score = modelApply(labelDummy, OPVector(Vectors.sparse(featureSize, featureArray))).score
+  private def computeDiffs
+  (
+    i: Int,
+    oldInd: Int,
+    oldVal: Double,
+    featureArray: Array[(Int, Double)],
+    featureSize: Int,
+    baseScore: Array[Double]
+  ): Array[Double] = {
+    featureArray.update(i, (oldInd, 0.0))
+    val score = modelApply(labelDummy, Vectors.sparse(featureSize, featureArray).toOPVector).score
     val diffs = baseScore.zip(score).map { case (b, s) => b - s }
     featureArray.update(i, (oldInd, oldVal))
     diffs
@@ -123,9 +131,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     left.zipAll(right, 0.0, 0.0).map { case (l, r) => l + r }
   }
 
-
-  private def returnTopPosNeg(filledSize: Int, featureArray: Array[(Int, Double)], featureSize: Int,
-    baseScore: Array[Double], k: Int, indexToExamine: Int): Seq[(Int, Double, Array[Double])] = {
+  private def returnTopPosNeg
+  (
+    featureArray: Array[(Int, Double)],
+    featureSize: Int,
+    baseScore: Array[Double], k: Int,
+    indexToExamine: Int
+  ): Seq[(Int, Double, Array[Double])] = {
     // Heap that will contain the top K positive LOCO values
     val positiveMaxHeap = PriorityQueue.empty(MinScore)
     // Heap that will contain the top K negative LOCO values
@@ -137,7 +149,6 @@ class RecordInsightsLOCO[T <: Model[T]]
     var negativeCount = 0
 
     def addToHeaps(i: Int, max: Double, diffToExamine: Array[Double]): Unit = {
-
       if (max > 0.0) { // if positive LOCO then add it to positive heap
         positiveMaxHeap.enqueue((i, max, diffToExamine))
         positiveCount += 1
@@ -153,46 +164,38 @@ class RecordInsightsLOCO[T <: Model[T]]
       }
     }
 
-    var i = 0
-    val aggregationMap = scala.collection.mutable.Map.empty[String, (Array[Int], Array[Double])]
-    while (i < filledSize) {
+    val aggregationMap = mutable.Map.empty[String, (Array[Int], Array[Double])]
+    for {i <- featureArray.indices} {
       val (oldInd, oldVal) = featureArray(i)
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val max = diffToExamine(indexToExamine)
+      val history = histories(oldInd)
 
       // Let's check the indicator value and descriptor value
-      val history = histories(oldInd)
-      val parentStages = history.parentFeatureStages
-      val indValue = history.indicatorValue
-      val descValue = history.descriptorValue
-
       // If those values are empty, the field is likely to be a derived text feature (hashing tf output)
-      if (indValue.isEmpty && descValue.isEmpty) {
+      if (history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
         // Name of the field
-        val rawName = parentStages match {
-          case s if s.exists(_.contains(smartTextClassName)) => Some(history.parentFeatureOrigins.head)
+        val rawName = history.parentFeatureStages match {
+          case s if s.exists(_.contains(smartTextClassName)) => history.parentFeatureOrigins.headOption
           case s if s.exists(_.contains(smartTextMapClassName)) => history.grouping
           case _ => None
         }
-        rawName.map { name =>
+        rawName.foreach { name =>
           // Update the aggregation map
           val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
-          aggregationMap(name) = (indices :+ i, sumArray(array, diffToExamine))
+          aggregationMap.update(name, (indices :+ i, sumArray(array, diffToExamine)))
         }
-      } else {
-        addToHeaps(i, max, diffToExamine)
-      }
-      i += 1
+      } else addToHeaps(i, max, diffToExamine)
     }
+
     // Adding LOCO results from aggregation map into heaps
-    aggregationMap.foreach {
-      case (_, (indices, ar)) => {
-        val i = indices.head // The index here is arbitrary
-        val n = indices.length
-        val diffToExamine = ar.map(_ / n)
-        val max = diffToExamine(indexToExamine)
-        addToHeaps(i, max, diffToExamine)
-      }
+    for {(indices, ar) <- aggregationMap.values} {
+      // The index here is arbitrary
+      val i = indices.head
+      val n = indices.length
+      val diffToExamine = ar.map(_ / n)
+      val max = diffToExamine(indexToExamine)
+      addToHeaps(i, max, diffToExamine)
     }
 
     val topPositive = positiveMaxHeap.dequeueAll
@@ -201,16 +204,14 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   override def transformFn: OPVector => TextMap = features => {
-
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
 
     // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
     // Besides non 0 values, we want to check the text features as well
-    val indices = (featuresSparse.indices ++ textIndices).toSet
-    val filledSize = indices.size
-    val featureArray = indices.map(i => i -> features.value(i)).toArray
+    val indices = (featuresSparse.indices ++ textIndices).distinct.sorted
+    val featureArray = indices.map(i => i -> features.value(i))
     val featureSize = featuresSparse.size
 
     val k = $(topK)
@@ -221,15 +222,15 @@ class RecordInsightsLOCO[T <: Model[T]]
       case 2 => 1
       case n if n > 2 => baseResult.prediction.toInt
     }
-    val topPosNeg = returnTopPosNeg(filledSize, featureArray, featureSize, baseScore, k, indexToExamine)
+    val topPosNeg = returnTopPosNeg(featureArray, featureSize, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
       case TopKStrategy.Abs => topPosNeg.sortBy { case (_, v, _) => -math.abs(v) }.take(k)
       case TopKStrategy.PositiveNegative => topPosNeg.sortBy { case (_, v, _) => -v }
     }
 
-    top.map { case (k, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(k)._1), v) }
-      .toMap.toTextMap
+    top.map { case (f, _, v) => RecordInsightsParser.insightToText(featureInfo(featureArray(f)._1), v) }.toMap.toTextMap
   }
+
 }
 
 
@@ -237,25 +238,20 @@ class RecordInsightsLOCO[T <: Model[T]]
  * Ordering of the heap that removes lowest score
  */
 private object MinScore extends Ordering[(Int, Double, Array[Double])] {
-  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
-    y._2 compare x._2
+  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int = y._2 compare x._2
 }
 
 /**
  * Ordering of the heap that removes highest score
  */
 private object MaxScore extends Ordering[(Int, Double, Array[Double])] {
-  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int =
-    x._2 compare y._2
+  def compare(x: (Int, Double, Array[Double]), y: (Int, Double, Array[Double])): Int = x._2 compare y._2
 }
 
 sealed abstract class TopKStrategy(val name: String) extends EnumEntry with Serializable
 
 object TopKStrategy extends Enum[TopKStrategy] {
   val values = findValues
-
   case object Abs extends TopKStrategy("abs")
-
   case object PositiveNegative extends TopKStrategy("positive and negative")
-
 }
