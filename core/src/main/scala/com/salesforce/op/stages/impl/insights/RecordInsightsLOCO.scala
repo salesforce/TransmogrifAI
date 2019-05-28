@@ -43,10 +43,8 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{IntParam, Param}
-import com.salesforce.op.stages.impl.insights.RecordInsightsLOCO._
 
 import scala.collection.mutable
-import scala.collection.mutable.PriorityQueue
 
 /**
  * Creates record level insights for model predictions. Takes the model to explain as a constructor argument.
@@ -75,20 +73,15 @@ class RecordInsightsLOCO[T <: Model[T]]
   )
 
   def setTopK(value: Int): this.type = set(topK, value)
-
   def getTopK: Int = $(topK)
-
   setDefault(topK -> 20)
 
   final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
     doc = "Whether returning topK based on absolute value or topK positives and negatives. For MultiClassification," +
       " the value is from the predicted class (i.e. the class having the highest probability)"
   )
-
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
-
   def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
-
   setDefault(topKStrategy, TopKStrategy.Abs.entryName)
 
   private val modelApply = model match {
@@ -97,8 +90,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     case m => toOPUnchecked(m).transformFn
   }
   private val labelDummy = RealNN(0.0)
-  private lazy val vectorMetadata = OpVectorMetadata(getInputSchema()(in1.name))
-  private lazy val histories = vectorMetadata.getColumnHistory()
+  private lazy val histories = OpVectorMetadata(getInputSchema()(in1.name)).getColumnHistory()
   private lazy val featureInfo = histories.map(_.toJson(false))
 
   /**
@@ -128,7 +120,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     diffs
   }
 
-  private def sumArray(left: Array[Double], right: Array[Double]): Array[Double] = {
+  private def sumArrays(left: Array[Double], right: Array[Double]): Array[Double] = {
     left.zipAll(right, 0.0, 0.0).map { case (l, r) => l + r }
   }
 
@@ -175,7 +167,7 @@ class RecordInsightsLOCO[T <: Model[T]]
         // Update the aggregation map
         for {name <- rawName} {
           val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
-          aggregationMap.update(name, (indices :+ i, sumArray(array, diffToExamine)))
+          aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
         }
       } else {
         val value = diffToExamine(indexToExamine)
