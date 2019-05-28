@@ -395,7 +395,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       }.map { case (a: Array[Double], n: Long) => a.map(_ / n).toSeq }
       val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
 
-      val actual = parsed.map(_.find { case (history, _) => predicate(history) }.get)
+      val actual = parsed
+        .flatMap(_.find { case (history, _) => predicate(history) })
         .filter(_._1.indicatorValue.isEmpty).map(_._2.map(_._2)).toSeq
       val zip = actual.zip(expected)
       zip.foreach { case (a, e) =>
