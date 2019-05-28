@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
 import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.RichVector._
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
@@ -195,11 +196,10 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // TODO: sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
-    val res = ArrayBuffer.empty[(Int, Double)]
-    featuresSparse.foreachActive((i, v) => res += i -> v)
+    val featuresBreeze = featuresSparse.toBreeze
     // Besides non 0 values, we want to check the text features as well
-    textFeatureIndices.foreach(i => if (!featuresSparse.indices.contains(i)) res += i -> 0.0)
-    val featureArray = res.sortBy(_._1).toArray
+    val indices = (featuresSparse.indices ++ textFeatureIndices).distinct.sorted
+    val featureArray = indices.map(i => i -> featuresBreeze(i))
     val featureSize = featuresSparse.size
 
     val k = $(topK)
