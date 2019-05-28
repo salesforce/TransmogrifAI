@@ -129,27 +129,12 @@ class RecordInsightsLOCO[T <: Model[T]]
   (
     featureArray: Array[(Int, Double)],
     featureSize: Int,
-    baseScore: Array[Double], k: Int,
+    baseScore: Array[Double],
+    k: Int,
     indexToExamine: Int
   ): Seq[LOCOValue] = {
-    // Heap that will contain the top K positive LOCO values
-    val positiveMaxHeap = mutable.PriorityQueue.empty(MinScore)
-    // Heap that will contain the top K negative LOCO values
-    val negativeMaxHeap = mutable.PriorityQueue.empty(MaxScore)
 
-    def addToHeaps(loco: LOCOValue): Unit = {
-      // Not keeping LOCOs with value 0, i.e. for each element of the feature vector != 0.0
-      if (loco.value > 0.0) { // if positive LOCO then add it to positive heap
-        positiveMaxHeap.enqueue(loco)
-        // remove the lowest element if the heap size goes above k
-        if (positiveMaxHeap.length > k) positiveMaxHeap.dequeue()
-      } else if (loco.value < 0.0) { // if negative LOCO then add it to negative heap
-        negativeMaxHeap.enqueue(loco)
-        // remove the highest element if the heap size goes above k
-        if (negativeMaxHeap.length > k) negativeMaxHeap.dequeue()
-      }
-    }
-
+    val minMaxHeap = new MinMaxHeap(k)
     val aggregationMap = mutable.Map.empty[String, (Array[Int], Array[Double])]
     for {i <- featureArray.indices} {
       val (oldInd, oldVal) = featureArray(i)
@@ -171,7 +156,7 @@ class RecordInsightsLOCO[T <: Model[T]]
           aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
         }
       } else {
-        addToHeaps(LOCOValue(i, diffToExamine(indexToExamine), diffToExamine))
+        minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
       }
     }
 
@@ -180,11 +165,10 @@ class RecordInsightsLOCO[T <: Model[T]]
       // The index here is arbitrary
       val (i, n) = (indices.head, indices.length)
       val diffToExamine = ar.map(_ / n)
-      addToHeaps(LOCOValue(i, diffToExamine(indexToExamine), diffToExamine))
+      minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
     }
 
-    val (topPositive, topNegative) = (positiveMaxHeap.dequeueAll, negativeMaxHeap.dequeueAll)
-    topPositive ++ topNegative
+    minMaxHeap.dequeueAll
   }
 
   override def transformFn: OPVector => TextMap = features => {
@@ -222,6 +206,36 @@ class RecordInsightsLOCO[T <: Model[T]]
 }
 
 /**
+ * Heap to keep top K of min and max LOCO values
+ *
+ * @param k number of values to keep
+ */
+private class MinMaxHeap(k: Int) {
+
+  // Heap that will contain the top K positive LOCO values
+  private val positives = mutable.PriorityQueue.empty(MinScore)
+
+  // Heap that will contain the top K negative LOCO values
+  private val negatives = mutable.PriorityQueue.empty(MaxScore)
+
+  def enqueue(loco: LOCOValue): Unit = {
+    // Not keeping LOCOs with value 0, i.e. for each element of the feature vector != 0.0
+    if (loco.value > 0.0) { // if positive LOCO then add it to positive heap
+      positives.enqueue(loco)
+      // remove the lowest element if the heap size goes above k
+      if (positives.length > k) positives.dequeue()
+    } else if (loco.value < 0.0) { // if negative LOCO then add it to negative heap
+      negatives.enqueue(loco)
+      // remove the highest element if the heap size goes above k
+      if (negatives.length > k) negatives.dequeue()
+    }
+  }
+
+  def dequeueAll: Seq[LOCOValue] = positives.dequeueAll ++ negatives.dequeueAll
+
+}
+
+/**
  * LOCO value container
  *
  * @param i     feature value index
@@ -229,7 +243,6 @@ class RecordInsightsLOCO[T <: Model[T]]
  * @param diffs scores diff
  */
 private case class LOCOValue(i: Int, value: Double, diffs: Array[Double])
-
 
 /**
  * Ordering of the heap that removes lowest score
