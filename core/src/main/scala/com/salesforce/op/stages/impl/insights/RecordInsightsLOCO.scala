@@ -102,7 +102,7 @@ class RecordInsightsLOCO[T <: Model[T]]
   private lazy val featureInfo = histories.map(_.toJson(false))
 
   /**
-   * These are the name of the stages we want to perform an aggregation of the LOCO results over ferived features
+   * These are the name of the stages we want to perform an aggregation of the LOCO results over derived features
    */
   private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
   private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
