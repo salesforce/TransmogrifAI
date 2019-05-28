@@ -140,9 +140,9 @@ class RecordInsightsLOCO[T <: Model[T]]
     indexToExamine: Int
   ): Seq[LOCOValue] = {
     // Heap that will contain the top K positive LOCO values
-    val positiveMaxHeap = PriorityQueue.empty(MinScore)
+    val positiveMaxHeap = mutable.PriorityQueue.empty(MinScore)
     // Heap that will contain the top K negative LOCO values
-    val negativeMaxHeap = PriorityQueue.empty(MaxScore)
+    val negativeMaxHeap = mutable.PriorityQueue.empty(MaxScore)
 
     def addToHeaps(lv: LOCOValue): Unit = {
       // Not keeping LOCOs with value 0, i.e. for each element of the feature vector != 0.0
@@ -186,15 +186,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     // Adding LOCO results from aggregation map into heaps
     for {(indices, ar) <- aggregationMap.values} {
       // The index here is arbitrary
-      val i = indices.head
-      val n = indices.length
+      val (i, n) = (indices.head, indices.length)
       val diffToExamine = ar.map(_ / n)
       val max = diffToExamine(indexToExamine)
       addToHeaps(LOCOValue(i, max, diffToExamine))
     }
 
-    val topPositive = positiveMaxHeap.dequeueAll
-    val topNegative = negativeMaxHeap.dequeueAll
+    val (topPositive, topNegative) = (positiveMaxHeap.dequeueAll, negativeMaxHeap.dequeueAll)
     topPositive ++ topNegative
   }
 
