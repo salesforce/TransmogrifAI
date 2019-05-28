@@ -46,7 +46,6 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{IntParam, Param}
 
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
 
 /**
  * Creates record level insights for model predictions. Takes the model to explain as a constructor argument.
@@ -138,14 +137,14 @@ class RecordInsightsLOCO[T <: Model[T]]
     // Heap that will contain the top K negative LOCO values
     val negativeMaxHeap = mutable.PriorityQueue.empty(MaxScore)
 
-    def addToHeaps(lv: LOCOValue): Unit = {
+    def addToHeaps(loco: LOCOValue): Unit = {
       // Not keeping LOCOs with value 0, i.e. for each element of the feature vector != 0.0
-      if (lv.value > 0.0) { // if positive LOCO then add it to positive heap
-        positiveMaxHeap.enqueue(lv)
+      if (loco.value > 0.0) { // if positive LOCO then add it to positive heap
+        positiveMaxHeap.enqueue(loco)
         // remove the lowest element if the heap size goes above k
         if (positiveMaxHeap.length > k) positiveMaxHeap.dequeue()
-      } else if (lv.value < 0.0) { // if negative LOCO then add it to negative heap
-        negativeMaxHeap.enqueue(lv)
+      } else if (loco.value < 0.0) { // if negative LOCO then add it to negative heap
+        negativeMaxHeap.enqueue(loco)
         // remove the highest element if the heap size goes above k
         if (negativeMaxHeap.length > k) negativeMaxHeap.dequeue()
       }
@@ -172,8 +171,7 @@ class RecordInsightsLOCO[T <: Model[T]]
           aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
         }
       } else {
-        val value = diffToExamine(indexToExamine)
-        addToHeaps(LOCOValue(i, value, diffToExamine))
+        addToHeaps(LOCOValue(i, diffToExamine(indexToExamine), diffToExamine))
       }
     }
 
@@ -182,8 +180,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       // The index here is arbitrary
       val (i, n) = (indices.head, indices.length)
       val diffToExamine = ar.map(_ / n)
-      val max = diffToExamine(indexToExamine)
-      addToHeaps(LOCOValue(i, max, diffToExamine))
+      addToHeaps(LOCOValue(i, diffToExamine(indexToExamine), diffToExamine))
     }
 
     val (topPositive, topNegative) = (positiveMaxHeap.dequeueAll, negativeMaxHeap.dequeueAll)
