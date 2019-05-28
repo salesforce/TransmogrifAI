@@ -31,7 +31,7 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.ml.PipelineStage
 import org.json4s.{JObject, JValue}
@@ -47,10 +47,10 @@ import scala.util.{Failure, Success, Try}
  *
  * @tparam StageType stage type to read/write
  */
-final class DefaultOpPipelineStageJsonReaderWriter[StageType <: OpPipelineStageBase]
+final class DefaultOpPipelineStageReaderWriter[StageType <: OpPipelineStageBase]
 (
   implicit val ct: ClassTag[StageType]
-) extends OpPipelineStageJsonReaderWriter[StageType] with SerializationFuns {
+) extends OpPipelineStageReaderWriter[StageType] with OpPipelineStageSerializationFuns {
 
   /**
    * Read stage from json

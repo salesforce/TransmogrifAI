@@ -33,7 +33,7 @@ package com.salesforce.op
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages._
 import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JNothing, JValue}

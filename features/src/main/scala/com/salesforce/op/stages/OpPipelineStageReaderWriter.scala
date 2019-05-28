@@ -33,21 +33,47 @@ package com.salesforce.op.stages
 import com.salesforce.op.features.FeatureDistributionType
 import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerializer}
-import enumeratum._
+import com.salesforce.op.utils.reflection.ReflectionUtils
+import enumeratum.{Enum, EnumEntry}
 import org.json4s.ext.JodaTimeSerializers
 import org.json4s.jackson.Serialization
-import org.json4s.{Formats, FullTypeHints}
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
-import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.json4s.{Formats, FullTypeHints, JValue}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 
-object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
+/**
+ * Stage reader/writer implementation used to (de)serialize stages from/to trained models
+ *
+ * @tparam StageType stage type to read/write
+ */
+trait OpPipelineStageReaderWriter[StageType <: OpPipelineStageBase] extends OpPipelineStageReadWriteFormats {
 
-  private val log = LoggerFactory.getLogger(OpPipelineStageReadWriteShared.getClass)
+  /**
+   * Read stage from json
+   *
+   * @param stageClass stage class
+   * @param json       json to read stage from
+   * @return read result
+   */
+  def read(stageClass: Class[StageType], json: JValue): Try[StageType]
+
+  /**
+   * Write stage to json
+   *
+   * @param stage stage instance to write
+   * @return write result
+   */
+  def write(stage: StageType): Try[JValue]
+
+}
+
+
+object OpPipelineStageReaderWriter extends OpPipelineStageReadWriteFormats {
+
+  private val log = LoggerFactory.getLogger(OpPipelineStageReaderWriter.getClass)
 
   /**
    * Stage json field names
@@ -89,23 +115,23 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
 
   /**
    * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
-   * or the default one [[DefaultOpPipelineStageJsonReaderWriter]]
+   * or the default one [[DefaultOpPipelineStageReaderWriter]]
    *
    * @param stageClass stage class
    * @tparam StageType stage type
    * @return reader/writer implementation
    */
-  private[stages] def readerWriterFor[StageType <: OpPipelineStageBase : ClassTag]
+  def readerWriterFor[StageType <: OpPipelineStageBase : ClassTag]
   (
     stageClass: Class[StageType]
-  ): OpPipelineStageJsonReaderWriter[StageType] = {
+  ): OpPipelineStageReaderWriter[StageType] = {
     if (!stageClass.isAnnotationPresent(classOf[ReaderWriter])) {
-      new DefaultOpPipelineStageJsonReaderWriter[StageType]()
+      new DefaultOpPipelineStageReaderWriter[StageType]()
     }
     else {
       Try {
         val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
-        ReflectionUtils.newInstance[OpPipelineStageJsonReaderWriter[StageType]](readerWriterClass.getName)
+        ReflectionUtils.newInstance[OpPipelineStageReaderWriter[StageType]](readerWriterClass.getName)
       } match {
         case Success(readerWriter) =>
           if (log.isDebugEnabled) {
@@ -124,6 +150,8 @@ object OpPipelineStageReadWriteShared extends OpPipelineStageReadWriteFormats {
 
 trait OpPipelineStageReadWriteFormats {
 
+  import OpPipelineStageReaderWriter._
+
   val typeHints = FullTypeHints(List(
     classOf[EmptyScalerArgs], classOf[LinearScalerArgs]
   ))
@@ -138,5 +166,26 @@ trait OpPipelineStageReadWriteFormats {
       EnumEntrySerializer.json4s[TimePeriod](TimePeriod) +
       EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
       new SpecialDoubleSerializer
+
+}
+
+
+private[op] trait OpPipelineStageSerializationFuns {
+
+  import OpPipelineStageReaderWriter._
+
+  def serializeArgument(argName: String, value: AnyRef): AnyValue = {
+    try {
+      val valueClass = value.getClass
+      // Test that value has no external dependencies and can be constructed without ctor args or is an object
+      ReflectionUtils.newInstance[AnyRef](valueClass.getName)
+      AnyValue(AnyValueTypes.ClassInstance, valueClass.getName, Option(valueClass.getName))
+    } catch {
+      case error: Exception => throw new RuntimeException(
+        s"Argument '$argName' [${value.getClass.getName}] cannot be serialized. " +
+          s"Make sure ${value.getClass.getName} has either no-args ctor or is an object, " +
+          "and does not have any external dependencies, e.g. use any out of scope variables.", error)
+    }
+  }
 
 }

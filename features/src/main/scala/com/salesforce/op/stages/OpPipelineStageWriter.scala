@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.util.MLWriter
@@ -74,7 +74,6 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
     }
     // We produce stage metadata for all the Spark params
     val metadata = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
-
 
     // Write out the stage using the specified writer instance
     val writer = readerWriterFor[OpPipelineStageBase](stage.getClass.asInstanceOf[Class[OpPipelineStageBase]])

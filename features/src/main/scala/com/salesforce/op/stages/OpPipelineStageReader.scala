@@ -31,7 +31,7 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.features.OPFeature
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
@@ -46,7 +46,7 @@ import scala.util.{Failure, Success, Try}
 /**
  * Reads the serialized output of [[OpPipelineStageWriter]]
  *
- * @param originalStage original stage instance from the workflow
+ * @param originalStage original stage instance from the workflow (legacy)
  * @param features      features loaded so far (used to lookup input features fot the stage)
  */
 final class OpPipelineStageReader private
@@ -55,7 +55,9 @@ final class OpPipelineStageReader private
   val features: Seq[OPFeature]
 ) extends MLReader[OpPipelineStageBase] {
 
-  @deprecated("Stage serialization has to be done without original stage", "0.6.0")
+  /**
+   * Legacy ctor which requires origin stage to be preset when loading stages
+   */
   def this(origStage: OpPipelineStageBase) =
     this(Option(origStage), origStage.getInputFeatures().flatMap(_.allFeatures))
 
@@ -100,12 +102,14 @@ final class OpPipelineStageReader private
     val stageClass = ReflectionUtils.classForName(className).asInstanceOf[Class[OpPipelineStageBase]]
 
     val stageTry: Try[OpPipelineStageBase] = isModelOpt match {
+      // ************************** Legacy mode **************************
       case Some(isModel) =>
         // *** Legacy mode ***
         // In case we stumbled upon model we instantiate it using the class name + ctor args
         // otherwise we simply use the provided stage instance.
-        if (isModel) new DefaultOpPipelineStageJsonReaderWriter[OpPipelineStageBase]().read(stageClass, ctorArgsJson)
+        if (isModel) new DefaultOpPipelineStageReaderWriter[OpPipelineStageBase]().read(stageClass, ctorArgsJson)
         else originalStage.map(Success(_)).getOrElse(Failure(new RuntimeException("Origin stage was not set")))
+      // *****************************************************************
       case _ =>
         // Get the reader instance to load the stage
         val reader = readerWriterFor[OpPipelineStageBase](stageClass)

@@ -127,7 +127,7 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
  * Stage reader/writer implementation used to (de)serialize [[FeatureGeneratorStage]]
  */
 class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
-  extends OpPipelineStageJsonReaderWriter[FeatureGeneratorStage[I, O]] with SerializationFuns {
+  extends OpPipelineStageReaderWriter[FeatureGeneratorStage[I, O]] with OpPipelineStageSerializationFuns {
 
   /**
    * Read stage from json
