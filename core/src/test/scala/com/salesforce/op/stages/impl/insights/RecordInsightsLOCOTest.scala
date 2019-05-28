@@ -293,7 +293,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
         "feature importances from Spark's RandomForest")
   }
 
-  it should "aggregate LOCOS for text and textMap derived features" in {
+  it should "aggregate values for text and textMap derived features" in {
 
     // Generating Data
     val numRows = 1000
@@ -401,7 +401,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       val zip = actual.zip(expected)
       zip.foreach { case (a, e) =>
         a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
-          s"expected aggregated LOCO ($v2) should be the same as actual ($v1)")
+          s"expected aggregated LOCO value ($v2) should be the same as actual ($v1)")
         }
       }
     }

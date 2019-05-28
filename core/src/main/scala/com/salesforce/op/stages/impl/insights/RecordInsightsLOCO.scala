@@ -45,6 +45,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.param.{IntParam, Param}
 
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 /**
  * Creates record level insights for model predictions. Takes the model to explain as a constructor argument.
@@ -99,10 +100,10 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
   private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
   // Indices of features derived from SmartText(Map)Vectorizer
-  private lazy val textIndices = histories
+  private lazy val textFeatureIndices = histories
     .filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName) || s.contains(smartTextMapClassName)))
     .map(_.index)
-    .distinct
+    .distinct.sorted
 
   private def computeDiffs
   (
@@ -192,11 +193,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
 
-    // TODO sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
+    // TODO: sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
+    val res = ArrayBuffer.empty[(Int, Double)]
+    featuresSparse.foreachActive((i, v) => res += i -> v)
     // Besides non 0 values, we want to check the text features as well
-    val indices = (featuresSparse.indices ++ textIndices).distinct.sorted
-    val featureArray = indices.map(i => i -> features.value(i))
+    textFeatureIndices.foreach(i => if (!featuresSparse.indices.contains(i)) res += i -> 0.0)
+    val featureArray = res.sortBy(_._1).toArray
     val featureSize = featuresSparse.size
 
     val k = $(topK)
