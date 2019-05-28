@@ -23,6 +23,11 @@ ext {
     templateResourcesDir = "$project.buildDir/template-resources"
 }
 
+application {
+    // Set this to the main class for cli.
+    mainClassName = "com.salesforce.op.cli.CLI"
+}
+
 task copySpark(type: Copy) {
     from '../templates/simple/gradle'
     into "$templateResourcesDir/templates/simple/gradle"
@@ -64,9 +69,6 @@ task copyTemplates(type: Copy) {
         fileName.replace(".gradle.template", ".gradle")
     }
     expand([
-            artifactory_user: '$artifactory_user',
-            artifactory_password: '$artifactory_password',
-            artifactory_contextUrl: '$artifactory_contextUrl',
             databaseHostname: 'db.company.com',
             version: scalaVersion,
             scalaVersion: scalaVersion,

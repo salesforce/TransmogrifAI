@@ -27,34 +27,44 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import java.time.temporal.WeekFields
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import org.apache.spark.ml.feature.StopWordsRemover
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
+/**
+ * Wrapper for [[org.apache.spark.ml.feature.StopWordsRemover]]
+ *
+ * A feature transformer that filters out stop words from input.
+ *
+ * @note null values from input array are preserved unless adding null to stopWords explicitly.
+ *
+ * @see <a href="http://en.wikipedia.org/wiki/Stop_words">Stop words (Wikipedia)</a>
+ * @see [[StopWordsRemover]] for more info
+ */
+class OpStopWordsRemover(uid: String = UID[StopWordsRemover])
+  extends OpTransformerWrapper[TextList, TextList, StopWordsRemover](transformer = new StopWordsRemover(), uid = uid) {
 
-case class TimePeriodVal(value: Int, min: Int, max: Int)
+  /**
+   * The words to be filtered out.
+   * Default: English stop words
+   *
+   * @see `StopWordsRemover.loadDefaultStopWords()`
+   */
+  def setStopWords(value: Array[String]): this.type = {
+    getSparkMlStage().get.setStopWords(value)
+    this
+  }
 
-sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
-    Instant
-      .ofEpochMilli(millis)
-      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
-
-  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
-}
-
-object TimePeriod extends Enum[TimePeriod] {
-  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
-
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
-  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
-  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
-  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
-  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
-  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
-  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
+  /**
+   * Whether to do a case sensitive comparison over the stop words.
+   * Default: false
+   */
+  def setCaseSensitive(value: Boolean): this.type = {
+    getSparkMlStage().get.setCaseSensitive(value)
+    this
+  }
 }

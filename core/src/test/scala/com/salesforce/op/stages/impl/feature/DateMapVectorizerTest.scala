@@ -132,7 +132,7 @@ class DateMapVectorizerTest extends FlatSpec with TestSparkContext with Attribut
     val model = workflow.setInputDataset(ds).setResultFeatures(vectorizer.getOutput()).train()
     model.save(modelLocation)
     val loaded = workflow.loadModel(modelLocation)
-    loaded.stages.map(_.uid) should contain (vectorizer.uid)
+    loaded.getStages().map(_.uid) should contain (vectorizer.uid)
   }
 
 }

@@ -27,34 +27,30 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import java.time.temporal.WeekFields
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.unary.UnaryTransformer
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
+import scala.reflect.runtime.universe.TypeTag
 
-case class TimePeriodVal(value: Int, min: Int, max: Int)
+/**
+ * TimePeriodTransformer extracts one of a set of time periods from a date/datetime
+ *
+ * @param period        time period to extract from date
+ * @param uid           uid for instance
+ * @param tti           type tag for input
+ * @tparam I            input feature type
+ */
+class TimePeriodTransformer[I <: Date]
+(
+  val period: TimePeriod,
+  uid: String = UID[TimePeriodTransformer[_]]
+)(
+  implicit override val tti: TypeTag[I]
+) extends UnaryTransformer[I, Integral](operationName = "dateToTimePeriod", uid = uid){
 
-sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
-    Instant
-      .ofEpochMilli(millis)
-      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
-
-  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
-}
-
-object TimePeriod extends Enum[TimePeriod] {
-  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
-
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
-  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
-  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
-  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
-  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
-  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
-  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
+  override def transformFn: I => Integral = (i: I) => i.value.map(t => period.extractIntFromMillis(t).toLong).toIntegral
 }

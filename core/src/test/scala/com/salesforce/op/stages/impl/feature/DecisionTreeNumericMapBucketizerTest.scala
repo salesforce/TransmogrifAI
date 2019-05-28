@@ -141,7 +141,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
     val model = workflow.setInputDataset(data).setResultFeatures(bucketizer.getOutput()).train()
     model.save(modelLocation)
     val loaded = workflow.loadModel(modelLocation)
-    loaded.stages.map(_.uid) should contain (bucketizer.uid)
+    loaded.getStages().map(_.uid) should contain (bucketizer.uid)
   }
 
   it should "not find any splits on random data" in new NormalData {

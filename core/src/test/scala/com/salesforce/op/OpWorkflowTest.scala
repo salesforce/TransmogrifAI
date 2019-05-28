@@ -138,13 +138,13 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed, pred)
       .withRawFeatureFilter(Option(dataReader), None)
-    wf.rawFeatures should contain theSameElementsAs
+    wf.getRawFeatures() should contain theSameElementsAs
       Array(age, boarded, booleanMap, description, gender, height, numericMap, stringMap, survived, weight)
 
     val blacklist: Array[OPFeature] = Array(age, gender, description, stringMap, numericMap)
     wf.setBlacklist(blacklist, Seq.empty)
     wf.getBlacklist() should contain theSameElementsAs blacklist
-    wf.rawFeatures should contain theSameElementsAs
+    wf.getRawFeatures() should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
     wf.getResultFeatures().flatMap(_.rawFeatures).distinct.sortBy(_.name) should contain theSameElementsAs
       Array(boarded, booleanMap, height, survived, weight)
@@ -188,11 +188,11 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       )
 
     val wfM = wf.train()
-    wf.rawFeatures.foreach { f =>
+    wf.getRawFeatures().foreach { f =>
       f.distributions.nonEmpty shouldBe true
       f.name shouldEqual f.distributions.head.name
     }
-    wfM.rawFeatures.foreach { f =>
+    wfM.getRawFeatures().foreach { f =>
       f.distributions.nonEmpty shouldBe true
       f.name shouldEqual f.distributions.head.name
     }
@@ -255,7 +255,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     )
 
     metadata shouldEqual expected
-    model.reader.get shouldBe workflow.reader.get
+    model.getReader() shouldBe workflow.getReader()
   }
 
   it should "use the raw feature filter to generate data instead of the reader when the filter is specified" in {
@@ -289,7 +289,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val data = model.score(keepRawFeatures = false, keepIntermediateFeatures = true)
 
     data.schema.fieldNames should contain theSameElementsAs
-      (workflow.stages.map(_.getOutputFeatureName) :+ KeyFieldName).distinct
+      (workflow.getStages().map(_.getOutputFeatureName) :+ KeyFieldName).distinct
   }
 
   it should "leave the raw features in the scoring output, if requested to" in {
@@ -312,7 +312,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "correctly set parameters on workflow stages when the parameter map is set" in {
-    workflow.stages.collect {
+    workflow.getStages().collect {
       case net: NormEstimatorTest[_] => net.getTest
     } should contain theSameElementsAs Array(false, false, false)
 
@@ -320,7 +320,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       OpParams(stageParams = Map("NormEstimatorTest" -> Map("test" -> true), "NotThere" -> Map("test" -> 1)))
     )
 
-    workflow.stages.collect {
+    workflow.getStages().collect {
       case net: NormEstimatorTest[_] => net.getTest
     } should contain theSameElementsAs Array(true, true, true)
 

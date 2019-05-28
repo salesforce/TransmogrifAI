@@ -27,34 +27,49 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import java.time.temporal.WeekFields
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.utils.spark.RichDataset._
+import org.apache.spark.ml.Transformer
+import org.apache.spark.ml.feature.NGram
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
 
-case class TimePeriodVal(value: Int, min: Int, max: Int)
+@RunWith(classOf[JUnitRunner])
+class OpNGramTest extends SwTransformerSpec[TextList, NGram, OpNGram] {
+  val data = Seq("a b c d e f g").map(_.split(" ").toSeq.toTextList)
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
 
-sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
-    Instant
-      .ofEpochMilli(millis)
-      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
+  val expectedResult = Seq(Seq("a b", "b c", "c d", "d e", "e f", "f g").toTextList)
 
-  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
-}
+  val bigrams = textListFeature.ngram()
+  val transformer = bigrams.originStage.asInstanceOf[OpNGram]
 
-object TimePeriod extends Enum[TimePeriod] {
-  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
+  it should "generate unigrams" in {
+    val unigrams = textListFeature.ngram(n = 1)
+    val transformedData = unigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(unigrams)
 
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
-  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
-  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
-  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
-  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
-  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
-  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
+    results(0) shouldBe data.head
+  }
+
+  it should "generate trigrams" in {
+    val trigrams = textListFeature.ngram(n = 3)
+    val transformedData = trigrams.originStage.asInstanceOf[Transformer].transform(inputData)
+    val results = transformedData.collect(trigrams)
+
+    results(0) shouldBe Seq("a b c", "b c d", "c d e", "d e f", "e f g").toTextList
+  }
+
+  it should "not allow n < 1" in {
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = 0)
+    the[IllegalArgumentException] thrownBy textListFeature.ngram(n = -1)
+  }
+
 }

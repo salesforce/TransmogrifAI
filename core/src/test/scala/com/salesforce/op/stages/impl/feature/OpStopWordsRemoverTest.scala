@@ -27,34 +27,42 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import java.time.temporal.WeekFields
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.salesforce.op._
+import com.salesforce.op.features.types._
+import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.test.{SwTransformerSpec, TestFeatureBuilder}
+import org.apache.spark.ml.feature.StopWordsRemover
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
 
-case class TimePeriodVal(value: Int, min: Int, max: Int)
+@RunWith(classOf[JUnitRunner])
+class OpStopWordsRemoverTest extends SwTransformerSpec[TextList, StopWordsRemover, OpStopWordsRemover] {
+  val data = Seq(
+    "I AM groot", "Groot call me human", "or I will crush you"
+  ).map(_.split(" ").toSeq.toTextList)
 
-sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
-    Instant
-      .ofEpochMilli(millis)
-      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
+  val (inputData, textListFeature) = TestFeatureBuilder(data)
 
-  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
-}
+  val bigrams = textListFeature.removeStopWords()
+  val transformer = bigrams.originStage.asInstanceOf[OpStopWordsRemover]
 
-object TimePeriod extends Enum[TimePeriod] {
-  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
+  val expectedResult = Seq(Seq("groot"), Seq("Groot", "call", "human"), Seq("crush")).map(_.toTextList)
 
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
-  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
-  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
-  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
-  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
-  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
-  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
+  it should "allow case sensitivity" in {
+    val noStopWords = textListFeature.removeStopWords(caseSensitive = true)
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("I", "AM", "groot"), Seq("Groot", "call", "human"), Seq("I", "crush")).map(_.toTextList)
+  }
+
+  it should "set custom stop words" in {
+    val noStopWords = textListFeature.removeStopWords(stopWords = Array("Groot", "I"))
+    val res = noStopWords.originStage.asInstanceOf[OpStopWordsRemover].transform(inputData)
+    res.collect(noStopWords) shouldBe Seq(
+      Seq("AM"), Seq("call", "me", "human"), Seq("or", "will", "crush", "you")).map(_.toTextList)
+  }
 }

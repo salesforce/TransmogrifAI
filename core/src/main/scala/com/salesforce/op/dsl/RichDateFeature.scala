@@ -33,7 +33,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.{DateListPivot, DateToUnitCircleTransformer, TimePeriod, TransmogrifierDefaults}
+import com.salesforce.op.stages.impl.feature._
 import org.joda.time.{DateTime => JDateTime}
 
 
@@ -60,6 +60,13 @@ trait RichDateFeature {
         )
       )
     }
+
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer feature of time period value
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = f.transformWith(new TimePeriodTransformer(period))
 
     /**
      * transforms a Date field into a cartesian coordinate representation
@@ -134,6 +141,13 @@ trait RichDateFeature {
         )
       )
     }
+
+    /**
+     * Convert to specified time period
+     * @param period type of [[TimePeriod]] to convert date feature to
+     * @return Integer feature of time period value
+     */
+    def toTimePeriod(period: TimePeriod): FeatureLike[Integral] = f.transformWith(new TimePeriodTransformer(period))
 
     /**
      * transforms a DateTime field into a cartesian coordinate representation

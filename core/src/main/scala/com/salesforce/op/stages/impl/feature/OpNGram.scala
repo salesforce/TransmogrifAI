@@ -27,34 +27,38 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
 package com.salesforce.op.stages.impl.feature
 
-import java.time.temporal.WeekFields
-import java.time.{Instant, LocalDateTime, ZoneId}
+import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.sparkwrappers.specific.OpTransformerWrapper
+import org.apache.spark.ml.feature.NGram
 
-import com.salesforce.op.utils.date.DateTimeUtils
-import enumeratum.{Enum, EnumEntry}
+/**
+ * Wrapper for [[org.apache.spark.ml.feature.NGram]]
+ *
+ * A feature transformer that converts the input array of strings into an array of n-grams. Null
+ * values in the input array are ignored.
+ * It returns an array of n-grams where each n-gram is represented by a space-separated string of
+ * words.
+ *
+ * When the input is empty, an empty array is returned.
+ * When the input array length is less than n (number of elements per n-gram), no n-grams are
+ * returned.
+ *
+ * @see [[NGram]] for more info
+ */
+class OpNGram(uid: String = UID[NGram])
+  extends OpTransformerWrapper[TextList, TextList, NGram](transformer = new NGram(), uid = uid) {
 
-case class TimePeriodVal(value: Int, min: Int, max: Int)
+  /**
+   * Minimum n-gram length, greater than or equal to 1.
+   * Default: 2, bigram features
+   */
+  def setN(value: Int): this.type = {
+    getSparkMlStage().get.setN(value)
+    this
+  }
 
-sealed abstract class TimePeriod(extractFn: LocalDateTime => TimePeriodVal) extends EnumEntry with Serializable {
-  def extractTimePeriodVal(millis: Long): TimePeriodVal = extractFn(
-    Instant
-      .ofEpochMilli(millis)
-      .atZone(ZoneId.of(DateTimeUtils.DefaultTimeZone.toString)).toLocalDateTime)
-
-  def extractIntFromMillis(millis: Long): Int = extractTimePeriodVal(millis).value
-}
-
-object TimePeriod extends Enum[TimePeriod] {
-  @transient val weekFields = WeekFields.of(java.time.DayOfWeek.MONDAY, 1)
-
-  val values: Seq[TimePeriod] = findValues
-  case object DayOfMonth extends TimePeriod(dt => TimePeriodVal(dt.getDayOfMonth, 1, 31))
-  case object DayOfWeek extends TimePeriod(dt => TimePeriodVal(dt.getDayOfWeek.getValue, 1, 7))
-  case object DayOfYear extends TimePeriod(dt => TimePeriodVal(dt.getDayOfYear, 1, 366))
-  case object HourOfDay extends TimePeriod(dt => TimePeriodVal(dt.getHour, 0, 24))
-  case object MonthOfYear extends TimePeriod(dt => TimePeriodVal(dt.getMonthValue, 1, 12))
-  case object WeekOfMonth extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfMonth()), 1, 6))
-  case object WeekOfYear extends TimePeriod(dt => TimePeriodVal(dt.get(weekFields.weekOfYear()), 1, 53))
 }
