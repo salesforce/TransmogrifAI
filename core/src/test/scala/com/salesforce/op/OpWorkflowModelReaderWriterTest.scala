@@ -276,9 +276,9 @@ class OpWorkflowModelReaderWriterTest
     val wfM = wf.train()
     wfM.save(saveFlowPathStable)
     wf.getBlacklist().map(_.name) should contain theSameElementsAs
-      Array("age", "boarded", "description", "gender", "height", "weight")
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
     wf.getBlacklistMapKeys() shouldBe
-      Map("booleanMap" -> Set("Male"), "stringMap" -> Set("Male"), "numericMap" -> Set("Male"))
+      Map(booleanMap.name -> Set("Male"), stringMap.name -> Set("Male"), numericMap.name -> Set("Male"))
 
     val wfMR = wf.loadModel(saveFlowPathStable).setReader(wfM.getReader())
     assert(wfM, wfMR)
@@ -287,17 +287,32 @@ class OpWorkflowModelReaderWriterTest
   it should "load a workflow model that has a RawFeatureFilter and a different workflow" in new VectorizedFlow {
     val wfM = wf.loadModel(saveFlowPathStable)
     wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
-    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
-      Array("age", "boarded", "booleanMap", "description", "gender", "height", "numericMap",
-        "stringMap", "survived", "weight")
+    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
-      Array("booleanMap", "numericMap", "stringMap", "survived")
+      Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
     wfM.getBlacklist().map(_.name) should contain theSameElementsAs
-      Array("age", "boarded", "description", "gender", "height", "weight")
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
+  }
+
+  it should "load a workflow model that has a RawFeatureFilter without workflow" in new VectorizedFlow {
+    val wfM = OpWorkflowModel.load(saveFlowPathStable)
+    wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
+    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
+
+    wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
+      Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
+    wfM.getBlacklist().map(_.name) should contain theSameElementsAs
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
   it should "load model and allow copying it" in new VectorizedFlow {
     val wfM = wf.loadModel(saveFlowPathStable).setReader(dataReader)
+    val copy = wfM.copy().setReader(dataReader)
+    assert(copy, wfM)
+  }
+
+  it should "load model without workflow and allow copying it" in {
+    val wfM = OpWorkflowModel.load(saveFlowPathStable).setReader(dataReader)
     val copy = wfM.copy().setReader(dataReader)
     assert(copy, wfM)
   }
@@ -313,13 +328,6 @@ class OpWorkflowModelReaderWriterTest
     val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
     wfM.getRawFeatureFilterResults().rawFeatureFilterMetrics shouldBe empty
     wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
-  }
-
-  it should "error on loading a model without workflow" in {
-    val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
-    error.getMessage should startWith("Failed to load Workflow from path")
-    error.getCause.isInstanceOf[NotImplementedError] shouldBe true
-    error.getCause.getMessage shouldBe "Loading models without the original workflow is currently not supported"
   }
 
   def assert(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {

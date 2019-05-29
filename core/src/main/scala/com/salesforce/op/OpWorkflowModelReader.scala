@@ -30,6 +30,7 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.OpWorkflowModelReadWriteShared.{FieldNames => FN}
 import com.salesforce.op.OpWorkflowModelReadWriteShared.FieldNames._
 import com.salesforce.op.features.{FeatureJsonHelper, OPFeature, TransientFeature}
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
@@ -40,7 +41,6 @@ import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.internal.Trees
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -90,9 +90,9 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
       model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainingParams))
       stages <- loadStages(json, workflowOpt, path)
-      allFeatures <- resolveAllFeatures(json, stages)
-      resultFeatures <- resolveResultFeatures(json, allFeatures)
-      blacklist <- resolveBlacklist(json, allFeatures)
+      resolvedFeatures <- resolveFeatures(json, stages)
+      resultFeatures <- resolveResultFeatures(json, resolvedFeatures)
+      blacklist <- resolveBlacklist(json, workflowOpt, resolvedFeatures, path)
       blacklistMapKeys <- resolveBlacklistMapKeys(json)
       rffResults <- resolveRawFeatureFilterResults(json)
     } yield model
@@ -104,12 +104,23 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       .setRawFeatureFilterResults(rffResults)
   }
 
-  private def resolveBlacklist(json: JValue, allFeatures: Array[OPFeature]): Try[Array[OPFeature]] = Try {
-    if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
-      val blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[JArray].arr
-      blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid.extract[String])).toArray
+  private def resolveBlacklist
+  (
+    json: JValue,
+    wfOpt: Option[OpWorkflow],
+    features: Array[OPFeature],
+    path: String
+  ): Try[Array[OPFeature]] = {
+    if ((json \ BlacklistedFeaturesUids.entryName) == JNothing) { // for backwards compatibility
+      Success(Array.empty[OPFeature])
     } else {
-      Array.empty[OPFeature]
+      for {
+        feats <- wfOpt
+          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlacklist()))
+          .getOrElse(loadStages(json, BlacklistedStages, path).map(_._2))
+        allFeatures = features ++ feats
+        blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[Array[String]]
+      } yield blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
     }
   }
 
@@ -120,23 +131,24 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     }
   }
 
-  private def loadStages(json: JValue, wfOpt: Option[OpWorkflow], path: String): Try[Array[OPStage]] =
-    wfOpt.map(wf => loadStages(json, wf, path)).getOrElse(loadStages(json, path))
+  private def loadStages(json: JValue, wfOpt: Option[OpWorkflow], path: String): Try[Array[OPStage]] = {
+    wfOpt.map(wf => loadStages(json, Stages, wf, path)).getOrElse(loadStages(json, Stages, path).map(_._1))
+  }
 
-  private def loadStages(json: JValue, path: String): Try[Array[OPStage]] = Try {
-    val stagesJs = (json \ Stages.entryName).extract[JArray].arr
+  private def loadStages(json: JValue, field: FN, path: String): Try[(Array[OPStage], Array[OPFeature])] = Try {
+    val stagesJs = (json \ field.entryName).extract[JArray].arr
     val (recoveredStages, recoveredFeatures) = ArrayBuffer.empty[OPStage] -> ArrayBuffer.empty[OPFeature]
     for {j <- stagesJs} {
       val stage = new OpPipelineStageReader(recoveredFeatures).loadFromJson(j, path = path).asInstanceOf[OPStage]
       recoveredStages += stage
       recoveredFeatures += stage.getOutput()
     }
-    recoveredStages.toArray
+    recoveredStages.toArray -> recoveredFeatures.toArray
   }
 
-  private def loadStages(json: JValue, workflow: OpWorkflow, path: String): Try[Array[OPStage]] = Try {
+  private def loadStages(json: JValue, field: FN, workflow: OpWorkflow, path: String): Try[Array[OPStage]] = Try {
     val generators = workflow.getRawFeatures().map(_.originStage)
-    val stagesJs = (json \ Stages.entryName).extract[JArray].arr
+    val stagesJs = (json \ field.entryName).extract[JArray].arr
     val recoveredStages = stagesJs.flatMap { j =>
       val stageUid = (j \ Uid.entryName).extract[String]
       val originalStage = workflow.getStages().find(_.uid == stageUid)
@@ -151,7 +163,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
     generators ++ recoveredStages
   }
 
-  private def resolveAllFeatures(json: JValue, stages: Array[OPStage]): Try[Array[OPFeature]] = Try {
+  private def resolveFeatures(json: JValue, stages: Array[OPStage]): Try[Array[OPFeature]] = Try {
     val featuresArr = (json \ AllFeatures.entryName).extract[JArray].arr
     val stagesMap = stages.map(stage => stage.uid -> stage).toMap[String, OPStage]
 
