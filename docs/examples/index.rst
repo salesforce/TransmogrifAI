@@ -14,3 +14,4 @@ Examples
   Running-from-Spark-Shell
   Running-from-Jupyter-Notebook
   Bootstrap-Your-First-Project
+  Community-Projects
