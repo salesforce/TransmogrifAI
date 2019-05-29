@@ -54,8 +54,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    sc.parallelize(Seq(toJsonString(path)), 1)
-      .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path))
+    sc.parallelize(Seq(toJsonString(path)), 1).saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path))
   }
 
   /**
@@ -102,8 +101,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @return array of serialized stages
    */
   private def stagesJArray(path: String): JArray = {
-    val stages: Seq[OpPipelineStageBase] = model.getStages()
-    val stagesJson: Seq[JObject] = stages
+    val stages = model.getRawFeatures().map(_.originStage) ++ model.getStages()
+    val stagesJson = stages
       .map(_.write.asInstanceOf[OpPipelineStageWriter].writeToJson(path))
       .filter(_.children.nonEmpty)
     JArray(stagesJson.toList)

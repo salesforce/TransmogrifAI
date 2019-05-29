@@ -39,6 +39,8 @@ import org.apache.spark.ml.util.MLReader
 import org.json4s.JsonAST.{JArray, JNothing, JValue}
 import org.json4s.jackson.JsonMethods.parse
 
+import scala.collection.mutable.ArrayBuffer
+import scala.reflect.internal.Trees
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -49,7 +51,6 @@ import scala.util.{Failure, Success, Try}
  * @param workflowOpt optional workflow that produced the trained model
  */
 class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReader[OpWorkflowModel] {
-
 
   /**
    * Load a previously trained workflow model from path
@@ -72,7 +73,9 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @param path to the trained workflow model
    * @return workflow model
    */
-  def loadJson(json: String, path: String): Try[OpWorkflowModel] = Try(parse(json)).flatMap(loadJson(_, path = path))
+  def loadJson(json: String, path: String): Try[OpWorkflowModel] = {
+    Try(parse(json)).flatMap(loadJson(_, path = path))
+  }
 
   /**
    * Load Workflow instance from json
@@ -81,98 +84,98 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
    * @param path to the trained workflow model
    * @return workflow model instance
    */
-  def loadJson(json: JValue, path: String): Try[OpWorkflowModel] = workflowOpt match {
-    case None =>
-      throw new NotImplementedError("Loading models without the original workflow is currently not supported")
-
-    case Some(workflow) =>
-      for {
-        trainParams <- OpParams.fromString((json \ TrainParameters.entryName).extract[String])
-        params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
-        model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainParams))
-        (stages, resultFeatures) <- Try(resolveFeaturesAndStages(workflow, json, path))
-        blacklist <- Try(resolveBlacklist(workflow, json))
-        blacklistMapKeys <- Try(resolveBlacklistMapKeys(json))
-        results <- resolveRawFeatureFilterResults(json)
-      } yield model
-        .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
-        .setFeatures(resultFeatures)
-        .setParameters(params)
-        .setBlacklist(blacklist)
-        .setBlacklistMapKeys(blacklistMapKeys)
-        .setRawFeatureFilterResults(results)
+  def loadJson(json: JValue, path: String): Try[OpWorkflowModel] = {
+    for {
+      trainingParams <- OpParams.fromString((json \ TrainParameters.entryName).extract[String])
+      params <- OpParams.fromString((json \ Parameters.entryName).extract[String])
+      model <- Try(new OpWorkflowModel(uid = (json \ Uid.entryName).extract[String], trainingParams))
+      stages <- loadStages(json, workflowOpt, path)
+      allFeatures <- resolveAllFeatures(json, stages)
+      resultFeatures <- resolveResultFeatures(json, allFeatures)
+      blacklist <- resolveBlacklist(json, allFeatures)
+      blacklistMapKeys <- resolveBlacklistMapKeys(json)
+      rffResults <- resolveRawFeatureFilterResults(json)
+    } yield model
+      .setStages(stages.filterNot(_.isInstanceOf[FeatureGeneratorStage[_, _]]))
+      .setFeatures(resultFeatures)
+      .setParameters(params)
+      .setBlacklist(blacklist)
+      .setBlacklistMapKeys(blacklistMapKeys)
+      .setRawFeatureFilterResults(rffResults)
   }
 
-  private def resolveBlacklist(workflow: OpWorkflow, json: JValue): Array[OPFeature] = {
+  private def resolveBlacklist(json: JValue, allFeatures: Array[OPFeature]): Try[Array[OPFeature]] = Try {
     if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
       val blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[JArray].arr
-      val allFeatures = workflow.getRawFeatures() ++ workflow.getBlacklist() ++
-        workflow.getStages().flatMap(_.getInputFeatures()) ++
-        workflow.getResultFeatures()
       blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid.extract[String])).toArray
     } else {
       Array.empty[OPFeature]
     }
   }
 
-  private def resolveBlacklistMapKeys(json: JValue): Map[String, Set[String]] = {
+  private def resolveBlacklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
     (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
       case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
       case None => Map.empty
     }
   }
 
-  private def resolveFeaturesAndStages
-  (
-    workflow: OpWorkflow,
-    json: JValue,
-    path: String
-  ): (Array[OPStage], Array[OPFeature]) = {
-    val stages = loadStages(workflow, json, path)
-    val stagesMap = stages.map(stage => stage.uid -> stage).toMap[String, OPStage]
-    val featuresMap = resolveFeatures(json, stagesMap)
-    resolveStages(stages, featuresMap)
+  private def loadStages(json: JValue, wfOpt: Option[OpWorkflow], path: String): Try[Array[OPStage]] =
+    wfOpt.map(wf => loadStages(json, wf, path)).getOrElse(loadStages(json, path))
 
-    val resultIds = (json \ ResultFeaturesUids.entryName).extract[Array[String]]
-    val resultFeatures = featuresMap.filterKeys(resultIds.toSet).values
-
-    stages.toArray -> resultFeatures.toArray
+  private def loadStages(json: JValue, path: String): Try[Array[OPStage]] = Try {
+    val stagesJs = (json \ Stages.entryName).extract[JArray].arr
+    val (recoveredStages, recoveredFeatures) = ArrayBuffer.empty[OPStage] -> ArrayBuffer.empty[OPFeature]
+    for {j <- stagesJs} {
+      val stage = new OpPipelineStageReader(recoveredFeatures).loadFromJson(j, path = path).asInstanceOf[OPStage]
+      recoveredStages += stage
+      recoveredFeatures += stage.getOutput()
+    }
+    recoveredStages.toArray
   }
 
-  private def loadStages(workflow: OpWorkflow, json: JValue, path: String): Seq[OPStage] = {
+  private def loadStages(json: JValue, workflow: OpWorkflow, path: String): Try[Array[OPStage]] = Try {
+    val generators = workflow.getRawFeatures().map(_.originStage)
     val stagesJs = (json \ Stages.entryName).extract[JArray].arr
     val recoveredStages = stagesJs.flatMap { j =>
-      val stageUidOpt = (j \ Uid.entryName).extractOpt[String]
-      stageUidOpt.map { stageUid =>
-        val originalStage = workflow.getStages().find(_.uid == stageUid)
-        originalStage match {
-          case Some(os) => new OpPipelineStageReader(os).loadFromJson(j, path = path).asInstanceOf[OPStage]
-          case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
-        }
+      val stageUid = (j \ Uid.entryName).extract[String]
+      val originalStage = workflow.getStages().find(_.uid == stageUid)
+      originalStage match {
+        case Some(os) => Option(
+          new OpPipelineStageReader(os).loadFromJson(j, path = path)).map(_.asInstanceOf[OPStage]
+        )
+        case None if generators.exists(_.uid == stageUid) => None
+        case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
       }
     }
-    val generators = workflow.getRawFeatures().map(_.originStage)
     generators ++ recoveredStages
   }
 
-  private def resolveFeatures(json: JValue, stages: Map[String, OPStage]): Map[String, OPFeature] = {
-    val results = (json \ AllFeatures.entryName).extract[JArray].arr
+  private def resolveAllFeatures(json: JValue, stages: Array[OPStage]): Try[Array[OPFeature]] = Try {
+    val featuresArr = (json \ AllFeatures.entryName).extract[JArray].arr
+    val stagesMap = stages.map(stage => stage.uid -> stage).toMap[String, OPStage]
+
     // should have been serialized in topological order
     // so that parent features can be used to construct each new feature
-    results.foldLeft(Map.empty[String, OPFeature])((featMap, feat) =>
-      FeatureJsonHelper.fromJson(feat, stages, featMap) match {
-        case Success(f) => featMap + (f.uid -> f)
+    val featuresMap = featuresArr.foldLeft(Map.empty[String, OPFeature])((featMap, feat) =>
+      FeatureJsonHelper.fromJson(feat, stagesMap, featMap) match {
         case Failure(e) => throw new RuntimeException(s"Error resolving feature: $feat", e)
+        case Success(f) => featMap + (f.uid -> f)
       }
     )
-  }
 
-  private def resolveStages(stages: Seq[OPStage], featuresMap: Map[String, OPFeature]): Unit = {
+    // set input features to stages
     for {stage <- stages} {
       val inputIds = stage.getTransientFeatures().map(_.uid)
       val inFeatures = inputIds.map(id => TransientFeature(featuresMap(id))) // features are order dependent
       stage.set(stage.inputFeatures, inFeatures)
     }
+    featuresMap.values.toArray
+  }
+
+  private def resolveResultFeatures(json: JValue, features: Array[OPFeature]): Try[Array[OPFeature]] = Try {
+    val resultIds = (json \ ResultFeaturesUids.entryName).extract[Array[String]].toSet
+    features.filter(f => resultIds.contains(f.uid))
   }
 
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
