@@ -8,3 +8,4 @@
 6. Building ML Apps simplified with AutoML by [@ajayborra](https://twitter.com/ajayborra), [@hims_mittal](https://twitter.com/hims_mittal) - [blog](https://engineering.salesforce.com/transmogrifai-automl-vs-sparkml-46b225fac8fc), [code](https://github.com/ajayborra/TransmogrifAI-CaliforniaHousing)
 7. TAML: automatically train a "good" predictive model given only a CSV dataset by [@crupley](https://github.com/crupley) - [code](https://github.com/crupley/taml)
 8. Using TransmogrifAI to predict income level from census data by [@anushalihala](https://github.com/anushalihala) - [code](https://github.com/anushalihala/transmogrifai-project)
+9. MNIST: image classification with TransmogrifAI by [@ajayborra](https://github.com/ajayborra) - [code](https://github.com/ajayborra/TransmogrifAI-ImageClassification)
