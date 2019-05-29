@@ -259,7 +259,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait VectorizedFlow extends UIDReset {
-    val catHead = rawFeatures.transmogrify().map[Real](v => Real(v.value.toArray.headOption))
+    val catHead = rawFeatures.transmogrify().map[Real](OpWorkflowModelReaderWriterTest.catHeadFn)
     val wf = new OpWorkflow()
       .setParameters(workflowParams)
       .setResultFeatures(catHead)
