@@ -218,15 +218,15 @@ object FeatureBuilder {
   }
 
   /**
-    * Builds features from a [[DataFrame]]
-    *
-    * @param data        input [[DataFrame]]
-    * @param response    response feature name
-    * @param nonNullable optional non nullable feature names
-    * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
-    * @throws RuntimeException if fails to construct a response feature
-    * @return label and other features
-    */
+   * Builds features from a [[DataFrame]]
+   *
+   * @param data        input [[DataFrame]]
+   * @param response    response feature name
+   * @param nonNullable optional non nullable feature names
+   * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
+   * @throws RuntimeException         if fails to construct a response feature
+   * @return label and other features
+   */
   def fromDataFrame[ResponseType <: FeatureType : WeakTypeTag](data: DataFrame, response: String, nonNullable: Set[String] = Set.empty): (Feature[ResponseType], Array[Feature[_ <: FeatureType]]) = fromSchema(data.schema, response, nonNullable)
   def fromRow[O <: FeatureType : WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, None)
   def fromRow[O <: FeatureType : WeakTypeTag](name: String): FeatureBuilderWithExtract[Row, O] = fromRow[O](name, None)
