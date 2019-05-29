@@ -104,33 +104,6 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
       .setRawFeatureFilterResults(rffResults)
   }
 
-  private def resolveBlacklist
-  (
-    json: JValue,
-    wfOpt: Option[OpWorkflow],
-    features: Array[OPFeature],
-    path: String
-  ): Try[Array[OPFeature]] = {
-    if ((json \ BlacklistedFeaturesUids.entryName) == JNothing) { // for backwards compatibility
-      Success(Array.empty[OPFeature])
-    } else {
-      for {
-        feats <- wfOpt
-          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlacklist()))
-          .getOrElse(loadStages(json, BlacklistedStages, path).map(_._2))
-        allFeatures = features ++ feats
-        blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[Array[String]]
-      } yield blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
-    }
-  }
-
-  private def resolveBlacklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
-    (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
-      case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
-      case None => Map.empty
-    }
-  }
-
   private def loadStages(json: JValue, wfOpt: Option[OpWorkflow], path: String): Try[Array[OPStage]] = {
     wfOpt.map(wf => loadStages(json, Stages, wf, path)).getOrElse(loadStages(json, Stages, path).map(_._1))
   }
@@ -188,6 +161,33 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
   private def resolveResultFeatures(json: JValue, features: Array[OPFeature]): Try[Array[OPFeature]] = Try {
     val resultIds = (json \ ResultFeaturesUids.entryName).extract[Array[String]].toSet
     features.filter(f => resultIds.contains(f.uid))
+  }
+
+  private def resolveBlacklist
+  (
+    json: JValue,
+    wfOpt: Option[OpWorkflow],
+    features: Array[OPFeature],
+    path: String
+  ): Try[Array[OPFeature]] = {
+    if ((json \ BlacklistedFeaturesUids.entryName) != JNothing) { // for backwards compatibility
+      for {
+        feats <- wfOpt
+          .map(wf => Success(wf.getAllFeatures() ++ wf.getBlacklist()))
+          .getOrElse(loadStages(json, BlacklistedStages, path).map(_._2))
+        allFeatures = features ++ feats
+        blacklistIds = (json \ BlacklistedFeaturesUids.entryName).extract[Array[String]]
+      } yield blacklistIds.flatMap(uid => allFeatures.find(_.uid == uid))
+    } else {
+      Success(Array.empty[OPFeature])
+    }
+  }
+
+  private def resolveBlacklistMapKeys(json: JValue): Try[Map[String, Set[String]]] = Try {
+    (json \ BlacklistedMapKeys.entryName).extractOpt[Map[String, List[String]]] match {
+      case Some(blackMapKeys) => blackMapKeys.map { case (k, vs) => k -> vs.toSet }
+      case None => Map.empty
+    }
   }
 
   private def resolveRawFeatureFilterResults(json: JValue): Try[RawFeatureFilterResults] = {
