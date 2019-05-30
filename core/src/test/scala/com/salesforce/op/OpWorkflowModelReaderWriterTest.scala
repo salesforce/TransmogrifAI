@@ -298,7 +298,6 @@ class OpWorkflowModelReaderWriterTest
     val wfM = OpWorkflowModel.load(saveFlowPathStable)
     wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
     wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
-
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
       Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
     wfM.getBlacklist().map(_.name) should contain theSameElementsAs
