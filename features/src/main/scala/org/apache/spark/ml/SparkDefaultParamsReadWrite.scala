@@ -79,15 +79,19 @@ case object SparkDefaultParamsReadWrite {
    * @param expectedClassName  If non empty, this is checked against the loaded metadata.
    * @throws IllegalArgumentException if expectedClassName is specified and does not match metadata
    */
-  def parseMetadata(jsonStr: String): Metadata =
-    DefaultParamsReader.parseMetadata(jsonStr)
+  def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata =
+    DefaultParamsReader.parseMetadata(metadataStr)
 
   /**
    * Extract Params from metadata, and set them in the instance.
-   * This works if all Params implement [[org.apache.spark.ml.param.Param.jsonDecode()]].
-   * TODO: Move to [[Metadata]] method
+   * This works if all Params (except params included by `skipParams` list) implement
+   * [[org.apache.spark.ml.param.Param.jsonDecode()]].
+   *
+   * @param skipParams The params included in `skipParams` won't be set. This is useful if some
+   *                   params don't implement [[org.apache.spark.ml.param.Param.jsonDecode()]]
+   *                   and need special handling.
    */
-  def getAndSetParams(stage: OpPipelineStageBase, metadata: Metadata): Unit =
-    DefaultParamsReader.getAndSetParams(stage, metadata)
+  def getAndSetParams(stage: OpPipelineStageBase, metadata: Metadata, skipParams: Option[List[String]] = None): Unit =
+    metadata.getAndSetParams(stage, skipParams)
 
 }

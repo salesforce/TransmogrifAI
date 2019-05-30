@@ -1,15 +1,16 @@
 buildscript {
     repositories {
         mavenCentral()
+        jcenter()
         maven { url "https://plugins.gradle.org/m2/" }
     }
-    //dependencies {
+    dependencies {
+        classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.16.0'
     //  classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
-    //}
+    }
 }
 
 plugins {
-    id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
     id 'com.github.johnrengelman.shadow' version '5.0.0'
 }
 
@@ -78,8 +79,8 @@ dependencies {
     compileOnly("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
     testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
 
-    // Spark Avro
-    compile ("com.databricks:spark-avro_$scalaVersion:$sparkAvroVersion") { exclude group: "org.apache.avro", module: "avro" }
+     // Spark Avro
+     compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
 
 }
 

@@ -36,7 +36,6 @@ import com.salesforce.op.utils.text.TextUtils
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, Metadata, MetadataBuilder, StructType}
-import com.databricks.spark.avro._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import scala.collection.mutable.{WrappedArray => MWrappedArray}
 
@@ -72,7 +71,7 @@ object RichDataset {
     val schemaStr = spark.sparkContext.textFile(schemaPath(path)).collect().mkString
     val schema = DataType.fromJson(schemaStr).asInstanceOf[StructType]
     val origNames = schema.fields.map(_.metadata.getString(OriginalNameMetaKey))
-    val data = spark.read.avro(dataPath(path)).toDF(origNames: _*)
+    val data = spark.read.format("avro").load(dataPath(path)).toDF(origNames: _*)
     val columns =
       for {
         (c, f) <- data.columns.zip(schema.fields)
@@ -212,7 +211,7 @@ object RichDataset {
       val cleaned = ds.select(columns: _*)
 
       spark.sparkContext.parallelize(Seq(cleaned.schema.prettyJson), 1).saveAsTextFile(schemaPath(path))
-      cleaned.write.mode(saveMode).options(options).avro(dataPath(path))
+      cleaned.write.mode(saveMode).options(options).format("avro").save(dataPath(path))
     }
 
     /**
