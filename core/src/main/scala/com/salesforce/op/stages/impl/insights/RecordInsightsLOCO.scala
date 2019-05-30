@@ -190,6 +190,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       case 0 => throw new RuntimeException("model does not produce scores for insights")
       case 1 => 0
       case 2 => 1
+      // For MultiClassification, the value is from the predicted class(i.e. the class having the highest probability)
       case n if n > 2 => baseResult.prediction.toInt
     }
     val topPosNeg = returnTopPosNeg(featureArray, featureSize, baseScore, k, indexToExamine)
