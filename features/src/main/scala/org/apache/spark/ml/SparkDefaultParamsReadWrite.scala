@@ -47,28 +47,34 @@ case object SparkDefaultParamsReadWrite {
    * @see [[OpPipelineStageWriter]] for details on what this includes.
    */
   def getMetadataToSave(
-    stage: OpPipelineStageBase,
+    instance: OpPipelineStageBase,
     extraMetadata: Option[JObject] = None,
     paramMap: Option[JValue] = None
-  ): JObject = {
-    val uid = stage.uid
-    val cls = stage.getClass.getName
-    val params = stage.extractParamMap().toSeq.asInstanceOf[Seq[ParamPair[Any]]]
+  ): String = {
+    val uid = instance.uid
+    val cls = instance.getClass.getName
+    val params = instance.paramMap.toSeq
+    val defaultParams = instance.defaultParamMap.toSeq
     val jsonParams = paramMap.getOrElse(render(params.map { case ParamPair(p, v) =>
       p.name -> parse(p.jsonEncode(v))
     }.toList))
+    val jsonDefaultParams = render(defaultParams.map { case ParamPair(p, v) =>
+      p.name -> parse(p.jsonEncode(v))
+    }.toList)
     val basicMetadata = ("class" -> cls) ~
       ("timestamp" -> System.currentTimeMillis()) ~
       ("sparkVersion" -> org.apache.spark.SPARK_VERSION) ~
       ("uid" -> uid) ~
-      ("paramMap" -> jsonParams)
+      ("paramMap" -> jsonParams) ~
+      ("defaultParamMap" -> jsonDefaultParams)
     val metadata = extraMetadata match {
       case Some(jObject) =>
         basicMetadata ~ jObject
       case None =>
         basicMetadata
     }
-    metadata
+    val metadataJson: String = compact(render(metadata))
+    metadataJson
   }
 
   /**
