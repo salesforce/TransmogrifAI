@@ -129,7 +129,7 @@ class OpWorkflowModelReader(val workflowOpt: Option[OpWorkflow]) extends MLReade
         case Some(os) => Option(
           new OpPipelineStageReader(os).loadFromJson(j, path = path)).map(_.asInstanceOf[OPStage]
         )
-        case None if generators.exists(_.uid == stageUid) => None
+        case None if generators.exists(_.uid == stageUid) => None // skip the generator since they are in the workflow
         case None => throw new RuntimeException(s"Workflow does not contain a stage with uid: $stageUid")
       }
     }
