@@ -52,7 +52,7 @@ import org.apache.spark.sql.types.{DoubleType, StringType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
@@ -543,7 +543,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val expectedScores = expectedScoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect()
     model.save(workflowLocation)
 
-    def assertModel(model: OpWorkflowModel) = {
+    def assertModel(model: OpWorkflowModel): Assertion = {
       val scoresDF = model.setInputDataset(ds, keyFn).score()
       val scores = scoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect()
       // Compare the scores produced by the loaded model vs original model
