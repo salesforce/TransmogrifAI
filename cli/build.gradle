@@ -77,7 +77,6 @@ task copyTemplates(type: Copy) {
             junitVersion: junitVersion,
             sparkVersion: sparkVersion,
             avroVersion: avroVersion,
-            sparkAvroVersion: sparkAvroVersion,
             hadoopVersion: hadoopVersion,
             collectionsVersion: collectionsVersion,
             transmogrifaiVersion: version,

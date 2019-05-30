@@ -359,11 +359,11 @@ class OpXGBoostClassificationModel
 
   private lazy val model = getSparkMlStage().get
   private lazy val booster = model.nativeBooster
-  private lazy val treeLimit = model.getTreeLimit.toInt
+  private lazy val treeLimit = model.getTreeLimit
   private lazy val missing = model.getMissing
 
   override def transformFn: (RealNN, OPVector) => Prediction = (label, features) => {
-    val data = removeMissingValues(Iterator(features.value.asXGB), missing)
+    val data = processMissingValues(Iterator(features.value.asXGB), missing)
     val dm = new DMatrix(dataIter = data)
     val rawPred = booster.predict(dm, outPutMargin = true, treeLimit = treeLimit)(0).map(_.toDouble)
     val rawPrediction = if (model.numClasses == 2) Array(-rawPred(0), rawPred(0)) else rawPred
