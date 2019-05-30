@@ -53,5 +53,5 @@ class TimePeriodListTransformer[I <: DateList]
 ) extends UnaryTransformer[I, OPVector](operationName = "dateListToTimePeriod", uid = uid) {
 
   override def transformFn: I => OPVector =
-    (i: I) => i.value.map(t => period.extractFromTime(t).toDouble).toOPVector
+    (i: I) => i.value.map(t => period.extractIntFromMillis(t).toDouble).toOPVector
 }
