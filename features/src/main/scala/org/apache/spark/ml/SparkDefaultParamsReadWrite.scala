@@ -83,8 +83,31 @@ case object SparkDefaultParamsReadWrite {
    * @param expectedClassName  If non empty, this is checked against the loaded metadata.
    * @throws IllegalArgumentException if expectedClassName is specified and does not match metadata
    */
-  def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata =
-    DefaultParamsReader.parseMetadata(metadataStr)
+  def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata = {
+    val metadata = parse(metadataStr)
+
+    implicit val format = DefaultFormats
+    val className = (metadata \ "class").extract[String]
+    val uid = (metadata \ "uid").extract[String]
+    val timestamp = (metadata \ "timestamp").extract[Long]
+    val sparkVersion = (metadata \ "sparkVersion").extract[String]
+    val params = metadata \ "paramMap"
+    val defaultParams = metadata \ "defaultParamMap"
+    if (expectedClassName.nonEmpty) {
+      require(className == expectedClassName, s"Error loading metadata: Expected class name" +
+        s" $expectedClassName but found class name $className")
+    }
+    // ******************************************************************************************
+    /**
+     * Backward compatible fix for models trained with older versions of Spark (prior to 2.4.x).
+     * The change introduced in https://github.com/apache/spark/pull/20633 added serialization of
+     * default params, older models won't have them and fail to load.
+     */
+    val defaultParamsFix = if (defaultParams == JNothing) JObject() else defaultParams
+    // ******************************************************************************************
+
+    new Metadata(className, uid, timestamp, sparkVersion, params, defaultParamsFix, metadata, metadataStr)
+  }
 
   /**
    * Extract Params from metadata, and set them in the instance.
