@@ -81,7 +81,7 @@ case object SparkDefaultParamsReadWrite {
    * Parse metadata JSON string produced by [[DefaultParamsWriter.getMetadataToSave()]].
    * This is a helper function for [[loadMetadata()]].
    *
-   * Note: this method was taken from DefaultParamsWriter.parseMetadata,
+   * Note: this method was taken from [[DefaultParamsWriter.parseMetadata]],
    * but modified to avoid failing on loading of Spark models prior to 2.4.x
    *
    * @param metadataStr  JSON string of metadata
