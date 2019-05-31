@@ -55,6 +55,9 @@ object OpPipelineStageReadWriteShared {
     case object Uid extends FieldNames("uid")
     case object Class extends FieldNames("class")
     case object ParamMap extends FieldNames("paramMap")
+    case object DefaultParamMap extends FieldNames("defaultParamMap")
+    case object Timestamp extends FieldNames("timestamp")
+    case object SparkVersion extends FieldNames("sparkVersion")
   }
 
   /**

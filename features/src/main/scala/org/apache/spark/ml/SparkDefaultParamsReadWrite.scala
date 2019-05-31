@@ -21,6 +21,7 @@
 package org.apache.spark.ml
 
 import com.salesforce.op.stages.OpPipelineStageBase
+import com.salesforce.op.stages.OpPipelineStageReadWriteShared.FieldNames._
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.util.{DefaultParamsReader, DefaultParamsWriter}
 import org.json4s.JsonDSL._
@@ -59,12 +60,12 @@ case object SparkDefaultParamsReadWrite {
     val jsonDefaultParams = render(defaultParams.map { case ParamPair(p, v) =>
       p.name -> parse(p.jsonEncode(v))
     }.toList)
-    val basicMetadata = ("class" -> cls) ~
-      ("timestamp" -> System.currentTimeMillis()) ~
-      ("sparkVersion" -> org.apache.spark.SPARK_VERSION) ~
-      ("uid" -> uid) ~
-      ("paramMap" -> jsonParams) ~
-      ("defaultParamMap" -> jsonDefaultParams)
+    val basicMetadata = (Class.entryName -> cls) ~
+      (Timestamp.entryName -> System.currentTimeMillis()) ~
+      (SparkVersion.entryName -> org.apache.spark.SPARK_VERSION) ~
+      (Uid.entryName -> uid) ~
+      (ParamMap.entryName -> jsonParams) ~
+      (DefaultParamMap.entryName -> jsonDefaultParams)
     val metadata = extraMetadata match {
       case Some(jObject) =>
         basicMetadata ~ jObject
@@ -90,12 +91,12 @@ case object SparkDefaultParamsReadWrite {
     val metadata = parse(metadataStr)
 
     implicit val format = DefaultFormats
-    val className = (metadata \ "class").extract[String]
-    val uid = (metadata \ "uid").extract[String]
-    val timestamp = (metadata \ "timestamp").extract[Long]
-    val sparkVersion = (metadata \ "sparkVersion").extract[String]
-    val params = metadata \ "paramMap"
-    val defaultParams = metadata \ "defaultParamMap"
+    val className = (metadata \ Class.entryName).extract[String]
+    val uid = (metadata \ Uid.entryName).extract[String]
+    val timestamp = (metadata \ Timestamp.entryName).extract[Long]
+    val sparkVersion = (metadata \ SparkVersion.entryName).extract[String]
+    val params = metadata \ ParamMap.entryName
+    val defaultParams = metadata \ DefaultParamMap.entryName
     if (expectedClassName.nonEmpty) {
       require(className == expectedClassName, s"Error loading metadata: Expected class name" +
         s" $expectedClassName but found class name $className")
