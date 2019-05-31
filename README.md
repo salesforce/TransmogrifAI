@@ -126,15 +126,11 @@ While this may seem a bit too magical, for those who want more control, Transmog
 You can simply add TransmogrifAI as a regular dependency to an existing project.
 Start by picking TransmogrifAI version to match your project dependencies from the version matrix below (if not sure - take the **stable** version):
 
-| TransmogrifAI Version      | Spark Version | Scala Version | Java Version |
-|----------------------------|:-------------:|:-------------:|:------------:|
-| 0.6.0 (unreleased, master) |      2.3      |      2.11     |      1.8     |
-| **0.5.3 (stable)**         |    **2.3**    |    **2.11**   |    **1.8**   |
-| 0.5.2                      |      2.3      |      2.11     |      1.8     |
-| 0.5.1                      |      2.3      |      2.11     |      1.8     |
-| 0.5.0                      |      2.3      |      2.11     |      1.8     |
-| 0.4.0                      |      2.2      |      2.11     |      1.8     |
-| 0.3.4                      |      2.2      |      2.11     |      1.8     |
+| TransmogrifAI Version                           | Spark Version | Scala Version | Java Version |
+|-------------------------------------------------|:-------------:|:-------------:|:------------:|
+| 0.6.0 (unreleased, master)                      |      2.3      |      2.11     |      1.8     |
+| **0.5.3 (stable)**, 0.5.2, 0.5.1, 0.5.0         |    **2.3**    |    **2.11**   |    **1.8**   |
+| 0.4.0, 0.3.4                                    |      2.2      |      2.11     |      1.8     |
 
 For Gradle in `build.gradle` add:
 ```gradle
