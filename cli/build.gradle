@@ -69,7 +69,6 @@ task copyTemplates(type: Copy) {
         fileName.replace(".gradle.template", ".gradle")
     }
     expand([
-            databaseHostname: 'db.company.com',
             version: scalaVersion,
             scalaVersion: scalaVersion,
             scalaVersionRevision: scalaVersionRevision,
@@ -79,9 +78,7 @@ task copyTemplates(type: Copy) {
             avroVersion: avroVersion,
             hadoopVersion: hadoopVersion,
             collectionsVersion: collectionsVersion,
-            transmogrifaiVersion: version,
-            buildNumber: (int)(Math.random() * 1000),
-            date: new Date()
+            transmogrifaiVersion: version
     ])
 }
 
