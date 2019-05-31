@@ -134,27 +134,22 @@ class OpClassifierModelTest extends FlatSpec with TestSparkContext with OpXGBoos
       .setLabelCol(labelF.name)
     val spk = cl.fit(rawDF)
     val op = toOP(spk, spk.uid).setInput(labelF, featureV)
-    compareOutputs(spk.transform(rawDF), op.transform(rawDF), false)
+    compareOutputs(spk.transform(rawDF), op.transform(rawDF))
   }
 
-  def compareOutputs
-  (
-    df1: DataFrame,
-    df2: DataFrame,
-    fullRawPred: Boolean = true
-  )(implicit arrayEquality: Equality[Array[Double]]): Unit = {
+  def compareOutputs(df1: DataFrame, df2: DataFrame)(implicit arrayEquality: Equality[Array[Double]]): Unit = {
     def keysStartsWith(name: String, value: Map[String, Double]): Array[Double] = {
       val names = value.keys.filter(_.startsWith(name)).toArray.sorted
       names.map(value)
     }
+
     val sorted1 = df1.collect().sortBy(_.getAs[Double](4))
     val sorted2 = df2.collect().sortBy(_.getAs[Map[String, Double]](2)(Prediction.Keys.PredictionName))
-    sorted1.zip(sorted2).foreach{ case (r1, r2) =>
+    sorted1.zip(sorted2).foreach { case (r1, r2) =>
       val map = r2.getAs[Map[String, Double]](2)
       r1.getAs[Double](4) shouldEqual map(Prediction.Keys.PredictionName)
       r1.getAs[Vector](3).toArray shouldEqual keysStartsWith(Prediction.Keys.ProbabilityName, map)
-      if (fullRawPred) r1.getAs[Vector](2).toArray shouldEqual keysStartsWith(Prediction.Keys.RawPredictionName, map)
-      else r1.getAs[Vector](2).toArray shouldEqual keysStartsWith(Prediction.Keys.RawPredictionName, map).tail
+      r1.getAs[Vector](2).toArray shouldEqual keysStartsWith(Prediction.Keys.RawPredictionName, map)
     }
   }
 
