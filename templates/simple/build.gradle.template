@@ -79,9 +79,8 @@ dependencies {
     compileOnly("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
     testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
 
-     // Spark Avro
-     compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
-
+    // Spark Avro
+    compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
 }
 
 configurations.all {
