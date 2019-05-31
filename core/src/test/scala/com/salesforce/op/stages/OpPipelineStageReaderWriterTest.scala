@@ -73,8 +73,8 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   it should "write class name" in {
     (stageJson \ FN.Class.entryName).extract[String] shouldBe stage.getClass.getName
   }
-  it should "write paramMap" in {
-    val params = (stageJson \ FN.ParamMap.entryName).extract[Map[String, Any]]
+  it should "write params map" in {
+    val params = extractParams(stageJson).extract[Map[String, Any]]
     if (hasOutputName) {
       params should have size 4
       params.keys shouldBe Set("inputFeatures", "outputMetadata", "inputSchema", "outputFeatureName")
@@ -84,17 +84,18 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     }
   }
   it should "write outputMetadata" in {
-    val metadataStr = compact(render((stageJson \ FN.ParamMap.entryName) \ "outputMetadata"))
+    val params = extractParams(stageJson)
+    val metadataStr = compact(render(extractParams(stageJson) \ "outputMetadata"))
     val metadata = Metadata.fromJson(metadataStr)
     metadata shouldBe stage.getMetadata()
   }
   it should "write inputSchema" in {
-    val schemaStr = compact(render((stageJson \ FN.ParamMap.entryName) \ "inputSchema"))
+    val schemaStr = compact(render(extractParams(stageJson) \ "inputSchema"))
     val schema = DataType.fromJson(schemaStr)
     schema shouldBe stage.getInputSchema()
   }
   it should "write input features" in {
-    val jArray = ((stageJson \ FN.ParamMap.entryName) \ "inputFeatures").extract[JArray]
+    val jArray = (extractParams(stageJson) \ "inputFeatures").extract[JArray]
     jArray.values should have length 1
     val obj = jArray(0).extract[JObject]
     obj.values.keys shouldBe Set("name", "isResponse", "isRaw", "uid", "typeName", "stages", "originFeatures")
@@ -119,6 +120,12 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     stageLoaded.operationName shouldBe stage.operationName
     stageLoaded.getInputFeatures() shouldBe stage.getInputFeatures()
     stageLoaded.getInputSchema() shouldBe stage.getInputSchema()
+  }
+
+  private def extractParams(stageJson: JValue): JValue = {
+    val defaultParamsMap = stageJson \ FN.DefaultParamMap.entryName
+    val paramsMap = stageJson \ FN.ParamMap.entryName
+    defaultParamsMap.merge(paramsMap)
   }
 
 }
