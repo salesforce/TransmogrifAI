@@ -321,7 +321,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     val labels = RandomIntegral.integrals(0, 2).limit(numRows).map(_.value.get.toRealNN)
 
     val generatedTextData: Seq[(Text, Text, TextMap, RealNN)] = countryData.zip(textData)
-      .zip(textMapData).zip(labels).map { case (((c, t), tm), l) => (c, t, tm, l)}
+      .zip(textMapData).zip(labels).map { case (((c, t), tm), l) => (c, t, tm, l) }
 
     val (textDF, country, text, textMap, labelNoRes) = TestFeatureBuilder("country", "text", "textMap", "label",
       generatedTextData)
@@ -478,7 +478,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
         history.parentFeatureStages.head.contains("smartTxtVec")
       assertAggregatedWithPredicate(textAreaFeature, predicate)
     }
-    
+
     assertAggregatedText(text)
     assertAggregatedTextMap(textMap, "k0")
     assertAggregatedTextMap(textMap, "k1")
