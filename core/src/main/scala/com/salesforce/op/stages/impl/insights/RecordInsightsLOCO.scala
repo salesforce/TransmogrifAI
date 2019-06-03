@@ -148,7 +148,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       if (textFeatureIndices.contains(oldInd) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
         // Name of the field
         val rawName = history.parentFeatureType match {
-          case s if s.exists(mapTypes.contains) => {
+          case s if s.exists(textMapTypes.contains) => {
             val grouping = history.grouping
             history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
           }
