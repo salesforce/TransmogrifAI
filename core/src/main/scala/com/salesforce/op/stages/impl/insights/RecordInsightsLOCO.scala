@@ -151,13 +151,16 @@ class RecordInsightsLOCO[T <: Model[T]]
       if (textFeatureIndices.contains(oldInd) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
         // Name of the field
         val rawName = history.parentFeatureType match {
-          case s if s.exists(mapTypes.contains) => history.grouping
+          case s if s.exists(mapTypes.contains) => {
+            val grouping = history.grouping
+            history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
+          }
           case s if s.exists(textTypes.contains) => history.parentFeatureOrigins.headOption
           case s => throw new Error(s"type should be Text or TextMap, here ${s.mkString(",")}")
         }
         // Update the aggregation map
         for {name <- rawName} {
-          val key = name + "_" + history.parentFeatureStages.mkString(",")
+          val key = name
           val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
           aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
         }

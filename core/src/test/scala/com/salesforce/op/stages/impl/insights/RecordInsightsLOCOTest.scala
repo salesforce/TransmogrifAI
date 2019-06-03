@@ -388,7 +388,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val parsed = insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
 
-    parsed.map(_.size shouldBe 8)
+    parsed.map(p => assert(p.size == 7|| p.size == 8, "TextArea can have two null indicator values"))
     parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
       && r.indicatorValue.isDefined), "SmartTextVectorizer detects country feature as a PickList, hence no " +
       "aggregation required for LOCO on this field."))
@@ -442,7 +442,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
      *
      * @param textFeature Text Field
      */
-    def assertAggregatedText(textFeature: FeatureLike[Text]): Unit = {
+    def assertAggregatedText(textFeature: FeatureLike[_ <: Text]): Unit = {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeature.name)
       assertAggregatedWithPredicate(textFeature, predicate)
     }
@@ -458,32 +458,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       assertAggregatedWithPredicate(textMapFeature, predicate)
     }
 
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually on a text Area field
-     *
-     * @param textAreaFeature Text Area Field
-     */
-    def assertAggregatedTextArea(textAreaFeature: FeatureLike[TextArea]): Unit = {
-      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureName.head.contains("TextList")
-      assertAggregatedWithPredicate(textAreaFeature, predicate)
-    }
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually on a text Area field using smartVectorize
-     *
-     * @param textAreaFeature Text Area Field
-     */
-    def assertAggregatedSmartTextArea(textAreaFeature: FeatureLike[TextArea]): Unit = {
-      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureName.head.contains("textArea") &&
-        history.parentFeatureStages.head.contains("smartTxtVec")
-      assertAggregatedWithPredicate(textAreaFeature, predicate)
-    }
-
     assertAggregatedText(text)
     assertAggregatedTextMap(textMap, "k0")
     assertAggregatedTextMap(textMap, "k1")
-    assertAggregatedTextArea(textArea)
-    assertAggregatedSmartTextArea(textArea)
+    assertAggregatedText(textArea)
     assertAggregatedTextMap(textAreaMap, "k0")
     assertAggregatedTextMap(textAreaMap, "k1")
 
