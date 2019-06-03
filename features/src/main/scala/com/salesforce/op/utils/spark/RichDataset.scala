@@ -33,12 +33,13 @@ package com.salesforce.op.utils.spark
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureLike, FeatureSparkTypes, OPFeature}
 import com.salesforce.op.utils.text.TextUtils
+import org.apache.avro.mapred.AvroInputFormat
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DataType, Metadata, MetadataBuilder, StructType}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import scala.collection.mutable.{WrappedArray => MWrappedArray}
 
+import scala.collection.mutable.{WrappedArray => MWrappedArray}
 import scala.reflect.ClassTag
 
 
@@ -59,6 +60,8 @@ object RichDataset {
   private[op] def schemaPath(path: String): String = s"${path.stripSuffix("/")}/schema"
   private[op] def dataPath(path: String): String = s"${path.stripSuffix("/")}/data"
 
+  private val AvroFormat = "avro"
+
   implicit class RichDataFrameWriter[T](w: DataFrameWriter[T]) {
 
     /**
@@ -68,7 +71,7 @@ object RichDataset {
      *   format("avro").save(path)
      * }}}
      */
-    def avro(path: String): Unit = w.format("avro").save(path)
+    def avro(path: String): Unit = w.format(AvroFormat).save(path)
 
   }
 
@@ -81,7 +84,7 @@ object RichDataset {
      *   format("avro").load(path)
      * }}}
      */
-    def avro(path: String): DataFrame = r.format("avro").load(path)
+    def avro(path: String): DataFrame = r.format(AvroFormat).load(path)
 
   }
 
