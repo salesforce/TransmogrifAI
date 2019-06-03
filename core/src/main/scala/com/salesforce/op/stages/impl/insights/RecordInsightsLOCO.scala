@@ -33,7 +33,6 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.stages.impl.feature.{SmartTextMapVectorizer, SmartTextVectorizer}
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
@@ -95,13 +94,19 @@ class RecordInsightsLOCO[T <: Model[T]]
   private lazy val featureInfo = histories.map(_.toJson(false))
 
   /**
-   * These are the name of the stages we want to perform an aggregation of the LOCO results over derived features
+   * These are the name of the types we want to perform an aggregation of the LOCO results over derived features
    */
-  private val smartTextClassName = classOf[SmartTextVectorizer[_]].getSimpleName
-  private val smartTextMapClassName = classOf[SmartTextMapVectorizer[_]].getSimpleName
-  // Indices of features derived from SmartText(Map)Vectorizer
+  val textType = classOf[Text].getName
+  val textMapType = classOf[TextMap].getName
+  val textAreaType = classOf[TextArea].getName
+  val textAreaMapType = classOf[TextAreaMap].getName
+  val textListType = classOf[TextList].getName
+
+  val textTypes = Array(textType, textAreaType, textListType)
+  val mapTypes = Array(textMapType, textAreaMapType)
+  // Indices of features derived from Text(Map)Vectorizer
   private lazy val textFeatureIndices = histories
-    .filter(_.parentFeatureStages.exists(s => s.contains(smartTextClassName) || s.contains(smartTextMapClassName)))
+    .filter(_.parentFeatureType.exists((textTypes ++ mapTypes).contains))
     .map(_.index)
     .distinct.sorted
 
@@ -143,17 +148,18 @@ class RecordInsightsLOCO[T <: Model[T]]
 
       // Let's check the indicator value and descriptor value
       // If those values are empty, the field is likely to be a derived text feature (hashing tf output)
-      if (history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
+      if (textFeatureIndices.contains(oldInd) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
         // Name of the field
-        val rawName = history.parentFeatureStages match {
-          case s if s.exists(_.contains(smartTextClassName)) => history.parentFeatureOrigins.headOption
-          case s if s.exists(_.contains(smartTextMapClassName)) => history.grouping
-          case _ => None
+        val rawName = history.parentFeatureType match {
+          case s if s.exists(mapTypes.contains) => history.grouping
+          case s if s.exists(textTypes.contains) => history.parentFeatureOrigins.headOption
+          case s => throw new Error(s"type should be Text or TextMap, here ${s.mkString(",")}")
         }
         // Update the aggregation map
         for {name <- rawName} {
-          val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
-          aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
+          val key = name + "_" + history.parentFeatureStages.mkString(",")
+          val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
+          aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
         }
       } else {
         minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)

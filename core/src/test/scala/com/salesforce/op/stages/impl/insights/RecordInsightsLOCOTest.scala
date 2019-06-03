@@ -45,6 +45,7 @@ import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorColumnMetad
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{DataFrame, Encoder, Row}
+import org.apache.spark.sql.functions.monotonically_increasing_id
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.ml.linalg._
 import org.junit.runner.RunWith
@@ -297,24 +298,42 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     // Generating Data
     val numRows = 1000
+
     // Random Text Data
     val textData: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.3).take(numRows).toList
+
+    // Random Text Area Data. Keys are k0 and k1
+    val textAreaData: Seq[TextArea] = RandomText.textAreas(10, 15).withProbabilityOfEmpty(0.3).take(numRows).toList
+
     // Random Text Map Data. Keys are k0 and k1
     val textMapData: Seq[TextMap] = RandomMap.of(RandomText.strings(5, 10).withProbabilityOfEmpty(0.5),
       0, 3).take(numRows).toList
+
+    // Random Text Area Map Data. Keys are k0 and k1
+    val textAreaMapData: Seq[TextAreaMap] = RandomMap.of(RandomText.textAreas(5, 10).withProbabilityOfEmpty(0.5),
+      0, 3).take(numRows).toList
+
     // Random Country Data
     val countryData: Seq[Text] = RandomText.textFromDomain(List("USA", "Mexico", "Canada")).withProbabilityOfEmpty(0.2)
       .take(numRows).toList
+
     // Response variable
     val labels = RandomIntegral.integrals(0, 2).limit(numRows).map(_.value.get.toRealNN)
 
+    val generatedTextData: Seq[(Text, Text, TextMap, RealNN)] = countryData.zip(textData)
+      .zip(textMapData).zip(labels).map { case (((c, t), tm), l) => (c, t, tm, l)}
 
-    val generatedData: Seq[(Text, Text, TextMap, RealNN)] = countryData.zip(textData).zip(textMapData).zip(labels).map {
-      case (((c, t), t2), l) => (c, t, t2, l)
-    }
+    val (textDF, country, text, textMap, labelNoRes) = TestFeatureBuilder("country", "text", "textMap", "label",
+      generatedTextData)
 
-    val (testData, country, text, textMap, labelNoRes) = TestFeatureBuilder("country", "text", "textMap", "label",
-      generatedData)
+    val generatedTextAreaData: Seq[(TextArea, TextAreaMap)] = textAreaData.zip(textAreaMapData)
+
+    val (textAreaDF, textArea, textAreaMap) = TestFeatureBuilder("textArea", "textAreaMap", generatedTextAreaData)
+
+    val textDFWithID = textDF.withColumn("id", monotonically_increasing_id())
+    val textAreaDFWithID = textAreaDF.withColumn("id", monotonically_increasing_id())
+    val testData = textDFWithID.join(textAreaDFWithID, "id")
+
     val label = labelNoRes.copy(isResponse = true)
 
     // Apply SmartText(Map)Vectorizer to created features
@@ -331,13 +350,25 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
       toLowerCase,
       others = Array(country))
 
+    val textAreaVectorized = textArea.vectorize(numHashes, autoDetectLanguage, minTokenLength, toLowerCase)
+
+    val textAreaSmartVectorized = textArea.smartVectorize(maxCardinality, numHashes, autoDetectLanguage,
+      minTokenLength, toLowerCase)
+
     val textMapVectorized = textMap.smartVectorize(maxCardinality,
       numHashes,
       autoDetectLanguage,
       minTokenLength,
       toLowerCase)
 
-    val featureVector = Seq(textVectorized, textMapVectorized).combine()
+    val textAreaMapVectorized = textAreaMap.smartVectorize(maxCardinality,
+      numHashes,
+      autoDetectLanguage,
+      minTokenLength,
+      toLowerCase)
+
+    val featureVector = Seq(textVectorized, textMapVectorized, textAreaVectorized, textAreaSmartVectorized,
+      textAreaMapVectorized).combine()
 
     val vectorized = new OpWorkflow().setResultFeatures(featureVector).transform(testData)
 
@@ -357,9 +388,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val parsed = insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
 
-    parsed.map(_.size shouldBe 4)
+    parsed.map(_.size shouldBe 8)
     parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
-      && r.indicatorValue.isDefined), "SmartVectorizer detects country feature as a PickList, hence no " +
+      && r.indicatorValue.isDefined), "SmartTextVectorizer detects country feature as a PickList, hence no " +
       "aggregation required for LOCO on this field."))
     parsed.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
 
@@ -421,16 +452,40 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
      *
      * @param textMapFeature Text Map Field
      */
-    def assertAggregatedTextMap(textMapFeature: FeatureLike[TextMap], keyName: String): Unit = {
+    def assertAggregatedTextMap(textMapFeature: FeatureLike[_ <: TextMap], keyName: String): Unit = {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeature.name) &&
         history.grouping == Option(keyName)
       assertAggregatedWithPredicate(textMapFeature, predicate)
     }
 
+    /**
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually on a text Area field
+     *
+     * @param textAreaFeature Text Area Field
+     */
+    def assertAggregatedTextArea(textAreaFeature: FeatureLike[TextArea]): Unit = {
+      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureName.head.contains("TextList")
+      assertAggregatedWithPredicate(textAreaFeature, predicate)
+    }
+
+    /**
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually on a text Area field using smartVectorize
+     *
+     * @param textAreaFeature Text Area Field
+     */
+    def assertAggregatedSmartTextArea(textAreaFeature: FeatureLike[TextArea]): Unit = {
+      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureName.head.contains("textArea") &&
+        history.parentFeatureStages.head.contains("smartTxtVec")
+      assertAggregatedWithPredicate(textAreaFeature, predicate)
+    }
+    
     assertAggregatedText(text)
     assertAggregatedTextMap(textMap, "k0")
     assertAggregatedTextMap(textMap, "k1")
-
+    assertAggregatedTextArea(textArea)
+    assertAggregatedSmartTextArea(textArea)
+    assertAggregatedTextMap(textAreaMap, "k0")
+    assertAggregatedTextMap(textAreaMap, "k1")
 
   }
 }
