@@ -96,17 +96,14 @@ class RecordInsightsLOCO[T <: Model[T]]
   /**
    * These are the name of the types we want to perform an aggregation of the LOCO results over derived features
    */
-  val textType = classOf[Text].getName
-  val textMapType = classOf[TextMap].getName
-  val textAreaType = classOf[TextArea].getName
-  val textAreaMapType = classOf[TextAreaMap].getName
-  val textListType = classOf[TextList].getName
+  private val textTypes =
+    Set(FeatureType.typeName[Text], FeatureType.typeName[TextArea], FeatureType.typeName[TextList])
+  private val textMapTypes =
+    Set(FeatureType.typeName[TextMap], FeatureType.typeName[TextAreaMap])
 
-  val textTypes = Array(textType, textAreaType, textListType)
-  val mapTypes = Array(textMapType, textAreaMapType)
   // Indices of features derived from Text(Map)Vectorizer
   private lazy val textFeatureIndices = histories
-    .filter(_.parentFeatureType.exists((textTypes ++ mapTypes).contains))
+    .filter(_.parentFeatureType.exists((textTypes ++ textMapTypes).contains))
     .map(_.index)
     .distinct.sorted
 
