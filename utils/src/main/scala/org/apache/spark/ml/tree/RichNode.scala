@@ -30,10 +30,15 @@
 
 package org.apache.spark.ml.tree
 
+import org.apache.spark.ml.linalg.Vector
+import org.apache.spark.mllib.tree.model.{Node => OldNode}
+import org.apache.spark.mllib.tree.configuration.FeatureType._
+
 object RichNode {
 
   /**
    * Enrichment functions for Decision Tree node
+   *
    * @param node Decision Tree node
    */
   implicit class RichNode(val node: Node) extends AnyVal {
@@ -53,6 +58,46 @@ object RichNode {
       case _: LeafNode => Array.empty[Double]
     }
 
+    def predictImpl(features: Vector): LeafNode = node.predictImpl(features)
+
+    def toOld(id: Int): OldNode = node.toOld(id)
+
+  }
+
+}
+
+
+object RichOldNode {
+
+  /**
+   * Enrichment functions for Old Decision Tree node
+   *
+   * @param node Old Decision Tree node
+   */
+  implicit class RichOldNode(val node: OldNode) extends AnyVal {
+    def predictImplIdx(features: Vector): Int = {
+      {
+        if (node.isLeaf) {
+          node.id
+        } else {
+          val split = node.split
+          if (split.get.featureType == Continuous) {
+            if (features(split.get.feature) <= split.get.threshold) {
+              node.leftNode.get.predictImplIdx(features)
+            } else {
+              node.rightNode.get.predictImplIdx(features)
+            }
+          } else {
+            if (split.get.categories.contains(features(split.get.feature))) {
+              node.leftNode.get.predictImplIdx(features)
+            } else {
+              node.rightNode.get.predictImplIdx(features)
+            }
+          }
+        }
+      }
+
+    }
   }
 
 }

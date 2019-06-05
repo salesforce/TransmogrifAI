@@ -32,6 +32,7 @@ package com.salesforce.op.stages.impl.regression
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
+import com.salesforce.op.stages.impl.classification.QuantileRegressionRF
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import com.salesforce.op.test._
 import org.apache.spark.ml.linalg.Vectors
@@ -73,13 +74,22 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
       .setMinInstancesPerNode(2)
       .setMinInfoGain(0.1)
       .setSeed(42L)
-    estimator.fit(inputData)
+    val model = estimator.fit(inputData)
 
     estimator.predictor.getMaxDepth shouldBe 7
     estimator.predictor.getMaxBins shouldBe 3
     estimator.predictor.getMinInstancesPerNode shouldBe 2
     estimator.predictor.getMinInfoGain shouldBe 0.1
     estimator.predictor.getSeed shouldBe 42L
+
+    val trees = model.getSparkMlStage().get.trees
+
+    val quantileRegressionRF = new QuantileRegressionRF(trees = trees).setInput(label, features)
+      .setPercentageLevel(0.90)
+
+
+    val transformedData = model.transform(inputData)
+    quantileRegressionRF.fit(transformedData).transform(transformedData).show()
 
   }
 }
