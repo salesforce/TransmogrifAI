@@ -63,8 +63,9 @@ class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
-
+  // scalastyle:off
   override def transformFn: (RealNN, OPVector) => RealMap = ???
+  // scalastyle:on
 
   def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
 
