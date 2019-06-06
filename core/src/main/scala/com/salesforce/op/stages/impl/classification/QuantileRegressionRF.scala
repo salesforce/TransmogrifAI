@@ -1,6 +1,7 @@
 package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.{OPVector, RealMap, RealNN}
 import org.apache.spark.ml.tree.RichNode._
 import org.apache.spark.ml.tree.RichOldNode._
@@ -9,8 +10,9 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.ml.linalg
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.ml.regression.DecisionTreeRegressionModel
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, SparkSession}
 import org.apache.spark.sql.expressions.Window
 
 class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationName: String = "quantiles",
@@ -27,6 +29,7 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
   setDefault(percentageLevel -> 0.95)
 
   implicit val encoderLeafNode: Encoder[(Option[Double], Array[Int])] = Encoders.kryo[(Option[Double], Array[Int])]
+  private implicit val encoderInt: Encoder[Int] = ExpressionEncoder[Int]()
 
   override def fitFn(dataset: Dataset[(Option[Double], linalg.Vector)]): BinaryModel[RealNN, OPVector, RealMap] = {
 
@@ -41,28 +44,30 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
           leafID
         }
       }
+    val T = trees.length
 
-    new QuantileRegressionRFModels(leaves, trees, lowerLevel, upperLevel, operationName, uid)
+    val leaveSizes = (0 until T).map(i => leaves.map(_._2(i)).rdd.countByValue()).map(_.toMap)
+
+    new QuantileRegressionRFModels(leaves.rdd, trees, lowerLevel, upperLevel, leaveSizes, T, operationName, uid)
 
   }
 }
 
 
-class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
-  trees: Array[DecisionTreeRegressionModel], lowerLevel: Double, upperLevel: Double, operationName: String, uid: String)
+class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
+  trees: Array[DecisionTreeRegressionModel], lowerLevel: Double, upperLevel: Double,
+  leaveSizes: Seq[Map[Int, Long]], T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
-  private implicit val encoderInt: Encoder[Int] = ExpressionEncoder[Int]()
 
-  override def transformFn: (RealNN, OPVector) => RealMap = {
+  override def transformFn: (RealNN, OPVector) => RealMap = ???
+  def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
 
-    val T = trees.length
-    val leaveSizes = (0 until T).map(i => leaves.map(_._2(i)).rdd.countByValue())
 
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
-      val weightsRDD = leaves.rdd.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
+      val weightsRDD = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
         case ((l1, l2), i) =>
           if (l1 == l2) {
             1.0 / leaveSizes(i).get(l1).getOrElse(throw new Exception(s"fail to find leave $l1 in Tree # $i." +
@@ -71,7 +76,7 @@ class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
       }.sum / T -> y
       }
 
-      import leaves.sparkSession.implicits._
+      import sparkSession.implicits._
       val weights = weightsRDD.toDF()
       val Array(wName, yName) = weights.columns
 
@@ -88,6 +93,13 @@ class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
 
       new RealMap(Map("lowerQuantile" -> qLower.get, "upperQuantile" -> qUpper.get))
     }
+  }
+  override def transform(dataset: Dataset[_]): DataFrame = {
+    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
+    val sparkSession = dataset.sparkSession
+    val functionUDF = FeatureSparkTypes.udf2[RealNN, OPVector, RealMap](transformFn(sparkSession))
+    val meta = newSchema(getOutputFeatureName).metadata
+    dataset.select(col("*"), functionUDF(col(in1.name), col(in2.name)).as(getOutputFeatureName, meta))
   }
 }
 
