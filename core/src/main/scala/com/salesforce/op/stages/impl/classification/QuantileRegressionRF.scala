@@ -65,7 +65,8 @@ class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
       val weights = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
         case ((l1, l2), i) =>
           if (l1 == l2) {
-            1.0 / leaveSizes(i).get(l1).get
+            1.0 / leaveSizes(i).get(l1).getOrElse(throw new Exception(s"fail to find leave $l1 in Tree # $i." +
+              s" Available leaves are ${leaveSizes(i).toSeq}"))
           } else 0.0
       }.sum / T -> y
       }
