@@ -20,12 +20,15 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
   extends BinaryEstimator[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   val percentageLevel = new DoubleParam(
-  parent = this, name = "percentageLevel",
-  doc = "level of prediction interval",
-  isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
+    parent = this, name = "percentageLevel",
+    doc = "level of prediction interval",
+    isValid = ParamValidators.inRange(lowerBound = 0.0, upperBound = 1.0)
   )
+
   final def setPercentageLevel(v: Double): this.type = set(percentageLevel, v)
+
   final def getPercentageLevel: Double = $(percentageLevel)
+
   setDefault(percentageLevel -> 0.95)
 
   implicit val encoderLeafNode: Encoder[(Option[Double], Array[Int])] = Encoders.kryo[(Option[Double], Array[Int])]
@@ -37,13 +40,13 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
     val upperLevel = (1 + getPercentageLevel) / 2.0
 
     val leaves = dataset.map { case (l, f) =>
-        l -> trees.map { case tree =>
-          val node = tree.rootNode
-          val oldNode = node.toOld(1)
-          val leafID = oldNode.predictImplIdx(f)
-          leafID
-        }
+      l -> trees.map { case tree =>
+        val node = tree.rootNode
+        val oldNode = node.toOld(1)
+        val leafID = oldNode.predictImplIdx(f)
+        leafID
       }
+    }
     val T = trees.length
 
     val leaveSizes = (0 until T).map(i => leaves.map(_._2(i)).rdd.countByValue()).map(_.toMap)
@@ -62,8 +65,8 @@ class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
 
   override def transformFn: (RealNN, OPVector) => RealMap = ???
-  def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
 
+  def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
 
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
@@ -94,6 +97,7 @@ class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
       new RealMap(Map("lowerQuantile" -> qLower.get, "upperQuantile" -> qUpper.get))
     }
   }
+
   override def transform(dataset: Dataset[_]): DataFrame = {
     val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
     val sparkSession = dataset.sparkSession
