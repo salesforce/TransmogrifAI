@@ -62,7 +62,7 @@ class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
 
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
-      val weights = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
+      val weightsRDD = leaves.rdd.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
         case ((l1, l2), i) =>
           if (l1 == l2) {
             1.0 / leaveSizes(i).get(l1).getOrElse(throw new Exception(s"fail to find leave $l1 in Tree # $i." +
@@ -70,6 +70,9 @@ class QuantileRegressionRFModels(leaves: Dataset[(Option[Double], Array[Int])],
           } else 0.0
       }.sum / T -> y
       }
+
+      import leaves.sparkSession.implicits._
+      val weights = weightsRDD.toDF()
       val Array(wName, yName) = weights.columns
 
       val cumF = weights.sort(yName).select(sum(col(wName)).over(Window.orderBy(yName)
