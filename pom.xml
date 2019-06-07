@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.salesforce.transmogrifai</groupId>
     <artifactId>TransmogrifAI</artifactId>
-    <version>0.6.0-SNAPSHOT</version>
+    <version>0.5.3</version>
     <name>TransmogrifAI</name>
     <description>AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning</description>
     <url>https://github.com/salesforce/TransmogrifAI</url>
@@ -42,7 +42,7 @@
         <dependency>
             <groupId>com.salesforce.transmogrifai</groupId>
             <artifactId>transmogrifai-readers_2.11</artifactId>
-            <version>0.6.0-SNAPSHOT</version>
+            <version>0.5.3</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
