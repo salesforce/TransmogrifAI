@@ -2,7 +2,7 @@ package com.salesforce.op.stages.impl.classification
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.FeatureSparkTypes
-import com.salesforce.op.features.types.{OPVector, RealMap, RealNN}
+import com.salesforce.op.features.types._
 import org.apache.spark.ml.tree.RichNode._
 import org.apache.spark.ml.tree.RichOldNode._
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
@@ -51,20 +51,22 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 
     val leaveSizes = (0 until T).map(i => leaves.map(_._2(i)).rdd.countByValue()).map(_.toMap)
 
-    new QuantileRegressionRFModels(leaves.rdd, trees, lowerLevel, upperLevel, leaveSizes, T, operationName, uid)
+    new QuantileRegressionRFModels(leaves.collect, trees, lowerLevel, upperLevel, leaveSizes, T, operationName, uid)
 
   }
 }
 
 
-class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
+class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
   trees: Array[DecisionTreeRegressionModel], lowerLevel: Double, upperLevel: Double,
-  leaveSizes: Seq[Map[Int, Long]], T: Int, operationName: String, uid: String)
+  val leaveSizes: Seq[Map[Int, Long]], T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
+
   // scalastyle:off
-  override def transformFn: (RealNN, OPVector) => RealMap = ???
+  override def transformFn: (RealNN, OPVector) => RealMap = (v, _) => Map.empty[String, Double].toRealMap
+
   // scalastyle:on
 
   def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
@@ -81,8 +83,9 @@ class QuantileRegressionRFModels(leaves: RDD[(Option[Double], Array[Int])],
       }
 
       import sparkSession.implicits._
-      val weights = weightsRDD.toDF()
-      val Array(wName, yName) = weights.columns
+      val Array(wName, yName) = Array("weights", "labels")
+      val weights = weightsRDD.toDF(wName, yName)
+
 
       val cumF = weights.sort(yName).select(sum(col(wName)).over(Window.orderBy(yName)
         .rowsBetween(Window.unboundedPreceding, Window.currentRow)),
