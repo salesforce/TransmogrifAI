@@ -82,7 +82,6 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
       val cumF = weightsSeq.sortBy(_._2).scan(0.0 -> Option(0.0)) { case ((v, _), (w: Double, l: Option[Double])) =>
         v + w -> l
       }.tail
-      
       val qLower = cumF.filter {
         _._1 >= lowerLevel
       }.head._2
