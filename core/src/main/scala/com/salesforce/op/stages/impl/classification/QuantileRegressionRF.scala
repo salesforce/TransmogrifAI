@@ -12,7 +12,7 @@ import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.ml.regression.DecisionTreeRegressionModel
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, Row, SparkSession}
 import org.apache.spark.sql.expressions.Window
 
 class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationName: String = "quantiles",
@@ -64,16 +64,12 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
 
-  // scalastyle:off
-  override def transformFn: (RealNN, OPVector) => RealMap = (v, _) => Map.empty[String, Double].toRealMap
 
-  // scalastyle:on
-
-  def transformFn(sparkSession: SparkSession): (RealNN, OPVector) => RealMap = {
+  def transformFn: (RealNN, OPVector) => RealMap = {
 
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
-      val weightsRDD = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
+      val weightsSeq = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
         case ((l1, l2), i) =>
           if (l1 == l2) {
             1.0 / leaveSizes(i).get(l1).getOrElse(throw new Exception(s"fail to find leave $l1 in Tree # $i." +
@@ -82,32 +78,22 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
       }.sum / T -> y
       }
 
-      import sparkSession.implicits._
-      val Array(wName, yName) = Array("weights", "labels")
-      val weights = weightsRDD.toDF(wName, yName)
 
-
-      val cumF = weights.sort(yName).select(sum(col(wName)).over(Window.orderBy(yName)
-        .rowsBetween(Window.unboundedPreceding, Window.currentRow)),
-        col(yName)).as[(Double, Option[Double])]
-
+      val cumF = weightsSeq.sortBy(_._2).scan(0.0 -> Option(0.0)) { case ((v, _), (w: Double, l: Option[Double])) =>
+        v + w -> l
+      }.tail
+      
       val qLower = cumF.filter {
         _._1 >= lowerLevel
-      }.first()._2
+      }.head._2
       val qUpper = cumF.filter {
         _._1 >= upperLevel
-      }.first()._2
+      }.head._2
 
       new RealMap(Map("lowerQuantile" -> qLower.get, "upperQuantile" -> qUpper.get))
     }
   }
 
-  override def transform(dataset: Dataset[_]): DataFrame = {
-    val newSchema = setInputSchema(dataset.schema).transformSchema(dataset.schema)
-    val sparkSession = dataset.sparkSession
-    val functionUDF = FeatureSparkTypes.udf2[RealNN, OPVector, RealMap](transformFn(sparkSession))
-    val meta = newSchema(getOutputFeatureName).metadata
-    dataset.select(col("*"), functionUDF(col(in1.name), col(in2.name)).as(getOutputFeatureName, meta))
-  }
+
 }
 
