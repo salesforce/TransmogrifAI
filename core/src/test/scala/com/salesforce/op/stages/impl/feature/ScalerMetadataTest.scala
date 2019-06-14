@@ -55,7 +55,7 @@ class ScalerMetadataTest extends FlatSpec with TestSparkContext {
   }
 
   it should "properly construct ScalerMetaData for a LogScaler" in {
-    val metadata = ScalerMetadata(scalingType = ScalingType.Logarithmic, scalingArgs = EmptyArgs()).toMetadata()
+    val metadata = ScalerMetadata(scalingType = ScalingType.Logarithmic, scalingArgs = EmptyScalerArgs()).toMetadata()
     metadata.getString(ScalerMetadata.scalingTypeName) shouldBe ScalingType.Logarithmic.entryName
     metadata.getString(ScalerMetadata.scalingArgsName) shouldBe "{}"
   }

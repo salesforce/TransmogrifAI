@@ -30,20 +30,13 @@
 
 package com.salesforce.op.dsl
 
-import java.util.regex.Pattern
-
+import com.salesforce.op.dsl.RichTextFeatureLambdas._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.text._
-import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
-import org.apache.lucene.analysis.pattern.PatternTokenizer
 
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.Try
-
-
 trait RichTextFeature {
   self: RichFeature =>
 
@@ -55,7 +48,7 @@ trait RichTextFeature {
      *
      * @return A new MultiPickList feature
      */
-    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](_.value.toSet[String].toMultiPickList)
+    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](textToMultiPickList)
 
 
     /**
@@ -94,8 +87,8 @@ trait RichTextFeature {
     /**
      * Apply N-gram Similarity transformer
      *
-     * @param that      other text feature
-     * @param nGramSize the size of the n-gram to be used to compute the string distance
+     * @param that        other text feature
+     * @param nGramSize   the size of the n-gram to be used to compute the string distance
      * @param toLowerCase lowercase before computing similarity
      * @return ngrammed feature
      */
@@ -186,7 +179,7 @@ trait RichTextFeature {
         case (false, true) =>
           val nullIndicators = new TextListNullTransformer[TextList]().setInput(tokenized).getOutput()
           new VectorsCombiner().setInput(hashedFeatures, nullIndicators).getOutput()
-        case(false, false) => hashedFeatures
+        case (false, false) => hashedFeatures
       }
     }
 
@@ -372,19 +365,10 @@ trait RichTextFeature {
       minTokenLength: Int = TextTokenizer.MinTokenLength,
       toLowercase: Boolean = TextTokenizer.ToLowercase
     ): FeatureLike[TextList] = {
-      require(Try(Pattern.compile(pattern)).isSuccess, s"Invalid regex pattern: $pattern")
 
-      // A simple Lucene analyzer with regex Pattern Tokenizer
-      val analyzer = new LuceneTextAnalyzer(analyzers = lang => new Analyzer {
-        def createComponents(fieldName: String): TokenStreamComponents = {
-          val regex = Pattern.compile(pattern)
-          val source = new PatternTokenizer(regex, group)
-          new TokenStreamComponents(source)
-        }
-      })
       tokenize(
         languageDetector = TextTokenizer.LanguageDetector,
-        analyzer = analyzer,
+        analyzer = new LuceneRegexTextAnalyzer(pattern, group),
         autoDetectLanguage = false,
         autoDetectThreshold = 1.0,
         defaultLanguage = Language.Unknown,
@@ -437,7 +421,8 @@ trait RichTextFeature {
 
     /**
      * Check if feature is a substring of the companion feature
-     * @param f2 feature which would contain the first input as a substring
+     *
+     * @param f2          feature which would contain the first input as a substring
      * @param toLowercase lowercase before checking for substrings
      * @tparam T2 type tag of second feature
      * @return Binary feature indicating if substring was found
@@ -575,17 +560,18 @@ trait RichTextFeature {
      *
      * @return email prefix
      */
-    def toEmailPrefix: FeatureLike[Text] = f.map[Text](_.prefix.toText, "prefix")
+    def toEmailPrefix: FeatureLike[Text] = f.map[Text](emailToPrefix, "prefix")
 
     /**
      * Extract email domains
      *
      * @return email domain
      */
-    def toEmailDomain: FeatureLike[Text] = f.map[Text](_.domain.toText, "domain")
+    def toEmailDomain: FeatureLike[Text] = f.map[Text](emailToDomain, "domain")
 
     /**
      * Check if email is valid
+     *
      * @return binary feature containing boolean value of whether email was valid format
      */
     def isValidEmail: FeatureLike[Binary] = f.transformWith(new ValidEmailTransformer())
@@ -614,7 +600,7 @@ trait RichTextFeature {
       others: Array[FeatureLike[Email]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      val domains = (f +: others).map(_.map[PickList](_.domain.toPickList))
+      val domains = (f +: others).map(_.map[PickList](emailToPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
         trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
@@ -627,27 +613,19 @@ trait RichTextFeature {
     /**
      * Extract url domain, i.e. salesforce.com, data.com etc.
      */
-    def toDomain: FeatureLike[Text] = f.map[Text](_.domain.toText, "urlDomain")
+    def toDomain: FeatureLike[Text] = f.map[Text](urlToDomain, "urlDomain")
 
     /**
      * Extracts url protocol, i.e. http, https, ftp etc.
      */
-    def toProtocol: FeatureLike[Text] = f.map[Text](_.protocol.toText, "urlProtocol")
+    def toProtocol: FeatureLike[Text] = f.map[Text](urlToProtocol, "urlProtocol")
 
     /**
      * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
      * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
      * Default valid protocols are: http, https, ftp.
      */
-    def isValidUrl: FeatureLike[Binary] = f.exists(_.isValid)
-
-    /**
-     * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
-     * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
-     *
-     * @param protocols url protocols to consider valid, i.e. http, https, ftp etc.
-     */
-    def isValidUrl(protocols: Array[String]): FeatureLike[Binary] = f.exists(_.isValid(protocols))
+    def isValidUrl: FeatureLike[Binary] = f.exists(urlIsValid)
 
     /**
      * Converts a sequence of [[URL]] features into a vector, extracting the domains of the valid urls
@@ -672,7 +650,7 @@ trait RichTextFeature {
       others: Array[FeatureLike[URL]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      val domains = (f +: others).map(_.map[PickList](v => if (v.isValid) v.domain.toPickList else PickList.empty))
+      val domains = (f +: others).map(_.map[PickList](urlToPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
         trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
@@ -719,7 +697,7 @@ trait RichTextFeature {
     ): FeatureLike[OPVector] = {
 
       val feats: Array[FeatureLike[PickList]] =
-        (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](_.value.toPickList))
+        (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](textToPickList))
 
       feats.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls, others = feats.tail,
@@ -818,5 +796,27 @@ trait RichTextFeature {
     }
 
   }
+
+}
+
+object RichTextFeatureLambdas {
+
+  def emailToPickList: Email => PickList = _.domain.toPickList
+
+  def emailToPrefix: Email => Text = _.prefix.toText
+
+  def emailToDomain: Email => Text = _.domain.toText
+
+  def urlToPickList: URL => PickList = (v: URL) => if (v.isValid) v.domain.toPickList else PickList.empty
+
+  def urlToDomain: URL => Text = _.domain.toText
+
+  def urlToProtocol: URL => Text = _.protocol.toText
+
+  def urlIsValid: URL => Boolean = _.isValid
+
+  def textToPickList: Text => PickList = _.value.toPickList
+
+  def textToMultiPickList: Text => MultiPickList = _.value.toSet[String].toMultiPickList
 
 }

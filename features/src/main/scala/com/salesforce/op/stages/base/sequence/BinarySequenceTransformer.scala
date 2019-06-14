@@ -35,9 +35,9 @@ import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.{OpPipelineStage2N, OpTransformer}
 import org.apache.spark.ml.Transformer
+import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.apache.spark.util.ClosureUtils
-import org.apache.spark.sql.functions._
 
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try

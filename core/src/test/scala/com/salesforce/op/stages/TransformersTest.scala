@@ -132,15 +132,11 @@ class TransformersTest extends FlatSpec with Matchers with PassengerFeaturesTest
     val ageMap: FeatureLike[Text] = age.map[Text](_.value.map(_.toString).toText)
     val heightFilter: FeatureLike[RealNN] =
       height.filter(_.value.contains(100.0), default = new RealNN(Double.MinValue))
-    val heightFilterNot: FeatureLike[RealNN] =
-      height.filterNot(_.value.contains(100.0), default = new RealNN(0.0))
-    val heightCollect: FeatureLike[Real] =
-      height.collect[Real](Real.empty){ case r if r.v.contains(100.0) => Real(123.0) }
     val ageExists: FeatureLike[Binary] = age.exists(_.value.contains(100.0))
     val heightReplaced: FeatureLike[RealNN] = height.replaceWith(new RealNN(1.0), new RealNN(2.0))
-    val all = Seq(ageMap, heightFilter, heightFilterNot, heightCollect, ageExists, heightReplaced)
+    val all = Seq(ageMap, heightFilter, ageExists, heightReplaced)
 
-    all.flatMap(_.parents) shouldBe Array(age, height, height, height, age, height)
+    all.flatMap(_.parents) shouldBe Array(age, height, age, height)
     all.forall(_.originStage.isInstanceOf[Transformer]) shouldBe true
   }
   it should "allow applying generic feature binary transformations" in {

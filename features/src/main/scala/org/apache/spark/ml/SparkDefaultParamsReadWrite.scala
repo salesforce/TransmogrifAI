@@ -35,6 +35,8 @@ case object SparkDefaultParamsReadWrite {
 
   type Metadata = DefaultParamsReader.Metadata
 
+  implicit val formats = DefaultFormats
+
   /**
    * Helper for [[OpPipelineStageWriter]] which extracts the JSON to save.
    * This is useful for ensemble models which need to save metadata for many sub-models.
@@ -48,7 +50,7 @@ case object SparkDefaultParamsReadWrite {
     stage: OpPipelineStageBase,
     extraMetadata: Option[JObject] = None,
     paramMap: Option[JValue] = None
-  ): String = {
+  ): JObject = {
     val uid = stage.uid
     val cls = stage.getClass.getName
     val params = stage.extractParamMap().toSeq.asInstanceOf[Seq[ParamPair[Any]]]
@@ -66,8 +68,7 @@ case object SparkDefaultParamsReadWrite {
       case None =>
         basicMetadata
     }
-    val metadataJson: String = compact(render(metadata))
-    metadataJson
+    metadata
   }
 
   /**
