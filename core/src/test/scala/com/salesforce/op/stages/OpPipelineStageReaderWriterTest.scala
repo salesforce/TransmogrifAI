@@ -32,7 +32,7 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataset._
@@ -50,7 +50,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   extends FlatSpec with PassengerSparkFixtureTest {
 
   val meta = new MetadataBuilder().putString("foo", "bar").build()
-
+  val expectedFeaturesLength = 1
   def stage: OpPipelineStageBase with Transformer
   val expected: Array[Real]
   val hasOutputName = true
@@ -66,9 +66,6 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   Spec(this.getClass) should "write stage uid" in {
     log.info(pretty(stageJson))
     (stageJson \ FN.Uid.entryName).extract[String] shouldBe stage.uid
-  }
-  it should "write isModel" in {
-    (stageJson \ FN.IsModel.entryName).extract[Boolean] shouldBe isModel
   }
   it should "write class name" in {
     (stageJson \ FN.Class.entryName).extract[String] shouldBe stage.getClass.getName
@@ -95,7 +92,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
   }
   it should "write input features" in {
     val jArray = ((stageJson \ FN.ParamMap.entryName) \ "inputFeatures").extract[JArray]
-    jArray.values should have length 1
+    jArray.values should have length expectedFeaturesLength
     val obj = jArray(0).extract[JObject]
     obj.values.keys shouldBe Set("name", "isResponse", "isRaw", "uid", "typeName", "stages", "originFeatures")
   }

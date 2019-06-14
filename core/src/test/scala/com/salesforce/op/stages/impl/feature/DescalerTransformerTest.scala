@@ -63,14 +63,14 @@ class DescalerTransformerTest extends OpTransformerSpec[Real, DescalerTransforme
   it should "descale and work in log-scaling workflow" in {
     val logScaler = new ScalerTransformer[Real, Real](
       scalingType = ScalingType.Logarithmic,
-      scalingArgs = EmptyArgs()
+      scalingArgs = EmptyScalerArgs()
     ).setInput(f1)
     val scaledResponse = logScaler.getOutput()
     val metadata = logScaler.transform(inputData).schema(scaledResponse.name).metadata
     ScalerMetadata(metadata) match {
       case Failure(err) => fail(err)
       case Success(meta) =>
-        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyArgs())
+        meta shouldBe ScalerMetadata(ScalingType.Logarithmic, EmptyScalerArgs())
     }
 
     val shifted = scaledResponse.map[Real](v => v.value.map(_ + 1).toReal, operationName = "shift")
