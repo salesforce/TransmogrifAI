@@ -31,7 +31,6 @@
 package com.salesforce.op.features
 
 import collection.JavaConverters._
-import scala.language.implicitConversions
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 /**
