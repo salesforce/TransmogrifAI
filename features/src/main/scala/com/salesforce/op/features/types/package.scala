@@ -214,8 +214,8 @@ package object types extends FeatureTypeSparkConverters {
   }
   implicit class JMapLongConversions(val v: java.util.Map[String, java.lang.Long]) extends AnyVal {
     def toIntegralMap: IntegralMap = new IntegralMap(
-      Option(v).map(_.asScala.mapValues(_.longValue()).toMap
-      ).getOrElse(Map.empty))
+      Option(v).map(_.asScala.mapValues(_.longValue()).toMap).getOrElse(Map.empty)
+    )
   }
   implicit class JMapDoubleConversions(val v: java.util.Map[String, java.lang.Double]) extends AnyVal {
     def toRealMap: RealMap = new RealMap(
