@@ -42,14 +42,18 @@ import org.scalatest.junit.JUnitRunner
 class JavaConversionTest extends FlatSpec with TestCommon {
 
   Spec[JavaConversionTest] should "convert java Map to TextMap" in {
-    val j = new util.HashMap[String, String]()
+    type T = util.HashMap[String, String]
+    null.asInstanceOf[T].toTextMap shouldEqual TextMap(Map())
+    val j = new T()
     j.toTextMap shouldEqual TextMap(Map())
     j.put("A", "a")
     j.toTextMap shouldEqual TextMap(Map("A" -> "a"))
   }
 
   it should "convert java Map to MultiPickListMap" in {
-    val j = new util.HashMap[String, java.util.HashSet[String]]()
+    type T = util.HashMap[String, java.util.HashSet[String]]
+    null.asInstanceOf[T].toMultiPickListMap shouldEqual MultiPickListMap(Map())
+    val j = new T()
     j.toMultiPickListMap shouldEqual MultiPickListMap(Map())
     val h = new util.HashSet[String]()
     h.add("X")
@@ -59,21 +63,27 @@ class JavaConversionTest extends FlatSpec with TestCommon {
   }
 
   it should "convert java Map to IntegralMap" in {
-    val j = new util.HashMap[String, java.lang.Long]()
+    type T = util.HashMap[String, java.lang.Long]
+    null.asInstanceOf[T].toIntegralMap shouldEqual IntegralMap(Map())
+    val j = new T()
     j.toIntegralMap shouldEqual IntegralMap(Map())
     j.put("test", java.lang.Long.valueOf(17))
     j.toIntegralMap shouldEqual IntegralMap(Map("test" -> 17))
   }
 
   it should "convert java Map to RealMap" in {
-    val j = new util.HashMap[String, java.lang.Double]()
+    type T = util.HashMap[String, java.lang.Double]
+    null.asInstanceOf[T].toRealMap shouldEqual RealMap(Map())
+    val j = new T()
     j.toRealMap shouldEqual RealMap(Map())
     j.put("test", java.lang.Double.valueOf(17.5))
     j.toRealMap shouldEqual RealMap(Map("test" -> 17.5))
   }
 
   it should "convert java Map to BinaryMap" in {
-    val j = new util.HashMap[String, java.lang.Boolean]()
+    type T = util.HashMap[String, java.lang.Boolean]
+    null.asInstanceOf[T].toBinaryMap shouldEqual RealMap(Map())
+    val j = new T()
     j.toBinaryMap shouldEqual RealMap(Map())
     j.put("test1", java.lang.Boolean.TRUE)
     j.put("test0", java.lang.Boolean.FALSE)
