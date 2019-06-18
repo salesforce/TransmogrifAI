@@ -47,7 +47,8 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     val j = new T()
     j.toTextMap shouldEqual TextMap(Map())
     j.put("A", "a")
-    j.toTextMap shouldEqual TextMap(Map("A" -> "a"))
+    j.put("B", null)
+    j.toTextMap shouldEqual TextMap(Map("A" -> "a", "B" -> null))
   }
 
   it should "convert java Map to MultiPickListMap" in {
@@ -59,7 +60,8 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     h.add("X")
     h.add("Y")
     j.put("test", h)
-    j.toMultiPickListMap shouldEqual MultiPickListMap(Map("test" -> Set("X", "Y")))
+    j.put("test2", null)
+    j.toMultiPickListMap shouldEqual MultiPickListMap(Map("test" -> Set("X", "Y"), "test2" -> Set()))
   }
 
   it should "convert java Map to IntegralMap" in {
@@ -68,7 +70,9 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     val j = new T()
     j.toIntegralMap shouldEqual IntegralMap(Map())
     j.put("test", java.lang.Long.valueOf(17))
-    j.toIntegralMap shouldEqual IntegralMap(Map("test" -> 17))
+    j.put("test2", null)
+    j.toIntegralMap.v("test") shouldEqual 17
+    j.toIntegralMap.v("test2") shouldEqual (null: java.lang.Long)
   }
 
   it should "convert java Map to RealMap" in {
@@ -77,7 +81,9 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     val j = new T()
     j.toRealMap shouldEqual RealMap(Map())
     j.put("test", java.lang.Double.valueOf(17.5))
-    j.toRealMap shouldEqual RealMap(Map("test" -> 17.5))
+    j.put("test2", null)
+    j.toRealMap.v("test") shouldEqual 17.5
+    j.toRealMap.v("test2") shouldEqual (null: java.lang.Double)
   }
 
   it should "convert java Map to BinaryMap" in {
@@ -87,7 +93,10 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     j.toBinaryMap shouldEqual RealMap(Map())
     j.put("test1", java.lang.Boolean.TRUE)
     j.put("test0", java.lang.Boolean.FALSE)
-    j.toBinaryMap shouldEqual BinaryMap(Map("test1" -> true, "test0" -> false))
+    j.put("test2", null)
+    j.toBinaryMap.v("test1") shouldEqual true
+    j.toBinaryMap.v("test0") shouldEqual false
+    j.toBinaryMap.v("test2") shouldEqual (null: java.lang.Boolean)
   }
 
 }
