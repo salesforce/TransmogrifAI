@@ -32,12 +32,13 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.features._
 import com.salesforce.op.features.types.FeatureType
+import org.apache.spark.ml.PipelineStage
 
 import scala.reflect.runtime.universe.TypeTag
 
 
-private[op] trait HasOut[O <: FeatureType] {
-  self: OpPipelineStage[O] =>
+private[op] trait HasOut[O <: FeatureType] extends OpPipelineStage[O] {
+  self: PipelineStage =>
 
   /**
    * Type tag of the output

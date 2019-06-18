@@ -34,7 +34,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, OPFeature}
 import com.salesforce.op.readers.{CustomReader, DataFrameFieldNames, ReaderKey}
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeTernaryOPMapTransformer
+import com.salesforce.op.stages.impl.feature.OPMapVectorizerTestHelper.makeMapifyTransformer
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test._
 import com.salesforce.op.testkit.{RandomData, _}
@@ -440,7 +440,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator25, currencyGenerator95, currencyGenerator50, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -513,7 +513,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -570,7 +570,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -624,7 +624,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -669,7 +669,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator25, currencyGenerator95, currencyGenerator50, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -758,7 +758,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
     val transformedTrainDf = new OpWorkflow().setResultFeatures(mapFeature).transform(trainDf)
@@ -820,7 +820,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val (trainDf, c1, c2, c3) = generateRandomDfAndFeatures[Currency, Currency, Currency](
       currencyGenerator1, currencyGenerator2, currencyGenerator3, numRows
     )
-    val mapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
+    val mapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](c1, c2, c3)
     // Need to make a raw version of this feature so that RawFeatureFilter will pick it up
     val mapFeatureRaw = mapFeature.asRaw(isResponse = false)
 

@@ -40,9 +40,11 @@ class ScalerTest extends FlatSpec with TestSparkContext {
 
   Spec[Scaler] should "error on invalid data" in {
     val error = intercept[IllegalArgumentException](
-      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyArgs())
+      Scaler.apply(scalingType = ScalingType.Linear, args = EmptyScalerArgs())
     )
-    error.getMessage shouldBe "Invalid combination of scaling type 'Linear' and args type 'EmptyArgs'"
+    error.getMessage shouldBe
+      s"Invalid combination of scaling type '${ScalingType.Linear}' " +
+        s"and args type '${EmptyScalerArgs().getClass.getSimpleName}'"
   }
 
   it should "correctly build construct a LinearScaler" in {
@@ -53,7 +55,7 @@ class ScalerTest extends FlatSpec with TestSparkContext {
   }
 
   it should "correctly build construct a LogScaler" in {
-    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyArgs())
+    val linearScaler = Scaler.apply(scalingType = ScalingType.Logarithmic, args = EmptyScalerArgs())
     linearScaler shouldBe a[LogScaler]
     linearScaler.scalingType shouldBe ScalingType.Logarithmic
   }
