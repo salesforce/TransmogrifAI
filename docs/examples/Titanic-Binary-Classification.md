@@ -165,7 +165,7 @@ The fitted workflow can now be saved, and loaded again to be applied to any new 
 ```scala
 fittedWorkflow.save(saveWorkflowPath)
 
-val savedWorkflow = workflow.loadModel(saveWorkflowPath).setReader(testDataReader)
+val savedWorkflow = OpWorkflowModel.load(saveWorkflowPath).setReader(testDataReader)
 ```
 
 

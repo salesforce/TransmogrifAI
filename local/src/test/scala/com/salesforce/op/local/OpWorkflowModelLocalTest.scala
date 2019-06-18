@@ -39,7 +39,7 @@ import com.salesforce.op.stages.impl.feature.StringIndexerHandleInvalid
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
-import com.salesforce.op.{OpParams, OpWorkflow}
+import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -48,7 +48,7 @@ import org.slf4j.LoggerFactory
 
 
 @RunWith(classOf[JUnitRunner])
-class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest with TestCommon {
+class OpWorkflowModelLocalTest extends FlatSpec with PassengerSparkFixtureTest with TestCommon {
 
   val log = LoggerFactory.getLogger(this.getClass)
 
@@ -79,9 +79,9 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
   lazy val expectedScores = model.score().sort(KeyFieldName).collect(prediction, survivedNum, indexed, deindexed)
 
 
-  Spec(classOf[OpWorkflowRunnerLocal]) should "produce scores without Spark" in {
-    val params = new OpParams().withValues(modelLocation = Some(modelLocation))
-    val scoreFn = new OpWorkflowRunnerLocal(workflow).scoreFunction(params)
+  Spec(classOf[OpWorkflowModelLocal]) should "produce scores without Spark" in {
+    val scoreFn = OpWorkflowModel.load(modelLocation).scoreFunction
+    scoreFn shouldBe a[ScoreFunction]
     scoreFn shouldBe a[ScoreFunction]
     val scores = rawData.map(scoreFn)
     assert(scores, expectedScores)
