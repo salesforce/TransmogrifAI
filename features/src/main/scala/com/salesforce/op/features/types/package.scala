@@ -55,7 +55,6 @@ package object types extends FeatureTypeSparkConverters {
     def toCity: City = new City(Option(v))
     def toStreet: Street = new Street(Option(v))
   }
-
   implicit class OptStringConversions(val v: Option[String]) extends AnyVal {
     def toText: Text = new Text(v)
     def toEmail: Email = new Email(v)
@@ -79,31 +78,26 @@ package object types extends FeatureTypeSparkConverters {
     def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
     def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
   }
-
   implicit class JFloatConversions(val v: java.lang.Float) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toCurrency: Currency = new Currency(Option(v).map(_.toDouble))
     def toPercent: Percent = new Percent(Option(v).map(_.toDouble))
   }
-
   implicit class JIntegerConversions(val v: java.lang.Integer) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toIntegral: Integral = new Integral(Option(v).map(_.toLong))
     def toDate: Date = new Date(Option(v).map(_.toLong))
     def toDateTime: DateTime = new DateTime(Option(v).map(_.toLong))
   }
-
   implicit class JLongConversions(val v: java.lang.Long) extends AnyVal {
     def toReal: Real = new Real(Option(v).map(_.toDouble))
     def toIntegral: Integral = new Integral(Option(v).map(_.toLong))
     def toDate: Date = new Date(Option(v).map(_.toLong))
     def toDateTime: DateTime = new DateTime(Option(v).map(_.toLong))
   }
-
   implicit class JBooleanConversions(val v: java.lang.Boolean) extends AnyVal {
     def toBinary: Binary = new Binary(v)
   }
-
   implicit class OptDoubleConversions(val v: Option[Double]) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN(default: Double): RealNN = new RealNN(v.getOrElse(default))
@@ -111,7 +105,6 @@ package object types extends FeatureTypeSparkConverters {
     def toPercent: Percent = new Percent(v)
     def toBinary: Binary = new Binary(v.map(_ != 0.0))
   }
-
   implicit class OptFloatConversions(val v: Option[Float]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
     def toRealNN(default: Float): RealNN = new RealNN(v.getOrElse(default))
@@ -119,7 +112,6 @@ package object types extends FeatureTypeSparkConverters {
     def toPercent: Percent = new Percent(v.map(_.toDouble))
     def toBinary: Binary = new Binary(v.map(_ != 0f))
   }
-
   implicit class OptIntConversions(val v: Option[Int]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
     def toIntegral: Integral = new Integral(v.map(_.toLong))
@@ -127,7 +119,6 @@ package object types extends FeatureTypeSparkConverters {
     def toDateTime: DateTime = new DateTime(v.map(_.toLong))
     def toBinary: Binary = new Binary(v.map(_ != 0))
   }
-
   implicit class OptLongConversions(val v: Option[Long]) extends AnyVal {
     def toReal: Real = new Real(v.map(_.toDouble))
     def toIntegral: Integral = new Integral(v)
@@ -135,11 +126,9 @@ package object types extends FeatureTypeSparkConverters {
     def toDateTime: DateTime = new DateTime(v)
     def toBinary: Binary = new Binary(v.map(_ != 0L))
   }
-
   implicit class OptBooleanConversions(val v: Option[Boolean]) extends AnyVal {
     def toBinary: Binary = new Binary(v)
   }
-
   implicit class DoubleConversions(val v: Double) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN: RealNN = new RealNN(v)
@@ -147,7 +136,6 @@ package object types extends FeatureTypeSparkConverters {
     def toPercent: Percent = new Percent(v)
     def toBinary: Binary = new Binary(v != 0.0)
   }
-
   implicit class FloatConversions(val v: Float) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN: RealNN = new RealNN(v)
@@ -155,7 +143,6 @@ package object types extends FeatureTypeSparkConverters {
     def toPercent: Percent = new Percent(v)
     def toBinary: Binary = new Binary(v != 0f)
   }
-
   implicit class IntConversions(val v: Int) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN: RealNN = new RealNN(v)
@@ -164,7 +151,6 @@ package object types extends FeatureTypeSparkConverters {
     def toDateTime: DateTime = new DateTime(v.toLong)
     def toBinary: Binary = new Binary(v != 0)
   }
-
   implicit class LongConversions(val v: Long) extends AnyVal {
     def toReal: Real = new Real(v)
     def toRealNN: RealNN = new RealNN(v)
@@ -173,7 +159,6 @@ package object types extends FeatureTypeSparkConverters {
     def toDateTime: DateTime = new DateTime(v)
     def toBinary: Binary = new Binary(v != 0L)
   }
-
   implicit class BooleanConversions(val v: Boolean) extends AnyVal {
     def toBinary: Binary = new Binary(v)
   }
@@ -185,7 +170,6 @@ package object types extends FeatureTypeSparkConverters {
     def toOPVector: OPVector = new OPVector(Vectors.dense(v.toArray))
     def toGeolocation: Geolocation = new Geolocation(v)
   }
-
   implicit class SeqLongConversions(val v: Seq[Long]) extends AnyVal {
     def toDateList: DateList = new DateList(v)
     def toDateTimeList: DateTimeList = new DateTimeList(v)
@@ -193,13 +177,11 @@ package object types extends FeatureTypeSparkConverters {
     def toRealNN: Seq[RealNN] = v.map(_.toRealNN)
     def toIntegral: Seq[Integral] = v.map(_.toIntegral)
   }
-
   implicit class SeqStringConversions(val v: Seq[String]) extends AnyVal {
     def toTextList: TextList = new TextList(v)
     def toMultiPickList: MultiPickList = new MultiPickList(v.toSet)
     def toText: Seq[Text] = v.map(_.toText)
   }
-
   implicit class Tup3DoubleConversions(val v: (Double, Double, Double)) extends AnyVal {
     def toGeolocation: Geolocation = new Geolocation(v)
   }
@@ -227,7 +209,6 @@ package object types extends FeatureTypeSparkConverters {
   implicit class JMapStringConversions(val v: java.util.Map[String, String]) extends AnyVal {
     def toTextMap: TextMap = new TextMap(Option(v).map(_.asScala.toMap).getOrElse(Map.empty))
   }
-
   implicit class JMapSetConversions(val v: java.util.Map[String, java.util.HashSet[String]]) extends AnyVal {
     def toMultiPickListMap: MultiPickListMap = new MultiPickListMap(
       Option(v).map(_.asScala.mapValues {
@@ -236,25 +217,21 @@ package object types extends FeatureTypeSparkConverters {
       }.toMap).getOrElse(Map.empty)
     )
   }
-
   implicit class JMapLongConversions(val v: java.util.Map[String, java.lang.Long]) extends AnyVal {
     def toIntegralMap: IntegralMap = new IntegralMap(
       Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Long]]
     )
   }
-
   implicit class JMapDoubleConversions(val v: java.util.Map[String, java.lang.Double]) extends AnyVal {
     def toRealMap: RealMap = new RealMap(
       Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Double]]
     )
   }
-
   implicit class JMapBooleanConversions(val v: java.util.Map[String, java.lang.Boolean]) extends AnyVal {
     def toBinaryMap: BinaryMap = new BinaryMap(
       Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Boolean]]
     )
   }
-
   implicit class MapStringConversions(val v: Map[String, String]) extends AnyVal {
     def toTextMap: TextMap = new TextMap(v)
     def toEmailMap: EmailMap = new EmailMap(v)
@@ -271,28 +248,23 @@ package object types extends FeatureTypeSparkConverters {
     def toPostalCodeMap: PostalCodeMap = new PostalCodeMap(v)
     def toStreetMap: StreetMap = new StreetMap(v)
   }
-
   implicit class MapSetConversions(val v: Map[String, Set[String]]) extends AnyVal {
     def toMultiPickListMap: MultiPickListMap = new MultiPickListMap(v)
   }
-
   implicit class MapLongConversions(val v: Map[String, Long]) extends AnyVal {
     def toIntegralMap: IntegralMap = new IntegralMap(v)
     def toDateMap: DateMap = new DateMap(v)
     def toDateTimeMap: DateTimeMap = new DateTimeMap(v)
   }
-
   implicit class MapDoubleConversions(val v: Map[String, Double]) extends AnyVal {
     def toRealMap: RealMap = new RealMap(v)
     def toPercentMap: PercentMap = new PercentMap(v)
     def toCurrencyMap: CurrencyMap = new CurrencyMap(v)
     def toPrediction: Prediction = new Prediction(v)
   }
-
   implicit class MapBooleanConversions(val v: Map[String, Boolean]) extends AnyVal {
     def toBinaryMap: BinaryMap = new BinaryMap(v)
   }
-
   implicit class MapGeolocationConversions(val v: Map[String, Seq[Double]]) extends AnyVal {
     def toGeolocationMap: GeolocationMap = new GeolocationMap(v)
   }
