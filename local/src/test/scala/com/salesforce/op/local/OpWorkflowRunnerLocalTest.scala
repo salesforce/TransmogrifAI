@@ -42,9 +42,10 @@ import com.salesforce.op.test.{PassengerSparkFixtureTest, TestCommon, TestFeatur
 import com.salesforce.op.testkit.{RandomList, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichRow._
-import com.salesforce.op.{OpParams, OpWorkflow, UID}
+import com.salesforce.op.{OpParams, OpWorkflow, OpWorkflowModel, UID}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Row
+import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -112,7 +113,7 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
 
   it should "produce scores without Spark for all feature types" in {
     // Generate features of all possible types
-    val numOfRows = 100
+    val numOfRows = 10
     val (ds, features) = TestFeatureBuilder.random(numOfRows)(
       // HashingTF transformer used in vectorization of text lists does not handle nulls well,
       // therefore setting minLen = 1 for now
@@ -136,15 +137,13 @@ class OpWorkflowRunnerLocalTest extends FlatSpec with PassengerSparkFixtureTest 
     // Train, score and save the model
     val model = workflow.train()
     val expectedScoresDF = model.score()
-    val expectedScores =
-      expectedScoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect().map(_.toMap)
+    val expectedScores = expectedScoresDF.sort(KeyFieldName).select(prediction.name).collect().map(_.toMap)
     model.save(modelLocation2)
 
     // Load and score the model
-    val params = new OpParams().withValues(modelLocation = Some(modelLocation2))
-    val scoreFn = new OpWorkflowRunnerLocal(workflow).scoreFunction(params)
+    val scoreFn = OpWorkflowModel.load(modelLocation2).scoreFunction
     scoreFn shouldBe a[ScoreFunction]
-    val rawData = ds.sort(KeyFieldName).collect().map(_.toMap)
+    val rawData = ds.withColumn(KeyFieldName, col(id)).sort(KeyFieldName).collect().map(_.toMap)
     val scores = rawData.map(scoreFn)
     scores.length shouldBe expectedScores.length
     for {((score, expected), i) <- scores.zip(expectedScores).zipWithIndex} withClue(s"Record index $i: ") {
