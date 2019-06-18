@@ -71,7 +71,7 @@ class JavaConversionTest extends FlatSpec with TestCommon {
     j.toIntegralMap shouldEqual IntegralMap(Map())
     j.put("test", java.lang.Long.valueOf(17))
     j.put("test2", null)
-    j.toIntegralMap.v("test") shouldEqual 17
+    j.toIntegralMap.v("test") shouldEqual 17L
     j.toIntegralMap.v("test2") shouldEqual (null: java.lang.Long)
   }
 
