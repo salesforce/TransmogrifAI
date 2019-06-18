@@ -700,7 +700,7 @@ class MyStageReaderWriter extends OpPipelineStageReaderWriter[MyStage] {
 class MyStage(...) extends UnaryTransformer[Text, Text] { ... }
 ```
 
-[Here](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/stages/impl/feature/TextTokenizer.scala#L114) is a full example of a custom reader/writer for our own TextTokenizer stage.
+[Here](https://github.com/salesforce/TransmogrifAI/blob/master/core/src/main/scala/com/salesforce/op/stages/impl/feature/TextTokenizer.scala#L114) is a full example of a custom reader/writer implementation for our own TextTokenizer stage.
 
 ### Loading Saved Workflows
 
