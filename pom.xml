@@ -144,12 +144,6 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.daodecode</groupId>
-            <artifactId>scalaj-collection_2.11</artifactId>
-            <version>0.1.2</version>
-            <scope>compile</scope>
-        </dependency>
-        <dependency>
             <groupId>com.lihaoyi</groupId>
             <artifactId>sourcecode_2.11</artifactId>
             <version>0.1.3</version>
