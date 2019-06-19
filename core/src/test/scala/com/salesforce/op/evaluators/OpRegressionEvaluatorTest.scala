@@ -97,7 +97,6 @@ class OpRegressionEvaluatorTest extends FlatSpec with TestSparkContext {
   it should "evaluate the metrics from a single model" in {
     val model = testEstimator2.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
-    transformedData.show(10)
     val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata()
 
     assert(metrics.getDouble(RegressionEvalMetrics.RootMeanSquaredError.toString) <= 1E-12, "rmse should be close to 0")
