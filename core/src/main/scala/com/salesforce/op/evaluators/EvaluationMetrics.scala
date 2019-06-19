@@ -177,6 +177,22 @@ object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
 
 
 /**
+ * Forecast Metrics
+ */
+sealed abstract class ForecastEvalMetric
+(
+  val sparkEntryName: String,
+  val humanFriendlyName: String
+) extends EvalMetric
+
+
+object ForecastEvalMetrics extends Enum[RegressionEvalMetric] {
+  val values: Seq[RegressionEvalMetric] = findValues
+  case object sMAPE extends RegressionEvalMetric("smape", "symmetric Mean Absolute Percentage Error")
+}
+
+
+/**
  * GeneralMetrics
  */
 sealed abstract class OpEvaluatorNames
