@@ -31,12 +31,13 @@
 package com.salesforce.op.utils.spark
 
 import java.io.File
+import java.time.LocalDateTime
 
 import com.holdenkarau.spark.testing.RDDGenerator
 import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.utils.date.DateTimeUtils
 import org.apache.hadoop.io.compress.DefaultCodec
 import org.apache.hadoop.mapred.JobConf
-import org.joda.time.DateTime
 import org.junit.runner.RunWith
 import org.scalacheck.Arbitrary
 import org.scalatest.PropSpec
@@ -52,14 +53,14 @@ class RichRDDTest extends PropSpec with PropertyChecks with TestSparkContext {
 
   property("save as a text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTimeUtils.getMillis(LocalDateTime.now(DateTimeUtils.DefaultTimeZone))).toString
       rdd.saveAsTextFile(out, None, new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }
   }
   property("save as a compressed text file") {
     forAll(data) { rdd =>
-      val out = new File(tempDir, "op-richrdd-" + DateTime.now().getMillis).toString
+      val out = new File(tempDir, "op-richrdd-" + DateTimeUtils.getMillis(LocalDateTime.now(DateTimeUtils.DefaultTimeZone))).toString
       rdd.saveAsTextFile(out, Some(classOf[DefaultCodec]), new JobConf(rdd.context.hadoopConfiguration))
       spark.read.textFile(out).count() shouldBe rdd.count()
     }

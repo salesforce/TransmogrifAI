@@ -30,6 +30,9 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
@@ -37,7 +40,6 @@ import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
-import org.joda.time.{DateTimeConstants, Days, DateTime => JDateTime}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -48,17 +50,19 @@ import org.scalatest.junit.JUnitRunner
 class DateTimeVectorizerTest extends FlatSpec with TestSparkContext with AttributeAsserts {
 
   // Sunday July 12th 1998 at 22:45
-  private val defaultDate = new JDateTime(1998, 7, 12, 22, 45, DateTimeUtils.DefaultTimeZone).getMillis
+  private val defaultDate = DateTimeUtils.getMillis(LocalDateTime.of(1998, 7, 12, 22, 45))
 
-  private def expected(moment: JDateTime) = {
-    val nowMinusMilli = moment.minus(1L).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val now = moment.minus(0L).getMillis / DateTimeConstants.MILLIS_PER_DAY
+  private def expected(moment: LocalDateTime) = {
+    val nowMinusMilli = DateTimeUtils.getMillis(moment.minus(1, ChronoUnit.MILLIS)) /
+      DateTimeUtils.MILLIS_PER_DAY
+
+    val now = DateTimeUtils.getMillis(moment.minus(0L, ChronoUnit.MILLIS)) /
+      DateTimeUtils.MILLIS_PER_DAY
     val zero = 0
-    val threeDaysAgo = moment.minus(3 * DateTimeConstants.MILLIS_PER_DAY).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val defaultTimeAgo = moment.minus(defaultDate).getMillis / DateTimeConstants.MILLIS_PER_DAY
-    val hundredDaysAgo = Days
-      .daysBetween(new JDateTime(moment.plusDays(100).getMillis, DateTimeUtils.DefaultTimeZone), moment)
-      .getDays
+    val threeDaysAgo = DateTimeUtils.getMillis(moment.minusDays(3)) /
+      DateTimeUtils.MILLIS_PER_DAY
+    val defaultTimeAgo = DateTimeUtils.getMillis(moment) - defaultDate / DateTimeUtils.MILLIS_PER_DAY
+    val hundredDaysAgo = ChronoUnit.DAYS.between(moment.plusDays(100), moment)
 
     Array(
       Array(nowMinusMilli, zero, now),
@@ -67,12 +71,12 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext with Attribu
     ).map(_.map(_.toDouble)).map(v => Vectors.dense(v).toOPVector)
   }
 
-  def checkAt(moment: JDateTime): Unit = {
+  def checkAt(moment: LocalDateTime): Unit = {
     val (ds, f1, f2, f3) = TestFeatureBuilder(
       Seq[(DateTime, DateTime, DateTime)](
         (DateTime(1), DateTime.empty, DateTime(0)),
-        (DateTime(1), DateTime(defaultDate), DateTime(3 * DateTimeConstants.MILLIS_PER_DAY)),
-        (DateTime.empty, DateTime(0), DateTime(moment.plusDays(100).plusMinutes(1).getMillis))
+        (DateTime(1), DateTime(defaultDate), DateTime(3 * DateTimeUtils.MILLIS_PER_DAY)),
+        (DateTime.empty, DateTime(0), DateTime(DateTimeUtils.getMillis(moment.plusDays(100).plusMinutes(1))))
       )
     )
 
@@ -134,6 +138,6 @@ class DateTimeVectorizerTest extends FlatSpec with TestSparkContext with Attribu
   }
 
   it should "vectorize dates correctly on test date" in {
-    checkAt(new JDateTime(2017, 9, 28, 15, 45, 39, DateTimeUtils.DefaultTimeZone))
+    checkAt(LocalDateTime.of(2017, 9, 28, 15, 45, 39))
   }
 }
