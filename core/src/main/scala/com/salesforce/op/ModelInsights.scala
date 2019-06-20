@@ -450,7 +450,7 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
-    val models = stages.collect{
+    val models: Array[OPStage with Model[_]] = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
     } // TODO support other model types?
