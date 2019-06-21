@@ -51,7 +51,7 @@ private[readers] trait ReaderType[T] extends Serializable {
    *
    * @return full input type name
    */
-  final def fullTypeName: String = wtt.tpe.typeSymbol.fullName
+  final def fullTypeName: String = wtt.tpe.toString
 
   /**
    * Short reader input type name
@@ -66,8 +66,7 @@ private[readers] trait ReaderType[T] extends Serializable {
    * @param opParams contains map of reader type to ReaderParams instances
    * @return ReaderParams instance if it exists
    */
-  final def getReaderParams(opParams: OpParams): Option[ReaderParams] = opParams.readerParams
-    .get(this.wtt.tpe.toString.split("\\.").last)
+  final def getReaderParams(opParams: OpParams): Option[ReaderParams] = opParams.readerParams.get(typeName)
 
 }
 
