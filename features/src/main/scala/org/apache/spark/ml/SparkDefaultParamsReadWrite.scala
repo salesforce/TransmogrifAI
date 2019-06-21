@@ -21,7 +21,7 @@
 package org.apache.spark.ml
 
 import com.salesforce.op.stages.OpPipelineStageBase
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared.FieldNames._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter.FieldNames._
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.util.{DefaultParamsReader, DefaultParamsWriter}
 import org.json4s.JsonDSL._
@@ -36,6 +36,8 @@ case object SparkDefaultParamsReadWrite {
 
   type Metadata = DefaultParamsReader.Metadata
 
+  implicit val formats = DefaultFormats
+
   /**
    * Helper for [[OpPipelineStageWriter]] which extracts the JSON to save.
    * This is useful for ensemble models which need to save metadata for many sub-models.
@@ -49,7 +51,7 @@ case object SparkDefaultParamsReadWrite {
     instance: OpPipelineStageBase,
     extraMetadata: Option[JObject] = None,
     paramMap: Option[JValue] = None
-  ): String = {
+  ): JObject = {
     val uid = instance.uid
     val cls = instance.getClass.getName
     val params = instance.paramMap.toSeq
@@ -72,8 +74,7 @@ case object SparkDefaultParamsReadWrite {
       case None =>
         basicMetadata
     }
-    val metadataJson: String = compact(render(metadata))
-    metadataJson
+    metadata
   }
 
   /**
@@ -90,7 +91,6 @@ case object SparkDefaultParamsReadWrite {
   def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata = {
     val metadata = parse(metadataStr)
 
-    implicit val format = DefaultFormats
     val className = (metadata \ Class.entryName).extract[String]
     val uid = (metadata \ Uid.entryName).extract[String]
     val timestamp = (metadata \ Timestamp.entryName).extract[Long]
@@ -102,7 +102,7 @@ case object SparkDefaultParamsReadWrite {
         s" $expectedClassName but found class name $className")
     }
     // ******************************************************************************************
-    /**
+    /*
      * Backward compatible fix for models trained with older versions of Spark (prior to 2.4.x).
      * The change introduced in https://github.com/apache/spark/pull/20633 added serialization of
      * default params, older models won't have them and fail to load.

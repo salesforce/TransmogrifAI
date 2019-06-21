@@ -32,10 +32,10 @@ package com.salesforce.op.stages.impl.feature
 
 import java.util.{Date => JDate}
 
-import com.salesforce.op.OpWorkflow
-import com.salesforce.op.features.types._
+import com.salesforce.op.{OpWorkflow, UID}
+import com.salesforce.op.features.types.{OPMap, _}
 import com.salesforce.op.features.{Feature, FeatureLike}
-import com.salesforce.op.stages.base.ternary.TernaryLambdaTransformer
+import com.salesforce.op.stages.base.ternary.{TernaryLambdaTransformer, TernaryTransformer}
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit._
 import com.salesforce.op.utils.spark.RichDataset._
@@ -391,7 +391,7 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
       summary.getMetadataArray(OpVectorMetadata.ColumnsKey).toList
     )
     // Transformer to construct a single map feature from the individual features
-    val mapFeature = makeTernaryOPMapTransformer[F, FM, MT](rawF1, rawF2, rawF3)
+    val mapFeature = makeMapifyTransformer[F, FM, MT](rawF1, rawF2, rawF3)
     val mapFeatureVector = Transmogrifier.transmogrify(Seq(mapFeature))(TransmogrifierTestDefaults).combine()
     val transformedMap = new OpWorkflow().setResultFeatures(mapFeatureVector).transform(rawDF)
     val mapSummary = transformedMap.schema(mapFeatureVector.name).metadata
@@ -464,35 +464,46 @@ object OPMapVectorizerTestHelper extends Matchers with AttributeAsserts {
     // TODO assert metadata
   }
 
+
+
   /**
-   * Construct OPMap transformer for raw features
+   * Construct Mapify transformer for raw features
    */
-  def makeTernaryOPMapTransformer[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
+  def makeMapifyTransformer[F <: FeatureType : TypeTag, FM <: OPMap[MT] : TypeTag, MT: TypeTag]
   (
     rawF1: FeatureLike[F],
     rawF2: FeatureLike[F],
     rawF3: FeatureLike[F]
   ): Feature[FM] = {
-    val ftFactory = FeatureTypeFactory[FM]()
-
-    // Transformer to construct a single map feature from the individual features
-    val mapTransformer = new TernaryLambdaTransformer[F, F, F, FM](operationName = "mapify",
-      transformFn = (f1, f2, f3) => {
-        // For all the maps, the value in the original feature type is an Option[MT], but can't figure out how
-        // to specify that here since that's not true in general for FeatureTypes (eg. RealNN)
-        def asMap(v: F, featureName: String): Map[String, Any] = {
-          v.value match {
-            case Some(s) => Map(featureName -> s)
-            case t: Traversable[_] if t.nonEmpty => Map(featureName -> t)
-            case _ => Map.empty
-          }
-        }
-
-        val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
-        ftFactory.newInstance(mapData)
-      }
-    )
+    val mapTransformer = new MapifyTransformer[F, FM, MT]()
     mapTransformer.setInput(rawF1, rawF2, rawF3).getOutput().asInstanceOf[Feature[FM]]
+  }
+
+}
+
+
+class MapifyTransformer[F <: FeatureType, FM <: OPMap[MT], MT]
+(
+  uid: String = UID[MapifyTransformer[F, FM, MT]],
+  operationName: String = "mapify"
+)(implicit tti1: TypeTag[F],
+  tto: TypeTag[FM],
+  ttov: TypeTag[FM#Value]
+) extends TernaryTransformer[F, F, F, FM](uid = uid, operationName = operationName)(tti1, tti1, tti1, tto, ttov) {
+
+  @transient lazy val ftFactory = FeatureTypeFactory[FM]()
+
+  def asMap(v: F, featureName: String): Map[String, Any] = v.value match {
+    case Some(s) => Map(featureName -> s)
+    case t: Traversable[_] if t.nonEmpty => Map(featureName -> t)
+    case _ => Map.empty
+  }
+
+  override def transformFn: (F, F, F) => FM = (f1: F, f2: F, f3: F) => {
+    // For all the maps, the value in the original feature type is an Option[MT], but can't figure out how
+    // to specify that here since that's not true in general for FeatureTypes (eg. RealNN)
+    val mapData = asMap(f1, "f1") ++ asMap(f2, "f2") ++ asMap(f3, "f3")
+    ftFactory.newInstance(mapData)
   }
 
 }

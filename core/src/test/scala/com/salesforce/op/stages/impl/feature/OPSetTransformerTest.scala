@@ -31,55 +31,37 @@
 package com.salesforce.op.stages.impl.feature
 
 
-import com.salesforce.op.features.types.{Email, EmailMap, Integral, IntegralMap, Real, _}
-import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.sql.Dataset
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
-import OPSetTransformerTest._
 import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-/**
- * @author ksuchanek
- * @since 214
- */
+
 @RunWith(classOf[JUnitRunner])
-class OPSetTransformerTest extends OpTransformerSpec[MultiPickList, TransformerType] {
-  lazy val (inputData, top) = TestFeatureBuilder("name",
-    Seq(MultiPickList(Set("A", "B")))
+class OPSetTransformerTest
+  extends OpTransformerSpec[MultiPickList, OPSetTransformer[Text, Text, MultiPickList, MultiPickList]] {
+
+  lazy val (inputData, top) = TestFeatureBuilder("name", Seq(
+    Set("A", "B").toMultiPickList
+  ))
+
+  val transformer: OPSetTransformer[Text, Text, MultiPickList, MultiPickList] =
+    new LowerCaseSetTransformer().setInput(top)
+
+  val expectedResult: Seq[MultiPickList] = Seq(
+    Set("a", "b").toMultiPickList
   )
-
-  /**
-   * [[OpTransformer]] instance to be tested
-   */
-  override val transformer: TransformerType = new TransformerType(
-    transformer = new BaseTransformer(),
-    operationName = "testUnaryMapWrap").setInput(top)
-
-  /**
-   * Expected result of the transformer applied on the Input Dataset
-   */
-  override val expectedResult: Seq[MultiPickList] = Seq(
-    MultiPickList(Set("a", "b"))
-  )
-}
-
-object OPSetTransformerTest {
-  type TransformerType = OPSetTransformer[Text, Text, MultiPickList, MultiPickList]
-
-  class BaseTransformer extends UnaryTransformer[Text, Text](
-    operationName = "testUnary",
-    uid = UID[BaseTransformer]
-  ) {
-    override def transformFn: (Text => Text) = (input: Text) => input.value.map(_.toLowerCase()).toText
-  }
 
 }
 
 
-
+class LowerCaseSetTransformer
+(
+  uid: String = UID[LowerCaseSetTransformer],
+  operationName: String = "lowerCaseSet"
+) extends OPSetTransformer[Text, Text, MultiPickList, MultiPickList](
+  uid = uid,
+  operationName = operationName,
+  transformer = new LowerCaseTransformer
+)

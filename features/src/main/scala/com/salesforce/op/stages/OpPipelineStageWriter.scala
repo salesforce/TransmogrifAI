@@ -30,19 +30,15 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
-import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.util.MLWriter
-import org.apache.spark.ml.{Estimator, Model, PipelineStage, SparkDefaultParamsReadWrite}
-import org.json4s.Extraction
+import org.apache.spark.ml.{Estimator, SparkDefaultParamsReadWrite}
 import org.json4s.JsonAST.{JObject, JValue}
-import org.json4s.jackson.JsonMethods.{compact, parse, render}
+import org.json4s.jackson.JsonMethods.{compact, render}
 
-import scala.reflect.runtime.universe.TypeTag
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /**
  * MLWriter class used to write TransmogrifAI stages to disk
@@ -68,78 +64,27 @@ final class OpPipelineStageWriter(val stage: OpPipelineStageBase) extends MLWrit
    *
    * @return stage metadata json
    */
-  def writeToJson(path: String): JObject = jsonSerialize(writeToMap(path)).asInstanceOf[JObject]
-
-  /**
-   * Stage metadata map
-   *
-   * @return stage metadata map
-   */
-  def writeToMap(path: String): Map[String, Any] = {
+  def writeToJson(path: String): JObject = {
     stage match {
-      case _: Estimator[_] => return Map.empty[String, Any] // no need to serialize estimators
+      case _: Estimator[_] => return JObject() // no need to serialize estimators
       case s: SparkWrapperParams[_] =>
         // Set save path for all Spark wrapped stages of type [[SparkWrapperParams]] so they can save
         s.setStageSavePath(path)
       case _ =>
     }
     // We produce stage metadata for all the Spark params
-    val metadataJson = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
-    // Add isModel indicator
-    val metadata = parse(metadataJson).extract[Map[String, Any]] + (FieldNames.IsModel.entryName -> isModel)
-    // In case we stumbled upon a model instance, we also include it's ctor args
-    // so we can reconstruct the model instance when loading
-    if (isModel) metadata + (FieldNames.CtorArgs.entryName -> modelCtorArgs().toMap) else metadata
-  }
+    val metadata = SparkDefaultParamsReadWrite.getMetadataToSave(stage)
 
-  private def isModel: Boolean = stage.isInstanceOf[Model[_]]
-
-  /**
-   * Extract model ctor args values keyed by their names, so we can reconstruct the model instance when loading.
-   * See [[OpPipelineStageReader]].OpPipelineStageReader
-   *
-   * @return model ctor args values by their names
-   */
-  private def modelCtorArgs(): Seq[(String, AnyValue)] = Try {
-    // Reflect all model ctor args
-    val (_, argsList) = ReflectionUtils.bestCtorWithArgs(stage)
-
-    // Wrap all ctor args into AnyValue container
-    for {(argName, argValue) <- argsList} yield {
-      val anyValue = argValue match {
-        // Special handling for Feature Type TypeTags
-        case t: TypeTag[_] if FeatureType.isFeatureType(t) || FeatureType.isFeatureValueType(t) =>
-          AnyValue(`type` = AnyValueTypes.TypeTag, value = ReflectionUtils.dealisedTypeName(t.tpe))
-        case t: TypeTag[_] =>
-          throw new RuntimeException(
-            s"Unknown type tag '${t.tpe.toString}'. " +
-              "Only Feature and Feature Value type tags are supported for serialization."
-          )
-
-        // Spark wrapped stage is saved using [[SparkWrapperParams]], so we just writing it's uid here
-        case Some(v: PipelineStage) => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
-        case v: PipelineStage => AnyValue(AnyValueTypes.SparkWrappedStage, v.uid)
-
-        // Everything else goes as is and is handled by json4s
-        case v =>
-          // try serialize value with json4s
-          val av = AnyValue(AnyValueTypes.Value, v)
-          Try(jsonSerialize(av)) match {
-            case Success(_) => av
-            case Failure(e) =>
-              throw new RuntimeException(s"Failed to json4s serialize argument '$argName' with value '$v'", e)
-          }
-
-      }
-      argName -> anyValue
+    // Write out the stage using the specified writer instance
+    val writer = readerWriterFor[OpPipelineStageBase](stage.getClass.asInstanceOf[Class[OpPipelineStageBase]])
+    val stageJson: JValue = writer.write(stage) match {
+      case Failure(err) => throw new RuntimeException(s"Failed to write out stage '${stage.uid}'", err)
+      case Success(json) => json
     }
-  } match {
-    case Success(args) => args
-    case Failure(error) =>
-      throw new RuntimeException(s"Failed to extract constructor arguments for model stage '${stage.uid}'. " +
-        "Make sure your model class is a concrete final class with json4s serializable arguments.", error
-      )
+
+    // Join metadata & with stage ctor args
+    val j = metadata.merge(JObject(FieldNames.CtorArgs.entryName -> stageJson))
+    render(j).asInstanceOf[JObject]
   }
 
-  private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))
 }
