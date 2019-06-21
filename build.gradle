@@ -64,7 +64,6 @@ configure(allProjs) {
         scalaGraphVersion = '1.12.5'
         scalafmtVersion = '1.5.1'
         hadoopVersion = 'hadoop2'
-        scalajCollVersion = '0.1.2'
         json4sVersion = '3.5.3' // matches Spark dependency version
         jodaTimeVersion = '2.9.4'
         jodaConvertVersion = '1.8.1'

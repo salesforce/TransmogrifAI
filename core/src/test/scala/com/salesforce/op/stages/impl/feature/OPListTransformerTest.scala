@@ -31,55 +31,43 @@
 package com.salesforce.op.stages.impl.feature
 
 
-import com.salesforce.op.features.types.{Email, EmailMap, Integral, IntegralMap, Real, _}
-import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
-import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.sql.Dataset
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
-import OPListTransformerTest._
 import com.salesforce.op.UID
+import com.salesforce.op.features.types._
+import com.salesforce.op.stages.base.unary.UnaryTransformer
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
-/**
- * @author ksuchanek
- * @since 214
- */
+
 @RunWith(classOf[JUnitRunner])
-class OPListTransformerTest extends OpTransformerSpec[TextList, TransformerType] {
-  lazy val (inputData, top) = TestFeatureBuilder("name",
-    Seq(TextList(Seq("A", "B")))
-  )
+class OPListTransformerTest
+  extends OpTransformerSpec[TextList, OPListTransformer[Text, Text, TextList, TextList]] {
 
-  /**
-   * [[OpTransformer]] instance to be tested
-   */
-  override val transformer: TransformerType = new TransformerType(
-    transformer = new BaseTransformer(),
-    operationName = "testUnaryMapWrap").setInput(top)
+  lazy val (inputData, top) = TestFeatureBuilder("name", Seq(
+    Seq("A", "B").toTextList
+  ))
 
-  /**
-   * Expected result of the transformer applied on the Input Dataset
-   */
-  override val expectedResult: Seq[TextList] = Seq(
-    TextList(Seq("a", "b"))
+  val transformer: OPListTransformer[Text, Text, TextList, TextList] =
+    new LowerCaseListTransformer().setInput(top)
+
+  val expectedResult: Seq[TextList] = Seq(
+    Seq("a", "b").toTextList
   )
 }
 
-object OPListTransformerTest {
-  type TransformerType = OPListTransformer[Text, Text, TextList, TextList]
-
-  class BaseTransformer extends UnaryTransformer[Text, Text](
-    operationName = "testUnary",
-    uid = UID[BaseTransformer]
-  ) {
-    override def transformFn: (Text => Text) = (input: Text) => input.value.map(_.toLowerCase()).toText
-  }
-
+class LowerCaseTransformer extends UnaryTransformer[Text, Text](
+  operationName = "lowerCaseUnary",
+  uid = UID[LowerCaseTransformer]
+) {
+  def transformFn: (Text => Text) = (input: Text) => input.value.map(_.toLowerCase()).toText
 }
 
-
-
+class LowerCaseListTransformer
+(
+  uid: String = UID[LowerCaseListTransformer],
+  operationName: String = "lowerCaseList"
+) extends OPListTransformer[Text, Text, TextList, TextList](
+  uid = uid,
+  operationName = operationName,
+  transformer = new LowerCaseTransformer
+)

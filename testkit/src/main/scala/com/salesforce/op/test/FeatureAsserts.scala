@@ -86,4 +86,5 @@ trait FeatureAsserts extends Matchers {
     fg.uid.startsWith(classOf[FeatureGeneratorStage[I, O]].getSimpleName) shouldBe true
   }
 
+
 }
