@@ -92,7 +92,6 @@ case object SparkDefaultParamsReadWrite {
   def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata = {
     val metadata = parse(metadataStr)
 
-    implicit val format = DefaultFormats
     val className = (metadata \ Class.entryName).extract[String]
     val uid = (metadata \ Uid.entryName).extract[String]
     val timestamp = (metadata \ Timestamp.entryName).extract[Long]
@@ -104,7 +103,7 @@ case object SparkDefaultParamsReadWrite {
         s" $expectedClassName but found class name $className")
     }
     // ******************************************************************************************
-    /**
+    /*
      * Backward compatible fix for models trained with older versions of Spark (prior to 2.4.x).
      * The change introduced in https://github.com/apache/spark/pull/20633 added serialization of
      * default params, older models won't have them and fail to load.
