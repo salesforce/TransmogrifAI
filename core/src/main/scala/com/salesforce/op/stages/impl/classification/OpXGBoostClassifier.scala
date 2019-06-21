@@ -236,6 +236,11 @@ class OpXGBoostClassifier(uid: String = UID[OpXGBoostClassifier])
   def setMaxBins(value: Int): this.type = set(maxBins, value)
 
   /**
+   * Maximum number of nodes to be added. Only relevant when grow_policy=lossguide is set.
+   */
+  def setMaxLeaves(value: Int): this.type = set(maxLeaves, value)
+
+  /**
    * This is only used for approximate greedy algorithm.
    * This roughly translated into O(1 / sketch_eps) number of bins. Compared to directly select
    * number of bins, this comes with theoretical guarantee with sketch accuracy.
@@ -282,7 +287,18 @@ class OpXGBoostClassifier(uid: String = UID[OpXGBoostClassifier])
   def setLambdaBias(value: Double): this.type = set(lambdaBias, value)
 
   // setters for learning params
+
+  /**
+   * Specify the learning task and the corresponding learning objective.
+   * options: reg:squarederror, reg:logistic, binary:logistic, binary:logitraw, count:poisson,
+   * multi:softmax, multi:softprob, rank:pairwise, reg:gamma. default: reg:squarederror
+   */
   def setObjective(value: String): this.type = set(objective, value)
+
+  /**
+   * Objective type used for training. For options see [[ml.dmlc.xgboost4j.scala.spark.params.LearningTaskParams]]
+   */
+  def setObjectiveType(value: String): this.type = set(objectiveType, value)
 
   /**
    * Specify the learning task and the corresponding learning objective.
@@ -309,6 +325,11 @@ class OpXGBoostClassifier(uid: String = UID[OpXGBoostClassifier])
    * of consecutive increases in any evaluation metric.
    */
   def setNumEarlyStoppingRounds(value: Int): this.type = set(numEarlyStoppingRounds, value)
+
+  /**
+   * Define the expected optimization to the evaluation metrics, true to maximize otherwise minimize it
+   */
+  def setMaximizeEvaluationMetrics(value: Boolean): this.type = set(maximizeEvaluationMetrics, value)
 
   /**
    * Customized objective function provided by user. default: null
@@ -370,6 +391,7 @@ class OpXGBoostClassificationModel
     val prob = booster.predict(dm, outPutMargin = false, treeLimit = treeLimit)(0).map(_.toDouble)
     val probability = if (model.numClasses == 2) Array(1.0 - prob(0), prob(0)) else prob
     val prediction = probability2predictionMirror(Vectors.dense(probability)).asInstanceOf[Double]
+
     Prediction(prediction = prediction, rawPrediction = rawPrediction, probability = probability)
   }
 }
