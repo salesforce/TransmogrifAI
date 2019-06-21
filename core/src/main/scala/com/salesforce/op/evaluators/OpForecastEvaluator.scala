@@ -100,7 +100,7 @@ case class SMAPEValue private (nominator: Double, denominator: Double, cnt: Long
 }
 
 /**
- * Metrics of Regression Problem
+ * Metrics of Forecasting Problem
  *
  * @param SMAPE symmetric Mean Absolute Percentage Error
  *
