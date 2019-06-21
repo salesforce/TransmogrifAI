@@ -44,6 +44,7 @@ import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
@@ -59,7 +60,7 @@ import org.apache.spark.sql.functions._
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality {
+class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality with OpXGBoostQuietLogging {
 
   private val density = weight / height
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
@@ -447,7 +448,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly serialize and deserialize from json when raw feature filter is used" in {
-
     val insights = modelWithRFF.modelInsights(predWithMaps)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
