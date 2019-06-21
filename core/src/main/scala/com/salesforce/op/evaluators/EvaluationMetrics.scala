@@ -110,6 +110,7 @@ object EvalMetric {
     BinaryClassEvalMetrics.withNameInsensitiveOption(name)
       .orElse(MultiClassEvalMetrics.withNameInsensitiveOption(name))
       .orElse(RegressionEvalMetrics.withNameInsensitiveOption(name))
+      .orElse(ForecastEvalMetrics.withNameInsensitiveOption(name))
       .orElse(OpEvaluatorNames.withNameInsensitiveOption(name))
       .getOrElse(OpEvaluatorNames.Custom(name, name))
   }
@@ -186,9 +187,9 @@ sealed abstract class ForecastEvalMetric
 ) extends EvalMetric
 
 
-object ForecastEvalMetrics extends Enum[RegressionEvalMetric] {
-  val values: Seq[RegressionEvalMetric] = findValues
-  case object sMAPE extends RegressionEvalMetric("smape", "symmetric Mean Absolute Percentage Error")
+object ForecastEvalMetrics extends Enum[ForecastEvalMetric] {
+  val values: Seq[ForecastEvalMetric] = findValues
+  case object SMAPE extends ForecastEvalMetric("smape", "symmetric mean absolute percentage error")
 }
 
 
@@ -210,6 +211,7 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
   case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
   case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
+  case object Forecast extends OpEvaluatorNames("regForecast", "regression evaluation metrics")
   case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
     override def entryName: String = name.toLowerCase
   }

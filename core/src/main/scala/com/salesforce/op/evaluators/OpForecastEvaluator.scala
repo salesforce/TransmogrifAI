@@ -35,12 +35,15 @@ import com.salesforce.op.utils.spark.RichEvaluator._
 import org.apache.spark.ml.evaluation.RegressionEvaluator
 import org.apache.spark.sql.Dataset
 import org.slf4j.LoggerFactory
+import com.twitter.algebird.Operators._
+import com.twitter.algebird.Semigroup
+import com.twitter.algebird.macros.caseclass
 
 /**
  *
- * Instance to evaluate Regression metrics
- * The metrics are rmse, mse, r2 and mae
- * Default evaluation returns Root Mean Squared Error
+ * Instance to evaluate Forecast metrics
+ * The metrics are SMAPE
+ * Default evaluation returns SMAPE
  *
  * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
@@ -49,63 +52,60 @@ import org.slf4j.LoggerFactory
 
 private[op] class OpForecastEvaluator
 (
-  override val name: EvalMetric = OpEvaluatorNames.Regression,
+  override val name: EvalMetric = OpEvaluatorNames.Forecast,
   override val isLargerBetter: Boolean = false,
-  override val uid: String = UID[OpRegressionEvaluator]
+  override val uid: String = UID[OpForecastEvaluator]
 ) extends OpRegressionEvaluatorBase[ForecastMetrics](uid) {
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
-  def getDefaultMetric: ForecastMetrics => Double = _.sMAPE
+  def getDefaultMetric: ForecastMetrics => Double = _.SMAPE
 
   override def evaluateAll(data: Dataset[_]): ForecastMetrics = {
     val dataUse = makeDataToUse(data, getLabelCol)
 
     val smape: Double = getSMAPE(dataUse, getLabelCol, getPredictionValueCol)
-    val metrics = ForecastMetrics(
-      sMAPE = smape
-    )
+    val metrics = ForecastMetrics(SMAPE = smape)
 
     log.info("Evaluated metrics: {}", metrics.toString)
     metrics
 
   }
 
+
+
   protected def getSMAPE(data: Dataset[_], labelCol: String, predictionValueCol: String): Double = {
     data.select(labelCol, predictionValueCol).rdd
-      .map(r => ReduceSMAPE(r.getAs[Double](0), r.getAs[Double](1)))
-      .reduce(_ + _).metric
+      .map(r => SMAPEValue(r.getAs[Double](0), r.getAs[Double](1)))
+      .reduce(_ + _).value
   }
 }
 
 // https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
-case class ReduceSMAPE(nominator: Double, denominator: Double, cnt: Long) {
-  def +(that: ReduceSMAPE): ReduceSMAPE = {
-    ReduceSMAPE(this.nominator + that.nominator, this.denominator + that.denominator, this.cnt + that.cnt)
+object SMAPEValue {
+  def apply(y: Double, yHat: Double): SMAPEValue = {
+    SMAPEValue(2 * Math.abs(y - yHat), Math.abs(y) + Math.abs(yHat), 1L)
   }
+  implicit val smapeSG: Semigroup[SMAPEValue] = caseclass.semigroup[SMAPEValue]
+}
 
-  def metric: Double = {
+case class SMAPEValue private (nominator: Double, denominator: Double, cnt: Long) {
+  def value: Double = {
     if (denominator == 0.0) {
-      Double.PositiveInfinity
+      Double.NaN
     } else {
       (nominator / denominator) / cnt
     }
   }
 }
 
-object ReduceSMAPE {
-  def apply(y: Double, y_hat: Double): ReduceSMAPE = {
-    ReduceSMAPE(2 * Math.abs(y - y_hat), Math.abs(y) + Math.abs(y_hat), 1L)
-  }
-}
-
 /**
  * Metrics of Regression Problem
  *
- * @param sMAPE symmetric Mean Absolute Percentage Error
+ * @param SMAPE symmetric Mean Absolute Percentage Error
  *
  */
 case class ForecastMetrics
 (
-  sMAPE: Double
+  SMAPE: Double
 ) extends EvaluationMetrics

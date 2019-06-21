@@ -87,7 +87,7 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     val transformedData = model.setInput(label, features).transform(ds)
     val metrics = testEvaluator.evaluateAll(transformedData).toMetadata()
 
-    metrics.getDouble(ForecastEvalMetrics.sMAPE.toString) shouldBe (0.0075 +- 1e-4)
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.0075 +- 1e-4)
 
   }
 
@@ -95,7 +95,15 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     val model = testEstimator2.fit(ds)
     val transformedData = model.setInput(label, features).transform(ds)
     val metrics = testEvaluator2.evaluateAll(transformedData).toMetadata()
-
-    metrics.getDouble(ForecastEvalMetrics.sMAPE.toString) shouldBe (0.0072 +- 1e-4)
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.0072 +- 1e-4)
   }
+
+  it should "evaluate the metrics when data is 0" in {
+    val data = Seq(0.0, 0.0, 0.0).map(x => (x, Map("prediction" -> x)))
+    import spark.implicits._
+    val df = spark.sparkContext.parallelize(data).toDF("f1", "r1")
+    val metrics = new OpForecastEvaluator().setLabelCol("f1").setPredictionCol("r1").evaluateAll(df).toMetadata()
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString).isNaN shouldBe true
+  }
+
 }
