@@ -40,7 +40,6 @@ import com.twitter.algebird.Semigroup
 import com.twitter.algebird.macros.caseclass
 
 /**
- *
  * Instance to evaluate Forecast metrics
  * The metrics are SMAPE
  * Default evaluation returns SMAPE
@@ -49,7 +48,6 @@ import com.twitter.algebird.macros.caseclass
  * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
  */
-
 private[op] class OpForecastEvaluator
 (
   override val name: EvalMetric = OpEvaluatorNames.Forecast,
@@ -69,10 +67,7 @@ private[op] class OpForecastEvaluator
 
     log.info("Evaluated metrics: {}", metrics.toString)
     metrics
-
   }
-
-
 
   protected def getSMAPE(data: Dataset[_], labelCol: String, predictionValueCol: String): Double = {
     data.select(labelCol, predictionValueCol).rdd
@@ -81,7 +76,12 @@ private[op] class OpForecastEvaluator
   }
 }
 
-// https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
+/**
+ * SMAPE value computation. See formula here:
+ * https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
+ *
+ * @param SMAPE symmetric Mean Absolute Percentage Error
+ */
 object SMAPEValue {
   def apply(y: Double, yHat: Double): SMAPEValue = {
     SMAPEValue(2 * Math.abs(y - yHat), Math.abs(y) + Math.abs(yHat), 1L)
@@ -90,22 +90,12 @@ object SMAPEValue {
 }
 
 case class SMAPEValue private (nominator: Double, denominator: Double, cnt: Long) {
-  def value: Double = {
-    if (denominator == 0.0) {
-      Double.NaN
-    } else {
-      (nominator / denominator) / cnt
-    }
-  }
+  def value: Double = if (denominator == 0.0) Double.NaN else (nominator / denominator) / cnt
 }
 
 /**
  * Metrics of Forecasting Problem
  *
  * @param SMAPE symmetric Mean Absolute Percentage Error
- *
  */
-case class ForecastMetrics
-(
-  SMAPE: Double
-) extends EvaluationMetrics
+case class ForecastMetrics(SMAPE: Double) extends EvaluationMetrics
