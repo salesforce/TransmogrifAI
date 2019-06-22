@@ -176,6 +176,6 @@ man_pages = [
 #  dir menu entry, description, category)
 texinfo_documents = [
     (master_doc, 'TransmogrifAI', 'TransmogrifAI',
-     author, 'TransmogrifAI', 'utomated machine learning for structured data.',
+     author, 'TransmogrifAI', 'Automated machine learning for structured data.',
      'Miscellaneous'),
 ]
