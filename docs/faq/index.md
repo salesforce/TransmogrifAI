@@ -57,5 +57,5 @@ import com.salesforce.op.utils.spark.RichStructType._
 You can! Simply use the `.setInputRDD(myRDD)` or `.setInputDataSet(myDataSet)` methods on Workflow to pass in your data.
 
 ## How do I examine intermediate data when trying to debug my ML workflow?
-You can generate data up to any particular point in the Workflow using the method `.computeDataUpTo(myFeature)`. Calling this method on your Workflow or WorkflowModel will compute a DataFrame which contains all of the rows for features created up to that point in your flow.
+You can generate data up to any particular point in the OpWorkflow using the method `.computeDataUpTo(myFeature)`. Calling this method on your OpWorkflow or OpWorkflowModel will compute a DataFrame which contains all of the rows for features created up to that point in your flow.
 
