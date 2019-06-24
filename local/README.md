@@ -25,9 +25,8 @@ import com.salesforce.op.local._
 // Spark Session needed for model loading & score function creation
 implicit val spark = SparkSession.builder().getOrCreate()
 
-// Create your workflow & load the model
-val workflow: OpWorkflow = ...
-val model = workflow.loadModel("/path/to/model")
+// Load the trained model
+val model = OpWorkflowModel.load("/path/to/model")
 
 // Create score function once and use it indefinitely
 val scoreFn = model.scoreFunction

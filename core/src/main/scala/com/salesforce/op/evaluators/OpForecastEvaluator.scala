@@ -135,7 +135,7 @@ object SeasonalAbsDiff {
 }
 
 case class SeasonalAbsDiff private
-  (seasonalWindow: Int, lagsLength: Int, lags: mutable.ListBuffer[Double], absDiff: Double) {
+(seasonalWindow: Int, lagsLength: Int, lags: mutable.ListBuffer[Double], absDiff: Double) {
   def combine(that: SeasonalAbsDiff): SeasonalAbsDiff = {
     // println(this, that)
     var newLength = lagsLength + that.lagsLength
@@ -169,9 +169,4 @@ case class SeasonalAbsDiff private
  * @param SMAPE symmetric Mean Absolute Percentage Error
  *
  */
-case class ForecastMetrics
-(
-  SMAPE: Double,
-  seasonalError: Double,
-  MASE: Double
-) extends EvaluationMetrics
+case class ForecastMetrics(SMAPE: Double, seasonalError: Double, MASE: Double) extends EvaluationMetrics
