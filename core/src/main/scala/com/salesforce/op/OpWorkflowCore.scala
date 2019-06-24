@@ -255,7 +255,7 @@ private[op] trait OpWorkflowCore {
       val readerInputTypes = reader.get.subReaders.map(_.fullTypeName).toSet
       val unmatchedFeatures = rawFeatures.filterNot(f =>
         readerInputTypes
-          .contains(f.originStage.asInstanceOf[FeatureGeneratorStage[_, _ <: FeatureType]].tti.tpe.toString)
+          .contains(f.originStage.asInstanceOf[FeatureGeneratorStage[_, _ <: FeatureType]].tti.tpe)
       )
       require(
         unmatchedFeatures.isEmpty,
