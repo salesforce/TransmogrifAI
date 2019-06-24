@@ -671,6 +671,30 @@ case object ModelInsights {
     contributions.getOrElse(Seq.empty)
   }
 
+  private[op] def descaleModelContributions
+  (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    val contributions = stage.collect {
+      case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
+      case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTClassificationModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: LinearSVCModel => Seq(m.coefficients.toArray.toSeq)
+      case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
+      case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
+      case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
+      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
+    }
+    contributions.getOrElse(Seq.empty)
+  }
+
   private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
     model match {
       case Some(m: SelectedModel) =>
