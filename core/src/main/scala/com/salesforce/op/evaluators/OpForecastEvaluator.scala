@@ -137,7 +137,6 @@ object SeasonalAbsDiff {
 case class SeasonalAbsDiff private
 (seasonalWindow: Int, lagsLength: Int, lags: mutable.ListBuffer[Double], absDiff: Double) {
   def combine(that: SeasonalAbsDiff): SeasonalAbsDiff = {
-    // println(this, that)
     var newLength = lagsLength + that.lagsLength
     var l = this.lags
     var newAbsDiff = this.absDiff + that.absDiff
