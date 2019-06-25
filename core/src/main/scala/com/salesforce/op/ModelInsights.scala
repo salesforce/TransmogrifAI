@@ -561,6 +561,7 @@ case object ModelInsights {
           val featureStd = getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0)
           val sparkFtrContrib = keptIndex
             .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val LRStandardization = checkLRStandardization(model).getOrElse(false)
           val labelStd = label.distribution.getOrElse(1.0) match {
             case Continuous(_, _, _, variance) => math.sqrt(variance)
             // for (binary) logistic regression we only need to multiply by feature standard deviation
@@ -598,7 +599,7 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution = sparkFtrContrib,
+              contribution = if (LRStandardization) descaledFtrContrib else sparkFtrContrib,
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -663,6 +664,17 @@ case object ModelInsights {
       val j = corr.nanCorrs.indexOf(name)
       if (j >= 0) Option(Double.NaN)
       else None
+    }
+  }
+
+  private[op] def checkLRStandardization(model: Option[Model[_]]): Option[Boolean] = {
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    stage.collect {
+      case m: LogisticRegressionModel | LinearRegressionModel  => true && m.getStandardization
+      case _ => false
     }
   }
 
