@@ -577,7 +577,6 @@ case object ModelInsights {
               computeVariance(domain, prob)
           }
           // TODO: throw exception if (labelStd == 0)
-          val descaledFtrContrib = sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
 
           h.parentFeatureOrigins ->
             Insights(
@@ -599,7 +598,11 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution = if (LRStandardization) descaledFtrContrib else sparkFtrContrib,
+              contribution =
+                if (LRStandardization) {
+                  sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
+                }
+                else sparkFtrContrib,
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
