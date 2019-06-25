@@ -149,7 +149,7 @@ private[op] abstract class JoinedReader[T, U]
   )(implicit spark: SparkSession): (DataFrame, Array[String]) = {
 
     def getData(r: DataReader[_]): DataFrame = {
-      val readerFeatures = rawFeatures.filter { f => getGenStage(f).tti.tpe.toString == r.fullTypeName }
+      val readerFeatures = rawFeatures.filter { f => getGenStage(f).tti.tpe.typeSymbol.fullName == r.fullTypeName }
       r.generateDataFrame(readerFeatures, opParams)
     }
 

@@ -52,7 +52,7 @@ import org.apache.spark.sql.types.{DoubleType, StringType}
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.joda.time.DateTime
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
+import org.scalatest.{Assertion, FlatSpec}
 import org.scalatest.junit.JUnitRunner
 import org.slf4j.LoggerFactory
 
@@ -543,17 +543,19 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
     val expectedScores = expectedScoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect()
     model.save(workflowLocation)
 
-    // Load and score the model
-    val loaded = workflow.loadModel(workflowLocation)
-    val scoresDF = loaded.setInputDataset(ds, keyFn).score()
-    val scores = scoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect()
+    def assertModel(model: OpWorkflowModel): Assertion = {
+      val scoresDF = model.setInputDataset(ds, keyFn).score()
+      val scores = scoresDF.select(prediction.name, KeyFieldName).sort(KeyFieldName).collect()
+      // Compare the scores produced by the loaded model vs original model
+      scores should contain theSameElementsAs expectedScores
+    }
 
-    // Compare the scores produced by the loaded model vs original model
-    scores should contain theSameElementsAs expectedScores
-
-    // TODO - once supported, load the model without the workflow and score it as well
-    val error = intercept[RuntimeException](OpWorkflowModel.load(workflowLocation))
-    error.getMessage should startWith("Failed to load Workflow from path")
+    withClue("Expected to load and score model with provided workflow: ") {
+      assertModel(model = workflow.loadModel(workflowLocation))
+    }
+    withClue("Expected to load and score model without workflow: ") {
+      assertModel(model = OpWorkflowModel.load(workflowLocation))
+    }
   }
 
 }

@@ -84,7 +84,7 @@ final class FractionOfResponsesModel private[op]
   operationName: String,
   uid: String
 ) extends SequenceModel[DateList, OPVector](operationName = operationName, uid = uid) {
-  def transformFn: (Seq[DateList]) => OPVector = row => {
+  def transformFn: Seq[DateList] => OPVector = row => {
     val fractions = row.zip(counts).map { case (feature, count) => feature.value.size.toDouble / count }
     Vectors.dense(fractions.toArray).toOPVector
   }

@@ -36,15 +36,6 @@ import com.salesforce.op.stages.base.unary.UnaryTransformer
 
 import scala.reflect.runtime.universe.TypeTag
 
-object ToOccurTransformer {
-  private def defaultMatches[T <: FeatureType](value: T): Boolean = value match {
-    case num: OPNumeric[_] if num.nonEmpty => num.toDouble.get > 0.0
-    case text: Text if text.nonEmpty => text.value.get.length > 0
-    case collection: OPCollection => collection.nonEmpty
-    case _ => false
-  }
-}
-
 /**
  * Transformer that converts input feature of type I into doolean feature using a user specified function that
  * maps object type I to a Boolean
@@ -56,12 +47,24 @@ object ToOccurTransformer {
 class ToOccurTransformer[I <: FeatureType]
 (
   uid: String = UID[ToOccurTransformer[I]],
-  val matchFn: I => Boolean = ToOccurTransformer.defaultMatches[I] _
+  val matchFn: I => Boolean = ToOccurTransformer.defaultMatches[I]
 )(implicit tti: TypeTag[I])
   extends UnaryTransformer[I, RealNN](operationName = "toOccur", uid = uid) {
 
   private val (yes, no) = (RealNN(1.0), RealNN(0.0))
 
   def transformFn: I => RealNN = (value: I) => if (matchFn(value)) yes else no
+
+}
+
+
+object ToOccurTransformer {
+
+  def defaultMatches[T <: FeatureType]: T => Boolean = {
+    case num: OPNumeric[_] if num.nonEmpty => num.toDouble.get > 0.0
+    case text: Text if text.nonEmpty => text.value.get.length > 0
+    case collection: OPCollection => collection.nonEmpty
+    case _ => false
+  }
 
 }
