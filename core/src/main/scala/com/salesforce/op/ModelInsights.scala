@@ -559,7 +559,8 @@ case object ModelInsights {
           }
           val keptIndex = indexInToIndexKept.get(h.index)
           val featureStd = getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0)
-          val sparkFtrContrib = keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val sparkFtrContrib = keptIndex
+            .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
           val labelStd = label.distribution.getOrElse(1.0) match {
           case Continuous(_, _, _, variance) => math.sqrt(variance)
           // for (binary) logistic regression we only need to multiply by feature standard deviation
@@ -568,7 +569,7 @@ case object ModelInsights {
               val floatDomain = domain.map(_.toDouble)
               val sqfloatDomain = floatDomain.map(math.pow(_, 2))
               val weighted = (floatDomain, prob).zipped map (_ * _)
-              val sqweighted =  (sqfloatDomain, prob).zipped map (_ * _)
+              val sqweighted = (sqfloatDomain, prob).zipped map (_ * _)
               val mean = weighted.sum
               return sqweighted.sum - mean
             }
@@ -596,7 +597,7 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution = keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
+              contribution = sparkFtrContrib,
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
