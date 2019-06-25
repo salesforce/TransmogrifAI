@@ -205,7 +205,7 @@ case class StageMetrics private
   shuffleWriteTime: Long,
   shuffleBytesWritten: Long,
   shuffleRecordsWritten: Long
-) extends JsonLike {}
+) extends JsonLike
 
 object StageMetrics {
   /**
