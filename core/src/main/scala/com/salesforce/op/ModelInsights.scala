@@ -487,7 +487,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, label),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -537,7 +537,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
+    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
+    label: LabelSummary
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
@@ -557,7 +558,24 @@ case object ModelInsights {
             case _ => None
           }
           val keptIndex = indexInToIndexKept.get(h.index)
-
+          val featureStd = getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0)
+          val sparkFtrContrib = keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val labelStd = label.distribution.getOrElse(1.0) match {
+          case Continuous(_, _, _, variance) => math.sqrt(variance)
+          // for (binary) logistic regression we only need to multiply by feature standard deviation
+          case Discrete(domain, prob) =>
+            def computeVariance(domain: Seq[String], prob: Seq[Double]): Double = {
+              val floatDomain = domain.map(_.toDouble)
+              val sqfloatDomain = floatDomain.map(math.pow(_, 2))
+              val weighted = (floatDomain, prob).zipped map (_ * _)
+              val sqweighted =  (sqfloatDomain, prob).zipped map (_ * _)
+              val mean = weighted.sum
+              return sqweighted.sum - mean
+            }
+            computeVariance(domain, prob)
+          }
+          // TODO: throw exception if (labelStd == 0)
+          val descaledFtrContrib = sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
           h.parentFeatureOrigins ->
             Insights(
               derivedFeatureName = h.columnName,
@@ -578,8 +596,7 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution =
-                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
+              contribution = keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -648,30 +665,6 @@ case object ModelInsights {
   }
 
   private[op] def getModelContributions
-  (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
-    val stage = model.flatMap {
-      case m: SparkWrapperParams[_] => m.getSparkMlStage()
-      case _ => None
-    }
-    val contributions = stage.collect {
-      case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
-      case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: NaiveBayesModel => m.theta.rowIter.toSeq.map(_.toArray.toSeq)
-      case m: DecisionTreeClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: GBTClassificationModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: LinearSVCModel => Seq(m.coefficients.toArray.toSeq)
-      case m: LinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: DecisionTreeRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: RandomForestRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: GBTRegressionModel => Seq(m.featureImportances.toArray.toSeq)
-      case m: GeneralizedLinearRegressionModel => Seq(m.coefficients.toArray.toSeq)
-      case m: XGBoostRegressionModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
-      case m: XGBoostClassificationModel => Seq(m.nativeBooster.getFeatureScoreVector(featureVectorSize).toArray.toSeq)
-    }
-    contributions.getOrElse(Seq.empty)
-  }
-
-  private[op] def descaleModelContributions
   (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
     val stage = model.flatMap {
       case m: SparkWrapperParams[_] => m.getSparkMlStage()
