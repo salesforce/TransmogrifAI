@@ -487,7 +487,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, label),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -537,7 +537,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
+    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
+    label: LabelSummary
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
@@ -557,6 +558,25 @@ case object ModelInsights {
             case _ => None
           }
           val keptIndex = indexInToIndexKept.get(h.index)
+          val featureStd = getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0)
+          val sparkFtrContrib = keptIndex
+            .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val labelStd = label.distribution.getOrElse(1.0) match {
+            case Continuous(_, _, _, variance) => math.sqrt(variance)
+            // for (binary) logistic regression we only need to multiply by feature standard deviation
+            case Discrete(domain, prob) =>
+              def computeVariance(domain: Seq[String], prob: Seq[Double]): Double = {
+                val floatDomain = domain.map(_.toDouble)
+                val sqfloatDomain = floatDomain.map(math.pow(_, 2))
+                val weighted = (floatDomain, prob).zipped map (_ * _)
+                val sqweighted = (sqfloatDomain, prob).zipped map (_ * _)
+                val mean = weighted.sum
+                return sqweighted.sum - mean
+              }
+              computeVariance(domain, prob)
+          }
+          // TODO: throw exception if (labelStd == 0)
+          val descaledFtrContrib = sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
 
           h.parentFeatureOrigins ->
             Insights(
@@ -578,8 +598,7 @@ case object ModelInsights {
                   getIfExists(idx, s.categoricalStats(groupIdx).contingencyMatrix)
                 case _ => Map.empty[String, Double]
               },
-              contribution =
-                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
+              contribution = sparkFtrContrib,
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
