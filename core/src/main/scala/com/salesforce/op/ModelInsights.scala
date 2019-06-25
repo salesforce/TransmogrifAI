@@ -599,7 +599,7 @@ case object ModelInsights {
                 case _ => Map.empty[String, Double]
               },
               contribution =
-                if (LRStandardization) {
+                if (LRStandardization && sparkFtrContrib.nonEmpty) {
                   sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
                 }
                 else sparkFtrContrib,
