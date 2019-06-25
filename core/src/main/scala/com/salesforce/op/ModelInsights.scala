@@ -487,7 +487,7 @@ case object ModelInsights {
     ModelInsights(
       label = getLabelSummary(label, checkerSummary),
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, label),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, getLabelSummary(label, checkerSummary)),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -673,7 +673,8 @@ case object ModelInsights {
       case _ => None
     }
     stage.collect {
-      case m: LogisticRegressionModel | LinearRegressionModel  => true && m.getStandardization
+      case m: LogisticRegressionModel => true && m.getStandardization
+      case m: LinearRegressionModel => true && m.getStandardization
       case _ => false
     }
   }

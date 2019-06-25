@@ -509,9 +509,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
     val featureInsights = ModelInsights.getFeatureInsights(
       Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      RawFeatureFilterResults()
+      RawFeatureFilterResults(), labelSum
     )
     featureInsights.size shouldBe 2
 
