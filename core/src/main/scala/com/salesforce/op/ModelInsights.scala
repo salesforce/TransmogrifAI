@@ -567,17 +567,17 @@ case object ModelInsights {
             case Some(Continuous(_, _, _, variance)) => math.sqrt(variance)
             case Some(Discrete(domain, prob)) =>
               val (weighted, sqweighted) = (domain zip prob).foldLeft((0.0, 0.0)) {
-              case ((weightSum, sqweightSum), (d, p)) =>
-                val floatD = d.toDouble
-                val weight = floatD * p
-                val sqweight = floatD * weight
-                (weightSum + weight, sqweightSum + sqweight)
-            }
+                case ((weightSum, sqweightSum), (d, p)) =>
+                  val floatD = d.toDouble
+                  val weight = floatD * p
+                  val sqweight = floatD * weight
+                  (weightSum + weight, sqweightSum + sqweight)
+              }
               sqweighted - weighted
-            case Some(d) => throw new Exception("Unsupported distribution type for the label")
-            case None => throw new Exception("Label does not exist, please check your data")
+            case Some(d) => throw new RuntimeException("Unsupported distribution type for the label")
+            case None => throw new RuntimeException("Label does not exist, please check your data")
           }
-          if (labelStd == 0) throw new Exception("The standard deviation of the label is zero, " +
+          if (labelStd == 0) throw new RuntimeException("The standard deviation of the label is zero, " +
             "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
           h.parentFeatureOrigins ->
             Insights(
