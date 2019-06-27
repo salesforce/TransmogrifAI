@@ -128,7 +128,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val standardizedLinReg = new OpLinearRegression().setStandardization(true)
     .setInput(labelData, genFeatureVector).getOutput()
 
-  lazy val linRegWorkFlow = new OpWorkflow().setResultFeatures(standardizedLinReg, unstandardizedLinReg)
+  lazy val linRegWorkFlow = new OpWorkflow().setResultFeatures(standardizedLinReg, unstandardizedLinReg).setInputDataset(rawDF)
   lazy val linRegModel = linRegWorkFlow.train()
   val standardizedFtImp = linRegModel.modelInsights(standardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
   val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
