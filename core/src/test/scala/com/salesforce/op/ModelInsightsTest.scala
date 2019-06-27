@@ -40,12 +40,13 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
-import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.testkit.{RandomReal}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
-import org.scalactic.Equality
+import com.salesforce.op.features.types.Real
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
@@ -70,6 +71,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
   val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
+  val logRegression = new OpLogisticRegression()
   val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
   val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
   val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
@@ -94,6 +96,46 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       new ParamGridBuilder().build()).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
     .setInput(label, features)
     .getOutput()
+
+  def std(x: Seq[Real]): Double = {
+    require(x.size > 1)
+    val mean = x.map(_.toDouble.get).sum / x.size
+    Math.sqrt(x.map(i => Math.pow(i.toDouble.get - mean, 2)).sum / (x.size - 1))
+  }
+  val uniformGen = RandomReal.normal[Real](0,10)
+  uniformGen.reset(42)
+  val uniformPredictor: Seq[Real] = uniformGen.limit(10)
+  val uniformPredictorStd = std(uniformPredictor)
+
+  val normGen = RandomReal.uniform[Real](minValue = 10000.0, maxValue = 20000.0)
+  normGen.reset(42)
+  val normalPredictor: Seq[Real] = normGen.limit(10)
+  val normalPredictorStd = std(normalPredictor)
+
+  val linearRegLabel = (normalPredictor, uniformPredictor).zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
+  val linearRegLabelStd = std(linearRegLabel)
+
+  val generatedData = uniformPredictor.zip(normalPredictor).zip(linearRegLabel) .map {
+    case ((f1, f2), label) => (f1, f2, label)
+  }
+  val (rawDF, rawUnif, rawNorm, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
+  val labelData = rawLabel.copy(isResponse = true)
+  val genFeatureVector = rawUnif.vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(rawNorm))
+
+  val unstandardizedLinReg = new OpLinearRegression().setStandardization(false)
+    .setInput(labelData, genFeatureVector).getOutput()
+
+  val standardizedLinReg = new OpLinearRegression().setStandardization(true)
+    .setInput(labelData, genFeatureVector).getOutput()
+
+  lazy val linRegWorkFlow = new OpWorkflow().setResultFeatures(standardizedLinReg, unstandardizedLinReg)
+  lazy val linRegModel = linRegWorkFlow.train()
+  val standardizedFtImp = linRegModel.modelInsights(standardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
+  val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
+  it should "correctly return the descaled coefficient for linear regression, " +
+    "regardless whether features were standardized or not" in {
+    standardizedFtImp shouldEqual unstandardizedFtImp
+  }
 
   val params = new OpParams()
 

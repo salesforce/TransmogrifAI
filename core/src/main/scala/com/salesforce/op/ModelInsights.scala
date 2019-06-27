@@ -672,11 +672,13 @@ case object ModelInsights {
   }
 
   private[op] def checkLRStandardization(model: Option[Model[_]]): Option[Boolean] = {
-    for {
-      m : SparkWrapperParams[_] <- model
-      stage <- m.getSparkMlStage()
-    } yield stage match {
-      case s: LogisticRegressionModel | LinearRegressionModel => s.getStandardization
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    stage.collect {
+      case m: LogisticRegressionModel => m.getStandardization
+      case m: LinearRegressionModel => m.getStandardization
       case _ => false
     }
   }
