@@ -562,22 +562,23 @@ case object ModelInsights {
           val sparkFtrContrib = keptIndex
             .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
           val LRStandardization = checkLRStandardization(model).getOrElse(false)
-          val labelStd = label.distribution.getOrElse(1.0) match {
-            case Continuous(_, _, _, variance) => math.sqrt(variance)
-            // for (binary) logistic regression we only need to multiply by feature standard deviation
-            case Discrete(domain, prob) =>
-              def computeVariance(domain: Seq[String], prob: Seq[Double]): Double = {
-                val floatDomain = domain.map(_.toDouble)
-                val sqfloatDomain = floatDomain.map(math.pow(_, 2))
-                val weighted = (floatDomain, prob).zipped map (_ * _)
-                val sqweighted = (sqfloatDomain, prob).zipped map (_ * _)
-                val mean = weighted.sum
-                return sqweighted.sum - mean
-              }
-              computeVariance(domain, prob)
-          }
-          // TODO: throw exception if (labelStd == 0)
 
+          val labelStd = label.distribution match {
+            case Some(Continuous(_, _, _, variance)) => math.sqrt(variance)
+            case Some(Discrete(domain, prob)) =>
+              val (weighted, sqweighted) = (domain zip prob).foldLeft((0.0, 0.0)) {
+              case ((weightSum, sqweightSum), (d, p)) =>
+                val floatD = d.toDouble
+                val weight = floatD * p
+                val sqweight = floatD * weight
+                (weightSum + weight, sqweightSum + sqweight)
+            }
+              sqweighted - weighted
+            case Some(d) => throw new Exception("Unsupported distribution type for the label")
+            case None => throw new Exception("Label does not exist, please check your data")
+          }
+          if (labelStd == 0) throw new Exception("The standard deviation of the label is zero, " +
+            "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
           h.parentFeatureOrigins ->
             Insights(
               derivedFeatureName = h.columnName,
@@ -671,13 +672,11 @@ case object ModelInsights {
   }
 
   private[op] def checkLRStandardization(model: Option[Model[_]]): Option[Boolean] = {
-    val stage = model.flatMap {
-      case m: SparkWrapperParams[_] => m.getSparkMlStage()
-      case _ => None
-    }
-    stage.collect {
-      case m: LogisticRegressionModel => true && m.getStandardization
-      case m: LinearRegressionModel => true && m.getStandardization
+    for {
+      m : SparkWrapperParams[_] <- model
+      stage <- m.getSparkMlStage()
+    } yield stage match {
+      case s: LogisticRegressionModel | LinearRegressionModel => s.getStandardization
       case _ => false
     }
   }
