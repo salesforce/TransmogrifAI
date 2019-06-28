@@ -549,10 +549,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
     /**
-      * Compare the aggregation made by RecordInsightsLOCO to one made manually
-      *
-      * @param predicate  predicate used by RecordInsights in order to aggregate
-      */
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     *
+     * @param predicate  predicate used by RecordInsights in order to aggregate
+     */
     def assertAggregatedWithPredicate(predicate: OpVectorColumnHistory => Boolean): Unit = {
       val dateIndices = meta.getColumnHistory()
         .filter(predicate)
@@ -585,10 +585,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     }
 
     /**
-      * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
-      *
-      * @param dateFeature Text Field
-      */
+     * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
+     *
+     * @param dateFeature Text Field
+     */
     def assertAggregatedDate(dateFeature: FeatureLike[_ <: Date]): Unit = {
       for { timePeriod <- TransmogrifierDefaults.CircularDateRepresentations } {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeature.name) &&
@@ -599,10 +599,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     }
 
     /**
-      * Compare the aggregation made by RecordInsightsLOCO to one made manually
-      *
-      * @param dateMapFeature Text Map Field
-      */
+     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     *
+     * @param dateMapFeature Text Map Field
+     */
     def assertAggregatedDateMap(dateMapFeature: FeatureLike[_ <: DateMap], keyName: String): Unit = {
       for { timePeriod <- TransmogrifierDefaults.CircularDateRepresentations } {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeature.name) &&

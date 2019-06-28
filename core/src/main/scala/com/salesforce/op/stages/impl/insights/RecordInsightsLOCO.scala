@@ -151,7 +151,8 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   /**
-   * Optionally convert columnMetadata's descriptorValue like "y_DayOfWeek", "x_DayOfWeek" to TimePeriod enum - DayOfWeek.
+   * Optionally convert columnMetadata's descriptorValue like
+   * "y_DayOfWeek", "x_DayOfWeek" to TimePeriod enum - DayOfWeek.
    * @return Option[TimePeriod]
    */
   private def convertToTimePeriod(descriptorValue: String): Option[TimePeriod] =
