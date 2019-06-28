@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.insights
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
+import com.salesforce.op.stages.impl.feature.{DateToUnitCircle, TimePeriod}
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
@@ -41,10 +42,35 @@ import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.ml.param.{IntParam, Param}
+import org.apache.spark.ml.param.{IntParam, Param, Params}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
+
+trait RecordInsightsLOCOParams extends Params {
+
+  final val topK = new IntParam(
+    parent = this, name = "topK",
+    doc = "Number of insights to keep for each record"
+  )
+  def setTopK(value: Int): this.type = set(topK, value)
+  def getTopK: Int = $(topK)
+
+  final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
+    doc = "Whether returning topK based on absolute value or topK positives and negatives. For MultiClassification," +
+      " the value is from the predicted class (i.e. the class having the highest probability)"
+  )
+  def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
+  def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
+
+
+
+  setDefault(
+    topK -> 20,
+    topKStrategy -> TopKStrategy.Abs.entryName
+  )
+}
 
 /**
  * Creates record level insights for model predictions. Takes the model to explain as a constructor argument.
@@ -65,24 +91,8 @@ class RecordInsightsLOCO[T <: Model[T]]
 (
   val model: T,
   uid: String = UID[RecordInsightsLOCO[_]]
-) extends UnaryTransformer[OPVector, TextMap](operationName = "recordInsightsLOCO", uid = uid) {
-
-  final val topK = new IntParam(
-    parent = this, name = "topK",
-    doc = "Number of insights to keep for each record"
-  )
-
-  def setTopK(value: Int): this.type = set(topK, value)
-  def getTopK: Int = $(topK)
-  setDefault(topK -> 20)
-
-  final val topKStrategy = new Param[String](parent = this, name = "topKStrategy",
-    doc = "Whether returning topK based on absolute value or topK positives and negatives. For MultiClassification," +
-      " the value is from the predicted class (i.e. the class having the highest probability)"
-  )
-  def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
-  def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
-  setDefault(topKStrategy, TopKStrategy.Abs.entryName)
+) extends UnaryTransformer[OPVector, TextMap](operationName = "recordInsightsLOCO", uid = uid)
+  with RecordInsightsLOCOParams {
 
   private val modelApply = model match {
     case m: SelectedModel => m.transformFn
@@ -100,10 +110,23 @@ class RecordInsightsLOCO[T <: Model[T]]
     Set(FeatureType.typeName[Text], FeatureType.typeName[TextArea], FeatureType.typeName[TextList])
   private val textMapTypes =
     Set(FeatureType.typeName[TextMap], FeatureType.typeName[TextAreaMap])
+  private val dateTypes =
+    Set(FeatureType.typeName[Date], FeatureType.typeName[DateTime])
+  private val dateMapTypes =
+    Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
   // Indices of features derived from Text(Map)Vectorizer
-  private lazy val textFeatureIndices = histories
-    .filter(_.parentFeatureType.exists((textTypes ++ textMapTypes).contains))
+  private lazy val textFeatureIndices = getIndicesOfFeatureType(textTypes ++ textMapTypes)
+
+  // Indices of features derived from Date(Map)Vectorizer
+  private lazy val dateFeatureIndices = getIndicesOfFeatureType(dateTypes ++ dateMapTypes)
+
+  /**
+   * Return the indices of features derived from given types.
+   * @return Seq[Int]
+   */
+  private def getIndicesOfFeatureType (types: Set[String]): Seq[Int] = histories
+    .filter(_.parentFeatureType.exists((types).contains))
     .map(_.index)
     .distinct.sorted
 
@@ -126,6 +149,13 @@ class RecordInsightsLOCO[T <: Model[T]]
   private def sumArrays(left: Array[Double], right: Array[Double]): Array[Double] = {
     left.zipAll(right, 0.0, 0.0).map { case (l, r) => l + r }
   }
+
+  /**
+   * Optionally convert columnMetadata's descriptorValue like "y_DayOfWeek", "x_DayOfWeek" to TimePeriod enum - DayOfWeek.
+   * @return Option[TimePeriod]
+   */
+  private def convertToTimePeriod(descriptorValue: String): Option[TimePeriod] =
+    descriptorValue.split("_").lastOption.flatMap(TimePeriod.withNameInsensitiveOption)
 
   private def returnTopPosNeg
   (
@@ -161,7 +191,28 @@ class RecordInsightsLOCO[T <: Model[T]]
           val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
           aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
         }
-      } else {
+      }
+      // Let's check the descriptor value
+      // If those values exist, the field is likely to be a derived date feature from unit circle transformer.
+      else if (dateFeatureIndices.contains(oldInd) && history.descriptorValue.isDefined) {
+        // Name of the field
+        val rawName: Option[String] = history.parentFeatureType match {
+          case s if s.exists(dateMapTypes.contains) => {
+            val grouping = history.grouping
+            history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
+          }
+          case s if s.exists(dateTypes.contains) => history.parentFeatureOrigins.headOption
+          case s => throw new Error(s"type should be Date or DateMap, here ${s.mkString(",")}")
+        }
+        val timePeriod = history.descriptorValue.flatMap(convertToTimePeriod)
+        // Update the aggregation map
+        for {name <- rawName} {
+          val key = name + "_" + timePeriod.map(_.entryName).getOrElse("")
+          val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
+          aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
+        }
+      }
+      else {
         minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
       }
     }
@@ -185,8 +236,8 @@ class RecordInsightsLOCO[T <: Model[T]]
     val featuresSparse = features.value.toSparse
     val res = ArrayBuffer.empty[(Int, Double)]
     featuresSparse.foreachActive((i, v) => res += i -> v)
-    // Besides non 0 values, we want to check the text features as well
-    textFeatureIndices.foreach(i => if (!featuresSparse.indices.contains(i)) res += i -> 0.0)
+    // Besides non 0 values, we want to check the text/date features as well
+    (textFeatureIndices ++ dateFeatureIndices).foreach(i => if (!featuresSparse.indices.contains(i)) res += i -> 0.0)
     val featureArray = res.toArray
     val featureSize = featuresSparse.size
 
