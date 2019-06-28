@@ -97,7 +97,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .getOutput()
 
   val smallFeatureVariance = 10.0
-  val bigFeatureVariance= 100.0
+  val bigFeatureVariance = 100.0
   val smallNorm = RandomReal.normal[Real](0, smallFeatureVariance).limit(1000)
   val bigNorm = RandomReal.normal[Real](10000.0, bigFeatureVariance).limit(1000)
   val linearRegLabel = (smallNorm, bigNorm)
@@ -125,9 +125,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   lazy val linRegWorkFlow = new OpWorkflow()
     .setResultFeatures(unstandardizedpred, standardizedpred).setInputDataset(rawDF)
   lazy val linRegModel = linRegWorkFlow.train()
-  lazy val standardizedLinModel = Option(linRegModel.getOriginStageOf(standardizedpred).asInstanceOf[OpLinearRegressionModel])
-  val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedpred).features.map(_.derivedFeatures.map(_.contribution))
-  val standardizedFtImp = linRegModel.modelInsights(standardizedpred).features.map(_.derivedFeatures.map(_.contribution))
+  lazy val standardizedLinModel = Option(linRegModel.getOriginStageOf(standardizedpred)
+    .asInstanceOf[OpLinearRegressionModel])
+  val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedpred)
+    .features.map(_.derivedFeatures.map(_.contribution))
+  val standardizedFtImp = linRegModel.modelInsights(standardizedpred)
+    .features.map(_.derivedFeatures.map(_.contribution))
   val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
   val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
   val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
@@ -696,9 +699,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "correctly return the descaled coefficient for linear regression, " +
     "when standardization is on" in {
 
-    // Since 5000 & 1 are always returned as the coefficients of the model trained on unstandardized data
-    // and we can analytically calculate the scaled version of them by the linear regression formula,
-    // the coefficients of the model trained on standardized data should be within a small distance of the analytical formula.
+    // Since 5000 & 1 are always returned as the coefficients of the model
+    // trained on unstandardized data and we can analytically calculate
+    // the scaled version of them by the linear regression formula, the coefficients
+    // of the model trained on standardized data should be within a small distance of the analytical formula.
 
     // difference between the real coefficient and the analytical formula
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
