@@ -35,13 +35,13 @@ import com.salesforce.op.features.{Feature, FeatureDistributionType}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
-import com.salesforce.op.testkit.{RandomReal}
+import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -49,7 +49,6 @@ import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
@@ -97,45 +96,42 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .setInput(label, features)
     .getOutput()
 
-  def std(x: Seq[Real]): Double = {
-    require(x.size > 1)
-    val mean = x.map(_.toDouble.get).sum / x.size
-    Math.sqrt(x.map(i => Math.pow(i.toDouble.get - mean, 2)).sum / (x.size - 1))
-  }
-  val uniformGen = RandomReal.normal[Real](0,10)
-  uniformGen.reset(42)
-  val uniformPredictor: Seq[Real] = uniformGen.limit(10)
-  val uniformPredictorStd = std(uniformPredictor)
+  val smallFeatureVariance = 10.0
+  val bigFeatureVariance= 100.0
+  val smallNorm = RandomReal.normal[Real](0, smallFeatureVariance).limit(1000)
+  val bigNorm = RandomReal.normal[Real](10000.0, bigFeatureVariance).limit(1000)
+  val linearRegLabel = (smallNorm, bigNorm)
+    .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
 
-  val normGen = RandomReal.uniform[Real](minValue = 10000.0, maxValue = 20000.0)
-  normGen.reset(42)
-  val normalPredictor: Seq[Real] = normGen.limit(10)
-  val normalPredictorStd = std(normalPredictor)
+  // label is a sum of two scaled Normals, hence we also know its standard deviation
+  val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
 
-  val linearRegLabel = (normalPredictor, uniformPredictor).zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
-  val linearRegLabelStd = std(linearRegLabel)
-
-  val generatedData = uniformPredictor.zip(normalPredictor).zip(linearRegLabel) .map {
+  val generatedData = smallNorm.zip(bigNorm).zip(linearRegLabel).map {
     case ((f1, f2), label) => (f1, f2, label)
   }
-  val (rawDF, rawUnif, rawNorm, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
+  val (rawDF, rawSmall, rawBig, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
   val labelData = rawLabel.copy(isResponse = true)
-  val genFeatureVector = rawUnif.vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(rawNorm))
+  val genFeatureVector = rawSmall
+    .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(rawBig))
 
-  val unstandardizedLinReg = new OpLinearRegression().setStandardization(false)
-    .setInput(labelData, genFeatureVector).getOutput()
+  val checkedFeatures = labelData.sanityCheck(genFeatureVector, removeBadFeatures = false)
 
-  val standardizedLinReg = new OpLinearRegression().setStandardization(true)
-    .setInput(labelData, genFeatureVector).getOutput()
+  val unstandardizedpred = new OpLinearRegression().setStandardization(false)
+    .setInput(labelData, checkedFeatures).getOutput()
 
-  lazy val linRegWorkFlow = new OpWorkflow().setResultFeatures(standardizedLinReg, unstandardizedLinReg).setInputDataset(rawDF)
+  val standardizedpred = new OpLinearRegression().setStandardization(true)
+    .setInput(labelData, checkedFeatures).getOutput()
+
+  lazy val linRegWorkFlow = new OpWorkflow()
+    .setResultFeatures(unstandardizedpred, standardizedpred).setInputDataset(rawDF)
   lazy val linRegModel = linRegWorkFlow.train()
-  val standardizedFtImp = linRegModel.modelInsights(standardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
-  val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedLinReg).features.map(_.derivedFeatures.map(_.contribution))
-  it should "correctly return the descaled coefficient for linear regression, " +
-    "regardless whether features were standardized or not" in {
-    standardizedFtImp shouldEqual unstandardizedFtImp
-  }
+  lazy val standardizedLinModel = Option(linRegModel.getOriginStageOf(standardizedpred).asInstanceOf[OpLinearRegressionModel])
+  val unstandardizedFtImp = linRegModel.modelInsights(unstandardizedpred).features.map(_.derivedFeatures.map(_.contribution))
+  val standardizedFtImp = linRegModel.modelInsights(standardizedpred).features.map(_.derivedFeatures.map(_.contribution))
+  val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
+  val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
+  val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
+  val orginalbigCoeff = unstandardizedFtImp.flatten.flatten.last
 
   val params = new OpParams()
 
@@ -695,5 +691,19 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       f.variance.isEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
     }
+  }
+
+  it should "correctly return the descaled coefficient for linear regression, " +
+    "when standardization is on" in {
+
+    // Since 5000 & 1 are always returned as the coefficients of the model trained on unstandardized data
+    // and we can analytically calculate the scaled version of them by the linear regression formula,
+    // the coefficients of the model trained on standardized data should be within a small distance of the analytical formula.
+
+    // difference between the real coefficient and the analytical formula
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
+    absError < 2.5 shouldBe true
+    absError2 < 0.01 shouldBe true
   }
 }
