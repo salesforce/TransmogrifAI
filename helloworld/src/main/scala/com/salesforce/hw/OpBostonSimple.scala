@@ -41,24 +41,24 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 /**
-  * Define a case class representing the Boston housing data
-  *
-  * @param rowId   id of the house
-  * @param crim    per capita crime rate by town
-  * @param zn      proportion of residential land zoned for lots over 25,000 sq.ft.
-  * @param indus   proportion of non-retail business acres per town
-  * @param chas    Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)
-  * @param nox     nitric oxides concentration (parts per 10 million)
-  * @param rm      average number of rooms per dwelling
-  * @param age     proportion of owner-occupied units built prior to 1940
-  * @param dis     weighted distances to five Boston employment centres
-  * @param rad     index of accessibility to radial highways
-  * @param tax     full-value property-tax rate per $10,000
-  * @param ptratio pupil-teacher ratio by town
-  * @param b       1000(Bk - 0.63)**2 where Bk is the proportion of blacks by town
-  * @param lstat   % lower status of the population
-  * @param medv    median value of owner-occupied homes in $1000's
-  */
+ * Define a case class representing the Boston housing data
+ *
+ * @param rowId   id of the house
+ * @param crim    per capita crime rate by town
+ * @param zn      proportion of residential land zoned for lots over 25,000 sq.ft.
+ * @param indus   proportion of non-retail business acres per town
+ * @param chas    Charles River dummy variable (= 1 if tract bounds river; 0 otherwise)
+ * @param nox     nitric oxides concentration (parts per 10 million)
+ * @param rm      average number of rooms per dwelling
+ * @param age     proportion of owner-occupied units built prior to 1940
+ * @param dis     weighted distances to five Boston employment centres
+ * @param rad     index of accessibility to radial highways
+ * @param tax     full-value property-tax rate per $10,000
+ * @param ptratio pupil-teacher ratio by town
+ * @param b       1000(Bk - 0.63)**2 where Bk is the proportion of blacks by town
+ * @param lstat   % lower status of the population
+ * @param medv    median value of owner-occupied homes in $1000's
+ */
 case class BostonHouse
 (
   rowId: Int,
@@ -124,9 +124,9 @@ object OpBostonSimple {
     // Define a feature of type vector containing all the predictors you'd like to use
     val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
 
-    val labels = medv
+    val label = medv
 
-    val checkedFeatures = labels.sanityCheck(features, removeBadFeatures = true)
+    val checkedFeatures = label.sanityCheck(features, removeBadFeatures = true)
 
     ////////////////////////////////////////////////////////////////////////////////
     // WORKFLOW DEFINITION
@@ -137,9 +137,9 @@ object OpBostonSimple {
     val prediction = RegressionModelSelector
       .withTrainValidationSplit(
         modelTypesToUse = Seq(OpLinearRegression))
-      .setInput(labels, checkedFeatures).getOutput()
+      .setInput(label, checkedFeatures).getOutput()
 
-    val evaluator = Evaluators.Regression().setLabelCol(labels).setPredictionCol(prediction)
+    val evaluator = Evaluators.Regression().setLabelCol(label).setPredictionCol(prediction)
 
     ////////////////////////////////////////////////////////////////////////////////
     // WORKFLOW
@@ -147,11 +147,23 @@ object OpBostonSimple {
 
     val dataReader = DataReaders.Simple.csvCase[BostonHouse](path = Option(csvFilePath), key = _.rowId.toString())
 
-    val workflow = new OpWorkflow().setResultFeatures(prediction, labels).setReader(dataReader)
+    val workflow = new OpWorkflow().setResultFeatures(prediction, label).setReader(dataReader)
 
     val model = workflow.train()
 
     println(s"Model summary:\n${model.summaryPretty()}")
+
+    // Extract information (i.e. feature importance) via model insights
+    val modelInsights = model.modelInsights(prediction)
+    val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+    val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
+      feature.contribution.map( contribution => math.abs(contribution))
+        .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
+    val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
+
+    val topNum = math.min(20, sortedContributions.size)
+    println(s"Top $topNum feature contributions:")
+    sortedContributions.take(topNum).foreach( featureInfo => println(s"${featureInfo._1}: ${featureInfo._2}"))
 
     // Manifest the result features of the workflow
     println("Scoring the model")

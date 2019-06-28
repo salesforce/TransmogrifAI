@@ -41,14 +41,14 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 /**
-  * Define a case class corresponding to our data
-  * @param id           flower id
-  * @param sepalLength  sepal length in cm
-  * @param sepalWidth   sepal width in cm
-  * @param petalLength  petal length in cm
-  * @param petalWidth   petal width in cm
-  * @param irisClass    class of iris (Iris Setosa, Iris Veriscolour, Iris Virginica)
-  */
+ * Define a case class corresponding to our data
+ * @param id           flower id
+ * @param sepalLength  sepal length in cm
+ * @param sepalWidth   sepal width in cm
+ * @param petalLength  petal length in cm
+ * @param petalWidth   petal width in cm
+ * @param irisClass    class of iris (Iris Setosa, Iris Veriscolour, Iris Virginica)
+ */
 case class Iris
 (
   id: Int,
@@ -95,9 +95,9 @@ object OpIrisSimple {
     // Define a feature of type vector containing all the predictors you'd like to use
     val features = Seq(sepalLength, sepalWidth, petalLength, petalWidth).transmogrify()
 
-    val labels = irisClass.indexed()
+    val label = irisClass.indexed()
 
-    val checkedFeatures = labels.sanityCheck(features, removeBadFeatures = true)
+    val checkedFeatures = label.sanityCheck(features, removeBadFeatures = true)
 
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -109,9 +109,9 @@ object OpIrisSimple {
     val prediction = MultiClassificationModelSelector
       .withTrainValidationSplit(
         modelTypesToUse = Seq(OpLogisticRegression))
-      .setInput(labels, checkedFeatures).getOutput()
+      .setInput(label, checkedFeatures).getOutput()
 
-    val evaluator = Evaluators.MultiClassification().setLabelCol(labels).setPredictionCol(prediction)
+    val evaluator = Evaluators.MultiClassification().setLabelCol(label).setPredictionCol(prediction)
 
     ////////////////////////////////////////////////////////////////////////////////
     // WORKFLOW
@@ -119,11 +119,24 @@ object OpIrisSimple {
 
     val dataReader = DataReaders.Simple.csvCase[Iris](path = Option(csvFilePath), key = _.id.toString())
 
-    val workflow = new OpWorkflow().setResultFeatures(prediction, labels).setReader(dataReader)
+    val workflow = new OpWorkflow().setResultFeatures(prediction, label).setReader(dataReader)
 
     val model = workflow.train()
 
     println(s"Model summary:\n${model.summaryPretty()}")
+
+    // Extract information (i.e. feature importance) via model insights
+    val modelInsights = model.modelInsights(prediction)
+    val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+    val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
+      feature.contribution.map( contribution => math.abs(contribution))
+        .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
+    val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
+
+    val topNum = math.min(20, sortedContributions.size)
+    println(s"Top $topNum feature contributions:")
+    sortedContributions.take(topNum).foreach( featureInfo => println(s"${featureInfo._1}: ${featureInfo._2}"))
+
 
     // Manifest the result features of the workflow
     println("Scoring the model")
