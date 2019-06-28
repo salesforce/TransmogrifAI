@@ -34,32 +34,44 @@ import com.salesforce.op.aggregators.MaxReal
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import org.joda.time.Duration
+import PassengerFeaturesTestLambdas._
 
 
 trait PassengerFeaturesTest {
-
-  val age = FeatureBuilder.Real[Passenger].extract(_.getAge.toReal).aggregate(MaxReal).asPredictor
-  val gender = FeatureBuilder.MultiPickList[Passenger].extract(p => Set(p.getGender).toMultiPickList).asPredictor
-  val genderPL = FeatureBuilder.PickList[Passenger].extract(p => p.getGender.toPickList).asPredictor
-
-  val height = FeatureBuilder.RealNN[Passenger]
-    .extract(p => Option(p.getHeight).map(_.toDouble).toRealNN(0.0))
-    .window(Duration.millis(300))
-    .asPredictor
-
-  val heightNoWindow = FeatureBuilder.Real[Passenger].extract(_.getHeight.toReal).asPredictor
-  val weight = FeatureBuilder.Real[Passenger].extract(_.getWeight.toReal).asPredictor
-  val description = FeatureBuilder.Text[Passenger].extract(_.getDescription.toText).asPredictor
-  val boarded = FeatureBuilder.DateList[Passenger].extract(p => Seq(p.getBoarded.toLong).toDateList).asPredictor
-  val stringMap = FeatureBuilder.TextMap[Passenger].extract(p => p.getStringMap.toTextMap).asPredictor
-  val numericMap = FeatureBuilder.RealMap[Passenger].extract(p => p.getNumericMap.toRealMap).asPredictor
-  val booleanMap = FeatureBuilder.BinaryMap[Passenger].extract(p => p.getBooleanMap.toBinaryMap).asPredictor
-  val survived = FeatureBuilder.Binary[Passenger].extract(p => Option(p.getSurvived).map(_ == 1).toBinary).asResponse
-  val boardedTime = FeatureBuilder.Date[Passenger].extract(_.getBoarded.toLong.toDate).asPredictor
-  val boardedTimeAsDateTime = FeatureBuilder.DateTime[Passenger].extract(_.getBoarded.toLong.toDateTime).asPredictor
+  val age = FeatureBuilder.Real[Passenger].extract(ageFn).aggregate(MaxReal).asPredictor
+  val gender = FeatureBuilder.MultiPickList[Passenger].extract(genderFn).asPredictor
+  val genderPL = FeatureBuilder.PickList[Passenger].extract(genderPLFn).asPredictor
+  val height = FeatureBuilder.RealNN[Passenger].extract(heightFn).window(Duration.millis(300)).asPredictor
+  val heightNoWindow = FeatureBuilder.Real[Passenger].extract(heightToReal).asPredictor
+  val weight = FeatureBuilder.Real[Passenger].extract(weightToReal).asPredictor
+  val description = FeatureBuilder.Text[Passenger].extract(descriptionFn).asPredictor
+  val boarded = FeatureBuilder.DateList[Passenger].extract(boardedToDL).asPredictor
+  val stringMap = FeatureBuilder.TextMap[Passenger].extract(stringMapFn).asPredictor
+  val numericMap = FeatureBuilder.RealMap[Passenger].extract(numericMapFn).asPredictor
+  val booleanMap = FeatureBuilder.BinaryMap[Passenger].extract(booleanMapFn).asPredictor
+  val survived = FeatureBuilder.Binary[Passenger].extract(survivedFn).asResponse
+  val boardedTime = FeatureBuilder.Date[Passenger].extract(boardedTimeFn).asPredictor
+  val boardedTimeAsDateTime = FeatureBuilder.DateTime[Passenger].extract(boardedDTFn).asPredictor
 
   val rawFeatures: Array[OPFeature] = Array(
     survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap
   )
 
+}
+
+object PassengerFeaturesTestLambdas {
+  def genderFn: Passenger => MultiPickList = p => Set(p.getGender).toMultiPickList
+  def genderPLFn: Passenger => PickList = p => p.getGender.toPickList
+  def heightFn: Passenger => RealNN = p => Option(p.getHeight).map(_.toDouble).toRealNN(0.0)
+  def heightToReal: Passenger => Real = _.getHeight.toReal
+  def weightToReal: Passenger => Real = _.getWeight.toReal
+  def descriptionFn: Passenger => Text = _.getDescription.toText
+  def boardedToDL: Passenger => DateList = p => Seq(p.getBoarded.toLong).toDateList
+  def stringMapFn: Passenger => TextMap = p => p.getStringMap.toTextMap
+  def numericMapFn: Passenger => RealMap = p => p.getNumericMap.toRealMap
+  def booleanMapFn: Passenger => BinaryMap = p => p.getBooleanMap.toBinaryMap
+  def survivedFn: Passenger => Binary = p => Option(p.getSurvived).map(_ == 1).toBinary
+  def boardedTimeFn: Passenger => Date = _.getBoarded.toLong.toDate
+  def boardedDTFn: Passenger => DateTime = _.getBoarded.toLong.toDateTime
+  def ageFn: Passenger => Real = _.getAge.toReal
 }

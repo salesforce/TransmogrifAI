@@ -135,9 +135,10 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Updated instance of feature
    */
   def getUpdatedFeatures(features: Array[OPFeature]): Array[OPFeature] = {
-    val allFeatures = rawFeatures ++ blacklistedFeatures ++ stages.map(_.getOutput())
-    features.map{f => allFeatures.find(_.sameOrigin(f))
-      .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
+    val allFeatures = getRawFeatures() ++ getBlacklist() ++ getStages().map(_.getOutput())
+    features.map { f =>
+      allFeatures.find(_.sameOrigin(f))
+        .getOrElse(throw new IllegalArgumentException(s"feature $f is not a part of this workflow"))
     }
   }
 

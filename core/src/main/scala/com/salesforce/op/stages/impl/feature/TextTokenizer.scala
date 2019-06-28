@@ -34,10 +34,14 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.feature.TextTokenizer.TextTokenizerResult
+import com.salesforce.op.stages.{OpPipelineStageReaderWriter, ReaderWriter}
 import com.salesforce.op.utils.text.{Language, _}
 import org.apache.spark.ml.param._
+import org.json4s.{JObject, JValue}
+import org.json4s.JsonDSL._
 
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.Try
 
 trait LanguageDetectionParams extends Params {
 
@@ -111,6 +115,7 @@ trait TextTokenizerParams extends LanguageDetectionParams with TextMatchingParam
  * @param analyzer         a text analyzer instance (defaults to a [[LuceneTextAnalyzer]])
  * @param uid              uid of the stage
  */
+@ReaderWriter(classOf[TextTokenizerReaderWriter[_ <: Text]])
 class TextTokenizer[T <: Text]
 (
   val languageDetector: LanguageDetector = TextTokenizer.LanguageDetector,
@@ -124,7 +129,7 @@ class TextTokenizer[T <: Text]
 object TextTokenizer {
   val LanguageDetector: LanguageDetector = new OptimaizeLanguageDetector()
   val Analyzer: TextAnalyzer = new LuceneTextAnalyzer()
-  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneTextAnalyzer(LuceneTextAnalyzer.withHtmlStripping)
+  val AnalyzerHtmlStrip: TextAnalyzer = new LuceneHtmlStripTextAnalyzer()
   val AutoDetectLanguage = false
   val AutoDetectThreshold = 0.99
   val DefaultLanguage: Language = Language.Unknown
@@ -193,4 +198,63 @@ object TextTokenizer {
      */
     def tokens: TextList = sentences.flatMap(_.value).toTextList
   }
+}
+
+
+/**
+ * Special reader/writer class for [[TextTokenizer]] stage
+ */
+class TextTokenizerReaderWriter[T <: Text] extends OpPipelineStageReaderWriter[TextTokenizer[T]] {
+
+  /**
+   * Read stage from json
+   *
+   * @param stageClass stage class
+   * @param json       json to read stage from
+   * @return read result
+   */
+  def read(stageClass: Class[TextTokenizer[T]], json: JValue): Try[TextTokenizer[T]] = Try {
+    val languageDetector = ((json \ "languageDetector").extract[JObject] \ "className").extract[String] match {
+      case c if c == classOf[OptimaizeLanguageDetector].getName => new OptimaizeLanguageDetector
+    }
+    val analyzerJson = (json \ "analyzer").extract[JObject]
+    val analyzer = (analyzerJson \ "className").extract[String] match {
+      case c if c == classOf[LuceneRegexTextAnalyzer].getName =>
+        new LuceneRegexTextAnalyzer(
+          pattern = (analyzerJson \ "pattern").extract[String],
+          group = (analyzerJson \ "group").extract[Int]
+        )
+      case c if c == classOf[LuceneHtmlStripTextAnalyzer].getName => new LuceneHtmlStripTextAnalyzer
+      case c if c == classOf[LuceneTextAnalyzer].getName => new LuceneTextAnalyzer
+      case c if c == classOf[OpenNLPAnalyzer].getName => new OpenNLPAnalyzer
+      case c => throw new RuntimeException(s"Unknown text analyzer class: $c")
+    }
+    val tti = FeatureType.featureTypeTag((json \ "tti").extract[String]).asInstanceOf[TypeTag[T]]
+
+    new TextTokenizer[T](
+      uid = (json \ "uid").extract[String],
+      languageDetector = languageDetector,
+      analyzer = analyzer
+    )(tti)
+  }
+
+  /**
+   * Write stage to json
+   *
+   * @param stage stage instance to write
+   * @return write result
+   */
+  def write(stage: TextTokenizer[T]): Try[JValue] = Try {
+    val analyzer: JValue = stage.analyzer match {
+      case r: LuceneRegexTextAnalyzer =>
+        ("className" -> r.getClass.getName) ~ ("pattern" -> r.pattern) ~ ("group" -> r.group)
+      case _ =>
+        "className" -> stage.analyzer.getClass.getName
+    }
+    ("uid" -> stage.uid) ~
+      ("tti" -> FeatureType.typeName(stage.tti)) ~
+      ("languageDetector" -> ("className" -> stage.languageDetector.getClass.getName)) ~
+      ("analyzer" -> analyzer)
+  }
+
 }

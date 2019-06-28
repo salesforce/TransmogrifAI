@@ -284,4 +284,3 @@ class ReflectionUtilsTest extends FlatSpec with Matchers {
   }
 
 }
-

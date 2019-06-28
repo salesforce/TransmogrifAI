@@ -185,7 +185,7 @@ object FeatureBuilder {
    * @param response    response feature name
    * @param nonNullable optional non nullable feature names
    * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
-   * @throws RuntimeException if fails to construct a response feature
+   * @throws RuntimeException         if fails to construct a response feature
    * @return label and other features
    */
   def fromSchema[ResponseType <: FeatureType : WeakTypeTag](
@@ -218,28 +218,43 @@ object FeatureBuilder {
   }
 
   /**
-    * Builds features from a [[DataFrame]]
-    *
-    * @param data        input [[DataFrame]]
-    * @param response    response feature name
-    * @param nonNullable optional non nullable feature names
-    * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
-    * @throws RuntimeException if fails to construct a response feature
-    * @return label and other features
-    */
+   * Builds features from a [[DataFrame]]
+   *
+   * @param data        input [[DataFrame]]
+   * @param response    response feature name
+   * @param nonNullable optional non nullable feature names
+   * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
+   * @throws RuntimeException         if fails to construct a response feature
+   * @return label and other features
+   */
   def fromDataFrame[ResponseType <: FeatureType : WeakTypeTag](data: DataFrame, response: String, nonNullable: Set[String] = Set.empty): (Feature[ResponseType], Array[Feature[_ <: FeatureType]]) = fromSchema(data.schema, response, nonNullable)
   def fromRow[O <: FeatureType : WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, None)
   def fromRow[O <: FeatureType : WeakTypeTag](name: String): FeatureBuilderWithExtract[Row, O] = fromRow[O](name, None)
   def fromRow[O <: FeatureType : WeakTypeTag](index: Int)(implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, Some(index))
   def fromRow[O <: FeatureType : WeakTypeTag](name: String, index: Option[Int]): FeatureBuilderWithExtract[Row, O] = {
-    val c = FeatureTypeSparkConverter[O]()
     new FeatureBuilderWithExtract[Row, O](
       name = name,
-      extractFn = (r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name))),
-      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))"
+      extractFn = FromRowExtractFn[O](index, name),
+      extractSource =
+        s"""${classOf[FromRowExtractFn[O]].getName}[${FeatureType.shortTypeName[O]}]($index, "$name")"""
     )
   }
+
   // scalastyle:on
+}
+
+/**
+ * Generic value extract function for [[Row]]
+ *
+ * @param index optional index of the value to extract from [[Row]]
+ * @param name  name of the value to extract from [[Row]]
+ * @param tto   feature type tag
+ * @tparam O output feature type
+ */
+case class FromRowExtractFn[O <: FeatureType](index: Option[Int], name: String)
+  (implicit val tto: WeakTypeTag[O]) extends Function1[Row, O] with Serializable {
+  private val c = FeatureTypeSparkConverter[O]()(tto)
+  def apply(r: Row): O = c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))
 }
 
 /**
@@ -256,8 +271,7 @@ final class FeatureBuilder[I, O <: FeatureType](val name: String) {
    *
    * @param fn a function to extract value of the feature from the raw data
    */
-  def extract(fn: I => O): FeatureBuilderWithExtract[I, O] =
-    macro FeatureBuilderMacros.extract[I, O]
+  def extract(fn: I => O): FeatureBuilderWithExtract[I, O] = macro FeatureBuilderMacros.extract[I, O]
 
   /**
    * Feature extract method - a function to extract value of the feature from the raw data.
@@ -326,8 +340,9 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
         aggregator = aggregator,
         outputName = name,
         outputIsResponse = isResponse,
-        aggregateWindow = aggregateWindow
-      )(tti, tto)
+        aggregateWindow = aggregateWindow,
+        inputType = Left(tti)
+      )(tto)
 
     originStage.getOutput().asInstanceOf[Feature[O]]
   }

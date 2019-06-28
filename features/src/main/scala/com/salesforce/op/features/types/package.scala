@@ -30,7 +30,7 @@
 
 package com.salesforce.op.features
 
-import com.daodecode.scalaj.collection.immutable._
+import collection.JavaConverters._
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 
 /**
@@ -196,6 +196,7 @@ package object types extends FeatureTypeSparkConverters {
   implicit class VectorConversions(val v: Vector) extends AnyVal {
     def toOPVector: OPVector = new OPVector(v)
   }
+
   // Arrays
   implicit class ArrayDoubleConversions(val v: Array[Double]) extends AnyVal {
     def toReal: Array[Real] = v.map(_.toReal)
@@ -206,20 +207,30 @@ package object types extends FeatureTypeSparkConverters {
 
   // Maps
   implicit class JMapStringConversions(val v: java.util.Map[String, String]) extends AnyVal {
-    def toTextMap: TextMap = new TextMap(Option(v).map(_.deepAsScalaImmutable).getOrElse(Map.empty))
+    def toTextMap: TextMap = new TextMap(Option(v).map(_.asScala.toMap).getOrElse(Map.empty))
   }
   implicit class JMapSetConversions(val v: java.util.Map[String, java.util.HashSet[String]]) extends AnyVal {
-    def toMultiPickListMap: MultiPickListMap =
-      new MultiPickListMap(Option(v).map(_.deepAsScalaImmutable).getOrElse(Map.empty))
+    def toMultiPickListMap: MultiPickListMap = new MultiPickListMap(
+      Option(v).map(_.asScala.mapValues {
+        case null => Set.empty[String]
+        case s => s.asScala.toSet
+      }.toMap).getOrElse(Map.empty)
+    )
   }
   implicit class JMapLongConversions(val v: java.util.Map[String, java.lang.Long]) extends AnyVal {
-    def toIntegralMap: IntegralMap = new IntegralMap(Option(v).map(_.deepAsScalaImmutable).getOrElse(Map.empty))
+    def toIntegralMap: IntegralMap = new IntegralMap(
+      Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Long]]
+    )
   }
   implicit class JMapDoubleConversions(val v: java.util.Map[String, java.lang.Double]) extends AnyVal {
-    def toRealMap: RealMap = new RealMap(Option(v).map(_.deepAsScalaImmutable).getOrElse(Map.empty))
+    def toRealMap: RealMap = new RealMap(
+      Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Double]]
+    )
   }
   implicit class JMapBooleanConversions(val v: java.util.Map[String, java.lang.Boolean]) extends AnyVal {
-    def toBinaryMap: BinaryMap = new BinaryMap(Option(v).map(_.deepAsScalaImmutable).getOrElse(Map.empty))
+    def toBinaryMap: BinaryMap = new BinaryMap(
+      Option(v).map(_.asScala.toMap).getOrElse(Map.empty).asInstanceOf[Map[String, Boolean]]
+    )
   }
   implicit class MapStringConversions(val v: Map[String, String]) extends AnyVal {
     def toTextMap: TextMap = new TextMap(v)
@@ -257,6 +268,7 @@ package object types extends FeatureTypeSparkConverters {
   implicit class MapGeolocationConversions(val v: Map[String, Seq[Double]]) extends AnyVal {
     def toGeolocationMap: GeolocationMap = new GeolocationMap(v)
   }
+
   implicit def intMapToRealMap(m: IntegralMap#Value): RealMap#Value = m.map { case (k, v) => k -> v.toDouble }
   implicit def booleanToRealMap(m: BinaryMap#Value): RealMap#Value = m.map { case (k, b) => k -> (if (b) 1.0 else 0.0) }
 

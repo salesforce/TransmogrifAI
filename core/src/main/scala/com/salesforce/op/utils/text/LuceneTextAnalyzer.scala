@@ -32,8 +32,10 @@ package com.salesforce.op.utils.text
 
 import java.io.Reader
 import java.nio.charset.StandardCharsets
+import java.util.regex.Pattern
 
 import com.salesforce.op.utils.text.Language._
+import org.apache.lucene.analysis.Analyzer.TokenStreamComponents
 import org.apache.lucene.analysis._
 import org.apache.lucene.analysis.ar.ArabicAnalyzer
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer
@@ -64,6 +66,7 @@ import org.apache.lucene.analysis.lt.LithuanianAnalyzer
 import org.apache.lucene.analysis.lv.LatvianAnalyzer
 import org.apache.lucene.analysis.nl.DutchAnalyzer
 import org.apache.lucene.analysis.no.NorwegianAnalyzer
+import org.apache.lucene.analysis.pattern.PatternTokenizer
 import org.apache.lucene.analysis.pt.PortugueseAnalyzer
 import org.apache.lucene.analysis.ro.RomanianAnalyzer
 import org.apache.lucene.analysis.ru.RussianAnalyzer
@@ -76,17 +79,19 @@ import org.apache.lucene.analysis.tr.TurkishAnalyzer
 import org.apache.lucene.util.IOUtils
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Try
 
 /**
  * Text analyzer implementation using a Lucene analyzer
- *
- * @param analyzers Lucene analyzer factory to use (defaults to [[LuceneTextAnalyzer]])
  */
-class LuceneTextAnalyzer
-(
-  // use lambda to workaround a non serializable analyzer
-  analyzers: Language => Analyzer = LuceneTextAnalyzer.apply
-) extends TextAnalyzer {
+class LuceneTextAnalyzer extends TextAnalyzer {
+
+  /**
+   * Lucene analyzer factory to use (defaults to [[LuceneTextAnalyzer]])
+   * @param lang desired language
+   * @return language specific language analyzer
+   */
+  def analyzers(lang: Language): Analyzer = LuceneTextAnalyzer.apply(lang)
 
   /**
    * Analyze a text and produce tokens
@@ -117,6 +122,34 @@ class LuceneTextAnalyzer
   }
 
 }
+
+/**
+ * Text analyzer implementation using a Lucene analyzer with HTML stripping applied
+ */
+class LuceneHtmlStripTextAnalyzer extends LuceneTextAnalyzer {
+  override def analyzers(lang: Language): Analyzer = LuceneTextAnalyzer.withHtmlStripping(lang)
+}
+
+/**
+ * Text analyzer implementation using a Lucene analyzer with Pattern Tokenizer matching
+ *
+ * @param pattern is the regular expression
+ * @param group   selects the matching group as the token (default: -1, which is equivalent to "split".
+ */
+class LuceneRegexTextAnalyzer(val pattern: String, val group: Int = -1) extends LuceneTextAnalyzer {
+  require(Try(Pattern.compile(pattern)).isSuccess, s"Invalid regex pattern: $pattern")
+
+  private lazy val analyzer: Analyzer = new Analyzer {
+    def createComponents(fieldName: String): TokenStreamComponents = {
+      val regex = Pattern.compile(pattern)
+      val source = new PatternTokenizer(regex, group)
+      new TokenStreamComponents(source)
+    }
+  }
+
+  override def analyzers(lang: Language): Analyzer = analyzer
+}
+
 
 /**
  * Creates a Lucene Analyzer for a specific language or falls back to [[StandardAnalyzer]]
