@@ -132,7 +132,7 @@ Start by picking TransmogrifAI version to match your project dependencies from t
 | **0.5.3 (stable)**, 0.5.2, 0.5.1, 0.5.0         |    **2.3**    |    **2.11**   |    **1.8**   |
 | 0.4.0, 0.3.4                                    |      2.2      |      2.11     |      1.8     |
 
-For Gradle in `build.gradle` add:
+For Gradle in `build.gradle` add: 
 ```gradle
 repositories {
     jcenter()
