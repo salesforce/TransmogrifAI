@@ -197,11 +197,12 @@ class RecordInsightsLOCO[T <: Model[T]]
       val isUnitCircleDateFeature = dateFeatureIndices.contains(oldInd) && history.descriptorValue.isDefined
 
       if (isHashTextFeature || isUnitCircleDateFeature) {
-        // Update the aggregation map
         for {name <- getRawFeatureName(history)} {
+          // Update the aggregation map for each (rawFeatureName, timePeriod) in case of date features.
           val key = if (isUnitCircleDateFeature) {
             name + "_" + history.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
           }
+          // Update the aggregation map for each rawFeatureName in case of text features.
           else {
             name
           }
