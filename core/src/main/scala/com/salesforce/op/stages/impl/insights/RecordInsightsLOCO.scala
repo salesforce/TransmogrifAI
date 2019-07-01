@@ -66,8 +66,6 @@ trait RecordInsightsLOCOParams extends Params {
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
   def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
 
-
-
   setDefault(
     topK -> 20,
     topKStrategy -> TopKStrategy.Abs.entryName
@@ -201,10 +199,12 @@ class RecordInsightsLOCO[T <: Model[T]]
       if (isHashTextFeature || isUnitCircleDateFeature) {
         // Update the aggregation map
         for {name <- getRawFeatureName(history)} {
-          val key = if (isUnitCircleDateFeature)
+          val key = if (isUnitCircleDateFeature) {
             name + "_" + history.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
-          else
+          }
+          else {
             name
+          }
           val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
           aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
         }

@@ -544,10 +544,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
   }
 
   /**
-    * Compare the aggregation made by RecordInsightsLOCO to one made manually
-    *
-    * @param predicate  predicate used by RecordInsights in order to aggregate
-    */
+   * Compare the aggregation made by RecordInsightsLOCO to one made manually
+   *
+   * @param predicate  predicate used by RecordInsights in order to aggregate
+   */
   private def assertAggregatedWithPredicate(
     predicate: OpVectorColumnHistory => Boolean,
     featureTransformedDF: DataFrame,
