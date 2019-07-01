@@ -36,9 +36,11 @@ import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRan
 import com.salesforce.op._
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.stages.impl.feature.{DateListPivot, TransmogrifierDefaults}
+import com.salesforce.op.stages.impl.insights.RecordInsightsParser.Insights
 import com.salesforce.op.stages.impl.preparators.{SanityCheckDataTest, SanityChecker}
 import com.salesforce.op.stages.impl.regression.OpLinearRegression
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
+import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomMap, RandomReal, RandomText, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -393,50 +395,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     parsed.foreach(p => assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(country.name)
       && r.indicatorValue.isDefined), "SmartTextVectorizer detects country feature as a PickList, hence no " +
       "aggregation required for LOCO on this field."))
-    parsed.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
-
-    val meta = OpVectorMetadata.apply(checked.schema(checkedFeatureVector.name))
-
-    implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
-    implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually
-     *
-     * @param textFeature Text(Map) Field
-     * @param predicate   predicate used by RecordInsights in order to aggregate
-     */
-    def assertAggregatedWithPredicate(
-      textFeature: FeatureLike[_],
-      predicate: OpVectorColumnHistory => Boolean
-    ): Unit = {
-      val textIndices = meta.getColumnHistory()
-        .filter(c => predicate(c) && c.indicatorValue.isEmpty && c.descriptorValue.isEmpty)
-        .map(_.index)
-
-      val expectedLocos = checked.select(label, checkedFeatureVector).map { case Row(l: Double, v: Vector) =>
-        val featureArray = v.toArray
-        textIndices.map { i =>
-          val oldVal = v(i)
-          val baseScore = sparkModel.transformFn(l.toRealNN, v.toOPVector).score
-          featureArray.update(i, 0.0)
-          val newScore = sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score
-          featureArray.update(i, oldVal)
-          baseScore.zip(newScore).map { case (b, n) => b - n } -> 1L
-        }.reduce((a, b) => a._1.zip(b._1).map { case (v1, v2) => v1 + v2 } -> (a._2 + b._2))
-      }.map { case (a: Array[Double], n: Long) => a.map(_ / n).toSeq }
-      val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
-
-      val actual = parsed
-        .flatMap(_.find { case (history, _) => predicate(history) })
-        .filter(_._1.indicatorValue.isEmpty).map(_._2.map(_._2)).toSeq
-      val zip = actual.zip(expected)
-      zip.foreach { case (a, e) =>
-        a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
-          s"expected aggregated LOCO value ($v2) should be the same as actual ($v1)")
-        }
-      }
-    }
+    assertLOCOSum(parsed)
 
     /**
      * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
@@ -444,8 +403,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
      * @param textFeature Text Field
      */
     def assertAggregatedText(textFeature: FeatureLike[_ <: Text]): Unit = {
-      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeature.name)
-      assertAggregatedWithPredicate(textFeature, predicate)
+      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeature.name) &&
+        history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+      assertAggregatedWithPredicate(predicate, checked, checkedFeatureVector, label, sparkModel, parsed)
     }
 
     /**
@@ -455,8 +415,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
      */
     def assertAggregatedTextMap(textMapFeature: FeatureLike[_ <: TextMap], keyName: String): Unit = {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeature.name) &&
-        history.grouping == Option(keyName)
-      assertAggregatedWithPredicate(textMapFeature, predicate)
+        history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+      assertAggregatedWithPredicate(predicate, checked, checkedFeatureVector, label, sparkModel, parsed)
     }
 
     assertAggregatedText(text)
@@ -467,7 +427,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     assertAggregatedTextMap(textAreaMap, "k1")
 
   }
-  it should "aggregate values for date, datetime, dateMap and textMap derived features" in {
+  it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features" in {
     val refDate = TransmogrifierDefaults.ReferenceDate.minusMillis(1)
 
     val numRows = 1000
@@ -538,77 +498,36 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
 
     val locoInsights = locoTransformer.transform(featureTransformedDF)
 
-    val parsedLocoInsights = locoInsights.collect(locoTransformer.getOutput()).map(i =>
+    val parsedInsights = locoInsights.collect(locoTransformer.getOutput()).map(i =>
       RecordInsightsParser.parseInsights(i))
 
-    parsedLocoInsights.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
-
-    val meta = OpVectorMetadata.apply(featureTransformedDF.schema(featureVector.name))
-
-    implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
-    implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
+    assertLOCOSum(parsedInsights)
 
     /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     * Compare the aggregation made by RecordInsightsLOCO on a Date/DateTime field to one made manually
      *
-     * @param predicate  predicate used by RecordInsights in order to aggregate
-     */
-    def assertAggregatedWithPredicate(predicate: OpVectorColumnHistory => Boolean): Unit = {
-      val dateIndices = meta.getColumnHistory()
-        .filter(predicate)
-        .map(_.index)
-
-      val expectedLocos = featureTransformedDF.select(label, featureVector).map { case Row(l: Double, v: Vector) =>
-        val featureArray = v.toArray
-        val locos = dateIndices.map { i =>
-          val oldVal = v(i)
-          val baseScore = sparkModel.transformFn(l.toRealNN, v.toOPVector).score.toSeq
-          featureArray.update(i, 0.0)
-          val newScore = sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
-          featureArray.update(i, oldVal)
-          baseScore.zip(newScore).map { case (b, n) => b - n }
-        }
-        val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
-        sumLOCOs.map(_ / dateIndices.length)
-      }
-      val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
-
-      val actual = parsedLocoInsights
-        .flatMap(_.find { case (history, _) => predicate(history) })
-        .map(_._2.map(_._2)).toSeq
-      val zip = actual.zip(expected)
-      zip.foreach { case (a, e) =>
-        a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
-          s"expected aggregated LOCO value ($v2) should be the same as actual ($v1)")
-        }
-      }
-    }
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
-     *
-     * @param dateFeature Text Field
+     * @param dateFeature Date/DateTime Field
      */
     def assertAggregatedDate(dateFeature: FeatureLike[_ <: Date]): Unit = {
       for { timePeriod <- TransmogrifierDefaults.CircularDateRepresentations } {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeature.name) &&
           history.descriptorValue.isDefined &&
           history.descriptorValue.get.split("_").last == timePeriod.entryName
-        assertAggregatedWithPredicate(predicate)
+        assertAggregatedWithPredicate(predicate, featureTransformedDF, featureVector, label, sparkModel, parsedInsights)
       }
     }
 
     /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually
+     * Compare the aggregation made by RecordInsightsLOCO on a DateMap/DateTimeMap field to one made manually
      *
-     * @param dateMapFeature Text Map Field
+     * @param dateMapFeature DateMap/DateTimeMap Field
      */
     def assertAggregatedDateMap(dateMapFeature: FeatureLike[_ <: DateMap], keyName: String): Unit = {
       for { timePeriod <- TransmogrifierDefaults.CircularDateRepresentations } {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeature.name) &&
           history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
           history.descriptorValue.get.split("_").last == timePeriod.entryName
-        assertAggregatedWithPredicate(predicate)
+        assertAggregatedWithPredicate(predicate, featureTransformedDF, featureVector, label, sparkModel, parsedInsights)
       }
     }
 
@@ -618,5 +537,57 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext {
     assertAggregatedDateMap(dateMap, "k1")
     assertAggregatedDateMap(dateTimeMap, "k0")
     assertAggregatedDateMap(dateTimeMap, "k1")
+  }
+
+  private def assertLOCOSum(actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]): Unit = {
+    actualRecordInsights.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10, "LOCOs sum to 0")))
+  }
+
+  /**
+    * Compare the aggregation made by RecordInsightsLOCO to one made manually
+    *
+    * @param predicate  predicate used by RecordInsights in order to aggregate
+    */
+  private def assertAggregatedWithPredicate(
+    predicate: OpVectorColumnHistory => Boolean,
+    featureTransformedDF: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
+    sparkModel: OpPredictorWrapperModel[_],
+    actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]
+   ): Unit = {
+    implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
+    implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
+
+    val meta = OpVectorMetadata.apply(featureTransformedDF.schema(featureVector.name))
+
+    val indices = meta.getColumnHistory()
+      .filter(predicate)
+      .map(_.index)
+
+    val expectedLocos = featureTransformedDF.select(label, featureVector).map { case Row(l: Double, v: Vector) =>
+      val featureArray = v.toArray
+      val locos = indices.map { i =>
+        val oldVal = v(i)
+        val baseScore = sparkModel.transformFn(l.toRealNN, v.toOPVector).score.toSeq
+        featureArray.update(i, 0.0)
+        val newScore = sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
+        featureArray.update(i, oldVal)
+        baseScore.zip(newScore).map { case (b, n) => b - n }
+      }
+      val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
+      sumLOCOs.map(_ / indices.length)
+    }
+    val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
+
+    val actual = actualRecordInsights
+      .flatMap(_.find { case (history, _) => predicate(history) })
+      .map(_._2.map(_._2)).toSeq
+    val zip = actual.zip(expected)
+    zip.foreach { case (a, e) =>
+      a.zip(e).foreach { case (v1, v2) => assert(math.abs(v1 - v2) < 1e-10,
+        s"expected aggregated LOCO value ($v2) should be the same as actual ($v1)")
+      }
+    }
   }
 }

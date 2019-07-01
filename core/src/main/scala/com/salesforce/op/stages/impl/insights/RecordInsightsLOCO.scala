@@ -30,14 +30,14 @@
 
 package com.salesforce.op.stages.impl.insights
 
-import com.salesforce.op.UID
+import com.salesforce.op.{FeatureInsights, UID}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.feature.{DateToUnitCircle, TimePeriod}
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorMetadata}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
@@ -46,6 +46,8 @@ import org.apache.spark.ml.param.{IntParam, Param, Params}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
+
+import scala.reflect.runtime.universe._
 
 
 trait RecordInsightsLOCOParams extends Params {
@@ -158,6 +160,21 @@ class RecordInsightsLOCO[T <: Model[T]]
   private def convertToTimePeriod(descriptorValue: String): Option[TimePeriod] =
     descriptorValue.split("_").lastOption.flatMap(TimePeriod.withNameInsensitiveOption)
 
+  private def isMapFeature(featureType: String ): Boolean = {
+    val featureTypeTag = FeatureType.featureTypeTag(featureType)
+    featureTypeTag.tpe <:< weakTypeOf[OPMap[_]]
+  }
+
+  private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = {
+    if (history.parentFeatureType.exists(isMapFeature)) {
+      val grouping = history.grouping
+      history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
+    }
+    else {
+      history.parentFeatureOrigins.headOption
+    }
+  }
+
   private def returnTopPosNeg
   (
     featureArray: Array[(Int, Double)],
@@ -174,41 +191,20 @@ class RecordInsightsLOCO[T <: Model[T]]
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val history = histories(oldInd)
 
-      // Let's check the indicator value and descriptor value
-      // If those values are empty, the field is likely to be a derived text feature (hashing tf output)
-      if (textFeatureIndices.contains(oldInd) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty) {
-        // Name of the field
-        val rawName = history.parentFeatureType match {
-          case s if s.exists(textMapTypes.contains) => {
-            val grouping = history.grouping
-            history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
-          }
-          case s if s.exists(textTypes.contains) => history.parentFeatureOrigins.headOption
-          case s => throw new Error(s"type should be Text or TextMap, here ${s.mkString(",")}")
-        }
+      // If indicator value and descriptor value values are empty, the field is likely
+      // to be a derived text feature (hashing tf output)
+      val isHashTextFeature = textFeatureIndices.contains(oldInd) &&
+        history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+      // If the descriptor value exists, the field is likely to be a derived date feature from unit circle transformer.
+      val isUnitCircleDateFeature = dateFeatureIndices.contains(oldInd) && history.descriptorValue.isDefined
+
+      if (isHashTextFeature || isUnitCircleDateFeature) {
         // Update the aggregation map
-        for {name <- rawName} {
-          val key = name
-          val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
-          aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
-        }
-      }
-      // Let's check the descriptor value
-      // If those values exist, the field is likely to be a derived date feature from unit circle transformer.
-      else if (dateFeatureIndices.contains(oldInd) && history.descriptorValue.isDefined) {
-        // Name of the field
-        val rawName: Option[String] = history.parentFeatureType match {
-          case s if s.exists(dateMapTypes.contains) => {
-            val grouping = history.grouping
-            history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
-          }
-          case s if s.exists(dateTypes.contains) => history.parentFeatureOrigins.headOption
-          case s => throw new Error(s"type should be Date or DateMap, here ${s.mkString(",")}")
-        }
-        val timePeriod = history.descriptorValue.flatMap(convertToTimePeriod)
-        // Update the aggregation map
-        for {name <- rawName} {
-          val key = name + "_" + timePeriod.map(_.entryName).getOrElse("")
+        for {name <- getRawFeatureName(history)} {
+          val key = if (isUnitCircleDateFeature)
+            name + "_" + history.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
+          else
+            name
           val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
           aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
         }
