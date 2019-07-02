@@ -75,13 +75,13 @@ private[op] class OpForecastEvaluator
   override def evaluateAll(data: Dataset[_]): ForecastMetrics = {
     val dataUse = makeDataToUse(data, getLabelCol)
 
-    val metrics = getMetrics(dataUse, getLabelCol, getPredictionValueCol)
+    val metrics = computeMetrics(dataUse, getLabelCol, getPredictionValueCol)
     log.info("Evaluated metrics: {}", metrics.toString)
     metrics
 
   }
 
-  protected def getMetrics(data: Dataset[_], labelCol: String, predictionValueCol: String): ForecastMetrics = {
+  protected def computeMetrics(data: Dataset[_], labelCol: String, predictionValueCol: String): ForecastMetrics = {
 
     val rows = data.select(labelCol, predictionValueCol).rdd
       .map(r => (r.getAs[Double](0), r.getAs[Double](1))).take(maxItems)
@@ -90,17 +90,16 @@ private[op] class OpForecastEvaluator
     val seasonalLimit = cnt - seasonalWindow
 
     var i = 0
-    var seasonalAbsDiff = 0.0
-    var absDiffSum = 0.0
-    var smapeSum = 0.0
+    var (seasonalAbsDiff, absDiffSum, smapeSum) = (0.0, 0.0, 0.0)
 
     while (i < cnt) {
-      val r = rows(i)
+      val (y, yHat) = rows(i)
+      val (ySeasonal, _) = rows(i + seasonalWindow)
       if (i < seasonalLimit) {
-        seasonalAbsDiff += Math.abs(r._1 - rows(i + seasonalWindow)._1)
+        seasonalAbsDiff += Math.abs(y - ySeasonal)
       }
-      val absDiff = Math.abs(r._1 - r._2)
-      val sumAbs = Math.abs(r._1) + Math.abs(r._2)
+      val absDiff = Math.abs(y - yHat)
+      val sumAbs = Math.abs(y) + Math.abs(yHat)
       if (sumAbs > 0) {
         smapeSum += absDiff / sumAbs
       }
@@ -124,7 +123,9 @@ private[op] class OpForecastEvaluator
 /**
  * Metrics of Forecasting Problem
  *
- * @param SMAPE symmetric Mean Absolute Percentage Error
+ * @param SMAPE         Symmetric Mean Absolute Percentage Error
+ * @param SeasonalError Seasonal Error
+ * @param MASE          Mean Absolute Scaled Error
  *
  */
 case class ForecastMetrics(SMAPE: Double, SeasonalError: Double, MASE: Double) extends EvaluationMetrics
