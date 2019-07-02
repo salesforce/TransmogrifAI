@@ -39,21 +39,34 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
 import com.twitter.algebird.macros.caseclass
 
+import scala.collection.mutable
+
 /**
+ *
  * Instance to evaluate Forecast metrics
  * The metrics are SMAPE
  * Default evaluation returns SMAPE
  *
+ * See: https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
+ *
+ * @param seasonalWindow length of the season (e.g. 7 for daily data with weekly seasonality)
+ * @param maxItems       max number of items to process (default: 10 years of hourly data)
  * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
  */
+
 private[op] class OpForecastEvaluator
 (
+  val seasonalWindow: Int = 1,
+  val maxItems: Int = 87660,
   override val name: EvalMetric = OpEvaluatorNames.Forecast,
   override val isLargerBetter: Boolean = false,
   override val uid: String = UID[OpForecastEvaluator]
 ) extends OpRegressionEvaluatorBase[ForecastMetrics](uid) {
+
+  require(seasonalWindow > 0, "seasonalWindow must not be negative")
+  require(maxItems > 0, "maxItems must not be negative")
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
@@ -62,40 +75,58 @@ private[op] class OpForecastEvaluator
   override def evaluateAll(data: Dataset[_]): ForecastMetrics = {
     val dataUse = makeDataToUse(data, getLabelCol)
 
-    val smape: Double = getSMAPE(dataUse, getLabelCol, getPredictionValueCol)
-    val metrics = ForecastMetrics(SMAPE = smape)
-
+    val metrics = computeMetrics(dataUse, getLabelCol, getPredictionValueCol)
     log.info("Evaluated metrics: {}", metrics.toString)
     metrics
+
   }
 
-  protected def getSMAPE(data: Dataset[_], labelCol: String, predictionValueCol: String): Double = {
-    data.select(labelCol, predictionValueCol).rdd
-      .map(r => SMAPEValue(r.getAs[Double](0), r.getAs[Double](1)))
-      .reduce(_ + _).value
-  }
-}
+  protected def computeMetrics(data: Dataset[_], labelCol: String, predictionValueCol: String): ForecastMetrics = {
 
-/**
- * SMAPE value computation. See formula here:
- * https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
- *
- * @param SMAPE symmetric Mean Absolute Percentage Error
- */
-object SMAPEValue {
-  def apply(y: Double, yHat: Double): SMAPEValue = {
-    SMAPEValue(2 * Math.abs(y - yHat), Math.abs(y) + Math.abs(yHat), 1L)
-  }
-  implicit val smapeSG: Semigroup[SMAPEValue] = caseclass.semigroup[SMAPEValue]
-}
+    val rows = data.select(labelCol, predictionValueCol).rdd
+      .map(r => (r.getAs[Double](0), r.getAs[Double](1))).take(maxItems)
 
-case class SMAPEValue private (nominator: Double, denominator: Double, cnt: Long) {
-  def value: Double = if (denominator == 0.0) Double.NaN else (nominator / denominator) / cnt
+    val cnt = rows.length
+    val seasonalLimit = cnt - seasonalWindow
+    var i = 0
+    var (seasonalAbsDiff, absDiffSum, smapeSum) = (0.0, 0.0, 0.0)
+
+    while (i < cnt) {
+      val (y, yHat) = rows(i)
+
+      if (i < seasonalLimit) {
+        val (ySeasonal, _) = rows(i + seasonalWindow)
+        seasonalAbsDiff += Math.abs(y - ySeasonal)
+      }
+      val absDiff = Math.abs(y - yHat)
+
+      val sumAbs = Math.abs(y) + Math.abs(yHat)
+      if (sumAbs > 0) {
+        smapeSum += absDiff / sumAbs
+      }
+
+      absDiffSum += absDiff
+      i += 1
+    }
+
+    val seasonalError = seasonalAbsDiff / seasonalLimit
+    val maseDenominator = seasonalError * cnt
+
+    ForecastMetrics(
+      SMAPE = if (cnt > 0) 2 * smapeSum / cnt else 0.0,
+      SeasonalError = seasonalError,
+      MASE = if (maseDenominator > 0) absDiffSum / maseDenominator else 0.0
+    )
+
+  }
 }
 
 /**
  * Metrics of Forecasting Problem
  *
- * @param SMAPE symmetric Mean Absolute Percentage Error
+ * @param SMAPE         Symmetric Mean Absolute Percentage Error
+ * @param SeasonalError Seasonal Error
+ * @param MASE          Mean Absolute Scaled Error
+ *
  */
-case class ForecastMetrics(SMAPE: Double) extends EvaluationMetrics
+case class ForecastMetrics(SMAPE: Double, SeasonalError: Double, MASE: Double) extends EvaluationMetrics
