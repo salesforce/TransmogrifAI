@@ -88,17 +88,18 @@ private[op] class OpForecastEvaluator
 
     val cnt = rows.length
     val seasonalLimit = cnt - seasonalWindow
-
     var i = 0
     var (seasonalAbsDiff, absDiffSum, smapeSum) = (0.0, 0.0, 0.0)
 
     while (i < cnt) {
       val (y, yHat) = rows(i)
-      val (ySeasonal, _) = rows(i + seasonalWindow)
+
       if (i < seasonalLimit) {
+        val (ySeasonal, _) = rows(i + seasonalWindow)
         seasonalAbsDiff += Math.abs(y - ySeasonal)
       }
       val absDiff = Math.abs(y - yHat)
+
       val sumAbs = Math.abs(y) + Math.abs(yHat)
       if (sumAbs > 0) {
         smapeSum += absDiff / sumAbs
