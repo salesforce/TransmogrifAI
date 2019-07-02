@@ -524,7 +524,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   def withRawFeatureFilter[T](
     trainingReader: Option[Reader[T]],
     scoringReader: Option[Reader[T]],
-    bins: Int = 100,
+    bins: Int = 500,
     minFillRate: Double = 0.001,
     maxFillDifference: Double = 0.90,
     maxFillRatioDiff: Double = 20.0,

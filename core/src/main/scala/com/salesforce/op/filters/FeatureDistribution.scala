@@ -38,7 +38,9 @@ import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
+import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.feature.HashingTF
+import org.apache.spark.mllib.stat.Statistics
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -90,6 +92,19 @@ case class FeatureDistribution
    * @return fraction of data that is non empty
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
+
+  /**
+   * Test whether the given distribution is Uniform, for detecting useless text hashes
+   *
+   * @return true means rejecting Null hypothesis (current distribution is a uniform distribution) => likely keep the raw feature
+   *         false means failing to reject the Null hypothesis => proceed to check the length cardinality
+   */
+
+  def chiSqUnifTest(cutoff: Double): Boolean = {
+    val vectorizedDistr = Vectors.dense(distribution)
+    val goodnessOfFitTestResult = Statistics.chiSqTest(vectorizedDistr)
+    return goodnessOfFitTestResult.pValue < cutoff
+  }
 
   /**
    * Combine feature distributions

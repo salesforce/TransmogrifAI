@@ -97,6 +97,7 @@ class RawFeatureFilter[T]
   val maxFillRatioDiff: Double,
   val maxJSDivergence: Double,
   val maxCorrelation: Double,
+  val pvalCutoff: Double,
   val correlationType: CorrelationType = CorrelationType.Pearson,
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
@@ -320,6 +321,7 @@ class RawFeatureFilter[T]
       message = s"Features excluded because training fill rate did not meet min required ($minFill)"
     )
 
+    val uniformFtDistribution: Seq[Boolean] = trainingDistribs.map(_.chiSqUnifTest(pvalCutoff))
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
       case Some(corr) => corr > maxCorrelation
       case None => false
