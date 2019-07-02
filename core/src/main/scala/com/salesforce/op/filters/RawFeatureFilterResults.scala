@@ -125,7 +125,7 @@ object RawFeatureFilterConfig extends RawFeatureFilterFormats {
  * Contains raw feature metrics computing in Raw Feature Filter
  *
  * @param name                          feature name
- * @param key          map key associated with distribution (when the feature is a map)
+ * @param key                           map key associated with distribution (when the feature is a map)
  * @param trainingFillRate              proportion of values that are null in the training distribution
  * @param trainingNullLabelAbsoluteCorr correlation between null indicator and the label in the training distribution
  * @param scoringFillRate               proportion of values that are null in the scoring distribution
@@ -149,7 +149,7 @@ case class RawFeatureFilterMetrics
  * Contains results of Raw Feature Filter tests for a given feature
  *
  * @param name                    feature name
- * @param key          map key associated with distribution (when the feature is a map)
+ * @param key                     map key associated with distribution (when the feature is a map)
  * @param trainingUnfilledState   training fill rate did not meet min required
  * @param trainingNullLabelLeaker null indicator correlation (absolute) exceeded max allowed
  * @param scoringUnfilledState    scoring fill rate did not meet min required
