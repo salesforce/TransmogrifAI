@@ -107,43 +107,6 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     metrics.getDouble(ForecastEvalMetrics.SMAPE.toString).isNaN shouldBe true
   }
 
-
-  it should "verify that SeasonalAbsDiff works" in {
-    def testSimple(stop: Int = 20, window: Int = 1, expected: Double): Unit = {
-      val l = (1 to stop).map(x => SeasonalAbsDiff.apply(window, x)).fold(SeasonalAbsDiff.zero(window))(_.combine(_))
-      if (expected.isNaN) {
-        l.seasonalError(stop).isNaN shouldBe true
-      } else {
-        l.seasonalError(stop) shouldBe expected
-      }
-    }
-
-    testSimple(20, 1, 1.0)
-    testSimple(20, 5, 5.0)
-    testSimple(20, 20, Double.NaN)
-
-
-    def testSignal(dataLength: Int, windowLength: Int): Unit = {
-      val signal = (1 to dataLength).map(x => Math.sin((x / dataLength) * 2.0 * Math.PI))
-      val expected = (1 to (dataLength - windowLength)).map(x => {
-        Math.abs(
-          Math.sin((x / dataLength) * 2.0 * Math.PI)
-            - Math.sin((windowLength / dataLength) * 2.0 * Math.PI + (x / dataLength) * 2.0 * Math.PI)
-        )
-      }).sum / (dataLength - windowLength)
-
-
-      val res = signal
-        .map(x => SeasonalAbsDiff.apply(windowLength, x))
-        .fold(SeasonalAbsDiff.zero(windowLength))(_.combine(_))
-        .seasonalError(dataLength)
-      res shouldEqual (expected +- 1e-6)
-    }
-
-    (1 to 50).foreach(x => testSignal(100, x))
-
-  }
-
   it should "verify that Forecast Metrics works" in {
     val dataLength = 100
     val seasonalWindow = 25
@@ -156,9 +119,10 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     val metrics = new OpForecastEvaluator(seasonalWindow)
       .setLabelCol("f1").setPredictionCol("r1").evaluateAll(df).toMetadata()
 
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.18 +- 1e-3)
     metrics.getDouble(ForecastEvalMetrics.MASE.toString) shouldBe (0.16395 +- 1e-5)
     metrics.getDouble(ForecastEvalMetrics.seasonalError.toString) shouldBe (0.77634 +- 1e-5)
-    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.18 +- 1e-3)
+
   }
 
 }

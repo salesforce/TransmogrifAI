@@ -47,6 +47,10 @@ import scala.collection.mutable
  * The metrics are SMAPE
  * Default evaluation returns SMAPE
  *
+ * See: https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
+ *
+ * @param seasonalWindow length of the season
+ * @param maxItems       max items to process (default: 10 years of hourly data)
  * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
@@ -55,6 +59,7 @@ import scala.collection.mutable
 private[op] class OpForecastEvaluator
 (
   val seasonalWindow: Int = 1,
+  val maxItems: Int = 87660,
   override val name: EvalMetric = OpEvaluatorNames.Forecast,
   override val isLargerBetter: Boolean = false,
   override val uid: String = UID[OpForecastEvaluator]
@@ -73,94 +78,53 @@ private[op] class OpForecastEvaluator
 
   }
 
-
   protected def getMetrics(data: Dataset[_], labelCol: String, predictionValueCol: String): ForecastMetrics = {
-    val res = data.select(labelCol, predictionValueCol).rdd
-      .map(r => MetricValue(r.getAs[Double](0), r.getAs[Double](1))).coalesce(1)
-      .fold(MetricValue.zero(seasonalWindow))(_ + _)
-    ForecastMetrics(
-      SMAPE = res.smape,
-      seasonalError = res.seasonalError,
-      MASE = res.mase
-    )
 
-  }
-}
+    val rows = data.select(labelCol, predictionValueCol).rdd
+      .map(r => (r.getAs[Double](0), r.getAs[Double](1))).take(maxItems)
 
-// https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
-object MetricValue {
-  def apply(y: Double, yHat: Double): MetricValue = {
-    val absDiff = Math.abs(y - yHat)
-    val sumAbs = Math.abs(y) + Math.abs(yHat)
-    val smapeSum = if (sumAbs > 0) {
-      absDiff / sumAbs
-    } else {
-      0.0
+    val cnt = rows.length
+    var i = 0
+    val seasonalLimit = cnt - seasonalWindow
+    var seasonalAbsDiff = 0.0
+    var absDiffSum = 0.0
+    var sumAbs = 0.0
+    var smapeSum = 0.0
+    while (i < cnt) {
+      val r = rows(i)
+      if (i < seasonalLimit) {
+        seasonalAbsDiff += Math.abs(r._1 - rows(i + seasonalWindow)._1)
+      }
+      val absDiff = Math.abs(r._1 - r._2)
+      sumAbs = Math.abs(r._1) + Math.abs(r._2)
+      smapeSum += {
+        if (sumAbs > 0) {
+          absDiff / sumAbs
+        } else {
+          0.0
+        }
+      }
+      absDiffSum += absDiff
+      i += 1
     }
-    MetricValue(absDiff, smapeSum, SeasonalAbsDiff.apply(0, y), 1L)
-  }
 
-  def zero(seasonalWindow: Int): MetricValue = {
-    MetricValue(0d, 0d, SeasonalAbsDiff.zero(seasonalWindow), 0L)
-  }
-
-  implicit val smapeSG: Semigroup[MetricValue] = caseclass.semigroup[MetricValue]
-}
-
-case class MetricValue private(absDiff: Double, smapeSum: Double, seasonalAbsDiff: SeasonalAbsDiff, cnt: Long) {
-  def smape: Double = {
-    if (cnt == 0) {
+    val smape: Double = if (cnt == 0) {
       Double.NaN
     } else {
       2 * smapeSum / cnt
     }
-  }
 
-  def seasonalError: Double = seasonalAbsDiff.seasonalError(cnt)
 
-  def mase: Double = absDiff / (seasonalError * cnt)
+    val seasonalError = seasonalAbsDiff / seasonalLimit
 
-}
+    ForecastMetrics(
+      SMAPE = smape,
+      seasonalError = seasonalError,
+      MASE = absDiffSum / (seasonalError * cnt)
+    )
 
-object SeasonalAbsDiff {
-  def apply(seasonalWindow: Int, y: Double): SeasonalAbsDiff =
-    SeasonalAbsDiff(seasonalWindow, 1, mutable.ListBuffer[Double](y), 0.0)
-
-  def zero(seasonalWindow: Int): SeasonalAbsDiff =
-    SeasonalAbsDiff(seasonalWindow, 0, mutable.ListBuffer[Double](), 0.0)
-
-  implicit val seasonalAbsDiffSG: Semigroup[SeasonalAbsDiff] = new Semigroup[SeasonalAbsDiff] {
-    override def plus(x: SeasonalAbsDiff, y: SeasonalAbsDiff): SeasonalAbsDiff = x.combine(y)
   }
 }
-
-case class SeasonalAbsDiff private
-(seasonalWindow: Int, lagsLength: Int, lags: mutable.ListBuffer[Double], absDiff: Double) {
-  def combine(that: SeasonalAbsDiff): SeasonalAbsDiff = {
-    var newLength = lagsLength + that.lagsLength
-    var l = this.lags
-    var newAbsDiff = this.absDiff + that.absDiff
-    var idx = seasonalWindow - lagsLength
-
-    while (newLength > seasonalWindow) {
-      newAbsDiff += Math.abs(l.head - that.lags(idx))
-      l = l.tail
-      newLength -= 1
-      idx += 1
-    }
-    SeasonalAbsDiff(seasonalWindow, newLength, l ++ that.lags, newAbsDiff)
-  }
-
-  def seasonalError(dataLength: Long): Double = {
-    val denominator = dataLength - seasonalWindow
-    if (denominator > 0) {
-      absDiff / denominator
-    } else {
-      Double.NaN
-    }
-  }
-}
-
 
 /**
  * Metrics of Forecasting Problem
