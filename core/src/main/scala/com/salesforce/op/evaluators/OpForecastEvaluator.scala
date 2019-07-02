@@ -49,8 +49,8 @@ import scala.collection.mutable
  *
  * See: https://www.m4.unic.ac.cy/wp-content/uploads/2018/03/M4-Competitors-Guide.pdf
  *
- * @param seasonalWindow length of the season
- * @param maxItems       max items to process (default: 10 years of hourly data)
+ * @param seasonalWindow length of the season (e.g. 7 for daily data with weekly seasonality)
+ * @param maxItems       max number of items to process (default: 10 years of hourly data)
  * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
  * @param uid            uid for instance
@@ -64,6 +64,9 @@ private[op] class OpForecastEvaluator
   override val isLargerBetter: Boolean = false,
   override val uid: String = UID[OpForecastEvaluator]
 ) extends OpRegressionEvaluatorBase[ForecastMetrics](uid) {
+
+  require(seasonalWindow > 0, "seasonalWindow must not be negative")
+  require(maxItems > 0, "maxItems must not be negative")
 
   @transient private lazy val log = LoggerFactory.getLogger(this.getClass)
 
