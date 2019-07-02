@@ -153,6 +153,7 @@ class RawFeatureFilter[T]
       (respOut, predOut)
     }
     val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
+    val (_, featureAvgTextLen) : (Map[FeatureKey, Double], Map[FeatureKey, Double]) = preparedFeatures.map(_.avgTextLength)
 
     implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
     // Have to use the training summaries do process scoring for comparison
@@ -192,7 +193,8 @@ class RawFeatureFilter[T]
       responseDistributions = responseDistributions,
       predictorSummaries = predictorSummaries,
       predictorDistributions = predictorDistributions,
-      correlationInfo = correlationInfo
+      correlationInfo = correlationInfo,
+      avgtextLength = featureAvgTextLen
     )
   }
 
@@ -303,7 +305,8 @@ class RawFeatureFilter[T]
   private[op] def getRawFeatureFilterExclusionReasons(
     trainingDistribs: Seq[FeatureDistribution],
     scoringDistribs: Seq[FeatureDistribution],
-    rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics]
+    rawFeatureFilterMetrics: Seq[RawFeatureFilterMetrics],
+    avgTextLenInfo: Map[FeatureKey, Double]
   ): Seq[ExclusionReasons] = {
 
     def logExcluded(excluded: Seq[Boolean], message: String): Unit = {
@@ -322,6 +325,7 @@ class RawFeatureFilter[T]
     )
 
     val uniformFtDistribution: Seq[Boolean] = trainingDistribs.map(_.chiSqUnifTest(pvalCutoff))
+    val throwOutRandomText: Seq[Boolean]
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
       case Some(corr) => corr > maxCorrelation
       case None => false
@@ -443,7 +447,8 @@ class RawFeatureFilter[T]
   private[op] def getFeaturesToExclude(
     trainingDistribs: Seq[FeatureDistribution],
     scoringDistribs: Seq[FeatureDistribution],
-    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
+    correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]],
+    avgTextLenInfo: Seq[Double]
   ): (Seq[RawFeatureFilterMetrics], Seq[ExclusionReasons], Seq[String], Map[String, Set[String]]) = {
 
     val rawFeatureFilterMetrics = getRawFeatureFilterMetrics(
@@ -455,7 +460,8 @@ class RawFeatureFilter[T]
     val exclusionReasons = getRawFeatureFilterExclusionReasons(
       trainingDistribs = trainingDistribs,
       scoringDistribs = scoringDistribs,
-      rawFeatureFilterMetrics = rawFeatureFilterMetrics
+      rawFeatureFilterMetrics = rawFeatureFilterMetrics,
+      avgTextLenInfo = avgTextLenInfo
     )
 
     val excludedFeatures = exclusionReasons.map(_.excluded)

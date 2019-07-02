@@ -42,6 +42,7 @@ package com.salesforce.op.filters
  *                               1st level keys correspond to response keys
  *                               2nd level keys correspond to predictor keys with values being
  *                               null-label leakage corr. value
+ * @param avgtextLength          average length of text features
  */
 private[op] case class AllFeatureInformation
 (
@@ -49,5 +50,6 @@ private[op] case class AllFeatureInformation
   responseDistributions: Array[FeatureDistribution],
   predictorSummaries: Map[FeatureKey, Summary],
   predictorDistributions: Array[FeatureDistribution],
-  correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
+  correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]],
+  avgtextLength: Map[FeatureKey, Double]
 )
