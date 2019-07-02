@@ -109,14 +109,11 @@ private[op] class OpForecastEvaluator
       i += 1
     }
 
-    val smape: Double = if (cnt == 0) 0.0 else 2 * smapeSum / cnt
-
     val seasonalError = seasonalAbsDiff / seasonalLimit
     val maseDenominator = seasonalError * cnt
 
-
     ForecastMetrics(
-      SMAPE = smape,
+      SMAPE = if (cnt > 0) 2 * smapeSum / cnt else 0.0,
       SeasonalError = seasonalError,
       MASE = if (maseDenominator > 0) absDiffSum / maseDenominator else 0.0
     )
