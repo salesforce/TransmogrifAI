@@ -119,7 +119,7 @@ private[op] class OpForecastEvaluator
 
     ForecastMetrics(
       SMAPE = smape,
-      seasonalError = seasonalError,
+      SeasonalError = seasonalError,
       MASE = absDiffSum / (seasonalError * cnt)
     )
 
@@ -132,4 +132,4 @@ private[op] class OpForecastEvaluator
  * @param SMAPE symmetric Mean Absolute Percentage Error
  *
  */
-case class ForecastMetrics(SMAPE: Double, seasonalError: Double, MASE: Double) extends EvaluationMetrics
+case class ForecastMetrics(SMAPE: Double, SeasonalError: Double, MASE: Double) extends EvaluationMetrics

@@ -121,7 +121,7 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
 
     metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.18 +- 1e-3)
     metrics.getDouble(ForecastEvalMetrics.MASE.toString) shouldBe (0.16395 +- 1e-5)
-    metrics.getDouble(ForecastEvalMetrics.seasonalError.toString) shouldBe (0.77634 +- 1e-5)
+    metrics.getDouble(ForecastEvalMetrics.SeasonalError.toString) shouldBe (0.77634 +- 1e-5)
 
   }
 
