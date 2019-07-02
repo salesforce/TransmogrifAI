@@ -20,7 +20,6 @@ To understand the motivation behind TransmogrifAI check out these:
 
 Skip to [Quick Start and Documentation](#quick-start-and-documentation).
 
-
 ## Predicting Titanic Survivors with TransmogrifAI
 
 The Titanic dataset is an often-cited dataset in the machine learning community. The goal is to build a machine learnt model that will predict survivors from the Titanic passenger manifest. Here is how you would build the model using TransmogrifAI:
