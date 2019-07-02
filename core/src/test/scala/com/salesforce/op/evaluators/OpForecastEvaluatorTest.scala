@@ -104,7 +104,9 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     val data = Seq().map(x => (x, Map("prediction" -> x)))
     val df = spark.sparkContext.parallelize(data).toDF("f1", "r1")
     val metrics = new OpForecastEvaluator().setLabelCol("f1").setPredictionCol("r1").evaluateAll(df).toMetadata()
-    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString).isNaN shouldBe true
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe 0.0
+    metrics.getDouble(ForecastEvalMetrics.MASE.toString) shouldBe 0.0
+    metrics.getDouble(ForecastEvalMetrics.SeasonalError.toString) shouldBe 0.0
   }
 
   it should "verify that Forecast Metrics works" in {
@@ -123,6 +125,23 @@ class OpForecastEvaluatorTest extends FlatSpec with TestSparkContext {
     metrics.getDouble(ForecastEvalMetrics.MASE.toString) shouldBe (0.16395 +- 1e-5)
     metrics.getDouble(ForecastEvalMetrics.SeasonalError.toString) shouldBe (0.77634 +- 1e-5)
 
+  }
+
+  it should "verify that Forecast Metrics works if seasonalWindow is too large" in {
+    val dataLength = 100
+    val seasonalWindow = 101
+    val data = (0 until dataLength).map(x => {
+      val y = Math.sin((x.toDouble / dataLength) * 2.0 * Math.PI)
+      (y, Map("prediction" -> y * 1.2))
+    })
+
+    val df = spark.sparkContext.parallelize(data).toDF("f1", "r1")
+    val metrics = new OpForecastEvaluator(seasonalWindow)
+      .setLabelCol("f1").setPredictionCol("r1").evaluateAll(df).toMetadata()
+
+    metrics.getDouble(ForecastEvalMetrics.SMAPE.toString) shouldBe (0.18 +- 1e-3)
+    metrics.getDouble(ForecastEvalMetrics.MASE.toString) shouldBe 0.0
+    metrics.getDouble(ForecastEvalMetrics.SeasonalError.toString) shouldBe 0.0
   }
 
 }

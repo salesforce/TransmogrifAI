@@ -87,11 +87,13 @@ private[op] class OpForecastEvaluator
       .map(r => (r.getAs[Double](0), r.getAs[Double](1))).take(maxItems)
 
     val cnt = rows.length
-    var i = 0
     val seasonalLimit = cnt - seasonalWindow
+
+    var i = 0
     var seasonalAbsDiff = 0.0
     var absDiffSum = 0.0
     var smapeSum = 0.0
+
     while (i < cnt) {
       val r = rows(i)
       if (i < seasonalLimit) {
@@ -99,30 +101,24 @@ private[op] class OpForecastEvaluator
       }
       val absDiff = Math.abs(r._1 - r._2)
       val sumAbs = Math.abs(r._1) + Math.abs(r._2)
-      smapeSum += {
-        if (sumAbs > 0) {
-          absDiff / sumAbs
-        } else {
-          0.0
-        }
+      if (sumAbs > 0) {
+        smapeSum += absDiff / sumAbs
       }
+
       absDiffSum += absDiff
       i += 1
     }
 
-    val smape: Double = if (cnt == 0) {
-      Double.NaN
-    } else {
-      2 * smapeSum / cnt
-    }
-
+    val smape: Double = if (cnt == 0) 0.0 else 2 * smapeSum / cnt
 
     val seasonalError = seasonalAbsDiff / seasonalLimit
+    val maseDenominator = seasonalError * cnt
+
 
     ForecastMetrics(
       SMAPE = smape,
       SeasonalError = seasonalError,
-      MASE = absDiffSum / (seasonalError * cnt)
+      MASE = if (maseDenominator > 0) absDiffSum / maseDenominator else 0.0
     )
 
   }
