@@ -235,7 +235,7 @@ class RawFeatureFilter[T]
       fillRatioDiffs: Seq[Option[Double]]
     ): Seq[RawFeatureFilterMetrics] = {
 
-      trainingDistribs.map(_.name)
+      trainingDistribs.map(dist => dist.name -> dist.key)
         .zip(trainingFillRates)
         .zip(trainingNullLabelAbsoluteCorrs)
         .zip(scoringFillRates)
@@ -243,10 +243,10 @@ class RawFeatureFilter[T]
         .zip(fillRateDiffs)
         .zip(fillRatioDiffs)
         .map {
-          case ((((((name, trainingFillRate), trainingNullLabelAbsoluteCorr),
+          case (((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
           scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff) =>
             RawFeatureFilterMetrics(
-              name, trainingFillRate, trainingNullLabelAbsoluteCorr,
+              name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
               scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff)
         }
     }
@@ -342,7 +342,7 @@ class RawFeatureFilter[T]
       fillRatioDiffMismatches: Seq[Boolean]
     ): Seq[ExclusionReasons] = {
 
-      trainingDistribs.map(_.name)
+      trainingDistribs.map(dist => dist.name-> dist.key)
         .zip(trainingUnfilledStates)
         .zip(trainingNullLabelLeakers)
         .zip(scoringUnfilledStates)
@@ -350,10 +350,11 @@ class RawFeatureFilter[T]
         .zip(fillRateDiffMismatches)
         .zip(fillRatioDiffMismatches)
         .map {
-          case ((((((name, trainingUnfilledState), trainingNullLabelLeaker),
+          case (((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
           scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch) =>
             ExclusionReasons(
               name,
+              key,
               trainingUnfilledState,
               trainingNullLabelLeaker,
               scoringUnfilledState,
