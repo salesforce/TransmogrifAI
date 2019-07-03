@@ -121,9 +121,10 @@ case class FeatureDistribution
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
     val combinedDist = distribution + fd.distribution
+    val combinedAvgTextLen = (avgTextLen * count + fd.avgTextLen * fd.count)/(count+fd.count)
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary, `type`)
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedAvgTextLen, combinedDist, combinedSummary, `type`)
   }
 
   /**
@@ -183,7 +184,7 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, `type`) =>
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, `avgTextLen`, d, s, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep
     case _ => false
   }
