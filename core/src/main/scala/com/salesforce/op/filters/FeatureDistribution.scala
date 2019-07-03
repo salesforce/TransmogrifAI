@@ -176,6 +176,7 @@ case class FeatureDistribution
       "key" -> key,
       "count" -> count.toString,
       "nulls" -> nulls.toString,
+      "avgTextLen" -> avgTextLen.toString,
       "distribution" -> distribution.mkString("[", ",", "]"),
       "summaryInfo" -> summaryInfo.mkString("[", ",", "]")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
@@ -246,8 +247,8 @@ object FeatureDistribution {
     val (nullCount, (summaryInfo, distribution)) =
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
-    val avgTextLen = value.get match {
-      case Left(v) => v.map(_.size).sum / v.size
+    val avgTextLen = value match {
+      case Some(Left(v)) => v.map(_.size).sum / v.size
       case _ => 0.0
     }
     FeatureDistribution(

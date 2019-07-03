@@ -189,7 +189,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "have toString" in {
     FeatureDistribution("A", None, 10, 1, 0, Array(1, 4, 0, 0, 6), Array.empty).toString() shouldBe
       "FeatureDistribution(type = Training, name = A, key = None, count = 10, nulls = 1, " +
-        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [])"
+        "avgTextLen = 0.0, distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [])"
   }
 
   it should "marshall to/from json" in {
@@ -203,11 +203,11 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   }
 
   it should "marshall to/from json with default vector args" in {
-    val fd1 = FeatureDistribution("A", None, 10, 1, 0, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
-    val fd2 = FeatureDistribution("A", Some("X"), 20, 20, 0, Array(2, 8, 0, 0, 12), Array.empty)
+    val fd1 = FeatureDistribution("A", None, 10, 1, 0.0, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
+    val fd2 = FeatureDistribution("A", Some("X"), 20, 20, 0.0, Array(2, 8, 0, 0, 12), Array.empty)
     val json =
-      """[{"name":"A","count":10,"nulls":1,"distribution":[1.0,4.0,0.0,0.0,6.0],"type":"Scoring"},
-        |{"name":"A","key":"X","count":20,"nulls":20,"distribution":[2.0,8.0,0.0,0.0,12.0]}]
+      """[{"name":"A","count":10,"nulls":1,"avgTextLen":0.0,"distribution":[1.0,4.0,0.0,0.0,6.0],"type":"Scoring"},
+        |{"name":"A","key":"X","count":20,"nulls":20,"avgTextLen":0.0,"distribution":[2.0,8.0,0.0,0.0,12.0]}]
         |""".stripMargin
 
     FeatureDistribution.fromJson(json) match {
