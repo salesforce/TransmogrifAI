@@ -190,6 +190,8 @@ sealed abstract class ForecastEvalMetric
 object ForecastEvalMetrics extends Enum[ForecastEvalMetric] {
   val values: Seq[ForecastEvalMetric] = findValues
   case object SMAPE extends ForecastEvalMetric("smape", "symmetric mean absolute percentage error")
+  case object MASE extends ForecastEvalMetric("mase", "mean absolute scaled error")
+  case object SeasonalError extends ForecastEvalMetric("seasonalError", "seasonal error")
 }
 
 
