@@ -203,7 +203,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   }
 
   it should "marshall to/from json with default vector args" in {
-    val fd1 = FeatureDistribution("A", None, 10, 1, 0.0, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
+    val fd1 = FeatureDistribution("A", None, 10, 1, 0.0, Array(1, 4, 0, 0, 6),
+      Array.empty, FeatureDistributionType.Scoring)
     val fd2 = FeatureDistribution("A", Some("X"), 20, 20, 0.0, Array(2, 8, 0, 0, 12), Array.empty)
     val json =
       """[{"name":"A","count":10,"nulls":1,"avgTextLen":0.0,"distribution":[1.0,4.0,0.0,0.0,6.0],"type":"Scoring"},

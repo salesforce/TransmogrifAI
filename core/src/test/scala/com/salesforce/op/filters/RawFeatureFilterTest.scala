@@ -254,8 +254,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
 
   it should "correctly determine which features to exclude based on all the stats" in {
     // all
-    val filter4 = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.1, 0.5,
-      Double.PositiveInfinity, 0.5, 1.0, 0.05,0.0)
+    val filter4 = new RawFeatureFilter(
+      simpleReader, Some(dataReader), 10, 0.1, 0.5, Double.PositiveInfinity, 0.5, 1.0, 0.05,0.0)
     val (rawFeatureMetrics, exclusionReasons, excludedBothAllF, excludedBothAllMK) =
       filter4.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
     excludedBothAllF.toSet shouldEqual Set("A", "B", "C", "D")
@@ -643,7 +643,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     // We should be able to set the features to either be the train features or the score ones here
     val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 0.8, 1.0, 0.05, 0.0)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader),
+      10, 0.1, 1.0, Double.PositiveInfinity, 0.8, 1.0, 0.05, 0.0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
 
     // TODO: Add a check for the reason dropped once that information is passed on to the workflow
@@ -855,7 +856,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val params = new OpParams()
     // We should be able to set the features to either be the train features or the score ones here
     val features: Array[OPFeature] = Array(c1, c2, c3, mapFeatureRaw, labelDataRaw)
-    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10, 0.1, 1.0, Double.PositiveInfinity, 1.0, 0.8, 0.05, 0.0)
+    val filter = new RawFeatureFilter(trainReader, Some(scoreReader), 10,
+      0.1, 1.0, Double.PositiveInfinity, 1.0, 0.8, 0.05, 0.0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
 
     // TODO: check that filter.getFeaturesToExclude contains the correlation exclusions too
