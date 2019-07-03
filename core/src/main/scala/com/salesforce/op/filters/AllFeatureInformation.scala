@@ -50,6 +50,5 @@ private[op] case class AllFeatureInformation
   responseDistributions: Array[FeatureDistribution],
   predictorSummaries: Map[FeatureKey, Summary],
   predictorDistributions: Array[FeatureDistribution],
-  correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]],
-  avgtextLength: Map[FeatureKey, Double]
+  correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]]
 )

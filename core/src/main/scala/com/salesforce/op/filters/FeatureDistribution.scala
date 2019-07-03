@@ -53,6 +53,7 @@ import scala.util.Try
  * @param key          map key associated with distribution (when the feature is a map)
  * @param count        total count of feature seen
  * @param nulls        number of empties seen in feature
+ * @param avgTextLen   average length of the text (only applicable to text feature)
  * @param distribution binned counts of feature values (hashed for strings, evenly spaced bins for numerics)
  * @param summaryInfo  either min and max number of tokens for text data, or splits used for bins for numeric data
  * @param `type`       feature distribution type: training or scoring
@@ -63,6 +64,7 @@ case class FeatureDistribution
   key: Option[String],
   count: Long,
   nulls: Long,
+  avgTextLen: Double,
   distribution: Array[Double],
   summaryInfo: Array[Double],
   `type`: FeatureDistributionType = FeatureDistributionType.Training
@@ -96,14 +98,18 @@ case class FeatureDistribution
   /**
    * Test whether the given distribution is Uniform, for detecting useless text hashes
    *
-   * @return true means rejecting Null hypothesis (current distribution is a uniform distribution) => likely keep the raw feature
-   *         false means failing to reject the Null hypothesis => proceed to check the length cardinality
+   * @return true means we don't have enough evidence to reject Null hypothesis (current distribution is uniform)
+   *         likely to drop the feature, but will combine with average text length check.
+   *         If the hash space is too small w.r.t, a text feature could still appear uniformly distributed
+   *
+   *         false means rejecting the Null hypothesis
+   *         hashed feature deos not follow uniform distribution, but could still be useless
    */
 
   def chiSqUnifTest(cutoff: Double): Boolean = {
     val vectorizedDistr = Vectors.dense(distribution)
     val goodnessOfFitTestResult = Statistics.chiSqTest(vectorizedDistr)
-    return goodnessOfFitTestResult.pValue < cutoff
+    return goodnessOfFitTestResult.pValue >= cutoff
   }
 
   /**
@@ -239,12 +245,16 @@ object FeatureDistribution {
     val (nullCount, (summaryInfo, distribution)) =
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
-
+    val avgTextLen = value.get match {
+      case Left(v) => v.map(_.size).sum / v.size
+      case _ => 0.0
+    }
     FeatureDistribution(
       name = name,
       key = key,
       count = 1L,
       nulls = nullCount,
+      avgTextLen = avgTextLen,
       summaryInfo = summaryInfo,
       distribution = distribution,
       `type` = `type`

@@ -59,15 +59,6 @@ private[filters] case class PreparedFeatures
   def summaries: (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
     responses.mapValues(Summary(_)) -> predictors.mapValues(Summary(_))
 
-  def avgTextLength: (Map[FeatureKey, Double], Map[FeatureKey, Double]) = {
-    responses.mapValues(avgTextLen(_)) -> predictors.mapValues(avgTextLen(_))
-    def avgTextLen(preppedFeature: ProcessedSeq): Double = {
-      preppedFeature match {
-        case Left(v) => v.map(_.size).sum / v.size
-        case Right(_) => 0.0
-      }
-    }
-  }
   /**
    * Computes vector of size responseKeys.length + predictorKeys.length. The first responses.length
    * values are the actual response values (nulls replaced with 0.0). Its (i + responses.length)th value
