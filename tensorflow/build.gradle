@@ -1,0 +1,17 @@
+dependencies {
+    compile project(':core')
+    testCompile project(':testkit')
+
+    // TensorFlow Java API
+    compile "org.tensorflow:tensorflow:$tensorFlowVersion"
+
+    // TensorFlow binaries for Linux and Mac OS
+    // Additional dependencies required to use CUDA, cuDNN, NCCL, and TensorRT
+    // Read more - https://github.com/bytedeco/javacpp-presets/tree/master/tensorflow
+    compile "org.bytedeco:tensorflow:$tensorFlowVersion-$javaCPPPresetsVersion"
+    compile "org.bytedeco:tensorflow:$tensorFlowVersion-$javaCPPPresetsVersion:linux-x86_64"
+    compile "org.bytedeco:tensorflow:$tensorFlowVersion-$javaCPPPresetsVersion:macosx-x86_64"
+    compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion"
+    compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:linux-x86_64"
+    compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:macosx-x86_64"
+}

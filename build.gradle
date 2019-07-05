@@ -90,6 +90,9 @@ configure(allProjs) {
         akkaSlf4jVersion = '2.3.11'
         mleapVersion = '0.13.0'
         memoryFilesystemVersion = '2.1.0'
+        tensorFlowVersion = '1.13.1'
+        javaCPPPresetsVersion = '1.5'
+        mklDNNVersion = '0.18.1'
     }
 
     configurations {
