@@ -1,6 +1,6 @@
 # Boston Regression
 
-The following code illustrates how TransmogrifAI can be used to do linear regression. We use Boston dataset to predict housing prices.
+The following code illustrates how TransmogrifAI can be used to do linear regression. We use Boston dataset to predict housing prices. This example is very similar to the Titanic Binary Classification example, so you should look over that example first if you have not already.
 The code for this example can be found [here](https://github.com/salesforce/TransmogrifAI/tree/master/helloworld/src/main/scala/com/salesforce/hw/boston), and the data over [here](https://github.com/salesforce/op/tree/master/helloworld/src/main/resources/BostonDataset).
 
 **Define features**
@@ -25,58 +25,48 @@ val medv = FeatureBuilder.RealNN[BostonHouse].extract(_.medv.toRealNN).asRespons
 **Feature Engineering**
 
 ```scala
-val houseFeatures = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
+val features = Seq(crim, zn, indus, chas, nox, rm, age, dis, rad, tax, ptratio, b, lstat).transmogrify()
+val label = medv
+val checkedFeatures = label.sanityCheck(features, removeBadFeatures = true)
 ```
+
 **Modeling & Evaluation**
+
+For regression problems, we use ```RegressionModelSelector``` to choose which type of models to use, which in this case is Linear Regression. You can find more model types [here](../developer-guide#modelselector).
+
 ```scala
 val prediction = RegressionModelSelector
-  .withCrossValidation(dataSplitter = Option(DataSplitter(seed = randomSeed)), seed = randomSeed)
-  .setRandomForestSeed(randomSeed)
-  .setGradientBoostedTreeSeed(randomSeed)
-  .setInput(medv, houseFeatures)
-  .getOutput()
+  .withTrainValidationSplit(
+    modelTypesToUse = Seq(OpLinearRegression))
+  .setInput(label, checkedFeatures).getOutput()
 
 val workflow = new OpWorkflow().setResultFeatures(prediction)
 
-val evaluator = Evaluators.Regression().setLabelCol(medv).setPredictionCol(prediction)
+val evaluator = Evaluators.Regression().setLabelCol(label).setPredictionCol(prediction)
 
-def runner(opParams: OpParams): OpWorkflowRunner =
-  new OpWorkflowRunner(
-    workflow = workflow,
-    trainingReader = trainingReader,
-    scoringReader = scoringReader,
-    evaluationReader = Option(trainingReader),
-    evaluator = Option(evaluator),
-    scoringEvaluator = None,
-    featureToComputeUpTo = Option(houseFeatures)
-  )
+val model = workflow.train()
 ```
-You can run the code using the following commands for train, score and evaluate:
+
+**Results**
+
+We can extract each feature's contribution to the model via ```ModelInsights```, like in the Titanic Binary Classification example.
+
+```scala
+val modelInsights = model.modelInsights(prediction)
+val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
+  feature.contribution.map( contribution => math.abs(contribution))
+    .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
+val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
+    
+val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
+```
+
+You can run the code using the following command:
+
 ```bash
 cd helloworld
 ./gradlew compileTestScala installDist
-```
-**Train**
-```bash
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
---run-type=train \
---model-location=/tmp/boston-model \
---read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data"
-```
-**Score**
-```bash
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
---run-type=score \
---model-location=/tmp/boston-model \
---read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
---write-location=/tmp/boston-scores"
-```
-**Evaluate**
-```bash
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
---run-type=evaluate \
---read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
---write-location=/tmp/boston-eval \
---model-location=/tmp/boston-model \
---metrics-location=/tmp/boston-metrics"
+./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpBostonSimple -Dargs="\
+`pwd`/src/main/resources/BostonDataset/housingData.csv"
 ```

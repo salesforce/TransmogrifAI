@@ -36,13 +36,13 @@ In the main function, we create a spark session as per usual:
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
-val conf = new SparkConf().setAppName("TitanicPrediction")
-implicit val spark = SparkSession.builder.config(conf).getOrCreate()
+implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
+import spark.implicits._ // Needed for Encoders for the Passenger case class
 ```
 
-We then define the set of raw features that we would like to extract from the data. The raw features are defined using [FeatureBuilders](/Developer-Guide#featurebuilders), and are strongly typed. TransmogrifAI supports the following basic feature types: Text, Numeric, Vector, List , Set, Map. In addition it supports many specific feature types which extend these base types: Email extends Text; Integral, Real and Binary extend Numeric; Currency and Percentage extend Real. For a complete view of the types supported see the [Type Hierarchy and Automatic Feature Engineering](/Developer-Guide#type-hierarchy-and-automatic-feature-engineering) section in the Documentation.
+We then define the set of raw features that we would like to extract from the data. The raw features are defined using [FeatureBuilders](../developer-guide#featurebuilders), and are strongly typed. TransmogrifAI supports the following basic feature types: Text, Numeric, Vector, List , Set, Map. In addition it supports many specific feature types which extend these base types: Email extends Text; Integral, Real and Binary extend Numeric; Currency and Percentage extend Real. For a complete view of the types supported see the [Type Hierarchy and Automatic Feature Engineering](../developer-guide#type-hierarchy-and-automatic-feature-engineering) section in the Documentation.
 
-Basic FeatureBuilders will be created for you if you use the TransmogrifAI CLI to bootstrap your project as described [here](/examples/Bootstrap-Your-First-Project.html). However, it is often useful to edit this code to customize feature generation and take full advantage of the Feature types available (selecting the appropriate type will improve automatic feature engineering steps).
+Basic FeatureBuilders will be created for you if you use the TransmogrifAI CLI to bootstrap your project as described [here](../examples/Bootstrap-Your-First-Project.html). However, it is often useful to edit this code to customize feature generation and take full advantage of the Feature types available (selecting the appropriate type will improve automatic feature engineering steps).
 
 When defining raw features, specify the extract logic to be applied to the raw data, and  also  annotate the features as either predictor or response variables via the FeatureBuilders:
 ```scala
@@ -114,8 +114,7 @@ The next stage applies another powerful AutoML Estimator — the [SanityChecker]
 
 ```scala
 // Optionally check the features with a sanity checker
-val sanityCheck = false
-val finalFeatures = if (sanityCheck) survived.sanityCheck(passengerFeatures) else passengerFeatures
+val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
 ```
 Finally, the OpLogisticRegression Estimator is applied to derive a new triplet of Features which are essentially probabilities and predictions returned by the logistic regression algorithm:
 
@@ -123,7 +122,10 @@ Finally, the OpLogisticRegression Estimator is applied to derive a new triplet o
 // Define the model we want to use (here a simple logistic regression) and get the resulting output
 import com.salesforce.op.stages.impl.classification.OpLogisticRegression
 
-val prediction = new OpLogisticRegression().setInput(survived, finalFeatures).getOutput
+// Define the model we want to use (here a simple logistic regression) and get the resulting output
+val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
+  modelTypesToUse = Seq(OpLogisticRegression)
+).setInput(survived, checkedFeatures).getOutput()
 ```
 We could alternatively have used the [ModelSelector](../automl-capabilities#modelselectors) — another powerful AutoML Estimator that automatically tries out a variety of different classification algorithms and then selects the best one.
 
@@ -132,24 +134,21 @@ Notice that everything we've done so far has been purely at the level of definit
 ```scala
 import com.salesforce.op.readers.DataReaders
 
-val trainDataReader = DataReaders.Simple.csvCase[Passenger](
-      path = Some(csvFilePath), // location of data file
-      key = _.id.toString  // identifier for entity being modeled
-)   
+val dataReader = DataReaders.Simple.csvCase[Passenger](path = Option(csvFilePath), key = _.id.toString)   
 
 val workflow =
    new OpWorkflow()
       .setResultFeatures(survived, prediction)
-      .setReader(trainDataReader)
+      .setReader(dataReader)
 ```
 
-When we now call 'train' on this workflow, it automatically computes and executes the entire DAG of Stages needed to compute the features ```survived, prediction, rawPrediction```, and ```prob```, fitting all the estimators on the training data in the process. Calling ```score``` on the fitted workflow then transforms the underlying training data to produce a DataFrame with the all the features manifested. The ```score``` method can optionally be passed an evaluator that produces metrics. 
+When we now call 'train' on this workflow, it automatically computes and executes the entire DAG of Stages needed to compute the features ```survived, prediction, rawPrediction```, and ```prob```, fitting all the estimators on the training data in the process. Calling ```scoreAndEvaluate``` on the model then transforms the underlying training data to produce a DataFrame with the all the features manifested. The ```scoreAndEvaluate``` method can optionally be passed an evaluator that produces metrics. 
 
 ```scala
 import com.salesforce.op.evaluators.Evaluators
 
 // Fit the workflow to the data
-val fittedWorkflow = workflow.train()
+val model = workflow.train()
 
 val evaluator = Evaluators.BinaryClassification()
    .setLabelCol(survived)
@@ -157,15 +156,19 @@ val evaluator = Evaluators.BinaryClassification()
 
 // Apply the fitted workflow to the train data and manifest
 // the resulting dataframe together with metrics
-val (transformedTrainData, metrics) = fittedWorkflow.scoreAndEvaluate(evaluator = evaluator)
+val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
 ```
 
-The fitted workflow can now be saved, and loaded again to be applied to any new data set of type Passengers by changing the reader. 
-
+We can find information about the model via ```ModelInsights```. In this example, we extracting each feature's contribution to the model by first listing all of the features that the model derives from the input features and finding their maximum contribution. We can also find the correlation of the feature with the label, mean of the feature values, variance of the values, etc... More information about ```ModelInsights``` can be found [here](../developer-guide#extracting-modelinsights-from-a-fitted-workflow).
 ```scala
-fittedWorkflow.save(saveWorkflowPath)
-
-val savedWorkflow = OpWorkflowModel.load(saveWorkflowPath).setReader(testDataReader)
+// Extract information (i.e. feature importance) via model insights
+val modelInsights = model.modelInsights(prediction)
+val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
+  feature.contribution.map( contribution => math.abs(contribution))
+    .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
+val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
 ```
+
 
 
