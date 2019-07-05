@@ -109,7 +109,7 @@ case class FeatureDistribution
   def chiSqUnifTest(cutoff: Double): Boolean = {
     val vectorizedDistr = Vectors.dense(distribution)
     val goodnessOfFitTestResult = Statistics.chiSqTest(vectorizedDistr)
-    return goodnessOfFitTestResult.pValue >= cutoff
+    goodnessOfFitTestResult.pValue >= cutoff
   }
 
   /**
@@ -121,7 +121,7 @@ case class FeatureDistribution
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
     val combinedDist = distribution + fd.distribution
-    val combinedAvgTextLen = (avgTextLen * count + fd.avgTextLen * fd.count)/(count + fd.count)
+    val combinedAvgTextLen = (avgTextLen * count + fd.avgTextLen * fd.count) / (count + fd.count)
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls,
