@@ -30,32 +30,54 @@
 
 package com.salesforce.op.tensorflow
 
-import java.nio.IntBuffer
+import java.nio.FloatBuffer
 
-import com.salesforce.op.test.TestCommon
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
+import org.bytedeco.tensorflow._
+import org.bytedeco.tensorflow.global.tensorflow._
 
+/**
+ * A very simple linear model: y = x * W + b
+ * Copied from - https://github.com/tensorflow/models/tree/master/samples/languages/java/training
+ *
+ * Expects three inputs: 'x', 'W', 'b'
+ * Produces output: 'y' := x * W + b
+ *
+ * @param graphFile path to graph (.pb) to load
+ */
+class SimpleLinearModel(graphFile: String) {
 
-@RunWith(classOf[JUnitRunner])
-class SimpleTensorFlowModelTest extends FlatSpec with TestCommon {
-
-  Spec[SimpleTensorFlowModel] should "spawn" in {
-    noException shouldBe thrownBy (new SimpleTensorFlowModel)
+  def graph(): GraphDef = {
+    val graphDef = new GraphDef()
+    TF_CHECK_OK(ReadBinaryProto(Env.Default(), graphFile, graphDef))
+    graphDef
   }
 
-  it should "run" in {
-    val tfModel = new SimpleTensorFlowModel(2, 3)
-    val outputs = tfModel.run().get()
-    outputs.length shouldBe 1
+  def run
+  (
+    x: Float, w: Float, b: Float
+  )(
+    g: GraphDef = graph(),
+    sessionOptions: SessionOptions = new SessionOptions()
+  ): TensorVector = {
+    val session = new Session(sessionOptions)
+    try {
+      val graphDef = new GraphDef()
+      TF_CHECK_OK(session.Create(graphDef))
 
-    for {output <- outputs} {
-      output.NumElements shouldBe 6
-      val vals = new Array[Int](output.NumElements.toInt)
-      output.createBuffer[IntBuffer]().get(vals)
-      vals shouldBe Array.fill(6)(17)
-    }
+      def toTensor(f: Float) = {
+        val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
+        tensor.createBuffer[FloatBuffer]().put(f)
+        tensor
+      }
+
+      val input_feed = new StringTensorPairVector(
+        Array("input", "W", "b"), Array[Tensor](toTensor(x), toTensor(w), toTensor(b))
+      )
+      val outputs = new TensorVector
+      TF_CHECK_OK(session.Run(input_feed, new StringVector("add:0"), new StringVector, outputs))
+      outputs
+    } finally session.close()
   }
+
 
 }

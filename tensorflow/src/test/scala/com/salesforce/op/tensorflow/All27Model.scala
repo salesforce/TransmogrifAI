@@ -34,45 +34,46 @@ import org.bytedeco.tensorflow._
 import org.bytedeco.tensorflow.global.tensorflow._
 
 /**
- * Just a simple TensorFlow model used in test.
+ * Just a simple TensorFlow model used in test that computes matrices filled in with value 27.
  *
  * It creates a graph of three matrices of specified sizes filled with:
  * ones, sixes and tens respectively, then it sums them.
  *
- * Result should be a matrix of specified sizes with value 17 in all cells.
+ * Result should be a matrix of specified sizes with value 27 in all cells.
+ *
+ * Example for: new SimpleTensorFlowModel(2).run() should yield [27, 27]
  *
  * @param sizes matrix dimensions
  */
-class SimpleTensorFlowModel(sizes: Long*) {
+class All27Model(sizes: Long*) {
 
-  // Platform-specific initialization routine
-  InitMain("trainer", null.asInstanceOf[Array[Int]], null)
-
-  // Create a new empty graph
-  val scope = Scope.NewRootScope
+  def graph(): GraphDef = {
+    // Create a new empty graph
+    val scope = Scope.NewRootScope
 
   // Matrices of ones, sixes and tens in specified sizes
   val shape = new TensorShape(sizes: _*)
   val ones = Const(scope.WithOpName("ones"), 1, shape)
   val sixes = Const(scope.WithOpName("sixes"), 6, shape)
-  val tens = Const(scope.WithOpName("tens"), 10, shape)
+  val tens = Const(scope.WithOpName("tens"), 20, shape)
 
-  // Adding all matrices element-wise
-  val ov = new OutputVector(ones, sixes, tens)
-  val inputList = new InputList(ov)
-  val add = new AddN(scope.WithOpName("add"), inputList)
+    // Adding all matrices element-wise
+    val ov = new OutputVector(ones, sixes, tens)
+    val inputList = new InputList(ov)
+    val add = new AddN(scope.WithOpName("add"), inputList)
 
-  // Build a graph definition object
-  val graph = new GraphDef
-  TF_CHECK_OK(scope.ToGraphDef(graph))
+    // Build a graph definition object
+    val graph = new GraphDef
+    TF_CHECK_OK(scope.ToGraphDef(graph))
+    graph
+  }
 
-  // Creates a session.
-  val sessionOptions = new SessionOptions
-  val session = new Session(sessionOptions)
-
-  def run(): TensorVector = {
-    try { // Create the graph to be used for the session.
-      TF_CHECK_OK(session.Create(graph))
+  def run(g: GraphDef = graph(), sessionOptions: SessionOptions = new SessionOptions): TensorVector = {
+    // Creates a session.
+    val session = new Session(sessionOptions)
+    try {
+      // Create the graph to be used for the session.
+      TF_CHECK_OK(session.Create(g))
       // Input and output of a single session run.
       val input_feed = new StringTensorPairVector
       val output_tensor_name = new StringVector("add:0")
