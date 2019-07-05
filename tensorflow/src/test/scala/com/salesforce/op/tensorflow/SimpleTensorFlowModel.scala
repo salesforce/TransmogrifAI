@@ -51,7 +51,7 @@ class SimpleTensorFlowModel(sizes: Long*) {
   // Create a new empty graph
   val scope = Scope.NewRootScope
 
-  // (2, 2) matrix of ones, sixes and tens
+  // Matrices of ones, sixes and tens in specified sizes
   val shape = new TensorShape(sizes: _*)
   val ones = Const(scope.WithOpName("ones"), 1, shape)
   val sixes = Const(scope.WithOpName("sixes"), 6, shape)
