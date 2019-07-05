@@ -158,19 +158,9 @@ class RecordInsightsLOCO[T <: Model[T]]
   private def convertToTimePeriod(descriptorValue: String): Option[TimePeriod] =
     descriptorValue.split("_").lastOption.flatMap(TimePeriod.withNameInsensitiveOption)
 
-  private def isMapFeature(featureType: String ): Boolean = {
-    val featureTypeTag = FeatureType.featureTypeTag(featureType)
-    featureTypeTag.tpe <:< weakTypeOf[OPMap[_]]
-  }
-
-  private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = {
-    if (history.parentFeatureType.exists(isMapFeature)) {
-      val grouping = history.grouping
-      history.parentFeatureOrigins.headOption.map(_ + "_" + grouping.getOrElse(""))
-    }
-    else {
-      history.parentFeatureOrigins.headOption
-    }
+  private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = history.grouping match {
+    case Some(grouping) => history.parentFeatureOrigins.headOption.map(_ + "_" + grouping)
+    case None => history.parentFeatureOrigins.headOption
   }
 
   private def returnTopPosNeg
@@ -189,29 +179,23 @@ class RecordInsightsLOCO[T <: Model[T]]
       val diffToExamine = computeDiffs(i, oldInd, oldVal, featureArray, featureSize, baseScore)
       val history = histories(oldInd)
 
-      // If indicator value and descriptor value values are empty, the field is likely
-      // to be a derived text feature (hashing tf output)
-      val isHashTextFeature = textFeatureIndices.contains(oldInd) &&
-        history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-      // If the descriptor value exists, the field is likely to be a derived date feature from unit circle transformer.
-      val isUnitCircleDateFeature = dateFeatureIndices.contains(oldInd) && history.descriptorValue.isDefined
-
-      if (isHashTextFeature || isUnitCircleDateFeature) {
-        for {name <- getRawFeatureName(history)} {
-          // Update the aggregation map for each (rawFeatureName, timePeriod) in case of date features.
-          val key = if (isUnitCircleDateFeature) {
-            name + "_" + history.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
+      history match {
+        // If indicator value and descriptor value of a derived text feature are empty, then it is likely
+        // to be a hashing tf output. We aggregate such features for each (rawFeatureName).
+        case h if h.indicatorValue.isEmpty && h.descriptorValue.isEmpty && textFeatureIndices.contains(oldInd)  =>
+          for {name <- getRawFeatureName(h)} {
+            val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
+            aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
           }
-          // Update the aggregation map for each rawFeatureName in case of text features.
-          else {
-            name
+        // If the descriptor value of a derived date feature exists, then it is likely to be
+        // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
+        case h if h.descriptorValue.isDefined && dateFeatureIndices.contains(oldInd) =>
+          for {name <- getRawFeatureName(h)} {
+            val key = name + "_" + h.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
+            val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
+            aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
           }
-          val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
-          aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
-        }
-      }
-      else {
-        minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
+        case _ => minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
       }
     }
 
