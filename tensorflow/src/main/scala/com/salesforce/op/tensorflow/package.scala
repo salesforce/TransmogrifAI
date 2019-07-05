@@ -3,6 +3,8 @@ package com.salesforce.op
 import java.nio.{DoubleBuffer, FloatBuffer, IntBuffer, LongBuffer}
 
 import org.bytedeco.tensorflow._
+import org.bytedeco.tensorflow.global.tensorflow._
+import org.tensorflow.TensorFlowException
 
 package object tensorflow {
 
@@ -35,6 +37,12 @@ package object tensorflow {
     def asString: String = t.createStringArray().toString
 
     def asCharArray: Array[Char] = asString.toCharArray
+
+  }
+
+  implicit class RichStatus(val s: Status) extends AnyVal {
+
+    def errorIfNotOK(): Unit = if (s.code() != OK) throw new RuntimeException(s.error_message().getString)
 
   }
 

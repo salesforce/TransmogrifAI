@@ -77,6 +77,7 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
 
     result.get() match {
       case Array(v) => v.asIntArray shouldBe Array.fill(6)(27)
+      case v => fail("Unexpected result: " + v)
     }
   }
 
@@ -89,12 +90,14 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
 
     val result1 = tfModel.run(x = 11f, w = 5f, b = -2f)()
     result1.get() match {
-      case Array(v) => v.asIntArray shouldBe Array(11f * 5f - 2f)
+      case Array(v) => v.asFloatArray shouldBe Array(11f * 5f - 2f)
+      case v => fail("Unexpected result: " + v)
     }
 
     val result2 = tfModel.run(x = -2f, w = 3f, b = 100f)()
     result2.get() match {
-      case Array(v) => v.asIntArray shouldBe Array(-2f * 3f + 100f)
+      case Array(v) => v.asFloatArray shouldBe Array(-2f * 3f + 100f)
+      case v => fail("Unexpected result: " + v)
     }
   }
 

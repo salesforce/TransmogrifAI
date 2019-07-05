@@ -64,7 +64,7 @@ class All27Model(sizes: Long*) {
 
     // Build a graph definition object
     val graph = new GraphDef
-    TF_CHECK_OK(scope.ToGraphDef(graph))
+    scope.ToGraphDef(graph).errorIfNotOK()
     graph
   }
 
@@ -73,14 +73,14 @@ class All27Model(sizes: Long*) {
     val session = new Session(sessionOptions)
     try {
       // Create the graph to be used for the session.
-      TF_CHECK_OK(session.Create(g))
+      session.Create(g).errorIfNotOK()
       // Input and output of a single session run.
       val input_feed = new StringTensorPairVector
       val output_tensor_name = new StringVector("add:0")
       val target_tensor_name = new StringVector
       val outputs = new TensorVector
       // Run the session once
-      TF_CHECK_OK(session.Run(input_feed, output_tensor_name, target_tensor_name, outputs))
+      session.Run(input_feed, output_tensor_name, target_tensor_name, outputs).errorIfNotOK()
       outputs
     } finally if (session != null) session.close()
   }

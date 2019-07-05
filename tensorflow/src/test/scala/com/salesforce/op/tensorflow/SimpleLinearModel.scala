@@ -48,7 +48,7 @@ class SimpleLinearModel(graphFile: String) {
 
   def graph(): GraphDef = {
     val graphDef = new GraphDef()
-    TF_CHECK_OK(ReadBinaryProto(Env.Default(), graphFile, graphDef))
+    ReadBinaryProto(Env.Default(), graphFile, graphDef).errorIfNotOK()
     graphDef
   }
 
@@ -61,8 +61,7 @@ class SimpleLinearModel(graphFile: String) {
   ): TensorVector = {
     val session = new Session(sessionOptions)
     try {
-      val graphDef = new GraphDef()
-      TF_CHECK_OK(session.Create(graphDef))
+      session.Create(g).errorIfNotOK()
 
       def toTensor(f: Float) = {
         val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
