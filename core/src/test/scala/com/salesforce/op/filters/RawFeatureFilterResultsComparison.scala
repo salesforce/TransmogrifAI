@@ -64,6 +64,7 @@ object RawFeatureFilterResultsComparison extends FlatSpec with Matchers with Dou
 
   def compareMetrics(m1: RawFeatureFilterMetrics, m2: RawFeatureFilterMetrics): Unit = {
     m1.name shouldBe m2.name
+    m1.key shouldBe m2.key
     m1.trainingFillRate shouldBe m2.trainingFillRate
     m1.trainingNullLabelAbsoluteCorr shouldEqual m2.trainingNullLabelAbsoluteCorr
     m1.scoringFillRate shouldEqual m2.scoringFillRate
@@ -78,6 +79,7 @@ object RawFeatureFilterResultsComparison extends FlatSpec with Matchers with Dou
 
   def compareExclusionReasons(er1: ExclusionReasons, er2: ExclusionReasons): Unit = {
     er1.name shouldBe er2.name
+    er1.key shouldBe er2.key
     er1.trainingUnfilledState shouldBe er2.trainingUnfilledState
     er1.trainingNullLabelLeaker shouldBe er2.trainingNullLabelLeaker
     er1.scoringUnfilledState shouldBe er2.scoringUnfilledState
