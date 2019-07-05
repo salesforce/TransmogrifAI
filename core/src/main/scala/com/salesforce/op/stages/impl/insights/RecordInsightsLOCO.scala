@@ -182,7 +182,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       history match {
         // If indicator value and descriptor value of a derived text feature are empty, then it is likely
         // to be a hashing tf output. We aggregate such features for each (rawFeatureName).
-        case h if h.indicatorValue.isEmpty && h.descriptorValue.isEmpty && textFeatureIndices.contains(oldInd)  =>
+        case h if h.indicatorValue.isEmpty && h.descriptorValue.isEmpty && textFeatureIndices.contains(oldInd) =>
           for {name <- getRawFeatureName(h)} {
             val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
             aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))

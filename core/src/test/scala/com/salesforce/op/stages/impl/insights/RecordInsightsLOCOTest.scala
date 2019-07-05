@@ -365,12 +365,12 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
      * @param dateFeatureName Date/DateTime Field
      */
     def assertAggregatedDate(dateFeatureName: String): Unit = {
-        for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
-          withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
-            val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
-              history.descriptorValue.isDefined &&
-              history.descriptorValue.get.split("_").last == timePeriod.entryName
-            assertAggregatedWithPredicate(predicate, testData)
+      for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
+        withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
+          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
+            history.descriptorValue.isDefined &&
+            history.descriptorValue.get.split("_").last == timePeriod.entryName
+          assertAggregatedWithPredicate(predicate, testData)
         }
       }
     }
@@ -380,7 +380,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
      *
      * @param dateMapFeatureName DateMap/DateTimeMap Field
      */
-    def assertAggregatedDateMap(dateMapFeatureName:String, keyName: String): Unit = {
+    def assertAggregatedDateMap(dateMapFeatureName: String, keyName: String): Unit = {
       for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
         withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawMapFeature - $dateMapFeatureName " +
           s"with key as $keyName.") {
@@ -407,7 +407,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
   private def assertAggregatedWithPredicate(
     predicate: OpVectorColumnHistory => Boolean,
     testData: RecordInsightsTestData[LogisticRegressionModel]
-   ): Unit = {
+  ): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
@@ -417,18 +417,19 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       .filter(predicate)
       .map(_.index)
 
-    val expectedLocos = testData.featureTransformedDF.select(testData.label, testData.featureVector).map { case Row(l: Double, v: Vector) =>
-      val featureArray = v.toArray
-      val locos = indices.map { i =>
-        val oldVal = v(i)
-        val baseScore = testData.sparkModel.transformFn(l.toRealNN, v.toOPVector).score.toSeq
-        featureArray.update(i, 0.0)
-        val newScore = testData.sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
-        featureArray.update(i, oldVal)
-        baseScore.zip(newScore).map { case (b, n) => b - n }
-      }
-      val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
-      sumLOCOs.map(_ / indices.length)
+    val expectedLocos = testData.featureTransformedDF.select(testData.label, testData.featureVector).map {
+      case Row(l: Double, v: Vector) =>
+        val featureArray = v.toArray
+        val locos = indices.map { i =>
+          val oldVal = v(i)
+          val baseScore = testData.sparkModel.transformFn(l.toRealNN, v.toOPVector).score.toSeq
+          featureArray.update(i, 0.0)
+          val newScore = testData.sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
+          featureArray.update(i, oldVal)
+          baseScore.zip(newScore).map { case (b, n) => b - n }
+        }
+        val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
+        sumLOCOs.map(_ / indices.length)
     }
     val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
 
