@@ -39,8 +39,8 @@ import org.bytedeco.tensorflow.global.tensorflow._
  * A very simple linear model: y = x * W + b
  * Copied from - https://github.com/tensorflow/models/tree/master/samples/languages/java/training
  *
- * Expects three inputs: 'x', 'W', 'b'
- * Produces output: 'y' := x * W + b
+ * Train on pairs (x,y)
+ * Predict 'y' for given 'x'
  *
  * @param graphFile path to graph (.pb) to load
  */
@@ -52,30 +52,33 @@ class SimpleLinearModel(graphFile: String) {
     graphDef
   }
 
-  def run
-  (
-    x: Float, w: Float, b: Float
-  )(
-    g: GraphDef = graph(),
-    sessionOptions: SessionOptions = new SessionOptions()
-  ): TensorVector = {
-    val session = new Session(sessionOptions)
-    try {
-      session.Create(g).errorIfNotOK()
+  def train(session: Session, g: GraphDef = graph())(data: => Seq[(Float, Float)]): Unit = {
+    session.Create(g).errorIfNotOK()
 
-      def toTensor(f: Float) = {
-        val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
-        tensor.createBuffer[FloatBuffer]().put(f)
-        tensor
-      }
-
+    // TODO: run in parallel, e.g.
+    // https://github.com/bytedeco/javacpp-presets/blob/master/tensorflow/samples/ExampleTrainer.java#L142
+    for {(x, y) <- data} {
       val input_feed = new StringTensorPairVector(
-        Array("input", "W", "b"), Array[Tensor](toTensor(x), toTensor(w), toTensor(b))
+        Array("input", "target"), Array[Tensor](toTensor(x), toTensor(y))
       )
       val outputs = new TensorVector
-      TF_CHECK_OK(session.Run(input_feed, new StringVector("add:0"), new StringVector, outputs))
+      session.Run(input_feed, new StringVector, new StringVector("init:0", "train:0"), outputs).errorIfNotOK()
+    }
+  }
+
+  def predict(session: Session, x: Float): TensorVector = {
+    try {
+      val input_feed = new StringTensorPairVector(Array("input"), Array[Tensor](toTensor(x)))
+      val outputs = new TensorVector
+      session.Run(input_feed, new StringVector("output:0"), new StringVector("init:0"), outputs).errorIfNotOK()
       outputs
-    } finally session.close()
+    } finally if (session != null) session.close()
+  }
+
+  private def toTensor(f: Float): Tensor = {
+    val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
+    tensor.createBuffer[FloatBuffer]().put(f)
+    tensor
   }
 
 

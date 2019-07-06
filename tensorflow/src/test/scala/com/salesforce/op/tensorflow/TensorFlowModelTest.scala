@@ -33,6 +33,7 @@ package com.salesforce.op.tensorflow
 import java.io.{File, FileOutputStream}
 
 import com.salesforce.op.test.TestCommon
+import org.bytedeco.tensorflow.{Session, SessionOptions}
 import org.bytedeco.tensorflow.global.tensorflow._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -77,7 +78,7 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
 
     result.get() match {
       case Array(v) => v.asIntArray shouldBe Array.fill(6)(27)
-      case v => fail("Unexpected result: " + v)
+      case v => fail("Unexpected result of size " + v.length)
     }
   }
 
@@ -85,21 +86,32 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
     noException shouldBe thrownBy (new SimpleLinearModel(graphFile.getAbsolutePath).graph())
   }
 
-  it should "run" in {
+  it should "train & predict" in {
     val tfModel = new SimpleLinearModel(graphFile.getAbsolutePath)
+    val session = new Session(new SessionOptions())
 
-    val result1 = tfModel.run(x = 11f, w = 5f, b = -2f)()
-    result1.get() match {
-      case Array(v) => v.asFloatArray shouldBe Array(11f * 5f - 2f)
-      case v => fail("Unexpected result: " + v)
-    }
+    try {
+      // Train.
+      tfModel.train(session)(data = (0 until 1).map(_ => util.Random.nextFloat()).map(x => x -> (3f * x + 2f)))
 
-    val result2 = tfModel.run(x = -2f, w = 3f, b = 100f)()
-    result2.get() match {
-      case Array(v) => v.asFloatArray shouldBe Array(-2f * 3f + 100f)
-      case v => fail("Unexpected result: " + v)
-    }
+      // Predict. Ideally would produce: 3 * x + 2
+      val result = tfModel.predict(session, x = 2f)
+      result.get() match {
+        // TODO: we get 13f all the time - it seems that the model is not learning!!!
+        // should try printing session:
+        // private static void printVariables(Session sess) {
+        //    List<Tensor<?>> values = sess.runner().fetch("W/read").fetch("b/read").run();
+        //    System.out.printf("W = %f\tb = %f\n", values.get(0).floatValue(), values.get(1).floatValue());
+        //    for (Tensor<?> t : values) {
+        //      t.close();
+        //    }
+        //  }
+
+        case Array(v) if v.NumElements() == 1 => v.asFloatArray.head shouldBe ((3f * 2f + 2f) +- .5f)
+        case v => fail("Unexpected result of size " + v.length)
+      }
+    } finally if (session != null) session.close()
+
   }
-
 
 }
