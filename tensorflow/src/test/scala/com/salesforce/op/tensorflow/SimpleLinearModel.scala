@@ -30,8 +30,6 @@
 
 package com.salesforce.op.tensorflow
 
-import java.nio.FloatBuffer
-
 import org.bytedeco.tensorflow._
 import org.bytedeco.tensorflow.global.tensorflow._
 
@@ -62,7 +60,7 @@ class SimpleLinearModel(graphFile: String) {
 
     for {(x, y) <- data} {
       val input_feed = new StringTensorPairVector(
-        Array("input", "target"), Array[Tensor](toTensor(x), toTensor(y))
+        Array("input", "target"), Array[Tensor](x.asTensor, y.asTensor)
       )
       val outputs = new TensorVector
       session.Run(input_feed, new StringVector, new StringVector("train"), outputs).errorIfNotOK()
@@ -70,7 +68,7 @@ class SimpleLinearModel(graphFile: String) {
   }
 
   def predict(x: Float)(implicit session: Session): TensorVector = {
-    val input_feed = new StringTensorPairVector(Array("input"), Array[Tensor](toTensor(x)))
+    val input_feed = new StringTensorPairVector(Array("input"), Array[Tensor](x.asTensor))
     val outputs = new TensorVector
     session.Run(input_feed, new StringVector("output"), new StringVector, outputs).errorIfNotOK()
     outputs
@@ -80,16 +78,10 @@ class SimpleLinearModel(graphFile: String) {
 
   def getB(implicit session: Session): Float = getFloatValue("b/read")
 
-  private def getFloatValue(operation: String)(implicit session: Session)  = {
+  private def getFloatValue(operation: String)(implicit session: Session): Float = {
     val outputs = new TensorVector
     session.Run(new StringTensorPairVector, new StringVector(operation), new StringVector, outputs).errorIfNotOK()
     outputs.get(0).asFloatArray(0)
-  }
-
-  private def toTensor(f: Float): Tensor = {
-    val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
-    tensor.createBuffer[FloatBuffer]().put(f)
-    tensor
   }
 
 }

@@ -34,7 +34,6 @@ import java.nio.{DoubleBuffer, FloatBuffer, IntBuffer, LongBuffer}
 
 import org.bytedeco.tensorflow._
 import org.bytedeco.tensorflow.global.tensorflow._
-import org.tensorflow.TensorFlowException
 
 package object tensorflow {
 
@@ -73,10 +72,36 @@ package object tensorflow {
 
   }
 
+  /**
+   * Enrichment to handle TensorFlow status values
+   *
+   * @param s [[Status]] instance
+   */
   implicit class RichStatus(val s: Status) extends AnyVal {
 
+    /**
+     * Checks if [[Status]].code == OK, otherwise throws [[RuntimeException]]
+     * @throws RuntimeException is [[Status]].code != OK
+     */
     def errorIfNotOK(): Unit = if (s.code() != OK) throw new RuntimeException(s.error_message().getString)
 
   }
+
+  /**
+   * Enrichment for [[Float]] value conversion
+   *
+   * @param f [[Float]] instance
+   */
+  implicit class RichFloatForTensorFlow(val f: Float) extends AnyVal {
+
+    def asTensor: Tensor = {
+      val tensor = new Tensor(DT_FLOAT, new TensorShape(1))
+      tensor.createBuffer[FloatBuffer]().put(f)
+      tensor
+    }
+
+  }
+
+
 
 }
