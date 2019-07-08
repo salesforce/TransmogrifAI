@@ -40,8 +40,8 @@ import org.apache.spark.ml.PipelineStage
 import org.apache.spark.util.ClosureUtils
 import org.joda.time.Duration
 import org.json4s.JValue
-import org.json4s.JsonAST.JObject
 import org.json4s.JsonDSL._
+import com.salesforce.op.stages.ValueReaderWriter._
 
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Try
@@ -136,35 +136,38 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    * @param json       json to read stage from
    * @return read result
    */
-  def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = {
-    Try {
-      val tti = (json \ "tti").extract[String]
-      val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
+  def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = Try {
+    val tti = (json \ "tti").extract[String]
+    val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
 
-      val extractFnJson = json \ "extractFn"
-      val extractFnClassName = (extractFnJson \ "className").extract[String]
-      val extractFn = extractFnClassName match {
-        case c if classOf[FromRowExtractFn[_]].getName == c =>
-          val index = (extractFnJson \ "index").extractOpt[Int]
-          val name = (extractFnJson \ "name").extract[String]
-          FromRowExtractFn[O](index, name)(tto).asInstanceOf[Function1[I, O]]
-        case c =>
-          ReflectionUtils.newInstance[Function1[I, O]](c)
-      }
-
-      val aggregatorClassName = (json \ "aggregator" \ "className").extract[String]
-      val aggregator = ReflectionUtils.newInstance[MonoidAggregator[Event[O], _, O]](aggregatorClassName)
-
-      val outputName = (json \ "outputName").extract[String]
-      val extractSource = (json \ "extractSource").extract[String]
-      val uid = (json \ "uid").extract[String]
-      val outputIsResponse = (json \ "outputIsResponse").extract[Boolean]
-      val aggregateWindow = (json \ "aggregateWindow").extractOpt[Long].map(Duration.millis)
-
-      new FeatureGeneratorStage[I, O](extractFn, extractSource, aggregator,
-        outputName, outputIsResponse, aggregateWindow, uid, Right(tti))(tto)
+    val extractFnJson = json \ "extractFn"
+    val extractFn = (extractFnJson \ "className").extract[String] match {
+      case extractFnClassName if classOf[FromRowExtractFn[_]].getName == extractFnClassName =>
+        val index = (extractFnJson \ "index").extractOpt[Int]
+        val name = (extractFnJson \ "name").extract[String]
+        FromRowExtractFn[O](index, name)(tto).asInstanceOf[Function1[I, O]]
+      case extractFnClassName =>
+        val extractFnClass = ReflectionUtils.classForName(extractFnClassName).asInstanceOf[Class[I => O]]
+        readerWriterFor(extractFnClass, "extractFn")
+          .read(extractFnClass, extractFnJson \ "value").get
     }
 
+    val aggregatorJson = json \ "aggregator"
+    val aggregatorClassName = (aggregatorJson \ "className").extract[String]
+    val aggregatorClass = ReflectionUtils.classForName(aggregatorClassName)
+      .asInstanceOf[Class[MonoidAggregator[Event[O], _, O]]]
+    val aggregator =
+      readerWriterFor(aggregatorClass, "aggregator")
+        .read(aggregatorClass, aggregatorJson \ "value").get
+
+    val outputName = (json \ "outputName").extract[String]
+    val extractSource = (json \ "extractSource").extract[String]
+    val uid = (json \ "uid").extract[String]
+    val outputIsResponse = (json \ "outputIsResponse").extract[Boolean]
+    val aggregateWindow = (json \ "aggregateWindow").extractOpt[Long].map(Duration.millis)
+
+    new FeatureGeneratorStage[I, O](extractFn, extractSource, aggregator,
+      outputName, outputIsResponse, aggregateWindow, uid, Right(tti))(tto)
   }
 
   /**
@@ -175,17 +178,23 @@ class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
    */
   def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
     for {
-      extractFn <- Try {
+      extractFn <- {
         stage.extractFn match {
-          case e: FromRowExtractFn[_] =>
-            ("className" -> e.getClass.getName) ~ ("index" -> e.index) ~ ("name" -> e.name)
-          case e =>
-            ("className" -> serializeArgument("extractFn", e).value.toString) ~ JObject()
+          case extract: FromRowExtractFn[_] => Try {
+            ("className" -> extract.getClass.getName) ~ ("index" -> extract.index) ~ ("name" -> extract.name)
+          }
+          case extract => {
+            val extractClass = extract.getClass.asInstanceOf[Class[I => O]]
+            readerWriterFor(extractClass, "extractFn")
+              .write(extract).map { j => ("className" -> extractClass.getName) ~ ("value" -> j) }
+          }
         }
       }
-      aggregator <- Try(
-        ("className" -> serializeArgument("aggregator", stage.aggregator).value.toString) ~ JObject()
-      )
+      aggregator <- {
+        val aggregatorClass = stage.aggregator.getClass.asInstanceOf[Class[MonoidAggregator[Event[O], _, O]]]
+        readerWriterFor[MonoidAggregator[Event[O], _, O]](aggregatorClass, "aggregator")
+          .write(stage.aggregator).map { j => ("className" -> aggregatorClass.getName) ~ ("value" -> j) }
+      }
     } yield {
       ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
         ("tto" -> FeatureType.typeName(stage.tto)) ~
