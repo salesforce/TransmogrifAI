@@ -99,11 +99,12 @@ case class FeatureDistribution
    * Test whether the given distribution is Uniform, for detecting useless text hashes
    *
    * @return true means we don't have enough evidence to reject Null hypothesis (current distribution is uniform)
-   *         likely to drop the feature, but will combine with average text length check.
-   *         If the hash space is too small w.r.t, a text feature could still appear uniformly distributed
-   *
-   *         false means rejecting the Null hypothesis
-   *         hashed feature deos not follow uniform distribution, but could still be useless
+   *         likely to drop the feature, unless average text length check is higher than a threshold.
+   *         False positive: If the hash space is too small w.r.t. the feature cardinality, a text feature
+   *         could still appear uniformly distributed.
+   *         false means rejecting the Null hypothesis, we should keep this text feature.
+   *         False negative: hashed feature does not follow uniform distribution, but could still be useless.
+   *         Not sure how to handle this case.
    */
 
   def chiSqUnifTest(cutoff: Double): Boolean = {
