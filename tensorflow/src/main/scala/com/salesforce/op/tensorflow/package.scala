@@ -38,6 +38,11 @@ import org.tensorflow.TensorFlowException
 
 package object tensorflow {
 
+  /**
+   * Enrichment for [[Tensor]] type to allow extracting values out
+   *
+   * @param t [[Tensor]] instance
+   */
   implicit class RichTensor(val t: Tensor) extends AnyVal {
 
     def asIntArray: Array[Int] = {
@@ -66,8 +71,6 @@ package object tensorflow {
 
     def asString: String = t.createStringArray().toString
 
-    def asCharArray: Array[Char] = asString.toCharArray
-
   }
 
   implicit class RichStatus(val s: Status) extends AnyVal {
@@ -75,6 +78,5 @@ package object tensorflow {
     def errorIfNotOK(): Unit = if (s.code() != OK) throw new RuntimeException(s.error_message().getString)
 
   }
-
 
 }
