@@ -484,10 +484,12 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
+    val labelSummary = getLabelSummary(label, checkerSummary)
+
     ModelInsights(
-      label = getLabelSummary(label, checkerSummary),
+      label = labelSummary,
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, getLabelSummary(label, checkerSummary)),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -562,9 +564,15 @@ case object ModelInsights {
           val sparkFtrContrib = keptIndex
             .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
           val LRStandardization = checkLRStandardization(model).getOrElse(false)
-
+          val defaultLabelStd = 1.0
           val labelStd = label.distribution match {
-            case Some(Continuous(_, _, _, variance)) => math.sqrt(variance)
+            case Some(Continuous(_, _, _, variance)) =>
+              if (variance == 0) {
+                log.info("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
+                defaultLabelStd
+              }
+              else math.sqrt(variance)
             case Some(Discrete(domain, prob)) =>
               val (weighted, sqweighted) = (domain zip prob).foldLeft((0.0, 0.0)) {
                 case ((weightSum, sqweightSum), (d, p)) =>
@@ -573,12 +581,22 @@ case object ModelInsights {
                   val sqweight = floatD * weight
                   (weightSum + weight, sqweightSum + sqweight)
               }
-              sqweighted - weighted
-            case Some(d) => throw new RuntimeException("Unsupported distribution type for the label")
-            case None => throw new RuntimeException("Label does not exist, please check your data")
+              if (sqweighted == weighted) {
+                log.info("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
+                defaultLabelStd
+              }
+              else sqweighted - weighted
+            case Some(_) => {
+              log.info("Performing weight descaling on an unsupported distribution")
+              defaultLabelStd
+            }
+            case None => {
+              log.info("Label does not exist, please check your data")
+              defaultLabelStd
+            }
           }
-          if (labelStd == 0) throw new RuntimeException("The standard deviation of the label is zero, " +
-            "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
+
           h.parentFeatureOrigins ->
             Insights(
               derivedFeatureName = h.columnName,
