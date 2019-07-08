@@ -506,7 +506,8 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *                           a feature
    * @param maxJSDivergence    maximum Jensen-Shannon divergence between the training and scoring distributions
    *                           for a feature
-   * @param pvalCutoff         p-value cutoff to test whether the distribution of a hashed text feature is uniform or not
+   * @param pvalCutoff         p-value cutoff to test whether the distribution of a hashed text feature
+   *                           is uniform or not
    * @param minTextLen         cutoff to determine whether the length of a text feature is too short
    *                           to be considered free text (to be combined with pvalCutoff)
    * @param protectedFeatures  list of features that should never be removed (features that are used to create them will
