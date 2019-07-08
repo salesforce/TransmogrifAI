@@ -106,7 +106,6 @@ case class FeatureDistribution
    *         False negative: hashed feature does not follow uniform distribution, but could still be useless.
    *         Not sure how to handle this case.
    */
-
   def chiSqUnifTest(cutoff: Double): Boolean = {
     val vectorizedDistr = Vectors.dense(distribution)
     val goodnessOfFitTestResult = Statistics.chiSqTest(vectorizedDistr)
