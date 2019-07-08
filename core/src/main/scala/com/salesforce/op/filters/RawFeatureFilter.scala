@@ -72,6 +72,9 @@ import scala.util.Failure
  * @param maxJSDivergence               maximum Jensen-Shannon divergence between training
  *                                      and scoring distributions to be kept
  * @param maxCorrelation                maximum absolute correlation allowed between
+ * @param pvalCutoff                    p-value cutoff to test whether the distribution of a hashed text feature is uniform or not
+ * @param minTextLen                    minimum value of average text length for a text feature
+ *                                      to be considered free text (to be combined with pvalCutoff)
  *                                      raw predictor null indicator and label
  * @param correlationType               type of correlation metric to use
  * @param jsDivergenceProtectedFeatures features that are protected from removal by JS divergence check
