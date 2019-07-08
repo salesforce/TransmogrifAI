@@ -64,7 +64,7 @@ case class FeatureDistribution
   key: Option[String],
   count: Long,
   nulls: Long,
-  avgTextLen: Double,
+  avgTextLen: Double = 0.0,
   distribution: Array[Double],
   summaryInfo: Array[Double],
   `type`: FeatureDistributionType = FeatureDistributionType.Training
