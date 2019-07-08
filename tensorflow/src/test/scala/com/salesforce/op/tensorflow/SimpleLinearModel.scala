@@ -52,27 +52,38 @@ class SimpleLinearModel(graphFile: String) {
     graphDef
   }
 
-  def train(session: Session, g: GraphDef = graph())(data: => Seq[(Float, Float)]): Unit = {
+  def train(g: GraphDef = graph())(data: => Seq[(Float, Float)])(implicit session: Session): Unit = {
     session.Create(g).errorIfNotOK()
 
-    // TODO: run in parallel, e.g.
-    // https://github.com/bytedeco/javacpp-presets/blob/master/tensorflow/samples/ExampleTrainer.java#L142
+    // Initialize 'W := 5' and 'b := 3' values
+    session.Run(
+      new StringTensorPairVector, new StringVector, new StringVector("init"), new TensorVector
+    ).errorIfNotOK()
+
     for {(x, y) <- data} {
       val input_feed = new StringTensorPairVector(
         Array("input", "target"), Array[Tensor](toTensor(x), toTensor(y))
       )
       val outputs = new TensorVector
-      session.Run(input_feed, new StringVector, new StringVector("init:0", "train:0"), outputs).errorIfNotOK()
+      session.Run(input_feed, new StringVector, new StringVector("train"), outputs).errorIfNotOK()
     }
   }
 
-  def predict(session: Session, x: Float): TensorVector = {
-    try {
-      val input_feed = new StringTensorPairVector(Array("input"), Array[Tensor](toTensor(x)))
-      val outputs = new TensorVector
-      session.Run(input_feed, new StringVector("output:0"), new StringVector("init:0"), outputs).errorIfNotOK()
-      outputs
-    } finally if (session != null) session.close()
+  def predict(x: Float)(implicit session: Session): TensorVector = {
+    val input_feed = new StringTensorPairVector(Array("input"), Array[Tensor](toTensor(x)))
+    val outputs = new TensorVector
+    session.Run(input_feed, new StringVector("output"), new StringVector, outputs).errorIfNotOK()
+    outputs
+  }
+
+  def getW(implicit session: Session): Float = getFloatValue("W/read")
+
+  def getB(implicit session: Session): Float = getFloatValue("b/read")
+
+  private def getFloatValue(operation: String)(implicit session: Session)  = {
+    val outputs = new TensorVector
+    session.Run(new StringTensorPairVector, new StringVector(operation), new StringVector, outputs).errorIfNotOK()
+    outputs.get(0).asFloatArray(0)
   }
 
   private def toTensor(f: Float): Tensor = {
@@ -80,6 +91,5 @@ class SimpleLinearModel(graphFile: String) {
     tensor.createBuffer[FloatBuffer]().put(f)
     tensor
   }
-
 
 }

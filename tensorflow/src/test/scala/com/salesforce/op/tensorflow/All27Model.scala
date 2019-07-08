@@ -69,18 +69,11 @@ class All27Model(sizes: Long*) {
   }
 
   def run(g: GraphDef = graph(), sessionOptions: SessionOptions = new SessionOptions): TensorVector = {
-    // Creates a session.
     val session = new Session(sessionOptions)
     try {
-      // Create the graph to be used for the session.
       session.Create(g).errorIfNotOK()
-      // Input and output of a single session run.
-      val input_feed = new StringTensorPairVector
-      val output_tensor_name = new StringVector("add:0")
-      val target_tensor_name = new StringVector
       val outputs = new TensorVector
-      // Run the session once
-      session.Run(input_feed, output_tensor_name, target_tensor_name, outputs).errorIfNotOK()
+      session.Run(new StringTensorPairVector, new StringVector("add"), new StringVector, outputs).errorIfNotOK()
       outputs
     } finally if (session != null) session.close()
   }

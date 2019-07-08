@@ -88,26 +88,22 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
 
   it should "train & predict" in {
     val tfModel = new SimpleLinearModel(graphFile.getAbsolutePath)
-    val session = new Session(new SessionOptions())
+    implicit val session: Session = new Session(new SessionOptions())
 
     try {
       // Train.
-      tfModel.train(session)(data = (0 until 1).map(_ => util.Random.nextFloat()).map(x => x -> (3f * x + 2f)))
+      val trainingData = (0 until 2500).map(_ => util.Random.nextFloat()).map(x => x -> (3f * x + 2f))
+      tfModel.train()(trainingData)
 
-      // Predict. Ideally would produce: 3 * x + 2
-      val result = tfModel.predict(session, x = 2f)
-      result.get() match {
-        // TODO: we get 13f all the time - it seems that the model is not learning!!!
-        // should try printing session:
-        // private static void printVariables(Session sess) {
-        //    List<Tensor<?>> values = sess.runner().fetch("W/read").fetch("b/read").run();
-        //    System.out.printf("W = %f\tb = %f\n", values.get(0).floatValue(), values.get(1).floatValue());
-        //    for (Tensor<?> t : values) {
-        //      t.close();
-        //    }
-        //  }
+      tfModel.getW shouldBe (3f +- .2f)
+      tfModel.getB shouldBe (2f +- .2f)
 
-        case Array(v) if v.NumElements() == 1 => v.asFloatArray.head shouldBe ((3f * 2f + 2f) +- .5f)
+      // Predict.
+      // Ideally would produce: 3 * x + 2
+      for {
+        (x, prediction) <- (0 until 10).map(x => x -> tfModel.predict(x))
+      } prediction.get() match {
+        case Array(v) if v.NumElements() == 1 => v.asFloatArray(0) shouldBe ((3f * x + 2f) +- .5f)
         case v => fail("Unexpected result of size " + v.length)
       }
     } finally if (session != null) session.close()
