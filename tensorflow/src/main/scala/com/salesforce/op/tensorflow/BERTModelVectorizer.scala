@@ -138,13 +138,10 @@ case class BERTModel
         Array(inputs.inputIds, inputs.inputMask, inputs.segmentIds)
       )
       val outputs = new TensorVector
-
       modelBundle.session()
         .Run(input_feed, new StringVector(config.pooledOutput), new StringVector, outputs)
         .errorIfNotOK()
-
       val floats = outputs.get(0).asFloatArray
-      println(floats.size)
       Vectors.dense(floats.map(_.toDouble)).toOPVector
 
     case _ =>
