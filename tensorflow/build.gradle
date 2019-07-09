@@ -14,4 +14,9 @@ dependencies {
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion"
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:linux-x86_64"
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:macosx-x86_64"
+
+    // BERT tokenizers
+    compile "com.robrua.nlp:easy-bert:1.0.3"
+    // BERT pre-trained model
+    testCompile "com.robrua.nlp.models:easy-bert-uncased-L-12-H-768-A-12:1.0.0"
 }

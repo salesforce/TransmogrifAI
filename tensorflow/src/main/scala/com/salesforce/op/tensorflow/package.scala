@@ -99,9 +99,6 @@ package object tensorflow {
       tensor.createBuffer[FloatBuffer]().put(f)
       tensor
     }
-
   }
-
-
 
 }

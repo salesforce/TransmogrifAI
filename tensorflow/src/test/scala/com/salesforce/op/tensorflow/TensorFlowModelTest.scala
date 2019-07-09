@@ -48,6 +48,7 @@ class TensorFlowModelTest extends FlatSpec with TestCommon with BeforeAndAfterAl
     val stream = getClass.getResourceAsStream("/model/graph.pb")
     val res = new Array[Byte](stream.available())
     stream.read(res)
+    stream.close()
     res
   }
   private lazy val graphFile: File = {
