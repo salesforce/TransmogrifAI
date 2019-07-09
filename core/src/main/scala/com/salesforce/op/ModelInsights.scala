@@ -568,7 +568,7 @@ case object ModelInsights {
           val labelStd = label.distribution match {
             case Some(Continuous(_, _, _, variance)) =>
               if (variance == 0) {
-                log.info("The standard deviation of the label is zero, " +
+                log.warn("The standard deviation of the label is zero, " +
                   "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
                 defaultLabelStd
               }
@@ -582,17 +582,17 @@ case object ModelInsights {
                   (weightSum + weight, sqweightSum + sqweight)
               }
               if (sqweighted == weighted) {
-                log.info("The standard deviation of the label is zero, " +
+                log.warn("The standard deviation of the label is zero, " +
                   "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
                 defaultLabelStd
               }
               else sqweighted - weighted
             case Some(_) => {
-              log.info("Performing weight descaling on an unsupported distribution")
+              log.warn("Performing weight descaling on an unsupported distribution")
               defaultLabelStd
             }
             case None => {
-              log.info("Label does not exist, please check your data")
+              log.warn("Label does not exist, please check your data")
               defaultLabelStd
             }
           }
