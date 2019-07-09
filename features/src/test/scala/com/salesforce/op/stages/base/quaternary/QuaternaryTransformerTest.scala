@@ -57,7 +57,11 @@ class QuaternaryTransformerTest
 }
 
 object QuaternaryTransformerTest {
-  def fn: (Real, Integral, Text, Binary) => Real = (r, i, t, b) =>
-    (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
-      t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
+  private class Fn extends Function4[Real, Integral, Text, Binary, Real] with Serializable {
+    def apply(r: Real, i: Integral, t: Text, b: Binary): Real =
+      (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
+        t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
+  }
+
+  def fn: (Real, Integral, Text, Binary) => Real = new Fn
 }

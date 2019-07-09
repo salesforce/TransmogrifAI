@@ -56,6 +56,10 @@ class TernaryTransformerTest extends OpTransformerSpec[Real, TernaryTransformer[
 }
 
 object Lambda {
-  def fn: (Real, Integral, Binary) => Real =
-    (r, i, b) => (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0)).toReal
+  private class Fn extends Function3[Real, Integral, Binary, Real] with Serializable {
+    def apply(r: Real, i: Integral, b: Binary): Real =
+      (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0)).toReal
+  }
+
+  def fn: (Real, Integral, Binary) => Real = new Fn
 }

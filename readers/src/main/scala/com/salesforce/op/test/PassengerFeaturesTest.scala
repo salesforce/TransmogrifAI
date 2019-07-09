@@ -60,18 +60,74 @@ trait PassengerFeaturesTest {
 }
 
 object PassengerFeaturesTestLambdas {
-  def genderFn: Passenger => MultiPickList = p => Set(p.getGender).toMultiPickList
-  def genderPLFn: Passenger => PickList = p => p.getGender.toPickList
-  def heightFn: Passenger => RealNN = p => Option(p.getHeight).map(_.toDouble).toRealNN(0.0)
-  def heightToReal: Passenger => Real = _.getHeight.toReal
-  def weightToReal: Passenger => Real = _.getWeight.toReal
-  def descriptionFn: Passenger => Text = _.getDescription.toText
-  def boardedToDL: Passenger => DateList = p => Seq(p.getBoarded.toLong).toDateList
-  def stringMapFn: Passenger => TextMap = p => p.getStringMap.toTextMap
-  def numericMapFn: Passenger => RealMap = p => p.getNumericMap.toRealMap
-  def booleanMapFn: Passenger => BinaryMap = p => p.getBooleanMap.toBinaryMap
-  def survivedFn: Passenger => Binary = p => Option(p.getSurvived).map(_ == 1).toBinary
-  def boardedTimeFn: Passenger => Date = _.getBoarded.toLong.toDate
-  def boardedDTFn: Passenger => DateTime = _.getBoarded.toLong.toDateTime
-  def ageFn: Passenger => Real = _.getAge.toReal
+  private class GenderFn extends Function1[Passenger, MultiPickList] with Serializable {
+    def apply(p: Passenger): MultiPickList = Set(p.getGender).toMultiPickList
+  }
+
+  private class GenderPLFn extends Function1[Passenger, PickList] with Serializable {
+    def apply(p: Passenger): PickList = p.getGender.toPickList
+  }
+
+  private class HeightFn extends Function1[Passenger, RealNN] with Serializable {
+    def apply(p: Passenger): RealNN = Option(p.getHeight).map(_.toDouble).toRealNN(0.0)
+  }
+
+  private class HeightToReal extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getHeight.toReal
+  }
+
+  private class WeightToReal extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getWeight.toReal
+  }
+
+  private class DescriptionFn extends Function1[Passenger, Text] with Serializable {
+    def apply(p: Passenger): Text = p.getDescription.toText
+  }
+
+  private class BoardedToDL extends Function1[Passenger, DateList] with Serializable {
+    def apply(p: Passenger): DateList = Seq(p.getBoarded.toLong).toDateList
+  }
+
+  private class StringMapFn extends Function1[Passenger, TextMap] with Serializable {
+    def apply(p: Passenger): TextMap = p.getStringMap.toTextMap
+  }
+
+  private class NumericMapFn extends Function1[Passenger, RealMap] with Serializable {
+    def apply(p: Passenger): RealMap = p.getNumericMap.toRealMap
+  }
+
+  private class BooleanMapFn extends Function1[Passenger, BinaryMap] with Serializable {
+    def apply(p: Passenger): BinaryMap = p.getBooleanMap.toBinaryMap
+  }
+
+  private class SurvivedFn extends Function1[Passenger, Binary] with Serializable {
+    def apply(p: Passenger): Binary = Option(p.getSurvived).map(_ == 1).toBinary
+  }
+
+  private class BoardedTimeFn extends Function1[Passenger, Date] with Serializable {
+    def apply(p: Passenger): Date = p.getBoarded.toLong.toDate
+  }
+
+  private class BoardedDTFn extends Function1[Passenger, DateTime] with Serializable {
+    def apply(p: Passenger): DateTime = p.getBoarded.toLong.toDateTime
+  }
+
+  private class AgeFn extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getAge.toReal
+  }
+
+  def genderFn: Passenger => MultiPickList = new GenderFn
+  def genderPLFn: Passenger => PickList = new GenderPLFn
+  def heightFn: Passenger => RealNN = new HeightFn
+  def heightToReal: Passenger => Real = new HeightToReal
+  def weightToReal: Passenger => Real = new WeightToReal
+  def descriptionFn: Passenger => Text = new DescriptionFn
+  def boardedToDL: Passenger => DateList = new BoardedToDL
+  def stringMapFn: Passenger => TextMap = new StringMapFn
+  def numericMapFn: Passenger => RealMap = new NumericMapFn
+  def booleanMapFn: Passenger => BinaryMap = new BooleanMapFn
+  def survivedFn: Passenger => Binary = new SurvivedFn
+  def boardedTimeFn: Passenger => Date = new BoardedTimeFn
+  def boardedDTFn: Passenger => DateTime = new BoardedDTFn
+  def ageFn: Passenger => Real = new AgeFn
 }

@@ -800,23 +800,58 @@ trait RichTextFeature {
 }
 
 object RichTextFeatureLambdas {
+  private class EmailToPickList extends Function1[Email, PickList] with Serializable {
+    def apply(v: Email): PickList = v.domain.toPickList
+  }
 
-  def emailToPickList: Email => PickList = _.domain.toPickList
+  private class EmailToPrefix extends Function1[Email, Text] with Serializable {
+    def apply(v: Email): Text = v.prefix.toText
+  }
 
-  def emailToPrefix: Email => Text = _.prefix.toText
+  private class EmailToDomain extends Function1[Email, Text] with Serializable {
+    def apply(v: Email): Text = v.domain.toText
+  }
 
-  def emailToDomain: Email => Text = _.domain.toText
+  private class UrlToPickList extends Function1[URL, PickList] with Serializable {
+    def apply(v: URL): PickList = if (v.isValid) v.domain.toPickList else PickList.empty
+  }
 
-  def urlToPickList: URL => PickList = (v: URL) => if (v.isValid) v.domain.toPickList else PickList.empty
+  private class UrlToDomain extends Function1[URL, Text] with Serializable {
+    def apply(v: URL): Text = v.domain.toText
+  }
 
-  def urlToDomain: URL => Text = _.domain.toText
+  private class UrlToProtocol extends Function1[URL, Text] with Serializable {
+    def apply(v: URL): Text = v.protocol.toText
+  }
 
-  def urlToProtocol: URL => Text = _.protocol.toText
+  private class UrlIsValid extends Function1[URL, Boolean] with Serializable {
+    def apply(v: URL): Boolean = v.isValid
+  }
 
-  def urlIsValid: URL => Boolean = _.isValid
+  private class TextToPickList extends Function1[Text, PickList] with Serializable {
+    def apply(v: Text): PickList = v.value.toPickList
+  }
 
-  def textToPickList: Text => PickList = _.value.toPickList
+  private class TextToMultiPickList extends Function1[Text, MultiPickList] with Serializable {
+    def apply(v: Text): MultiPickList = v.value.toSet[String].toMultiPickList
+  }
 
-  def textToMultiPickList: Text => MultiPickList = _.value.toSet[String].toMultiPickList
+  def emailToPickList: Email => PickList = new EmailToPickList
+
+  def emailToPrefix: Email => Text = new EmailToPrefix
+
+  def emailToDomain: Email => Text = new EmailToDomain
+
+  def urlToPickList: URL => PickList = new UrlToPickList
+
+  def urlToDomain: URL => Text = new UrlToDomain
+
+  def urlToProtocol: URL => Text = new UrlToProtocol
+
+  def urlIsValid: URL => Boolean = new UrlIsValid
+
+  def textToPickList: Text => PickList = new TextToPickList
+
+  def textToMultiPickList: Text => MultiPickList = new TextToMultiPickList
 
 }

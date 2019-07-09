@@ -62,6 +62,10 @@ class BinarySequenceTransformerTest
 }
 
 object Lambda {
-  def fn: (Real, Seq[Text]) => MultiPickList =
-    (r, texts) => MultiPickList(texts.map(_.value.get).toSet + r.value.get.toString)
+  class Fn extends Function2[Real, Seq[Text], MultiPickList] with Serializable {
+    def apply(r: Real, texts: Seq[Text]): MultiPickList =
+      MultiPickList(texts.map(_.value.get).toSet + r.value.get.toString)
+  }
+
+  def fn: (Real, Seq[Text]) => MultiPickList = new Fn
 }

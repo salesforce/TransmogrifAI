@@ -51,5 +51,9 @@ class BinaryTransformerTest extends OpTransformerSpec[Real, BinaryTransformer[Re
 }
 
 object BinaryTransformerTest {
-  def fn: (Real, RealNN) => Real = (i1, i2) => new Real(for {v1 <- i1.value; v2 <- i2.value} yield v1 / (v2 * v2))
+  private class Fn extends Function2[Real, RealNN, Real] with Serializable {
+    def apply(i1: Real, i2: RealNN): Real = new Real(for {v1 <- i1.value; v2 <- i2.value} yield v1 / (v2 * v2))
+  }
+
+  def fn: (Real, RealNN) => Real = new Fn
 }

@@ -61,5 +61,9 @@ class SequenceTransformerTest extends OpTransformerSpec[MultiPickList, SequenceT
 }
 
 object SequenceTransformerTest {
-  def fn: Seq[Real] => MultiPickList = value => MultiPickList(value.flatMap(_.v.map(_.toString)).toSet)
+  private class Fn extends Function1[Seq[Real], MultiPickList] with Serializable {
+    def apply(value: Seq[Real]): MultiPickList = MultiPickList(value.flatMap(_.v.map(_.toString)).toSet)
+  }
+
+  def fn: Seq[Real] => MultiPickList = new Fn
 }

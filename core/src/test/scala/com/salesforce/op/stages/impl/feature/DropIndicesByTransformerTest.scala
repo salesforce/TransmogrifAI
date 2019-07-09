@@ -116,5 +116,9 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
 }
 
 object DropIndicesByTransformerTest {
-  def matchFn: OpVectorColumnMetadata => Boolean = _.isNullIndicator
+  private class MatchFn extends Function1[OpVectorColumnMetadata, Boolean] with Serializable {
+    def apply(x: OpVectorColumnMetadata): Boolean = x.isNullIndicator
+  }
+
+  def matchFn: OpVectorColumnMetadata => Boolean = new MatchFn
 }

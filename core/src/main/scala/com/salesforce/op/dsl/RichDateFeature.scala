@@ -204,7 +204,15 @@ trait RichDateFeature {
 }
 
 object RichDateFeatureLambdas {
-  def toDateList: Date => DateList = (x: Date) => x.value.toSeq.toDateList
+  private class ToDateList extends Function1[Date, DateList] with Serializable {
+    def apply(x: Date): DateList = x.value.toSeq.toDateList
+  }
 
-  def toDateTimeList: DateTime => DateTimeList = (x: DateTime) => x.value.toSeq.toDateTimeList
+  private class ToDateTimeList extends Function1[DateTime, DateTimeList] with Serializable {
+    def apply(x: DateTime): DateTimeList = x.value.toSeq.toDateTimeList
+  }
+
+  def toDateList: Date => DateList = new ToDateList
+
+  def toDateTimeList: DateTime => DateTimeList = new ToDateTimeList
 }

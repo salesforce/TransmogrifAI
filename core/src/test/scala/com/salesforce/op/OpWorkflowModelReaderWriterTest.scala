@@ -386,6 +386,14 @@ trait UIDReset {
 }
 
 object OpWorkflowModelReaderWriterTest {
-  def catHeadFn: OPVector => Real = v => Real(v.value.toArray.headOption)
-  def emptyVectorFn: Passenger => OPVector = _ => OPVector.empty
+  private class CatHeadFn extends Function1[OPVector, Real] with Serializable {
+    def apply(v: OPVector): Real = Real(v.value.toArray.headOption)
+  }
+
+  private class EmptyVectorFn extends Function1[Passenger, OPVector] with Serializable {
+    def apply(p: Passenger): OPVector = OPVector.empty
+  }
+
+  def catHeadFn: OPVector => Real = new CatHeadFn
+  def emptyVectorFn: Passenger => OPVector = new EmptyVectorFn
 }
