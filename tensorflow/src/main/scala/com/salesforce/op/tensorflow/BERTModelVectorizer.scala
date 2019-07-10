@@ -62,7 +62,10 @@ class BERTModelVectorizer
 
   @transient private lazy val bertModel: BERTModel = modelLoader.model
 
-  def transformFn: Text => OPVector = bertModel(_)
+  def transformFn: Text => OPVector = {
+    case SomeValue(Some(s)) => Vectors.dense(bertModel(s).map(_.toDouble)).toOPVector
+    case _ => OPVector.empty // TODO: is it ok to return an empty vector here?
+  }
 
   def close(): Unit = if (bertModel != null) bertModel.close()
 }
@@ -128,24 +131,20 @@ case class BERTModel
     }
   }
 
-  def apply(t: Text): OPVector = t match {
-    case SomeValue(Some(s)) =>
-      val tokens = tokenizer.tokenize(s)
-      val ids = tokenizer.convert(tokens)
-      val inputs = prepareInputs(tokens, ids, config.maxSequenceLength)
-      val input_feed = new StringTensorPairVector(
-        Array(config.inputIds, config.inputMask, config.segmentIds),
-        Array(inputs.inputIds, inputs.inputMask, inputs.segmentIds)
-      )
-      val outputs = new TensorVector
-      modelBundle.session()
-        .Run(input_feed, new StringVector(config.pooledOutput), new StringVector, outputs)
-        .errorIfNotOK()
-      val floats = outputs.get(0).asFloatArray
-      Vectors.dense(floats.map(_.toDouble)).toOPVector
+  def apply(s: String): Array[Float] = {
+    val tokens = tokenizer.tokenize(s)
+    val ids = tokenizer.convert(tokens)
+    val inputs = prepareInputs(tokens, ids, config.maxSequenceLength)
+    val input_feed = new StringTensorPairVector(
+      Array(config.inputIds, config.inputMask, config.segmentIds),
+      Array(inputs.inputIds, inputs.inputMask, inputs.segmentIds)
+    )
+    val outputs = new TensorVector
+    modelBundle.session()
+      .Run(input_feed, new StringVector(config.pooledOutput), new StringVector, outputs)
+      .errorIfNotOK()
 
-    case _ =>
-      OPVector.empty // TODO: is it ok to return an empty vector here?
+    outputs.get(0).asFloatArray
   }
 
   /**
