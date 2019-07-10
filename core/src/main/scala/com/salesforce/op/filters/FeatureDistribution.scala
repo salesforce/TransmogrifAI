@@ -53,7 +53,6 @@ import scala.util.Try
  * @param key          map key associated with distribution (when the feature is a map)
  * @param count        total count of feature seen
  * @param nulls        number of empties seen in feature
- * @param avgTextLen   average length of the text (only applicable to text feature)
  * @param distribution binned counts of feature values (hashed for strings, evenly spaced bins for numerics)
  * @param summaryInfo  either min and max number of tokens for text data, or splits used for bins for numeric data
  * @param `type`       feature distribution type: training or scoring
@@ -64,7 +63,6 @@ case class FeatureDistribution
   key: Option[String],
   count: Long,
   nulls: Long,
-  avgTextLen: Double = 0.0,
   distribution: Array[Double],
   summaryInfo: Array[Double],
   `type`: FeatureDistributionType = FeatureDistributionType.Training
@@ -121,11 +119,9 @@ case class FeatureDistribution
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
     val combinedDist = distribution + fd.distribution
-    val combinedAvgTextLen = (avgTextLen * count + fd.avgTextLen * fd.count) / (count + fd.count)
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls,
-      combinedAvgTextLen, combinedDist, combinedSummary, `type`)
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary, `type`)
   }
 
   /**
@@ -177,7 +173,6 @@ case class FeatureDistribution
       "key" -> key,
       "count" -> count.toString,
       "nulls" -> nulls.toString,
-      "avgTextLen" -> avgTextLen.toString,
       "distribution" -> distribution.mkString("[", ",", "]"),
       "summaryInfo" -> summaryInfo.mkString("[", ",", "]")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
@@ -186,7 +181,7 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, `avgTextLen`, d, s, `type`) =>
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep
     case _ => false
   }
@@ -257,7 +252,6 @@ object FeatureDistribution {
       key = key,
       count = 1L,
       nulls = nullCount,
-      avgTextLen = avgTextLen,
       summaryInfo = summaryInfo,
       distribution = distribution,
       `type` = `type`
