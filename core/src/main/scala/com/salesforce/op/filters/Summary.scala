@@ -31,7 +31,7 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.feature.TextStats
-import com.twitter.algebird.{Moments, MomentsAggregator, Monoid}
+import com.twitter.algebird.{Moments, MomentsAggregator, MomentsGroup, Monoid}
 
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
@@ -53,11 +53,11 @@ case object Summary {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = {
       val combinedtextLen: Option[Moments] = (l.textLength, r.textLength) match {
-        case (Some(leftTL), Some(rightTL)) => Some(leftTL + rightTL)
+        case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
         case _ => None
       }
       val combinedtextCard: Option[TextStats] = (l.textCard, r.textCard) match {
-        case (Some(leftTC), Some(rightTC)) => Some(leftTC + rightTC)
+        case (Some(leftTC), Some(rightTC)) => Some((leftTC + rightTC))
         case _ => None
       }
       Summary(
@@ -74,7 +74,7 @@ case object Summary {
   def apply(preppedFeature: ProcessedSeq): Summary = {
     preppedFeature match {
       case Left(v) =>
-        val textLenMoments = v.map(x => Moments(x.length.toDouble)).reduceLeft[Moments](_ + _)
+        val textLenMoments = MomentsGroup.sum(v.map(x => Moments(x.length.toDouble)))
         val tokenDistribution = TextStats(v.groupBy(identity).mapValues(_.size))
         Summary(v.size, v.size, v.size, 1.0, Some(textLenMoments), Some(tokenDistribution))
       case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
