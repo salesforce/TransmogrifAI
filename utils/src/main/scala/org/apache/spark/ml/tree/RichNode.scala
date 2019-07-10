@@ -62,6 +62,8 @@ object RichNode {
 
     def toOld(id: Int): OldNode = node.toOld(id)
 
+
+    def stats = node.impurityStats
   }
 
 }

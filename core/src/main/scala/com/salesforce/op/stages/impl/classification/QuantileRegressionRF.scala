@@ -31,8 +31,10 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 
   setDefault(percentageLevel -> 0.95)
 
-  implicit val encoderLeafNode: Encoder[(Option[Double], Array[Int])] = Encoders.kryo[(Option[Double], Array[Int])]
+  implicit val encoderLeafNode: Encoder[(Option[Double], Array[(Int, Long)])] = Encoders.kryo[(Option[Double], Array[(Int, Long)])]
   private implicit val encoderInt: Encoder[Int] = ExpressionEncoder[Int]()
+  private implicit val encoderIntLong: Encoder[(Int, Long)] = ExpressionEncoder[(Int, Long)]()
+
 
   override def fitFn(dataset: Dataset[(Option[Double], linalg.Vector)]): BinaryModel[RealNN, OPVector, RealMap] = {
 
@@ -42,24 +44,24 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
     val leaves = dataset.map { case (l, f) =>
       l -> trees.map { case tree =>
         val node = tree.rootNode
+        val leaf = node.predictImpl(f)
+        //println(s"${leaf.stats.count} ${leaf.impurity} ${leaf.prediction}")
         val oldNode = node.toOld(1)
         val leafID = oldNode.predictImplIdx(f)
-        leafID
+        leafID -> leaf.stats.count
       }
     }
     val T = trees.length
 
-    val leaveSizes = (0 until T).map(i => leaves.map(_._2(i)).rdd.countByValue()).map(_.toMap)
-
-    new QuantileRegressionRFModels(leaves.collect, trees, lowerLevel, upperLevel, leaveSizes, T, operationName, uid)
+    new QuantileRegressionRFModels(leaves.collect, trees, lowerLevel, upperLevel, T, operationName, uid)
 
   }
 }
 
 
-class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
+class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)])],
   trees: Array[DecisionTreeRegressionModel], lowerLevel: Double, upperLevel: Double,
-  val leaveSizes: Seq[Map[Int, Long]], T: Int, operationName: String, uid: String)
+  T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
@@ -70,21 +72,24 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[Int])],
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
       val weightsSeq = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
-        case ((l1, l2), i) =>
+        case (((l1, count), l2), i) =>
           if (l1 == l2) {
-            1.0 / leaveSizes(i).get(l1).getOrElse(throw new Exception(s"fail to find leave $l1 in Tree # $i." +
-              s" Available leaves are ${leaveSizes(i).toSeq}"))
+            1.0 / count
           } else 0.0
       }.sum / T -> y
       }
 
+      //println(weightsSeq)
 
       val cumF = weightsSeq.sortBy(_._2).scan(0.0 -> Option(0.0)) { case ((v, _), (w: Double, l: Option[Double])) =>
         v + w -> l
       }.tail
+
       val qLower = cumF.filter {
         _._1 >= lowerLevel
       }.head._2
+      //println(qLower)
+      //println(upperLevel)
       val qUpper = cumF.filter {
         _._1 >= upperLevel
       }.head._2
