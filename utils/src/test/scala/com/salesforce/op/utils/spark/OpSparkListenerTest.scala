@@ -83,8 +83,6 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     firstStage.stageId shouldBe 0
     firstStage.numTasks shouldBe 1
     firstStage.status shouldBe "succeeded"
-
-    System.out.println(appMetrics.toJson(pretty = true))
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {
@@ -163,6 +161,7 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     val total = Seq(sm0, sm1).foldLeft(CumulativeStageMetrics.zero)(_ + _)
 
     total.peakExecutionMemory shouldBe Max(1001)
+    total.toJson(true).contains("\"peakExecutionMemory\" : 1001") shouldBe true
   }
 }
 

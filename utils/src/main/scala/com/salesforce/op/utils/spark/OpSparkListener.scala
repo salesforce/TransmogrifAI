@@ -147,6 +147,23 @@ class OpSparkListener
 
 }
 
+trait MetricJsonLike extends JsonLike {
+  override def toJson(pretty: Boolean): String = {
+    JsonUtils.toJsonString(this, pretty = pretty, Seq(SerDes[Max[Long]](
+      classOf[Max[Long]],
+      new StdSerializer[Max[Long]](classOf[Max[Long]]) {
+        override def serialize(
+          value: Max[Long],
+          gen: JsonGenerator, provider: SerializerProvider
+        ): Unit = {
+          gen.writeNumber(value.get)
+        }
+      },
+      null // not necessary
+    )))
+  }
+}
+
 /**
  * App metrics container.
  * Contains the app info, all the stage metrics computed by the spark listener and project version info.
@@ -164,7 +181,7 @@ case class AppMetrics
   stageMetrics: Seq[StageMetrics],
   cumulativeStageMetrics: CumulativeStageMetrics,
   versionInfo: VersionInfo
-) extends JsonLike {
+) extends MetricJsonLike {
 
   def appDurationPretty: String = {
     val duration = new Duration(appDuration)
@@ -177,7 +194,7 @@ case class AppMetrics
 }
 
 
-trait BaseStageMetrics extends JsonLike {
+trait BaseStageMetrics {
   def numTasks: Int
   def numAccumulables: Int
   def executorRunTime: Long
@@ -202,21 +219,6 @@ trait BaseStageMetrics extends JsonLike {
   def shuffleWriteTime: Long
   def shuffleBytesWritten: Long
   def shuffleRecordsWritten: Long
-
-  override def toJson(pretty: Boolean): String = {
-    JsonUtils.toJsonString(this, pretty = pretty, Seq(SerDes[Max[Long]](
-      classOf[Max[Long]],
-      new StdSerializer[Max[Long]](classOf[Max[Long]]) {
-        override def serialize(
-          value: Max[Long],
-          gen: JsonGenerator, provider: SerializerProvider
-        ): Unit = {
-          gen.writeNumber(value.get)
-        }
-      },
-      null // not necessary
-    )))
-  }
 }
 
 /**
@@ -258,7 +260,7 @@ case class StageMetrics private
   shuffleWriteTime: Long,
   shuffleBytesWritten: Long,
   shuffleRecordsWritten: Long
-) extends BaseStageMetrics {
+) extends BaseStageMetrics with MetricJsonLike {
   val duration: Option[Long] =
     for {
       c <- completionTime
@@ -346,7 +348,7 @@ case class CumulativeStageMetrics(
   shuffleWriteTime: Long,
   shuffleBytesWritten: Long,
   shuffleRecordsWritten: Long
-) extends BaseStageMetrics
+) extends BaseStageMetrics with MetricJsonLike
 
 object CumulativeStageMetrics {
   implicit val stageSG = caseclass.semigroup[CumulativeStageMetrics]
