@@ -14,8 +14,12 @@ dependencies {
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion"
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:linux-x86_64"
     compile "org.bytedeco:mkl-dnn:$mklDNNVersion-$javaCPPPresetsVersion:macosx-x86_64"
+    // For running TensorFlow with GPU add the following dependencies:
+    // compile "org.bytedeco:tensorflow:$tensorFlowVersion-$javaCPPPresetsVersion:linux-x86_64-gpu"
+    // compile "org.bytedeco:tensorflow:$tensorFlowVersion-$javaCPPPresetsVersion:macosx-x86_64-gpu"
 
     // BERT tokenizers
+    // Read more - https://github.com/robrua/easy-bert
     compile "com.robrua.nlp:easy-bert:1.0.3"
     // BERT pre-trained model
     testCompile "com.robrua.nlp.models:easy-bert-uncased-L-12-H-768-A-12:1.0.0"
