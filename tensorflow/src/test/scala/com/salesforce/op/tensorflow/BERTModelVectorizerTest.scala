@@ -32,6 +32,7 @@ package com.salesforce.op.tensorflow
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomText
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -98,5 +99,22 @@ class BERTModelVectorizerTest extends OpTransformerSpec[OPVector, BERTModelVecto
       embedding.exists(_ != 0f) shouldBe true
     }
   }
+
+//  it should "produce a model that computes multi-sentence embedding promptly" in {
+//    val bertModel = bertLoader.model
+//
+//    val batches = RandomText.countries.take(1000).grouped(50).map(_.map(_.value.getOrElse("")).toArray)
+//
+//    for {batch <- batches} {
+//      val start = System.currentTimeMillis()
+//      val embeddings = bertModel(batch)
+//      embeddings.foreach { embedding =>
+//        embedding.length shouldBe 768
+//        embedding.exists(_ != 0f) shouldBe true
+//      }
+//      val end = System.currentTimeMillis()
+//      println("Elapsed: " + (end - start).toString + "ms")
+//    }
+//  }
 
 }

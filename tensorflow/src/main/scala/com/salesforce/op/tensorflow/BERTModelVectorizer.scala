@@ -258,8 +258,15 @@ class BERTModelResourceLoader(val resource: String) extends BERTModelLoader {
       val tags = new StringUnorderedSet()
       tags.insert(new BytePointer("serve"))
       val modelBundle = new SavedModelBundle()
+      val sessionOptions = new SessionOptions()
+      val configProto = new ConfigProto()
+//      configProto.mutable_device_count().put(new BytePointer("CPU"), 2)
+//      configProto.mutable_device_count().put(new BytePointer("GPU"), 0)
+//      configProto.set_allow_soft_placement(true)
+//      configProto.set_log_device_placement(true)
+      sessionOptions.config(configProto)
       LoadSavedModel(
-        new SessionOptions(), new RunOptions(), bertModelDir.toAbsolutePath.toFile.toString, tags, modelBundle
+        sessionOptions, new RunOptions(), bertModelDir.toAbsolutePath.toFile.toString, tags, modelBundle
       )
 
       BERTModel(config = modelConfig, modelBundle = modelBundle, tokenizer = tokenizer)
