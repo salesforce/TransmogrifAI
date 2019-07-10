@@ -98,11 +98,7 @@ class OpSparkListener
     appStartTime = appStartTime,
     appEndTime = appEndTime,
     appDuration = appEndTime - appStartTime,
-    stageMetrics = if (collectStageMetrics) {
-      stageMetrics.toList
-    } else {
-      List.empty[StageMetrics]
-    },
+    stageMetrics = stageMetrics.toList,
     cumulativeStageMetrics = cumulativeStageMetrics,
     versionInfo = VersionInfo()
   )
