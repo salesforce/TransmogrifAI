@@ -77,4 +77,26 @@ class BERTModelVectorizerTest extends OpTransformerSpec[OPVector, BERTModelVecto
     bertModel.tokenizer should not be null
   }
 
+  it should "produce a model that computes single sentence embedding correctly" in {
+    val bertModel = bertLoader.model
+
+    val embedding = bertModel("hello world")
+    embedding.length shouldBe 768
+    embedding.exists(_ != 0f) shouldBe true
+
+    embedding shouldBe bertModel("hello world")
+    val _ = bertModel("aaaa")
+    embedding shouldBe bertModel("hello world")
+  }
+
+  it should "produce a model that computes multi-sentence embeddings" in {
+    val bertModel = bertLoader.model
+
+    val embeddings = bertModel(Array("hello world", "OK OK", ""))
+    embeddings.foreach { embedding =>
+      embedding.length shouldBe 768
+      embedding.exists(_ != 0f) shouldBe true
+    }
+  }
+
 }

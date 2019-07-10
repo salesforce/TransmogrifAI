@@ -131,10 +131,18 @@ case class BERTModel
     }
   }
 
-  def apply(s: String): Array[Float] = {
-    val tokens = tokenizer.tokenize(s)
-    val ids = tokenizer.convert(tokens)
-    val inputs = prepareInputs(tokens, ids, config.maxSequenceLength)
+  /**
+   * Applies BERT embedding on multiple sentences
+   *
+   * @param sentences sentences to embed
+   * @return sentence embeddings
+   */
+  def apply(sentences: Array[String]): Array[Array[Float]] = {
+    require(sentences.nonEmpty, "'sentences' cannot be empty")
+
+    val allTokens = tokenizer.tokenize(sentences: _*)
+    val allIds = allTokens.map(tokenizer.convert)
+    val inputs = prepareInputs(config.maxSequenceLength, allIds)
     val input_feed = new StringTensorPairVector(
       Array(config.inputIds, config.inputMask, config.segmentIds),
       Array(inputs.inputIds, inputs.inputMask, inputs.segmentIds)
@@ -144,20 +152,33 @@ case class BERTModel
       .Run(input_feed, new StringVector(config.pooledOutput), new StringVector, outputs)
       .errorIfNotOK()
 
-    outputs.get(0).asFloatArray
+    val tensor = outputs.get(0)
+    val embeddings = tensor.asFloatArray
+    if (sentences.length == 1) Array(embeddings)
+    else embeddings.grouped(tensor.NumElements().toInt / sentences.length).toArray
   }
 
   /**
+   * Applies BERT embedding on a single sentence
+   *
+   * @param sentence sentence to embed
+   * @return sentence embedding
+   */
+  def apply(sentence: String): Array[Float] = apply(Array(sentence)).head
+
+  /**
+   * Borrowed from easy-bert library - https://github.com/robrua/easy-bert
+   *
    * In BERT:
    * inputIds are the indexes in the vocabulary for each token in the sequence
    * inputMask is a binary mask that shows which inputIds have valid data in them
    * segmentIds are meant to distinguish paired sequences during training tasks.
    * Here they're always 0 since we're only doing inference.
    */
-  private def prepareInputs(tokens: Array[String], ids: Array[Int], maxSequenceLength: Int): Inputs = {
-    val inputIdsT = new Tensor(DT_INT32, new TensorShape(1, maxSequenceLength))
-    val inputMaskT = new Tensor(DT_INT32, new TensorShape(1, maxSequenceLength))
-    val segmentIdsT = new Tensor(DT_INT32, new TensorShape(1, maxSequenceLength))
+  private def prepareInputs(maxSequenceLength: Int, allIds: Array[Array[Int]]): Inputs = {
+    val inputIdsT = new Tensor(DT_INT32, new TensorShape(allIds.length, maxSequenceLength))
+    val inputMaskT = new Tensor(DT_INT32, new TensorShape(allIds.length, maxSequenceLength))
+    val segmentIdsT = new Tensor(DT_INT32, new TensorShape(allIds.length, maxSequenceLength))
 
     val inputIds = inputIdsT.createBuffer[IntBuffer]()
     val inputMask = inputMaskT.createBuffer[IntBuffer]()
@@ -167,22 +188,28 @@ case class BERTModel
     inputMask.put(1)
     segmentIds.put(0)
 
-    var i = 0
-    while (i < ids.length && i < maxSequenceLength - 2) {
-      inputIds.put(ids(i))
+    var k = 0
+    while (k < allIds.length) {
+      var i = 0
+      val ids = allIds(k)
+      while (i < ids.length && i < maxSequenceLength - 2) {
+        inputIds.put(ids(i))
+        inputMask.put(1)
+        segmentIds.put(0)
+        i += 1
+      }
+      inputIds.put(separatorTokenId)
       inputMask.put(1)
       segmentIds.put(0)
-      i += 1
-    }
-    inputIds.put(separatorTokenId)
-    inputMask.put(1)
-    segmentIds.put(0)
 
-    while(inputIds.position() < maxSequenceLength) {
-      inputIds.put(0)
-      inputMask.put(0)
-      segmentIds.put(0)
+      while(inputIds.position() < maxSequenceLength * (k + 1)) {
+        inputIds.put(0)
+        inputMask.put(0)
+        segmentIds.put(0)
+      }
+      k += 1
     }
+
     inputIds.rewind()
     inputMask.rewind()
     segmentIds.rewind()
