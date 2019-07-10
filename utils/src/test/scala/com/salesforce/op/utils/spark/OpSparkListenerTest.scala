@@ -83,6 +83,8 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     firstStage.stageId shouldBe 0
     firstStage.numTasks shouldBe 1
     firstStage.status shouldBe "succeeded"
+    firstStage.duration shouldBe Option(
+      firstStage.completionTime.getOrElse(0L) - firstStage.submissionTime.getOrElse(0L))
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {
