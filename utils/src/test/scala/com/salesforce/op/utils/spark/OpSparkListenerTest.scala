@@ -85,7 +85,7 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     firstStage.status shouldBe "succeeded"
     val dur = firstStage.completionTime.getOrElse(0L) - firstStage.submissionTime.getOrElse(0L)
     firstStage.duration shouldBe Option(dur)
-    firstStage.toJson(pretty = true) should include s""""duration" : $dur"""
+    firstStage.toJson(pretty = true) should include(s""""duration" : $dur""")
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {

@@ -319,7 +319,8 @@ object StageMetrics {
   }
 }
 
-case class CumulativeStageMetrics(
+case class CumulativeStageMetrics
+(
   numTasks: Int,
   numAccumulables: Int,
   executorRunTime: Long,
