@@ -215,6 +215,7 @@ trait BaseStageMetrics {
   def shuffleWriteTime: Long
   def shuffleBytesWritten: Long
   def shuffleRecordsWritten: Long
+  def duration: Option[Long]
 }
 
 /**
@@ -257,7 +258,7 @@ case class StageMetrics private
   shuffleBytesWritten: Long,
   shuffleRecordsWritten: Long
 ) extends BaseStageMetrics with MetricJsonLike {
-  val duration: Option[Long] =
+  override val duration: Option[Long] =
     for {
       c <- completionTime
       s <- submissionTime
@@ -343,7 +344,8 @@ case class CumulativeStageMetrics(
   shuffleRemoteBlocksFetched: Long,
   shuffleWriteTime: Long,
   shuffleBytesWritten: Long,
-  shuffleRecordsWritten: Long
+  shuffleRecordsWritten: Long,
+  duration: Option[Long] = None
 ) extends BaseStageMetrics with MetricJsonLike
 
 object CumulativeStageMetrics {
@@ -374,7 +376,8 @@ object CumulativeStageMetrics {
     shuffleRemoteBlocksFetched = 0L,
     shuffleWriteTime = 0L,
     shuffleBytesWritten = 0L,
-    shuffleRecordsWritten = 0L)
+    shuffleRecordsWritten = 0L
+  )
 
   def plus(csm: CumulativeStageMetrics, sm: StageMetrics): CumulativeStageMetrics = csm +
     CumulativeStageMetrics(
@@ -402,6 +405,7 @@ object CumulativeStageMetrics {
       shuffleRemoteBlocksFetched = sm.shuffleRemoteBlocksFetched,
       shuffleWriteTime = sm.shuffleWriteTime,
       shuffleBytesWritten = sm.shuffleBytesWritten,
-      shuffleRecordsWritten = sm.shuffleRecordsWritten
+      shuffleRecordsWritten = sm.shuffleRecordsWritten,
+      duration = sm.duration
   )
 }

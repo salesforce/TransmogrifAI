@@ -83,8 +83,9 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
     firstStage.stageId shouldBe 0
     firstStage.numTasks shouldBe 1
     firstStage.status shouldBe "succeeded"
-    firstStage.duration shouldBe Option(
-      firstStage.completionTime.getOrElse(0L) - firstStage.submissionTime.getOrElse(0L))
+    val dur = firstStage.completionTime.getOrElse(0L) - firstStage.submissionTime.getOrElse(0L)
+    firstStage.duration shouldBe Option(dur)
+    firstStage.toJson(pretty = true) should include s""""duration" : $dur"""
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {
@@ -129,7 +130,8 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
       shuffleRemoteBlocksFetched = 1,
       shuffleWriteTime = 1,
       shuffleBytesWritten = 1,
-      shuffleRecordsWritten = 1
+      shuffleRecordsWritten = 1,
+      duration = Some(1)
     )
 
     val sm1 = CumulativeStageMetrics(
@@ -157,13 +159,16 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
       shuffleRemoteBlocksFetched = 1,
       shuffleWriteTime = 1,
       shuffleBytesWritten = 1,
-      shuffleRecordsWritten = 1
+      shuffleRecordsWritten = 1,
+      duration = Some(2)
     )
 
     val total = Seq(sm0, sm1).foldLeft(CumulativeStageMetrics.zero)(_ + _)
 
     total.peakExecutionMemory shouldBe Max(1001)
-    total.toJson(true).contains("\"peakExecutionMemory\" : 1001") shouldBe true
+    val jsonStr = total.toJson(pretty = true)
+    jsonStr should include ("\"peakExecutionMemory\" : 1001")
+    jsonStr should include ("\"duration\" : 3")
   }
 }
 
