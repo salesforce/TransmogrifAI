@@ -141,7 +141,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
-    val vec = FeatureBuilder.OPVector[Passenger].extract(OpWorkflowModelReaderWriterTest.emptyVectorFn).asPredictor
+    val vec = FeatureBuilder.OPVector[Passenger].extract(new OpWorkflowModelReaderWriterTest.EmptyVectorFn).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
     val schema = FeatureSparkTypes.toStructType(vec)
     val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
@@ -158,12 +158,12 @@ class OpWorkflowModelReaderWriterTest
 
   trait OldVectorizedFlow extends UIDReset {
     val cat = Seq(gender, boarded, height, age, description).transmogrify()
-    val catHead = cat.map[Real](OpWorkflowModelReaderWriterTest.catHeadFn)
+    val catHead = cat.map[Real](new OpWorkflowModelReaderWriterTest.CatHeadFn)
     val wf = new OpWorkflow().setParameters(workflowParams).setResultFeatures(catHead)
   }
 
   trait VectorizedFlow extends UIDReset {
-    val catHead = rawFeatures.transmogrify().map[Real](OpWorkflowModelReaderWriterTest.catHeadFn)
+    val catHead = rawFeatures.transmogrify().map[Real](new OpWorkflowModelReaderWriterTest.CatHeadFn)
     val wf = new OpWorkflow().setParameters(workflowParams).setResultFeatures(catHead)
   }
 
@@ -386,6 +386,13 @@ trait UIDReset {
 }
 
 object OpWorkflowModelReaderWriterTest {
-  def catHeadFn: OPVector => Real = v => Real(v.value.toArray.headOption)
-  def emptyVectorFn: Passenger => OPVector = _ => OPVector.empty
+
+  class CatHeadFn extends Function1[OPVector, Real] with Serializable {
+    def apply(v: OPVector): Real = Real(v.value.toArray.headOption)
+  }
+
+  class EmptyVectorFn extends Function1[Passenger, OPVector] with Serializable {
+    def apply(v: Passenger): OPVector = OPVector.empty
+  }
+
 }
