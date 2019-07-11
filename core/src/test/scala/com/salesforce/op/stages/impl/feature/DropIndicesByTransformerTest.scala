@@ -54,9 +54,9 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val (data, v) = TestFeatureBuilder(vecData)
     val meta = OpVectorMetadata(v.name, Array(TransientFeature(v).toColumnMetaData()), Map.empty).toMetadata
     val inputData = data.withColumn(v.name, col(v.name).as(v.name, meta))
-    val stage = new DropIndicesByTransformer(
-      DropIndicesByTransformerTest.matchFn
-    ).setInput(v).setInputSchema(inputData.schema)
+    val stage =
+      new DropIndicesByTransformer(new DropIndicesByTransformerTest.MatchFn)
+        .setInput(v).setInputSchema(inputData.schema)
     inputData -> stage
   }
 
@@ -85,7 +85,7 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val rawMeta = OpVectorMetadata(vectorizedPicklist.name, vectorizedPicklist.originStage.getMetadata())
     val trimmedMeta = OpVectorMetadata(materializedFeatures.schema(prunedVector.name))
     rawMeta.columns.length - 1 shouldBe trimmedMeta.columns.length
-    trimmedMeta.columns.foreach(_.indicatorValue == "Red" shouldBe false)
+    trimmedMeta.columns.foreach(_.indicatorValue.contains("Red") shouldBe false)
   }
 
   it should "work with its shortcut" in {
@@ -109,12 +109,15 @@ class DropIndicesByTransformerTest extends OpTransformerSpec[OPVector, DropIndic
     val nonSer = new NonSerializable(5)
     val vectorizedPicklist = picklistFeature.vectorize(topK = 10, minSupport = 3, cleanText = false)
     intercept[IllegalArgumentException](
-      vectorizedPicklist.dropIndicesBy(_.indicatorValue.get == nonSer.in)
+      vectorizedPicklist.dropIndicesBy(_.indicatorValue.get == nonSer.in.toString)
     ).getMessage shouldBe "Provided function is not serializable"
   }
 
 }
 
 object DropIndicesByTransformerTest {
-  def matchFn: OpVectorColumnMetadata => Boolean = _.isNullIndicator
+
+  class MatchFn extends Function1[OpVectorColumnMetadata, Boolean] with Serializable {
+    def apply(m: OpVectorColumnMetadata): Boolean = m.isNullIndicator
+  }
 }

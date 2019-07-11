@@ -44,7 +44,7 @@ class OpTransformerSequenceReaderWriterTest extends OpPipelineStageReaderWriterT
   val stage =
     new SequenceLambdaTransformer[DateList, Real](
       operationName = "test",
-      transformFn = Lambdas.fncSequence,
+      transformFn = new Lambdas.FncSequence,
       uid = "uid_1234"
     ).setInput(boarded).setMetadata(meta)
 
