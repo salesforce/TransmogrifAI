@@ -560,7 +560,7 @@ case object ModelInsights {
             case _ => None
           }
           val keptIndex = indexInToIndexKept.get(h.index)
-          val featureStd = getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0)
+          val featureStd = math.sqrt(getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0))
           val sparkFtrContrib = keptIndex
             .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
           val LRStandardization = checkLRStandardization(model).getOrElse(false)
