@@ -62,7 +62,7 @@ private[filters] case class PreparedFeatures
   /**
    * Computes vector of size responseKeys.length + predictorKeys.length. The first responses.length
    * values are the actual response values (nulls replaced with 0.0). Its (i + responses.length)th value
-   * is 1 iff. the predictor associated to ith f eature key is null, for i >= 0.
+   * is 1 iff. the predictor associated to ith feature key is null, for i >= 0.
    *
    * @param responseKeys  response feature keys
    * @param predictorKeys set of all predictor keys needed for constructing binary vector
