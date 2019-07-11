@@ -126,7 +126,7 @@ class RecordInsightsLOCO[T <: Model[T]]
    * @return Seq[Int]
    */
   private def getIndicesOfFeatureType (types: Set[String]): Seq[Int] = histories
-    .filter(_.parentFeatureType.exists((types).contains))
+    .filter(_.parentFeatureType.exists(types.contains))
     .map(_.index)
     .distinct.sorted
 
@@ -191,7 +191,7 @@ class RecordInsightsLOCO[T <: Model[T]]
         // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
         case h if h.descriptorValue.isDefined && dateFeatureIndices.contains(oldInd) =>
           for {name <- getRawFeatureName(h)} {
-            val key = name + "_" + h.descriptorValue.flatMap(convertToTimePeriod).map(_.entryName).getOrElse("")
+            val key = name + h.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse("")
             val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
             aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
           }
