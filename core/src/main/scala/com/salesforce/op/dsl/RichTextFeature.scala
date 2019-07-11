@@ -37,6 +37,8 @@ import com.salesforce.op.stages.impl.feature._
 import com.salesforce.op.utils.text._
 
 import scala.reflect.runtime.universe.TypeTag
+
+
 trait RichTextFeature {
   self: RichFeature =>
 
@@ -48,7 +50,7 @@ trait RichTextFeature {
      *
      * @return A new MultiPickList feature
      */
-    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](textToMultiPickList)
+    def toMultiPickList: FeatureLike[MultiPickList] = f.map[MultiPickList](new TextToMultiPickList)
 
 
     /**
@@ -560,14 +562,14 @@ trait RichTextFeature {
      *
      * @return email prefix
      */
-    def toEmailPrefix: FeatureLike[Text] = f.map[Text](emailToPrefix, "prefix")
+    def toEmailPrefix: FeatureLike[Text] = f.map[Text](new EmailPrefixToText, "prefix")
 
     /**
      * Extract email domains
      *
      * @return email domain
      */
-    def toEmailDomain: FeatureLike[Text] = f.map[Text](emailToDomain, "domain")
+    def toEmailDomain: FeatureLike[Text] = f.map[Text](new EmailDomainToText, "domain")
 
     /**
      * Check if email is valid
@@ -600,7 +602,7 @@ trait RichTextFeature {
       others: Array[FeatureLike[Email]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      val domains = (f +: others).map(_.map[PickList](emailToPickList))
+      val domains = (f +: others).map(_.map[PickList](new EmailDomainToPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
         trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
@@ -613,19 +615,19 @@ trait RichTextFeature {
     /**
      * Extract url domain, i.e. salesforce.com, data.com etc.
      */
-    def toDomain: FeatureLike[Text] = f.map[Text](urlToDomain, "urlDomain")
+    def toDomain: FeatureLike[Text] = f.map[Text](new URLDomainToText, "urlDomain")
 
     /**
      * Extracts url protocol, i.e. http, https, ftp etc.
      */
-    def toProtocol: FeatureLike[Text] = f.map[Text](urlToProtocol, "urlProtocol")
+    def toProtocol: FeatureLike[Text] = f.map[Text](new URLProtocolToText, "urlProtocol")
 
     /**
      * Verifies if the url is of correct form of "Uniform Resource Identifiers (URI): Generic Syntax"
      * RFC2396 (http://www.ietf.org/rfc/rfc2396.txt)
      * Default valid protocols are: http, https, ftp.
      */
-    def isValidUrl: FeatureLike[Binary] = f.exists(urlIsValid)
+    def isValidUrl: FeatureLike[Binary] = f.exists(new URLIsValid)
 
     /**
      * Converts a sequence of [[URL]] features into a vector, extracting the domains of the valid urls
@@ -650,7 +652,7 @@ trait RichTextFeature {
       others: Array[FeatureLike[URL]] = Array.empty,
       maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
     ): FeatureLike[OPVector] = {
-      val domains = (f +: others).map(_.map[PickList](urlToPickList))
+      val domains = (f +: others).map(_.map[PickList](new URLDomainToPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
         trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
@@ -697,7 +699,7 @@ trait RichTextFeature {
     ): FeatureLike[OPVector] = {
 
       val feats: Array[FeatureLike[PickList]] =
-        (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](textToPickList))
+        (f +: others).map(_.detectMimeTypes(typeHint).map[PickList](new TextToPickList))
 
       feats.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, trackNulls = trackNulls, others = feats.tail,
@@ -801,22 +803,40 @@ trait RichTextFeature {
 
 object RichTextFeatureLambdas {
 
-  def emailToPickList: Email => PickList = _.domain.toPickList
+  class EmailDomainToPickList extends Function1[Email, PickList] with Serializable {
+    def apply(v: Email): PickList = v.domain.toPickList
+  }
 
-  def emailToPrefix: Email => Text = _.prefix.toText
+  class EmailDomainToText extends Function1[Email, Text] with Serializable {
+    def apply(v: Email): Text = v.domain.toText
+  }
 
-  def emailToDomain: Email => Text = _.domain.toText
+  class EmailPrefixToText extends Function1[Email, Text] with Serializable {
+    def apply(v: Email): Text = v.prefix.toText
+  }
 
-  def urlToPickList: URL => PickList = (v: URL) => if (v.isValid) v.domain.toPickList else PickList.empty
+  class URLDomainToPickList extends Function1[URL, PickList] with Serializable {
+    def apply(v: URL): PickList = if (v.isValid) v.domain.toPickList else PickList.empty
+  }
 
-  def urlToDomain: URL => Text = _.domain.toText
+  class URLDomainToText extends Function1[URL, Text] with Serializable {
+    def apply(v: URL): Text = v.domain.toText
+  }
 
-  def urlToProtocol: URL => Text = _.protocol.toText
+  class URLProtocolToText extends Function1[URL, Text] with Serializable {
+    def apply(v: URL): Text = v.protocol.toText
+  }
 
-  def urlIsValid: URL => Boolean = _.isValid
+  class URLIsValid extends Function1[URL, Boolean] with Serializable {
+    def apply(v: URL): Boolean = v.isValid
+  }
 
-  def textToPickList: Text => PickList = _.value.toPickList
+  class TextToPickList extends Function1[Text, PickList] with Serializable {
+    def apply(v: Text): PickList = v.value.toPickList
+  }
 
-  def textToMultiPickList: Text => MultiPickList = _.value.toSet[String].toMultiPickList
+  class TextToMultiPickList extends Function1[Text, MultiPickList] with Serializable {
+    def apply(v: Text): MultiPickList = v.value.toSet[String].toMultiPickList
+  }
 
 }
