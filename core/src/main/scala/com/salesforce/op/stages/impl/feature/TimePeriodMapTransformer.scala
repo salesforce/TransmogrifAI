@@ -53,5 +53,5 @@ class TimePeriodMapTransformer[I <: DateMap]
 ) extends UnaryTransformer[I, IntegralMap](operationName = "dateMapToTimePeriod", uid = uid) {
 
   override def transformFn: I => IntegralMap =
-    (i: I) => i.value.mapValues(t => period.extractIntFromMillis(t).toLong).toIntegralMap
+    (i: I) => i.value.map { case (k, t) => k -> period.extractIntFromMillis(t).toLong }.toIntegralMap
 }

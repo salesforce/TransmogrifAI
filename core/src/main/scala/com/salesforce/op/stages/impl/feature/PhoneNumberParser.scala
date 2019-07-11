@@ -247,7 +247,7 @@ class IsValidPhoneMapDefaultCountry(uid: String = UID[IsValidPhoneMapDefaultCoun
 
     phoneNumberMap.value
       .mapValues(p => PhoneNumberParser.validate(p.toPhone, region, isStrict))
-      .collect{ case(k, v) if !v.isEmpty => k -> v.value.get }.toBinaryMap
+      .collect { case (k, SomeValue(Some(b))) => k -> b }.toBinaryMap
   }
 }
 
