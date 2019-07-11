@@ -574,19 +574,26 @@ case object ModelInsights {
               }
               else math.sqrt(variance)
             case Some(Discrete(domain, prob)) =>
-              val (weighted, sqweighted) = (domain zip prob).foldLeft((0.0, 0.0)) {
-                case ((weightSum, sqweightSum), (d, p)) =>
-                  val floatD = d.toDouble
-                  val weight = floatD * p
-                  val sqweight = floatD * weight
-                  (weightSum + weight, sqweightSum + sqweight)
+              // mean = sum (x_i * p_i)
+              val mean = (domain zip prob).foldLeft(0.0) {
+              case (weightSum, (d, p)) =>
+                val floatD = d.toDouble
+                val weight = floatD * p
+                (weightSum + weight)
               }
-              if (sqweighted == weighted) {
+              // variance = sum (x_i - mu)^2 * p_i
+              val discreteVariance = (domain zip prob).foldLeft(0.0) {
+                case (sqweightSum, (d, p)) =>
+                  val floatD = d.toDouble
+                  val sqweight = (floatD - mean) * (floatD - mean) * p
+                  (sqweightSum + sqweight)
+              }
+              if (discreteVariance == 0) {
                 log.warn("The standard deviation of the label is zero, " +
                   "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
                 defaultLabelStd
               }
-              else sqweighted - weighted
+              else math.sqrt(discreteVariance)
             case Some(_) => {
               log.warn("Performing weight descaling on an unsupported distribution")
               defaultLabelStd
