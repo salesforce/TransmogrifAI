@@ -57,12 +57,12 @@ private[filters] case class PreparedFeatures
    * @return pair consisting of response and predictor summaries (in this order)
    */
   def summaries: (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
-    responses.mapValues(Summary(_)) -> predictors.mapValues(Summary(_))
+    responses.map { case (k, s) => k -> Summary(s) } -> predictors.map { case (k, s) => k -> Summary(s) }
 
   /**
    * Computes vector of size responseKeys.length + predictorKeys.length. The first responses.length
    * values are the actual response values (nulls replaced with 0.0). Its (i + responses.length)th value
-   * is 1 iff. the predictor associated to ith feature key is null, for i >= 0.
+   * is 1 iff. the predictor associated to ith f eature key is null, for i >= 0.
    *
    * @param responseKeys  response feature keys
    * @param predictorKeys set of all predictor keys needed for constructing binary vector
