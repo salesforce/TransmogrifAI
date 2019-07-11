@@ -31,7 +31,7 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.stages.impl.feature.TextStats
-import com.twitter.algebird.{Moments, MomentsAggregator, MomentsGroup, Monoid}
+import com.twitter.algebird._
 
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
@@ -43,7 +43,8 @@ import com.twitter.algebird.{Moments, MomentsAggregator, MomentsGroup, Monoid}
  */
 case class Summary(min: Double, max: Double, sum: Double, count: Double,
                    textLength: Option[Moments] = None,
-                   textCard: Option[TextStats] = None)
+                   textCard: Option[TextStats] = None,
+                   maxCardinality: Double)
 
 case object Summary {
 
@@ -52,6 +53,8 @@ case object Summary {
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = {
+      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
+
       val combinedtextLen: Option[Moments] = (l.textLength, r.textLength) match {
         case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
         case _ => None
