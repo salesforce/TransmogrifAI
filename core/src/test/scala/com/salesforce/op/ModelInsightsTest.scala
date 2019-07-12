@@ -707,7 +707,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     // difference between the real coefficient and the analytical formula
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
-    absError < 2.5 shouldBe true
+    absError < 0.01 shouldBe true
     absError2 < 0.01 shouldBe true
   }
 }

@@ -563,7 +563,6 @@ case object ModelInsights {
           val featureStd = math.sqrt(getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0))
           val sparkFtrContrib = keptIndex
             .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
-          val LRStandardization = checkLRStandardization(model).getOrElse(false)
           val defaultLabelStd = 1.0
           val labelStd = label.distribution match {
             case Some(Continuous(_, _, _, variance)) =>
@@ -625,10 +624,8 @@ case object ModelInsights {
                 case _ => Map.empty[String, Double]
               },
               contribution =
-                if (LRStandardization && sparkFtrContrib.nonEmpty) {
-                  sparkFtrContrib.updated(0, sparkFtrContrib.head * featureStd / labelStd)
-                }
-                else sparkFtrContrib,
+                descaleLRContrib(model, sparkFtrContrib, featureStd, labelStd).getOrElse(sparkFtrContrib),
+
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -696,15 +693,29 @@ case object ModelInsights {
     }
   }
 
-  private[op] def checkLRStandardization(model: Option[Model[_]]): Option[Boolean] = {
+  private[op] def descaleLRContrib(
+    model: Option[Model[_]],
+    sparkFtrContrib: Seq[Double],
+    featureStd: Double,
+    labelStd: Double): Option[Seq[Double]] = {
     val stage = model.flatMap {
       case m: SparkWrapperParams[_] => m.getSparkMlStage()
       case _ => None
     }
     stage.collect {
-      case m: LogisticRegressionModel => m.getStandardization
-      case m: LinearRegressionModel => m.getStandardization
-      case _ => false
+      case m: LogisticRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // scale entire feature contribution vector
+          sparkFtrContrib.map(_ * featureStd)
+        }
+        else sparkFtrContrib
+      case m: LinearRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // need to also divide by labelStd for linear regression
+        sparkFtrContrib.map(_ * featureStd / labelStd)
+      }
+      else sparkFtrContrib
+      case _ => sparkFtrContrib
     }
   }
 
