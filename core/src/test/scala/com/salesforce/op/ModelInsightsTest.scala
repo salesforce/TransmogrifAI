@@ -70,7 +70,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
   val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
-  val logRegression = new OpLogisticRegression()
   val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
   val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
   val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()

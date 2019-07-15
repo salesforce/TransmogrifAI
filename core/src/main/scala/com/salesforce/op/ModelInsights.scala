@@ -697,12 +697,12 @@ case object ModelInsights {
       case _ => None
     }
     stage.collect {
-      case m: LogisticRegressionModel =>
-        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
-          // scale entire feature contribution vector
-          sparkFtrContrib.map(_ * featureStd)
-        }
-        else sparkFtrContrib
+//      case m: LogisticRegressionModel =>
+//        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+//          // scale entire feature contribution vector
+//          sparkFtrContrib.map(_ * featureStd)
+//        }
+//        else sparkFtrContrib
       case m: LinearRegressionModel =>
         if (m.getStandardization && sparkFtrContrib.nonEmpty) {
           // need to also divide by labelStd for linear regression
