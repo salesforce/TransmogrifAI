@@ -575,17 +575,11 @@ case object ModelInsights {
             case Some(Discrete(domain, prob)) =>
               // mean = sum (x_i * p_i)
               val mean = (domain zip prob).foldLeft(0.0) {
-              case (weightSum, (d, p)) =>
-                val floatD = d.toDouble
-                val weight = floatD * p
-                (weightSum + weight)
+                case (weightSum, (d, p)) => weightSum + d.toDouble * p
               }
               // variance = sum (x_i - mu)^2 * p_i
               val discreteVariance = (domain zip prob).foldLeft(0.0) {
-                case (sqweightSum, (d, p)) =>
-                  val floatD = d.toDouble
-                  val sqweight = (floatD - mean) * (floatD - mean) * p
-                  (sqweightSum + sqweight)
+                case (sqweightSum, (d, p)) => sqweightSum + (d.toDouble - mean) * (d.toDouble - mean) * p
               }
               if (discreteVariance == 0) {
                 log.warn("The standard deviation of the label is zero, " +
