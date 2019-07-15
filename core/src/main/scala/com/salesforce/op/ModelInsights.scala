@@ -706,6 +706,8 @@ case object ModelInsights {
       case m: LinearRegressionModel =>
         if (m.getStandardization && sparkFtrContrib.nonEmpty) {
           // need to also divide by labelStd for linear regression
+          // See https://github.com/salesforce/TransmogrifAI/pull/345#discussion_r303634114
+          // Also see https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/regression/LinearRegression.scala#L551-L558
         sparkFtrContrib.map(_ * featureStd / labelStd)
       }
       else sparkFtrContrib
