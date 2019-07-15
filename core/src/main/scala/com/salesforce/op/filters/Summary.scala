@@ -44,7 +44,7 @@ import com.twitter.algebird._
 case class Summary(min: Double, max: Double, sum: Double, count: Double,
                    textLength: Option[Moments] = None,
                    textCard: Option[TextStats] = None,
-                   maxCardinality: Double)
+                   maxCardinality: Int = 0)
 
 case object Summary {
 
@@ -53,14 +53,17 @@ case object Summary {
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = {
-      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
-
+      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(l.maxCardinality)
       val combinedtextLen: Option[Moments] = (l.textLength, r.textLength) match {
         case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
+        case (Some(leftTL), None) => Some(leftTL)
+        case (None, Some(rightTL)) => Some(rightTL)
         case _ => None
       }
       val combinedtextCard: Option[TextStats] = (l.textCard, r.textCard) match {
-        case (Some(leftTC), Some(rightTC)) => Some((leftTC + rightTC))
+        case (Some(leftTC), Some(rightTC)) => Some(testStatsSG.plus(leftTC, rightTC))
+        case (Some(leftTC), None) => Some(leftTC)
+        case (None, Some(rightTC)) => Some(rightTC)
         case _ => None
       }
       Summary(
