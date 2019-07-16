@@ -41,10 +41,14 @@ class EmailToPickListMapTransformer(uid: String = UID[EmailToPickListMapTransfor
     operationName = "emailToPickListMap",
     transformer = new UnaryLambdaTransformer[Email, PickList](
       operationName = "emailToPickList",
-      transformFn = EmailToPickListMapTransformer.emailToPickList
+      transformFn = new EmailToPickListMapTransformer.EmailToPickList
     )
   )
 
 object EmailToPickListMapTransformer {
-  def emailToPickList: Email => PickList = email => email.domain.toPickList
+
+  class EmailToPickList extends Function1[Email, PickList] with Serializable {
+    def apply(v: Email): PickList = v.domain.toPickList
+  }
+
 }

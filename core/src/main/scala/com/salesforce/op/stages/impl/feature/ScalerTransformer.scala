@@ -33,10 +33,8 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
-import org.json4s.JsonAST.{JField, JNothing}
-import org.json4s.{CustomSerializer, JObject}
 
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Try}
