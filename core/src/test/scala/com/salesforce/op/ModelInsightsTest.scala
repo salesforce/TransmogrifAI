@@ -35,7 +35,7 @@ import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
-import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpLinearRegressionModel, OpXGBoostRegressor, RegressionModelSelector}
+import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
