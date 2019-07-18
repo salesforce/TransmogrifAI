@@ -697,17 +697,19 @@ case object ModelInsights {
       case _ => None
     }
     stage.collect {
-//      case m: LogisticRegressionModel =>
-//        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
-//          // scale entire feature contribution vector
-//          sparkFtrContrib.map(_ * featureStd)
-//        }
-//        else sparkFtrContrib
+      case m: LogisticRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // scale entire feature contribution vector
+          // See https://think-lab.github.io/d/205/
+          // § 4.5.2 Standardized Interpretations, An Introduction to Categorical Data Analysis, Alan Agresti
+          sparkFtrContrib.map(_ * featureStd)
+        }
+        else sparkFtrContrib
       case m: LinearRegressionModel =>
         if (m.getStandardization && sparkFtrContrib.nonEmpty) {
           // need to also divide by labelStd for linear regression
-          // See https://github.com/salesforce/TransmogrifAI/pull/345#discussion_r303634114
-          // Also see https://github.com/apache/spark/blob/master/mllib/src/main/scala/org/apache/spark/ml/regression/LinearRegression.scala#L551-L558
+          // See https://u.demog.berkeley.edu/~andrew/teaching/standard_coeff.pdf
+          // See https://en.wikipedia.org/wiki/Standardized_coefficient
         sparkFtrContrib.map(_ * featureStd / labelStd)
       }
       else sparkFtrContrib
