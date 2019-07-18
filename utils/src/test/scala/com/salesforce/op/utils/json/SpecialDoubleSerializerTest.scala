@@ -32,7 +32,7 @@ package com.salesforce.op.utils.json
 
 import com.salesforce.op.test.TestCommon
 import org.json4s.jackson.JsonMethods._
-import org.json4s.{DefaultFormats, Extraction}
+import org.json4s.{DefaultFormats, Extraction, Formats}
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -41,8 +41,6 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class SpecialDoubleSerializerTest extends FlatSpec with TestCommon {
 
-  implicit val formats = DefaultFormats + new SpecialDoubleSerializer
-
   val data = Map(
     "normal" -> Seq(-1.1, 0.0, 2.3),
     "infs" -> Seq(Double.NegativeInfinity, Double.PositiveInfinity),
@@ -50,18 +48,28 @@ class SpecialDoubleSerializerTest extends FlatSpec with TestCommon {
     "nan" -> Seq(Double.NaN)
   )
 
-  val dataJson = """{"normal":[-1.1,0.0,2.3],"infs":["-Infinity","Infinity"],"minMax":[-1.7976931348623157E308,1.7976931348623157E308],"nan":["NaN"]}""" // scalastyle:off
+  Spec[SpecialDoubleSerializer] should behave like
+    readWriteDoubleValues(data)(
+      json = """{"normal":[-1.1,0.0,2.3],"infs":["-Infinity","Infinity"],"minMax":[-1.7976931348623157E308,1.7976931348623157E308],"nan":["NaN"]}""" // scalastyle:off
+    )(DefaultFormats + new SpecialDoubleSerializer)
 
-  Spec[SpecialDoubleSerializer] should "write double entries" in {
-    compact(Extraction.decompose(data)) shouldBe dataJson
-  }
-  it should "read double entries" in {
-    val parsed = parse(dataJson).extract[Map[String, Seq[Double]]]
-    parsed.keys shouldBe data.keys
+  Spec[SpecialDoubleSerializer] + " (with big decimal)" should behave like
+    readWriteDoubleValues(data)(
+      json = """{"normal":[-1.1,0.0,2.3],"infs":["-Infinity","Infinity"],"minMax":[-1.7976931348623157E+308,1.7976931348623157E+308],"nan":["NaN"]}""" // scalastyle:off
+    )(DefaultFormats.withBigDecimal + new SpecialDoubleSerializer)
 
-    parsed zip data foreach {
-      case (("nan", a), ("nan", b)) => a.foreach(_.isNaN shouldBe true)
-      case ((_, a), (_, b)) => a should contain theSameElementsAs b
+
+  def readWriteDoubleValues(input: Map[String, Seq[Double]])(json: String)(implicit formats: Formats): Unit = {
+    it should "write double entries" in {
+      compact(Extraction.decompose(input)) shouldBe json
+    }
+    it should "read double entries" in {
+      val parsed = parse(json).extract[Map[String, Seq[Double]]]
+      parsed.keys shouldBe input.keys
+      parsed zip input foreach {
+        case (("nan", a), ("nan", b)) => a.foreach(_.isNaN shouldBe true)
+        case ((_, a), (_, b)) => a should contain theSameElementsAs b
+      }
     }
   }
 }
