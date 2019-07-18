@@ -34,7 +34,6 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictionModel, OpPredictorWrapper}
-import com.salesforce.op.utils.reflection.ReflectionUtils.reflectMethod
 import org.apache.spark.ml.regression.{GBTRegressionModel, GBTRegressor, OpGBTRegressorParams}
 
 import scala.reflect.runtime.universe.TypeTag
@@ -139,7 +138,4 @@ class OpGBTRegressionModel
   ttov: TypeTag[Prediction#Value]
 ) extends OpPredictionModel[GBTRegressionModel](
   sparkModel = sparkModel, uid = uid, operationName = operationName
-) {
-  @transient lazy val predictMirror = reflectMethod(getSparkMlStage().get, "predict")
-}
-
+)
