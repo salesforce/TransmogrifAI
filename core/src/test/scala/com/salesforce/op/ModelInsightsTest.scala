@@ -107,7 +107,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val noise = RandomReal.normal[Real](0.0, 100.0).limit(1000)
   // make a simple linear combination of the features (with noise), pass through sigmoid function and binarize
   // to make labels for logistic reg toy data
-  def binarize(x: Double) = {
+  def binarize(x: Double):Int = {
     val sigmoid = 1.0 / (1.0 + math.exp(-x))
     if (sigmoid > 0.5) 1 else 0
   }
@@ -118,8 +118,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
   val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
 
-  def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN])
-  :(Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
+  def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
+  (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
     val generatedData = feature1.zip(feature2).zip(label).map {
       case ((f1, f2), label) => (f1, f2, label)
     }
