@@ -107,7 +107,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val noise = RandomReal.normal[Real](0.0, 100.0).limit(1000)
   // make a simple linear combination of the features (with noise), pass through sigmoid function and binarize
   // to make labels for logistic reg toy data
-  def binarize(x: Double):Int = {
+  def binarize(x: Double): Int = {
     val sigmoid = 1.0 / (1.0 + math.exp(-x))
     if (sigmoid > 0.5) 1 else 0
   }
@@ -147,8 +147,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .setInput(logRegDF._1, logRegDF._2).getOutput()
 
   def getFeatureImp(standardizedModel: FeatureLike[Prediction],
-                    unstandardizedModel: FeatureLike[Prediction],
-                    DF: DataFrame): Array[Double] = {
+    unstandardizedModel: FeatureLike[Prediction],
+    DF: DataFrame): Array[Double] = {
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
