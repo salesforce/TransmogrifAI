@@ -327,7 +327,6 @@ class RawFeatureFilter[T]
     )
 
     val uniformFtDistribution: Seq[Boolean] = trainingDistribs.map(_.chiSqUnifTest(pvalCutoff))
-    val avgTextLenTest: Seq[Boolean] = trainingDistribs.map(_.avgTextLen < minTextLen)
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
       case Some(corr) => corr > maxCorrelation
       case None => false
