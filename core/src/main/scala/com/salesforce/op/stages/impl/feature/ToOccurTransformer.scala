@@ -47,7 +47,7 @@ import scala.reflect.runtime.universe.TypeTag
 class ToOccurTransformer[I <: FeatureType]
 (
   uid: String = UID[ToOccurTransformer[I]],
-  val matchFn: I => Boolean = ToOccurTransformer.defaultMatches[I]
+  val matchFn: I => Boolean = new ToOccurTransformer.DefaultMatches[I]
 )(implicit tti: TypeTag[I])
   extends UnaryTransformer[I, RealNN](operationName = "toOccur", uid = uid) {
 
@@ -60,11 +60,13 @@ class ToOccurTransformer[I <: FeatureType]
 
 object ToOccurTransformer {
 
-  def defaultMatches[T <: FeatureType]: T => Boolean = {
-    case num: OPNumeric[_] if num.nonEmpty => num.toDouble.get > 0.0
-    case text: Text if text.nonEmpty => text.value.get.length > 0
-    case collection: OPCollection => collection.nonEmpty
-    case _ => false
+  class DefaultMatches[T <: FeatureType] extends Function1[T, Boolean] with Serializable {
+    def apply(t: T): Boolean = t match {
+      case num: OPNumeric[_] if num.nonEmpty => num.toDouble.get > 0.0
+      case text: Text if text.nonEmpty => text.value.get.length > 0
+      case collection: OPCollection => collection.nonEmpty
+      case _ => false
+    }
   }
 
 }

@@ -32,6 +32,9 @@ package com.salesforce.op.utils.spark
 
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.date.DateTimeUtils
+import com.twitter.algebird.Max
+import com.twitter.algebird.Operators._
+import com.twitter.algebird.macros.caseclass
 import org.apache.log4j._
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -72,13 +75,17 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
   }
 
   it should "capture app stage metrics" in {
-    val stageMetrics = listener.metrics.stageMetrics
+    val appMetrics = listener.metrics
+    val stageMetrics = appMetrics.stageMetrics
     stageMetrics.size should be > 0
     val firstStage = stageMetrics.head
     firstStage.name should startWith("csv at OpSparkListenerTest.scala")
     firstStage.stageId shouldBe 0
     firstStage.numTasks shouldBe 1
     firstStage.status shouldBe "succeeded"
+    val dur = firstStage.completionTime.getOrElse(0L) - firstStage.submissionTime.getOrElse(0L)
+    firstStage.duration shouldBe Option(dur)
+    firstStage.toJson(pretty = true) should include(s""""duration" : $dur""")
   }
 
   it should "log messages for listener initialization, stage completion, app completion" in {
@@ -93,6 +100,75 @@ class OpSparkListenerTest extends FlatSpec with TableDrivenPropertyChecks with T
       )
     )
     forAll(messages) { m => logs.contains(m) shouldBe true }
+  }
+
+  it should "be able to aggregate Stage metrics" in {
+    implicit val stageSG = caseclass.semigroup[StageMetrics]
+
+    val sm0 = CumulativeStageMetrics(
+      numTasks = 1,
+      numAccumulables = 100,
+      executorRunTime = 1000L,
+      executorCpuTime = 700L,
+      executorDeserializeTime = 750L,
+      executorDeserializeCpuTime = 740L,
+      resultSerializationTime = 450L,
+      jvmGCTime = 2000L,
+      resultSizeBytes = 1L,
+      numUpdatedBlockStatuses = 1,
+      diskBytesSpilled = 1L,
+      memoryBytesSpilled = 1L,
+      peakExecutionMemory = Max(1000L),
+      recordsRead = 1,
+      bytesRead = 1,
+      recordsWritten = 1,
+      bytesWritten = 1,
+      shuffleFetchWaitTime = 1,
+      shuffleTotalBytesRead = 1,
+      shuffleTotalBlocksFetched = 1,
+      shuffleLocalBlocksFetched = 1,
+      shuffleRemoteBlocksFetched = 1,
+      shuffleWriteTime = 1,
+      shuffleBytesWritten = 1,
+      shuffleRecordsWritten = 1,
+      duration = Some(1)
+    )
+
+    val sm1 = CumulativeStageMetrics(
+      numTasks = 10,
+      numAccumulables = 100,
+      executorRunTime = 1000,
+      executorCpuTime = 700,
+      executorDeserializeTime = 750,
+      executorDeserializeCpuTime = 740,
+      resultSerializationTime = 450,
+      jvmGCTime = 2000,
+      resultSizeBytes = 1,
+      numUpdatedBlockStatuses = 1,
+      diskBytesSpilled = 1,
+      memoryBytesSpilled = 1,
+      peakExecutionMemory = Max(1001),
+      recordsRead = 1,
+      bytesRead = 1,
+      recordsWritten = 1,
+      bytesWritten = 1,
+      shuffleFetchWaitTime = 1,
+      shuffleTotalBytesRead = 1,
+      shuffleTotalBlocksFetched = 1,
+      shuffleLocalBlocksFetched = 1,
+      shuffleRemoteBlocksFetched = 1,
+      shuffleWriteTime = 1,
+      shuffleBytesWritten = 1,
+      shuffleRecordsWritten = 1,
+      duration = Some(2)
+    )
+
+    val total = Seq(sm0, sm1).foldLeft(CumulativeStageMetrics.zero)(_ + _)
+
+    total.peakExecutionMemory shouldBe Max(1001)
+    val jsonStr = total.toJson(pretty = true)
+    jsonStr should include ("\"peakExecutionMemory\" : 1001")
+    jsonStr should include ("\"duration\" : 3")
   }
 }
 

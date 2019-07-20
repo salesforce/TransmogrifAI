@@ -44,7 +44,7 @@ class OpTransformerQuaternaryReaderWriterTest extends OpPipelineStageReaderWrite
   val stage =
     new QuaternaryLambdaTransformer[Real, Real, Text, Real, Real](
       operationName = "test",
-      transformFn = Lambdas.fncQuaternary,
+      transformFn = new Lambdas.FncQuaternary,
       uid = "uid_1234"
     ).setInput(weight, age, description, weight).setMetadata(meta)
 
