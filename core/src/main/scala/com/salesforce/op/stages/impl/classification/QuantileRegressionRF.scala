@@ -31,7 +31,8 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 
   setDefault(percentageLevel -> 0.95)
 
-  implicit val encoderLeafNode: Encoder[(Option[Double], Array[(Int, Long)])] = Encoders.kryo[(Option[Double], Array[(Int, Long)])]
+  implicit val encoderLeafNode: Encoder[(Option[Double], Array[(Int, Long)])] = Encoders.kryo[(Option[Double],
+    Array[(Int, Long)])]
   private implicit val encoderInt: Encoder[Int] = ExpressionEncoder[Int]()
   private implicit val encoderIntLong: Encoder[(Int, Long)] = ExpressionEncoder[(Int, Long)]()
 
