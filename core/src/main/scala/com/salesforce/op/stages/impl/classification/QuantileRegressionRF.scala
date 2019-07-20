@@ -45,7 +45,6 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
       l -> trees.map { case tree =>
         val node = tree.rootNode
         val leaf = node.predictImpl(f)
-        //println(s"${leaf.stats.count} ${leaf.impurity} ${leaf.prediction}")
         val oldNode = node.toOld(1)
         val leafID = oldNode.predictImplIdx(f)
         leafID -> leaf.stats.count
@@ -79,7 +78,6 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)]
       }.sum / T -> y
       }
 
-      //println(weightsSeq)
 
       val cumF = weightsSeq.sortBy(_._2).scan(0.0 -> Option(0.0)) { case ((v, _), (w: Double, l: Option[Double])) =>
         v + w -> l
@@ -88,8 +86,6 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)]
       val qLower = cumF.filter {
         _._1 >= lowerLevel
       }.head._2
-      //println(qLower)
-      //println(upperLevel)
       val qUpper = cumF.filter {
         _._1 >= upperLevel
       }.head._2
