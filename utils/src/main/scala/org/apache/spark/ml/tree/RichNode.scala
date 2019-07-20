@@ -31,8 +31,9 @@
 package org.apache.spark.ml.tree
 
 import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.mllib.tree.model.{Node => OldNode}
+import org.apache.spark.mllib.tree.model.{ImpurityStats, Node => OldNode}
 import org.apache.spark.mllib.tree.configuration.FeatureType._
+import org.apache.spark.mllib.tree.impurity.ImpurityCalculator
 
 object RichNode {
 
@@ -63,7 +64,7 @@ object RichNode {
     def toOld(id: Int): OldNode = node.toOld(id)
 
 
-    def stats = node.impurityStats
+    def stats: ImpurityCalculator = node.impurityStats
   }
 
 }
