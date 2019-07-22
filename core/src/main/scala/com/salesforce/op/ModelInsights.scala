@@ -568,7 +568,7 @@ case object ModelInsights {
             case Some(Continuous(_, _, _, variance)) =>
               if (variance == 0) {
                 log.warn("The standard deviation of the label is zero, " +
-                  "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
                 defaultLabelStd
               }
               else math.sqrt(variance)
@@ -583,12 +583,12 @@ case object ModelInsights {
               }
               if (discreteVariance == 0) {
                 log.warn("The standard deviation of the label is zero, " +
-                  "so the coefficients and intercepts of the model will be zeros, training is not needed.\"")
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
                 defaultLabelStd
               }
               else math.sqrt(discreteVariance)
             case Some(_) => {
-              log.warn("Performing weight descaling on an unsupported distribution")
+              log.warn("Failing to perform weight descaling because distribution is unsupported.")
               defaultLabelStd
             }
             case None => {
