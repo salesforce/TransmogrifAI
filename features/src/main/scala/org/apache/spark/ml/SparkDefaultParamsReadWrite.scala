@@ -21,7 +21,6 @@
 package org.apache.spark.ml
 
 import com.salesforce.op.stages.OpPipelineStageBase
-import com.salesforce.op.stages.OpPipelineStageReaderWriter.FieldNames._
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.util.{DefaultParamsReader, DefaultParamsWriter}
 import org.json4s.JsonDSL._
@@ -48,26 +47,21 @@ case object SparkDefaultParamsReadWrite {
    * @see [[OpPipelineStageWriter]] for details on what this includes.
    */
   def getMetadataToSave(
-    instance: OpPipelineStageBase,
+    stage: OpPipelineStageBase,
     extraMetadata: Option[JObject] = None,
     paramMap: Option[JValue] = None
   ): JObject = {
-    val uid = instance.uid
-    val cls = instance.getClass.getName
-    val params = instance.paramMap.toSeq
-    val defaultParams = instance.defaultParamMap.toSeq
+    val uid = stage.uid
+    val cls = stage.getClass.getName
+    val params = stage.extractParamMap().toSeq.asInstanceOf[Seq[ParamPair[Any]]]
     val jsonParams = paramMap.getOrElse(render(params.map { case ParamPair(p, v) =>
       p.name -> parse(p.jsonEncode(v))
     }.toList))
-    val jsonDefaultParams = render(defaultParams.map { case ParamPair(p, v) =>
-      p.name -> parse(p.jsonEncode(v))
-    }.toList)
-    val basicMetadata = (Class.entryName -> cls) ~
-      (Timestamp.entryName -> System.currentTimeMillis()) ~
-      (SparkVersion.entryName -> org.apache.spark.SPARK_VERSION) ~
-      (Uid.entryName -> uid) ~
-      (ParamMap.entryName -> jsonParams) ~
-      (DefaultParamMap.entryName -> jsonDefaultParams)
+    val basicMetadata = ("class" -> cls) ~
+      ("timestamp" -> System.currentTimeMillis()) ~
+      ("sparkVersion" -> org.apache.spark.SPARK_VERSION) ~
+      ("uid" -> uid) ~
+      ("paramMap" -> jsonParams)
     val metadata = extraMetadata match {
       case Some(jObject) =>
         basicMetadata ~ jObject
@@ -81,48 +75,19 @@ case object SparkDefaultParamsReadWrite {
    * Parse metadata JSON string produced by [[DefaultParamsWriter.getMetadataToSave()]].
    * This is a helper function for [[loadMetadata()]].
    *
-   * Note: this method was taken from [[DefaultParamsWriter.parseMetadata]],
-   * but modified to avoid failing on loading of Spark models prior to 2.4.x
-   *
    * @param metadataStr  JSON string of metadata
    * @param expectedClassName  If non empty, this is checked against the loaded metadata.
    * @throws IllegalArgumentException if expectedClassName is specified and does not match metadata
    */
-  def parseMetadata(metadataStr: String, expectedClassName: String = ""): Metadata = {
-    val metadata = parse(metadataStr)
-
-    val className = (metadata \ Class.entryName).extract[String]
-    val uid = (metadata \ Uid.entryName).extract[String]
-    val timestamp = (metadata \ Timestamp.entryName).extract[Long]
-    val sparkVersion = (metadata \ SparkVersion.entryName).extract[String]
-    val params = metadata \ ParamMap.entryName
-    val defaultParams = metadata \ DefaultParamMap.entryName
-    if (expectedClassName.nonEmpty) {
-      require(className == expectedClassName, s"Error loading metadata: Expected class name" +
-        s" $expectedClassName but found class name $className")
-    }
-    // ******************************************************************************************
-    /*
-     * Backward compatible fix for models trained with older versions of Spark (prior to 2.4.x).
-     * The change introduced in https://github.com/apache/spark/pull/20633 added serialization of
-     * default params, older models won't have them and fail to load.
-     */
-    val defaultParamsFix = if (defaultParams == JNothing) JObject() else defaultParams
-    // ******************************************************************************************
-
-    new Metadata(className, uid, timestamp, sparkVersion, params, defaultParamsFix, metadata, metadataStr)
-  }
+  def parseMetadata(jsonStr: String): Metadata =
+    DefaultParamsReader.parseMetadata(jsonStr)
 
   /**
    * Extract Params from metadata, and set them in the instance.
-   * This works if all Params (except params included by `skipParams` list) implement
-   * [[org.apache.spark.ml.param.Param.jsonDecode()]].
-   *
-   * @param skipParams The params included in `skipParams` won't be set. This is useful if some
-   *                   params don't implement [[org.apache.spark.ml.param.Param.jsonDecode()]]
-   *                   and need special handling.
+   * This works if all Params implement [[org.apache.spark.ml.param.Param.jsonDecode()]].
+   * TODO: Move to [[Metadata]] method
    */
-  def getAndSetParams(stage: OpPipelineStageBase, metadata: Metadata, skipParams: Option[List[String]] = None): Unit =
-    metadata.getAndSetParams(stage, skipParams)
+  def getAndSetParams(stage: OpPipelineStageBase, metadata: Metadata): Unit =
+    DefaultParamsReader.getAndSetParams(stage, metadata)
 
 }
