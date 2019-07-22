@@ -40,11 +40,12 @@ import com.twitter.algebird._
  * @param max   maximum value seen for double, maximum number of tokens in one text for text
  * @param sum   sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
+ * @param maxCardinality maximum number of unique tokens to keep track of, for a given text feature
  */
 case class Summary(min: Double, max: Double, sum: Double, count: Double,
                    textLength: Option[Moments] = None,
                    textCard: Option[TextStats] = None,
-                   maxCardinality: Int = 0)
+                   maxCardinality: Int = 500)
 
 case object Summary {
 
