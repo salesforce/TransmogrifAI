@@ -87,8 +87,8 @@ class OpWorkflowModelReaderWriterTest
     aggregateParams = null
   )
 
-  val distributions = Array(FeatureDistribution("a", None, 1L, 1L, 0, Array(1.0), Array(1.0)),
-    FeatureDistribution("b", Option("b"), 2L, 2L, 0, Array(2.0), Array(2.0)))
+  val distributions = Array(FeatureDistribution("a", None, 1L, 1L, Array(1.0), Array(1.0)),
+    FeatureDistribution("b", Option("b"), 2L, 2L, Array(2.0), Array(2.0)))
 
   val rawFeatureFilterResults = RawFeatureFilterResults(rawFeatureDistributions = distributions)
 
