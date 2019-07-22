@@ -530,7 +530,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     maxFillRatioDiff: Double = 20.0,
     maxJSDivergence: Double = 0.90,
     maxCorrelation: Double = 0.95,
-    pvalCutoff: Double = 0.05,
     correlationType: CorrelationType = CorrelationType.Pearson,
     protectedFeatures: Array[OPFeature] = Array.empty,
     protectedJSFeatures: Array[OPFeature] = Array.empty,
