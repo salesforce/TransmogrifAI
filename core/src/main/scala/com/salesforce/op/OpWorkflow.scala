@@ -506,10 +506,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    *                           a feature
    * @param maxJSDivergence    maximum Jensen-Shannon divergence between the training and scoring distributions
    *                           for a feature
-   * @param pvalCutoff         p-value cutoff to test whether the distribution of a hashed text feature
-   *                           is uniform or not
-   * @param minTextLen         cutoff to determine whether the length of a text feature is too short
-   *                           to be considered free text (to be combined with pvalCutoff)
    * @param protectedFeatures  list of features that should never be removed (features that are used to create them will
    *                           also be protected)
    * @param protectedJSFeatures features that are protected from removal by JS divergence check
@@ -528,14 +524,13 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   def withRawFeatureFilter[T](
     trainingReader: Option[Reader[T]],
     scoringReader: Option[Reader[T]],
-    bins: Int = 500,
+    bins: Int = 100,
     minFillRate: Double = 0.001,
     maxFillDifference: Double = 0.90,
     maxFillRatioDiff: Double = 20.0,
     maxJSDivergence: Double = 0.90,
     maxCorrelation: Double = 0.95,
     pvalCutoff: Double = 0.05,
-    minTextLen: Double = 100,
     correlationType: CorrelationType = CorrelationType.Pearson,
     protectedFeatures: Array[OPFeature] = Array.empty,
     protectedJSFeatures: Array[OPFeature] = Array.empty,
@@ -558,8 +553,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         maxFillRatioDiff = maxFillRatioDiff,
         maxJSDivergence = maxJSDivergence,
         maxCorrelation = maxCorrelation,
-        pvalCutoff = pvalCutoff,
-        minTextLen = minTextLen,
         correlationType = correlationType,
         protectedFeatures = protectedRawFeatures,
         jsDivergenceProtectedFeatures = protectedRawJSFeatures,

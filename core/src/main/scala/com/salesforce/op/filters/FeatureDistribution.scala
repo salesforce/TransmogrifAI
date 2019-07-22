@@ -94,23 +94,6 @@ case class FeatureDistribution
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
 
   /**
-   * Test whether the given distribution is Uniform, for detecting useless text hashes
-   *
-   * @return true means we don't have enough evidence to reject Null hypothesis (current distribution is uniform)
-   *         likely to drop the feature, unless average text length check is higher than a threshold.
-   *         False positive: If the hash space is too small w.r.t. the feature cardinality, a text feature
-   *         could still appear uniformly distributed.
-   *         false means rejecting the Null hypothesis, we should keep this text feature.
-   *         False negative: hashed feature does not follow uniform distribution, but could still be useless.
-   *         Not sure how to handle this case.
-   */
-  def chiSqUnifTest(cutoff: Double): Boolean = {
-    val vectorizedDistr = Vectors.dense(distribution)
-    val goodnessOfFitTestResult = Statistics.chiSqTest(vectorizedDistr)
-    goodnessOfFitTestResult.pValue >= cutoff
-  }
-
-  /**
    * Combine feature distributions
    *
    * @param fd other feature distribution (from the same feature)
