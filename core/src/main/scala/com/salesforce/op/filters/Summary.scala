@@ -40,28 +40,28 @@ import com.twitter.algebird._
  * @param max   maximum value seen for double, maximum number of tokens in one text for text
  * @param sum   sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
- * @param maxCardinality maximum number of unique tokens to keep track of, for a given text feature
+ * @param moments object tracking statistical moments for double, or the length of the text for text
+ * @param cardinality object tracking the frequency/distribution of some of the numeric values, or tokens for text
  */
 case class Summary(min: Double, max: Double, sum: Double, count: Double,
-                   textLength: Option[Moments] = None,
-                   textCard: Option[TextStats] = None,
-                   maxCardinality: Int = 500)
+                   moments: Option[Moments] = None,
+                   cardinality: Option[TextStats] = None)
 
 case object Summary {
-
+  val maxCardinality = 500
   val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0)
 
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = {
-      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(l.maxCardinality)
-      val combinedtextLen: Option[Moments] = (l.textLength, r.textLength) match {
+      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
+      val combinedtextLen: Option[Moments] = (l.moments, r.moments) match {
         case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
         case (Some(leftTL), None) => Some(leftTL)
         case (None, Some(rightTL)) => Some(rightTL)
         case _ => None
       }
-      val combinedtextCard: Option[TextStats] = (l.textCard, r.textCard) match {
+      val combinedtextCard: Option[TextStats] = (l.cardinality, r.cardinality) match {
         case (Some(leftTC), Some(rightTC)) => Some(testStatsSG.plus(leftTC, rightTC))
         case (Some(leftTC), None) => Some(leftTC)
         case (None, Some(rightTC)) => Some(rightTC)
@@ -82,9 +82,15 @@ case object Summary {
     preppedFeature match {
       case Left(v) =>
         val textLenMoments = MomentsGroup.sum(v.map(x => Moments(x.length.toDouble)))
-        val tokenDistribution = TextStats(v.groupBy(identity).mapValues(_.size))
+        val tokenDistribution = TextStats(v.groupBy(identity).map{case (key, value) => (key, value.size)})
         Summary(v.size, v.size, v.size, 1.0, Some(textLenMoments), Some(tokenDistribution))
-      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
+      case Right(v) =>
+        monoid.sum(v.map(d =>
+          Summary(d, d, d, 1.0,
+            Some(Moments(d)), Some(TextStats(Map((d.toString -> 1))))
+          )
+        )
+      )
     }
   }
 }
