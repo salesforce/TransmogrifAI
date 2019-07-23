@@ -55,13 +55,13 @@ case object Summary {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = {
       implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
-      val combinedtextLen: Option[Moments] = (l.moments, r.moments) match {
+      val combinedMoments: Option[Moments] = (l.moments, r.moments) match {
         case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
         case (Some(leftTL), None) => Some(leftTL)
         case (None, Some(rightTL)) => Some(rightTL)
         case _ => None
       }
-      val combinedtextCard: Option[TextStats] = (l.cardinality, r.cardinality) match {
+      val combinedCardinality: Option[TextStats] = (l.cardinality, r.cardinality) match {
         case (Some(leftTC), Some(rightTC)) => Some(testStatsSG.plus(leftTC, rightTC))
         case (Some(leftTC), None) => Some(leftTC)
         case (None, Some(rightTC)) => Some(rightTC)
@@ -69,7 +69,7 @@ case object Summary {
       }
       Summary(
         math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count,
-        combinedtextLen, combinedtextCard
+        combinedMoments, combinedCardinality
       )
     }
   }
