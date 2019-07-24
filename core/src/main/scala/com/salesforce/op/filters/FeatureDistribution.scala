@@ -65,6 +65,7 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
+  momentSummary: Option[Array[Double]] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -226,11 +227,20 @@ object FeatureDistribution {
     val (nullCount, (summaryInfo, distribution)) =
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
+    val momentSummary = summary.moments match {
+      case Some(moment) => Some(Array(moment.mean, moment.stddev, moment.kurtosis, moment.skewness))
+      case _ => None
+    }
+    val cardSummary = summary.cardinality match {
+      case Some(cardinality) => cardinality.valueCounts.unzip
+      case _ => None
+    }
     FeatureDistribution(
       name = name,
       key = key,
       count = 1L,
       nulls = nullCount,
+      momentSummary = momentSummary,
       summaryInfo = summaryInfo,
       distribution = distribution,
       `type` = `type`
