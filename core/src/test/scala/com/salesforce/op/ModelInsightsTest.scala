@@ -732,16 +732,17 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     // of the model trained on standardized data should be within a small distance of the analytical formula.
 
     // difference between the real coefficient and the analytical formula
-    //     return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
     val coeffs = getFeatureImp(standardizedLinpred, unstandardizedLinpred, linRegDF._3)
     val descaledsmallCoeff = coeffs(0)
     val originalsmallCoeff = coeffs(1)
     val descaledbigCoeff = coeffs(2)
     val orginalbigCoeff = coeffs(3)
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
-    absError < 0.01 shouldBe true
-    absError2 < 0.01 shouldBe true
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
+    absError / bigCoeffSum < 0.05 shouldBe true
+    absError2 / smallCoeffSum < 0.05 shouldBe true
   }
 
   it should "correctly return the descaled coefficient for logistic regression, " +
@@ -753,8 +754,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val orginalbigCoeff = coeffs(3)
     // difference between the real coefficient and the analytical formula
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
-    absError < 0.5 shouldBe true
-    absError2 < 0.01 shouldBe true
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
+    absError / bigCoeffSum < 0.05 shouldBe true
+    absError2 / smallCoeffSum < 0.05 shouldBe true
   }
 }
