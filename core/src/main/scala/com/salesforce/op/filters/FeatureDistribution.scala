@@ -66,7 +66,7 @@ case class FeatureDistribution
   distribution: Array[Double],
   summaryInfo: Array[Double],
   momentSummary: Option[Array[Double]] = None,
-  cardinalitySummary: Option[(Array[String], Array[Double])] = None,
+  cardinalitySummary: Option[(Array[String], Array[Int])] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -233,7 +233,7 @@ object FeatureDistribution {
       case _ => None
     }
     val cardSummary = summary.cardinality match {
-      case Some(cardinality) => Some(cardinality.valueCounts.unzip)
+      case Some(cardinality) => Some(cardinality.valueCounts.unzip._1.toArray -> cardinality.valueCounts.unzip._2.toArray)
       case _ => None
     }
     FeatureDistribution(
@@ -242,6 +242,7 @@ object FeatureDistribution {
       count = 1L,
       nulls = nullCount,
       momentSummary = momentSummary,
+      cardinalitySummary = cardSummary,
       summaryInfo = summaryInfo,
       distribution = distribution,
       `type` = `type`
