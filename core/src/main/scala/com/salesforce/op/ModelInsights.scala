@@ -484,10 +484,12 @@ case object ModelInsights {
         s" to fill in model insights"
     )
 
+    val labelSummary = getLabelSummary(label, checkerSummary)
+
     ModelInsights(
-      label = getLabelSummary(label, checkerSummary),
+      label = labelSummary,
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -537,7 +539,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
+    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
+    label: LabelSummary
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
@@ -557,6 +560,42 @@ case object ModelInsights {
             case _ => None
           }
           val keptIndex = indexInToIndexKept.get(h.index)
+          val featureStd = math.sqrt(getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0))
+          val sparkFtrContrib = keptIndex
+            .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val defaultLabelStd = 1.0
+          val labelStd = label.distribution match {
+            case Some(Continuous(_, _, _, variance)) =>
+              if (variance == 0) {
+                log.warn("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
+                defaultLabelStd
+              }
+              else math.sqrt(variance)
+            case Some(Discrete(domain, prob)) =>
+              // mean = sum (x_i * p_i)
+              val mean = (domain zip prob).foldLeft(0.0) {
+                case (weightSum, (d, p)) => weightSum + d.toDouble * p
+              }
+              // variance = sum (x_i - mu)^2 * p_i
+              val discreteVariance = (domain zip prob).foldLeft(0.0) {
+                case (sqweightSum, (d, p)) => sqweightSum + (d.toDouble - mean) * (d.toDouble - mean) * p
+              }
+              if (discreteVariance == 0) {
+                log.warn("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
+                defaultLabelStd
+              }
+              else math.sqrt(discreteVariance)
+            case Some(_) => {
+              log.warn("Failing to perform weight descaling because distribution is unsupported.")
+              defaultLabelStd
+            }
+            case None => {
+              log.warn("Label does not exist, please check your data")
+              defaultLabelStd
+            }
+          }
 
           h.parentFeatureOrigins ->
             Insights(
@@ -579,7 +618,8 @@ case object ModelInsights {
                 case _ => Map.empty[String, Double]
               },
               contribution =
-                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
+                descaleLRContrib(model, sparkFtrContrib, featureStd, labelStd).getOrElse(sparkFtrContrib),
+
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -644,6 +684,36 @@ case object ModelInsights {
       val j = corr.nanCorrs.indexOf(name)
       if (j >= 0) Option(Double.NaN)
       else None
+    }
+  }
+
+  private[op] def descaleLRContrib(
+    model: Option[Model[_]],
+    sparkFtrContrib: Seq[Double],
+    featureStd: Double,
+    labelStd: Double): Option[Seq[Double]] = {
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    stage.collect {
+      case m: LogisticRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // scale entire feature contribution vector
+          // See https://think-lab.github.io/d/205/
+          // § 4.5.2 Standardized Interpretations, An Introduction to Categorical Data Analysis, Alan Agresti
+          sparkFtrContrib.map(_ * featureStd)
+        }
+        else sparkFtrContrib
+      case m: LinearRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // need to also divide by labelStd for linear regression
+          // See https://u.demog.berkeley.edu/~andrew/teaching/standard_coeff.pdf
+          // See https://en.wikipedia.org/wiki/Standardized_coefficient
+        sparkFtrContrib.map(_ * featureStd / labelStd)
+      }
+      else sparkFtrContrib
+      case _ => sparkFtrContrib
     }
   }
 
