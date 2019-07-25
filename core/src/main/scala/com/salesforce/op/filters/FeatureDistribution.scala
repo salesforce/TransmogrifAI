@@ -108,11 +108,12 @@ case class FeatureDistribution
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
     val combinedmomentsAndCard = (momentsAndCard, fd.momentsAndCard) match {
       case (Some(x), None) => Some(x)
-      case (Some(x), Some(y)) => Some((x._1 + y._1, x._2 + y._2))
+      case (Some(x), Some(y)) => Some((x._1 + y._1, testStatsSG.plus(x._2 , y._2)))
       case (None, Some(y)) => Some(y)
       case (_, _) => None
     }
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummaryInfo, combinedmomentsAndCard, `type`)
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
+      combinedSummaryInfo, combinedmomentsAndCard, `type`)
   }
 
   /**
