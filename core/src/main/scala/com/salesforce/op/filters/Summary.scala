@@ -30,8 +30,7 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.stages.impl.feature.TextStats
-import com.twitter.algebird._
+import com.twitter.algebird.Monoid
 
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
@@ -40,38 +39,18 @@ import com.twitter.algebird._
  * @param max   maximum value seen for double, maximum number of tokens in one text for text
  * @param sum   sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
- * @param moments object tracking statistical moments for double, or the length of the text for text
- * @param cardinality object tracking the frequency/distribution of some of the numeric values, or tokens for text
  */
-case class Summary(min: Double, max: Double, sum: Double, count: Double,
-                   moments: Option[Moments] = None,
-                   cardinality: Option[TextStats] = None)
+case class Summary(min: Double, max: Double, sum: Double, count: Double)
 
 case object Summary {
-  val maxCardinality = 500
+
   val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0)
 
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
-    override def plus(l: Summary, r: Summary) = {
-      implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
-      val combinedMoments: Option[Moments] = (l.moments, r.moments) match {
-        case (Some(leftTL), Some(rightTL)) => Some(MomentsGroup.plus(leftTL, rightTL))
-        case (Some(leftTL), None) => Some(leftTL)
-        case (None, Some(rightTL)) => Some(rightTL)
-        case _ => None
-      }
-      val combinedCardinality: Option[TextStats] = (l.cardinality, r.cardinality) match {
-        case (Some(leftTC), Some(rightTC)) => Some(testStatsSG.plus(leftTC, rightTC))
-        case (Some(leftTC), None) => Some(leftTC)
-        case (None, Some(rightTC)) => Some(rightTC)
-        case _ => None
-      }
-      Summary(
-        math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count,
-        combinedMoments, combinedCardinality
-      )
-    }
+    override def plus(l: Summary, r: Summary) = Summary(
+      math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count
+    )
   }
 
   /**
@@ -80,17 +59,8 @@ case object Summary {
    */
   def apply(preppedFeature: ProcessedSeq): Summary = {
     preppedFeature match {
-      case Left(v) =>
-        val textLenMoments = MomentsGroup.sum(v.map(x => Moments(x.length.toDouble)))
-        val tokenDistribution = TextStats(v.groupBy(identity).map{case (key, value) => (key, value.size)})
-        Summary(v.size, v.size, v.size, 1.0, Some(textLenMoments), Some(tokenDistribution))
-      case Right(v) =>
-        monoid.sum(v.map(d =>
-          Summary(d, d, d, 1.0,
-            Some(Moments(d)), Some(TextStats(Map((d.toString -> 1))))
-          )
-        )
-      )
+      case Left(v) => Summary(v.size, v.size, v.size, 1.0)
+      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
     }
   }
 }
