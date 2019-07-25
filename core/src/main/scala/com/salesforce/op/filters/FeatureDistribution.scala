@@ -33,14 +33,12 @@ package com.salesforce.op.filters
 import java.util.Objects
 
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
-import org.apache.spark.mllib.linalg.Vectors
+import com.twitter.algebird.{Moments, Semigroup}
 import org.apache.spark.mllib.feature.HashingTF
-import org.apache.spark.mllib.stat.Statistics
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -65,8 +63,7 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
-  momentSummary: Option[Array[Double]] = None,
-  cardinalitySummary: Option[(Array[String], Array[Int])] = None,
+  summary: Summary,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -105,8 +102,8 @@ case class FeatureDistribution
     checkMatch(fd)
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
-    val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary, `type`)
+    val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummaryInfo, summary, `type`)
   }
 
   /**
@@ -166,8 +163,8 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, `type`) =>
-      distribution.deep == d.deep && summaryInfo.deep == s.deep
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, sInfo, s, `type`) =>
+      distribution.deep == d.deep && summaryInfo.deep == sInfo.deep && summary == s
     case _ => false
   }
 
@@ -228,25 +225,33 @@ object FeatureDistribution {
     val (nullCount, (summaryInfo, distribution)) =
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
-    val momentSummary = summary.moments match {
-      case Some(moment) => Some(Array(moment.mean, moment.stddev, moment.kurtosis, moment.skewness))
-      case _ => None
-    }
-    val cardSummary = summary.cardinality match {
-      case Some(cardinality) => Some(cardinality.valueCounts.unzip._1.toArray -> cardinality.valueCounts.unzip._2.toArray)
-      case _ => None
-    }
+
+
     FeatureDistribution(
       name = name,
       key = key,
       count = 1L,
       nulls = nullCount,
-      momentSummary = momentSummary,
-      cardinalitySummary = cardSummary,
+      summary = summary,
       summaryInfo = summaryInfo,
       distribution = distribution,
       `type` = `type`
     )
+  }
+
+  private def momentsValues(values: ProcessedSeq): Moments = {
+    values match {
+      case Left(seq) =>
+      case Right(seq) => seq.map(_.toString)
+    }
+  }
+
+  private def cardinalityValues(values: ProcessedSeq): TextStats = {
+    val population = values match {
+      case Left(seq) => seq
+      case Right(seq) => seq.map(_.toString)
+    }
+    TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
   }
 
   /**
