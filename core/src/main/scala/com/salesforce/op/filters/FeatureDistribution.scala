@@ -63,7 +63,7 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
-  momentsAndCard: Option[(Moments, TextStats)],
+  momentsAndCard: Option[(Moments, TextStats)] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
