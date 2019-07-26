@@ -63,7 +63,8 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
-  momentsAndCard: Option[(Moments, TextStats)] = None,
+  moments: Option[Moments] = None,
+  cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -106,14 +107,20 @@ case class FeatureDistribution
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    val combinedmomentsAndCard = (momentsAndCard, fd.momentsAndCard) match {
+    val combinedMoments = (moments, fd.moments) match {
       case (Some(x), None) => Some(x)
-      case (Some(x), Some(y)) => Some((x._1 + y._1, testStatsSG.plus(x._2 , y._2)))
+      case (Some(x), Some(y)) => Some(x+y)
+      case (None, Some(y)) => Some(y)
+      case (_, _) => None
+    }
+    val combinedCard = (cardEstimate, fd.cardEstimate) match {
+      case (Some(x), None) => Some(x)
+      case (Some(x), Some(y)) => Some(testStatsSG.plus(x,y))
       case (None, Some(y)) => Some(y)
       case (_, _) => None
     }
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedmomentsAndCard, `type`)
+      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
   }
 
   /**
@@ -173,8 +180,9 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, `type`) =>
-      distribution.deep == d.deep && summaryInfo.deep == s.deep && momentsAndCard == m
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, c, `type`) =>
+      distribution.deep == d.deep && summaryInfo.deep == s.deep &&
+        moments == m && cardEstimate == c
     case _ => false
   }
 
@@ -237,8 +245,8 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val momentsAndCard = value match {
-      case Some(m) => Some(momentsValues(m), cardinalityValues(m))
-      case _ => None
+      case Some(m) => (Some(momentsValues(m)), Some(cardinalityValues(m)))
+      case _ => (None, None)
     }
 
     FeatureDistribution(
@@ -248,7 +256,8 @@ object FeatureDistribution {
       nulls = nullCount,
       summaryInfo = summaryInfo,
       distribution = distribution,
-      momentsAndCard = momentsAndCard,
+      moments = momentsAndCard._1,
+      cardEstimate = momentsAndCard._2,
       `type` = `type`
     )
   }
