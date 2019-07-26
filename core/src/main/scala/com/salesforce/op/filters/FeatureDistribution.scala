@@ -173,7 +173,9 @@ case class FeatureDistribution
       "count" -> count.toString,
       "nulls" -> nulls.toString,
       "distribution" -> distribution.mkString("[", ",", "]"),
-      "summaryInfo" -> summaryInfo.mkString("[", ",", "]")
+      "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
+      "cardinality" -> cardEstimate.getOrElse(None).toString(),
+      "moments" -> moments.getOrElse(None).toString()
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
