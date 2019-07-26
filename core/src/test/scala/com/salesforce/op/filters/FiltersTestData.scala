@@ -48,8 +48,10 @@ trait FiltersTestData {
   protected val scoreSummaries = Seq(
     FeatureDistribution("A", None, 10, 8, Array(1, 4, 0, 0, 6), Array.empty, None, FeatureDistributionType.Scoring),
     FeatureDistribution("B", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty, None, FeatureDistributionType.Scoring),
-    FeatureDistribution("C", Some("1"), 10, 1, Array(0, 0, 10, 10, 0), Array.empty, None, FeatureDistributionType.Scoring),
-    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12), Array.empty, None, FeatureDistributionType.Scoring),
+    FeatureDistribution("C", Some("1"), 10, 1, Array(0, 0, 10, 10, 0),
+      Array.empty, None, FeatureDistributionType.Scoring),
+    FeatureDistribution("C", Some("2"), 20, 19, Array(2, 8, 0, 0, 12),
+      Array.empty, None, FeatureDistributionType.Scoring),
     FeatureDistribution("D", Some("1"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty, None, FeatureDistributionType.Scoring),
     FeatureDistribution("D", Some("2"), 0, 0, Array(0, 0, 0, 0, 0), Array.empty, None, FeatureDistributionType.Scoring)
   )
