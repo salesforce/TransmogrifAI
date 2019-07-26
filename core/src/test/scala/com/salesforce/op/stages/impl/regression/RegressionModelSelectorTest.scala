@@ -230,7 +230,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val model = testEstimator.fit(data)
     model.evaluateModel(data)
-    println(model.modelStageIn)
 
     // evaluation metrics from train set should be in metadata
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
@@ -238,16 +237,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
-
-    // evaluation metrics from train set should be in metadata
-    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
-    RegressionEvalMetrics.values.foreach(metric =>
-      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
-        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
-    )
-    println(metaData.bestModelName)
-    println(metaData.validationResults)
-
+    metaData.validationResults.foreach(println(_))
+    metaData.validationResults.size shouldBe 42
   }
 
 
@@ -269,7 +260,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       .setInput(label, features)
 
 
-    intercept[RuntimeException](testEstimator.fit(data))
+    intercept[Exception](testEstimator.fit(data))
   }
 
   it should "fit and predict with a train validation split even if there is no split between training and test" in {

@@ -49,6 +49,7 @@ import org.slf4j.{Logger, LoggerFactory}
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 
 /**
@@ -320,24 +321,19 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
           estimator.set(pi1, label).set(pi2, features)
       }
       Future {
-        val metricsFut = params.map { p =>
-          Future {
+        val paramsMetrics = params.map { p =>
+          Try {
             val model = estimator.fit(train, p).asInstanceOf[M]
             val metric = evaluator.evaluate(model.transform(test, p))
             log.info(s"Got metric $metric for model $name trained with $p.")
             p -> metric
           }
+        }.flatMap{
+          case Success(v) => Some(v)
+          case Failure(e) =>
+            log.warn(s"Model $name attempted in model selector with failed with following issue: \n${e.getMessage}")
+            None
         }
-
-        val metricsOfAttempts = metricsFut.map { f =>
-          f.map(Option(_)).recover {
-            case e: Throwable =>
-              log.warn(s"Model $name attempted in model selector with failed with following issue: \n${e.getMessage}")
-              None
-          }
-        }.toSeq
-        val paramsMetrics = SparkThreadUtils.utils.awaitResult(Future.sequence(metricsOfAttempts), maxWait)
-          .flatten.toArray
         val (goodParams, metrics) = paramsMetrics.unzip
 
         val (bestMetric, bestIndex) =
@@ -357,8 +353,8 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     }}
     val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryOfAttempts), maxWait).flatten.toArray
     if (summary.isEmpty) {
-      throw new RuntimeException(s"All models failed model selector!!! Failing flow! Models tried were:" +
-        s" \n${modelInfo.mkString("\n")}")
+      throw new RuntimeException(s"All models failed model selector!!! Failing flow! Models tried were: \n" +
+        s"${modelInfo.map(m => s"${m._1.getClass.getSimpleName} -> ${m._2.mkString(", ")}"  ).mkString("\n")}")
     }
     train.unpersist()
     test.unpersist()
