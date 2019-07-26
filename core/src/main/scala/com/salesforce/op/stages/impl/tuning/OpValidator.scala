@@ -265,10 +265,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       indexOfLastEstimator = Some(-1)
     )
     val selectTrain = newTrain.select(label, features)
-      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
-
     val selectTest = newTest.select(label, features)
-      .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
 
     val (balancedTrain, balancedTest) = splitter.map(s => (
       s.validationPrepare(selectTrain),
@@ -310,9 +307,8 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       val name = estimator.getClass.getSimpleName
       estimator match {
         case e: OpPipelineStage2[RealNN, OPVector, Prediction]@unchecked =>
-          val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked, _)) =
-            FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label,
-              nonNullable = Set(features, ModelSelectorNames.idColName))
+          val (labelFeat, Array(featuresFeat: Feature[OPVector]@unchecked)) =
+            FeatureBuilder.fromDataFrame[RealNN](train.toDF(), response = label, nonNullable = Set(features))
           e.setInput(labelFeat, featuresFeat)
           evaluator.setPredictionCol(e.getOutput())
         case _ => // otherwise it is a spark estimator

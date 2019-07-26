@@ -33,7 +33,6 @@ package com.salesforce.op.stages.impl.selector
 import com.salesforce.op.UID
 import com.salesforce.op.evaluators.{EvaluationMetrics, _}
 import com.salesforce.op.features.types._
-import com.salesforce.op.readers.DataFrameFieldNames
 import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
@@ -41,13 +40,11 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames.ModelType
 import com.salesforce.op.stages.impl.tuning.{BestEstimator, _}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
 import org.apache.spark.ml.{Estimator, Model, PredictionModel}
-import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
 import scala.reflect.runtime.universe._
@@ -117,33 +114,17 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   protected[op] def findBestEstimator(data: DataFrame, dag: Option[StagesDAG] = None)
     (implicit spark: SparkSession): (BestEstimator[E], Option[SplitterSummary], DataFrame) = {
 
-    val datasetWithIDPre = getDataSetWithId(data)
-    val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
-    val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
+    val PrevalidationVal(splitterSummary, dataOpt) = prepareForValidation(data, in1.name)
+    val dataUse = dataOpt.getOrElse(data)
 
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = datasetWithID,
-      label = in1.name, features = in2.name, dag = dag, splitter = splitter,
-      stratifyCondition = validator.isClassification
+    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataUse,
+      label = in1.name, features = in2.name, dag = dag, splitter = splitter
     )
 
     bestEstimator = Option(theBestEstimator)
-    (theBestEstimator, splitterSummary, datasetWithID)
+    (theBestEstimator, splitterSummary, dataUse)
   }
 
-  private def getDataSetWithId(data: Dataset[_]): DataFrame = {
-    setInputSchema(data.schema).transformSchema(data.schema)
-    require(!data.isEmpty, "Dataset cannot be empty")
-    // TODO this removes weight column - want to keep it if set
-    val datasetWithIDPre =
-      if (data.columns.contains(DataFrameFieldNames.KeyFieldName)) {
-        data.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
-      } else {
-        data.select(in1.name, in2.name)
-          .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
-      }
-    require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
-    datasetWithIDPre
-  }
 
   private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
     splitter
@@ -162,13 +143,13 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   final override def fit(dataset: Dataset[_]): SelectedModel = {
 
     implicit val spark = dataset.sparkSession
-
+    setInputSchema(dataset.schema).transformSchema(dataset.schema)
+    require(!dataset.isEmpty, "Dataset cannot be empty")
+    val data = dataset.select(in1.name, in2.name)
     val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map{ e =>
-      val dataWithIDPre = getDataSetWithId(dataset)
-      val PrevalidationVal(summary, dataWithIDOpt) = prepareForValidation(dataWithIDPre, in1.name)
-      val dataWithID = dataWithIDOpt.getOrElse(dataWithIDPre)
-      (e, summary, dataWithID)
-    }.getOrElse{ findBestEstimator(dataset.toDF()) }
+      val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, in1.name)
+      (e, summary, dataOpt.getOrElse(data))
+    }.getOrElse{ findBestEstimator(data.toDF()) }
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
