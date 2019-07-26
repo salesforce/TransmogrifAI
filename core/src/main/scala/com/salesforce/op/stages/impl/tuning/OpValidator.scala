@@ -353,7 +353,8 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     }}
     val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryOfAttempts), maxWait).flatten.toArray
     if (summary.isEmpty) {
-      throw new RuntimeException(s"All models failed model selector!!! Failing flow! Models tried were: \n" +
+      throw new RuntimeException(
+        s"All models failed model selector or failed to finsih within $maxWait!!! Models tried were: \n" +
         s"${modelInfo.map(m => s"${m._1.getClass.getSimpleName} -> ${m._2.mkString(", ")}"  ).mkString("\n")}")
     }
     train.unpersist()

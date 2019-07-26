@@ -67,7 +67,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     (i.toDouble, Vectors.dense(2 * i, 4 * i + 5, rand.nextFloat())))
 
   val data = sc.parallelize(rawData).toDF("label", "features")
-  data.show()
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
     data, response = "label", nonNullable = Set("features")
