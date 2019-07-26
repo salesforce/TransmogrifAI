@@ -31,8 +31,10 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
+import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
+import com.twitter.algebird.Moments
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -194,7 +196,9 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
 
   it should "marshall to/from json" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
-    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
+      Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
+      FeatureDistributionType.Scoring)
     val json = FeatureDistribution.toJson(Array(fd1, fd2))
     FeatureDistribution.fromJson(json) match {
       case Success(r) => r shouldBe Seq(fd1, fd2)
