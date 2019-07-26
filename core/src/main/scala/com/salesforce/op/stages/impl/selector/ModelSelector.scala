@@ -93,6 +93,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   }
 
   @transient private[op] var bestEstimator: Option[BestEstimator[E]] = None
+  // TODO allow smart modification of these values
   @transient private lazy val modelsUse = models.map{case (e, p) =>
     val est = e.setOutputFeatureName(getOutputFeatureName)
     val par = if (p.isEmpty) Array(new ParamMap) else p
@@ -136,6 +137,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     implicit val spark = dataset.sparkSession
 
+    // TODO this removes weight column - want to keep it if set
     val datasetWithIDPre =
       if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
         dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
@@ -145,12 +147,14 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       }
     require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
 
+    // TODO put this functionallity into findBestModel above
     val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
     val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
     val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
       setInputSchema(dataset.schema).transformSchema(dataset.schema)
-      val best = validator
-        .validate(modelInfo = modelsUse, dataset = datasetWithID, label = in1.name, features = in2.name)
+      val best = validator.validate(
+        modelInfo = modelsUse, dataset = datasetWithID, label = in1.name, features = in2.name
+      )
       bestEstimator = Some(best)
       best
     }

@@ -105,6 +105,8 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
 
   def parallelism: Int
 
+  def maxWait: Duration
+
   private[op] final def isClassification = evaluator match {
     case _: OpBinaryClassificationEvaluatorBase[_] => true
     case _: OpMultiClassificationEvaluatorBase[_] => true
@@ -200,6 +202,15 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     splitter: Option[Splitter]
   ): Array[(RDD[Row], RDD[Row])]
 
+  /**
+   * Creates RDD grouped by classes (0, 1, 2, 3, ..., K) for stratified sampling
+   * @param dataset dataset to prepare
+   * @param message message to log
+   * @param label label name
+   * @param splitter data splitter (processor) for pre modeling data manipulation
+   * @tparam T
+   * @return Sequence of RDDs grouped by label class
+   */
   protected def prepareStratification[T](
     dataset: Dataset[T],
     message: String,
@@ -225,6 +236,17 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     datasetsByClass.map(_.toDF().rdd)
   }
 
+  /**
+   * Transform data in train or test up to the model selector
+   * @param dag Stages to be applied in DAG
+   * @param training training data
+   * @param validation validation data
+   * @param label label name
+   * @param features feature name
+   * @param splitter data splitter (processor) for pre modeling data manipulation
+   * @param sparkSession
+   * @return transformed training and test data
+   */
   protected def applyDAG(
     dag: StagesDAG,
     training: Dataset[Row],
@@ -267,6 +289,17 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     result
   }
 
+  /**
+   * Does the model fitting for the all models and their accompanying hyperparameter grids
+   * @param modelInfo Sequence of estimators and grids to try
+   * @param label label column
+   * @param features features column
+   * @param train training data
+   * @param test test data
+   * @param ec
+   * @tparam T
+   * @return Array of fit models and their metrics
+   */
   protected def getSummary[T](
     modelInfo: Seq[(E, Array[ParamMap])], label: String, features: String, train: Dataset[T], test: Dataset[T]
   )(implicit ec: ExecutionContext): Array[ValidatedModel[E]] = {
@@ -287,25 +320,46 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
           estimator.set(pi1, label).set(pi2, features)
       }
       Future {
-        val numModels = params.length
-        val metrics = new Array[Double](params.length)
-        log.info(s"Train split with multiple sets of parameters.")
-        val models = estimator.fit(train, params).asInstanceOf[Seq[M]]
-        for {i <- 0 until numModels} {
-          val metric = evaluator.evaluate(models(i).transform(test, params(i)))
-          log.info(s"Got metric $metric for model $name trained with ${params(i)}.")
-          metrics(i) = metric
+        val metricsFut = params.map { p =>
+          Future {
+            val model = estimator.fit(train, p).asInstanceOf[M]
+            val metric = evaluator.evaluate(model.transform(test, p))
+            log.info(s"Got metric $metric for model $name trained with $p.")
+            p -> metric
+          }
         }
+
+        val metricsOfAttempts = metricsFut.map { f =>
+          f.map(Option(_)).recover {
+            case e: Throwable =>
+              log.warn(s"Model $name attempted in model selector with failed with following issue: \n${e.getMessage}")
+              None
+          }
+        }.toSeq
+        val paramsMetrics = SparkThreadUtils.utils.awaitResult(Future.sequence(metricsOfAttempts), maxWait)
+          .flatten.toArray
+        val (goodParams, metrics) = paramsMetrics.unzip
+
         val (bestMetric, bestIndex) =
           if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
           else metrics.zipWithIndex.minBy(_._1)
 
         log.info(s"Best set of parameters:\n${params(bestIndex)} for $name")
         log.info(s"Best train validation split metric: $bestMetric.")
-        ValidatedModel(estimator, bestIndex, metrics, params)
+        ValidatedModel(estimator, bestIndex, metrics, goodParams)
       }
     }
-    val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryFuts), Duration.Inf).toArray
+
+    val summaryOfAttempts = summaryFuts.map { f => f.map(Option(_)).recover {
+      case e: Throwable =>
+        log.warn(s"Model attempted in model selector failed with following issue: \n${e.getMessage}")
+        None
+    }}
+    val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryOfAttempts), maxWait).flatten.toArray
+    if (summary.isEmpty) {
+      throw new RuntimeException(s"All models failed model selector!!! Failing flow! Models tried were:" +
+        s" \n${modelInfo.mkString("\n")}")
+    }
     train.unpersist()
     test.unpersist()
     summary
@@ -330,5 +384,6 @@ object ValidatorParamDefaults {
   val TrainRatio = 0.75
   val Stratify = false
   val Parallelism = 8
+  val MaxWait = Duration(1L, "day") // TODO Day or Inf
 }
 

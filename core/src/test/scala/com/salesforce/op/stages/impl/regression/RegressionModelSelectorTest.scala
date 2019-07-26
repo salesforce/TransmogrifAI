@@ -36,7 +36,7 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.ModelSelectorSummary
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning.BestEstimator
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
@@ -51,6 +51,8 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.Random
+
 
 @RunWith(classOf[JUnitRunner])
 class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
@@ -59,11 +61,13 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
   val stageNames = "label_prediction"
 
   import spark.implicits._
+  val rand = new Random(seed)
 
-  val rawData: Seq[(Double, Vector)] = List.range(0, 100, 1).map(i =>
-    (i.toDouble, Vectors.dense(2 * i, 4 * i)))
+  val rawData: Seq[(Double, Vector)] = List.range(-100, 100, 1).map(i =>
+    (i.toDouble, Vectors.dense(2 * i, 4 * i + 5, rand.nextFloat())))
 
   val data = sc.parallelize(rawData).toDF("label", "features")
+  data.show()
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
     data, response = "label", nonNullable = Set("features")
@@ -211,6 +215,61 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val justScores = transformedData.collect(pred)
 
     justScores.length shouldEqual transformedData.count()
+  }
+
+  it should "fit and predict for even when some models fail" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression, RegressionModelsToTry.OpGeneralizedLinearRegression)
+      )
+      .setInput(label, features)
+
+
+    val model = testEstimator.fit(data)
+    model.evaluateModel(data)
+    println(model.modelStageIn)
+
+    // evaluation metrics from train set should be in metadata
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+
+    // evaluation metrics from train set should be in metadata
+    val metaDataHoldOut = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).holdoutEvaluation
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaDataHoldOut.get.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+    println(metaData.bestModelName)
+    println(metaData.validationResults)
+
+  }
+
+
+  it should "fail when all models fail" in {
+
+    val glr = new OpGeneralizedLinearRegression()
+    val glrParams = new ParamGridBuilder()
+      .addGrid(glr.family, Seq("poisson"))
+      .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .build()
+
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelsAndParameters = Seq(glr -> glrParams)
+      )
+      .setInput(label, features)
+
+
+    intercept[RuntimeException](testEstimator.fit(data))
   }
 
   it should "fit and predict with a train validation split even if there is no split between training and test" in {
