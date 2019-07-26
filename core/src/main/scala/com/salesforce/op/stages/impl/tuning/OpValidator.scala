@@ -380,6 +380,6 @@ object ValidatorParamDefaults {
   val TrainRatio = 0.75
   val Stratify = false
   val Parallelism = 8
-  val MaxWait = Duration(1L, "day") // TODO Day or Inf
+  val MaxWait = Duration(1L, "day")
 }
 

@@ -223,7 +223,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
         numFolds = 4,
         validationMetric = Evaluators.Regression.mse(),
         seed = 10L,
-        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression, RegressionModelsToTry.OpGeneralizedLinearRegression)
+        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression,
+          RegressionModelsToTry.OpGeneralizedLinearRegression)
       )
       .setInput(label, features)
 

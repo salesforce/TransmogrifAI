@@ -38,7 +38,7 @@ import com.salesforce.op.stages._
 import com.salesforce.op.stages.base.binary.OpTransformer2
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.ModelType
-import com.salesforce.op.stages.impl.tuning._
+import com.salesforce.op.stages.impl.tuning.{BestEstimator, _}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
 import com.salesforce.op.utils.spark.RichDataset._
@@ -100,31 +100,57 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     est -> par
   }
 
+  lazy val labelColName: String = in1.name
+
+  override protected[op] def outputsColNamesMap: Map[String, String] =
+    Map(ModelSelectorNames.outputParamName -> getOutputFeatureName)
+
   /**
    * Find best estimator with validation on a workflow level. Executed when workflow level Cross Validation is on
    * (see [[com.salesforce.op.OpWorkflow.withWorkflowCV]])
    *
    * @param data                data to validate
    * @param dag                 dag done inside the Cross-validation/Train-validation split
-   * @param persistEveryKStages frequency of persisting the DAG's stages
    * @param spark               Spark Session
    * @return Updated Model Selector with best model along with best paramMap
    */
-  protected[op] def findBestEstimator(data: DataFrame, dag: StagesDAG, persistEveryKStages: Int = 0)
-    (implicit spark: SparkSession): Unit = {
-    val PrevalidationVal(_, dataSetOpt) = prepareForValidation(data, in1.name)
-    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataSetOpt.getOrElse(data),
-      label = in1.name, features = in2.name, dag = Option(dag), splitter = splitter,
+  protected[op] def findBestEstimator(data: DataFrame, dag: Option[StagesDAG] = None)
+    (implicit spark: SparkSession): (BestEstimator[E], Option[SplitterSummary], DataFrame) = {
+
+    val datasetWithIDPre = getDataSetWithId(data)
+    val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
+    val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
+
+    val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = datasetWithID,
+      label = in1.name, features = in2.name, dag = dag, splitter = splitter,
       stratifyCondition = validator.isClassification
     )
 
     bestEstimator = Option(theBestEstimator)
+    (theBestEstimator, splitterSummary, datasetWithID)
   }
 
-  lazy val labelColName: String = in1.name
+  private def getDataSetWithId(data: Dataset[_]): DataFrame = {
+    setInputSchema(data.schema).transformSchema(data.schema)
+    require(!data.isEmpty, "Dataset cannot be empty")
+    // TODO this removes weight column - want to keep it if set
+    val datasetWithIDPre =
+      if (data.columns.contains(DataFrameFieldNames.KeyFieldName)) {
+        data.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
+      } else {
+        data.select(in1.name, in2.name)
+          .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
+      }
+    require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
+    datasetWithIDPre
+  }
 
-  override protected[op] def outputsColNamesMap: Map[String, String] =
-    Map(ModelSelectorNames.outputParamName -> getOutputFeatureName)
+  private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
+    splitter
+      .map(_.withLabelColumnName(labelColName).preValidationPrepare(data))
+      .getOrElse(PrevalidationVal(None, Option(data)))
+  }
+
 
   /**
    * Splits the data into training test and test set, balances the training set and selects the best model
@@ -137,27 +163,12 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     implicit val spark = dataset.sparkSession
 
-    // TODO this removes weight column - want to keep it if set
-    val datasetWithIDPre =
-      if (dataset.columns.contains(DataFrameFieldNames.KeyFieldName)) {
-        dataset.select(in1.name, in2.name, DataFrameFieldNames.KeyFieldName)
-      } else {
-        dataset.select(in1.name, in2.name)
-          .withColumn(ModelSelectorNames.idColName, monotonically_increasing_id())
-      }
-    require(!datasetWithIDPre.isEmpty, "Dataset cannot be empty")
-
-    // TODO put this functionallity into findBestModel above
-    val PrevalidationVal(splitterSummary, dataSetWithIDOpt) = prepareForValidation(datasetWithIDPre, in1.name)
-    val datasetWithID = dataSetWithIDOpt.getOrElse(datasetWithIDPre)
-    val BestEstimator(name, estimator, summary) = bestEstimator.getOrElse {
-      setInputSchema(dataset.schema).transformSchema(dataset.schema)
-      val best = validator.validate(
-        modelInfo = modelsUse, dataset = datasetWithID, label = in1.name, features = in2.name
-      )
-      bestEstimator = Some(best)
-      best
-    }
+    val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map{ e =>
+      val dataWithIDPre = getDataSetWithId(dataset)
+      val PrevalidationVal(summary, dataWithIDOpt) = prepareForValidation(dataWithIDPre, in1.name)
+      val dataWithID = dataWithIDOpt.getOrElse(dataWithIDPre)
+      (e, summary, dataWithID)
+    }.getOrElse{ findBestEstimator(dataset.toDF()) }
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
@@ -199,11 +210,6 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setEvaluators(evaluators)
   }
 
-  private def prepareForValidation(data: DataFrame, labelColName: String): PrevalidationVal = {
-    splitter
-      .map(_.withLabelColumnName(labelColName).preValidationPrepare(data))
-      .getOrElse(PrevalidationVal(None, Option(data)))
-  }
 }
 
 /**

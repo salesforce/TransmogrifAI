@@ -53,18 +53,16 @@ object DefaultSelectorParams {
   val RegSolver = Array("auto") // regression solver spark default auto
   val FitIntercept = Array(true) // fit intercept spark default true
   val NbSmoothing = Array(1.0) // spark default 1.0
-  val DistFamily = Array("gaussian", "binomial", "poisson", "gamma", "tweedie") // generalized linear model distribution family
-  val LinkFunction = Array("identity", "log", "inverse", "logit", "probit", "cloglog", "sqrt") // generalized linear model link function
-  /*
-  * Valid link functions for each family is listed below. The first link function of each family
-  * is the default one.
-    *  - "gaussian" : "identity", "log", "inverse"
-  *  - "binomial" : "logit", "probit", "cloglog"
-  *  - "poisson"  : "log", "identity", "sqrt"
-  *  - "gamma"    : "inverse", "identity", "log"
-  *  - "tweedie"  : power link function specified through "linkPower". The default link power in
-  *  the tweedie family is 1 - variancePower.
-  */
+  val DistFamily = Array("gaussian", "binomial", "poisson", "gamma", "tweedie") // glm distribution family
+  val LinkFunction = Array("identity", "log", "inverse", "logit", "probit", "cloglog", "sqrt") // glm link function
+  //   Valid link functions for each family is listed below. The first link function of each family
+  //   is the default one.
+  //    - "gaussian" : "identity", "log", "inverse"
+  //    - "binomial" : "logit", "probit", "cloglog"
+  //    - "poisson"  : "log", "identity", "sqrt"
+  //    - "gamma"    : "inverse", "identity", "log"
+  //    - "tweedie"  : power link function specified through "linkPower". The default link power in
+  //    the tweedie family is 1 - variancePower.
   val NumRound = Array(100) // number of rounds for xgboost (default 1)
   val Eta = Array(0.1 , 0.3) // step size shrinkage for xgboost (default 0.3)
   val MinChildWeight = Array(1.0, 5.0, 10.0) // minimum sum of instance weight needed in a child for xgboost (default 1)
