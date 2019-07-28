@@ -99,6 +99,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(0).distribution.length shouldBe 100
     distribs(0).distribution.sum shouldBe 10000
     distribs.foreach(d => d.featureKey shouldBe d.name -> d.key)
+    distribs(0).moments.get.count shouldBe 10000
   }
 
   it should "be correctly created for map features" in {
