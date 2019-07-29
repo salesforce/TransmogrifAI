@@ -280,7 +280,8 @@ object FeatureDistribution {
   }
 
   /**
-   * Function to track frequency of the first $(maxCard) unique values (number for numeric features, token for text features)
+   * Function to track frequency of the first $(MaxCardinality) unique values
+   * (number for numeric features, token for text features)
    *
    * @param values          values to track distribution / frequency
    * @return TextStats object containing a Map from a value to its frequency (histogram)
