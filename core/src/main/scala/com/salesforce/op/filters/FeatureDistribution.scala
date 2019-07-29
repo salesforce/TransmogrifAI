@@ -102,7 +102,7 @@ case class FeatureDistribution
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
     // should move this somewhere else
-    implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(FeatureDistribution.MaxCardinality)
+    implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(RawFeatureFilter.MaxCardinality)
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
@@ -194,7 +194,6 @@ case class FeatureDistribution
 object FeatureDistribution {
 
   val MaxBins = 100000
-  val MaxCardinality = 500
 
   implicit val semigroup: Semigroup[FeatureDistribution] = new Semigroup[FeatureDistribution] {
     override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
