@@ -265,6 +265,12 @@ object FeatureDistribution {
     )
   }
 
+  /**
+   * Function to calculate the first five central moments of numeric values, or length of tokens for text features
+   *
+   * @param values          values to calculate moments
+   * @return Moments object containing information about moments
+   */
   private def momentsValues(values: ProcessedSeq): Moments = {
     val population = values match {
       case Left(seq) => seq.map(x => x.length.toDouble)
@@ -273,6 +279,12 @@ object FeatureDistribution {
     MomentsGroup.sum(population.map(x => Moments(x)))
   }
 
+  /**
+   * Function to track frequency of the first $(maxCard) unique values (number for numeric features, token for text features)
+   *
+   * @param values          values to track distribution / frequency
+   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
     val population = values match {
       case Left(seq) => seq
