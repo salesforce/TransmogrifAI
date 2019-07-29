@@ -305,6 +305,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val lrParams = new ParamGridBuilder()
       .addGrid(lr.regParam, Array(0.0, 0.001, 0.1))
       .build()
+
     val models = Seq(lr -> lrParams)
 
     val pred1 = BinaryClassificationModelSelector.withCrossValidation(
@@ -312,7 +313,6 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       numFolds = 2,
       validationMetric = Evaluators.BinaryClassification.auPR(),
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator),
-      seed = 10L,
       parallelism = 4,
       modelsAndParameters = models
     ).setInput(survivedNum, fv)
@@ -328,7 +328,6 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       numFolds = 2,
       validationMetric = Evaluators.BinaryClassification.auPR(),
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator),
-      seed = 10L,
       parallelism = 4,
       modelsAndParameters = models
     ).setInput(survivedNum, fv)
@@ -344,10 +343,11 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     val summary2 = model2.modelInsights(pred2)
     log.info("model2.summary: \n{}", summary2)
 
-    summary1.selectedModelInfo.get.validationResults
-      .forall(_.metricValues.asInstanceOf[SingleMetric].value < 0.81) shouldBe true
-    summary2.selectedModelInfo.get.validationResults
-      .forall(_.metricValues.asInstanceOf[SingleMetric].value < 0.81) shouldBe false
+    summary1.selectedModelInfo.get.validationResults.zip(
+      summary2.selectedModelInfo.get.validationResults
+    ).forall{ case (v1, v2) =>
+        v1.metricValues.asInstanceOf[SingleMetric].value < v2.metricValues.asInstanceOf[SingleMetric].value
+    } shouldBe true
   }
 
   def compare(

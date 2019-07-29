@@ -42,7 +42,6 @@ import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.functions.monotonically_increasing_id
 import org.apache.spark.sql.{Dataset, Row, SparkSession, functions}
 import org.apache.spark.util.SparkThreadUtils
 import org.slf4j.{Logger, LoggerFactory}
