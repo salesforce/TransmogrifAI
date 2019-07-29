@@ -196,7 +196,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "have toString" in {
     FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty).toString() shouldBe
       "FeatureDistribution(type = Training, name = A, key = None, count = 10, nulls = 1, " +
-        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [], cardinality = None, moments = None)"
+        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [], cardinality = , moments = )"
   }
 
   it should "marshall to/from json" in {
