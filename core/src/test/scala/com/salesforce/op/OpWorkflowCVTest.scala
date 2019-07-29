@@ -314,6 +314,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       validationMetric = Evaluators.BinaryClassification.auPR(),
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator),
       parallelism = 4,
+      seed = 10L,
       modelsAndParameters = models
     ).setInput(survivedNum, fv)
       .getOutput()
@@ -329,6 +330,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
       validationMetric = Evaluators.BinaryClassification.auPR(),
       trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator),
       parallelism = 4,
+      seed = 10L,
       modelsAndParameters = models
     ).setInput(survivedNum, fv)
       .getOutput()
@@ -346,6 +348,7 @@ class OpWorkflowCVTest extends FlatSpec with PassengerSparkFixtureTest {
     summary1.selectedModelInfo.get.validationResults.zip(
       summary2.selectedModelInfo.get.validationResults
     ).forall{ case (v1, v2) =>
+      println(v1.metricValues.asInstanceOf[SingleMetric].value, v2.metricValues.asInstanceOf[SingleMetric].value)
         v1.metricValues.asInstanceOf[SingleMetric].value < v2.metricValues.asInstanceOf[SingleMetric].value
     } shouldBe true
   }
