@@ -48,6 +48,8 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
+import com.salesforce.op.stages.impl.feature.TextStats
+import com.twitter.algebird.Moments
 import org.apache.spark.sql.DataFrame
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -152,6 +154,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
+    println(model.modelInsights(standardizedModel).features
+      .flatMap(_.distributions).size)
     val unstandardizedFtImp = model.modelInsights(unstandardizedModel)
       .features.map(_.derivedFeatures.map(_.contribution))
     val standardizedFtImp = model.modelInsights(standardizedModel)
@@ -163,6 +167,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
   }
 
+  def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
+    DF: DataFrame): (Seq[Moments], Seq[TextStats]) = {
+    lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
+    lazy val model = workFlow.train()
+    val featureMoments = model.modelInsights(inputModel).features
+      .flatMap(_.distributions.map(_.moments.get))
+    val featureCardinality = model.modelInsights(inputModel).features
+      .flatMap(_.distributions.map(_.cardEstimate.get))
+    return (featureMoments, featureCardinality)
+  }
 
   val params = new OpParams()
 
@@ -760,5 +774,28 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
     absError / bigCoeffSum < tol shouldBe true
     absError2 / smallCoeffSum < tol shouldBe true
+  }
+
+  val tol2 = 0.001
+  val MomentsAndCard = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+  val moments = MomentsAndCard._1
+  val cardinality = MomentsAndCard._2
+  val uniqueValsmallFeature = smallNorm.map(_.toDouble.get).toSet
+  val uniqueValbigFeature = bigNorm.map(_.toDouble.get).toSet
+
+  it should "correctly return moments calculation for numeric features" in {
+    moments.size shouldBe 2
+    moments(0).count shouldBe 1000
+    math.abs(moments(0).mean) < tol2 shouldBe true
+    math.abs(moments(0).variance - 10.0) / (moments(0).variance + 10.0)  < tol2 shouldBe true
+    moments(1).count shouldBe 1000
+    math.abs(moments(1).mean - 10000) / (moments(1).mean + 10000) < tol2 shouldBe true
+    math.abs(moments(1).variance - bigFeatureVariance) / (moments(1).variance + bigFeatureVariance)  < tol2 shouldBe true
+  }
+
+  it should "correctly return cardinality calculation for numeric features" in {
+    cardinality.size shouldBe 2
+    cardinality(0).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValsmallFeature) shouldBe true
+    cardinality(1).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValbigFeature) shouldBe true
   }
 }
