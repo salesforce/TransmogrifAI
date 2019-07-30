@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericB
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{Moments, MomentsGroup, Semigroup}
+import com.twitter.algebird.{Moments, MomentsGroup, Semigroup, Tuple2Semigroup}
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
@@ -106,20 +106,10 @@ case class FeatureDistribution
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    val combinedMoments = (moments, fd.moments) match {
-      case (Some(x), None) => Some(x)
-      case (Some(x), Some(y)) => Some(x + y)
-      case (None, Some(y)) => Some(y)
-      case (_, _) => None
-    }
-    val combinedCard = (cardEstimate, fd.cardEstimate) match {
-      case (Some(x), None) => Some(x)
-      case (Some(x), Some(y)) => Some(testStatsSG.plus(x, y))
-      case (None, Some(y)) => Some(y)
-      case (_, _) => None
-    }
+    implicit val sgTuple2Moments = new Tuple2Semigroup[Moments, Moments]()
+    implicit val sgTuple2TextStats = new Tuple2Semigroup[TextStats, TextStats]()
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
+      combinedSummaryInfo, moments + fd.moments, cardEstimate + fd.cardEstimate, `type`)
   }
 
   /**
