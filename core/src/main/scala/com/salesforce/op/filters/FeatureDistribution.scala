@@ -106,10 +106,22 @@ case class FeatureDistribution
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    implicit val sgTuple2Moments = new Tuple2Semigroup[Moments, Moments]()
-    implicit val sgTuple2TextStats = new Tuple2Semigroup[TextStats, TextStats]()
+
+    val combinedMoments = (moments, fd.moments) match {
+      case (Some(x), None) => Some(x)
+      case (Some(x), Some(y)) => Some(x + y)
+      case (None, Some(y)) => Some(y)
+      case (_, _) => None
+    }
+    val combinedCard = (cardEstimate, fd.cardEstimate) match {
+      case (Some(x), None) => Some(x)
+      case (Some(x), Some(y)) => Some(testStatsSG.plus(x, y))
+      case (None, Some(y)) => Some(y)
+      case (_, _) => None
+    }
+
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, moments + fd.moments, cardEstimate + fd.cardEstimate, `type`)
+      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
   }
 
   /**
