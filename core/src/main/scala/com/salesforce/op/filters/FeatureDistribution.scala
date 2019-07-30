@@ -246,7 +246,7 @@ object FeatureDistribution {
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
-    val momentsAndCard = value match {
+    val (moments, cardEstimate) = value match {
       case Some(m) => (Some(momentsValues(m)), Some(cardinalityValues(m)))
       case _ => (None, None)
     }
@@ -258,8 +258,8 @@ object FeatureDistribution {
       nulls = nullCount,
       summaryInfo = summaryInfo,
       distribution = distribution,
-      moments = momentsAndCard._1,
-      cardEstimate = momentsAndCard._2,
+      moments = moments,
+      cardEstimate = cardEstimate,
       `type` = `type`
     )
   }
