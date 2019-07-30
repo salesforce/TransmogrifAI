@@ -50,6 +50,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import scala.concurrent.duration.Duration
 
 import scala.util.Random
 
@@ -242,9 +243,10 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
   }
 
 
-  it should "fail when all models fail" in {
+  it should "fail when all models fail due to inappropriate data" in {
 
     val glr = new OpGeneralizedLinearRegression()
+    // GLR poisson cannot take negative values so will fail this test
     val glrParams = new ParamGridBuilder()
       .addGrid(glr.family, Seq("poisson"))
       .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
@@ -256,6 +258,21 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
         validationMetric = Evaluators.Regression.mse(),
         seed = 10L,
         modelsAndParameters = Seq(glr -> glrParams)
+      )
+      .setInput(label, features)
+
+
+    intercept[Exception](testEstimator.fit(data))
+  }
+
+  it should "fail when maxWait is set too low" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression),
+        maxWait = Duration(1L, "microsecond")
       )
       .setInput(label, features)
 

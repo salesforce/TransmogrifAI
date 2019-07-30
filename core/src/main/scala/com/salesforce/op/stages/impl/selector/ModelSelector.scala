@@ -118,7 +118,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val dataUse = dataOpt.getOrElse(data)
 
     val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataUse,
-      label = in1.name, features = in2.name, dag = dag, splitter = splitter
+      label = labelColName, features = in2.name, dag = dag, splitter = splitter
     )
 
     bestEstimator = Option(theBestEstimator)
