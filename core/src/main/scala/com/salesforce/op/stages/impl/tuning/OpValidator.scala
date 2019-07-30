@@ -315,30 +315,31 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
           val pi2 = estimator.getParam(ModelSelectorNames.inputParam2Name)
           estimator.set(pi1, label).set(pi2, features)
       }
-      Future {
-        val paramsMetrics = params.map { p =>
-          Try {
+
+        val paramsMetricsF = params.seq.map { p =>
+          val f = Future {
             val model = estimator.fit(train, p).asInstanceOf[M]
             val metric = evaluator.evaluate(model.transform(test, p))
             log.info(s"Got metric $metric for model $name trained with $p.")
-            p -> metric
+            Some(p -> metric)
           }
-        }.flatMap{
-          case Success(v) => Some(v)
-          case Failure(e) =>
+          f.recover({ case e: Throwable =>
             log.warn(s"Model $name attempted in model selector with failed with following issue: \n${e.getMessage}")
             None
+          })
         }
-        val (goodParams, metrics) = paramsMetrics.unzip
 
-        val (bestMetric, bestIndex) =
-          if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
-          else metrics.zipWithIndex.minBy(_._1)
+        Future.sequence(paramsMetricsF).map { paramsMetrics =>
+          val (goodParams, metrics) = paramsMetrics.flatten.unzip
 
-        log.info(s"Best set of parameters:\n${params(bestIndex)} for $name")
-        log.info(s"Best train validation split metric: $bestMetric.")
-        ValidatedModel(estimator, bestIndex, metrics, goodParams)
-      }
+          val (bestMetric, bestIndex) =
+            if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
+            else metrics.zipWithIndex.minBy(_._1)
+
+          log.info(s"Best set of parameters:\n${params(bestIndex)} for $name")
+          log.info(s"Best train validation split metric: $bestMetric.")
+          ValidatedModel(estimator, bestIndex, metrics.toArray, goodParams.toArray)
+        }
     }
 
     val summaryOfAttempts = summaryFuts.map { f => f.map(Option(_)).recover {
