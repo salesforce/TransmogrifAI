@@ -119,9 +119,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val linearRegLabel = (smallNorm, bigNorm)
     .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
   val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
-//  val tenSmallNormFeatures = List.fill(10)(smallNorm)
-//  val tenSmallFeaturesLabel = tenSmallNormFeatures :+ linearRegLabel
-//  val tenDF = tenSmallFeaturesLabel.
   def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
   (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
     val generatedData = feature1.zip(feature2).zip(label).map {
@@ -151,6 +148,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
   val linRegDF = twoFeatureDF(smallNorm, bigNorm, linearRegLabel)
   val logRegDF = twoFeatureDF(smallNorm, mediumNorm, logisticRegLabel)
+  val bigLinRegDF = tenFeaturesDF(smallNorm, bigNorm, linearRegLabel)
+
+  val bigLinPred = new OpLinearRegression().setStandardization(false)
+    .setInput(bigLinRegDF._1, bigLinRegDF._2).getOutput()
 
   val unstandardizedLinpred = new OpLinearRegression().setStandardization(false)
     .setInput(linRegDF._1, linRegDF._2).getOutput()
@@ -793,7 +794,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   val tol2 = 0.001
-  val MomentsAndCard = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+  val MomentsAndCard = getFeatureMomentsAndCard(bigLinPred, bigLinRegDF._3)
   val moments = MomentsAndCard._1
   val cardinality = MomentsAndCard._2
   val uniqueValsmallFeature = smallNorm.map(_.toDouble.get).toSet
