@@ -119,7 +119,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val linearRegLabel = (smallNorm, bigNorm)
     .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
   val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
-
+//  val tenSmallNormFeatures = List.fill(10)(smallNorm)
+//  val tenSmallFeaturesLabel = tenSmallNormFeatures :+ linearRegLabel
+//  val tenDF = tenSmallFeaturesLabel.
   def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
   (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
     val generatedData = feature1.zip(feature2).zip(label).map {
@@ -129,6 +131,20 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val labelData = rawLabel.copy(isResponse = true)
     val featureVector = raw1
       .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(raw2))
+    val checkedFeatures = labelData.sanityCheck(featureVector, removeBadFeatures = false)
+    return (labelData, checkedFeatures, rawDF)
+  }
+
+  def tenFeaturesDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
+  (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
+    val generatedData = feature1.zip(feature2).zip(label).map {
+      case ((f1, f2), label) => (f1, f2, label)
+    }
+    val (rawDF, raw1, raw2, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
+    val labelData = rawLabel.copy(isResponse = true)
+    val nineFeatures = Array.fill[FeatureLike[Real]](9)(raw2)
+    val featureVector = raw1
+      .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = nineFeatures)
     val checkedFeatures = labelData.sanityCheck(featureVector, removeBadFeatures = false)
     return (labelData, checkedFeatures, rawDF)
   }
