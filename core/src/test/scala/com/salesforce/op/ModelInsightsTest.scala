@@ -132,26 +132,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     return (labelData, checkedFeatures, rawDF)
   }
 
-  def tenFeaturesDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
-  (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
-    val generatedData = feature1.zip(feature2).zip(label).map {
-      case ((f1, f2), label) => (f1, f2, label)
-    }
-    val (rawDF, raw1, raw2, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
-    val labelData = rawLabel.copy(isResponse = true)
-    val nineFeatures = Array.fill[FeatureLike[Real]](12)(raw2.copy())
-    val featureVector = raw1
-      .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = nineFeatures)
-    val checkedFeatures = labelData.sanityCheck(featureVector, removeBadFeatures = false)
-    return (labelData, checkedFeatures, rawDF)
-  }
-
   val linRegDF = twoFeatureDF(smallNorm, bigNorm, linearRegLabel)
   val logRegDF = twoFeatureDF(smallNorm, mediumNorm, logisticRegLabel)
-  val bigLinRegDF = tenFeaturesDF(smallNorm, bigNorm, linearRegLabel)
-
-  val bigLinPred = new OpLinearRegression().setStandardization(false)
-    .setInput(bigLinRegDF._1, bigLinRegDF._2).getOutput()
 
   val unstandardizedLinpred = new OpLinearRegression().setStandardization(false)
     .setInput(linRegDF._1, linRegDF._2).getOutput()
@@ -185,7 +167,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
     DF: DataFrame): (Seq[Moments], Seq[TextStats]) = {
     lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
-    lazy val model = workFlow.train()
+    lazy val dummyReader = workFlow.getReader()
+    lazy val workFlowRFF = workFlow.withRawFeatureFilter(Some(dummyReader), None)
+    lazy val model = workFlowRFF.train()
     val featureMoments = model.modelInsights(inputModel).features
       .flatMap(_.distributions.map(_.moments.get))
     val featureCardinality = model.modelInsights(inputModel).features
@@ -209,590 +193,590 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
   val rawNames = Set(age.name, weight.name, height.name, genderPL.name, description.name)
 
-//  Spec[ModelInsights] should "throw an error when you try to get insights on a raw feature" in {
-//    val ex = the[IllegalArgumentException] thrownBy {
-//      workflowModel.modelInsights(age)
-//    }
-//    val expectedErrorMessage = "eature.? '?age.* is either a raw feature or not part of this workflow ?model"
-//    ex.getMessage.toLowerCase should include regex expectedErrorMessage
-//  }
-//
-//  it should "return empty insights when no selector, label, feature vector, or model are found" in {
-//    val insights = workflowModel.modelInsights(density)
-//    insights.label.labelName shouldBe None
-//    insights.features.isEmpty shouldBe true
-//    insights.selectedModelInfo.isEmpty shouldBe true
-//    insights.trainingParams shouldEqual params
-//
-//    // head will be RFF so accessing 2nd element
-//    insights.stageInfo.keys.slice(1, 2).toList.head shouldEqual
-//      s"${density.originStage.operationName}_${density.originStage.uid}"
-//
-//  }
-//
-//  it should "return only feature insights when no selector, label, or model are found" in {
-//    val insights = workflowModel.modelInsights(features)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.label.labelName shouldBe None
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    insights.selectedModelInfo.isEmpty shouldBe true
-//    insights.trainingParams shouldEqual params
-//    insights.stageInfo.keys.size shouldEqual 9
-//  }
-//
-//  it should "return model insights even when correlation is turned off for some features" in {
-//    val featuresFinal = Seq(
-//      description.vectorize(numHashes = 10, autoDetectLanguage = false, minTokenLength = 1, toLowercase = true),
-//      stringMap.vectorize(cleanText = true, numHashes = 10)
-//    ).combine()
-//    val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
-//    val prediction = MultiClassificationModelSelector
-//      .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
-//        modelsAndParameters = models)
-//      .setInput(label, featuresChecked)
-//      .getOutput()
-//    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
-//    val workflowModel = workflow.train()
-//    val insights = workflowModel.modelInsights(prediction)
-//    insights.features.size shouldBe 2
-//    insights.features.flatMap(_.derivedFeatures).size shouldBe 23
-//  }
-//
-//  it should "return feature insights with selector info and label info even when no models are found" in {
-//    val insights = workflowModel.modelInsights(checked)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.label.labelName shouldBe Some(label.name)
-//    insights.label.distribution.get.isInstanceOf[Continuous] shouldBe true
-//    insights.label.rawFeatureName shouldBe Seq(survived.name)
-//    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
-//    insights.label.stagesApplied.size shouldBe 1
-//    insights.label.sampleSize shouldBe Some(5.0)
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.contribution shouldBe Seq.empty
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    genderInsights.derivedFeatures.foreach { f =>
-//      f.contribution shouldBe Seq.empty
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    insights.selectedModelInfo.isEmpty shouldBe true
-//    insights.trainingParams shouldEqual params
-//    insights.stageInfo.keys.size shouldEqual 11
-//  }
-//
-//  it should "find the sanity checker metadata even if the model has been serialized" in {
-//    val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
-//    val json = OpWorkflowModelWriter.toJson(workflowModel, path)
-//    val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path)
-//    val insights = loadedModel.get.modelInsights(checked)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.contribution shouldBe Seq.empty
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.foreach { f =>
-//      f.contribution shouldBe Seq.empty
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//  }
-//
-//  it should "return feature insights with selector info and label info and model info" in {
-//    val insights = workflowModel.modelInsights(pred)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.label.labelName shouldBe Some(label.name)
-//    insights.label.distribution.get.isInstanceOf[Continuous] shouldBe true
-//    insights.label.rawFeatureName shouldBe Seq(survived.name)
-//    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
-//    insights.label.stagesApplied.size shouldBe 1
-//    insights.label.sampleSize shouldBe Some(5.0)
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    ageInsights.derivedFeatures(0).contribution.size shouldBe 1
-//    ageInsights.derivedFeatures(1).contribution.size shouldBe 0
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    genderInsights.derivedFeatures.foreach { f =>
-//      if (f.excluded.contains(true)) f.contribution.size shouldBe 0 else f.contribution.size shouldBe 1
-//      f.corr.nonEmpty shouldBe true
-//      f.variance.nonEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    insights.selectedModelInfo.get.validationType shouldBe CrossValidation
-//    insights.trainingParams shouldEqual params
-//    insights.stageInfo.keys.size shouldEqual 12
-//  }
-//
-//  it should "return feature insights with label info and model info even when no sanity checker is found" in {
-//    val insights = workflowModel.modelInsights(predLin)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.label.labelName shouldBe Some(label.name)
-//    insights.label.distribution.isEmpty shouldBe true
-//    insights.label.rawFeatureName shouldBe Seq(survived.name)
-//    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
-//    insights.label.stagesApplied.size shouldBe 1
-//    insights.label.sampleSize.isEmpty shouldBe true
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    genderInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
-//    insights.trainingParams shouldEqual params
-//    insights.stageInfo.keys.size shouldEqual 11
-//  }
-//
-//  it should "correctly pull out model contributions when passed a selected model" in {
-//    val reg = ModelInsights.getModelContributions(
-//      Option(workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel])
-//    )
-//    val lin = ModelInsights.getModelContributions(
-//      Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
-//    )
-//    reg.size shouldBe 1
-//    reg.head.size shouldBe 21
-//
-//    lin.size shouldBe 1
-//    lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
-//  }
-//
-//  it should "pretty print" in {
-//    val insights = workflowModel.modelInsights(pred)
-//    insights.selectedModelInfo.isDefined shouldBe true
-//    val pretty = insights.prettyPrint()
-//    val modelType = BinaryClassificationModelsToTry.OpLogisticRegression
-//    val sm = insights.selectedModelInfo.get
-//    sm.bestModelType shouldBe modelType.toString
-//    sm.validationResults.size shouldBe 2
-//
-//    pretty should include(s"Selected Model - $modelType")
-//    withClue("include only best model info: ") {
-//      pretty should include(sm.bestModelUID)
-//      pretty should include(sm.bestModelType)
-//      pretty should include(sm.bestModelName)
-//    }
-//    withClue("not include other models info: ") {
-//      val others = sm.validationResults.filterNot(v =>
-//        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
-//      )
-//      others.size shouldBe 1
-//      others.foreach { m =>
-//        pretty should not include m.modelName
-//      }
-//    }
-//    pretty should include regex raw"area under precision-recall\s+|\s+1.0"
-//    pretty should include("Model Evaluation Metrics")
-//    pretty should include("Top Model Insights")
-//    pretty should include("Top Positive Correlations")
-//    pretty should include("Top Contributions")
-//  }
-//
-//
-//  it should "correctly serialize and deserialize from json when raw feature filter is not used" in {
-//    val insights = workflowModel.modelInsights(pred)
-//    ModelInsights.fromJson(insights.toJson()) match {
-//      case Failure(e) => fail(e)
-//      case Success(deser) =>
-//        insights.label shouldEqual deser.label
-//        insights.features.zip(deser.features).foreach{
-//          case (i, o) =>
-//            i.featureName shouldEqual o.featureName
-//            i.featureType shouldEqual o.featureType
-//            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
-//            RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
-//            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
-//            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
-//        }
-//        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
-//          case (o, i) =>
-//            o.validationType shouldEqual i.validationType
-//            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
-//            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
-//            o.dataPrepResults shouldEqual i.dataPrepResults
-//            o.evaluationMetric shouldEqual i.evaluationMetric
-//            o.problemType shouldEqual i.problemType
-//            o.bestModelUID shouldEqual i.bestModelUID
-//            o.bestModelName shouldEqual i.bestModelName
-//            o.bestModelType shouldEqual i.bestModelType
-//            o.validationResults.zip(i.validationResults).foreach{
-//              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
-//                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
-//            }
-//            o.trainEvaluation shouldEqual i.trainEvaluation
-//            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
-//        }
-//        insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
-//        insights.stageInfo.keys shouldEqual deser.stageInfo.keys
-//    }
-//  }
-//
-//  it should "correctly serialize and deserialize from json when raw feature filter is used" in {
-//    val insights = modelWithRFF.modelInsights(predWithMaps)
-//    ModelInsights.fromJson(insights.toJson()) match {
-//      case Failure(e) => fail(e)
-//      case Success(deser) =>
-//        insights.label shouldEqual deser.label
-//        insights.features.zip(deser.features).foreach {
-//          case (i, o) =>
-//            i.featureName shouldEqual o.featureName
-//            i.featureType shouldEqual o.featureType
-//            i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
-//            RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
-//            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
-//            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
-//        }
-//        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
-//          case (o, i) =>
-//            o.validationType shouldEqual i.validationType
-//            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
-//            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
-//            o.dataPrepResults shouldEqual i.dataPrepResults
-//            o.evaluationMetric shouldEqual i.evaluationMetric
-//            o.problemType shouldEqual i.problemType
-//            o.bestModelUID shouldEqual i.bestModelUID
-//            o.bestModelName shouldEqual i.bestModelName
-//            o.bestModelType shouldEqual i.bestModelType
-//            o.validationResults.zip(i.validationResults).foreach {
-//              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
-//                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
-//            }
-//            o.trainEvaluation shouldEqual i.trainEvaluation
-//            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
-//        }
-//        insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
-//        insights.stageInfo.keys shouldEqual deser.stageInfo.keys
-//
-//        // check that raw feature filter config is correctly serialized and deserialized
-//
-//        def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
-//          modelInsights.stageInfo(RawFeatureFilter.stageName) match {
-//            case configInfo: Map[String, Map[String, String]]@unchecked =>
-//              configInfo.getOrElse("params", Map.empty[String, String])
-//            case _ => Map.empty[String, String]
-//          }
-//        }
-//
-//        (getRawFeatureFilterConfig(insights), getRawFeatureFilterConfig(deser)) match {
-//          case (paramsMapI, paramsMapD) =>
-//            paramsMapI.keys shouldEqual paramsMapD.keys
-//            paramsMapI("minFill") shouldEqual paramsMapD("minFill")
-//            paramsMapI("maxFillDifference") shouldEqual paramsMapD("maxFillDifference")
-//            paramsMapI("maxFillRatioDiff") shouldEqual paramsMapD("maxFillRatioDiff")
-//            paramsMapI("maxJSDivergence") shouldEqual paramsMapD("maxJSDivergence")
-//            paramsMapI("maxCorrelation") shouldEqual paramsMapD("maxCorrelation")
-//            paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
-//            paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
-//            paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
-//          }
-//    }
-//  }
-//
-//  it should "have feature insights for features that are removed by the raw feature filter" in {
-//    val insights = modelWithRFF.modelInsights(predWithMaps)
-//
-//    modelWithRFF.getBlacklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
-//    val heightIn = insights.features.find(_.featureName == age.name).get
-//    heightIn.derivedFeatures.size shouldBe 1
-//    heightIn.derivedFeatures.head.excluded shouldBe Some(true)
-//
-//    modelWithRFF.getBlacklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
-//    val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
-//    val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
-//    mapDerivedIn.size shouldBe 3
-//    droppedMapDerivedIn.size shouldBe 1
-//    droppedMapDerivedIn.head.excluded shouldBe Some(true)
-//    droppedMapDerivedIn.head.derivedFeatureGroup shouldBe Some("Female")
-//  }
-//
-//  val labelName = "l"
-//
-//  val summary = SanityCheckerSummary(
-//    correlationsWLabel = Correlations(Seq("f0_f0_f2_1", "f0_f0_f3_2"), Seq(5.2, 5.3), Seq("f1_0"),
-//      CorrelationType.Pearson),
-//    dropped = Seq("f1_0"),
-//    featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
-//      min = Seq(1.1, 1.2, 1.3, 1.0), mean = Seq(2.1, 2.2, 2.3, 2.0), variance = Seq(3.1, 3.2, 3.3, 3.0)),
-//    names = Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2", labelName),
-//    categoricalStats = Array(
-//      CategoricalGroupStats(
-//        group = "f0_f0_f2",
-//        categoricalFeatures = Array("f0_f0_f2_1"),
-//        contingencyMatrix = Map("0" -> Array(13.0, 17.0), "1" -> Array(5.0, 15.0), "2" -> Array(14.0, 36.0)),
-//        cramersV = 6.2,
-//        pointwiseMutualInfo = Map("0" -> Array(7.2), "1" -> Array(8.2), "2" -> Array(9.2)),
-//        mutualInfo = 10.2,
-//        maxRuleConfidences = Array(0.0),
-//        supports = Array(1.0)
-//      ), CategoricalGroupStats(
-//        group = "f0_f0_f2",
-//        categoricalFeatures = Array( "f0_f0_f3_2"),
-//        contingencyMatrix = Map("0" -> Array(11.0, 12.0), "1" -> Array(12.0, 12.0), "2" -> Array(13.0, 12.0)),
-//        cramersV = 6.3,
-//        pointwiseMutualInfo = Map("0" -> Array(7.3), "1" -> Array(8.3), "2" -> Array(9.3)),
-//        mutualInfo = 10.3,
-//        maxRuleConfidences = Array(0.0),
-//        supports = Array(1.0)
-//      )
-//    )
-//  )
-//
-//  val lbl = Feature[RealNN](labelName, true, null, Seq(), "test")
-//  val f1 = Feature[Real]("f1", true, null, Seq(), "test")
-//  val f0 = Feature[PickList]("f0", true, null, Seq(), "test")
-//
-//  val meta = OpVectorMetadata(
-//    "fv",
-//    OpVectorColumnMetadata(
-//      parentFeatureName = Seq("f1"),
-//      parentFeatureType = Seq(classOf[Real].getName),
-//      grouping = None,
-//      indicatorValue = None
-//    ) +: Array("f2", "f3").map { name =>
-//      OpVectorColumnMetadata(
-//        parentFeatureName = Seq("f0"),
-//        parentFeatureType = Seq(classOf[PickList].getName),
-//        grouping = Option("f0"),
-//        indicatorValue = Option(name)
-//      )
-//    },
-//    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
-//  )
-//
-//  it should "correctly extract the LabelSummary from the label and sanity checker info" in {
-//    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
-//    labelSum.labelName shouldBe Some(labelName)
-//    labelSum.rawFeatureName shouldBe lbl.history().originFeatures
-//    labelSum.rawFeatureType shouldBe Seq(classOf[RealNN].getName)
-//    labelSum.stagesApplied shouldBe lbl.history().stages
-//    labelSum.sampleSize shouldBe Some(3.0)
-//    labelSum.distribution.get.isInstanceOf[Discrete] shouldBe true
-//    labelSum.distribution.get.asInstanceOf[Discrete].domain should contain theSameElementsAs Array("0", "1", "2")
-//    labelSum.distribution.get.asInstanceOf[Discrete].prob should contain theSameElementsAs Array(0.3, 0.2, 0.5)
-//  }
-//
-//  it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
-//    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
-//
-//    val featureInsights = ModelInsights.getFeatureInsights(
-//      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-//      RawFeatureFilterResults(), labelSum
-//    )
-//    featureInsights.size shouldBe 2
-//
-//    val f1In = featureInsights.find(_.featureName == "f1").get
-//    f1In.featureType shouldBe classOf[Real].getName
-//    f1In.derivedFeatures.size shouldBe 1
-//
-//    val f1InDer = f1In.derivedFeatures.head
-//    f1InDer.derivedFeatureName shouldBe "f1_0"
-//    f1InDer.stagesApplied shouldBe Seq.empty
-//    f1InDer.derivedFeatureGroup shouldBe None
-//    f1InDer.derivedFeatureValue shouldBe None
-//    f1InDer.excluded shouldBe Option(true)
-//    f1InDer.corr.map(_.toString) shouldBe Some("NaN")
-//    f1InDer.cramersV shouldBe None
-//    f1InDer.mutualInformation shouldBe None
-//    f1InDer.pointwiseMutualInformation shouldBe Map.empty
-//    f1InDer.countMatrix shouldBe Map.empty
-//    f1InDer.contribution shouldBe Seq.empty
-//    f1InDer.min shouldBe Some(1.1)
-//    f1InDer.max shouldBe Some(0.1)
-//    f1InDer.mean shouldBe Some(2.1)
-//    f1InDer.variance shouldBe Some(3.1)
-//
-//    val f0In = featureInsights.find(_.featureName == "f0").get
-//    f0In.featureName shouldBe "f0"
-//    f0In.featureType shouldBe classOf[PickList].getName
-//    f0In.derivedFeatures.size shouldBe 2
-//
-//    val f0InDer2 = f0In.derivedFeatures.head
-//    f0InDer2.derivedFeatureName shouldBe "f0_f0_f2_1"
-//    f0InDer2.stagesApplied shouldBe Seq.empty
-//    f0InDer2.derivedFeatureGroup shouldBe Some("f0")
-//    f0InDer2.derivedFeatureValue shouldBe Some("f2")
-//    f0InDer2.excluded shouldBe Option(false)
-//    f0InDer2.corr shouldBe Some(5.2)
-//    f0InDer2.cramersV shouldBe Some(6.2)
-//    f0InDer2.mutualInformation shouldBe Some(10.2)
-//    f0InDer2.pointwiseMutualInformation shouldBe Map("0" -> 7.2, "1" -> 8.2, "2" -> 9.2)
-//    f0InDer2.countMatrix shouldBe Map("0" -> 13.0, "1" -> 5.0, "2" -> 14.0)
-//    f0InDer2.contribution shouldBe Seq.empty
-//    f0InDer2.min shouldBe Some(1.2)
-//    f0InDer2.max shouldBe Some(0.2)
-//    f0InDer2.mean shouldBe Some(2.2)
-//    f0InDer2.variance shouldBe Some(3.2)
-//
-//    val f0InDer3 = f0In.derivedFeatures.last
-//    f0InDer3.derivedFeatureName shouldBe "f0_f0_f3_2"
-//    f0InDer3.stagesApplied shouldBe Seq.empty
-//    f0InDer3.derivedFeatureGroup shouldBe Some("f0")
-//    f0InDer3.derivedFeatureValue shouldBe Some("f3")
-//    f0InDer3.excluded shouldBe Option(false)
-//    f0InDer3.corr shouldBe Some(5.3)
-//    f0InDer3.cramersV shouldBe Some(6.3)
-//    f0InDer3.mutualInformation shouldBe Some(10.3)
-//    f0InDer3.pointwiseMutualInformation shouldBe Map("0" -> 7.3, "1" -> 8.3, "2" -> 9.3)
-//    f0InDer3.countMatrix shouldBe Map("0" -> 11.0, "1" -> 12.0, "2" -> 13.0)
-//    f0InDer3.contribution shouldBe Seq.empty
-//    f0InDer3.min shouldBe Some(1.3)
-//    f0InDer3.max shouldBe Some(0.3)
-//    f0InDer3.mean shouldBe Some(2.3)
-//    f0InDer3.variance shouldBe Some(3.3)
-//  }
-//
-//  it should "include raw feature distribution information when RawFeatureFilter is used" in {
-//    val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
-//
-//    val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
-//
-//    val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
-//    trainingDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
-//
-//    val scoringDistributions = modelWithRFF.getRawScoringFeatureDistributions()
-//    scoringDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
-//
-//    trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
-//
-//    /**
-//     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-//     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-//     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-//     * it's not explicitly blacklisted itself.
-//     */
-//    val insights = modelWithRFF.modelInsights(predWithMaps)
-//
-//    insights.features.foreach(f =>
-//      f.distributions shouldBe wfDistributionsGrouped.getOrElse(f.featureName, Seq.empty)
-//    )
-//  }
-//
-//  it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
-//    val insights = workflowModel.modelInsights(pred)
-//    insights.features.foreach(f => f.distributions shouldBe empty)
-//  }
-//
-//  it should "return model insights for xgboost classification" in {
-//    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbClassifierPred)
-//    val insights = xgbWorkflowModel.modelInsights(xgbClassifierPred)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    genderInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//  }
-//
-//  it should "return model insights for xgboost regression" in {
-//    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbRegressorPred)
-//    val insights = xgbWorkflowModel.modelInsights(xgbRegressorPred)
-//    val ageInsights = insights.features.filter(_.featureName == age.name).head
-//    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
-//    insights.features.size shouldBe 5
-//    insights.features.map(_.featureName).toSet shouldEqual rawNames
-//    ageInsights.derivedFeatures.size shouldBe 2
-//    ageInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//    genderInsights.derivedFeatures.size shouldBe 4
-//    genderInsights.derivedFeatures.foreach { f =>
-//      f.contribution.size shouldBe 1
-//      f.corr.isEmpty shouldBe true
-//      f.variance.isEmpty shouldBe true
-//      f.cramersV.isEmpty shouldBe true
-//    }
-//  }
-//
-//  val tol = 0.03
-//  it should "correctly return the descaled coefficient for linear regression, " +
-//    "when standardization is on" in {
-//
-//    // Since 5000 & 1 are always returned as the coefficients of the model
-//    // trained on unstandardized data and we can analytically calculate
-//    // the scaled version of them by the linear regression formula, the coefficients
-//    // of the model trained on standardized data should be within a small distance of the analytical formula.
-//
-//    // difference between the real coefficient and the analytical formula
-//    val coeffs = getFeatureImp(standardizedLinpred, unstandardizedLinpred, linRegDF._3)
-//    val descaledsmallCoeff = coeffs(0)
-//    val originalsmallCoeff = coeffs(1)
-//    val descaledbigCoeff = coeffs(2)
-//    val orginalbigCoeff = coeffs(3)
-//    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
-//    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
-//    val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
-//    val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
-//    absError / bigCoeffSum < tol shouldBe true
-//    absError2 / smallCoeffSum < tol shouldBe true
-//  }
-//
-//  it should "correctly return the descaled coefficient for logistic regression, " +
-//    "when standardization is on" in {
-//    val coeffs = getFeatureImp(standardizedLogpred, unstandardizedLogpred, logRegDF._3)
-//    val descaledsmallCoeff = coeffs(0)
-//    val originalsmallCoeff = coeffs(1)
-//    val descaledbigCoeff = coeffs(2)
-//    val orginalbigCoeff = coeffs(3)
-//    // difference between the real coefficient and the analytical formula
-//    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
-//    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
-//    val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
-//    val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
-//    absError / bigCoeffSum < tol shouldBe true
-//    absError2 / smallCoeffSum < tol shouldBe true
-//  }
+  Spec[ModelInsights] should "throw an error when you try to get insights on a raw feature" in {
+    val ex = the[IllegalArgumentException] thrownBy {
+      workflowModel.modelInsights(age)
+    }
+    val expectedErrorMessage = "eature.? '?age.* is either a raw feature or not part of this workflow ?model"
+    ex.getMessage.toLowerCase should include regex expectedErrorMessage
+  }
 
-  val tol2 = 0.001
-  val MomentsAndCard = getFeatureMomentsAndCard(bigLinPred, bigLinRegDF._3)
+  it should "return empty insights when no selector, label, feature vector, or model are found" in {
+    val insights = workflowModel.modelInsights(density)
+    insights.label.labelName shouldBe None
+    insights.features.isEmpty shouldBe true
+    insights.selectedModelInfo.isEmpty shouldBe true
+    insights.trainingParams shouldEqual params
+
+    // head will be RFF so accessing 2nd element
+    insights.stageInfo.keys.slice(1, 2).toList.head shouldEqual
+      s"${density.originStage.operationName}_${density.originStage.uid}"
+
+  }
+
+  it should "return only feature insights when no selector, label, or model are found" in {
+    val insights = workflowModel.modelInsights(features)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.label.labelName shouldBe None
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    genderInsights.derivedFeatures.size shouldBe 4
+    insights.selectedModelInfo.isEmpty shouldBe true
+    insights.trainingParams shouldEqual params
+    insights.stageInfo.keys.size shouldEqual 9
+  }
+
+  it should "return model insights even when correlation is turned off for some features" in {
+    val featuresFinal = Seq(
+      description.vectorize(numHashes = 10, autoDetectLanguage = false, minTokenLength = 1, toLowercase = true),
+      stringMap.vectorize(cleanText = true, numHashes = 10)
+    ).combine()
+    val featuresChecked = label.sanityCheck(featuresFinal, correlationExclusion = CorrelationExclusion.HashedText)
+    val prediction = MultiClassificationModelSelector
+      .withCrossValidation(seed = 42, splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, featuresChecked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    insights.features.size shouldBe 2
+    insights.features.flatMap(_.derivedFeatures).size shouldBe 23
+  }
+
+  it should "return feature insights with selector info and label info even when no models are found" in {
+    val insights = workflowModel.modelInsights(checked)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.label.labelName shouldBe Some(label.name)
+    insights.label.distribution.get.isInstanceOf[Continuous] shouldBe true
+    insights.label.rawFeatureName shouldBe Seq(survived.name)
+    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
+    insights.label.stagesApplied.size shouldBe 1
+    insights.label.sampleSize shouldBe Some(5.0)
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    insights.selectedModelInfo.isEmpty shouldBe true
+    insights.trainingParams shouldEqual params
+    insights.stageInfo.keys.size shouldEqual 11
+  }
+
+  it should "find the sanity checker metadata even if the model has been serialized" in {
+    val path = tempDir.toString + "/model-insights-test-" + System.currentTimeMillis()
+    val json = OpWorkflowModelWriter.toJson(workflowModel, path)
+    val loadedModel = new OpWorkflowModelReader(Some(workflow)).loadJson(json, path)
+    val insights = loadedModel.get.modelInsights(checked)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution shouldBe Seq.empty
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
+
+  it should "return feature insights with selector info and label info and model info" in {
+    val insights = workflowModel.modelInsights(pred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.label.labelName shouldBe Some(label.name)
+    insights.label.distribution.get.isInstanceOf[Continuous] shouldBe true
+    insights.label.rawFeatureName shouldBe Seq(survived.name)
+    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
+    insights.label.stagesApplied.size shouldBe 1
+    insights.label.sampleSize shouldBe Some(5.0)
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures(0).contribution.size shouldBe 1
+    ageInsights.derivedFeatures(1).contribution.size shouldBe 0
+    ageInsights.derivedFeatures.foreach { f =>
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      if (f.excluded.contains(true)) f.contribution.size shouldBe 0 else f.contribution.size shouldBe 1
+      f.corr.nonEmpty shouldBe true
+      f.variance.nonEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    insights.selectedModelInfo.get.validationType shouldBe CrossValidation
+    insights.trainingParams shouldEqual params
+    insights.stageInfo.keys.size shouldEqual 12
+  }
+
+  it should "return feature insights with label info and model info even when no sanity checker is found" in {
+    val insights = workflowModel.modelInsights(predLin)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.label.labelName shouldBe Some(label.name)
+    insights.label.distribution.isEmpty shouldBe true
+    insights.label.rawFeatureName shouldBe Seq(survived.name)
+    insights.label.rawFeatureType shouldBe Seq(survived.typeName)
+    insights.label.stagesApplied.size shouldBe 1
+    insights.label.sampleSize.isEmpty shouldBe true
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    insights.selectedModelInfo.get.validationType shouldBe TrainValidationSplit
+    insights.trainingParams shouldEqual params
+    insights.stageInfo.keys.size shouldEqual 11
+  }
+
+  it should "correctly pull out model contributions when passed a selected model" in {
+    val reg = ModelInsights.getModelContributions(
+      Option(workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel])
+    )
+    val lin = ModelInsights.getModelContributions(
+      Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
+    )
+    reg.size shouldBe 1
+    reg.head.size shouldBe 21
+
+    lin.size shouldBe 1
+    lin.head.size shouldBe OpVectorMetadata("", checked.originStage.getMetadata()).columns.length
+  }
+
+  it should "pretty print" in {
+    val insights = workflowModel.modelInsights(pred)
+    insights.selectedModelInfo.isDefined shouldBe true
+    val pretty = insights.prettyPrint()
+    val modelType = BinaryClassificationModelsToTry.OpLogisticRegression
+    val sm = insights.selectedModelInfo.get
+    sm.bestModelType shouldBe modelType.toString
+    sm.validationResults.size shouldBe 2
+
+    pretty should include(s"Selected Model - $modelType")
+    withClue("include only best model info: ") {
+      pretty should include(sm.bestModelUID)
+      pretty should include(sm.bestModelType)
+      pretty should include(sm.bestModelName)
+    }
+    withClue("not include other models info: ") {
+      val others = sm.validationResults.filterNot(v =>
+        v.modelUID == sm.bestModelUID && v.modelName == sm.bestModelName && v.modelType == sm.bestModelType
+      )
+      others.size shouldBe 1
+      others.foreach { m =>
+        pretty should not include m.modelName
+      }
+    }
+    pretty should include regex raw"area under precision-recall\s+|\s+1.0"
+    pretty should include("Model Evaluation Metrics")
+    pretty should include("Top Model Insights")
+    pretty should include("Top Positive Correlations")
+    pretty should include("Top Contributions")
+  }
+
+
+  it should "correctly serialize and deserialize from json when raw feature filter is not used" in {
+    val insights = workflowModel.modelInsights(pred)
+    ModelInsights.fromJson(insights.toJson()) match {
+      case Failure(e) => fail(e)
+      case Success(deser) =>
+        insights.label shouldEqual deser.label
+        insights.features.zip(deser.features).foreach{
+          case (i, o) =>
+            i.featureName shouldEqual o.featureName
+            i.featureType shouldEqual o.featureType
+            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+            RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
+            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
+            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
+        }
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
+          case (o, i) =>
+            o.validationType shouldEqual i.validationType
+            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
+            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
+            o.dataPrepResults shouldEqual i.dataPrepResults
+            o.evaluationMetric shouldEqual i.evaluationMetric
+            o.problemType shouldEqual i.problemType
+            o.bestModelUID shouldEqual i.bestModelUID
+            o.bestModelName shouldEqual i.bestModelName
+            o.bestModelType shouldEqual i.bestModelType
+            o.validationResults.zip(i.validationResults).foreach{
+              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
+                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
+            }
+            o.trainEvaluation shouldEqual i.trainEvaluation
+            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
+        }
+        insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
+        insights.stageInfo.keys shouldEqual deser.stageInfo.keys
+    }
+  }
+
+  it should "correctly serialize and deserialize from json when raw feature filter is used" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+    ModelInsights.fromJson(insights.toJson()) match {
+      case Failure(e) => fail(e)
+      case Success(deser) =>
+        insights.label shouldEqual deser.label
+        insights.features.zip(deser.features).foreach {
+          case (i, o) =>
+            i.featureName shouldEqual o.featureName
+            i.featureType shouldEqual o.featureType
+            i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
+            RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
+            RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
+            RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
+        }
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
+          case (o, i) =>
+            o.validationType shouldEqual i.validationType
+            o.validationParameters.keySet shouldEqual i.validationParameters.keySet
+            o.dataPrepParameters.keySet shouldEqual i.dataPrepParameters.keySet
+            o.dataPrepResults shouldEqual i.dataPrepResults
+            o.evaluationMetric shouldEqual i.evaluationMetric
+            o.problemType shouldEqual i.problemType
+            o.bestModelUID shouldEqual i.bestModelUID
+            o.bestModelName shouldEqual i.bestModelName
+            o.bestModelType shouldEqual i.bestModelType
+            o.validationResults.zip(i.validationResults).foreach {
+              case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
+                ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
+            }
+            o.trainEvaluation shouldEqual i.trainEvaluation
+            o.holdoutEvaluation shouldEqual o.holdoutEvaluation
+        }
+        insights.trainingParams.toJson() shouldEqual deser.trainingParams.toJson()
+        insights.stageInfo.keys shouldEqual deser.stageInfo.keys
+
+        // check that raw feature filter config is correctly serialized and deserialized
+
+        def getRawFeatureFilterConfig(modelInsights: ModelInsights): Map[String, String] = {
+          modelInsights.stageInfo(RawFeatureFilter.stageName) match {
+            case configInfo: Map[String, Map[String, String]]@unchecked =>
+              configInfo.getOrElse("params", Map.empty[String, String])
+            case _ => Map.empty[String, String]
+          }
+        }
+
+        (getRawFeatureFilterConfig(insights), getRawFeatureFilterConfig(deser)) match {
+          case (paramsMapI, paramsMapD) =>
+            paramsMapI.keys shouldEqual paramsMapD.keys
+            paramsMapI("minFill") shouldEqual paramsMapD("minFill")
+            paramsMapI("maxFillDifference") shouldEqual paramsMapD("maxFillDifference")
+            paramsMapI("maxFillRatioDiff") shouldEqual paramsMapD("maxFillRatioDiff")
+            paramsMapI("maxJSDivergence") shouldEqual paramsMapD("maxJSDivergence")
+            paramsMapI("maxCorrelation") shouldEqual paramsMapD("maxCorrelation")
+            paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
+            paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
+            paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
+          }
+    }
+  }
+
+  it should "have feature insights for features that are removed by the raw feature filter" in {
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+
+    modelWithRFF.getBlacklist() should contain theSameElementsAs Array(age, description, genderPL, weight)
+    val heightIn = insights.features.find(_.featureName == age.name).get
+    heightIn.derivedFeatures.size shouldBe 1
+    heightIn.derivedFeatures.head.excluded shouldBe Some(true)
+
+    modelWithRFF.getBlacklistMapKeys() should contain theSameElementsAs Map(numericMap.name -> Set("Female"))
+    val mapDerivedIn = insights.features.find(_.featureName == numericMap.name).get.derivedFeatures
+    val droppedMapDerivedIn = mapDerivedIn.filter(_.derivedFeatureName == "Female")
+    mapDerivedIn.size shouldBe 3
+    droppedMapDerivedIn.size shouldBe 1
+    droppedMapDerivedIn.head.excluded shouldBe Some(true)
+    droppedMapDerivedIn.head.derivedFeatureGroup shouldBe Some("Female")
+  }
+
+  val labelName = "l"
+
+  val summary = SanityCheckerSummary(
+    correlationsWLabel = Correlations(Seq("f0_f0_f2_1", "f0_f0_f3_2"), Seq(5.2, 5.3), Seq("f1_0"),
+      CorrelationType.Pearson),
+    dropped = Seq("f1_0"),
+    featuresStatistics = SummaryStatistics(count = 3, sampleFraction = 0.01, max = Seq(0.1, 0.2, 0.3, 0.0),
+      min = Seq(1.1, 1.2, 1.3, 1.0), mean = Seq(2.1, 2.2, 2.3, 2.0), variance = Seq(3.1, 3.2, 3.3, 3.0)),
+    names = Seq("f1_0", "f0_f0_f2_1", "f0_f0_f3_2", labelName),
+    categoricalStats = Array(
+      CategoricalGroupStats(
+        group = "f0_f0_f2",
+        categoricalFeatures = Array("f0_f0_f2_1"),
+        contingencyMatrix = Map("0" -> Array(13.0, 17.0), "1" -> Array(5.0, 15.0), "2" -> Array(14.0, 36.0)),
+        cramersV = 6.2,
+        pointwiseMutualInfo = Map("0" -> Array(7.2), "1" -> Array(8.2), "2" -> Array(9.2)),
+        mutualInfo = 10.2,
+        maxRuleConfidences = Array(0.0),
+        supports = Array(1.0)
+      ), CategoricalGroupStats(
+        group = "f0_f0_f2",
+        categoricalFeatures = Array( "f0_f0_f3_2"),
+        contingencyMatrix = Map("0" -> Array(11.0, 12.0), "1" -> Array(12.0, 12.0), "2" -> Array(13.0, 12.0)),
+        cramersV = 6.3,
+        pointwiseMutualInfo = Map("0" -> Array(7.3), "1" -> Array(8.3), "2" -> Array(9.3)),
+        mutualInfo = 10.3,
+        maxRuleConfidences = Array(0.0),
+        supports = Array(1.0)
+      )
+    )
+  )
+
+  val lbl = Feature[RealNN](labelName, true, null, Seq(), "test")
+  val f1 = Feature[Real]("f1", true, null, Seq(), "test")
+  val f0 = Feature[PickList]("f0", true, null, Seq(), "test")
+
+  val meta = OpVectorMetadata(
+    "fv",
+    OpVectorColumnMetadata(
+      parentFeatureName = Seq("f1"),
+      parentFeatureType = Seq(classOf[Real].getName),
+      grouping = None,
+      indicatorValue = None
+    ) +: Array("f2", "f3").map { name =>
+      OpVectorColumnMetadata(
+        parentFeatureName = Seq("f0"),
+        parentFeatureType = Seq(classOf[PickList].getName),
+        grouping = Option("f0"),
+        indicatorValue = Option(name)
+      )
+    },
+    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
+  )
+
+  it should "correctly extract the LabelSummary from the label and sanity checker info" in {
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+    labelSum.labelName shouldBe Some(labelName)
+    labelSum.rawFeatureName shouldBe lbl.history().originFeatures
+    labelSum.rawFeatureType shouldBe Seq(classOf[RealNN].getName)
+    labelSum.stagesApplied shouldBe lbl.history().stages
+    labelSum.sampleSize shouldBe Some(3.0)
+    labelSum.distribution.get.isInstanceOf[Discrete] shouldBe true
+    labelSum.distribution.get.asInstanceOf[Discrete].domain should contain theSameElementsAs Array("0", "1", "2")
+    labelSum.distribution.get.asInstanceOf[Discrete].prob should contain theSameElementsAs Array(0.3, 0.2, 0.5)
+  }
+
+  it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
+    val featureInsights = ModelInsights.getFeatureInsights(
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
+      RawFeatureFilterResults(), labelSum
+    )
+    featureInsights.size shouldBe 2
+
+    val f1In = featureInsights.find(_.featureName == "f1").get
+    f1In.featureType shouldBe classOf[Real].getName
+    f1In.derivedFeatures.size shouldBe 1
+
+    val f1InDer = f1In.derivedFeatures.head
+    f1InDer.derivedFeatureName shouldBe "f1_0"
+    f1InDer.stagesApplied shouldBe Seq.empty
+    f1InDer.derivedFeatureGroup shouldBe None
+    f1InDer.derivedFeatureValue shouldBe None
+    f1InDer.excluded shouldBe Option(true)
+    f1InDer.corr.map(_.toString) shouldBe Some("NaN")
+    f1InDer.cramersV shouldBe None
+    f1InDer.mutualInformation shouldBe None
+    f1InDer.pointwiseMutualInformation shouldBe Map.empty
+    f1InDer.countMatrix shouldBe Map.empty
+    f1InDer.contribution shouldBe Seq.empty
+    f1InDer.min shouldBe Some(1.1)
+    f1InDer.max shouldBe Some(0.1)
+    f1InDer.mean shouldBe Some(2.1)
+    f1InDer.variance shouldBe Some(3.1)
+
+    val f0In = featureInsights.find(_.featureName == "f0").get
+    f0In.featureName shouldBe "f0"
+    f0In.featureType shouldBe classOf[PickList].getName
+    f0In.derivedFeatures.size shouldBe 2
+
+    val f0InDer2 = f0In.derivedFeatures.head
+    f0InDer2.derivedFeatureName shouldBe "f0_f0_f2_1"
+    f0InDer2.stagesApplied shouldBe Seq.empty
+    f0InDer2.derivedFeatureGroup shouldBe Some("f0")
+    f0InDer2.derivedFeatureValue shouldBe Some("f2")
+    f0InDer2.excluded shouldBe Option(false)
+    f0InDer2.corr shouldBe Some(5.2)
+    f0InDer2.cramersV shouldBe Some(6.2)
+    f0InDer2.mutualInformation shouldBe Some(10.2)
+    f0InDer2.pointwiseMutualInformation shouldBe Map("0" -> 7.2, "1" -> 8.2, "2" -> 9.2)
+    f0InDer2.countMatrix shouldBe Map("0" -> 13.0, "1" -> 5.0, "2" -> 14.0)
+    f0InDer2.contribution shouldBe Seq.empty
+    f0InDer2.min shouldBe Some(1.2)
+    f0InDer2.max shouldBe Some(0.2)
+    f0InDer2.mean shouldBe Some(2.2)
+    f0InDer2.variance shouldBe Some(3.2)
+
+    val f0InDer3 = f0In.derivedFeatures.last
+    f0InDer3.derivedFeatureName shouldBe "f0_f0_f3_2"
+    f0InDer3.stagesApplied shouldBe Seq.empty
+    f0InDer3.derivedFeatureGroup shouldBe Some("f0")
+    f0InDer3.derivedFeatureValue shouldBe Some("f3")
+    f0InDer3.excluded shouldBe Option(false)
+    f0InDer3.corr shouldBe Some(5.3)
+    f0InDer3.cramersV shouldBe Some(6.3)
+    f0InDer3.mutualInformation shouldBe Some(10.3)
+    f0InDer3.pointwiseMutualInformation shouldBe Map("0" -> 7.3, "1" -> 8.3, "2" -> 9.3)
+    f0InDer3.countMatrix shouldBe Map("0" -> 11.0, "1" -> 12.0, "2" -> 13.0)
+    f0InDer3.contribution shouldBe Seq.empty
+    f0InDer3.min shouldBe Some(1.3)
+    f0InDer3.max shouldBe Some(0.3)
+    f0InDer3.mean shouldBe Some(2.3)
+    f0InDer3.variance shouldBe Some(3.3)
+  }
+
+  it should "include raw feature distribution information when RawFeatureFilter is used" in {
+    val wfRawFeatureDistributions = modelWithRFF.getRawFeatureDistributions()
+
+    val wfDistributionsGrouped = wfRawFeatureDistributions.groupBy(_.name)
+
+    val trainingDistributions = modelWithRFF.getRawTrainingFeatureDistributions()
+    trainingDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Training)
+
+    val scoringDistributions = modelWithRFF.getRawScoringFeatureDistributions()
+    scoringDistributions.foreach(_.`type` shouldBe FeatureDistributionType.Scoring)
+
+    trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
+
+    /**
+     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blacklisted itself.
+     */
+    val insights = modelWithRFF.modelInsights(predWithMaps)
+
+    insights.features.foreach(f =>
+      f.distributions shouldBe wfDistributionsGrouped.getOrElse(f.featureName, Seq.empty)
+    )
+  }
+
+  it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
+    val insights = workflowModel.modelInsights(pred)
+    insights.features.foreach(f => f.distributions shouldBe empty)
+  }
+
+  it should "return model insights for xgboost classification" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbClassifierPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
+
+  it should "return model insights for xgboost regression" in {
+    noException should be thrownBy xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val insights = xgbWorkflowModel.modelInsights(xgbRegressorPred)
+    val ageInsights = insights.features.filter(_.featureName == age.name).head
+    val genderInsights = insights.features.filter(_.featureName == genderPL.name).head
+    insights.features.size shouldBe 5
+    insights.features.map(_.featureName).toSet shouldEqual rawNames
+    ageInsights.derivedFeatures.size shouldBe 2
+    ageInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+    genderInsights.derivedFeatures.size shouldBe 4
+    genderInsights.derivedFeatures.foreach { f =>
+      f.contribution.size shouldBe 1
+      f.corr.isEmpty shouldBe true
+      f.variance.isEmpty shouldBe true
+      f.cramersV.isEmpty shouldBe true
+    }
+  }
+
+  val tol = 0.03
+  it should "correctly return the descaled coefficient for linear regression, " +
+    "when standardization is on" in {
+
+    // Since 5000 & 1 are always returned as the coefficients of the model
+    // trained on unstandardized data and we can analytically calculate
+    // the scaled version of them by the linear regression formula, the coefficients
+    // of the model trained on standardized data should be within a small distance of the analytical formula.
+
+    // difference between the real coefficient and the analytical formula
+    val coeffs = getFeatureImp(standardizedLinpred, unstandardizedLinpred, linRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
+    absError / bigCoeffSum < tol shouldBe true
+    absError2 / smallCoeffSum < tol shouldBe true
+  }
+
+  it should "correctly return the descaled coefficient for logistic regression, " +
+    "when standardization is on" in {
+    val coeffs = getFeatureImp(standardizedLogpred, unstandardizedLogpred, logRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    // difference between the real coefficient and the analytical formula
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
+    absError / bigCoeffSum < tol shouldBe true
+    absError2 / smallCoeffSum < tol shouldBe true
+  }
+
+  val tol2 = 0.1
+  val MomentsAndCard = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
   val moments = MomentsAndCard._1
   val cardinality = MomentsAndCard._2
   val uniqueValsmallFeature = smallNorm.map(_.toDouble.get).toSet
@@ -801,16 +785,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "correctly return moments calculation for numeric features" in {
     moments.size shouldBe 2
     moments(0).count shouldBe 1000
-    math.abs(moments(0).mean) < tol2 shouldBe true
-    math.abs(moments(0).variance - 10.0) / (moments(0).variance + 10.0)  < tol2 shouldBe true
+    math.abs(moments(1).mean) < tol2 shouldBe true
+    math.abs(moments(1).variance - 10.0) / (moments(1).variance + 10.0)  < tol2 shouldBe true
     moments(1).count shouldBe 1000
-    math.abs(moments(1).mean - 10000) / (moments(1).mean + 10000) < tol2 shouldBe true
-    math.abs(moments(1).variance - bigFeatureVariance) / (moments(1).variance + bigFeatureVariance)  < tol2 shouldBe true
+    math.abs(moments(0).mean - 10000) / (moments(0).mean + 10000) < tol2 shouldBe true
+    math.abs(moments(0).variance - bigFeatureVariance) / (moments(0).variance + bigFeatureVariance)  < tol2 shouldBe true
   }
 
   it should "correctly return cardinality calculation for numeric features" in {
     cardinality.size shouldBe 2
-    cardinality(0).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValsmallFeature) shouldBe true
-    cardinality(1).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValbigFeature) shouldBe true
+    cardinality(0).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValbigFeature) shouldBe true
+    cardinality(1).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValsmallFeature) shouldBe true
   }
 }
