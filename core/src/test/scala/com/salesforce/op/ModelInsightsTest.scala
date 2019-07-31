@@ -789,12 +789,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     math.abs(moments(1).variance - 10.0) / (moments(1).variance + 10.0)  < tol2 shouldBe true
     moments(1).count shouldBe 1000
     math.abs(moments(0).mean - 10000) / (moments(0).mean + 10000) < tol2 shouldBe true
-    math.abs(moments(0).variance - bigFeatureVariance) / (moments(0).variance + bigFeatureVariance)  < tol2 shouldBe true
+    math.abs(moments(0).variance - bigFeatureVariance) / (moments(0).variance + bigFeatureVariance) < tol2 shouldBe true
   }
 
   it should "correctly return cardinality calculation for numeric features" in {
     cardinality.size shouldBe 2
-    cardinality(0).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValbigFeature) shouldBe true
-    cardinality(1).valueCounts.keySet.map(_.toDouble).subsetOf(uniqueValsmallFeature) shouldBe true
+    cardinality(0).valueCounts.keySet.map(_.toDouble)
+      .subsetOf(uniqueValbigFeature) shouldBe true
+    cardinality(1).valueCounts.keySet.map(_.toDouble)
+      .subsetOf(uniqueValsmallFeature) shouldBe true
   }
 }
