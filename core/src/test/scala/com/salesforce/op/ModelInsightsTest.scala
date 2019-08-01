@@ -31,7 +31,7 @@
 package com.salesforce.op
 
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{Feature, FeatureDistributionType}
+import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
@@ -40,19 +40,22 @@ import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
-import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
-import org.scalactic.Equality
+import com.salesforce.op.features.types.Real
+import org.apache.spark.sql.DataFrame
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality {
+class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality with OpXGBoostQuietLogging {
 
   private val density = weight / height
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
@@ -69,8 +72,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
-  val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
-  val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
+  val xgbClassifier = new OpXGBoostClassifier().setMissing(0.0f).setSilent(1).setSeed(42L)
+  val xgbRegressor = new OpXGBoostRegressor().setMissing(0.0f).setSilent(1).setSeed(42L)
   val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
   val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
   lazy val xgbWorkflow =
@@ -94,6 +97,72 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       new ParamGridBuilder().build()).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
     .setInput(label, features)
     .getOutput()
+
+  val smallFeatureVariance = 10.0
+  val mediumFeatureVariance = 1.0
+  val bigFeatureVariance = 100.0
+  val smallNorm = RandomReal.normal[Real](0.0, smallFeatureVariance).limit(1000)
+  val mediumNorm = RandomReal.normal[Real](10, mediumFeatureVariance).limit(1000)
+  val bigNorm = RandomReal.normal[Real](10000.0, bigFeatureVariance).limit(1000)
+  val noise = RandomReal.normal[Real](0.0, 100.0).limit(1000)
+  // make a simple linear combination of the features (with noise), pass through sigmoid function and binarize
+  // to make labels for logistic reg toy data
+  def binarize(x: Double): Int = {
+    val sigmoid = 1.0 / (1.0 + math.exp(-x))
+    if (sigmoid > 0.5) 1 else 0
+  }
+  val logisticRegLabel = (smallNorm, mediumNorm, noise)
+    .zipped.map(_.toDouble.get * 10 + _.toDouble.get + _.toDouble.get).map(binarize(_)).map(RealNN(_))
+  // toy label for linear reg is a sum of two scaled Normals, hence we also know its standard deviation
+  val linearRegLabel = (smallNorm, bigNorm)
+    .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
+  val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
+
+  def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
+  (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
+    val generatedData = feature1.zip(feature2).zip(label).map {
+      case ((f1, f2), label) => (f1, f2, label)
+    }
+    val (rawDF, raw1, raw2, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
+    val labelData = rawLabel.copy(isResponse = true)
+    val featureVector = raw1
+      .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(raw2))
+    val checkedFeatures = labelData.sanityCheck(featureVector, removeBadFeatures = false)
+    return (labelData, checkedFeatures, rawDF)
+  }
+
+  val linRegDF = twoFeatureDF(smallNorm, bigNorm, linearRegLabel)
+  val logRegDF = twoFeatureDF(smallNorm, mediumNorm, logisticRegLabel)
+
+  val unstandardizedLinpred = new OpLinearRegression().setStandardization(false)
+    .setInput(linRegDF._1, linRegDF._2).getOutput()
+
+  val standardizedLinpred = new OpLinearRegression().setStandardization(true)
+    .setInput(linRegDF._1, linRegDF._2).getOutput()
+
+  val unstandardizedLogpred = new OpLogisticRegression().setStandardization(false)
+    .setInput(logRegDF._1, logRegDF._2).getOutput()
+
+  val standardizedLogpred = new OpLogisticRegression().setStandardization(true)
+    .setInput(logRegDF._1, logRegDF._2).getOutput()
+
+  def getFeatureImp(standardizedModel: FeatureLike[Prediction],
+    unstandardizedModel: FeatureLike[Prediction],
+    DF: DataFrame): Array[Double] = {
+    lazy val workFlow = new OpWorkflow()
+      .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
+    lazy val model = workFlow.train()
+    val unstandardizedFtImp = model.modelInsights(unstandardizedModel)
+      .features.map(_.derivedFeatures.map(_.contribution))
+    val standardizedFtImp = model.modelInsights(standardizedModel)
+      .features.map(_.derivedFeatures.map(_.contribution))
+    val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
+    val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
+    val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
+    val orginalbigCoeff = unstandardizedFtImp.flatten.flatten.last
+    return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
+  }
+
 
   val params = new OpParams()
 
@@ -364,7 +433,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly serialize and deserialize from json when raw feature filter is used" in {
-
     val insights = modelWithRFF.modelInsights(predWithMaps)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
@@ -509,9 +577,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
     val featureInsights = ModelInsights.getFeatureInsights(
       Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      RawFeatureFilterResults()
+      RawFeatureFilterResults(), labelSum
     )
     featureInsights.size shouldBe 2
 
@@ -651,5 +721,44 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       f.variance.isEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
     }
+  }
+
+  val tol = 0.03
+  it should "correctly return the descaled coefficient for linear regression, " +
+    "when standardization is on" in {
+
+    // Since 5000 & 1 are always returned as the coefficients of the model
+    // trained on unstandardized data and we can analytically calculate
+    // the scaled version of them by the linear regression formula, the coefficients
+    // of the model trained on standardized data should be within a small distance of the analytical formula.
+
+    // difference between the real coefficient and the analytical formula
+    val coeffs = getFeatureImp(standardizedLinpred, unstandardizedLinpred, linRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
+    absError / bigCoeffSum < tol shouldBe true
+    absError2 / smallCoeffSum < tol shouldBe true
+  }
+
+  it should "correctly return the descaled coefficient for logistic regression, " +
+    "when standardization is on" in {
+    val coeffs = getFeatureImp(standardizedLogpred, unstandardizedLogpred, logRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    // difference between the real coefficient and the analytical formula
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
+    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
+    val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
+    absError / bigCoeffSum < tol shouldBe true
+    absError2 / smallCoeffSum < tol shouldBe true
   }
 }

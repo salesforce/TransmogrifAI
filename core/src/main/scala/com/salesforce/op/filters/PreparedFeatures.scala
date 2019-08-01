@@ -57,7 +57,7 @@ private[filters] case class PreparedFeatures
    * @return pair consisting of response and predictor summaries (in this order)
    */
   def summaries: (Map[FeatureKey, Summary], Map[FeatureKey, Summary]) =
-    responses.mapValues(Summary(_)) -> predictors.mapValues(Summary(_))
+    responses.map { case (k, s) => k -> Summary(s) } -> predictors.map { case (k, s) => k -> Summary(s) }
 
   /**
    * Computes vector of size responseKeys.length + predictorKeys.length. The first responses.length
