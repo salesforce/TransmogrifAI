@@ -149,8 +149,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .setInput(logRegDF._1, logRegDF._2).getOutput()
 
   def getFeatureImp(standardizedModel: FeatureLike[Prediction],
-                    unstandardizedModel: FeatureLike[Prediction],
-                    DF: DataFrame): Array[Double] = {
+    unstandardizedModel: FeatureLike[Prediction], DF: DataFrame): Array[Double] = {
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
@@ -166,7 +165,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
-                               DF: DataFrame): (Map[String, Moments], Map[String, TextStats]) = {
+    DF: DataFrame): (Map[String, Moments], Map[String, TextStats]) = {
     lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
     lazy val dummyReader = workFlow.getReader()
     lazy val workFlowRFF = workFlow.withRawFeatureFilter(Some(dummyReader), None)
@@ -673,11 +672,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     trainingDistributions ++ scoringDistributions shouldBe wfRawFeatureDistributions
 
     /**
-      * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
-      * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
-      * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
-      * it's not explicitly blacklisted itself.
-      */
+     * Currently, raw features that aren't explicitly blacklisted, but are not used because they are inputs to
+     * explicitly blacklisted features are not present as raw features in the model, nor in ModelInsights. For example,
+     * weight is explicitly blacklisted here, which means that height will not be added as a raw feature even though
+     * it's not explicitly blacklisted itself.
+     */
     val insights = modelWithRFF.modelInsights(predWithMaps)
 
     insights.features.foreach(f =>
