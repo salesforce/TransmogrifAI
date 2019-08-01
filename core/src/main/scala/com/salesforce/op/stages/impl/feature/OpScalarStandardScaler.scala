@@ -60,9 +60,17 @@ class OpScalarStandardScaler
     val internalScaler = new MLLibStandardScaler(withMean = estimator.getWithMean, withStd = estimator.getWithStd)
     val scalerModel = internalScaler.fit(vecData)
 
+    val std = scalerModel.std.toArray
+    val mean = scalerModel.mean.toArray
+    val stdMean = std.sum / std.length
+    val meanMean = mean.sum / mean.length
+    val scalingArgs = LinearScalerArgs(1 / stdMean, meanMean / stdMean)
+    val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
+    setMetadata(meta)
+
     new OpScalarStandardScalerModel(
-      std = scalerModel.std.toArray,
-      mean = scalerModel.mean.toArray,
+      std = std,
+      mean = mean,
       withStd = scalerModel.withStd,
       withMean = scalerModel.withMean,
       operationName = operationName,
