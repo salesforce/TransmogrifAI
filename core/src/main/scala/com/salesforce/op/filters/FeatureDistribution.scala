@@ -106,13 +106,8 @@ case class FeatureDistribution
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-
-    val combinedMoments = (moments, fd.moments) match {
-      case (Some(x), None) => Some(x)
-      case (Some(x), Some(y)) => Some(x + y)
-      case (None, Some(y)) => Some(y)
-      case (_, _) => None
-    }
+    implicit val opMonoidMoments = optionMonoid[Moments]
+    val combinedMoments = moments + fd.moments
     val combinedCard = (cardEstimate, fd.cardEstimate) match {
       case (Some(x), None) => Some(x)
       case (Some(x), Some(y)) => Some(testStatsSG.plus(x, y))
