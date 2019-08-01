@@ -44,6 +44,8 @@ import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
+import scala.util.{Failure, Success}
+
 
 @RunWith(classOf[JUnitRunner])
 class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[RealNN, RealNN], OpScalarStandardScaler] {
@@ -146,6 +148,35 @@ class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[Real
       "expectedNormalizedScalarFeature")
 
     assert(sumSqDist <= 0.000001, "===> the sum of squared distances between actual and expected should be zero.")
+  }
+
+  it should "descale and work in standardized workflow" in {
+    val featureNormalizer = new OpScalarStandardScaler().setInput(testF)
+    val normedOutput = featureNormalizer.getOutput()
+    val metadata = featureNormalizer.fit(inputData).getMetadata()
+    val expectedStd = 90.0 * math.sqrt(37.0)
+    val expectedMean = 370.0
+    val expectedSlope = 1 / expectedStd
+    val expectedIntercept = expectedMean / expectedStd
+    ScalerMetadata(metadata) match {
+      case Failure(err) => fail(err)
+      case Success(meta) =>
+        meta shouldBe a [ScalerMetadata]
+        meta.scalingType shouldBe ScalingType.Linear
+        meta.scalingArgs shouldBe a [LinearScalerArgs]
+        meta.scalingArgs.asInstanceOf[LinearScalerArgs].slope - expectedSlope should be < 0.001
+        meta.scalingArgs.asInstanceOf[LinearScalerArgs].intercept - expectedIntercept should be < 0.001
+    }
+
+    val descaledResponse = new DescalerTransformer[RealNN, RealNN, RealNN]()
+      .setInput(normedOutput, normedOutput).getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(descaledResponse)
+    val wfModel = workflow.setInputDataset(inputData).train()
+    val transformed = wfModel.score()
+
+    val actual = transformed.collect().map(_.getAs[Double](1))
+    val expected = Array(-730.0, -640.0, 260.0)
+    all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
   }
 
   private def validateDataframeDoubleColumn(normalizedFeatureDF: DataFrame, scaledFeatureName: String,
