@@ -34,12 +34,10 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.spark.ml.PipelineStage
-import org.json4s.{JObject, JValue}
-import org.json4s.jackson.JsonMethods.render
-import org.json4s.{Extraction, _}
+import org.json4s.{Extraction, JObject, JValue, _}
 
-import scala.reflect.{ClassTag, ManifestFactory}
 import scala.reflect.runtime.universe._
+import scala.reflect.{ClassTag, ManifestFactory}
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -47,10 +45,8 @@ import scala.util.{Failure, Success, Try}
  *
  * @tparam StageType stage type to read/write
  */
-final class DefaultOpPipelineStageReaderWriter[StageType <: OpPipelineStageBase]
-(
-  implicit val ct: ClassTag[StageType]
-) extends OpPipelineStageReaderWriter[StageType] with OpPipelineStageSerializationFuns {
+final class DefaultOpPipelineStageReaderWriter[StageType <: OpPipelineStageBase](implicit val ct: ClassTag[StageType])
+  extends OpPipelineStageReaderWriter[StageType] with OpPipelineStageSerializationFuns {
 
   /**
    * Read stage from json
@@ -179,6 +175,4 @@ final class DefaultOpPipelineStageReaderWriter[StageType <: OpPipelineStageBase]
     Extraction.decompose(args.toMap)
   }
 
-
-  private def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v))
 }

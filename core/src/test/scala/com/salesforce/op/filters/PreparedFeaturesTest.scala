@@ -32,6 +32,7 @@ package com.salesforce.op.filters
 
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature, TransientFeature}
+import com.salesforce.op.filters.Summary._
 import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
@@ -42,38 +43,13 @@ import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.filters.Summary._
+
+import scala.util.{Failure, Success, Try}
 
 @RunWith(classOf[JUnitRunner])
 class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
 
-  val responseKey1: FeatureKey = "Response1" -> None
-  val responseKey2: FeatureKey = "Response2" -> None
-  val predictorKey1: FeatureKey = "Predictor1" -> None
-  val predictorKey2A: FeatureKey = "Predictor2" -> Option("A")
-  val predictorKey2B: FeatureKey = "Predictor2" -> Option("B")
-
-  val preparedFeatures1 = PreparedFeatures(
-    responses = Map(responseKey1 -> Right(Seq(1.0)), responseKey2 -> Right(Seq(0.5))),
-    predictors = Map(
-      predictorKey1 -> Right(Seq(0.0, 0.0)),
-      predictorKey2A -> Left(Seq("i", "ii")),
-      predictorKey2B -> Left(Seq("iii"))))
-  val preparedFeatures2 = PreparedFeatures(
-    responses = Map(responseKey1 -> Right(Seq(0.0))),
-    predictors = Map(predictorKey1 -> Right(Seq(0.4, 0.5))))
-  val preparedFeatures3 = PreparedFeatures(
-    responses = Map(responseKey2 -> Right(Seq(-0.5))),
-    predictors = Map(predictorKey2A -> Left(Seq("iv"))))
-  val allPreparedFeatures = Seq(preparedFeatures1, preparedFeatures2, preparedFeatures3)
-  implicit val sgTuple2 = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
-  val (allResponseSummaries, allPredictorSummaries) = allPreparedFeatures.map(_.summaries).reduce(_ + _)
-
-  val allResponseKeys1 = Array(responseKey1, responseKey2)
-  val allResponseKeys2 = Array(responseKey1)
-  val allPredictorKeys1 = Array(predictorKey1, predictorKey2A, predictorKey2B)
-  val allPredictorKeys2 = Array(predictorKey1)
-
+  import PreparedFeaturesTestData._
 
   Spec[PreparedFeatures] should "produce correct summaries" in {
     val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
@@ -98,6 +74,15 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     allPredictorSummaries should contain theSameElementsAs
       Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4), predictorKey2A -> Summary(1.0, 2.0, 3.0, 2),
         predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
+  }
+
+  it should "produce summaries that are serializable" in {
+    Try(spark.sparkContext.makeRDD(allPreparedFeatures).map(_.summaries).reduce(_ + _)) match {
+      case Failure(error) => fail(error)
+      case Success((responses, predictors)) =>
+        responses shouldBe allResponseSummaries
+        predictors shouldBe allPredictorSummaries
+    }
   }
 
   it should "produce correct null-label leakage vector with single response" in {
@@ -217,4 +202,41 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
       vec.toArray.drop(idx).map(BigDecimal(_).setScale(2, BigDecimal.RoundingMode.HALF_UP).toDouble)
     }.toSeq should contain theSameElementsInOrderAs expectedResult
   }
+}
+
+object PreparedFeaturesTestData {
+
+  val responseKey1: FeatureKey = "Response1" -> None
+  val responseKey2: FeatureKey = "Response2" -> None
+  val predictorKey1: FeatureKey = "Predictor1" -> None
+  val predictorKey2A: FeatureKey = "Predictor2" -> Option("A")
+  val predictorKey2B: FeatureKey = "Predictor2" -> Option("B")
+
+  val preparedFeatures1 = PreparedFeatures(
+    responses = Map(responseKey1 -> Right(Seq(1.0)), responseKey2 -> Right(Seq(0.5))),
+    predictors = Map(
+      predictorKey1 -> Right(Seq(0.0, 0.0)),
+      predictorKey2A -> Left(Seq("i", "ii")),
+      predictorKey2B -> Left(Seq("iii")))
+  )
+
+  val preparedFeatures2 = PreparedFeatures(
+    responses = Map(responseKey1 -> Right(Seq(0.0))),
+    predictors = Map(predictorKey1 -> Right(Seq(0.4, 0.5)))
+  )
+
+  val preparedFeatures3 = PreparedFeatures(
+    responses = Map(responseKey2 -> Right(Seq(-0.5))),
+    predictors = Map(predictorKey2A -> Left(Seq("iv")))
+  )
+
+  val allPreparedFeatures = Seq(preparedFeatures1, preparedFeatures2, preparedFeatures3)
+  implicit val sgTuple2 = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
+  val (allResponseSummaries, allPredictorSummaries) = allPreparedFeatures.map(_.summaries).reduce(_ + _)
+
+  val allResponseKeys1 = Array(responseKey1, responseKey2)
+  val allResponseKeys2 = Array(responseKey1)
+  val allPredictorKeys1 = Array(predictorKey1, predictorKey2A, predictorKey2B)
+  val allPredictorKeys2 = Array(predictorKey1)
+
 }

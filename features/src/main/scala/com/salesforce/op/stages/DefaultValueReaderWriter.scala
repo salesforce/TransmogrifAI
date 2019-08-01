@@ -28,25 +28,47 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.json
+package com.salesforce.op.stages
 
-import org.json4s.CustomSerializer
-import org.json4s.JsonAST.{JDouble, JString, JDecimal}
+import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.json4s.JValue
+import org.json4s.JsonAST.{JObject, JString}
+
+import scala.reflect.ClassTag
+import scala.util.Try
+
 
 /**
- * Json4s serializer for marshalling special Double values: NaN, -Infinity and Infinity
+ * Default value reader/writer implementation used to (de)serialize stage arguments from/to trained models
+ * based on their class name and no args ctor.
+ *
+ * @param valueName value name
+ * @tparam T value type to read/write
  */
-// scalastyle:off
-class SpecialDoubleSerializer extends CustomSerializer[Double](ser =>
-  ({
-    case JString("NaN") => Double.NaN
-    case JString("-Infinity") => Double.NegativeInfinity
-    case JString("Infinity") => Double.PositiveInfinity
-    case JDouble(v) => v
-  }, {
-    case v: Double if v.isNaN => JString("NaN")
-    case Double.NegativeInfinity => JString("-Infinity")
-    case Double.PositiveInfinity => JString("Infinity")
-    case v: Double if ser.wantsBigDecimal => JDecimal(v)
-    case v: Double => JDouble(v)
-  }))
+final class DefaultValueReaderWriter[T <: AnyRef](valueName: String)(implicit val ct: ClassTag[T])
+  extends ValueReaderWriter[T] with OpPipelineStageReadWriteFormats with OpPipelineStageSerializationFuns {
+
+  /**
+   * Read value from json
+   *
+   * @param valueClass value class
+   * @param json       json to read argument value from
+   * @return read result
+   */
+  def read(valueClass: Class[T], json: JValue): Try[T] = Try {
+    val className = (json \ "className").extract[String]
+    ReflectionUtils.newInstance[T](className)
+  }
+
+  /**
+   * Write value to json
+   *
+   * @param value value to write
+   * @return write result
+   */
+  def write(value: T): Try[JValue] = Try {
+    val arg = serializeArgument(valueName, value)
+    JObject("className" -> JString(arg.value.toString))
+  }
+
+}

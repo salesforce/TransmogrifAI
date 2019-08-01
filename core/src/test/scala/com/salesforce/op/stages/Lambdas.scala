@@ -34,38 +34,37 @@ import com.salesforce.op.features.types.Real
 import com.salesforce.op.features.types._
 
 object Lambdas {
-  def fncUnary: Real => Real = (x: Real) => x.v.map(_ * 0.1234).toReal
 
-  def fncSequence: Seq[DateList] => Real = (x: Seq[DateList]) => {
-    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
-    Math.round(v / 1E6).toReal
+  class FncSequence extends Function1[Seq[DateList], Real] with Serializable {
+    def apply(x: Seq[DateList]): Real = {
+      val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+      Math.round(v / 1E6).toReal
+    }
   }
 
-  def fncBinarySequence: (Real, Seq[DateList]) => Real = (y: Real, x: Seq[DateList]) => {
-    val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
-    (Math.round(v / 1E6) + y.value.getOrElse(0.0)).toReal
+  class FncBinarySequence extends Function2[Real, Seq[DateList], Real] with Serializable {
+    def apply(y: Real, x: Seq[DateList]): Real = {
+      val v = x.foldLeft(0.0)((a, b) => a + b.value.sum)
+      (Math.round(v / 1E6) + y.value.getOrElse(0.0)).toReal
+    }
   }
 
-  def fncBinary: (Real, Real) => Real = (x: Real, y: Real) => (
-    for {
-      yv <- y.value
-      xv <- x.value
-    } yield xv * yv
-    ).toReal
+  class FncUnary extends Function1[Real, Real] with Serializable {
+    def apply(x: Real): Real = x.v.map(_ * 0.1234).toReal
+  }
 
-  def fncTernary: (Real, Real, Real) => Real = (x: Real, y: Real, z: Real) =>
-    (for {
-      xv <- x.value
-      yv <- y.value
-      zv <- z.value
-    } yield xv * yv + zv).toReal
+  class FncBinary extends Function2[Real, Real, Real] with Serializable {
+    def apply(x: Real, y: Real): Real = (for {yv <- y.value; xv <- x.value} yield xv * yv).toReal
+  }
 
-  def fncQuaternary: (Real, Real, Text, Real) => Real = (x: Real, y: Real, t: Text, z: Real) =>
-    (for {
-      xv <- x.value
-      yv <- y.value
-      tv <- t.value
-      zv <- z.value
-    } yield xv * yv + zv * tv.length).toReal
+  class FncTernary extends Function3[Real, Real, Real, Real] with Serializable {
+    def apply(x: Real, y: Real, z: Real): Real =
+      (for {yv <- y.value; xv <- x.value; zv <- z.value} yield xv * yv + zv).toReal
+  }
+
+  class FncQuaternary extends Function4[Real, Real, Text, Real, Real] with Serializable {
+    def apply(x: Real, y: Real, t: Text, z: Real): Real =
+      (for {yv <- y.value; xv <- x.value; tv <- t.value; zv <- z.value} yield xv * yv + zv * tv.length).toReal
+  }
 
 }

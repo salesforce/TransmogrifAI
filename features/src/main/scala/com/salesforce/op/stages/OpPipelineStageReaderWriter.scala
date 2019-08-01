@@ -36,12 +36,91 @@ import com.salesforce.op.utils.json.{EnumEntrySerializer, SpecialDoubleSerialize
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import enumeratum.{Enum, EnumEntry}
 import org.json4s.ext.JodaTimeSerializers
+import org.json4s.jackson.JsonMethods._
 import org.json4s.jackson.Serialization
-import org.json4s.{Formats, FullTypeHints, JValue}
+import org.json4s.{Extraction, Formats, FullTypeHints, JValue}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
+
+/**
+ * Value reader/writer implementation used to (de)serialize stage arguments from/to trained models
+ *
+ * @tparam T value type to read/write
+ */
+trait ValueReaderWriter[T <: AnyRef] {
+
+  /**
+   * Read value from json
+   *
+   * @param valueClass value class
+   * @param json       json to read argument value from
+   * @return read result
+   */
+  def read(valueClass: Class[T], json: JValue): Try[T]
+
+  /**
+   * Write value to json
+   *
+   * @param value value to write
+   * @return write result
+   */
+  def write(value: T): Try[JValue]
+
+}
+
+
+object ValueReaderWriter {
+
+  private val log = LoggerFactory.getLogger(ValueReaderWriter.getClass)
+
+  /**
+   * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
+   * or the default one [[DefaultValueReaderWriter]]
+   *
+   * @param valueClass value class
+   * @param valueName  value name
+   * @tparam T value type
+   * @return reader/writer implementation
+   */
+  def readerWriterFor[T <: AnyRef : ClassTag](valueClass: Class[T], valueName: String): ValueReaderWriter[T] = {
+    readerWriterForOrDefault[T, ValueReaderWriter[T]](valueClass, new DefaultValueReaderWriter[T](valueName))
+  }
+
+  /**
+   * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
+   * or the default one
+   *
+   * @param valueClass stage class
+   * @param defaultReaderWriter default reader writer instance maker
+   * @tparam T value type
+   * @return reader/writer implementation
+   */
+  private[op] def readerWriterForOrDefault[T <: AnyRef : ClassTag, RW  <: ValueReaderWriter[T]]
+  (
+    valueClass: Class[T],
+    defaultReaderWriter: => RW
+  ): RW = {
+    if (!valueClass.isAnnotationPresent(classOf[ReaderWriter])) defaultReaderWriter
+    else {
+      Try {
+        val readerWriterClass = valueClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
+        ReflectionUtils.newInstance[RW](readerWriterClass.getName)
+      } match {
+        case Success(readerWriter) =>
+          if (log.isDebugEnabled) {
+            log.debug(s"Using reader/writer of type '${readerWriter.getClass.getName}'"
+              + s"to (de)serialize value of type '${valueClass.getName}'")
+          }
+          readerWriter
+        case Failure(e) => throw new RuntimeException(
+          s"Failed to create reader/writer instance for value class ${valueClass.getName}", e)
+      }
+    }
+  }
+
+}
 
 
 /**
@@ -49,31 +128,33 @@ import scala.util.{Failure, Success, Try}
  *
  * @tparam StageType stage type to read/write
  */
-trait OpPipelineStageReaderWriter[StageType <: OpPipelineStageBase] extends OpPipelineStageReadWriteFormats {
-
-  /**
-   * Read stage from json
-   *
-   * @param stageClass stage class
-   * @param json       json to read stage from
-   * @return read result
-   */
-  def read(stageClass: Class[StageType], json: JValue): Try[StageType]
-
-  /**
-   * Write stage to json
-   *
-   * @param stage stage instance to write
-   * @return write result
-   */
-  def write(stage: StageType): Try[JValue]
-
-}
+trait OpPipelineStageReaderWriter[StageType <: OpPipelineStageBase]
+  extends ValueReaderWriter[StageType] with OpPipelineStageReadWriteFormats
 
 
 object OpPipelineStageReaderWriter extends OpPipelineStageReadWriteFormats {
 
-  private val log = LoggerFactory.getLogger(OpPipelineStageReaderWriter.getClass)
+  /**
+   * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
+   * or the default one [[DefaultOpPipelineStageReaderWriter]]
+   *
+   * @param stageClass stage class
+   * @tparam StageType stage type
+   * @return reader/writer implementation
+   */
+  def readerWriterFor[StageType <: OpPipelineStageBase : ClassTag]
+  (
+    stageClass: Class[StageType]
+  ): OpPipelineStageReaderWriter[StageType] = {
+    ValueReaderWriter.readerWriterForOrDefault[StageType, OpPipelineStageReaderWriter[StageType]](
+      stageClass, defaultReaderWriter = new DefaultOpPipelineStageReaderWriter[StageType]()
+    )
+  }
+
+  /**
+   * Serialize value to json
+   */
+  def jsonSerialize(v: Any): JValue = render(Extraction.decompose(v)(formats))(formats)
 
   /**
    * Stage json field names
@@ -90,6 +171,9 @@ object OpPipelineStageReaderWriter extends OpPipelineStageReadWriteFormats {
     case object Uid extends FieldNames("uid")
     case object Class extends FieldNames("class")
     case object ParamMap extends FieldNames("paramMap")
+    case object DefaultParamMap extends FieldNames("defaultParamMap")
+    case object Timestamp extends FieldNames("timestamp")
+    case object SparkVersion extends FieldNames("sparkVersion")
   }
 
   /**
@@ -112,38 +196,6 @@ object OpPipelineStageReaderWriter extends OpPipelineStageReadWriteFormats {
    * A container for Any Value
    */
   case class AnyValue(`type`: AnyValueTypes, value: Any, valueClass: Option[String])
-
-  /**
-   * Retrieve reader/writer implementation: either the custom one specified with [[ReaderWriter]] annotation
-   * or the default one [[DefaultOpPipelineStageReaderWriter]]
-   *
-   * @param stageClass stage class
-   * @tparam StageType stage type
-   * @return reader/writer implementation
-   */
-  def readerWriterFor[StageType <: OpPipelineStageBase : ClassTag]
-  (
-    stageClass: Class[StageType]
-  ): OpPipelineStageReaderWriter[StageType] = {
-    if (!stageClass.isAnnotationPresent(classOf[ReaderWriter])) {
-      new DefaultOpPipelineStageReaderWriter[StageType]()
-    }
-    else {
-      Try {
-        val readerWriterClass = stageClass.getAnnotation[ReaderWriter](classOf[ReaderWriter]).value()
-        ReflectionUtils.newInstance[OpPipelineStageReaderWriter[StageType]](readerWriterClass.getName)
-      } match {
-        case Success(readerWriter) =>
-          if (log.isDebugEnabled) {
-            log.debug(s"Using reader/writer of type '${readerWriter.getClass.getName}'"
-              + s"to (de)serialize stage of type '${stageClass.getName}'")
-          }
-          readerWriter
-        case Failure(e) => throw new RuntimeException(
-          s"Failed to create reader/writer instance for stage class ${stageClass.getName}", e)
-      }
-    }
-  }
 
 }
 
