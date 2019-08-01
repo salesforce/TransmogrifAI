@@ -161,9 +161,9 @@ class OpScalarStandardScalerTest extends OpEstimatorSpec[RealNN, UnaryModel[Real
     ScalerMetadata(metadata) match {
       case Failure(err) => fail(err)
       case Success(meta) =>
-        meta shouldBe a [ScalerMetadata]
+        meta shouldBe a[ScalerMetadata]
         meta.scalingType shouldBe ScalingType.Linear
-        meta.scalingArgs shouldBe a [LinearScalerArgs]
+        meta.scalingArgs shouldBe a[LinearScalerArgs]
         meta.scalingArgs.asInstanceOf[LinearScalerArgs].slope - expectedSlope should be < 0.001
         meta.scalingArgs.asInstanceOf[LinearScalerArgs].intercept - expectedIntercept should be < 0.001
     }
