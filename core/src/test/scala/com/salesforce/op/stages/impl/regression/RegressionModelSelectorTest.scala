@@ -42,6 +42,7 @@ import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -50,8 +51,9 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import scala.concurrent.duration.Duration
 
+import scala.concurrent.TimeoutException
+import scala.concurrent.duration.Duration
 import scala.util.Random
 
 
@@ -262,7 +264,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       .setInput(label, features)
 
 
-    intercept[Exception](testEstimator.fit(data))
+    intercept[SparkException](testEstimator.fit(data))
   }
 
   it should "fail when maxWait is set too low" in {
@@ -277,7 +279,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       .setInput(label, features)
 
 
-    intercept[Exception](testEstimator.fit(data))
+    intercept[TimeoutException](testEstimator.fit(data))
   }
 
   it should "fit and predict with a train validation split even if there is no split between training and test" in {

@@ -261,7 +261,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       train = training,
       test = validation,
       hasTest = true,
-      indexOfLastEstimator = Some(-1)
+      indexOfLastEstimator = Option(-1)
     )
     val selectTrain = newTrain.select(label, features)
     val selectTest = newTest.select(label, features)
@@ -317,14 +317,13 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
       }
 
         val paramsMetricsF = params.seq.map { p =>
-          val f = Future {
+          Future {
             val model = estimator.fit(train, p).asInstanceOf[M]
             val metric = evaluator.evaluate(model.transform(test, p))
             log.info(s"Got metric $metric for model $name trained with $p.")
-            Some(p -> metric)
-          }
-          f.recover({ case e: Throwable =>
-            log.warn(s"Model $name attempted in model selector with failed with following issue: \n${e.getMessage}")
+            Option(p -> metric)
+          }.recover({ case e: Throwable =>
+            log.warn(s"Model $name attempted in model selector with failed with following issue: \n", e)
             None
           })
         }
@@ -344,7 +343,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
 
     val summaryOfAttempts = summaryFuts.map { f => f.map(Option(_)).recover {
       case e: Throwable =>
-        log.warn(s"Model attempted in model selector failed with following issue: \n${e.getMessage}")
+        log.warn("Model attempted in model selector failed with following issue: \n", e)
         None
     }}
     val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryOfAttempts), maxWait).flatten.toArray

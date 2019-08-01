@@ -91,7 +91,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
   @transient private[op] var bestEstimator: Option[BestEstimator[E]] = None
   // TODO allow smart modification of these values
-  @transient private lazy val modelsUse = models.map{case (e, p) =>
+  @transient private lazy val modelsUse = models.map{ case (e, p) =>
     val est = e.setOutputFeatureName(getOutputFeatureName)
     val par = if (p.isEmpty) Array(new ParamMap) else p
     est -> par
@@ -114,7 +114,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
   protected[op] def findBestEstimator(data: DataFrame, dag: Option[StagesDAG] = None)
     (implicit spark: SparkSession): (BestEstimator[E], Option[SplitterSummary], DataFrame) = {
 
-    val PrevalidationVal(splitterSummary, dataOpt) = prepareForValidation(data, in1.name)
+    val PrevalidationVal(splitterSummary, dataOpt) = prepareForValidation(data, labelColName)
     val dataUse = dataOpt.getOrElse(data)
 
     val theBestEstimator = validator.validate(modelInfo = modelsUse, dataset = dataUse,
@@ -145,9 +145,9 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     implicit val spark = dataset.sparkSession
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
     require(!dataset.isEmpty, "Dataset cannot be empty")
-    val data = dataset.select(in1.name, in2.name)
+    val data = dataset.select(labelColName, in2.name)
     val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map{ e =>
-      val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, in1.name)
+      val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, labelColName)
       (e, summary, dataOpt.getOrElse(data))
     }.getOrElse{ findBestEstimator(data.toDF()) }
 
@@ -158,7 +158,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     log.info(s"With parameters : ${bestEst.extractParamMap()}")
 
     // set input and output params
-    outputsColNamesMap.foreach { case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
+    outputsColNamesMap.foreach{ case (pname, pvalue) => bestModel.set(bestModel.getParam(pname), pvalue) }
 
     // get eval results for metadata
     val trainingEval = evaluate(bestModel.transform(preparedData))
