@@ -48,9 +48,12 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
+import com.salesforce.op.stages.impl.feature.TextStats
+import com.twitter.algebird.Moments
 import org.apache.spark.sql.DataFrame
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.apache.spark.sql.functions._
 
 import scala.util.{Failure, Success}
 
@@ -117,7 +120,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val linearRegLabel = (smallNorm, bigNorm)
     .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
   val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
-
   def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
   (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
     val generatedData = feature1.zip(feature2).zip(label).map {
@@ -147,8 +149,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .setInput(logRegDF._1, logRegDF._2).getOutput()
 
   def getFeatureImp(standardizedModel: FeatureLike[Prediction],
-    unstandardizedModel: FeatureLike[Prediction],
-    DF: DataFrame): Array[Double] = {
+    unstandardizedModel: FeatureLike[Prediction], DF: DataFrame): Array[Double] = {
     lazy val workFlow = new OpWorkflow()
       .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
     lazy val model = workFlow.train()
@@ -163,6 +164,17 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
   }
 
+  def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
+    DF: DataFrame): (Map[String, Moments], Map[String, TextStats]) = {
+    lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
+    lazy val dummyReader = workFlow.getReader()
+    lazy val workFlowRFF = workFlow.withRawFeatureFilter(Some(dummyReader), None)
+    lazy val model = workFlowRFF.train()
+    val insights = model.modelInsights(inputModel)
+    val featureMoments = insights.features.map(f => f.featureName -> f.distributions.head.moments.get).toMap
+    val featureCardinality = insights.features.map(f => f.featureName -> f.distributions.head.cardEstimate.get).toMap
+    return (featureMoments, featureCardinality)
+  }
 
   val params = new OpParams()
 
@@ -400,16 +412,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       case Failure(e) => fail(e)
       case Success(deser) =>
         insights.label shouldEqual deser.label
-        insights.features.zip(deser.features).foreach{
+        insights.features.zip(deser.features).foreach {
           case (i, o) =>
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
-            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+            i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
             RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
             RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
             RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
         }
-        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
           case (o, i) =>
             o.validationType shouldEqual i.validationType
             o.validationParameters.keySet shouldEqual i.validationParameters.keySet
@@ -420,7 +432,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             o.bestModelUID shouldEqual i.bestModelUID
             o.bestModelName shouldEqual i.bestModelName
             o.bestModelType shouldEqual i.bestModelType
-            o.validationResults.zip(i.validationResults).foreach{
+            o.validationResults.zip(i.validationResults).foreach {
               case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
                 ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
             }
@@ -489,7 +501,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
             paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
             paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
-          }
+        }
     }
   }
 
@@ -531,7 +543,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         supports = Array(1.0)
       ), CategoricalGroupStats(
         group = "f0_f0_f2",
-        categoricalFeatures = Array( "f0_f0_f3_2"),
+        categoricalFeatures = Array("f0_f0_f3_2"),
         contingencyMatrix = Map("0" -> Array(11.0, 12.0), "1" -> Array(12.0, 12.0), "2" -> Array(13.0, 12.0)),
         cramersV = 6.3,
         pointwiseMutualInfo = Map("0" -> Array(7.3), "1" -> Array(8.3), "2" -> Array(9.3)),
@@ -760,5 +772,30 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
     absError / bigCoeffSum < tol shouldBe true
     absError2 / smallCoeffSum < tol shouldBe true
+  }
+
+  it should "correctly return moments calculation and cardinality calculation for numeric features" in {
+
+    import spark.implicits._
+    val df = linRegDF._3
+    val meanTol = 0.01
+    val varTol = 0.01
+    val (moments, cardinality) = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+
+    // Go through each feature and check that the mean, variance, and unique counts match the data
+    moments.foreach { case (featureName, value) => {
+      value.count shouldBe 1000
+      val (expectedMean, expectedVariance) =
+        df.select(avg(featureName), variance(featureName)).as[(Double, Double)].collect().head
+      math.abs((value.mean - expectedMean) / expectedMean) < meanTol shouldBe true
+      math.abs((value.variance - expectedVariance) / expectedVariance) < varTol shouldBe true
+      }
+    }
+
+    cardinality.foreach { case (featureName, value) => {
+      val actualUniques = df.select(featureName).as[Double].collect().toSet
+      value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
+      }
+    }
   }
 }
