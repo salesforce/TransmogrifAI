@@ -61,7 +61,7 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 
 
 class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)])],
-  rf: RandomForestRegressionModel, lowerLevel: Double, upperLevel: Double,
+  val rf: RandomForestRegressionModel, lowerLevel: Double, upperLevel: Double,
   T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
