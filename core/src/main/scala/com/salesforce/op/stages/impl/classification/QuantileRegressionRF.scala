@@ -60,9 +60,9 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 }
 
 
-class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)])],
-  val rf: RandomForestRegressionModel, lowerLevel: Double, upperLevel: Double,
-  T: Int, operationName: String, uid: String)
+class QuantileRegressionRFModels(val leaves: Seq[(Option[Double], Array[(Int, Long)])],
+  val rf: RandomForestRegressionModel, val lowerLevel: Double, val upperLevel: Double,
+  val T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
@@ -99,3 +99,42 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)]
 
 }
 
+
+class QuantileRegressionRFTransformer(val leaves: Seq[(Option[Double], Array[(Int, Long)])],
+  val rf: RandomForestRegressionModel, val lowerLevel: Double, val upperLevel: Double,
+  val T: Int, operationName: String, uid: String)
+  extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
+
+  private implicit val encoder: Encoder[(Double, Option[Double])] = ExpressionEncoder[(Double, Option[Double])]()
+
+
+  def transformFn: (RealNN, OPVector) => RealMap = {
+    val trees = rf.trees
+    (l: RealNN, f: OPVector) => {
+      val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
+      val weightsSeq = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {
+        case (((l1, count), l2), i) =>
+          if (l1 == l2) {
+            1.0 / count
+          } else 0.0
+      }.sum / T -> y
+      }
+
+
+      val cumF = weightsSeq.sortBy(_._2).scan(0.0 -> Option(0.0)) { case ((v, _), (w: Double, l: Option[Double])) =>
+        v + w -> l
+      }.tail
+
+      val qLower = cumF.filter {
+        _._1 >= lowerLevel
+      }.head._2
+      val qUpper = cumF.filter {
+        _._1 >= upperLevel
+      }.head._2
+
+      new RealMap(Map("lowerQuantile" -> qLower.get, "upperQuantile" -> qUpper.get))
+    }
+  }
+
+
+}
