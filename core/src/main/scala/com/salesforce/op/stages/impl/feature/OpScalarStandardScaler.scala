@@ -62,11 +62,13 @@ class OpScalarStandardScaler
 
     val std = scalerModel.std.toArray
     val mean = scalerModel.mean.toArray
-    val stdMean = std.sum / std.length
-    val meanMean = mean.sum / mean.length
-    val scalingArgs = LinearScalerArgs(1 / stdMean, meanMean / stdMean)
-    val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
-    setMetadata(meta)
+    if (std.length == 1) {
+      val stdMean = std.head
+      val meanMean = mean.head
+      val scalingArgs = LinearScalerArgs(1 / stdMean, - meanMean / stdMean)
+      val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
+      setMetadata(meta)
+    }
 
     new OpScalarStandardScalerModel(
       std = std,
