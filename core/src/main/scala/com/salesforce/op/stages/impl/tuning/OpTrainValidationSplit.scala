@@ -29,7 +29,6 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration.Duration
 
 
 private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
@@ -38,8 +37,7 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
   val seed: Long = ValidatorParamDefaults.Seed,
   val evaluator: OpEvaluatorBase[_],
   val stratify: Boolean = ValidatorParamDefaults.Stratify,
-  val parallelism: Int = ValidatorParamDefaults.Parallelism,
-  val maxWait: Duration = ValidatorParamDefaults.MaxWait
+  val parallelism: Int = ValidatorParamDefaults.Parallelism
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorNames.TrainValSplitResults

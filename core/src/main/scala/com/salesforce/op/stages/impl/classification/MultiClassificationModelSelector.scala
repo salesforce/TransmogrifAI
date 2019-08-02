@@ -33,14 +33,12 @@ package com.salesforce.op.stages.impl.classification
 import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.classification.{MultiClassClassificationModelsToTry => MTT}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector, ModelSelectorFactory}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
-
-import scala.concurrent.duration.Duration
 
 
 /**
@@ -135,7 +133,6 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
-   * @param maxWait             maximum allowable time to wait for a model to finish running (default is 1 day)
    * @return MultiClassification Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -147,12 +144,10 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = Defaults.modelTypesToUse,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty,
-    maxWait: Duration = ValidatorParamDefaults.MaxWait
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
-      numFolds = numFolds, seed = seed, evaluator = validationMetric, stratify = stratify, parallelism = parallelism,
-      maxWait = maxWait
+      numFolds = numFolds, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism
     )
     selector(cv,
       splitter = splitter,
@@ -183,7 +178,6 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
-   * @param maxWait             maximum allowable time to wait for a model to finish running (default is 1 day)
    * @return MultiClassification Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -195,8 +189,7 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
     stratify: Boolean = ValidatorParamDefaults.Stratify,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[MultiClassClassificationModelsToTry] = Defaults.modelTypesToUse,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty,
-    maxWait: Duration = ValidatorParamDefaults.MaxWait
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, stratify = stratify, parallelism = parallelism

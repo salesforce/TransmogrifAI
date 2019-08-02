@@ -33,11 +33,9 @@ package com.salesforce.op.stages.impl.selector
 import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.tuning.{OpValidator, Splitter, ValidatorParamDefaults}
+import com.salesforce.op.stages.impl.tuning.{OpValidator, Splitter}
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
-
-import scala.concurrent.duration.Duration
 
 /**
  * Creates the model selector class

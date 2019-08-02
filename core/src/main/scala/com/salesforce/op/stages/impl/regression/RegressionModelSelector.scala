@@ -34,13 +34,11 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.stages.impl.ModelsToTry
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => MTT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
-import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelector, ModelSelectorFactory}
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorFactory, ModelSelector}
 import com.salesforce.op.stages.impl.tuning._
 import enumeratum.Enum
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
-
-import scala.concurrent.duration.Duration
 
 
 /**
@@ -59,7 +57,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
      * Note: [[OpDecisionTreeRegressor]] and [[OpXGBoostRegressor]] are off by default
      */
     val modelTypesToUse: Seq[RegressionModelsToTry] = Seq(
-      MTT.OpLinearRegression, MTT.OpRandomForestRegressor, MTT.OpGBTRegressor
+      MTT.OpLinearRegression, MTT.OpRandomForestRegressor, MTT.OpGBTRegressor, MTT.OpGeneralizedLinearRegression
     )
 
     /**
@@ -109,7 +107,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
       val glrParams = new ParamGridBuilder()
         .addGrid(glr.fitIntercept, DefaultSelectorParams.FitIntercept)
         .addGrid(glr.family, DefaultSelectorParams.DistFamily)
-        .addGrid(glr.link, DefaultSelectorParams.LinkFunction)
         .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
         .addGrid(glr.regParam, DefaultSelectorParams.Regularization)
         .addGrid(glr.tol, DefaultSelectorParams.Tol)
@@ -148,7 +145,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
-   * @param maxWait             maximum allowable time to wait for a model to finish running (default is 1 day)
    * @return Regression Model Selector with a Cross Validation
    */
   def withCrossValidation(
@@ -159,11 +155,10 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty,
-    maxWait: Duration = ValidatorParamDefaults.MaxWait
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val cv = new OpCrossValidation[ModelType, EstimatorType](
-      numFolds = numFolds, seed = seed, evaluator = validationMetric, parallelism = parallelism, maxWait = maxWait
+      numFolds = numFolds, seed = seed, validationMetric, parallelism = parallelism
     )
     selector(cv,
       splitter = dataSplitter,
@@ -193,7 +188,6 @@ case object RegressionModelSelector extends ModelSelectorFactory {
    *                            for model selection Seq[(EstimatorType, Array[ParamMap])] where Estimator type must be
    *                            an Estimator that takes in a label (RealNN) and features (OPVector) and returns a
    *                            prediction (Prediction)
-   * @param maxWait             maximum allowable time to wait for a model to finish running (default is 1 day)
    * @return Regression Model Selector with a Train Validation Split
    */
   def withTrainValidationSplit(
@@ -204,8 +198,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
     modelTypesToUse: Seq[RegressionModelsToTry] = Defaults.modelTypesToUse,
-    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty,
-    maxWait: Duration = ValidatorParamDefaults.MaxWait
+    modelsAndParameters: Seq[(EstimatorType, Array[ParamMap])] = Seq.empty
   ): ModelSelector[ModelType, EstimatorType] = {
     val ts = new OpTrainValidationSplit[ModelType, EstimatorType](
       trainRatio = trainRatio, seed = seed, validationMetric, parallelism = parallelism
