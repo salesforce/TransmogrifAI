@@ -9,14 +9,14 @@ import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import org.apache.spark.sql.functions._
 import org.apache.spark.ml.linalg
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
-import org.apache.spark.ml.regression.DecisionTreeRegressionModel
+import org.apache.spark.ml.regression.{DecisionTreeRegressionModel, RandomForestRegressionModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, Row, SparkSession}
 import org.apache.spark.sql.expressions.Window
 
 class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationName: String = "quantiles",
-  val trees: Array[DecisionTreeRegressionModel])
+  val rf: RandomForestRegressionModel)
   extends BinaryEstimator[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
   val percentageLevel = new DoubleParam(
@@ -39,6 +39,7 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
 
   override def fitFn(dataset: Dataset[(Option[Double], linalg.Vector)]): BinaryModel[RealNN, OPVector, RealMap] = {
 
+    val trees = rf.trees
     val lowerLevel = (1 - getPercentageLevel) / 2.0
     val upperLevel = (1 + getPercentageLevel) / 2.0
 
@@ -53,14 +54,14 @@ class QuantileRegressionRF(uid: String = UID[QuantileRegressionRF], operationNam
     }
     val T = trees.length
 
-    new QuantileRegressionRFModels(leaves.collect, trees, lowerLevel, upperLevel, T, operationName, uid)
+    new QuantileRegressionRFModels(leaves.collect, rf, lowerLevel, upperLevel, T, operationName, uid)
 
   }
 }
 
 
 class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)])],
-  trees: Array[DecisionTreeRegressionModel], lowerLevel: Double, upperLevel: Double,
+  rf: RandomForestRegressionModel, lowerLevel: Double, upperLevel: Double,
   T: Int, operationName: String, uid: String)
   extends BinaryModel[RealNN, OPVector, RealMap](operationName = operationName, uid = uid) {
 
@@ -68,7 +69,7 @@ class QuantileRegressionRFModels(leaves: Seq[(Option[Double], Array[(Int, Long)]
 
 
   def transformFn: (RealNN, OPVector) => RealMap = {
-
+    val trees = rf.trees
     (l: RealNN, f: OPVector) => {
       val pred_leaves = trees.map(_.rootNode.toOld(1).predictImplIdx(f.value))
       val weightsSeq = leaves.map { case (y, y_leaves) => y_leaves.zip(pred_leaves).zipWithIndex.map {

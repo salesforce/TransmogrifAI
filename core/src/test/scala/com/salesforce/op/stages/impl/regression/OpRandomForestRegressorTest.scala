@@ -95,9 +95,9 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
     estimator.predictor.getMinInfoGain shouldBe 0.1
     estimator.predictor.getSeed shouldBe 42L
 
-    val trees = model.getSparkMlStage().get.trees
+    val rf = model.getSparkMlStage().get
 
-    val quantileRegressionRF = new QuantileRegressionRF(trees = trees).setInput(label, features)
+    val quantileRegressionRF = new QuantileRegressionRF(rf = rf).setInput(label, features)
       .setPercentageLevel(0.90)
 
 
@@ -135,9 +135,9 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
     val model = rf.fit(train)
 
 
-    val trees = model.getSparkMlStage().get.trees
+    val sparkRF = model.getSparkMlStage().get
 
-    val quantileRegressionRF = new QuantileRegressionRF(trees = trees).setInput(label, features)
+    val quantileRegressionRF = new QuantileRegressionRF(rf = sparkRF).setInput(label, features)
       .setPercentageLevel(0.90)
 
 
@@ -188,9 +188,9 @@ class OpRandomForestRegressorTest extends OpEstimatorSpec[Prediction,
     val model = rf.fit(train)
 
 
-    val trees = model.getSparkMlStage().get.trees
+    val sparkRf = model.getSparkMlStage().get
 
-    val quantileRegressionRF = new QuantileRegressionRF(trees = trees).setInput(label, features)
+    val quantileRegressionRF = new QuantileRegressionRF(rf = sparkRf).setInput(label, features)
       .setPercentageLevel(0.90)
 
 
