@@ -44,7 +44,8 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   val seed: Long = ValidatorParamDefaults.Seed,
   val evaluator: OpEvaluatorBase[_],
   val stratify: Boolean = ValidatorParamDefaults.Stratify,
-  val parallelism: Int = ValidatorParamDefaults.Parallelism
+  val parallelism: Int = ValidatorParamDefaults.Parallelism,
+  val maxWait: Duration = ValidatorParamDefaults.MaxWait
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorNames.CrossValResults
@@ -115,7 +116,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
       }
     }
     // Await for all the evaluations to complete
-    val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), Duration.Inf)
+    val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), maxWait)
 
     // Find the best model & return it
     val groupedSummary = modelSummaries.flatten.groupBy(_.model).map { case (_, folds) => findBestModel(folds) }.toArray
