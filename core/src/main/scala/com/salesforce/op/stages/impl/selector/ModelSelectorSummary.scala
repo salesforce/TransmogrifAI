@@ -232,7 +232,7 @@ case object ModelSelectorSummary {
    *
    * @param json encoded metrics
    */
-  private def evalMetFromJson(className: String, json: String): Try[EvaluationMetrics] = {
+  private[selector] def evalMetFromJson(className: String, json: String): Try[EvaluationMetrics] = {
     def error(c: Class[_], t: Throwable): Try[MultiMetrics] = Failure[MultiMetrics] {
       new IllegalArgumentException(s"Could not extract metrics of type " +
         s"${classOf[MultiMetrics]} from:\n$json", t)

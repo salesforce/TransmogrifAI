@@ -111,4 +111,21 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     decoded.holdoutEvaluation shouldEqual summary.holdoutEvaluation
   }
 
+  it should "not hide the root cause of JSON parsing errors" in {
+    val evalMetrics = MultiClassificationMetrics(Precision = 0.1, Recall = 0.2, F1 = 0.3, Error = 0.4,
+      ThresholdMetrics = ThresholdMetrics(topNs = Seq(1, 2), thresholds = Seq(1.1, 1.2),
+        correctCounts = Map(1 -> Seq(100L)), incorrectCounts = Map(2 -> Seq(200L)),
+        noPredictionCounts = Map(3 -> Seq(300L))))
+
+    val evalMetricsJson = evalMetrics.toJson()
+    val roundTripEvalMetrics = ModelSelectorSummary.evalMetFromJson(
+      classOf[MultiClassificationMetrics].getName, evalMetricsJson).get
+    roundTripEvalMetrics shouldBe evalMetrics
+
+    val corruptJson = evalMetricsJson.replace(":", "=")
+    val thr = intercept[IllegalArgumentException](ModelSelectorSummary.evalMetFromJson(
+      classOf[MultiClassificationMetrics].getName, corruptJson).get)
+
+    thr.getCause.getMessage shouldEqual "Unsupported format. Supported formats: json, yaml"
+  }
 }
