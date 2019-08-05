@@ -134,20 +134,11 @@ object RichVector {
   }
 
   implicit class RichSparseVector(val v: SparseVector) extends AnyVal {
-    def foreachNonZeroIndexedValue(f: (Int, Int, Double) => Unit): Unit = {
-      (0 until v.indices.length)
-        .withFilter(v.values(_) != 0.0)
-        .foreach(i => f(i, v.indices(i), v.values(i)))
-    }
-
-    def update(index: Int, indexVal: Int, value: Double): Double = {
+    def updated(index: Int, indexVal: Int, value: Double): SparseVector = {
       require(v.indices(index) == indexVal,
         s"Invalid index: indices($index)==${v.indices(index)}, expected: $indexVal")
-      val oldVal = v.values(index)
       v.values(index) = value
-      oldVal
+      v
     }
-
-    def toIndexedArray: Array[(Int, Double)] = v.indices.zip(v.values)
   }
 }
