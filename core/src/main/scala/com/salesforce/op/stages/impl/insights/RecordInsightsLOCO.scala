@@ -128,7 +128,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     .map(_.index)
     .distinct.sorted
 
-  private def computeDiffs
+  private def computeDiff
   (
     i: Int,
     oldInd: Int,
@@ -168,13 +168,12 @@ class RecordInsightsLOCO[T <: Model[T]]
     k: Int,
     indexToExamine: Int
   ): Seq[LOCOValue] = {
-    val zdif = Array.fill(baseScore.length)(0.0)
     val minMaxHeap = new MinMaxHeap(k)
     val aggregationMap = mutable.Map.empty[String, (Array[Int], Array[Double])]
 
-    agggregateDiffs(0, Left(featureSparse), indexToExamine, zdif, minMaxHeap, aggregationMap,
+    agggregateDiffs(0, Left(featureSparse), indexToExamine, minMaxHeap, aggregationMap,
       baseScore)
-    agggregateDiffs(featureSparse.size, Right(zeroValIndices), indexToExamine, zdif, minMaxHeap,
+    agggregateDiffs(featureSparse.size, Right(zeroValIndices), indexToExamine, minMaxHeap,
       aggregationMap, baseScore)
 
     // Adding LOCO results from aggregation map into heaps
@@ -192,19 +191,11 @@ class RecordInsightsLOCO[T <: Model[T]]
     offset: Int,
     featureVec: Either[SparseVector, Array[Int]],
     indexToExamine: Int,
-    zdif: Array[Double],
     minMaxHeap: MinMaxHeap,
     aggregationMap: mutable.Map[String, (Array[Int], Array[Double])],
     baseScore: Array[Double]
   ): Unit = {
-    (
-      featureVec match {
-        case Left(sparse) => (0 until sparse.size, sparse.indices).zipped
-          .map { case ( i, oldInd) => (i, oldInd, computeDiffs(i, oldInd, sparse, baseScore)) }
-        case Right(zeroeIndices) => (0 until zeroeIndices.length, zeroeIndices).zipped
-          .map { case (i, oldInd) => (i + offset, oldInd, zdif) }
-      }
-    ).foreach { case (i, oldInd, diffToExamine) =>
+    computeDiffs(featureVec, offset, baseScore).foreach { case (i, oldInd, diffToExamine) =>
       val history = histories(oldInd)
       history match {
         // If indicator value and descriptor value of a derived text feature are empty, then it is likely
@@ -224,6 +215,19 @@ class RecordInsightsLOCO[T <: Model[T]]
           }
         case _ => minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
       }
+    }
+  }
+
+  private def computeDiffs(
+    featureVec: Either[SparseVector, Array[Int]],
+    offset: Int, baseScore: Array[Double]
+   ) = {
+    val zdif = Array.fill(baseScore.length)(0.0)
+    featureVec match {
+      case Left(sparse) => (0 until sparse.size, sparse.indices).zipped
+        .map { case (i, oldInd) => (i, oldInd, computeDiff(i, oldInd, sparse, baseScore)) }
+      case Right(zeroeIndices) => (0 until zeroeIndices.length, zeroeIndices).zipped
+        .map { case (i, oldInd) => (i + offset, oldInd, zdif) }
     }
   }
 
