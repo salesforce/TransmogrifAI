@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.sparkwrappers.specific.OpPredictorWrapperModel
 import com.salesforce.op.stages.sparkwrappers.specific.SparkModelConverter._
-import com.salesforce.op.utils.spark.RichVector._
+import com.salesforce.op.utils.spark.RichVector.RichSparseVector
 import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorMetadata}
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.annotation.Experimental
@@ -130,16 +130,11 @@ class RecordInsightsLOCO[T <: Model[T]]
 
   private def computeDiff
   (
-    i: Int,
-    oldInd: Int,
     featureSparse: SparseVector,
     baseScore: Array[Double]
   ): Array[Double] = {
-    val oldVal = featureSparse.update(i, oldInd, 0.0)
     val score = modelApply(labelDummy, featureSparse.toOPVector).score
-    val diffs = baseScore.zip(score).map { case (b, s) => b - s }
-    featureSparse.update(i, oldInd, oldVal)
-    diffs
+    baseScore.zip(score).map { case (b, s) => b - s }
   }
 
   private def sumArrays(left: Array[Double], right: Array[Double]): Array[Double] = {
@@ -225,7 +220,9 @@ class RecordInsightsLOCO[T <: Model[T]]
     val zdif = Array.fill(baseScore.length)(0.0)
     featureVec match {
       case Left(sparse) => (0 until sparse.size, sparse.indices).zipped
-        .map { case (i, oldInd) => (i, oldInd, computeDiff(i, oldInd, sparse, baseScore)) }
+        .map { case (i, oldInd) =>
+          (i, oldInd, computeDiff(sparse.copy.updated(i, oldInd, 0.0), baseScore))
+        }
       case Right(zeroeIndices) => (0 until zeroeIndices.length, zeroeIndices).zipped
         .map { case (i, oldInd) => (i + offset, oldInd, zdif) }
     }
