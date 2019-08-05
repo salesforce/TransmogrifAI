@@ -3,10 +3,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
-import org.apache.spark.ml.linalg.Vectors
-import org.apache.spark.mllib.linalg.{Vector => OldVector, Vectors => OldVectors}
-import org.apache.spark.mllib.feature.StandardScaler
-import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.stddev_samp
 import org.apache.spark.sql.Dataset
 
 class StandardMinEstimator
@@ -19,9 +16,7 @@ class StandardMinEstimator
     val grouped = dataset.groupBy()
     val minVal = grouped.min().first().getDouble(0)
 
-    val vecData: RDD[OldVector] = dataset.rdd.map(v => OldVectors.fromML(Vectors.dense(v.get)))
-    val std = new StandardScaler().fit(vecData).std.toArray
-    val stdVal = std.head
+    val stdVal = dataset.agg(stddev_samp(dataset.columns.head)).first().getDouble(0)
 
     val scalingArgs = LinearScalerArgs(1 / stdVal, - minVal / stdVal)
     val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
