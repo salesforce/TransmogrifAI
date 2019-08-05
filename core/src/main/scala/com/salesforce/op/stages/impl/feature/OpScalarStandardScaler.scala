@@ -62,13 +62,13 @@ class OpScalarStandardScaler
 
     val std = scalerModel.std.toArray
     val mean = scalerModel.mean.toArray
-    if (std.length == 1) {
-      val stdMean = std.head
-      val meanMean = mean.head
-      val scalingArgs = LinearScalerArgs(1 / stdMean, - meanMean / stdMean)
-      val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
-      setMetadata(meta)
-    }
+
+    // Since is a UnaryEstimator, exactly one value will be in std and mean
+    val stdVal = std.head
+    val meanVal = mean.head
+    val scalingArgs = LinearScalerArgs(1 / stdVal, - meanVal / stdVal)
+    val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
+    setMetadata(meta)
 
     new OpScalarStandardScalerModel(
       std = std,
