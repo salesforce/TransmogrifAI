@@ -31,8 +31,10 @@
 package com.salesforce.op.filters
 
 import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
+import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
+import com.twitter.algebird.Moments
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
@@ -73,6 +75,10 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(3).distribution.sum shouldBe 0
     distribs(4).distribution.sum shouldBe 3
     distribs(4).summaryInfo.length shouldBe bins
+    distribs(2).cardEstimate.get shouldBe TextStats(Map("male" -> 1, "female" -> 1))
+    distribs(2).moments.get shouldBe Moments(2, 5.0, 2.0, 0.0, 2.0)
+    distribs(4).cardEstimate.get shouldBe TextStats(Map("5.0" -> 1, "1.0" -> 1, "3.0" -> 1))
+    distribs(4).moments.get shouldBe Moments(3, 3.0, 8.0, 0.0, 32.0)
   }
 
   it should "be correctly created for text features" in {
@@ -93,6 +99,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     distribs(0).distribution.length shouldBe 100
     distribs(0).distribution.sum shouldBe 10000
     distribs.foreach(d => d.featureKey shouldBe d.name -> d.key)
+    distribs(0).moments.get.count shouldBe 10000
   }
 
   it should "be correctly created for map features" in {
@@ -189,12 +196,14 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "have toString" in {
     FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty).toString() shouldBe
       "FeatureDistribution(type = Training, name = A, key = None, count = 10, nulls = 1, " +
-        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [])"
+        "distribution = [1.0,4.0,0.0,0.0,6.0], summaryInfo = [], cardinality = , moments = )"
   }
 
   it should "marshall to/from json" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
-    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
+    val fd2 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
+      Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
+      FeatureDistributionType.Scoring)
     val json = FeatureDistribution.toJson(Array(fd1, fd2))
     FeatureDistribution.fromJson(json) match {
       case Success(r) => r shouldBe Seq(fd1, fd2)
@@ -203,7 +212,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   }
 
   it should "marshall to/from json with default vector args" in {
-    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty, FeatureDistributionType.Scoring)
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
+      Array.empty, None, None, FeatureDistributionType.Scoring)
     val fd2 = FeatureDistribution("A", Some("X"), 20, 20, Array(2, 8, 0, 0, 12), Array.empty)
     val json =
       """[{"name":"A","count":10,"nulls":1,"distribution":[1.0,4.0,0.0,0.0,6.0],"type":"Scoring"},
