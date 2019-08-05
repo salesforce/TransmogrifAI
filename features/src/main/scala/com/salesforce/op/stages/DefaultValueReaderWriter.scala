@@ -28,40 +28,47 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.local
+package com.salesforce.op.stages
 
-import com.salesforce.op.{OpParams, OpWorkflow}
-import org.apache.spark.sql.SparkSession
+import com.salesforce.op.utils.reflection.ReflectionUtils
+import org.json4s.JValue
+import org.json4s.JsonAST.{JObject, JString}
+
+import scala.reflect.ClassTag
+import scala.util.Try
 
 
 /**
- * A class for running TransmogrifAI Workflow without Spark.
+ * Default value reader/writer implementation used to (de)serialize stage arguments from/to trained models
+ * based on their class name and no args ctor.
  *
- * @param workflow the workflow that you want to run (Note: the workflow should have the resultFeatures set)
+ * @param valueName value name
+ * @tparam T value type to read/write
  */
-class OpWorkflowRunnerLocal(val workflow: OpWorkflow) extends Serializable {
+final class DefaultValueReaderWriter[T <: AnyRef](valueName: String)(implicit val ct: ClassTag[T])
+  extends ValueReaderWriter[T] with OpPipelineStageReadWriteFormats with OpPipelineStageSerializationFuns {
 
   /**
-   * Load the model & prepare a score function for local scoring
+   * Read value from json
    *
-   * Note: since we use Spark native [[org.apache.spark.ml.util.MLWriter]] interface
-   * to load stages the Spark session is being created internally. So if you would not like
-   * to have an open SparkSession please make sure to stop it after creating the score function:
-   *
-   *   val scoreFunction = new OpWorkflowRunnerLocal(workflow).score(params)
-   *   // stop the session after creating the scoreFunction if needed
-   *   SparkSession.builder().getOrCreate().stop()
-   *
-   * @param params params to use during scoring
-   * @param spark  Spark Session needed for preparing scoring function.
-   *               Once scoring function is returned the Spark Session can be shutdown
-   *               since it's not required during local scoring.
-   * @return score function for local scoring
+   * @param valueClass value class
+   * @param json       json to read argument value from
+   * @return read result
    */
-  def scoreFunction(params: OpParams)(implicit spark: SparkSession): ScoreFunction = {
-    require(params.modelLocation.isDefined, "Model location must be set in params")
-    val model = workflow.loadModel(params.modelLocation.get)
-    model.scoreFunction
+  def read(valueClass: Class[T], json: JValue): Try[T] = Try {
+    val className = (json \ "className").extract[String]
+    ReflectionUtils.newInstance[T](className)
+  }
+
+  /**
+   * Write value to json
+   *
+   * @param value value to write
+   * @return write result
+   */
+  def write(value: T): Try[JValue] = Try {
+    val arg = serializeArgument(valueName, value)
+    JObject("className" -> JString(arg.value.toString))
   }
 
 }

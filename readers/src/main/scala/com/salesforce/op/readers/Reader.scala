@@ -51,7 +51,7 @@ private[readers] trait ReaderType[T] extends Serializable {
    *
    * @return full input type name
    */
-  final def fullTypeName: String = wtt.tpe.typeSymbol.fullName
+  final def fullTypeName: String = wtt.tpe.toString
 
   /**
    * Short reader input type name

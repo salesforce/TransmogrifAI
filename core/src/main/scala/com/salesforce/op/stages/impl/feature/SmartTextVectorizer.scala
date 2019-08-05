@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
@@ -82,7 +83,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val maxCard = $(maxCardinality)
     val shouldCleanText = $(cleanText)
 
-    implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCard)
+    implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
@@ -170,12 +171,14 @@ object SmartTextVectorizer {
 private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
 
 private[op] object TextStats {
-  def semiGroup(maxCardinality: Int): Semigroup[TextStats] = new Semigroup[TextStats] {
+  def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
     override def plus(l: TextStats, r: TextStats): TextStats = {
       if (l.valueCounts.size > maxCardinality) l
       else if (r.valueCounts.size > maxCardinality) r
       else TextStats(l.valueCounts + r.valueCounts)
     }
+
+    override def zero: TextStats = TextStats.empty
   }
 
   def empty: TextStats = TextStats(Map.empty)

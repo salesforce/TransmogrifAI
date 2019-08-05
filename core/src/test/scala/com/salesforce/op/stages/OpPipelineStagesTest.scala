@@ -134,7 +134,7 @@ class OpPipelineStagesTest
 
   val testOp = new com.salesforce.op.stages.base.unary.UnaryLambdaTransformer[Real, Real](
     operationName = "test",
-    transformFn = OpPipelineStagesTest.fnc0,
+    transformFn = new OpPipelineStagesTest.RealIdentity,
     uid = "myID"
   )
 
@@ -162,11 +162,10 @@ class OpPipelineStagesTest
 }
 
 object OpPipelineStagesTest {
-  private class Fnc0 extends Function1[Real, Real] with Serializable {
-    def apply(x: Real): Real = x
-  }
 
-  def fnc0: Real => Real = new Fnc0
+  class RealIdentity extends Function1[Real, Real] with Serializable {
+    def apply(v: Real): Real = v
+  }
 
   class TestStage(implicit val tto: TypeTag[RealNN], val ttov: TypeTag[RealNN#Value])
     extends Pipeline with OpPipelineStage1[RealNN, RealNN] {

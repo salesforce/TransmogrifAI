@@ -423,7 +423,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           log.info("Estimate best Model with CV/TS. Stages included in CV are: {}, {}",
             during.flatMap(_.map(_._1.stageName)).mkString(", "), modelSelector.uid: Any
           )
-          modelSelector.findBestEstimator(trainFixed, during, persistEveryKStages)
+          modelSelector.findBestEstimator(trainFixed, Option(during))
           val remainingDAG: StagesDAG = (during :+ (Array(modelSelector -> distance): Layer)) ++ after
 
           log.info("Applying DAG after CV/TS. Stages: {}", remainingDAG.flatMap(_.map(_._1.stageName)).mkString(", "))

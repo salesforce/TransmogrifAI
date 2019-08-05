@@ -48,7 +48,7 @@ class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransforme
    * [[OpTransformer]] instance to be tested
    */
   val transformer = new UnaryLambdaTransformer[Real, Real](
-    operationName = "unary", transformFn = UnaryTransformerTest.fn
+    operationName = "unary", transformFn = new UnaryTransformerTest.Fun
   ).setInput(f1)
 
   /**
@@ -59,9 +59,9 @@ class UnaryTransformerTest extends OpTransformerSpec[Real, UnaryLambdaTransforme
 }
 
 object UnaryTransformerTest {
-  private class Fn extends Function1[Real, Real] with Serializable {
+
+  class Fun extends Function1[Real, Real] with Serializable {
     def apply(r: Real): Real = r.v.map(_ * 2.0).toReal
   }
 
-  def fn: Real => Real = new Fn
 }

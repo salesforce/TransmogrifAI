@@ -49,7 +49,7 @@ class QuaternaryTransformerTest
   val (inputData, f1, f2, f3, f4) = TestFeatureBuilder(sample)
 
   val transformer = new QuaternaryLambdaTransformer[Real, Integral, Text, Binary, Real](
-    operationName = "quatro", transformFn = QuaternaryTransformerTest.fn
+    operationName = "quatro", transformFn = new QuaternaryTransformerTest.Fun
   ).setInput(f1, f2, f3, f4)
 
   val expectedResult = Seq(4.toReal, 6.toReal, 11.toReal)
@@ -57,11 +57,11 @@ class QuaternaryTransformerTest
 }
 
 object QuaternaryTransformerTest {
-  private class Fn extends Function4[Real, Integral, Text, Binary, Real] with Serializable {
+
+  class Fun extends Function4[Real, Integral, Text, Binary, Real] with Serializable {
     def apply(r: Real, i: Integral, t: Text, b: Binary): Real =
       (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0) +
         t.value.map(_.length.toDouble).getOrElse(0.0)).toReal
   }
 
-  def fn: (Real, Integral, Text, Binary) => Real = new Fn
 }

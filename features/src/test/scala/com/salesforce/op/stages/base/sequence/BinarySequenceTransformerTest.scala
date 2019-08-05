@@ -50,7 +50,7 @@ class BinarySequenceTransformerTest
   val (inputData, f1, f2, f3) = TestFeatureBuilder(sample)
 
   val transformer = new BinarySequenceLambdaTransformer[Real, Text, MultiPickList](
-    operationName = "realToMultiPicklist", transformFn = Lambda.fn
+    operationName = "realToMultiPicklist", transformFn = new BinarySequenceTransformerTest.Fun
   ).setInput(f1, f2, f3)
 
   val expectedResult = Seq(
@@ -61,11 +61,11 @@ class BinarySequenceTransformerTest
   ).map(_.toMultiPickList)
 }
 
-object Lambda {
-  class Fn extends Function2[Real, Seq[Text], MultiPickList] with Serializable {
+object BinarySequenceTransformerTest {
+
+  class Fun extends Function2[Real, Seq[Text], MultiPickList] with Serializable {
     def apply(r: Real, texts: Seq[Text]): MultiPickList =
       MultiPickList(texts.map(_.value.get).toSet + r.value.get.toString)
   }
 
-  def fn: (Real, Seq[Text]) => MultiPickList = new Fn
 }

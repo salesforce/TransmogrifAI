@@ -44,7 +44,7 @@ class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
   val stage =
     new UnaryLambdaTransformer[Real, Real](
       operationName = "test",
-      transformFn = Lambdas.fncUnary,
+      transformFn = new Lambdas.FncUnary,
       uid = "uid_1234"
     ).setInput(weight).setMetadata(meta)
 

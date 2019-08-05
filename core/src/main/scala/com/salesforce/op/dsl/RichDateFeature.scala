@@ -56,7 +56,7 @@ trait RichDateFeature {
       f.transformWith(
         new UnaryLambdaTransformer[Date, DateList](
           operationName = "dateToList",
-          RichDateFeatureLambdas.toDateList
+          new RichDateFeatureLambdas.ToDateList
         )
       )
     }
@@ -137,7 +137,7 @@ trait RichDateFeature {
       f.transformWith(
         new UnaryLambdaTransformer[DateTime, DateTimeList](
           operationName = "dateTimeToList",
-          RichDateFeatureLambdas.toDateTimeList
+          new RichDateFeatureLambdas.ToDateTimeList
         )
       )
     }
@@ -204,15 +204,13 @@ trait RichDateFeature {
 }
 
 object RichDateFeatureLambdas {
-  private class ToDateList extends Function1[Date, DateList] with Serializable {
-    def apply(x: Date): DateList = x.value.toSeq.toDateList
+
+  class ToDateList extends Function1[Date, DateList] with Serializable {
+    def apply(v: Date): DateList = v.value.toSeq.toDateList
   }
 
-  private class ToDateTimeList extends Function1[DateTime, DateTimeList] with Serializable {
-    def apply(x: DateTime): DateTimeList = x.value.toSeq.toDateTimeList
+  class ToDateTimeList extends Function1[Date, DateTimeList] with Serializable {
+    def apply(v: Date): DateTimeList = v.value.toSeq.toDateTimeList
   }
 
-  def toDateList: Date => DateList = new ToDateList
-
-  def toDateTimeList: DateTime => DateTimeList = new ToDateTimeList
 }
