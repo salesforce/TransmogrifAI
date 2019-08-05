@@ -33,6 +33,7 @@ package com.salesforce.op.stages
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.stages.impl.feature.{LinearScalerArgs, ScalerMetadata, ScalingType}
 import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -56,6 +57,11 @@ class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
     val grouped = dataset.groupBy()
     val maxVal = grouped.max().first().getDouble(0)
     val minVal = grouped.min().first().getDouble(0)
+
+    val scalingArgs = LinearScalerArgs(1 / (maxVal - minVal), - minVal / (maxVal - minVal))
+    val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
+    setMetadata(meta)
+
     new MinMaxNormEstimatorModel(
       min = minVal,
       max = maxVal,
