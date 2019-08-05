@@ -59,6 +59,7 @@ class ToOccurTransformer[I <: FeatureType]
 
 
 object ToOccurTransformer {
+
   class DefaultMatches[T <: FeatureType] extends Function1[T, Boolean] with Serializable {
     def apply(t: T): Boolean = t match {
       case num: OPNumeric[_] if num.nonEmpty => num.toDouble.get > 0.0
@@ -68,5 +69,4 @@ object ToOccurTransformer {
     }
   }
 
-  def defaultMatches[T <: FeatureType]: T => Boolean = new DefaultMatches[T]
 }
