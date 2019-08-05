@@ -63,7 +63,7 @@ class OpScalarStandardScaler
     val std = scalerModel.std.toArray
     val mean = scalerModel.mean.toArray
 
-    // Since is a UnaryEstimator, exactly one value will be in std and mean
+    // Since is a UnaryEstimator from RealNN to RealNN, exactly one value will be in std and mean
     val stdVal = std.head
     val meanVal = mean.head
     val scalingArgs = LinearScalerArgs(1 / stdVal, - meanVal / stdVal)
