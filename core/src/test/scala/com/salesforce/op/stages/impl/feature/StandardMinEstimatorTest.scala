@@ -36,7 +36,7 @@ import com.salesforce.op.stages.base.unary.UnaryModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import scala.util.{Failure, Success}
 
-class StandardMinEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], StandardMinEstimator]{
+class StandardMinEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], StandardMinEstimator[Real, Real]]{
 
   val inputValues: Seq[Double] = Seq(10, 100, 1000)
 
@@ -53,10 +53,10 @@ class StandardMinEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Re
 
   val (inputData, testF) = TestFeatureBuilder(inputValues.map(_.toReal))
 
-  override val estimator: StandardMinEstimator = new StandardMinEstimator().setInput(testF)
+  override val estimator: StandardMinEstimator[Real, Real] = new StandardMinEstimator[Real, Real].setInput(testF)
 
   it should "descale and work in standardized positive workflow" in {
-    val featureNormalizer = new StandardMinEstimator().setInput(testF)
+    val featureNormalizer = new StandardMinEstimator[Real, Real].setInput(testF)
     val normedOutput = featureNormalizer.getOutput()
     val metadata = featureNormalizer.fit(inputData).getMetadata()
 

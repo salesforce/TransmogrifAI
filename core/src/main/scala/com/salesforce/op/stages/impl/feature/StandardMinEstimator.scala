@@ -33,16 +33,17 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import scala.reflect.runtime.universe.TypeTag
 import org.apache.spark.sql.functions.stddev_samp
 import org.apache.spark.sql.Dataset
 
-class StandardMinEstimator
+class StandardMinEstimator[I <: Real, O <: Real]
 (
-  uid: String = UID[StandardMinEstimator]
-)
-  extends UnaryEstimator[Real, Real](operationName = "standardMin", uid = uid) {
+  uid: String = UID[StandardMinEstimator[_, _]]
+)(implicit tti: TypeTag[I], tto: TypeTag[O], ttov: TypeTag[O#Value])
+  extends UnaryEstimator[I, O](operationName = "standardMin", uid = uid) {
 
-  def fitFn(dataset: Dataset[Real#Value]): UnaryModel[Real, Real] = {
+  def fitFn(dataset: Dataset[O#Value]): UnaryModel[I, O] = {
     val grouped = dataset.groupBy()
     val minVal = grouped.min().first().getDouble(0)
 
@@ -62,12 +63,13 @@ class StandardMinEstimator
   }
 }
 
-final class StandardMinEstimatorModel private[op]
+final class StandardMinEstimatorModel[I <: Real, O <: Real]
 (
   val min: Double,
   val std: Double,
   operationName: String,
   uid: String
-) extends UnaryModel[Real, Real](operationName = operationName, uid = uid) {
-  def transformFn: Real => Real = r => r.v.map(v => (v - min) / std).toReal
+)(implicit tti: TypeTag[I], tto: TypeTag[O], ttov: TypeTag[O#Value])
+  extends UnaryModel[I, O](operationName = operationName, uid = uid) {
+  def transformFn: I => O = r => r.v.map(v => (v - min) / std).asInstanceOf[O]
 }
