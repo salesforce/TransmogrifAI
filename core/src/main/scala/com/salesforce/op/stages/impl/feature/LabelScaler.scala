@@ -36,7 +36,7 @@ sealed trait LabelScaler extends EnumEntry with Serializable
 
 object LabelScaler extends Enum[LabelScaler] {
   val values = findValues
-  case object OpScalarStandardScaler extends LabelScaler
-  case object MinMaxNormEstimator extends LabelScaler
-  case object StandardMinEstimator extends LabelScaler
+  case object OpScalarStandardLabelScaler extends LabelScaler
+  case object MinMaxNormLabelScaler extends LabelScaler
+  case object StandardMinLabelScaler extends LabelScaler
 }
