@@ -34,8 +34,12 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
+
 import scala.util.{Failure, Success}
 
+@RunWith(classOf[JUnitRunner])
 class StandardMinEstimatorTest extends OpEstimatorSpec[Real, UnaryModel[Real, Real], StandardMinEstimator[Real, Real]]{
 
   val inputValues: Seq[Double] = Seq(10, 100, 1000)

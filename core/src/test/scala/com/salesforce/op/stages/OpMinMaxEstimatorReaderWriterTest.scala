@@ -32,10 +32,9 @@ package com.salesforce.op.stages
 
 import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
-import com.salesforce.op.stages.impl.feature.{DescalerTransformer, LinearScalerArgs, ScalerMetadata, ScalingType, StandardMinEstimator}
+import com.salesforce.op.stages.impl.feature.{DescalerTransformer, LinearScalerArgs, MinMaxNormEstimator,
+  ScalerMetadata, ScalingType}
 import com.salesforce.op.test.TestFeatureBuilder
-import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -44,7 +43,7 @@ import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
 class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest {
-  private val minMax = new MinMaxNormEstimator().setInput(weight).setMetadata(meta)
+  private val minMax = new MinMaxNormEstimator[Real, Real].setInput(weight).setMetadata(meta)
 
   lazy val stage = minMax.fit(passengersDataSet)
 
@@ -56,7 +55,7 @@ class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest 
   val (inputData, testF) = TestFeatureBuilder(inputValues.map(_.toReal))
 
   it should "descale and work in min-max normalized workflow" in {
-    val featureNormalizer = new MinMaxNormEstimator().setInput(testF)
+    val featureNormalizer = new MinMaxNormEstimator[Real, Real].setInput(testF)
     val normedOutput = featureNormalizer.getOutput()
     val metadata = featureNormalizer.fit(inputData).getMetadata()
 
@@ -86,39 +85,4 @@ class OpMinMaxEstimatorReaderWriterTest extends OpPipelineStageReaderWriterTest 
     val expected : Seq[Double] = inputValues
     all(actual.zip(expected).map(x => math.abs(x._2 - x._1))) should be < 0.0001
   }
-}
-
-
-class MinMaxNormEstimator(uid: String = UID[MinMaxNormEstimator])
-  extends UnaryEstimator[Real, Real](operationName = "minMaxNorm", uid = uid) {
-
-  def fitFn(dataset: Dataset[Real#Value]): UnaryModel[Real, Real] = {
-    val grouped = dataset.groupBy()
-    val maxVal = grouped.max().first().getDouble(0)
-    val minVal = grouped.min().first().getDouble(0)
-
-    val scalingArgs = LinearScalerArgs(1 / (maxVal - minVal), - minVal / (maxVal - minVal))
-    val meta = ScalerMetadata(ScalingType.Linear, scalingArgs).toMetadata()
-    setMetadata(meta)
-
-    new MinMaxNormEstimatorModel(
-      min = minVal,
-      max = maxVal,
-      seq = Seq(minVal, maxVal),
-      map = Map("a" -> Map("b" -> 1.0, "c" -> 2.0), "d" -> Map.empty),
-      operationName = operationName,
-      uid = uid
-    )
-  }
-}
-
-final class MinMaxNormEstimatorModel private[op]
-(
-  val min: Double,
-  val max: Double,
-  val seq: Seq[Double],
-  val map: Map[String, Map[String, Double]],
-  operationName: String, uid: String
-) extends UnaryModel[Real, Real](operationName = operationName, uid = uid) {
-  def transformFn: Real => Real = r => r.v.map(v => (v - min) / (max - min)).toReal
 }
