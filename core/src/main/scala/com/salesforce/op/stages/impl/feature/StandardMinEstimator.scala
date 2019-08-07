@@ -37,6 +37,16 @@ import scala.reflect.runtime.universe.TypeTag
 import org.apache.spark.sql.functions.stddev_samp
 import org.apache.spark.sql.Dataset
 
+/**
+  * Scaling estimator that rescales a numerical feature to have min = 0 and variance = 1
+  *
+  * @param uid         uid for instance
+  * @param tti         type tag for input
+  * @param tto         type tag for output
+  * @param ttov        type tag for output value
+  * @tparam I input feature type
+  * @tparam O output feature type
+  */
 class StandardMinEstimator[I <: Real, O <: Real]
 (
   uid: String = UID[StandardMinEstimator[_, _]]
