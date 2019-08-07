@@ -383,8 +383,8 @@ class SmartTextVectorizerTest
     val r2 = TextStats(Map("hello" -> 1))
     val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
 
-    TextStats.semiGroup(2).plus(l1, r1) shouldBe expected1
-    TextStats.semiGroup(2).plus(l2, r2) shouldBe expected2
+    TextStats.monoid(2).plus(l1, r1) shouldBe expected1
+    TextStats.monoid(2).plus(l2, r2) shouldBe expected2
   }
 
 }

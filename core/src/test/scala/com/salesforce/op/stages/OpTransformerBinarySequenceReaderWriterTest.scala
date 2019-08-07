@@ -44,7 +44,7 @@ class OpTransformerBinarySequenceReaderWriterTest extends OpPipelineStageReaderW
   val stage =
     new BinarySequenceLambdaTransformer[Real, DateList, Real](
       operationName = "test",
-      transformFn = Lambdas.fncBinarySequence
+      transformFn = new Lambdas.FncBinarySequence
     ).setInput(weight, boarded).setMetadata(meta)
 
   val expected = Array(3114.toReal, 1538.toReal, 0.toReal, 1549.toReal, 1567.toReal, 1538.toReal)

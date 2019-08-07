@@ -95,7 +95,7 @@ object CSVToAvro {
       val value =
         if (index < columns.size) columns(index)
         else try {
-          field.defaultValue().asText()
+          field.defaultVal().toString
         } catch {
           case e: Exception =>
             throw new InvalidParameterException("Mismatch number of fields in csv record and avro schema")
