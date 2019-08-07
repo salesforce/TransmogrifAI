@@ -71,5 +71,11 @@ final class StandardMinEstimatorModel[I <: Real, O <: Real]
   uid: String
 )(implicit tti: TypeTag[I], tto: TypeTag[O], ttov: TypeTag[O#Value])
   extends UnaryModel[I, O](operationName = operationName, uid = uid) {
-  def transformFn: I => O = r => r.v.map(v => (v - min) / std).asInstanceOf[O]
+
+  private val ftFactory = FeatureTypeFactory[O]()
+
+  def transformFn: I => O = r => {
+    val scaled = r.v.map(v => (v - min) / std)
+    ftFactory.newInstance(scaled)
+  }
 }
