@@ -126,6 +126,9 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     val thr = intercept[IllegalArgumentException](ModelSelectorSummary.evalMetFromJson(
       classOf[MultiClassificationMetrics].getName, corruptJson).get)
 
+    thr.getMessage should startWith ("Could not extract metrics of type class " +
+      "com.salesforce.op.evaluators.MultiClassificationMetrics from: {")
+
     thr.getCause.getMessage shouldEqual "Unsupported format. Supported formats: json, yaml"
   }
 }

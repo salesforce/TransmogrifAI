@@ -234,10 +234,9 @@ case object ModelSelectorSummary {
    */
   private[selector] def evalMetFromJson(className: String, json: String): Try[EvaluationMetrics] = {
     def error(c: Class[_], t: Throwable): Try[MultiMetrics] = Failure[MultiMetrics] {
-      new IllegalArgumentException(
-        s"""Could not extract metrics of type ${classOf[MultiMetrics]}
-           |from:$json""".stripMargin, t)
+      new IllegalArgumentException(s"Could not extract metrics of type $c from: $json", t)
     }
+
     ReflectionUtils.classForName(className) match {
       case n if n == classOf[MultiMetrics] =>
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
