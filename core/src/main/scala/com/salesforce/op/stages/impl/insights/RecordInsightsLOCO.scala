@@ -157,7 +157,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
     // If the descriptor value of a derived date feature exists, then it is likely to be
     // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
-    name.map(_+ history.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse(""))
+    name.map(_ + history.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse(""))
   }
 
   private def returnTopPosNeg
@@ -233,7 +233,6 @@ class RecordInsightsLOCO[T <: Model[T]]
         featureIndexSet.contains
       }
       .toArray
-    
     // Count zeros by feature name
     val zeroCountByFeature = zeroValIndices.map { case i =>
       getRawFeatureName(histories(i)).get -> i
