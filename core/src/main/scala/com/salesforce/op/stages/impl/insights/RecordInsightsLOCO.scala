@@ -191,8 +191,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     baseScore: Array[Double]
   ): Unit = {
     computeDiffs(featureVec, offset, baseScore).foreach { case (i, oldInd, diffToExamine) =>
-      val history = histories(oldInd)
-      history match {
+      histories(oldInd) match {
         // If indicator value and descriptor value of a derived text feature are empty, then it is likely
         // to be a hashing tf output. We aggregate such features for each (rawFeatureName).
         case h if h.indicatorValue.isEmpty && h.descriptorValue.isEmpty && textFeatureIndices.contains(oldInd) =>
@@ -217,14 +216,14 @@ class RecordInsightsLOCO[T <: Model[T]]
     featureVec: Either[SparseVector, Array[Int]],
     offset: Int, baseScore: Array[Double]
    ) = {
-    val zdif = Array.fill(baseScore.length)(0.0)
+    val zeroDiff = Array.fill(baseScore.length)(0.0)
     featureVec match {
       case Left(sparse) => (0 until sparse.size, sparse.indices).zipped
         .map { case (i, oldInd) =>
           (i, oldInd, computeDiff(sparse.copy.updated(i, oldInd, 0.0), baseScore))
         }
-      case Right(zeroeIndices) => (0 until zeroeIndices.length, zeroeIndices).zipped
-        .map { case (i, oldInd) => (i + offset, oldInd, zdif) }
+      case Right(zeroIndices) => (0 until zeroIndices.length, zeroIndices).zipped
+        .map { case (i, oldInd) => (i + offset, oldInd, zeroDiff) }
     }
   }
 
