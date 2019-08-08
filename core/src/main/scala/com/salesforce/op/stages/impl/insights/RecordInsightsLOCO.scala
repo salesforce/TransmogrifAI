@@ -135,7 +135,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     baseScore: Array[Double]
   ): Array[Double] = {
     val score = modelApply(labelDummy, featureSparse.toOPVector).score
-    baseScore.zip(score).map { case (b, s) => b - s }
+    (baseScore, score).zipped.map { case (b, s) => b - s }
   }
 
   private def sumArrays(left: Array[Double], right: Array[Double]): Array[Double] = {
