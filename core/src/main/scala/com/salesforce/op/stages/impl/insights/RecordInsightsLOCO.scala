@@ -114,7 +114,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
   // Indices of features derived from Text(Map)Vectorizer
-  private lazy val textFeatureIndices = getIndicesOfFeatureType(textTypes ++ textMapTypes,
+  private lazy val textFeatureIndices: Seq[Int] = getIndicesOfFeatureType(textTypes ++ textMapTypes,
     h => h.indicatorValue.isEmpty && h.descriptorValue.isEmpty)
 
   // Indices of features derived from Date(Map)Vectorizer
@@ -125,9 +125,9 @@ class RecordInsightsLOCO[T <: Model[T]]
    * @return Seq[Int]
    */
   private def getIndicesOfFeatureType(types: Set[String], predicate: OpVectorColumnHistory => Boolean): Seq[Int] =
-    histories.filter(h => h.parentFeatureType.exists(types.contains) && predicate(h))
-      .map(_.index)
-      .distinct.sorted
+    histories.collect {
+      case h if h.parentFeatureType.exists(types.contains) && predicate(h) => h.index
+    }.distinct.sorted
 
   private def computeDiff
   (
@@ -151,13 +151,15 @@ class RecordInsightsLOCO[T <: Model[T]]
     descriptorValue.split("_").lastOption.flatMap(TimePeriod.withNameInsensitiveOption)
 
   private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = {
-    val name = history.grouping match {
-      case Some(grouping) => history.parentFeatureOrigins.headOption.map(_ + "_" + grouping)
-      case None => history.parentFeatureOrigins.headOption
-    }
+    val groupSuffix = history.grouping.map("_" + _).getOrElse("")
+    val name = history.parentFeatureOrigins.headOption.map(_ + groupSuffix)
+
     // If the descriptor value of a derived date feature exists, then it is likely to be
     // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
-    name.map(_ + history.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse(""))
+    name.map(_ +
+      history.descriptorValue
+        .flatMap(convertToTimePeriod)
+        .map(p => "_" + p.entryName).getOrElse(""))
   }
 
   private def returnTopPosNeg
@@ -229,14 +231,13 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // Besides non 0 values, we want to check the text/date features as well
     val zeroValIndices = (textFeatureIndices ++ dateFeatureIndices)
-      .filterNot {
-        featureIndexSet.contains
-      }
+      .filterNot(featureIndexSet.contains)
       .toArray
+
     // Count zeros by feature name
-    val zeroCountByFeature = zeroValIndices.map { case i =>
-      getRawFeatureName(histories(i)).get -> i
-    }.groupBy(_._1).mapValues(_.length)
+    val zeroCountByFeature = zeroValIndices
+      .groupBy(i => getRawFeatureName(histories(i)).get)
+      .mapValues(_.length).view.toMap
 
     val k = $(topK)
     // Index where to examine the difference in the prediction vector
