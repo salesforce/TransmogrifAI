@@ -114,19 +114,20 @@ class RecordInsightsLOCO[T <: Model[T]]
     Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
   // Indices of features derived from Text(Map)Vectorizer
-  private lazy val textFeatureIndices = getIndicesOfFeatureType(textTypes ++ textMapTypes)
+  private lazy val textFeatureIndices = getIndicesOfFeatureType(textTypes ++ textMapTypes,
+    h => h.indicatorValue.isEmpty && h.descriptorValue.isEmpty)
 
   // Indices of features derived from Date(Map)Vectorizer
-  private lazy val dateFeatureIndices = getIndicesOfFeatureType(dateTypes ++ dateMapTypes)
+  private lazy val dateFeatureIndices = getIndicesOfFeatureType(dateTypes ++ dateMapTypes, _.descriptorValue.isDefined)
 
   /**
    * Return the indices of features derived from given types.
    * @return Seq[Int]
    */
-  private def getIndicesOfFeatureType (types: Set[String]): Seq[Int] = histories
-    .filter(_.parentFeatureType.exists(types.contains))
-    .map(_.index)
-    .distinct.sorted
+  private def getIndicesOfFeatureType(types: Set[String], predicate: OpVectorColumnHistory => Boolean): Seq[Int] =
+    histories.filter(h => h.parentFeatureType.exists(types.contains) && predicate(h))
+      .map(_.index)
+      .distinct.sorted
 
   private def computeDiff
   (
@@ -149,15 +150,20 @@ class RecordInsightsLOCO[T <: Model[T]]
   private def convertToTimePeriod(descriptorValue: String): Option[TimePeriod] =
     descriptorValue.split("_").lastOption.flatMap(TimePeriod.withNameInsensitiveOption)
 
-  private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = history.grouping match {
-    case Some(grouping) => history.parentFeatureOrigins.headOption.map(_ + "_" + grouping)
-    case None => history.parentFeatureOrigins.headOption
+  private def getRawFeatureName(history: OpVectorColumnHistory): Option[String] = {
+    val name = history.grouping match {
+      case Some(grouping) => history.parentFeatureOrigins.headOption.map(_ + "_" + grouping)
+      case None => history.parentFeatureOrigins.headOption
+    }
+    // If the descriptor value of a derived date feature exists, then it is likely to be
+    // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
+    name.map(_+ history.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse(""))
   }
 
   private def returnTopPosNeg
   (
     featureSparse: SparseVector,
-    zeroValIndices: Array[Int],
+    zeroCountByFeature: Map[String, Int],
     featureSize: Int,
     baseScore: Array[Double],
     k: Int,
@@ -166,16 +172,15 @@ class RecordInsightsLOCO[T <: Model[T]]
     val minMaxHeap = new MinMaxHeap(k)
     val aggregationMap = mutable.Map.empty[String, (Array[Int], Array[Double])]
 
-    agggregateDiffs(0, Left(featureSparse), indexToExamine, minMaxHeap, aggregationMap,
+    agggregateDiffs(featureSparse, indexToExamine, minMaxHeap, aggregationMap,
       baseScore)
-    agggregateDiffs(featureSparse.size, Right(zeroValIndices), indexToExamine, minMaxHeap,
-      aggregationMap, baseScore)
 
     // Adding LOCO results from aggregation map into heaps
-    for {(indices, ar) <- aggregationMap.values} {
+    for {(name, (indices, ar)) <- aggregationMap} {
       // The index here is arbitrary
       val (i, n) = (indices.head, indices.length)
-      val diffToExamine = ar.map(_ / n)
+      val zeroCounts = zeroCountByFeature.get(name).getOrElse(0)
+      val diffToExamine = ar.map(_ / (n + zeroCounts))
       minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
     }
 
@@ -183,30 +188,21 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   private def agggregateDiffs(
-    offset: Int,
-    featureVec: Either[SparseVector, Array[Int]],
+    featureVec: SparseVector,
     indexToExamine: Int,
     minMaxHeap: MinMaxHeap,
     aggregationMap: mutable.Map[String, (Array[Int], Array[Double])],
     baseScore: Array[Double]
   ): Unit = {
-    computeDiffs(featureVec, offset, baseScore).foreach { case (i, oldInd, diffToExamine) =>
+    computeDiffs(featureVec, baseScore).foreach { case (i, oldInd, diffToExamine) =>
       val history = histories(oldInd)
       history match {
         // If indicator value and descriptor value of a derived text feature are empty, then it is likely
         // to be a hashing tf output. We aggregate such features for each (rawFeatureName).
-        case h if h.indicatorValue.isEmpty && h.descriptorValue.isEmpty && textFeatureIndices.contains(oldInd) =>
+        case h if (textFeatureIndices ++ dateFeatureIndices).contains(oldInd) =>
           for {name <- getRawFeatureName(h)} {
             val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
             aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
-          }
-        // If the descriptor value of a derived date feature exists, then it is likely to be
-        // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
-        case h if h.descriptorValue.isDefined && dateFeatureIndices.contains(oldInd) =>
-          for {name <- getRawFeatureName(h)} {
-            val key = name + h.descriptorValue.flatMap(convertToTimePeriod).map(p => "_" + p.entryName).getOrElse("")
-            val (indices, array) = aggregationMap.getOrElse(key, (Array.empty[Int], Array.empty[Double]))
-            aggregationMap.update(key, (indices :+ i, sumArrays(array, diffToExamine)))
           }
         case _ => minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
       }
@@ -214,17 +210,11 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   private def computeDiffs(
-    featureVec: Either[SparseVector, Array[Int]],
-    offset: Int, baseScore: Array[Double]
-   ) = {
-    val zdif = Array.fill(baseScore.length)(0.0)
-    featureVec match {
-      case Left(sparse) => (0 until sparse.size, sparse.indices).zipped
-        .map { case (i, oldInd) =>
-          (i, oldInd, computeDiff(sparse.copy.updated(i, oldInd, 0.0), baseScore))
-        }
-      case Right(zeroeIndices) => (0 until zeroeIndices.length, zeroeIndices).zipped
-        .map { case (i, oldInd) => (i + offset, oldInd, zdif) }
+    featureVec: SparseVector,
+    baseScore: Array[Double]
+  ) = {
+    (0 until featureVec.size, featureVec.indices).zipped.map { case (i, oldInd) =>
+      (i, oldInd, computeDiff(featureVec.copy.updated(i, oldInd, 0.0), baseScore))
     }
   }
 
@@ -239,8 +229,15 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // Besides non 0 values, we want to check the text/date features as well
     val zeroValIndices = (textFeatureIndices ++ dateFeatureIndices)
-      .filterNot { featureIndexSet.contains }
+      .filterNot {
+        featureIndexSet.contains
+      }
       .toArray
+    
+    // Count zeros by feature name
+    val zeroCountByFeature = zeroValIndices.map { case i =>
+      getRawFeatureName(histories(i)).get -> i
+    }.groupBy(_._1).mapValues(_.length)
 
     val k = $(topK)
     // Index where to examine the difference in the prediction vector
@@ -251,7 +248,7 @@ class RecordInsightsLOCO[T <: Model[T]]
       // For MultiClassification, the value is from the predicted class(i.e. the class having the highest probability)
       case n if n > 2 => baseResult.prediction.toInt
     }
-    val topPosNeg = returnTopPosNeg(featuresSparse, zeroValIndices, featureSize, baseScore, k, indexToExamine)
+    val topPosNeg = returnTopPosNeg(featuresSparse, zeroCountByFeature, featureSize, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
       case TopKStrategy.Abs => topPosNeg.sortBy { case LOCOValue(_, v, _) => -math.abs(v) }.take(k)
       // Take top K positive and top K negative LOCOs, hence 2 * K
