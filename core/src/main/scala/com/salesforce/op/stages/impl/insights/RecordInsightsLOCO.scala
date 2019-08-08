@@ -232,7 +232,6 @@ class RecordInsightsLOCO[T <: Model[T]]
     // Besides non 0 values, we want to check the text/date features as well
     val zeroValIndices = (textFeatureIndices ++ dateFeatureIndices)
       .filterNot(featureIndexSet.contains)
-      .toArray
 
     // Count zeros by feature name
     val zeroCountByFeature = zeroValIndices
