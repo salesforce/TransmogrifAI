@@ -113,11 +113,11 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val dateMapTypes =
     Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
-  // Indices of features derived from Text(Map)Vectorizer
+  // Indices of features derived from hashed Text(Map)Vectorizer
   private lazy val textFeatureIndices: Seq[Int] = getIndicesOfFeatureType(textTypes ++ textMapTypes,
     h => h.indicatorValue.isEmpty && h.descriptorValue.isEmpty)
 
-  // Indices of features derived from Date(Map)Vectorizer
+  // Indices of features derived from unit Date(Map)Vectorizer
   private lazy val dateFeatureIndices = getIndicesOfFeatureType(dateTypes ++ dateMapTypes, _.descriptorValue.isDefined)
 
   /**
@@ -154,12 +154,16 @@ class RecordInsightsLOCO[T <: Model[T]]
     val groupSuffix = history.grouping.map("_" + _).getOrElse("")
     val name = history.parentFeatureOrigins.headOption.map(_ + groupSuffix)
 
-    // If the descriptor value of a derived date feature exists, then it is likely to be
+    // If the descriptor value of a derived feature exists, then we check if it is
     // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
-    name.map(_ +
-      history.descriptorValue
-        .flatMap(convertToTimePeriod)
-        .map(p => "_" + p.entryName).getOrElse(""))
+    name.map { n =>
+      val timePeriodName = if ((dateTypes ++ dateMapTypes).exists(history.parentFeatureType.contains)) {
+        history.descriptorValue
+          .flatMap(convertToTimePeriod)
+          .map(p => "_" + p.entryName)
+      } else None
+      n + timePeriodName.getOrElse("")
+    }
   }
 
   private def returnTopPosNeg
@@ -177,6 +181,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     agggregateDiffs(featureSparse, indexToExamine, minMaxHeap, aggregationMap,
       baseScore)
 
+    // Aggregation map contains aggregation of Unit Circle Dates and Hashed Text Features
     // Adding LOCO results from aggregation map into heaps
     for {(name, (indices, ar)) <- aggregationMap} {
       // The index here is arbitrary
@@ -199,8 +204,8 @@ class RecordInsightsLOCO[T <: Model[T]]
     computeDiffs(featureVec, baseScore).foreach { case (i, oldInd, diffToExamine) =>
       val history = histories(oldInd)
       history match {
-        // If indicator value and descriptor value of a derived text feature are empty, then it is likely
-        // to be a hashing tf output. We aggregate such features for each (rawFeatureName).
+        // If indicator value and descriptor value of a derived text feature are empty, then it is
+        // a hashing tf output. We aggregate such features for each (rawFeatureName).
         case h if (textFeatureIndices ++ dateFeatureIndices).contains(oldInd) =>
           for {name <- getRawFeatureName(h)} {
             val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
