@@ -42,6 +42,7 @@ import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
+
 import scala.util.Try
 
 /**
@@ -92,6 +93,18 @@ case class FeatureDistribution
    * @return fraction of data that is non empty
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
+
+  def topKCardRatio(): Option[Double] = cardEstimate match {
+    case Some(x) =>
+      val counts = x.valueCounts.values.toList.sortWith(_ > _)
+      if (counts.size > 100) {
+        Some(counts.take(100).sum / count)
+      }
+      else {
+        Some(counts.sum / count)
+      }
+   case _ => None
+  }
 
   /**
    * Combine feature distributions
