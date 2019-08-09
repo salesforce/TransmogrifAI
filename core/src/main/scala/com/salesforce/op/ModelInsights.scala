@@ -393,7 +393,7 @@ case object ModelInsights {
 
   val SerializationFormats: Formats = {
     val typeHints = FullTypeHints(List(
-      classOf[Continuous], classOf[Discrete],
+      classOf[FeatureDistribution], classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
       classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
       classOf[BinaryClassificationBinMetrics], classOf[ThresholdMetrics],
