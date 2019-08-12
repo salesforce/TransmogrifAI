@@ -35,7 +35,7 @@ import com.salesforce.op.features._
 import com.salesforce.op.features.types._
 import com.salesforce.op.filters._
 import com.salesforce.op.stages._
-import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
+import com.salesforce.op.stages.impl.feature.{TextStats, TransmogrifierDefaults}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
@@ -46,6 +46,7 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import com.twitter.algebird.Moments
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoost.RichBooster
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
@@ -393,6 +394,7 @@ case object ModelInsights {
 
   val SerializationFormats: Formats = {
     val typeHints = FullTypeHints(List(
+      classOf[FeatureDistribution], classOf[Moments], classOf[TextStats],
       classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
       classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
