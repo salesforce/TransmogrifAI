@@ -156,6 +156,8 @@ class RecordInsightsLOCO[T <: Model[T]]
 
     // If the descriptor value of a derived feature exists, then we check if it is
     // from unit circle transformer. We aggregate such features for each (rawFeatureName, timePeriod).
+    // TODO : Filter by parentStage (DateToUnitCircleTransformer & DateToUnitCircleVectorizer) once the bug in the
+    //  feature history after multiple transformations has been fixed
     name.map { n =>
       val timePeriodName = if ((dateTypes ++ dateMapTypes).exists(history.parentFeatureType.contains)) {
         history.descriptorValue
