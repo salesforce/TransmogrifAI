@@ -133,4 +133,12 @@ object RichVector {
     Vectors.sparse(size, indices.toArray, values.toArray).compressed
   }
 
+  implicit class RichSparseVector(val v: SparseVector) extends AnyVal {
+    def updated(index: Int, indexVal: Int, value: Double): SparseVector = {
+      require(v.indices(index) == indexVal,
+        s"Invalid index: indices($index)==${v.indices(index)}, expected: $indexVal")
+      v.values(index) = value
+      v
+    }
+  }
 }
