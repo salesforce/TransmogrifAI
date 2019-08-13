@@ -147,7 +147,10 @@ case class RawFeatureFilterMetrics
   mean: Option[Double],
   variance: Option[Double],
   skewness: Option[Double],
-  kurtosis: Option[Double]
+  kurtosis: Option[Double],
+  rawcardSize: Option[Double],
+  rawavgcardCount: Option[Double],
+  rawmaxcardCounts: Option[Double]
 )
 
 /**

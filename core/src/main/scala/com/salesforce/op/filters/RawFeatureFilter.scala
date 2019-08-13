@@ -218,6 +218,9 @@ class RawFeatureFilter[T]
     val rawVariances: Seq[Option[Double]] = trainingDistribs.map(_.moments.map(_.variance))
     val rawKurtoses: Seq[Option[Double]] = trainingDistribs.map(_.moments.map(_.kurtosis))
     val rawSkewnesses: Seq[Option[Double]] = trainingDistribs.map(_.moments.map(_.skewness))
+    val rawcardSizes: Seq[Option[Double]] = trainingDistribs.map(_.cardSize())
+    val rawavgcardCounts: Seq[Option[Double]] = trainingDistribs.map(_.avgcardCount())
+    val rawmaxcardCounts: Seq[Option[Double]] =trainingDistribs.map(_.maxcardCount())
     val trainingNullLabelAbsoluteCorrs: Seq[Option[Double]] =
       if (correlationInfo.isEmpty) Seq.fill(featureSize)(None)
       else {
@@ -251,14 +254,19 @@ class RawFeatureFilter[T]
         .zip(rawVariances)
         .zip(rawSkewnesses)
         .zip(rawKurtoses)
+        .zip(rawcardSizes)
+        .zip(rawavgcardCounts)
+        .zip(rawmaxcardCounts)
         .map {
-          case ((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
+          case (((((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
           scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff),
-          topKratio), rawMean), rawVariance), rawSkewness), rawKurtosis) =>
+          topKratio), rawMean), rawVariance), rawSkewness), rawKurtosis),
+          rawcardSize), rawavgcardCount), rawmaxcardCounts)  =>
             RawFeatureFilterMetrics(
               name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
-              scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff, topKratio,
-              rawMean, rawVariance, rawSkewness, rawKurtosis)
+              scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff,
+              topKratio, rawMean, rawVariance, rawSkewness, rawKurtosis,
+              rawcardSize, rawavgcardCount, rawmaxcardCounts)
         }
     }
 

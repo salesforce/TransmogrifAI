@@ -42,7 +42,6 @@ import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
-
 import scala.util.Try
 
 /**
@@ -104,6 +103,23 @@ case class FeatureDistribution
         Some(counts.sum / count)
       }
    case _ => None
+  }
+
+  def cardSize(): Option[Double] = cardEstimate match {
+    case Some(x) => Some(x.valueCounts.size)
+    case _ => None
+  }
+
+  // average number of token per row
+  def avgcardCount(): Option[Double] = cardEstimate match {
+    case Some(x) => Some(x.valueCounts.values.sum / count)
+    case _ => None
+  }
+
+  // highest token count ?
+  def maxcardCount(): Option[Double] = cardEstimate match {
+    case Some(x) => Some(x.valueCounts.values.max)
+    case _ => None
   }
 
   /**
@@ -277,10 +293,10 @@ object FeatureDistribution {
    */
   private def momentsValues(values: ProcessedSeq): Moments = {
     val population = values match {
-      case Left(seq) => seq.map(x => x.length.toDouble)
-      case Right(seq) => seq
+      case Left(seq) => seq.map(x => x.length.toDouble).sum
+      case Right(seq) => seq.sum
     }
-    MomentsGroup.sum(population.map(x => Moments(x)))
+    Moments(population)
   }
 
   /**
