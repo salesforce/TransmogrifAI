@@ -453,6 +453,7 @@ case object ModelInsights {
     val models = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
+      case s: SelectedModelCombiner => s
     } // TODO support other model types?
     val model = models.lastOption
     log.info(
@@ -472,7 +473,7 @@ case object ModelInsights {
         // first try out to get vector metadata from sanity checker
         .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
         // fall back to model selector stage metadata
-        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelector[_, _]])))
+        .orElse(model.flatMap(m => makeMeta(m)))
         // finally try to get it from the last vector stage
         .orElse(
         stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
