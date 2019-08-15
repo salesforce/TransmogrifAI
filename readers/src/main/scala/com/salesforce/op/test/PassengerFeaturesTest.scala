@@ -34,32 +34,75 @@ import com.salesforce.op.aggregators.MaxReal
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureBuilder, OPFeature}
 import org.joda.time.Duration
+import PassengerFeaturesTest._
 
 
 trait PassengerFeaturesTest {
-
-  val age = FeatureBuilder.Real[Passenger].extract(_.getAge.toReal).aggregate(MaxReal).asPredictor
-  val gender = FeatureBuilder.MultiPickList[Passenger].extract(p => Set(p.getGender).toMultiPickList).asPredictor
-  val genderPL = FeatureBuilder.PickList[Passenger].extract(p => p.getGender.toPickList).asPredictor
-
-  val height = FeatureBuilder.RealNN[Passenger]
-    .extract(p => Option(p.getHeight).map(_.toDouble).toRealNN(0.0))
-    .window(Duration.millis(300))
-    .asPredictor
-
-  val heightNoWindow = FeatureBuilder.Real[Passenger].extract(_.getHeight.toReal).asPredictor
-  val weight = FeatureBuilder.Real[Passenger].extract(_.getWeight.toReal).asPredictor
-  val description = FeatureBuilder.Text[Passenger].extract(_.getDescription.toText).asPredictor
-  val boarded = FeatureBuilder.DateList[Passenger].extract(p => Seq(p.getBoarded.toLong).toDateList).asPredictor
-  val stringMap = FeatureBuilder.TextMap[Passenger].extract(p => p.getStringMap.toTextMap).asPredictor
-  val numericMap = FeatureBuilder.RealMap[Passenger].extract(p => p.getNumericMap.toRealMap).asPredictor
-  val booleanMap = FeatureBuilder.BinaryMap[Passenger].extract(p => p.getBooleanMap.toBinaryMap).asPredictor
-  val survived = FeatureBuilder.Binary[Passenger].extract(p => Option(p.getSurvived).map(_ == 1).toBinary).asResponse
-  val boardedTime = FeatureBuilder.Date[Passenger].extract(_.getBoarded.toLong.toDate).asPredictor
-  val boardedTimeAsDateTime = FeatureBuilder.DateTime[Passenger].extract(_.getBoarded.toLong.toDateTime).asPredictor
+  val age = FeatureBuilder.Real[Passenger].extract(new AgeExtract).aggregate(MaxReal).asPredictor
+  val gender = FeatureBuilder.MultiPickList[Passenger].extract(new GenderAsMultiPickListExtract).asPredictor
+  val genderPL = FeatureBuilder.PickList[Passenger].extract(new GenderAsPickListExtract).asPredictor
+  val height = FeatureBuilder.RealNN[Passenger].extract(new HeightToRealNNExtract)
+    .window(Duration.millis(300)).asPredictor
+  val heightNoWindow = FeatureBuilder.Real[Passenger].extract(new HeightToRealExtract).asPredictor
+  val weight = FeatureBuilder.Real[Passenger].extract(new WeightToRealExtract).asPredictor
+  val description = FeatureBuilder.Text[Passenger].extract(new DescriptionExtract).asPredictor
+  val boarded = FeatureBuilder.DateList[Passenger].extract(new BoardedToDateListExtract).asPredictor
+  val stringMap = FeatureBuilder.TextMap[Passenger].extract(new StringMapExtract).asPredictor
+  val numericMap = FeatureBuilder.RealMap[Passenger].extract(new NumericMapExtract).asPredictor
+  val booleanMap = FeatureBuilder.BinaryMap[Passenger].extract(new BooleanMapExtract).asPredictor
+  val survived = FeatureBuilder.Binary[Passenger].extract(new SurvivedExtract).asResponse
+  val boardedTime = FeatureBuilder.Date[Passenger].extract(new BoardedToDateExtract).asPredictor
+  val boardedTimeAsDateTime = FeatureBuilder.DateTime[Passenger].extract(new BoardedToDateTimeExtract).asPredictor
 
   val rawFeatures: Array[OPFeature] = Array(
     survived, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap
   )
+
+}
+
+object PassengerFeaturesTest {
+
+  class GenderAsMultiPickListExtract extends Function1[Passenger, MultiPickList] with Serializable {
+    def apply(p: Passenger): MultiPickList = Set(p.getGender).toMultiPickList
+  }
+  class GenderAsPickListExtract extends Function1[Passenger, PickList] with Serializable {
+    def apply(p: Passenger): PickList = p.getGender.toPickList
+  }
+  class HeightToRealNNExtract extends Function1[Passenger, RealNN] with Serializable {
+    def apply(p: Passenger): RealNN = Option(p.getHeight).map(_.toDouble).toRealNN(0.0)
+  }
+  class HeightToRealExtract extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getHeight.toReal
+  }
+  class WeightToRealExtract extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getWeight.toReal
+  }
+  class DescriptionExtract extends Function1[Passenger, Text] with Serializable {
+    def apply(p: Passenger): Text = p.getDescription.toText
+  }
+  class BoardedToDateListExtract extends Function1[Passenger, DateList] with Serializable {
+    def apply(p: Passenger): DateList = Seq(p.getBoarded.toLong).toDateList
+  }
+  class BoardedToDateExtract extends Function1[Passenger, Date] with Serializable {
+    def apply(p: Passenger): Date = p.getBoarded.toLong.toDate
+  }
+  class BoardedToDateTimeExtract extends Function1[Passenger, DateTime] with Serializable {
+    def apply(p: Passenger): DateTime = p.getBoarded.toLong.toDateTime
+  }
+  class SurvivedExtract extends Function1[Passenger, Binary] with Serializable {
+    def apply(p: Passenger): Binary = Option(p.getSurvived).map(_ == 1).toBinary
+  }
+  class StringMapExtract extends Function1[Passenger, TextMap] with Serializable {
+    def apply(p: Passenger): TextMap = p.getStringMap.toTextMap
+  }
+  class NumericMapExtract extends Function1[Passenger, RealMap] with Serializable {
+    def apply(p: Passenger): RealMap = p.getNumericMap.toRealMap
+  }
+  class BooleanMapExtract extends Function1[Passenger, BinaryMap] with Serializable {
+    def apply(p: Passenger): BinaryMap = p.getBooleanMap.toBinaryMap
+  }
+  class AgeExtract extends Function1[Passenger, Real] with Serializable {
+    def apply(p: Passenger): Real = p.getAge.toReal
+  }
 
 }

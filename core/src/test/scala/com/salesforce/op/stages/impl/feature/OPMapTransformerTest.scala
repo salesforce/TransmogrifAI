@@ -31,56 +31,43 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.{Email, EmailMap, Integral, IntegralMap, Real, _}
-import com.salesforce.op.stages.base.unary.{UnaryLambdaTransformer, UnaryTransformer}
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
-import com.salesforce.op.stages.impl.feature.OPMapTransformerTest.TransformerType
-import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.RichDataset._
-import org.apache.spark.sql.Dataset
+import com.salesforce.op.stages.base.unary.UnaryTransformer
+import com.salesforce.op.test.{OpTransformerSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
-/**
- * @author ksuchanek
- * @since 214
- */
+
 @RunWith(classOf[JUnitRunner])
-class OPMapTransformerTest extends OpTransformerSpec[IntegralMap, TransformerType] {
+class OPMapTransformerTest
+  extends OpTransformerSpec[IntegralMap, OPMapTransformer[Email, Integral, EmailMap, IntegralMap]] {
 
-  import OPMapTransformerTest._
+  lazy val (inputData, top) = TestFeatureBuilder("name", Seq(
+    Map("p1" -> "a@abcd.com", "p2" -> "xy@abcd.com").toEmailMap
+  ))
 
-  lazy val (inputData, top) = TestFeatureBuilder("name",
-    Seq(
-      Map("p1" -> "a@abcd.com", "p2" -> "xy@abcd.com")
-    ).map(EmailMap(_))
-  )
+  val transformer: OPMapTransformer[Email, Integral, EmailMap, IntegralMap] =
+    new LengthMapTransformer().setInput(top)
 
-  /**
-   * [[OpTransformer]] instance to be tested
-   */
-  override val transformer: TransformerType = new TransformerType(
-    transformer = new BaseTransformer(),
-    operationName = "testUnaryMapWrap").setInput(top)
-
-  /**
-   * Expected result of the transformer applied on the Input Dataset
-   */
-  override val expectedResult: Seq[IntegralMap] = Seq(
-    IntegralMap(Map("p1" -> 10L, "p2" -> 11L))
+  val expectedResult: Seq[IntegralMap] = Seq(
+    Map("p1" -> 10L, "p2" -> 11L).toIntegralMap
   )
 }
 
-object OPMapTransformerTest {
-  type TransformerType = OPMapTransformer[Email, Integral, EmailMap, IntegralMap]
-
-  class BaseTransformer extends UnaryTransformer[Email, Integral](
-    operationName = "testUnary",
-    uid = UID[BaseTransformer]
-  ) {
-    override def transformFn: (Email => Integral) = (input: Email) => input.value.map(_.length).toIntegral
-  }
-
+class LengthTransformer extends UnaryTransformer[Email, Integral](
+  operationName = "lengthUnary",
+  uid = UID[LengthTransformer]
+) {
+  override def transformFn: (Email => Integral) = (input: Email) => input.value.map(_.length).toIntegral
 }
+
+
+class LengthMapTransformer
+(
+  uid: String = UID[LengthMapTransformer],
+  operationName: String = "lengthMap"
+) extends OPMapTransformer[Email, Integral, EmailMap, IntegralMap](
+  uid = uid,
+  operationName = operationName,
+  transformer = new LengthTransformer
+)

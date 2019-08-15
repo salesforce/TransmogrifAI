@@ -175,7 +175,7 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
     }
   }
 
-  aggReaders.foreach( reader =>
+  aggReaders.foreach(reader =>
     Spec(reader.getClass) should "read and aggregate data correctly" in {
       val data = reader.readDataset().collect()
       data.foreach(_ shouldBe a[PassengerCaseClass])
@@ -183,13 +183,13 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
 
       val aggregatedData = reader.generateDataFrame(rawFeatures = Array(agePredictor, survivedResponse)).collect()
       aggregatedData.length shouldBe 6
-      aggregatedData.collect { case r if r.get(0) == "4" => r} shouldEqual Array(Row("4", 60, false))
+      aggregatedData.collect { case r if r.get(0) == "4" => r } shouldEqual Array(Row("4", 60, false))
 
       reader.fullTypeName shouldBe typeOf[PassengerCaseClass].toString
     }
   )
 
-  conditionalReaders.foreach( reader =>
+  conditionalReaders.foreach(reader =>
     Spec(reader.getClass) should "read and conditionally aggregate data correctly" in {
       val data = reader.readDataset().collect()
       data.foreach(_ shouldBe a[PassengerCaseClass])
@@ -203,4 +203,3 @@ class DataReadersTest extends FlatSpec with PassengerSparkFixtureTest with TestC
     }
   )
 }
-

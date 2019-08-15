@@ -35,6 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.{FeatureGeneratorStage, OpPipelineStage}
 import com.salesforce.op.utils.spark.RichRow._
 import com.twitter.algebird.MonoidAggregator
+import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Row}
 import org.joda.time.Duration
 
@@ -178,22 +179,22 @@ object FeatureBuilder {
   def apply[I: WeakTypeTag, O <: FeatureType : WeakTypeTag](name: String): FeatureBuilder[I, O] = new FeatureBuilder[I, O](name)
 
   /**
-   * Builds features from a [[DataFrame]]
+   * Builds features from a [[StructType]]
    *
-   * @param data        input [[DataFrame]]
+   * @param schema      input [[StructType]]
    * @param response    response feature name
    * @param nonNullable optional non nullable feature names
    * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
-   * @throws RuntimeException if fails to construct a response feature
+   * @throws RuntimeException         if fails to construct a response feature
    * @return label and other features
    */
-  def fromDataFrame[ResponseType <: FeatureType : WeakTypeTag](
-    data: DataFrame,
+  def fromSchema[ResponseType <: FeatureType : WeakTypeTag](
+    schema: StructType,
     response: String,
     nonNullable: Set[String] = Set.empty
   ): (Feature[ResponseType], Array[Feature[_ <: FeatureType]]) = {
     val allFeatures: Array[Feature[_ <: FeatureType]] =
-      data.schema.fields.zipWithIndex.map { case (field, index) =>
+      schema.fields.zipWithIndex.map { case (field, index) =>
         val isResponse = field.name == response
         val isNullable = !isResponse && !nonNullable.contains(field.name)
         val wtt: WeakTypeTag[_ <: FeatureType] = FeatureSparkTypes.featureTypeTagOf(field.dataType, isNullable)
@@ -215,18 +216,45 @@ object FeatureBuilder {
     }
     responseFeature -> features
   }
+
+  /**
+   * Builds features from a [[DataFrame]]
+   *
+   * @param data        input [[DataFrame]]
+   * @param response    response feature name
+   * @param nonNullable optional non nullable feature names
+   * @throws IllegalArgumentException if fails to map dataframe field type into a feature type
+   * @throws RuntimeException         if fails to construct a response feature
+   * @return label and other features
+   */
+  def fromDataFrame[ResponseType <: FeatureType : WeakTypeTag](data: DataFrame, response: String, nonNullable: Set[String] = Set.empty): (Feature[ResponseType], Array[Feature[_ <: FeatureType]]) = fromSchema(data.schema, response, nonNullable)
   def fromRow[O <: FeatureType : WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, None)
   def fromRow[O <: FeatureType : WeakTypeTag](name: String): FeatureBuilderWithExtract[Row, O] = fromRow[O](name, None)
   def fromRow[O <: FeatureType : WeakTypeTag](index: Int)(implicit name: sourcecode.Name): FeatureBuilderWithExtract[Row, O] = fromRow[O](name.value, Some(index))
   def fromRow[O <: FeatureType : WeakTypeTag](name: String, index: Option[Int]): FeatureBuilderWithExtract[Row, O] = {
-    val c = FeatureTypeSparkConverter[O]()
     new FeatureBuilderWithExtract[Row, O](
       name = name,
-      extractFn = (r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name))),
-      extractSource = "(r: Row) => c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))"
+      extractFn = FromRowExtractFn[O](index, name),
+      extractSource =
+        s"""${classOf[FromRowExtractFn[O]].getName}[${FeatureType.shortTypeName[O]}]($index, "$name")"""
     )
   }
+
   // scalastyle:on
+}
+
+/**
+ * Generic value extract function for [[Row]]
+ *
+ * @param index optional index of the value to extract from [[Row]]
+ * @param name  name of the value to extract from [[Row]]
+ * @param tto   feature type tag
+ * @tparam O output feature type
+ */
+case class FromRowExtractFn[O <: FeatureType](index: Option[Int], name: String)
+  (implicit val tto: WeakTypeTag[O]) extends Function1[Row, O] with Serializable {
+  private val c = FeatureTypeSparkConverter[O]()(tto)
+  def apply(r: Row): O = c.fromSpark(index.map(r.get).getOrElse(r.getAny(name)))
 }
 
 /**
@@ -243,8 +271,7 @@ final class FeatureBuilder[I, O <: FeatureType](val name: String) {
    *
    * @param fn a function to extract value of the feature from the raw data
    */
-  def extract(fn: I => O): FeatureBuilderWithExtract[I, O] =
-    macro FeatureBuilderMacros.extract[I, O]
+  def extract(fn: I => O): FeatureBuilderWithExtract[I, O] = macro FeatureBuilderMacros.extract[I, O]
 
   /**
    * Feature extract method - a function to extract value of the feature from the raw data.
@@ -313,8 +340,9 @@ final class FeatureBuilderWithExtract[I, O <: FeatureType]
         aggregator = aggregator,
         outputName = name,
         outputIsResponse = isResponse,
-        aggregateWindow = aggregateWindow
-      )(tti, tto)
+        aggregateWindow = aggregateWindow,
+        inputType = Left(tti)
+      )(tto)
 
     originStage.getOutput().asInstanceOf[Feature[O]]
   }

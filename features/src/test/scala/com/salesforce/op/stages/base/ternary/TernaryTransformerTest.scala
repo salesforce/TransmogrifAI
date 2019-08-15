@@ -47,10 +47,19 @@ class TernaryTransformerTest extends OpTransformerSpec[Real, TernaryTransformer[
 
   val (inputData, f1, f2, f3) = TestFeatureBuilder(sample)
 
-  val transformer = new TernaryLambdaTransformer[Real, Integral, Binary, Real](operationName = "trio",
-    transformFn = (r, i, b) => (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0)).toReal
+  val transformer = new TernaryLambdaTransformer[Real, Integral, Binary, Real](
+    operationName = "trio", transformFn = new TernaryTransformerTest.Fun
   ).setInput(f1, f2, f3)
 
   val expectedResult = Seq(1.toReal, 5.toReal, 4.toReal)
+
+}
+
+object TernaryTransformerTest {
+
+  class Fun extends Function3[Real, Integral, Binary, Real] with Serializable {
+    def apply(r: Real, i: Integral, b: Binary): Real =
+      (r.v.getOrElse(0.0) + i.toDouble.getOrElse(0.0) + b.toDouble.getOrElse(0.0)).toReal
+  }
 
 }

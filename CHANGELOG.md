@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.6.0
+
+Bug fixes:
+- Quick Fix Alias Type Names [#346](https://github.com/salesforce/TransmogrifAI/pull/346)
+- Forecast Evaluator - fixes SMAPE, adds MASE and Seasonal Error metrics [#342](https://github.com/salesforce/TransmogrifAI/pull/342)
+
+New features / updates:
+- Aggregate LOCOs of DateToUnitCircleTransformer. [#349](https://github.com/salesforce/TransmogrifAI/pull/349)
+- Convert lambda functions into concrete classes to allow compatibility with Scala 2.12 [#357](https://github.com/salesforce/TransmogrifAI/pull/357)
+- Replace mapValues with immutable Map where applicable [#363](https://github.com/salesforce/TransmogrifAI/pull/363)
+- Aggregate spark metrics during run time instead of post processing by default [#358](https://github.com/salesforce/TransmogrifAI/pull/358)
+- Allow customizing serialization for FeatureGenerator extract function [#352](https://github.com/salesforce/TransmogrifAI/pull/352)
+- Update helloworld examples to be simple [#351](https://github.com/salesforce/TransmogrifAI/pull/351)
+- Adding `key` ctor field in all RawFeatureFilter results [#348](https://github.com/salesforce/TransmogrifAI/pull/348)
+- Forecast evaluator + SMAPE metric [#337](https://github.com/salesforce/TransmogrifAI/pull/337)
+- Local scoring for model with features of all types [#340](https://github.com/salesforce/TransmogrifAI/pull/340)
+- Remove local runner + update docs [#335](https://github.com/salesforce/TransmogrifAI/pull/335)
+- Added missing test for java conversions [#334](https://github.com/salesforce/TransmogrifAI/pull/334)
+- Get rid of scalaj-collections [#333](https://github.com/salesforce/TransmogrifAI/pull/333)
+- Workflow independent model loading [#274](https://github.com/salesforce/TransmogrifAI/pull/274)
+- Aggregated LOCOs of SmartTextVectorizer outputs [#308](https://github.com/salesforce/TransmogrifAI/pull/308)
+- Added community projects docs section [#326](https://github.com/salesforce/TransmogrifAI/pull/326)
+- Add FeatureBuilder.fromSchema [#325](https://github.com/salesforce/TransmogrifAI/pull/325)
+- Improve WeekOfMonth in date transformers [#323](https://github.com/salesforce/TransmogrifAI/pull/323)
+- Improved datetime unit transformer shortcuts - Part 2 [#319](https://github.com/salesforce/TransmogrifAI/pull/319)
+- Correctly pass main class for CLI sub project [#321](https://github.com/salesforce/TransmogrifAI/pull/321)
+- Serialize blacklisted map keys with the model + updated access on workflow/model members [#320](https://github.com/salesforce/TransmogrifAI/pull/320)
+- Improved datetime unit transformer shortcuts [#316](https://github.com/salesforce/TransmogrifAI/pull/316)
+- Improved OpScalarStandardScalerTest [#317](https://github.com/salesforce/TransmogrifAI/pull/317)
+- improved PercentileCalibratorTest [#318](https://github.com/salesforce/TransmogrifAI/pull/318)
+- Added concrete wrappers for HashingTF, NGram and StopWordsRemover [#314](https://github.com/salesforce/TransmogrifAI/pull/314)
+- Avoid singleton random generators [#312](https://github.com/salesforce/TransmogrifAI/pull/312)
+- Remove free function aggregation with feature builders [#311](https://github.com/salesforce/TransmogrifAI/pull/311)
+- Added util methods to create class/object by name + retrieve type tag by type name [#310](https://github.com/salesforce/TransmogrifAI/pull/310)
+
+ Dependency updates:
+- Bump shadowjar plugin to 5.0.0 [#306](https://github.com/salesforce/TransmogrifAI/pull/306)
+- Bump Apache Tika to 1.21 [#331](https://github.com/salesforce/TransmogrifAI/pull/331)
+- Enable CicleCI version 2.1 [#353](https://github.com/salesforce/TransmogrifAI/pull/353)
+
 ## 0.5.3
 
 Bug fixes:

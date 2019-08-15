@@ -73,18 +73,18 @@ class FractionOfResponsesEstimator(uid: String = UID[FractionOfResponsesEstimato
     import dataset.sparkSession.implicits._
     val sizes = dataset.map(_.map(_.size))
     val size = getInputFeatures().length
-    val counts = sizes.select(SequenceAggregators.SumNumSeq[Int](size = size).toColumn).first()
+    val counts = sizes.select(SequenceAggregators.SumNumSeq[Int](size = size).toColumn).first().map(_.toDouble)
     new FractionOfResponsesModel(counts = counts, operationName = operationName, uid = uid)
   }
 }
 
 final class FractionOfResponsesModel private[op]
 (
-  val counts: Seq[Int],
+  val counts: Seq[Double],
   operationName: String,
   uid: String
 ) extends SequenceModel[DateList, OPVector](operationName = operationName, uid = uid) {
-  def transformFn: (Seq[DateList]) => OPVector = row => {
+  def transformFn: Seq[DateList] => OPVector = row => {
     val fractions = row.zip(counts).map { case (feature, count) => feature.value.size.toDouble / count }
     Vectors.dense(fractions.toArray).toOPVector
   }

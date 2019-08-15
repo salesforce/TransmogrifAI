@@ -57,7 +57,7 @@ import org.slf4j.LoggerFactory
 @RunWith(classOf[JUnitRunner])
 class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, ModelSelector[_, _]]
   with PredictionEquality with CompareParamGrid {
-
+  import ModelSelectorTest._
   val log = LoggerFactory.getLogger(this.getClass)
 
   val (seed, smallCount, bigCount) = (1234L, 20, 80)
@@ -263,15 +263,17 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
 
   }
 }
+object ModelSelectorTest {
 
-class TestEstimator extends BinaryEstimator[RealNN, OPVector, Prediction]("test", UID[TestEstimator]) {
-  override def fitFn(dataset: Dataset[(Option[Double], Vector)]): TestModel = new TestModel(uid)
-}
+  class TestEstimator extends BinaryEstimator[RealNN, OPVector, Prediction]("test", UID[TestEstimator]) {
+    override def fitFn(dataset: Dataset[(Option[Double], Vector)]): TestModel = new TestModel(uid)
+  }
 
-class TestModel(uid: String) extends BinaryModel[RealNN, OPVector, Prediction]("test", uid){
-  override def transformFn: (RealNN, OPVector) => Prediction = (l: RealNN, f: OPVector) => {
-    val pred = l.value.get
-    val raw = Array(pred, 1 - pred)
-    Prediction(pred, raw, raw)
+  class TestModel(uid: String) extends BinaryModel[RealNN, OPVector, Prediction]("test", uid) {
+    override def transformFn: (RealNN, OPVector) => Prediction = (l: RealNN, f: OPVector) => {
+      val pred = l.value.get
+      val raw = Array(pred, 1 - pred)
+      Prediction(pred, raw, raw)
+    }
   }
 }

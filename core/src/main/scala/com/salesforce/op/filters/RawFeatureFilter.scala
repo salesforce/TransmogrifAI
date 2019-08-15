@@ -124,7 +124,9 @@ class RawFeatureFilter[T]
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
-   * Get binned counts of the feature distribution and empty count for each raw feature
+   * Get binned counts of the feature distribution and empty count for each raw feature. This computes all the
+   * statistics on the training and scoring data. It does two map reduce operations, the first to produce a Summary
+   * of each feature, the second to produce a binned histogram (Distribution) for each feature based on the Summary.
    *
    * @param data                    data frame to compute counts on
    * @param features                list of raw, non-protected, features contained in the dataframe
@@ -151,6 +153,7 @@ class RawFeatureFilter[T]
       val predOut = allPredictors.map(TransientFeature(_))
       (respOut, predOut)
     }
+    // process all features based on raw type so that they can be summerized as either text or numeric
     val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
 
     implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
@@ -235,7 +238,7 @@ class RawFeatureFilter[T]
       fillRatioDiffs: Seq[Option[Double]]
     ): Seq[RawFeatureFilterMetrics] = {
 
-      trainingDistribs.map(_.name)
+      trainingDistribs.map(dist => dist.name -> dist.key)
         .zip(trainingFillRates)
         .zip(trainingNullLabelAbsoluteCorrs)
         .zip(scoringFillRates)
@@ -243,10 +246,10 @@ class RawFeatureFilter[T]
         .zip(fillRateDiffs)
         .zip(fillRatioDiffs)
         .map {
-          case ((((((name, trainingFillRate), trainingNullLabelAbsoluteCorr),
+          case (((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
           scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff) =>
             RawFeatureFilterMetrics(
-              name, trainingFillRate, trainingNullLabelAbsoluteCorr,
+              name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
               scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff)
         }
     }
@@ -342,7 +345,7 @@ class RawFeatureFilter[T]
       fillRatioDiffMismatches: Seq[Boolean]
     ): Seq[ExclusionReasons] = {
 
-      trainingDistribs.map(_.name)
+      trainingDistribs.map(dist => dist.name-> dist.key)
         .zip(trainingUnfilledStates)
         .zip(trainingNullLabelLeakers)
         .zip(scoringUnfilledStates)
@@ -350,10 +353,11 @@ class RawFeatureFilter[T]
         .zip(fillRateDiffMismatches)
         .zip(fillRatioDiffMismatches)
         .map {
-          case ((((((name, trainingUnfilledState), trainingNullLabelLeaker),
+          case (((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
           scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch) =>
             ExclusionReasons(
               name,
+              key,
               trainingUnfilledState,
               trainingNullLabelLeaker,
               scoringUnfilledState,
@@ -594,6 +598,8 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
+  val MaxCardinality = 500
+
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 

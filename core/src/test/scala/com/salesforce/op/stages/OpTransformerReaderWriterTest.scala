@@ -30,7 +30,6 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryLambdaTransformer
 import org.junit.runner.RunWith
@@ -42,11 +41,11 @@ class OpTransformerReaderWriterTest extends OpPipelineStageReaderWriterTest {
 
   override val hasOutputName = false
 
-  lazy val stage =
+  val stage =
     new UnaryLambdaTransformer[Real, Real](
       operationName = "test",
-      transformFn = _.v.map(_ * 0.1234).toReal,
-      uid = UID[UnaryLambdaTransformer[_, _]]
+      transformFn = new Lambdas.FncUnary,
+      uid = "uid_1234"
     ).setInput(weight).setMetadata(meta)
 
   val expected = Array(21.2248.toReal, 8.2678.toReal, Real.empty, 9.6252.toReal, 11.8464.toReal, 8.2678.toReal)

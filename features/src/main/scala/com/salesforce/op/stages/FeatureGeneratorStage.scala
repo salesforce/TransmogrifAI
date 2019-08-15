@@ -32,12 +32,16 @@ package com.salesforce.op.stages
 
 import com.salesforce.op.UID
 import com.salesforce.op.aggregators.{Event, FeatureAggregator, GenericFeatureAggregator}
+import com.salesforce.op.features._
 import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.features.{Feature, FeatureLike, FeatureUID, OPFeature}
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.twitter.algebird.MonoidAggregator
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.util.ClosureUtils
 import org.joda.time.Duration
+import org.json4s.JValue
+import org.json4s.JsonDSL._
+import com.salesforce.op.stages.ValueReaderWriter._
 
 import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Try
@@ -53,24 +57,34 @@ import scala.util.Try
  *                         (used to determine aggregation window)
  * @param aggregateWindow  time period during which to include features in aggregation
  * @param uid              unique id for stage
- * @param tti              weak type tag for input feature type
+ * @param inputType        input weak type tag or type name
  * @param tto              weak type tag for output feature type
  * @tparam I input data type
  * @tparam O output feature type
  */
+
+@ReaderWriter(classOf[FeatureGeneratorStageReaderWriter[_, _ <: FeatureType]])
 final class FeatureGeneratorStage[I, O <: FeatureType]
 (
   val extractFn: I => O,
   val extractSource: String,
   val aggregator: MonoidAggregator[Event[O], _, O],
-  outputName: String,
+  val outputName: String,
   override val outputIsResponse: Boolean,
   val aggregateWindow: Option[Duration] = None,
-  val uid: String = UID[FeatureGeneratorStage[I, O]]
-)(
-  implicit val tti: WeakTypeTag[I],
-  val tto: WeakTypeTag[O]
-) extends PipelineStage with OpPipelineStage[O] with HasIn1 {
+  val uid: String = UID[FeatureGeneratorStage[I, O]],
+  val inputType: Either[WeakTypeTag[I], String]
+)(implicit val tto: WeakTypeTag[O])
+  extends PipelineStage with OpPipelineStage[O] with HasIn1 {
+
+  // This hack is required as Spark can't serialize run-time created TypeTags
+  // when the stage is recovered on model loading.
+  // Since Spark tries to serialize Scala RuntimeMirror which is not serializable,
+  // we recover type tag from its type name upon request
+  @transient implicit val tti: WeakTypeTag[I] = inputType match {
+    case Right(typeName) => ReflectionUtils.typeTagForTypeName[I](typeName)
+    case Left(ttag) => ttag
+  }
 
   setOutputFeatureName(outputName)
 
@@ -106,4 +120,91 @@ final class FeatureGeneratorStage[I, O <: FeatureType]
    * @return Failure if not serializable
    */
   override def checkSerializable: Try[Unit] = ClosureUtils.checkSerializable(extractFn)
+}
+
+
+/**
+ * Stage reader/writer implementation used to (de)serialize [[FeatureGeneratorStage]]
+ */
+class FeatureGeneratorStageReaderWriter[I, O <: FeatureType]
+  extends OpPipelineStageReaderWriter[FeatureGeneratorStage[I, O]] with OpPipelineStageSerializationFuns {
+
+  /**
+   * Read stage from json
+   *
+   * @param stageClass stage class
+   * @param json       json to read stage from
+   * @return read result
+   */
+  def read(stageClass: Class[FeatureGeneratorStage[I, O]], json: JValue): Try[FeatureGeneratorStage[I, O]] = Try {
+    val tti = (json \ "tti").extract[String]
+    val tto = FeatureType.featureTypeTag((json \ "tto").extract[String]).asInstanceOf[WeakTypeTag[O]]
+
+    val extractFnJson = json \ "extractFn"
+    val extractFn = (extractFnJson \ "className").extract[String] match {
+      case extractFnClassName if classOf[FromRowExtractFn[_]].getName == extractFnClassName =>
+        val index = (extractFnJson \ "index").extractOpt[Int]
+        val name = (extractFnJson \ "name").extract[String]
+        FromRowExtractFn[O](index, name)(tto).asInstanceOf[Function1[I, O]]
+      case extractFnClassName =>
+        val extractFnClass = ReflectionUtils.classForName(extractFnClassName).asInstanceOf[Class[I => O]]
+        readerWriterFor(extractFnClass, "extractFn")
+          .read(extractFnClass, extractFnJson \ "value").get
+    }
+
+    val aggregatorJson = json \ "aggregator"
+    val aggregatorClassName = (aggregatorJson \ "className").extract[String]
+    val aggregatorClass = ReflectionUtils.classForName(aggregatorClassName)
+      .asInstanceOf[Class[MonoidAggregator[Event[O], _, O]]]
+    val aggregator =
+      readerWriterFor(aggregatorClass, "aggregator")
+        .read(aggregatorClass, aggregatorJson \ "value").get
+
+    val outputName = (json \ "outputName").extract[String]
+    val extractSource = (json \ "extractSource").extract[String]
+    val uid = (json \ "uid").extract[String]
+    val outputIsResponse = (json \ "outputIsResponse").extract[Boolean]
+    val aggregateWindow = (json \ "aggregateWindow").extractOpt[Long].map(Duration.millis)
+
+    new FeatureGeneratorStage[I, O](extractFn, extractSource, aggregator,
+      outputName, outputIsResponse, aggregateWindow, uid, Right(tti))(tto)
+  }
+
+  /**
+   * Write stage to json
+   *
+   * @param stage stage instance to write
+   * @return write result
+   */
+  def write(stage: FeatureGeneratorStage[I, O]): Try[JValue] = {
+    for {
+      extractFn <- {
+        stage.extractFn match {
+          case extract: FromRowExtractFn[_] => Try {
+            ("className" -> extract.getClass.getName) ~ ("index" -> extract.index) ~ ("name" -> extract.name)
+          }
+          case extract => {
+            val extractClass = extract.getClass.asInstanceOf[Class[I => O]]
+            readerWriterFor(extractClass, "extractFn")
+              .write(extract).map { j => ("className" -> extractClass.getName) ~ ("value" -> j) }
+          }
+        }
+      }
+      aggregator <- {
+        val aggregatorClass = stage.aggregator.getClass.asInstanceOf[Class[MonoidAggregator[Event[O], _, O]]]
+        readerWriterFor[MonoidAggregator[Event[O], _, O]](aggregatorClass, "aggregator")
+          .write(stage.aggregator).map { j => ("className" -> aggregatorClass.getName) ~ ("value" -> j) }
+      }
+    } yield {
+      ("tti" -> stage.tti.tpe.typeSymbol.fullName) ~
+        ("tto" -> FeatureType.typeName(stage.tto)) ~
+        ("aggregator" -> aggregator) ~
+        ("extractFn" -> extractFn) ~
+        ("outputName" -> stage.outputName) ~
+        ("aggregateWindow" -> stage.aggregateWindow.map(_.getMillis)) ~
+        ("uid" -> stage.uid) ~
+        ("extractSource" -> stage.extractSource) ~
+        ("outputIsResponse" -> stage.outputIsResponse)
+    }
+  }
 }

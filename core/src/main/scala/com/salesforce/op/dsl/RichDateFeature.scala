@@ -49,11 +49,15 @@ trait RichDateFeature {
 
     /**
      * Convert to DateList feature
+     *
      * @return
      */
     def toDateList(): FeatureLike[DateList] = {
       f.transformWith(
-        new UnaryLambdaTransformer[Date, DateList](operationName = "dateToList", _.value.toSeq.toDateList)
+        new UnaryLambdaTransformer[Date, DateList](
+          operationName = "dateToList",
+          new RichDateFeatureLambdas.ToDateList
+        )
       )
     }
 
@@ -70,7 +74,7 @@ trait RichDateFeature {
      *
      * @param timePeriod The time period to extract from the timestamp
      * @param others     Other features of same type
-     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     *                   enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
     def toUnitCircle
     (
@@ -126,13 +130,14 @@ trait RichDateFeature {
 
     /**
      * Convert to DateTimeList feature
+     *
      * @return
      */
     def toDateTimeList(): FeatureLike[DateTimeList] = {
       f.transformWith(
         new UnaryLambdaTransformer[DateTime, DateTimeList](
           operationName = "dateTimeToList",
-          _.value.toSeq.toDateTimeList
+          new RichDateFeatureLambdas.ToDateTimeList
         )
       )
     }
@@ -150,7 +155,7 @@ trait RichDateFeature {
      *
      * @param timePeriod The time period to extract from the timestamp
      * @param others     Other features of same type
-     * enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
+     *                   enum from: DayOfMonth, DayOfWeek, DayOfYear, HourOfDay, WeekOfMonth, WeekOfYear
      */
     def toUnitCircle(
       timePeriod: TimePeriod = TimePeriod.HourOfDay,
@@ -194,6 +199,18 @@ trait RichDateFeature {
       if (timePeriods.isEmpty) time else (timePeriods :+ time).combine()
     }
 
+  }
+
+}
+
+object RichDateFeatureLambdas {
+
+  class ToDateList extends Function1[Date, DateList] with Serializable {
+    def apply(v: Date): DateList = v.value.toSeq.toDateList
+  }
+
+  class ToDateTimeList extends Function1[Date, DateTimeList] with Serializable {
+    def apply(v: Date): DateTimeList = v.value.toSeq.toDateTimeList
   }
 
 }

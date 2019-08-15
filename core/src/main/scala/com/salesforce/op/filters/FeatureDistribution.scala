@@ -33,11 +33,11 @@ package com.salesforce.op.filters
 import java.util.Objects
 
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
+import com.twitter.algebird._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
@@ -63,6 +63,8 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
+  moments: Option[Moments] = None,
+  cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -99,10 +101,19 @@ case class FeatureDistribution
    */
   def reduce(fd: FeatureDistribution): FeatureDistribution = {
     checkMatch(fd)
+    // should move this somewhere else
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
+    implicit val opMonoid = optionMonoid[TextStats]
+
     val combinedDist = distribution + fd.distribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
-    val combinedSummary = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
-    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist, combinedSummary, `type`)
+    val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
+
+    val combinedMoments = moments + fd.moments
+    val combinedCard = cardEstimate + fd.cardEstimate
+
+    FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
+      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
   }
 
   /**
@@ -155,19 +166,23 @@ case class FeatureDistribution
       "count" -> count.toString,
       "nulls" -> nulls.toString,
       "distribution" -> distribution.mkString("[", ",", "]"),
-      "summaryInfo" -> summaryInfo.mkString("[", ",", "]")
+      "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
+      "cardinality" -> cardEstimate.map(_.toString).getOrElse(""),
+      "moments" -> moments.map(_.toString).getOrElse("")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, `type`) =>
-      distribution.deep == d.deep && summaryInfo.deep == s.deep
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, c, `type`) =>
+      distribution.deep == d.deep && summaryInfo.deep == s.deep &&
+        moments == m && cardEstimate == c
     case _ => false
   }
 
-  override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution, summaryInfo, `type`)
+  override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
+    summaryInfo, moments, cardEstimate, `type`)
 }
 
 object FeatureDistribution {
@@ -225,6 +240,9 @@ object FeatureDistribution {
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
+    val moments = value.map(momentsValues)
+    val cardEstimate = value.map(cardinalityValues)
+
     FeatureDistribution(
       name = name,
       key = key,
@@ -232,8 +250,39 @@ object FeatureDistribution {
       nulls = nullCount,
       summaryInfo = summaryInfo,
       distribution = distribution,
+      moments = moments,
+      cardEstimate = cardEstimate,
       `type` = `type`
     )
+  }
+
+  /**
+   * Function to calculate the first five central moments of numeric values, or length of tokens for text features
+   *
+   * @param values          values to calculate moments
+   * @return Moments object containing information about moments
+   */
+  private def momentsValues(values: ProcessedSeq): Moments = {
+    val population = values match {
+      case Left(seq) => seq.map(x => x.length.toDouble)
+      case Right(seq) => seq
+    }
+    MomentsGroup.sum(population.map(x => Moments(x)))
+  }
+
+  /**
+   * Function to track frequency of the first $(MaxCardinality) unique values
+   * (number for numeric features, token for text features)
+   *
+   * @param values          values to track distribution / frequency
+   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   */
+  private def cardinalityValues(values: ProcessedSeq): TextStats = {
+    val population = values match {
+      case Left(seq) => seq
+      case Right(seq) => seq.map(_.toString)
+    }
+    TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
   }
 
   /**

@@ -5,8 +5,6 @@ dependencies {
     // Scala graph
     compile "org.scala-graph:graph-core_$scalaVersion:$scalaGraphVersion"
 
-    // Java -> Scala converters
-    compile "com.daodecode:scalaj-collection_$scalaVersion:$scalajCollVersion"
 
     // Sourcecode macros
     compile "com.lihaoyi:sourcecode_$scalaVersion:$sourceCodeVersion"

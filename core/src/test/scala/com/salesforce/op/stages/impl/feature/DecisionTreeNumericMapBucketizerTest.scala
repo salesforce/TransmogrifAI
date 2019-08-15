@@ -53,7 +53,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
 
   val (inputData, estimator) = {
     val numericData = Seq(
-      Map("a" -> 1.0),
+      Map("a" -> 1.0, "b" -> 1.0),
       Map("a" -> 18.0),
       Map("b" -> 0.0),
       Map("a" -> -1.23, "b" -> 1.0),
@@ -66,7 +66,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
   }
 
   val expectedResult = Seq(
-    Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(1, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(2, 3, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
@@ -81,7 +81,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
       numerics.limit(total).zip(numerics.limit(total)).zip(numerics.limit(total)).zip(labelData)
         .map { case (((f1, f2), f3), f4) => (f1, f2, f3, f4) }
     val (data, f1, f2, f3, label) = TestFeatureBuilder[Real, Real, Real, RealNN](rawData)
-    val realMapFeature = makeTernaryOPMapTransformer[Real, RealMap, Double](f1, f2, f3)
+    val realMapFeature = makeMapifyTransformer[Real, RealMap, Double](f1, f2, f3)
     lazy val modelLocation = tempDir + "/dt-map-buck-test-model-" + org.joda.time.DateTime.now().getMillis
   }
 
@@ -104,7 +104,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
       correlated.zip(currencies.limit(total)).zip(correlated).zip(labelData)
         .map { case (((f1, f2), f3), f4) => (f1, f2, f3, f4) }
     val (data, f1, f2, f3, label) = TestFeatureBuilder[Currency, Currency, Currency, RealNN](rawData)
-    val currencyMapFeature = makeTernaryOPMapTransformer[Currency, CurrencyMap, Double](f1, f2, f3)
+    val currencyMapFeature = makeMapifyTransformer[Currency, CurrencyMap, Double](f1, f2, f3)
     val expectedSplits = Array(Double.NegativeInfinity, 15, 26, 91, Double.PositiveInfinity)
   }
 

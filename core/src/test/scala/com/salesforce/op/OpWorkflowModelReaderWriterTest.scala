@@ -67,7 +67,6 @@ class OpWorkflowModelReaderWriterTest
   )
   var saveFlowPath: String = _
   var saveModelPath: String = _
-
   val saveFlowPathStable: String = tempDir + "/op-rw-wf-test-" + DateTime.now().getMillis
 
   override protected def beforeEach(): Unit = {
@@ -142,7 +141,7 @@ class OpWorkflowModelReaderWriterTest
   }
 
   trait SwSingleStageFlow {
-    val vec = FeatureBuilder.OPVector[Passenger].extract(_ => OPVector.empty).asPredictor
+    val vec = FeatureBuilder.OPVector[Passenger].extract(new OpWorkflowModelReaderWriterTest.EmptyVectorFn).asPredictor
     val scaler = new StandardScaler().setWithStd(false).setWithMean(false)
     val schema = FeatureSparkTypes.toStructType(vec)
     val data = spark.createDataFrame(List(Row(Vectors.dense(1.0))).asJava, schema)
@@ -157,24 +156,35 @@ class OpWorkflowModelReaderWriterTest
     val (wfM, jsonModel) = makeModelAndJson(wf)
   }
 
+  trait OldVectorizedFlow extends UIDReset {
+    val cat = Seq(gender, boarded, height, age, description).transmogrify()
+    val catHead = cat.map[Real](new OpWorkflowModelReaderWriterTest.CatHeadFn)
+    val wf = new OpWorkflow().setParameters(workflowParams).setResultFeatures(catHead)
+  }
+
+  trait VectorizedFlow extends UIDReset {
+    val catHead = rawFeatures.transmogrify().map[Real](new OpWorkflowModelReaderWriterTest.CatHeadFn)
+    val wf = new OpWorkflow().setParameters(workflowParams).setResultFeatures(catHead)
+  }
+
   "Single Stage OpWorkflowWriter" should "have proper json entries" in new SingleStageFlow {
     val modelKeys = jsonModel.extract[Map[String, Any]].keys
     modelKeys should contain theSameElementsAs OpWorkflowModelReadWriteShared.FieldNames.values.map(_.entryName)
   }
 
-  it should "have correct result id" in new SingleStageFlow {
-    val idsM = (jsonModel \ ResultFeaturesUids.entryName).extract[Array[String]]
-    idsM should contain theSameElementsAs Array(density.uid)
-  }
-
-  it should "have a single stage" in new SingleStageFlow {
+  it should "recover all stages" in new SingleStageFlow {
     val stagesM = (jsonModel \ Stages.entryName).extract[JArray]
-    stagesM.values.size shouldBe 1
+    stagesM.values.size shouldBe 3
   }
 
-  it should "have 3 features" in new SingleStageFlow {
+  it should "recover all features" in new SingleStageFlow {
     val featsM = (jsonModel \ AllFeatures.entryName).extract[JArray]
     featsM.values.size shouldBe 3
+  }
+
+  it should "have the correct results feature ids" in new SingleStageFlow {
+    val idsM = (jsonModel \ ResultFeaturesUids.entryName).extract[Array[String]]
+    idsM should contain theSameElementsAs Array(density.uid)
   }
 
   it should "have correct uid" in new SingleStageFlow {
@@ -188,12 +198,12 @@ class OpWorkflowModelReaderWriterTest
     paramsM.stageParams shouldBe workflowParams.stageParams
   }
 
-  "MultiStage OpWorkflowWriter" should "recover all relevant stages" in new MultiStageFlow {
+  "MultiStage OpWorkflowWriter" should "recover all stages" in new MultiStageFlow {
     val stagesM = (jsonModel \ Stages.entryName).extract[JArray]
-    stagesM.values.size shouldBe 2
+    stagesM.values.size shouldBe 4
   }
 
-  it should "recover all relevant features" in new MultiStageFlow {
+  it should "recover all features" in new MultiStageFlow {
     val featsM = (jsonModel \ AllFeatures.entryName).extract[JArray]
     featsM.values.size shouldBe 4
   }
@@ -203,9 +213,9 @@ class OpWorkflowModelReaderWriterTest
     idsM should contain theSameElementsAs Array(density.uid, weight2.uid)
   }
 
-  "Raw feature only OpWorkflowWriter" should "recover no stages" in new RawFeatureFlow {
+  "Raw feature only OpWorkflowWriter" should "recover a single stage" in new RawFeatureFlow {
     val stagesM = (jsonModel \ Stages.entryName).extract[JArray]
-    stagesM.values.length shouldBe 0
+    stagesM.values.length shouldBe 1
   }
 
   it should "recover raw feature in feature list" in new RawFeatureFlow {
@@ -220,57 +230,42 @@ class OpWorkflowModelReaderWriterTest
 
   Spec[OpWorkflowModelReader] should "load proper single stage workflow" in new SingleStageFlow {
     wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath)
-    compareWorkflowModels(wfMR, wfM)
+    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    assert(wfMR, wfM)
   }
 
   it should "load proper multiple stage workflow" in new MultiStageFlow {
     wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath)
-    compareWorkflowModels(wfMR, wfM)
+    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    assert(wfMR, wfM)
   }
 
   it should "load proper raw feature workflow" in new RawFeatureFlow {
     wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath)
-    compareWorkflowModels(wfMR, wfM)
+    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    assert(wfMR, wfM)
   }
 
   it should "load proper workflow with spark wrapped stages" in new SwSingleStageFlow {
     wfM.save(saveModelPath)
-    val wfMR = wf.loadModel(saveModelPath)
-    compareWorkflowModels(wfMR, wfM)
+    val wfMR = wf.loadModel(saveModelPath).setReader(wfM.getReader())
+    assert(wfMR, wfM)
   }
 
   it should "work for models" in new SingleStageFlow {
     wf.setReader(dataReader)
     val model = wf.train()
     model.save(saveFlowPath)
-    val wfMR = wf.loadModel(saveFlowPath)
-    compareWorkflowModels(model, wfMR)
-  }
-
-  trait OldVectorizedFlow extends UIDReset {
-    val cat = Seq(gender, boarded, height, age, description).transmogrify()
-    val catHead = cat.map[Real](v => Real(v.value.toArray.headOption))
-    val wf = new OpWorkflow()
-      .setParameters(workflowParams)
-      .setResultFeatures(catHead)
-  }
-
-  trait VectorizedFlow extends UIDReset {
-    val catHead = rawFeatures.transmogrify().map[Real](v => Real(v.value.toArray.headOption))
-    val wf = new OpWorkflow()
-      .setParameters(workflowParams)
-      .setResultFeatures(catHead)
+    val wfMR = wf.loadModel(saveFlowPath).setReader(dataReader)
+    assert(model, wfMR)
   }
 
   it should "load workflow model with vectorized feature" in new VectorizedFlow {
     wf.setReader(dataReader)
     val wfM = wf.train()
     wfM.save(saveFlowPath)
-    val wfMR = wf.loadModel(saveFlowPath)
-    compareWorkflowModels(wfMR, wfM)
+    val wfMR = wf.loadModel(saveFlowPath).setReader(dataReader)
+    assert(wfMR, wfM)
   }
 
   it should "save a workflow model that has a RawFeatureFilter with correct blacklists" in new VectorizedFlow {
@@ -281,48 +276,52 @@ class OpWorkflowModelReaderWriterTest
     val wfM = wf.train()
     wfM.save(saveFlowPathStable)
     wf.getBlacklist().map(_.name) should contain theSameElementsAs
-      Array("age", "boarded", "description", "gender", "height", "weight")
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
     wf.getBlacklistMapKeys() shouldBe
-      Map("booleanMap" -> Set("Male"), "stringMap" -> Set("Male"), "numericMap" -> Set("Male"))
+      Map(booleanMap.name -> Set("Male"), stringMap.name -> Set("Male"), numericMap.name -> Set("Male"))
 
-    val wfMR = wf.loadModel(saveFlowPathStable)
-    compareWorkflowModels(wfM, wfMR)
+    val wfMR = wf.loadModel(saveFlowPathStable).setReader(wfM.getReader())
+    assert(wfM, wfMR)
   }
 
   it should "load a workflow model that has a RawFeatureFilter and a different workflow" in new VectorizedFlow {
     val wfM = wf.loadModel(saveFlowPathStable)
     wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
-    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
-      Array("age", "boarded", "booleanMap", "description", "gender", "height", "numericMap",
-        "stringMap", "survived", "weight")
+    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
     wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
-      Array("booleanMap", "numericMap", "stringMap", "survived")
+      Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
     wfM.getBlacklist().map(_.name) should contain theSameElementsAs
-      Array("age", "boarded", "description", "gender", "height", "weight")
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
+  }
+
+  it should "load a workflow model that has a RawFeatureFilter without workflow" in new VectorizedFlow {
+    val wfM = OpWorkflowModel.load(saveFlowPathStable)
+    wf.getResultFeatures().head.name shouldBe wfM.getResultFeatures().head.name
+    wf.getResultFeatures().head.history().originFeatures should contain theSameElementsAs rawFeatures.map(_.name)
+    wfM.getResultFeatures().head.history().originFeatures should contain theSameElementsAs
+      Seq(booleanMap, numericMap, stringMap, survived).map(_.name)
+    wfM.getBlacklist().map(_.name) should contain theSameElementsAs
+      Seq(age, boarded, description, gender, height, weight).map(_.name)
   }
 
   it should "load model and allow copying it" in new VectorizedFlow {
     val wfM = wf.loadModel(saveFlowPathStable).setReader(dataReader)
-    val copy = wfM.copy()
-    copy.uid shouldBe wfM.uid
-    copy.trainingParams.toString shouldBe wfM.trainingParams.toString
-    copy.isWorkflowCV shouldBe wfM.isWorkflowCV
-    copy.getReader() shouldBe wfM.getReader()
-    copy.getResultFeatures() shouldBe wfM.getResultFeatures()
-    copy.getRawFeatures() shouldBe wfM.getRawFeatures()
-    copy.getBlacklist() shouldBe wfM.getBlacklist()
-    copy.getBlacklistMapKeys() shouldBe wfM.getBlacklistMapKeys()
-    copy.getRawFeatureFilterResults() shouldBe wfM.getRawFeatureFilterResults()
-    copy.getStages().map(_.uid) shouldBe wfM.getStages().map(_.uid)
-    copy.getParameters().toString shouldBe wfM.getParameters().toString
+    val copy = wfM.copy().setReader(dataReader)
+    assert(copy, wfM)
   }
 
-  it should "be able to load a old version of a saved model" in new OldVectorizedFlow {
+  it should "load model without workflow and allow copying it" in {
+    val wfM = OpWorkflowModel.load(saveFlowPathStable).setReader(dataReader)
+    val copy = wfM.copy().setReader(dataReader)
+    assert(copy, wfM)
+  }
+
+  it should "load a old version of a saved model" in new OldVectorizedFlow {
     val wfM = wf.loadModel("src/test/resources/OldModelVersion")
     wfM.getBlacklist().isEmpty shouldBe true
   }
 
-  it should "be able to load a old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
+  it should "load a old version of a saved model (v0.5.1)" in new OldVectorizedFlow {
     // note: in these old models, raw feature filter config will be set to the config defaults
     // but we never re-initialize raw feature filter when loading a model (only scoring, no training)
     val wfM = wf.loadModel("src/test/resources/OldModelVersion_0_5_1")
@@ -330,57 +329,52 @@ class OpWorkflowModelReaderWriterTest
     wfM.getRawFeatureFilterResults().exclusionReasons shouldBe empty
   }
 
-  it should "error on loading a model without workflow" in {
-    val error = intercept[RuntimeException](OpWorkflowModel.load(saveFlowPathStable))
-    error.getMessage should startWith("Failed to load Workflow from path")
-    error.getCause.isInstanceOf[NotImplementedError] shouldBe true
-    error.getCause.getMessage shouldBe "Loading models without the original workflow is currently not supported"
-  }
-
-  def compareFeatures(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
+  def assert(f1: Array[OPFeature], f2: Array[OPFeature]): Unit = {
     f1.length shouldBe f2.length
     f1.sortBy(_.uid) should contain theSameElementsAs f2.sortBy(_.uid)
   }
 
-  // Ordering of stages is important
-  def compareStages(stages1: Array[OPStage], stages2: Array[OPStage]): Unit = {
+  def assert(stages1: Array[OPStage], stages2: Array[OPStage]): Unit = {
     stages1.length shouldBe stages2.length
+    // Ordering of stages is important
     stages1.zip(stages2).foreach {
       case (s1, s2) => {
         s1.uid shouldBe s2.uid
-        compareFeatures(s1.getInputFeatures(), s2.getInputFeatures())
+        assert(s1.getInputFeatures(), s2.getInputFeatures())
 
         val s1Feats: Array[OPFeature] = Array(s1.getOutput())
         val s2Feats: Array[OPFeature] = Array(s2.getOutput())
-        compareFeatures(s1Feats, s2Feats)
+        assert(s1Feats, s2Feats)
       }
     }
   }
 
-  def compareWorkflows(wf1: OpWorkflow, wf2: OpWorkflow): Unit = {
+  def assert(wf1: OpWorkflow, wf2: OpWorkflow): Unit = {
     wf1.uid shouldBe wf2.uid
-    compareParams(wf1.getParameters(), wf2.getParameters())
-    compareFeatures(wf1.getResultFeatures(), wf2.getResultFeatures())
-    compareFeatures(wf1.getBlacklist(), wf2.getBlacklist())
-    compareFeatures(wf1.getRawFeatures(), wf2.getRawFeatures())
-    compareStages(wf1.getStages(), wf2.getStages())
+    assert(wf1.getParameters(), wf2.getParameters())
+    assert(wf1.getResultFeatures(), wf2.getResultFeatures())
+    assert(wf1.getBlacklist(), wf2.getBlacklist())
+    assert(wf1.getRawFeatures(), wf2.getRawFeatures())
+    assert(wf1.getStages(), wf2.getStages())
     wf1.getBlacklistMapKeys() shouldBe  wf2.getBlacklistMapKeys()
     RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
   }
 
-  def compareWorkflowModels(wf1: OpWorkflowModel, wf2: OpWorkflowModel): Unit = {
-    wf1.uid shouldBe wf2.uid
-    compareParams(wf1.trainingParams, wf2.trainingParams)
-    compareParams(wf1.getParameters(), wf2.getParameters())
-    compareFeatures(wf1.getResultFeatures(), wf2.getResultFeatures())
-    compareFeatures(wf1.getBlacklist(), wf2.getBlacklist())
-    compareFeatures(wf1.getRawFeatures(), wf2.getRawFeatures())
-    compareStages(wf1.getStages(), wf2.getStages())
-    wf1.getBlacklistMapKeys() shouldBe  wf2.getBlacklistMapKeys()
-    RawFeatureFilterResultsComparison.compare(wf1.getRawFeatureFilterResults(), wf2.getRawFeatureFilterResults())
+  def assert(wfm1: OpWorkflowModel, wfm2: OpWorkflowModel): Unit = {
+    wfm1.uid shouldBe wfm2.uid
+    assert(wfm1.trainingParams, wfm2.trainingParams)
+    assert(wfm1.getParameters(), wfm2.getParameters())
+    wfm1.isWorkflowCV shouldBe wfm2.isWorkflowCV
+    wfm1.getReader() shouldBe wfm2.getReader()
+    assert(wfm1.getResultFeatures(), wfm2.getResultFeatures())
+    assert(wfm1.getRawFeatures(), wfm2.getRawFeatures())
+    assert(wfm1.getBlacklist(), wfm2.getBlacklist())
+    wfm1.getBlacklistMapKeys() shouldBe wfm2.getBlacklistMapKeys()
+    assert(wfm1.getStages(), wfm2.getStages())
+    RawFeatureFilterResultsComparison.compare(wfm1.getRawFeatureFilterResults(), wfm2.getRawFeatureFilterResults())
   }
 
-  def compareParams(p1: OpParams, p2: OpParams): Unit = {
+  def assert(p1: OpParams, p2: OpParams): Unit = {
     p1.stageParams shouldBe p2.stageParams
     p1.readerParams.toString() shouldBe p2.readerParams.toString()
     p1.customParams shouldBe p2.customParams
@@ -389,4 +383,16 @@ class OpWorkflowModelReaderWriterTest
 
 trait UIDReset {
   UID.reset()
+}
+
+object OpWorkflowModelReaderWriterTest {
+
+  class CatHeadFn extends Function1[OPVector, Real] with Serializable {
+    def apply(v: OPVector): Real = Real(v.value.toArray.headOption)
+  }
+
+  class EmptyVectorFn extends Function1[Passenger, OPVector] with Serializable {
+    def apply(v: Passenger): OPVector = OPVector.empty
+  }
+
 }

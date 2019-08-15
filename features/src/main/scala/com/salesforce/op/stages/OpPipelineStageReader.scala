@@ -30,27 +30,38 @@
 
 package com.salesforce.op.stages
 
-import com.salesforce.op.features.types.FeatureType
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared._
+import com.salesforce.op.features.OPFeature
+import com.salesforce.op.stages.OpPipelineStageReaderWriter._
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.utils.reflection.ReflectionUtils
 import org.apache.hadoop.fs.Path
 import org.apache.spark.ml.SparkDefaultParamsReadWrite
 import org.apache.spark.ml.util.MLReader
-import org.json4s.JsonAST.{JObject, JValue}
+import org.json4s.JsonAST.JValue
+import org.json4s._
 import org.json4s.jackson.JsonMethods.{compact, render}
-import org.json4s.{Extraction, _}
 
-import scala.reflect.runtime.universe._
 import scala.util.{Failure, Success, Try}
 
 /**
  * Reads the serialized output of [[OpPipelineStageWriter]]
  *
- * @param originalStage original serialized stage
+ * @param originalStage original stage instance from the workflow (legacy)
+ * @param features      features loaded so far (used to lookup input features fot the stage)
  */
-final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
-  extends MLReader[OpPipelineStageBase] {
+final class OpPipelineStageReader private
+(
+  val originalStage: Option[OpPipelineStageBase],
+  val features: Seq[OPFeature]
+) extends MLReader[OpPipelineStageBase] {
+
+  /**
+   * Legacy ctor which requires origin stage to be preset when loading stages
+   */
+  def this(origStage: OpPipelineStageBase) =
+    this(Option(origStage), origStage.getInputFeatures().flatMap(_.allFeatures))
+
+  def this(feats: Seq[OPFeature]) = this(None, feats)
 
   /**
    * Load from disk. File should contain data serialized in json format
@@ -77,88 +88,56 @@ final class OpPipelineStageReader(val originalStage: OpPipelineStageBase)
    * Loads from the json serialized data
    *
    * @param jsonStr json string
-   * @param path to the stored output
+   * @param path    to the stored output
    * @return OpPipelineStageBase
    */
   def loadFromJsonString(jsonStr: String, path: String): OpPipelineStageBase = {
     // Load stage json with it's params
     val metadata = SparkDefaultParamsReadWrite.parseMetadata(jsonStr)
     val (className, metadataJson) = metadata.className -> metadata.metadata
+
     // Check if it's a model
-    val isModel = (metadataJson \ FieldNames.IsModel.entryName).extract[Boolean]
-    // In case we stumbled upon model we instantiate it using the class name + ctor args
-    // otherwise we simply use the provided stage instance.
-    val stage = if (isModel) loadModel(className, metadataJson) else originalStage
-    // Recover all stage spark params and it's input features
-    val inputFeatures = originalStage.getInputFeatures()
+    val isModelOpt = (metadataJson \ FieldNames.IsModel.entryName).extractOpt[Boolean]
+    val ctorArgsJson = metadataJson \ FieldNames.CtorArgs.entryName
+    val stageClass = ReflectionUtils.classForName(className).asInstanceOf[Class[OpPipelineStageBase]]
+
+    val stageTry: Try[OpPipelineStageBase] = isModelOpt match {
+      // ************************** Legacy mode **************************
+      case Some(isModel) =>
+        // *** Legacy mode ***
+        // In case we stumbled upon model we instantiate it using the class name + ctor args
+        // otherwise we simply use the provided stage instance.
+        if (isModel) new DefaultOpPipelineStageReaderWriter[OpPipelineStageBase]().read(stageClass, ctorArgsJson)
+        else originalStage.map(Success(_)).getOrElse(Failure(new RuntimeException("Origin stage was not set")))
+      // *****************************************************************
+      case _ =>
+        // Get the reader instance to load the stage
+        val reader = readerWriterFor[OpPipelineStageBase](stageClass)
+        reader.read(stageClass, ctorArgsJson)
+    }
+    val stage = stageTry match {
+      case Failure(err) => throw new RuntimeException(s"Failed to read the stage of type '${stageClass.getName}'", err)
+      case Success(stg) => stg
+    }
 
     // Update [[SparkWrapperParams]] with path so we can load the [[SparkStageParam]] instance
     val updatedMetadata = stage match {
-      case _: SparkWrapperParams[_] =>
-        val updatedParams = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path)
-        metadata.copy(params = updatedParams)
+      case _: SparkWrapperParams[_] => metadata.copy(
+        params = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path),
+        defaultParams = SparkStageParam.updateParamsMetadataWithPath(metadata.defaultParams, path)
+      )
       case _ => metadata
     }
 
     // Set all stage params from the metadata
     SparkDefaultParamsReadWrite.getAndSetParams(stage, updatedMetadata)
-    val matchingFeatures = stage.getTransientFeatures().map{ f =>
-      inputFeatures.find( i => i.uid == f.uid && i.isResponse == f.isResponse && i.typeName == f.typeName )
-        .getOrElse( throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'") )
+
+    // Recover and set all stage input features
+    val matchingFeatures = stage.getTransientFeatures().map { f =>
+      features.find(i => i.uid == f.uid && i.isResponse == f.isResponse && i.typeName == f.typeName)
+        .getOrElse(throw new RuntimeException(s"Feature '${f.uid}' was not found for stage '${stage.uid}'"))
     }
     stage.setInputFeatureArray(matchingFeatures)
   }
 
-  /**
-   * Load the model instance from the metadata by instantiating it using a class name + ctor args
-   */
-  private def loadModel(modelClassName: String, metadataJson: JValue): OpPipelineStageBase = {
-    // Extract all the ctor args
-    val ctorArgsJson = (metadataJson \ FieldNames.CtorArgs.entryName).asInstanceOf[JObject].obj
-    val ctorArgsMap = ctorArgsJson.map { case (argName, j) => argName -> j.extract[AnyValue] }.toMap
-    // Get the model class
-
-    // Make the ctor function used for creating a model instance
-    val ctorArgs: (String, Symbol) => Try[Any] = (argName, argSymbol) => Try {
-      val anyValue = ctorArgsMap.getOrElse(argName,
-        throw new RuntimeException(s"Ctor argument '$argName' was not found for model class '$modelClassName'")
-      )
-      anyValue.`type` match {
-        // Special handling for Feature Type TypeTags
-        case AnyValueTypes.TypeTag =>
-          Try(FeatureType.featureTypeTag(anyValue.value.toString)).recoverWith[TypeTag[_]] { case e =>
-            Try(FeatureType.featureValueTypeTag(anyValue.value.toString))
-          } match {
-            case Success(featureTypeTag) => featureTypeTag
-            case Failure(e) =>
-              throw new RuntimeException(
-                s"Unknown type tag '${anyValue.value.toString}' for ctor argument '$argName'. " +
-                  "Only Feature and Feature Value type tags are supported for serialization.", e
-              )
-          }
-
-        // Spark wrapped stage is saved using [[SparkWrapperParams]] and loaded later using
-        // [[SparkDefaultParamsReadWrite]].getAndSetParams returning 'null' here
-        case AnyValueTypes.SparkWrappedStage => {
-          null // yes, yes - this should be 'null'
-        }
-
-        // Everything else is read using json4s
-        case AnyValueTypes.Value => Try {
-          val ttag = ReflectionUtils.typeTagForType[Any](tpe = argSymbol.info)
-          val manifest = ReflectionUtils.manifestForTypeTag[Any](ttag)
-          Extraction.decompose(anyValue.value).extract[Any](formats, manifest)
-        } match {
-          case Success(any) => any
-          case Failure(e) => throw new RuntimeException(
-            s"Failed to parse argument '$argName' from value '${anyValue.value}'", e)
-        }
-      }
-    }
-
-    // Reflect model class instance by class + ctor args
-    val modelClass = ReflectionUtils.classForName(modelClassName)
-    val model = ReflectionUtils.newInstance[OpPipelineStageBase](modelClass, ctorArgs)
-    model
-  }
 }

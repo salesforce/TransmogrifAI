@@ -33,30 +33,11 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.salesforce.op.utils.json.JsonUtils
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.{Failure, Try}
-
-
-/**
- * A trait to be extended by a case class containing the args needed to define a family of scaling & descaling functions
- */
-trait ScalingArgs extends JsonLike
-
-/**
- * Case class for Scaling families that take no parameters
- */
-case class EmptyArgs() extends ScalingArgs
-
-/**
- * Parameters need to uniquely define a linear scaling function
- *
- * @param slope     the slope of the linear scaler
- * @param intercept the x axis intercept of the linear scaler
- */
-case class LinearScalerArgs(slope: Double, intercept: Double) extends ScalingArgs
 
 /**
  * A trait for defining a new family of scaling functions
@@ -98,7 +79,7 @@ object Scaler {
  */
 case class LogScaler() extends Scaler {
   val scalingType: ScalingType = ScalingType.Logarithmic
-  val args: ScalingArgs = EmptyArgs()
+  val args: ScalingArgs = EmptyScalerArgs()
   def scale(v: Double): Double = math.log(v)
   def descale(v: Double): Double = math.exp(v)
 }
@@ -140,7 +121,7 @@ object ScalerMetadata extends {
       case t@ScalingType.Linear =>
         JsonUtils.fromString[LinearScalerArgs](args).map(ScalerMetadata(t, _))
       case t@ScalingType.Logarithmic =>
-        JsonUtils.fromString[EmptyArgs](args).map(ScalerMetadata(t, _))
+        JsonUtils.fromString[EmptyScalerArgs](args).map(ScalerMetadata(t, _))
       case t =>
         Failure(new IllegalArgumentException(s"Unsupported scaling type $t"))
     }

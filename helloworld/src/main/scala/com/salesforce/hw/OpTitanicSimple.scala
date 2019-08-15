@@ -152,6 +152,19 @@ object OpTitanicSimple {
     val model = workflow.train()
     println(s"Model summary:\n${model.summaryPretty()}")
 
+    // Extract information (i.e. feature importance) via model insights
+    val modelInsights = model.modelInsights(prediction)
+    val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+    val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
+      feature.contribution.map( contribution => math.abs(contribution))
+        .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
+    val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
+
+    val topNum = math.min(20, sortedContributions.size)
+    println(s"Top $topNum feature contributions:")
+    sortedContributions.take(topNum).foreach( featureInfo => println(s"${featureInfo._1}: ${featureInfo._2}"))
+
+
     // Manifest the result features of the workflow
     println("Scoring the model")
     val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)

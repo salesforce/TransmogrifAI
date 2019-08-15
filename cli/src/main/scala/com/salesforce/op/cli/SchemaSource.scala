@@ -138,7 +138,7 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
         case Some(actualType) =>
           val newSchema = Schema.create(actualType)
           val schemaField =
-            new Schema.Field(field.name, newSchema, "auto-generated", orgSchemaField.defaultValue)
+            new Schema.Field(field.name, newSchema, "auto-generated", orgSchemaField.defaultVal())
           AvroField.from(schemaField)
       }
     } else field
