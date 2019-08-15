@@ -798,4 +798,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       }
     }
   }
+
+  it should "return correct insights when a model combiner is used as the final feature" in {
+
+  }
 }

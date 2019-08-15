@@ -453,7 +453,7 @@ case object ModelInsights {
     val models = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
-      case s: SelectedModelCombiner => s
+      case s: SelectedCombinerModel => s
     } // TODO support other model types?
     val model = models.lastOption
     log.info(
