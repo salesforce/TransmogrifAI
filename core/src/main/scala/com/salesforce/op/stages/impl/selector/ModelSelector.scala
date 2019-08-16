@@ -144,7 +144,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     implicit val spark = dataset.sparkSession
     setInputSchema(dataset.schema).transformSchema(dataset.schema)
-    require(!dataset.isEmpty, "Dataset cannot be empty")
+    // require(!dataset.isEmpty, "Dataset cannot be empty")
     val data = dataset.select(labelColName, in2.name)
     val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map{ e =>
       val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, labelColName)
