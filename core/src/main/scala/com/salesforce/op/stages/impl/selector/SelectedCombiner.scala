@@ -136,9 +136,9 @@ class SelectedCombiner
     def makeMeta(model: SelectedCombinerModel): Unit = {
       def updateKeys(map: Map[String, Any], string: String) = map.map{ case (k, v) => k + string -> v }
 
-      if (model.weight1 == 1.0) //TODO fix
+      if (model.strategy == CombinationStrategy.Best && model.weight1 > 0.5)
         setMetadata(summary1.toMetadata().toSummaryMetadata())
-      else if (model.weight2 == 1.0)
+      else if (model.strategy == CombinationStrategy.Best)
         setMetadata(summary2.toMetadata().toSummaryMetadata())
       else {
         val summary = new ModelSelectorSummary(
@@ -172,12 +172,14 @@ class SelectedCombiner
         (0.5, 0.5)
     }
 
-    val model: SelectedCombinerModel =
-      new SelectedCombinerModel(weight1 = weight1, weight2 = weight2, operationName = operationName, uid = uid)
-        .setEvaluators(evaluators)
-        .setParent(this)
-        .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[Prediction], in3.asFeatureLike[Prediction])
-        .setOutputFeatureName(getOutputFeatureName)
+    val model: SelectedCombinerModel = new SelectedCombinerModel(
+      weight1 = weight1, weight2 = weight2, strategy = getCombinationStrategy(),
+      operationName = operationName, uid = uid
+    )
+      .setEvaluators(evaluators)
+      .setParent(this)
+      .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[Prediction], in3.asFeatureLike[Prediction])
+      .setOutputFeatureName(getOutputFeatureName)
 
     makeMeta(model)
     model.setMetadata(getMetadata())
@@ -189,6 +191,7 @@ final class SelectedCombinerModel private[op]
 (
   val weight1: Double,
   val weight2: Double,
+  val strategy: CombinationStrategy,
   val operationName: String,
   val uid: String
 )(

@@ -489,7 +489,7 @@ case object ModelInsights {
 
     ModelInsights(
       label = labelSummary,
-      features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
+      features = getFeatureInsights(vectorInput, checkerSummary, model, models, rawFeatures,
         blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
@@ -537,6 +537,7 @@ case object ModelInsights {
     vectorInfo: Option[OpVectorMetadata],
     summary: Option[SanityCheckerSummary],
     model: Option[Model[_]],
+    allModels: Seq[Model[_]],
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
@@ -545,7 +546,7 @@ case object ModelInsights {
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
-        val contributions = getModelContributions(model, Option(v.columns.length))
+        val contributions = getModelContributions(model, allModels, Option(v.columns.length))
         val droppedSet = s.dropped.toSet
         val indexInToIndexKept = v.columns
           .collect { case c if !droppedSet.contains(c.makeColName()) => c.index }
@@ -628,7 +629,7 @@ case object ModelInsights {
             )
         }
       case (Some(v), None) =>
-        val contributions = getModelContributions(model, Option(v.columns.length))
+        val contributions = getModelContributions(model, allModels, Option(v.columns.length))
         v.getColumnHistory().map { h =>
           h.parentFeatureOrigins -> Insights(
             derivedFeatureName = h.columnName,
@@ -719,11 +720,18 @@ case object ModelInsights {
   }
 
   private[op] def getModelContributions
-  (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
+  (model: Option[Model[_]], allModels: Seq[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
     val stage = model.flatMap {
       case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case m: SelectedCombinerModel if m.strategy == CombinationStrategy.Best => { // best result of 2 model selectors
+        println(m.strategy, m.weight1, m.weight2, m.getInputFeatures().map(_.originStage.uid).toList)
+        val originF = if (m.weight1 > 0.5) m.getInputFeature[Prediction](1) else m.getInputFeature[Prediction](2)
+        allModels.find( m => originF.exists(_.originStage.uid == m.uid) )
+          .flatMap{ case m: SparkWrapperParams[_] => m.getSparkMlStage() }
+      }
       case _ => None
     }
+    println(model, allModels, stage)
     val contributions = stage.collect {
       case m: LogisticRegressionModel => m.coefficientMatrix.rowIter.toSeq.map(_.toArray.toSeq)
       case m: RandomForestClassificationModel => Seq(m.featureImportances.toArray.toSeq)
@@ -745,6 +753,8 @@ case object ModelInsights {
   private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
     model match {
       case Some(m: SelectedModel) =>
+        Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
+      case Some(m: SelectedCombinerModel) =>
         Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
       case _ => None
     }
