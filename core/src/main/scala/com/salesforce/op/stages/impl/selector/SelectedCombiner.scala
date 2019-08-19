@@ -51,7 +51,7 @@ trait SelectedCombinerParams extends Params {
     isValid = (in: String) => CombinationStrategy.values.map(_.entryName).contains(in)
   )
   def setCombinationStrategy(value: CombinationStrategy): this.type = set(combinationStrategy, value.entryName)
-  def getCombinationStrategy(): CombinationStrategy = CombinationStrategy.withName($(combinationStrategy))
+  def getCombinationStrategy(): CombinationStrategy= CombinationStrategy.withName($(combinationStrategy))
   setDefault(combinationStrategy, CombinationStrategy.Best.entryName)
 
 }
@@ -163,7 +163,8 @@ class SelectedCombiner
 
     val (metricValue1, metricValue2) = (getMet(metricValueOpt1), getMet(metricValueOpt2))
 
-    val (weight1, weight2) = getCombinationStrategy() match {
+    val strategy = getCombinationStrategy()
+    val (weight1, weight2) = strategy match {
       case CombinationStrategy.Best =>
         if (metricValue1 > metricValue2) (1.0, 0.0) else (0.0, 1.0)
       case CombinationStrategy.Weighted =>
@@ -173,7 +174,7 @@ class SelectedCombiner
     }
 
     val model: SelectedCombinerModel = new SelectedCombinerModel(
-      weight1 = weight1, weight2 = weight2, strategy = getCombinationStrategy(),
+      weight1 = weight1, weight2 = weight2, strategy = strategy,
       operationName = operationName, uid = uid
     )
       .setEvaluators(evaluators)
@@ -226,11 +227,11 @@ final class SelectedCombinerModel private[op]
 }
 
 
-sealed abstract class CombinationStrategy(val name: String) extends EnumEntry with Serializable
+sealed abstract class CombinationStrategy extends EnumEntry with Serializable
 
 object CombinationStrategy extends Enum[CombinationStrategy] {
   val values = findValues
-  case object Weighted extends CombinationStrategy("weighted")
-  case object Equal extends CombinationStrategy("equal")
-  case object Best extends CombinationStrategy("best")
+  case object Weighted extends CombinationStrategy
+  case object Equal extends CombinationStrategy
+  case object Best extends CombinationStrategy
 }

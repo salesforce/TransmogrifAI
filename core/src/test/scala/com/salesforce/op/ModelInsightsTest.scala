@@ -806,7 +806,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
       .setParameters(params).setReader(dataReader).train()
     val insights = workflowModel.modelInsights(predComb)
-    println(insights.prettyPrint())
     insights.selectedModelInfo.nonEmpty shouldBe true
     insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
     insights.features.map(_.featureName).toSet shouldBe
