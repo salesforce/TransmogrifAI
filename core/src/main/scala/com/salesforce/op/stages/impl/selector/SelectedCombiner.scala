@@ -51,7 +51,7 @@ trait SelectedCombinerParams extends Params {
     isValid = (in: String) => CombinationStrategy.values.map(_.entryName).contains(in)
   )
   def setCombinationStrategy(value: CombinationStrategy): this.type = set(combinationStrategy, value.entryName)
-  def getCombinationStrategy(): CombinationStrategy= CombinationStrategy.withName($(combinationStrategy))
+  def getCombinationStrategy(): CombinationStrategy = CombinationStrategy.namesToValuesMap($(combinationStrategy))
   setDefault(combinationStrategy, CombinationStrategy.Best.entryName)
 
 }
@@ -171,6 +171,7 @@ class SelectedCombiner
         (metricValue1 / (metricValue1 + metricValue2), metricValue2 / (metricValue1 + metricValue2))
       case CombinationStrategy.Equal =>
         (0.5, 0.5)
+      case s => throw new RuntimeException(s"Combination strategy $s is not supported")
     }
 
     val model: SelectedCombinerModel = new SelectedCombinerModel(
@@ -227,7 +228,14 @@ final class SelectedCombinerModel private[op]
 }
 
 
-sealed abstract class CombinationStrategy extends EnumEntry with Serializable
+sealed abstract class CombinationStrategy extends EnumEntry with Serializable {
+  override def equals(obj: Any): Boolean = {
+    obj match {
+      case o: CombinationStrategy => this.entryName == o.entryName
+      case _ => false
+    }
+  }
+}
 
 object CombinationStrategy extends Enum[CombinationStrategy] {
   val values = findValues
