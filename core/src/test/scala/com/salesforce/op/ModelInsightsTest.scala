@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{CombinationStrategy, SelectedCombiner, SelectedModel}
+import com.salesforce.op.stages.impl.selector.{CombinationStrategy, SelectedCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
@@ -364,10 +364,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
   it should "correctly pull out model contributions when passed a selected model" in {
     val predLinMod = workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel]
-    val reg = ModelInsights.getModelContributions(Option(predLinMod), Seq(predLinMod))
+    val reg = ModelInsights.getModelContributions(Option(predLinMod))
 
     val linMod = workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel]
-    val lin = ModelInsights.getModelContributions(Option(linMod), Seq(linMod))
+    val lin = ModelInsights.getModelContributions(Option(linMod))
     reg.size shouldBe 1
     reg.head.size shouldBe 21
 
@@ -593,7 +593,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
 
     val featureInsights = ModelInsights.getFeatureInsights(
-      Option(meta), Option(summary), None, Seq(), Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
+      Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
       RawFeatureFilterResults(), labelSum
     )
     featureInsights.size shouldBe 2
@@ -806,10 +806,13 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
       .setParameters(params).setReader(dataReader).train()
     val insights = workflowModel.modelInsights(predComb)
+    println(insights.prettyPrint())
     insights.selectedModelInfo.nonEmpty shouldBe true
-    insights.features.map(_.featureName).toSet shouldBe
-      Set(gender, genderPL, age, height, description, weight, numericMap).map(_.name)
     insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.map(_.featureName).toSet shouldBe
+      Set(genderPL, age, height, description, weight, numericMap).map(_.name)
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.foreach(_.derivedFeatures.foreach(_.variance.nonEmpty shouldBe true))
   }
 
   it should "return correct insights when a model combiner best is used as the final feature" in {
@@ -817,20 +820,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       .setInput(label, pred, predWithMaps).getOutput()
     val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
       .setParameters(params).setReader(dataReader).train()
+    val predModel = workflowModel.getOriginStageOf(predComb).asInstanceOf[SelectedCombinerModel]
+    val winner = if (predModel.weight1 > 0.5) pred else predWithMaps
     val insights = workflowModel.modelInsights(predComb)
-    val insights1 = workflowModel.modelInsights(pred)
-    val insights2 = workflowModel.modelInsights(predWithMaps)
+    val insightsWin = workflowModel.modelInsights(winner)
+
     insights.selectedModelInfo.nonEmpty shouldBe true
-    println("pred")
-    println(insights1.prettyPrint())
-    println("predMaps")
-    println(insights2.prettyPrint())
-    println("combined")
-    println(insights.prettyPrint())
-    insights.features.map(_.featureName).toSet shouldBe
-      insights1.features.map(_.featureName).toSet.union(insights2.features.map(_.featureName).toSet)
-    //insights1.features.foreach(_.derivedFeatures.foreach(_.contribution.size shouldBe 1))
-    insights2.features.foreach(_.derivedFeatures.foreach(_.contribution.size shouldBe 1))
-    //insights.features.foreach(_.derivedFeatures.foreach(_.contribution.size shouldBe 1))
+    insights.features.map(_.featureName).toSet shouldBe insightsWin.features.map(_.featureName).toSet
+    insights.features.zip(insightsWin.features).foreach{
+      case (c, w) => c.derivedFeatures.zip(w.derivedFeatures)
+        .foreach{ case (c1, w1) => c1.contribution shouldBe w1.contribution }
+    }
   }
 }
