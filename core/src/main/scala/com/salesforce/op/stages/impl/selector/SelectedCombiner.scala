@@ -81,7 +81,7 @@ class SelectedCombiner
   private def getSummary(feature: TransientFeature) =
     ModelSelectorSummary.fromMetadata(getInputSchema()(feature.name).metadata.getSummaryMetadata())
 
-  override def onSetInput() = {
+  override def onSetInput(): Unit = {
     super.onSetInput()
 
     require(
@@ -136,11 +136,11 @@ class SelectedCombiner
     def makeMeta(model: SelectedCombinerModel): Unit = {
       def updateKeys(map: Map[String, Any], string: String) = map.map{ case (k, v) => k + string -> v }
 
-      if (model.strategy == CombinationStrategy.Best && model.weight1 > 0.5)
+      if (model.strategy == CombinationStrategy.Best && model.weight1 > 0.5) {
         setMetadata(summary1.toMetadata().toSummaryMetadata())
-      else if (model.strategy == CombinationStrategy.Best)
+      } else if (model.strategy == CombinationStrategy.Best) {
         setMetadata(summary2.toMetadata().toSummaryMetadata())
-      else {
+      } else {
         val summary = new ModelSelectorSummary(
           validationType = summary1.validationType,
           validationParameters = updateKeys(summary1.validationParameters, "_1") ++
