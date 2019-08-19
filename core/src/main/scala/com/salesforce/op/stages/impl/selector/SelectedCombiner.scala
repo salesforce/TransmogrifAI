@@ -152,7 +152,7 @@ class SelectedCombiner
           problemType = summary1.problemType,
           bestModelUID = summary1.bestModelUID + " " + summary2.bestModelUID,
           bestModelName = summary1.bestModelName + " " + summary2.bestModelName,
-          bestModelType = summary1.bestModelType + " " +summary2.bestModelType,
+          bestModelType = summary1.bestModelType + " " + summary2.bestModelType,
           validationResults = summary1.validationResults ++ summary2.validationResults,
           trainEvaluation = evaluate(model.transform(dataset)),
           holdoutEvaluation = None
