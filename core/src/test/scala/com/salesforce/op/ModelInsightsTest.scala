@@ -800,11 +800,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
   }
 
-  it should "return both metrics when having multiple binary classification metrics in model insights" in {
+  it should "return default & custom metrics when having multiple binary classification metrics in model insights" in {
     val prediction = BinaryClassificationModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator(
-          name = OpEvaluatorNames.Custom("second", "second")
+        trainTestEvaluators = Seq(Evaluators.BinaryClassification.custom(
+          metricName = "second", evaluateFn = _ => 0.0
         )),
         splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
@@ -816,18 +816,19 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val trainEval = insights.selectedModelInfo.get.trainEvaluation
     trainEval shouldBe a[MultiMetrics]
     val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
-    trainMetric.size shouldEqual 3
-    trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationMetrics]).toArray should
-      contain theSameElementsAs Array(true, true, false)
-    trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationBinMetrics]).toArray should
-      contain theSameElementsAs Array(true, false, false)
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Binary.humanFriendlyName -> classOf[BinaryClassificationMetrics],
+      OpEvaluatorNames.BinScore.humanFriendlyName -> classOf[BinaryClassificationBinMetrics],
+      "second" -> classOf[SingleMetric]
+    )
   }
 
-  it should "return both metrics when having multiple multi-class classification metrics in model insights" in {
+  it should
+    "return default & custom metrics when having multiple multi-class classification metrics in model insights" in {
     val prediction = MultiClassificationModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(new OpMultiClassificationEvaluator(
-          name = OpEvaluatorNames.Custom("second", "second")
+        trainTestEvaluators = Seq(Evaluators.MultiClassification.custom(
+          metricName = "second", evaluateFn = _ => 0.0
         )),
         splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
@@ -839,15 +840,17 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val trainEval = insights.selectedModelInfo.get.trainEvaluation
     trainEval shouldBe a[MultiMetrics]
     val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
-    trainMetric.size shouldEqual 2
-    trainMetric.foreach( metric => metric._2 shouldBe a[MultiClassificationMetrics])
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Multi.humanFriendlyName -> classOf[MultiClassificationMetrics],
+      "second" -> classOf[SingleMetric]
+    )
   }
 
-  it should "return both metrics when having multiple regression metrics in model insights" in {
+  it should "return default & custom metrics when having multiple regression metrics in model insights" in {
     val prediction = RegressionModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(new OpRegressionEvaluator(
-          name = OpEvaluatorNames.Custom("second", "second")
+        trainTestEvaluators = Seq(Evaluators.Regression.custom(
+          metricName = "second", evaluateFn = _ => 0.0
         )),
         dataSplitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
@@ -859,7 +862,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val trainEval = insights.selectedModelInfo.get.trainEvaluation
     trainEval shouldBe a[MultiMetrics]
     val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
-    trainMetric.size shouldEqual 2
-    trainMetric.foreach( metric => metric._2 shouldBe a[RegressionMetrics])
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Regression.humanFriendlyName -> classOf[RegressionMetrics],
+      "second" -> classOf[SingleMetric]
+    )
   }
 }
