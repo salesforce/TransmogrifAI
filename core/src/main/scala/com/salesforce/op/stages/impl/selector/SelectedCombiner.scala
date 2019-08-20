@@ -235,6 +235,7 @@ sealed abstract class CombinationStrategy extends EnumEntry with Serializable {
       case _ => false
     }
   }
+  override def hashCode(): Int = super.hashCode()
 }
 
 object CombinationStrategy extends Enum[CombinationStrategy] {
