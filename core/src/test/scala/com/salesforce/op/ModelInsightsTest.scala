@@ -30,7 +30,7 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.evaluators.{MultiClassificationMetrics, MultiMetrics, OpEvaluatorNames, OpMultiClassificationEvaluator, OpRegressionEvaluator, RegressionMetrics}
+import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
@@ -798,6 +798,29 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
       }
     }
+  }
+
+  it should "return both metrics when having multiple binary classification metrics in model insights" in {
+    val prediction = BinaryClassificationModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(new OpBinaryClassificationEvaluator(
+          name = OpEvaluatorNames.Custom("second", "second")
+        )),
+        splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, checked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.size shouldEqual 4
+    trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationMetrics]).toArray should
+      contain theSameElementsAs Array(true, true, false, false)
+    trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationBinMetrics]).toArray should
+      contain theSameElementsAs Array(true, true, false, false)
   }
 
   it should "return both metrics when having multiple multi-class classification metrics in model insights" in {
