@@ -38,7 +38,10 @@ import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird._
 import com.twitter.algebird.Operators._
+import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.feature.HashingTF
+import org.apache.spark.mllib.stat.Statistics
+import org.apache.spark.mllib.stat.test.ChiSqTestResult
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -122,6 +125,19 @@ case class FeatureDistribution
     case _ => None
   }
 
+  def chiSqUnifTestHash(): ChiSqTestResult = {
+    val vectorizedDistr = Vectors.dense(distribution)
+    return Statistics.chiSqTest(vectorizedDistr)
+  }
+
+  def chiSqUnifTestCard(): (Option[Double], Option[Double]) = cardEstimate match {
+    case Some(x) => {
+      val vectorizedDistr = Vectors.dense(x.valueCounts.values.toArray.map(_.toDouble))
+      val testResult = Statistics.chiSqTest(vectorizedDistr)
+      (Some(testResult.statistic), Some(testResult.pValue))
+    }
+    case _ => (None, None)
+  }
   /**
    * Combine feature distributions
    *
@@ -293,10 +309,10 @@ object FeatureDistribution {
    */
   private def momentsValues(values: ProcessedSeq): Moments = {
     val population = values match {
-      case Left(seq) => seq.map(x => x.length.toDouble).sum
-      case Right(seq) => seq.sum
+      case Left(seq) => seq.map(x => x.length.toDouble)
+      case Right(seq) => seq
     }
-    Moments(population)
+    MomentsGroup.sum(population.map(x => Moments(x)))
   }
 
   /**

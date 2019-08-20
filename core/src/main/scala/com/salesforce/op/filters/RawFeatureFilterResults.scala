@@ -150,7 +150,11 @@ case class RawFeatureFilterMetrics
   kurtosis: Option[Double],
   rawcardSize: Option[Double],
   rawavgcardCount: Option[Double],
-  rawmaxcardCounts: Option[Double]
+  rawmaxcardCount: Option[Double],
+  rawchiSq_dist_pval: Double,
+  rawchiSq_dist_stat: Double,
+  rawchiSq_card_pval: Option[Double],
+  rawchiSq_card_stat: Option[Double]
 )
 
 /**
