@@ -816,11 +816,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val trainEval = insights.selectedModelInfo.get.trainEvaluation
     trainEval shouldBe a[MultiMetrics]
     val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
-    trainMetric.size shouldEqual 4
+    trainMetric.size shouldEqual 3
     trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationMetrics]).toArray should
-      contain theSameElementsAs Array(true, true, false, false)
+      contain theSameElementsAs Array(true, true, false)
     trainMetric.map( metric => metric._2.isInstanceOf[BinaryClassificationBinMetrics]).toArray should
-      contain theSameElementsAs Array(true, true, false, false)
+      contain theSameElementsAs Array(true, false, false)
   }
 
   it should "return both metrics when having multiple multi-class classification metrics in model insights" in {
