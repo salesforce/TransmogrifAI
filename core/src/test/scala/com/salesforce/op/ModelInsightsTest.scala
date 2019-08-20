@@ -51,7 +51,7 @@ import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.stages.impl.feature.TextStats
 import com.twitter.algebird.Moments
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset}
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.apache.spark.sql.functions._
@@ -803,9 +803,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "return default & custom metrics when having multiple binary classification metrics in model insights" in {
     val prediction = BinaryClassificationModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(Evaluators.BinaryClassification.custom(
-          metricName = "second", evaluateFn = _ => 0.0
-        )),
+        trainTestEvaluators = Seq(
+          Evaluators.BinaryClassification.custom(metricName = "second", evaluateFn = _ => 0.0),
+          Evaluators.BinaryClassification.custom(metricName = "third", evaluateFn = _ => 1.0)
+        ),
         splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
       .setInput(label, checked)
@@ -819,7 +820,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
       OpEvaluatorNames.Binary.humanFriendlyName -> classOf[BinaryClassificationMetrics],
       OpEvaluatorNames.BinScore.humanFriendlyName -> classOf[BinaryClassificationBinMetrics],
-      "second" -> classOf[SingleMetric]
+      "second" -> classOf[SingleMetric],
+      "third" -> classOf[SingleMetric]
     )
   }
 
@@ -827,9 +829,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     "return default & custom metrics when having multiple multi-class classification metrics in model insights" in {
     val prediction = MultiClassificationModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(Evaluators.MultiClassification.custom(
-          metricName = "second", evaluateFn = _ => 0.0
-        )),
+        trainTestEvaluators = Seq(Evaluators.MultiClassification.custom(metricName = "second", evaluateFn = _ => 0.0)),
         splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
       .setInput(label, checked)
@@ -849,9 +849,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "return default & custom metrics when having multiple regression metrics in model insights" in {
     val prediction = RegressionModelSelector
       .withCrossValidation(seed = 42,
-        trainTestEvaluators = Seq(Evaluators.Regression.custom(
-          metricName = "second", evaluateFn = _ => 0.0
-        )),
+        trainTestEvaluators = Seq(Evaluators.Regression.custom(metricName = "second", evaluateFn = _ => 0.0)),
         dataSplitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
         modelsAndParameters = models)
       .setInput(label, features)
