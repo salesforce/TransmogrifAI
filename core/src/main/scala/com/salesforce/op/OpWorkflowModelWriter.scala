@@ -35,6 +35,7 @@ import com.salesforce.op.filters.RawFeatureFilterResults
 import com.salesforce.op.stages.{OPStage, OpPipelineStageWriter}
 import enumeratum._
 import org.apache.hadoop.fs.Path
+import org.apache.hadoop.io.compress.GzipCodec
 import org.apache.spark.ml.util.MLWriter
 import org.json4s.JsonAST.{JArray, JObject, JString}
 import org.json4s.JsonDSL._
@@ -54,7 +55,8 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
   implicit val jsonFormats: Formats = DefaultFormats
 
   override protected def saveImpl(path: String): Unit = {
-    sc.parallelize(Seq(toJsonString(path)), 1).saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path))
+    sc.parallelize(Seq(toJsonString(path)), 1)
+      .saveAsTextFile(OpWorkflowModelReadWriteShared.jsonPath(path), classOf[GzipCodec])
   }
 
   /**
@@ -63,7 +65,7 @@ class OpWorkflowModelWriter(val model: OpWorkflowModel) extends MLWriter {
    * @param path to save the model and its stages
    * @return model json string
    */
-  def toJsonString(path: String): String = pretty(render(toJson(path)))
+  def toJsonString(path: String): String = compact(render(toJson(path)))
 
   /**
    * Json serialize model instance
