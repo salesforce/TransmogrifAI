@@ -240,19 +240,26 @@ case object ModelSelectorSummary {
     ReflectionUtils.classForName(className) match {
       case n if n == classOf[MultiMetrics] =>
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
-          val asMetrics = d.flatMap{ case (_, values) => values.map{
+          val asMetrics = d.flatMap{ case (_, values) =>
+            values.map{
             case (nm: String, mp: Map[String, Any]@unchecked) =>
               val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
-              nm match {
-                case OpEvaluatorNames.Binary.humanFriendlyName =>
+
+              val binary = classOf[BinaryClassificationMetrics].getDeclaredFields.map(f => f.getName).toSet
+              val multi = classOf[MultiClassificationMetrics].getDeclaredFields.map(f => f.getName).toSet
+              val binscore = classOf[BinaryClassificationBinMetrics].getDeclaredFields.map(f => f.getName).toSet
+              val regression = classOf[RegressionMetrics].getDeclaredFields.map(f => f.getName).toSet
+              mp.keys match {
+                case `binary` =>
                   nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.BinScore.humanFriendlyName =>
+                case `binscore` =>
                   nm -> JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson).get
-                case OpEvaluatorNames.Multi.humanFriendlyName =>
+                case `multi` =>
                   nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.Regression.humanFriendlyName =>
+                case `regression` =>
                   nm -> JsonUtils.fromString[RegressionMetrics](valsJson).get
-                case _ => nm -> JsonUtils.fromString[SingleMetric](valsJson).get
+                case _ =>
+                  nm -> JsonUtils.fromString[SingleMetric](valsJson).get
               }}
           }
           MultiMetrics(asMetrics)
