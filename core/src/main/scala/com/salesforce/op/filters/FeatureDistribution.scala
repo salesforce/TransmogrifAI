@@ -100,10 +100,10 @@ case class FeatureDistribution
     case Some(x) =>
       val counts = x.valueCounts.values.toList.sortWith(_ > _)
       if (counts.size > 100) {
-        Some(counts.take(100).sum / count)
+        Some(counts.take(100).sum.toFloat / count)
       }
       else {
-        Some(counts.sum / count)
+        Some(counts.sum.toFloat / count)
       }
    case _ => None
   }
@@ -115,7 +115,7 @@ case class FeatureDistribution
 
   // average number of token per row
   def avgcardCount(): Option[Double] = cardEstimate match {
-    case Some(x) => Some(x.valueCounts.values.sum / count)
+    case Some(x) => Some(x.valueCounts.values.sum.toFloat / count)
     case _ => None
   }
 
