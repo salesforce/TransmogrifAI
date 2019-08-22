@@ -30,6 +30,7 @@
 
 package com.salesforce.op
 
+import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
@@ -50,7 +51,7 @@ import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.twitter.algebird.Moments
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset}
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.apache.spark.sql.functions._
@@ -830,5 +831,71 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       case (c, w) => c.derivedFeatures.zip(w.derivedFeatures)
         .foreach{ case (c1, w1) => c1.contribution shouldBe w1.contribution }
     }
+  }
+
+  it should "return default & custom metrics when having multiple binary classification metrics in model insights" in {
+    val prediction = BinaryClassificationModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(
+          Evaluators.BinaryClassification.custom(metricName = "second", evaluateFn = _ => 0.0),
+          Evaluators.BinaryClassification.custom(metricName = "third", evaluateFn = _ => 1.0)
+        ),
+        splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, checked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Binary.humanFriendlyName -> classOf[BinaryClassificationMetrics],
+      OpEvaluatorNames.BinScore.humanFriendlyName -> classOf[BinaryClassificationBinMetrics],
+      "second" -> classOf[SingleMetric],
+      "third" -> classOf[SingleMetric]
+    )
+  }
+
+  it should
+    "return default & custom metrics when having multiple multi-class classification metrics in model insights" in {
+    val prediction = MultiClassificationModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(Evaluators.MultiClassification.custom(metricName = "second", evaluateFn = _ => 0.0)),
+        splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, checked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Multi.humanFriendlyName -> classOf[MultiClassificationMetrics],
+      "second" -> classOf[SingleMetric]
+    )
+  }
+
+  it should "return default & custom metrics when having multiple regression metrics in model insights" in {
+    val prediction = RegressionModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(Evaluators.Regression.custom(metricName = "second", evaluateFn = _ => 0.0)),
+        dataSplitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, features)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Regression.humanFriendlyName -> classOf[RegressionMetrics],
+      "second" -> classOf[SingleMetric]
+    )
   }
 }

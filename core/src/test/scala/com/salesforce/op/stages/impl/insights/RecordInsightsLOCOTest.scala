@@ -30,11 +30,9 @@
 
 package com.salesforce.op.stages.impl.insights
 
-import com.salesforce.op.{FeatureHistory, OpWorkflow}
+import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{OpLogisticRegression, OpRandomForestClassifier}
-import com.salesforce.op._
-import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.stages.impl.feature.{DateListPivot, TransmogrifierDefaults}
 import com.salesforce.op.stages.impl.insights.RecordInsightsParser.Insights
 import com.salesforce.op.stages.impl.preparators.{SanityCheckDataTest, SanityChecker}
@@ -45,17 +43,18 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.testkit.{RandomIntegral, RandomMap, RandomReal, RandomText, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.ml.{Model, PredictionModel}
+import com.salesforce.op.{FeatureHistory, OpWorkflow, _}
+import org.apache.spark.ml.PredictionModel
 import org.apache.spark.ml.classification.LogisticRegressionModel
+import org.apache.spark.ml.linalg._
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{DataFrame, Encoder, Row}
 import org.apache.spark.sql.functions.monotonically_increasing_id
 import org.apache.spark.sql.types.StructType
-import org.apache.spark.ml.linalg._
+import org.apache.spark.sql.{DataFrame, Encoder, Row}
 import org.junit.runner.RunWith
-import org.scalatest.{FlatSpec, Suite}
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.{FlatSpec, Suite}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -307,8 +306,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
     withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
       "aggregation required for LOCO on this field.") {
-      testData.actualRecordInsights.foreach(p => assert(p.keys.exists(r =>
-        r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined)))
+      testData.actualRecordInsights.foreach { p =>
+        assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
+      }
     }
 
     assertLOCOSum(testData.actualRecordInsights)

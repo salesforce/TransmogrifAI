@@ -235,4 +235,6 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
     super.withNameInsensitiveOption(name).getOrElse(Custom(name, name, isLargerBetter))
   override def withNameInsensitive(name: String): OpEvaluatorNames = withNameInsensitive(name, true)
 
+  def withFriendlyNameInsensitive(name: String): Option[OpEvaluatorNames] =
+    values.collectFirst { case n if n.humanFriendlyName.equalsIgnoreCase(name) => n }
 }

@@ -141,7 +141,8 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
   def withCrossValidation(
     splitter: Option[DataCutter] = Option(DataCutter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
-    validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.MultiClassification.error(),
+    validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] =
+    Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
@@ -189,7 +190,8 @@ case object MultiClassificationModelSelector extends ModelSelectorFactory {
   def withTrainValidationSplit(
     splitter: Option[DataCutter] = Option(DataCutter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
-    validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.MultiClassification.error(),
+    validationMetric: OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics] =
+    Evaluators.MultiClassification.error(),
     trainTestEvaluators: Seq[OpMultiClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
