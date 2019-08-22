@@ -116,8 +116,9 @@ class SelectedCombiner
       s"Cannot combine model selectors for different problem types found ${summary1.problemType}" +
         s" and ${summary2.problemType}")
 
-    def getMetricValue(metrics: EvaluationMetrics, name: EvalMetric) = metrics.toMap.get(name.humanFriendlyName)
-      .map(_.asInstanceOf[Double])
+    def getMetricValue(metrics: EvaluationMetrics, name: EvalMetric) =
+      metrics.toMap.collectFirst{
+        case (k, v) if k.contains(name.humanFriendlyName) || k.contains(name.entryName) => v.asInstanceOf[Double]}
 
     def getWinningModelMetric(summary: ModelSelectorSummary) = {
       summary.validationResults.collectFirst {
@@ -193,7 +194,7 @@ class SelectedCombiner
     }
 
     val model: SelectedCombinerModel = new SelectedCombinerModel(
-      weight1 = weight1, weight2 = weight2, strategy = strategy,
+      weight1 = weight1, weight2 = weight2, strategy = strategy, metric = metricName,
       operationName = operationName, uid = uid
     )
       .setEvaluators(evaluators)
@@ -212,6 +213,7 @@ final class SelectedCombinerModel private[op]
   val weight1: Double,
   val weight2: Double,
   val strategy: CombinationStrategy,
+  val metric: EvalMetric,
   val operationName: String,
   val uid: String
 )(

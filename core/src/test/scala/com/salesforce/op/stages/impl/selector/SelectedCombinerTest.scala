@@ -30,7 +30,7 @@
 package com.salesforce.op.stages.impl.selector
 
 import com.salesforce.op.OpWorkflow
-import com.salesforce.op.evaluators.OpBinScoreEvaluator
+import com.salesforce.op.evaluators.{BinaryClassEvalMetrics, Evaluators, OpBinScoreEvaluator}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.PredictionEquality
@@ -123,6 +123,27 @@ class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerM
   }
 
   it should "work even if different metrics are used for determining best model" in {
+    val ms1 = BinaryClassificationModelSelector
+      .withCrossValidation(modelsAndParameters = Seq(lr -> lrParams),
+        validationMetric = Evaluators.BinaryClassification.f1())
+      .setInput(label, features)
+      .getOutput()
 
+    val ms2 = BinaryClassificationModelSelector
+      .withCrossValidation(modelsAndParameters = Seq(rf -> rfParams),
+        validationMetric = Evaluators.BinaryClassification.error())
+      .setInput(label, features)
+      .getOutput()
+
+
+    val inputData: Dataset[_] = new OpWorkflow()
+      .setResultFeatures(ms1, ms2)
+      .transform(data)
+
+    val comb = new SelectedCombiner().setInput(label, ms1, ms2)
+    val combFit = comb.fit(inputData)
+    combFit.transform(inputData).collect(comb.getOutput()) shouldBe inputData.collect(ms1)
+    combFit.strategy shouldBe CombinationStrategy.Best
+    combFit.metric shouldBe BinaryClassEvalMetrics.F1
   }
 }
