@@ -59,7 +59,7 @@ object Evaluators {
      * Area under ROC
      */
     def auROC(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuROC, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuROC) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuROC, dataset, default = 0.0)
       }
@@ -68,7 +68,7 @@ object Evaluators {
      * Area under Precision/Recall curve
      */
     def auPR(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.AuPR) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.AuPR, dataset, default = 0.0)
       }
@@ -78,7 +78,7 @@ object Evaluators {
      */
     def precision(): OpBinaryClassificationEvaluator =
       new OpBinaryClassificationEvaluator(
-        name = BinaryClassEvalMetrics.Precision, isLargerBetter = true) {
+        name = BinaryClassEvalMetrics.Precision) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.Precision, dataset, default = 0.0)
       }
@@ -88,7 +88,7 @@ object Evaluators {
      * Recall
      */
     def recall(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.Recall, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.Recall) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.Recall, dataset, default = 0.0)
       }
@@ -97,7 +97,7 @@ object Evaluators {
      * F1 score
      */
     def f1(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.F1, isLargerBetter = true) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.F1) {
         override def evaluate(dataset: Dataset[_]): Double =
           getBinaryEvaluatorMetric(BinaryClassEvalMetrics.F1, dataset, default = 0.0)
       }
@@ -106,7 +106,7 @@ object Evaluators {
      * Prediction error
      */
     def error(): OpBinaryClassificationEvaluator =
-      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.Error, isLargerBetter = false) {
+      new OpBinaryClassificationEvaluator(name = BinaryClassEvalMetrics.Error) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getBinaryEvaluatorMetric(BinaryClassEvalMetrics.Error, dataset, default = 1.0)
       }
@@ -128,12 +128,10 @@ object Evaluators {
       isLargerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, OPVector#Value, OPVector#Value, Double)] => Double
     ): OpBinaryClassificationEvaluatorBase[SingleMetric] = {
-      val largerBetter = isLargerBetter
       new OpBinaryClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpBinaryClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
-        override val isLargerBetter: Boolean = largerBetter
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
@@ -165,7 +163,7 @@ object Evaluators {
      * Weighted Precision
      */
     def precision(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Precision, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Precision) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Precision, dataset, default = 0.0)
       }
@@ -174,7 +172,7 @@ object Evaluators {
      * Weighted Recall
      */
     def recall(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Recall, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Recall) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.Recall, dataset, default = 0.0)
       }
@@ -183,7 +181,7 @@ object Evaluators {
      * F1 Score
      */
     def f1(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.F1, isLargerBetter = true) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.F1) {
         override def evaluate(dataset: Dataset[_]): Double =
           getMultiEvaluatorMetric(MultiClassEvalMetrics.F1, dataset, default = 0.0)
       }
@@ -192,7 +190,7 @@ object Evaluators {
      * Prediction Error
      */
     def error(): OpMultiClassificationEvaluator =
-      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Error, isLargerBetter = false) {
+      new OpMultiClassificationEvaluator(name = MultiClassEvalMetrics.Error) {
         override def evaluate(dataset: Dataset[_]): Double =
           1.0 - getMultiEvaluatorMetric(MultiClassEvalMetrics.Error, dataset, default = 1.0)
       }
@@ -214,12 +212,10 @@ object Evaluators {
       isLargerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, OPVector#Value, OPVector#Value, Double)] => Double
     ): OpMultiClassificationEvaluatorBase[SingleMetric] = {
-      val largerBetter = isLargerBetter
       new OpMultiClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpMultiClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
-        override val isLargerBetter: Boolean = largerBetter
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
@@ -251,7 +247,7 @@ object Evaluators {
      * Mean Squared Error
      */
     def mse(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = RegressionEvalMetrics.MeanSquaredError, isLargerBetter = false) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.MeanSquaredError) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanSquaredError, dataset, default = 0.0)
       }
@@ -260,7 +256,7 @@ object Evaluators {
      * Mean Absolute Error
      */
     def mae(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = RegressionEvalMetrics.MeanAbsoluteError, isLargerBetter = false) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.MeanAbsoluteError) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.MeanAbsoluteError, dataset, default = 0.0)
       }
@@ -269,7 +265,7 @@ object Evaluators {
      * R2
      */
     def r2(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = RegressionEvalMetrics.R2, isLargerBetter = true) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.R2) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.R2, dataset, default = 0.0)
       }
@@ -278,7 +274,7 @@ object Evaluators {
      * Root Mean Squared Error
      */
     def rmse(): OpRegressionEvaluator =
-      new OpRegressionEvaluator(name = RegressionEvalMetrics.RootMeanSquaredError, isLargerBetter = false) {
+      new OpRegressionEvaluator(name = RegressionEvalMetrics.RootMeanSquaredError) {
         override def evaluate(dataset: Dataset[_]): Double =
           getRegEvaluatorMetric(RegressionEvalMetrics.RootMeanSquaredError, dataset, default = 0.0)
       }
@@ -299,12 +295,10 @@ object Evaluators {
       isLargerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, Double)] => Double
     ): OpRegressionEvaluatorBase[SingleMetric] = {
-      val largerBetter = isLargerBetter
       new OpRegressionEvaluatorBase[SingleMetric](
         uid = UID[OpRegressionEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName)
-        override val isLargerBetter: Boolean = largerBetter
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {

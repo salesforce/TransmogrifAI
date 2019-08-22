@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{CombinationStrategy, SelectedCombiner, SelectedCombinerModel, SelectedModel}
+import com.salesforce.op.stages.impl.selector.{SelectedCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
@@ -48,7 +48,7 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.TextStats
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.twitter.algebird.Moments
 import org.apache.spark.sql.DataFrame
 import org.scalatest.FlatSpec

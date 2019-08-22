@@ -56,7 +56,6 @@ import org.slf4j.LoggerFactory
 private[op] class OpBinaryClassificationEvaluator
 (
   override val name: EvalMetric = OpEvaluatorNames.Binary,
-  override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpBinaryClassificationEvaluator],
   val numBins: Int = 100
 ) extends OpBinaryClassificationEvaluatorBase[BinaryClassificationMetrics](uid = uid) {

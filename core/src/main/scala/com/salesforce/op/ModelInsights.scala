@@ -35,7 +35,7 @@ import com.salesforce.op.features._
 import com.salesforce.op.features.types._
 import com.salesforce.op.filters._
 import com.salesforce.op.stages._
-import com.salesforce.op.stages.impl.feature.{TextStats, TransmogrifierDefaults}
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats, TransmogrifierDefaults}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}

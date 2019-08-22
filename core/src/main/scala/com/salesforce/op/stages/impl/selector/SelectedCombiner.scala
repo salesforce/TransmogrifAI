@@ -35,15 +35,17 @@ import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{Prediction, RealNN}
 import com.salesforce.op.stages.OpPipelineStage3
 import com.salesforce.op.stages.base.ternary.OpTransformer3
+import com.salesforce.op.stages.impl.feature.CombinationStrategy
 import com.salesforce.op.utils.spark.RichMetadata._
-import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.ml.param.{Param, Params}
 import org.apache.spark.ml.{Estimator, Model}
 import org.apache.spark.sql.Dataset
 
 import scala.reflect.runtime.universe._
 
-
+/**
+ * Parameters for SelectorCombiner
+ */
 trait SelectedCombinerParams extends Params {
 
   final val combinationStrategy = new Param[String](parent = this, name = "combinationStrategy",
@@ -56,6 +58,16 @@ trait SelectedCombinerParams extends Params {
 
 }
 
+/**
+ * Class used to combine the predictions produced by two model selectors into a single prediction.
+ * Does this by either taking the best models prediction or a combination of the two predictions that is
+ * either weighted by the accuracy measure or equal. Uses the summary information from the model selectors to
+ * determine the accuracy of the predictions and reruns evaluation (both train and test) when the predictions
+ * are combined.
+ *
+ * @param operationName name of operation
+ * @param uid stage uid
+ */
 class SelectedCombiner
 (
   val operationName: String = "combineModels",
@@ -67,10 +79,12 @@ class SelectedCombiner
   OpPipelineStage3[RealNN, Prediction, Prediction, Prediction] with SelectedCombinerParams with HasEval {
 
   override def evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = {
-    val ev1 = in2.getFeature().originStage.asInstanceOf[ModelSelector[_, _]].evaluators
-    val ev1names = ev1.map(_.name).toSet
-    val ev2 = in2.getFeature().originStage.asInstanceOf[ModelSelector[_, _]].evaluators
-    ev1 ++ ev2.filter(e => ev1names.contains(e.name))
+    val ms1 = in2.getFeature().originStage.asInstanceOf[ModelSelector[_, _]]
+    val ev1 = ms1.evaluators
+    val ev1names = ms1.evaluators.map(_.name).toSet
+    val ms2 = in3.getFeature().originStage.asInstanceOf[ModelSelector[_, _]]
+    val ev2 = ms2.evaluators
+    ev1 ++ ev2.filterNot(e => ev1names.contains(e.name))
   }
 
   override protected[op] def outputsColNamesMap: Map[String, String] =
@@ -116,11 +130,10 @@ class SelectedCombiner
       throw new RuntimeException("Evaluation metrics for two model selectors are non-overlapping")
     }
 
-
     val eval1 = summary1.evaluationMetric
     val eval2 = summary2.evaluationMetric
 
-    val (metricValueOpt1: Option[Double], metricValueOpt2: Option[Double], metricName: EvalMetric) =
+    val (metricValueOpt1, metricValueOpt2, metricName) =
       if (eval1 == eval2) { // same decision metric in validation results
         (getWinningModelMetric(summary1), getWinningModelMetric(summary2), eval1)
       } else { // look for overlapping metrics in training results
@@ -129,7 +142,7 @@ class SelectedCombiner
         if (m2e1.nonEmpty) {
           (getMetricValue(summary1.trainEvaluation, eval1), m2e1, eval1)
         } else if (m1e2.nonEmpty) {
-          (m1e2, getMetricValue(summary2.trainEvaluation, eval2))
+          (m1e2, getMetricValue(summary2.trainEvaluation, eval2), eval2)
         } else (None, None, eval1)
       }
 
@@ -166,7 +179,12 @@ class SelectedCombiner
     val strategy = getCombinationStrategy()
     val (weight1, weight2) = strategy match {
       case CombinationStrategy.Best =>
-        if (metricValue1 > metricValue2) (1.0, 0.0) else (0.0, 1.0)
+        (metricValue1 > metricValue2, metricName.isLargerBetter) match {
+          case (true, true) => (1.0, 0.0)
+          case (true, false) => (0.0, 1.0)
+          case (false, true) => (0.0, 1.0)
+          case (false, false) => (1.0, 0.0)
+        }
       case CombinationStrategy.Weighted =>
         (metricValue1 / (metricValue1 + metricValue2), metricValue2 / (metricValue1 + metricValue2))
       case CombinationStrategy.Equal =>
@@ -227,20 +245,3 @@ final class SelectedCombinerModel private[op]
   override def evaluators: Seq[OpEvaluatorBase[_ <: EvaluationMetrics]] = evaluatorList
 }
 
-
-sealed abstract class CombinationStrategy extends EnumEntry with Serializable {
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case o: CombinationStrategy => this.entryName == o.entryName
-      case _ => false
-    }
-  }
-  override def hashCode(): Int = super.hashCode()
-}
-
-object CombinationStrategy extends Enum[CombinationStrategy] {
-  val values = findValues
-  case object Weighted extends CombinationStrategy
-  case object Equal extends CombinationStrategy
-  case object Best extends CombinationStrategy
-}

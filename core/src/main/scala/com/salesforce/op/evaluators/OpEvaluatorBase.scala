@@ -118,8 +118,16 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
    */
   val name: EvalMetric
 
+
+  /**
+   * Use the definition of the metric to determine if larger is better
+   * @return
+   */
+  override def isLargerBetter: Boolean = name.isLargerBetter
+
   /**
    * Evaluate function that returns a class or value with the calculated metric value(s).
+ *
    * @param dataset data to evaluate
    * @return metrics
    */

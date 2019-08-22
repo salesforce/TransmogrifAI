@@ -61,7 +61,6 @@ private[op] class OpForecastEvaluator
   val seasonalWindow: Int = 1,
   val maxItems: Int = 87660,
   override val name: EvalMetric = OpEvaluatorNames.Forecast,
-  override val isLargerBetter: Boolean = false,
   override val uid: String = UID[OpForecastEvaluator]
 ) extends OpRegressionEvaluatorBase[ForecastMetrics](uid) {
 

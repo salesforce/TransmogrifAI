@@ -35,6 +35,7 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.impl.classification.{BinaryClassificationModelSelector, OpLogisticRegression, OpRandomForestClassifier}
+import com.salesforce.op.stages.impl.feature.CombinationStrategy
 import com.salesforce.op.test.OpEstimatorSpec
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.tuning.ParamGridBuilder
@@ -81,8 +82,7 @@ class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerM
     .build()
 
   val ms1 = BinaryClassificationModelSelector
-    .withCrossValidation(modelsAndParameters = Seq(lr -> lrParams),
-      trainTestEvaluators = Seq(new OpBinScoreEvaluator()))
+    .withCrossValidation(modelsAndParameters = Seq(lr -> lrParams))
     .setInput(label, features)
     .getOutput()
 
@@ -120,5 +120,9 @@ class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerM
     meta.trainEvaluation == meta2.trainEvaluation shouldBe false
     meta.trainEvaluation.toMap.keySet shouldBe meta1.trainEvaluation.toMap.keySet
       .union(meta2.trainEvaluation.toMap.keySet)
+  }
+
+  it should "work even if different metrics are used for determining best model" in {
+
   }
 }

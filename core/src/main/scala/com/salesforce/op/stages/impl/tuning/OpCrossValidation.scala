@@ -21,7 +21,7 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.github.fommil.netlib.BLAS
-import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
@@ -42,7 +42,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 (
   val numFolds: Int = ValidatorParamDefaults.NumFolds,
   val seed: Long = ValidatorParamDefaults.Seed,
-  val evaluator: OpEvaluatorBase[_],
+  val evaluator: OpEvaluatorBase[_ <: EvaluationMetrics],
   val stratify: Boolean = ValidatorParamDefaults.Stratify,
   val parallelism: Int = ValidatorParamDefaults.Parallelism,
   val maxWait: Duration = ValidatorParamDefaults.MaxWait
