@@ -260,7 +260,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val crossEntropy = Evaluators.BinaryClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 
@@ -304,7 +304,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
 
     val crossEntropy = Evaluators.BinaryClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 

@@ -125,13 +125,14 @@ object Evaluators {
      */
     def custom(
       metricName: String,
-      isLargerBetter: Boolean = true,
+      largerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, OPVector#Value, OPVector#Value, Double)] => Double
     ): OpBinaryClassificationEvaluatorBase[SingleMetric] = {
       new OpBinaryClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpBinaryClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, largerBetter)
+        override val isLargerBetter: Boolean = name.isLargerBetter
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
@@ -209,15 +210,15 @@ object Evaluators {
      */
     def custom(
       metricName: String,
-      isLargerBetter: Boolean = true,
+      largerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, OPVector#Value, OPVector#Value, Double)] => Double
     ): OpMultiClassificationEvaluatorBase[SingleMetric] = {
       new OpMultiClassificationEvaluatorBase[SingleMetric](
         uid = UID[OpMultiClassificationEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, largerBetter)
+        override val isLargerBetter: Boolean = name.isLargerBetter
         override def getDefaultMetric: SingleMetric => Double = _.value
-
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {
           import dataset.sparkSession.implicits._
           val dataUse = makeDataToUse(dataset, getLabelCol)
@@ -292,13 +293,14 @@ object Evaluators {
      */
     def custom(
       metricName: String,
-      isLargerBetter: Boolean = true,
+      largerBetter: Boolean = true,
       evaluateFn: Dataset[(Double, Double)] => Double
     ): OpRegressionEvaluatorBase[SingleMetric] = {
       new OpRegressionEvaluatorBase[SingleMetric](
         uid = UID[OpRegressionEvaluatorBase[SingleMetric]]
       ) {
-        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, isLargerBetter)
+        override val name: EvalMetric = OpEvaluatorNames.Custom(metricName, metricName, largerBetter)
+        override val isLargerBetter: Boolean = name.isLargerBetter
         override def getDefaultMetric: SingleMetric => Double = _.value
 
         override def evaluateAll(dataset: Dataset[_]): SingleMetric = {

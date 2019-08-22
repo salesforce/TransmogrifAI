@@ -116,7 +116,7 @@ abstract class OpEvaluatorBase[T <: EvaluationMetrics] extends Evaluator
   /**
    * Name of evaluator
    */
-  val name: EvalMetric
+  def name: EvalMetric
 
 
   /**
