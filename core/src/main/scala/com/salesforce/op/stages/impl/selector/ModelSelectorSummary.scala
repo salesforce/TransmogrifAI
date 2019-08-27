@@ -239,26 +239,26 @@ case object ModelSelectorSummary {
 
     ReflectionUtils.classForName(className) match {
       case n if n == classOf[MultiMetrics] =>
-        JsonUtils.fromString[Map[String, Map[String, Any]]](json).map{ d =>
-          val asMetrics = d.flatMap{ case (_, values) => values.map{
-            case (nm: String, mp: Map[String, Any]@unchecked) =>
+        JsonUtils.fromString[Map[String, Map[String, Any]]](json).map { d =>
+          val asMetrics = d.flatMap { case (_, values) =>
+            values.collect { case (nm: String, mp: Map[String, Any]@unchecked) =>
               val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
-              nm match {
-                case OpEvaluatorNames.Binary.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[BinaryClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.BinScore.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson).get
-                case OpEvaluatorNames.Multi.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[MultiClassificationMetrics](valsJson).get
-                case OpEvaluatorNames.Regression.humanFriendlyName =>
-                  nm -> JsonUtils.fromString[RegressionMetrics](valsJson).get
-                case _ => nm -> JsonUtils.fromString[SingleMetric](valsJson).get
-              }}
+              nm -> (OpEvaluatorNames.withFriendlyNameInsensitive(nm) match {
+                case Some(OpEvaluatorNames.Binary) => JsonUtils.fromString[BinaryClassificationMetrics](valsJson)
+                case Some(OpEvaluatorNames.BinScore) => JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson)
+                case Some(OpEvaluatorNames.Multi) => JsonUtils.fromString[MultiClassificationMetrics](valsJson)
+                case Some(OpEvaluatorNames.Regression) => JsonUtils.fromString[RegressionMetrics](valsJson)
+                case Some(OpEvaluatorNames.Forecast) => JsonUtils.fromString[ForecastMetrics](valsJson)
+                case _ => // assume a custom metric here, hence trying to parse as single metric value
+                  JsonUtils.fromString[SingleMetric](valsJson)
+              }).get
+            }
           }
           MultiMetrics(asMetrics)
         }.recoverWith { case t: Throwable => error(n, t) }
-      case n => JsonUtils.fromString(json)(ClassTag(n))
-        .recoverWith { case t: Throwable => error(n, t) }
+      case n =>
+        JsonUtils.fromString(json)(ClassTag(n))
+          .recoverWith { case t: Throwable => error(n, t) }
     }
   }
 }
