@@ -213,10 +213,12 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
   case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
   case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
-  case object Forecast extends OpEvaluatorNames("regForecast", "regression evaluation metrics")
+  case object Forecast extends OpEvaluatorNames("regForecast", "forecast evaluation metrics")
   case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
     override def entryName: String = name.toLowerCase
   }
+  def withFriendlyNameInsensitive(name: String): Option[OpEvaluatorNames] =
+    values.collectFirst { case n if n.humanFriendlyName.equalsIgnoreCase(name) => n }
   override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
   override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
     .getOrElse(Custom(name, name))
