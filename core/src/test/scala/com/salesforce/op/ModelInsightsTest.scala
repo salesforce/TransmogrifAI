@@ -736,7 +736,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
   }
 
-  val tol = 0.03
+  val tol = 0.1
   it should "correctly return the descaled coefficient for linear regression, " +
     "when standardization is on" in {
 
@@ -755,8 +755,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
-    absError / (2 * bigCoeffSum) < tol shouldBe true
-    absError2 / (2 * smallCoeffSum) < tol shouldBe true
+    2 * absError / bigCoeffSum < tol shouldBe true
+    2 * absError2 / smallCoeffSum < tol shouldBe true
   }
 
   it should "correctly return the descaled coefficient for logistic regression, " +
