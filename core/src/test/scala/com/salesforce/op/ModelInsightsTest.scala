@@ -771,8 +771,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
-    absError / (2 * bigCoeffSum) < tol shouldBe true
-    absError2 / (2 * smallCoeffSum) < tol shouldBe true
+    2 * absError / bigCoeffSum < tol shouldBe true
+    2 * absError2 / smallCoeffSum < tol shouldBe true
   }
 
   it should "correctly return moments calculation and cardinality calculation for numeric features" in {
