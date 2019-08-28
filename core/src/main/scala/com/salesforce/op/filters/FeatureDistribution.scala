@@ -324,7 +324,7 @@ object FeatureDistribution {
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
     val population = values match {
-      case Left(seq) => seq
+      case Left(seq) => seq.map(_.size.toString)
       case Right(seq) => seq.map(_.toString)
     }
     TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
