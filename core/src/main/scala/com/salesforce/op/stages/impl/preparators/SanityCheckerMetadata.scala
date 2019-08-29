@@ -317,8 +317,18 @@ case class Correlations
     corrMeta.build()
   }
 
-  private[op] def +(corr: Correlations): Correlations =
-    new Correlations(featuresIn ++ corr.featuresIn, values ++ corr.values, nanCorrs ++ corr.nanCorrs, corrType)
+  private[op] def +(corr: Correlations): Correlations = {
+    val corrName =
+      if (corrType != corr.corrType) {
+        CorrelationType.Custom(
+          corrType.entryName + corr.corrType.entryName,
+          corrType.sparkName + corr.corrType.sparkName
+        )
+      } else {
+        corrType
+      }
+    new Correlations(featuresIn ++ corr.featuresIn, values ++ corr.values, nanCorrs ++ corr.nanCorrs, corrName)
+  }
 }
 
 case object SanityCheckerSummary {

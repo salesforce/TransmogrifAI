@@ -38,7 +38,7 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{SelectedCombiner, SelectedCombinerModel, SelectedModel}
+import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
@@ -802,7 +802,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "return correct insights when a model combiner equal is used as the final feature" in {
-    val predComb = new SelectedCombiner().setCombinationStrategy(CombinationStrategy.Equal)
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Equal)
       .setInput(label, pred, predWithMaps).getOutput()
     val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
       .setParameters(params).setReader(dataReader).train()
@@ -816,7 +816,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "return correct insights when a model combiner best is used as the final feature" in {
-    val predComb = new SelectedCombiner().setCombinationStrategy(CombinationStrategy.Best)
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Best)
       .setInput(label, pred, predWithMaps).getOutput()
     val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
       .setParameters(params).setReader(dataReader).train()

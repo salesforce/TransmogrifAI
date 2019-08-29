@@ -228,12 +228,10 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
     override def entryName: String = name.toLowerCase
   }
   def withName(name: String, isLargerBetter: Boolean): OpEvaluatorNames =
-    Try(super.withName(name)).getOrElse(Custom(name, name, isLargerBetter))
-  override def withName(name: String): OpEvaluatorNames = withName(name, true)
+    super.withNameOption(name).getOrElse(Custom(name, name, isLargerBetter))
 
   def withNameInsensitive(name: String, isLargerBetter: Boolean): OpEvaluatorNames =
     super.withNameInsensitiveOption(name).getOrElse(Custom(name, name, isLargerBetter))
-  override def withNameInsensitive(name: String): OpEvaluatorNames = withNameInsensitive(name, true)
 
   def withFriendlyNameInsensitive(name: String): Option[OpEvaluatorNames] =
     values.collectFirst { case n if n.humanFriendlyName.equalsIgnoreCase(name) => n }

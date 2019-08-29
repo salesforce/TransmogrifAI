@@ -47,7 +47,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerModel, SelectedCombiner]
+class SelectedModelCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerModel, SelectedModelCombiner]
   with PredictionEquality {
 
   val (seed, smallCount, bigCount) = (1234L, 20, 80)
@@ -96,7 +96,7 @@ class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerM
     .setResultFeatures(ms1, ms2)
     .transform(data)
 
-  override val estimator: SelectedCombiner = new SelectedCombiner().setInput(label, ms1, ms2)
+  override val estimator: SelectedModelCombiner = new SelectedModelCombiner().setInput(label, ms1, ms2)
 
   override val expectedResult: Seq[Prediction] = inputData.collect(ms1)
 
@@ -140,7 +140,7 @@ class SelectedCombinerTest extends OpEstimatorSpec[Prediction, SelectedCombinerM
       .setResultFeatures(ms1, ms2)
       .transform(data)
 
-    val comb = new SelectedCombiner().setInput(label, ms1, ms2)
+    val comb = new SelectedModelCombiner().setInput(label, ms1, ms2)
     val combFit = comb.fit(inputData)
     combFit.transform(inputData).collect(comb.getOutput()) shouldBe inputData.collect(ms1)
     combFit.strategy shouldBe CombinationStrategy.Best

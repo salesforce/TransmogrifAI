@@ -53,7 +53,7 @@ trait SelectedCombinerParams extends Params {
     isValid = (in: String) => CombinationStrategy.values.map(_.entryName).contains(in)
   )
   def setCombinationStrategy(value: CombinationStrategy): this.type = set(combinationStrategy, value.entryName)
-  def getCombinationStrategy(): CombinationStrategy = CombinationStrategy.namesToValuesMap($(combinationStrategy))
+  def getCombinationStrategy(): CombinationStrategy = CombinationStrategy.withNameInsensitive($(combinationStrategy))
   setDefault(combinationStrategy, CombinationStrategy.Best.entryName)
 
 }
@@ -68,10 +68,10 @@ trait SelectedCombinerParams extends Params {
  * @param operationName name of operation
  * @param uid stage uid
  */
-class SelectedCombiner
+class SelectedModelCombiner
 (
   val operationName: String = "combineModels",
-  val uid: String = UID[SelectedCombiner]
+  val uid: String = UID[SelectedModelCombiner]
 )(
   implicit val tto: TypeTag[Prediction],
   val ttov: TypeTag[Prediction#Value]
@@ -116,21 +116,6 @@ class SelectedCombiner
       s"Cannot combine model selectors for different problem types found ${summary1.problemType}" +
         s" and ${summary2.problemType}")
 
-    def getMetricValue(metrics: EvaluationMetrics, name: EvalMetric) =
-      metrics.toMap.collectFirst{
-        case (k, v) if k.contains(name.humanFriendlyName) || k.contains(name.entryName) => v.asInstanceOf[Double]}
-
-    def getWinningModelMetric(summary: ModelSelectorSummary) = {
-      summary.validationResults.collectFirst {
-        case r if r.modelUID == summary.bestModelUID =>
-          getMetricValue(r.metricValues, summary.evaluationMetric)
-      }.flatten
-    }
-
-    def getMet(optionMet: Option[Double]) = optionMet.getOrElse {
-      throw new RuntimeException("Evaluation metrics for two model selectors are non-overlapping")
-    }
-
     val eval1 = summary1.evaluationMetric
     val eval2 = summary2.evaluationMetric
 
@@ -146,34 +131,6 @@ class SelectedCombiner
           (m1e2, getMetricValue(summary2.trainEvaluation, eval2), eval2)
         } else (None, None, eval1)
       }
-
-    def makeMeta(model: SelectedCombinerModel): Unit = {
-      def updateKeys(map: Map[String, Any], string: String) = map.map{ case (k, v) => k + string -> v }
-
-      if (model.strategy == CombinationStrategy.Best && model.weight1 > 0.5) {
-        setMetadata(summary1.toMetadata().toSummaryMetadata())
-      } else if (model.strategy == CombinationStrategy.Best) {
-        setMetadata(summary2.toMetadata().toSummaryMetadata())
-      } else {
-        val summary = new ModelSelectorSummary(
-          validationType = summary1.validationType,
-          validationParameters = updateKeys(summary1.validationParameters, "_1") ++
-            updateKeys(summary2.validationParameters, "_2"),
-          dataPrepParameters = updateKeys(summary1.dataPrepParameters, "_1") ++
-            updateKeys(summary2.dataPrepParameters, "_2"),
-          dataPrepResults = summary1.dataPrepResults.orElse(summary2.dataPrepResults),
-          evaluationMetric = metricName,
-          problemType = summary1.problemType,
-          bestModelUID = summary1.bestModelUID + " " + summary2.bestModelUID,
-          bestModelName = summary1.bestModelName + " " + summary2.bestModelName,
-          bestModelType = summary1.bestModelType + " " + summary2.bestModelType,
-          validationResults = summary1.validationResults ++ summary2.validationResults,
-          trainEvaluation = evaluate(model.transform(dataset)),
-          holdoutEvaluation = None
-        )
-        setMetadata(summary.toMetadata().toSummaryMetadata())
-      }
-    }
 
     val (metricValue1, metricValue2) = (getMet(metricValueOpt1), getMet(metricValueOpt2))
 
@@ -202,9 +159,50 @@ class SelectedCombiner
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[Prediction], in3.asFeatureLike[Prediction])
       .setOutputFeatureName(getOutputFeatureName)
 
-    makeMeta(model)
+    if (model.strategy == CombinationStrategy.Best && model.weight1 > 0.5) {
+      setMetadata(summary1.toMetadata().toSummaryMetadata())
+    } else if (model.strategy == CombinationStrategy.Best) {
+      setMetadata(summary2.toMetadata().toSummaryMetadata())
+    } else {
+      val summary = new ModelSelectorSummary(
+        validationType = summary1.validationType,
+        validationParameters = updateKeys(summary1.validationParameters, "_1") ++
+          updateKeys(summary2.validationParameters, "_2"),
+        dataPrepParameters = updateKeys(summary1.dataPrepParameters, "_1") ++
+          updateKeys(summary2.dataPrepParameters, "_2"),
+        dataPrepResults = summary1.dataPrepResults.orElse(summary2.dataPrepResults),
+        evaluationMetric = metricName,
+        problemType = summary1.problemType,
+        bestModelUID = summary1.bestModelUID + " " + summary2.bestModelUID,
+        bestModelName = summary1.bestModelName + " " + summary2.bestModelName,
+        bestModelType = summary1.bestModelType + " " + summary2.bestModelType,
+        validationResults = summary1.validationResults ++ summary2.validationResults,
+        trainEvaluation = evaluate(model.transform(dataset)),
+        holdoutEvaluation = None
+      )
+      setMetadata(summary.toMetadata().toSummaryMetadata())
+    }
+
     model.setMetadata(getMetadata())
   }
+
+  private def getMetricValue(metrics: EvaluationMetrics, name: EvalMetric) =
+    metrics.toMap.collectFirst{
+      case (k, v: Double) if k.contains(name.humanFriendlyName) || k.contains(name.entryName) => v
+    }
+
+  private def getWinningModelMetric(summary: ModelSelectorSummary) = {
+    summary.validationResults.collectFirst {
+      case r if r.modelUID == summary.bestModelUID =>
+        getMetricValue(r.metricValues, summary.evaluationMetric)
+    }.flatten
+  }
+
+  private def getMet(optionMet: Option[Double]) = optionMet.getOrElse {
+    throw new RuntimeException("Evaluation metrics for two model selectors are non-overlapping")
+  }
+
+  private def updateKeys(map: Map[String, Any], string: String) = map.map{ case (k, v) => k + string -> v }
 
 }
 
