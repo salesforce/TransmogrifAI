@@ -132,10 +132,14 @@ case class FeatureDistribution
 
   def chiSqUnifTestCard(): (Option[Double], Option[Double]) = cardEstimate match {
     case Some(x) => {
-      val vectorizedDistr = Vectors.dense(x.valueCounts.values.toArray.map(_.toDouble))
-      try {
+      val vec = x.valueCounts.values.toArray.map(_.toDouble)
+      if (vec.length > 0) {
+        val vectorizedDistr = Vectors.dense(vec)
         val testResult = Statistics.chiSqTest(vectorizedDistr)
         (Some(testResult.statistic), Some(testResult.pValue))
+      }
+      else {
+        (None, None)
       }
     }
     case _ => (None, None)
