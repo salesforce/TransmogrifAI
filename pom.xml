@@ -16,7 +16,7 @@
 
     <groupId>com.salesforce.transmogrifai</groupId>
     <artifactId>TransmogrifAI</artifactId>
-    <version>0.5.3</version>
+    <version>0.6.0</version>
     <name>TransmogrifAI</name>
     <description>AutoML library for building modular, reusable, strongly typed machine learning workflows on Spark with minimal hand tuning</description>
     <url>https://github.com/salesforce/TransmogrifAI</url>
