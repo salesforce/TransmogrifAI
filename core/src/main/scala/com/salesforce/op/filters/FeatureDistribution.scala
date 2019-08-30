@@ -135,6 +135,7 @@ case class FeatureDistribution
       val vec = x.valueCounts.values.toArray.map(_.toDouble)
       if (vec.length > 0) {
         val vectorizedDistr = Vectors.dense(vec)
+        println(vectorizedDistr)
         val testResult = Statistics.chiSqTest(vectorizedDistr)
         (Some(testResult.statistic), Some(testResult.pValue))
       }
