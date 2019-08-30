@@ -53,7 +53,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
 
   val (inputData, estimator) = {
     val numericData = Seq(
-      Map("a" -> 1.0, "b" -> 1.0),
+      Map("a" -> 1.0),
       Map("a" -> 18.0),
       Map("b" -> 0.0),
       Map("a" -> -1.23, "b" -> 1.0),
@@ -66,7 +66,7 @@ class DecisionTreeNumericMapBucketizerTest extends OpEstimatorSpec[OPVector,
   }
 
   val expectedResult = Seq(
-    Vectors.sparse(7, Array(1, 4, 6), Array(1.0, 1.0, 1.0)),
+    Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(1, 5, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(2, 3, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(7, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
