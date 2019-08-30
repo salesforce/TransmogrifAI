@@ -755,8 +755,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
-    2 * absError / bigCoeffSum should be < tol
-    2 * absError2 / smallCoeffSum should be < tol
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
   }
 
   it should "correctly return the descaled coefficient for logistic regression, " +
@@ -771,8 +771,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
-    2 * absError / bigCoeffSum should be < tol
-    2 * absError2 / smallCoeffSum should be < tol
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
   }
 
   it should "correctly return moments calculation and cardinality calculation for numeric features" in {
