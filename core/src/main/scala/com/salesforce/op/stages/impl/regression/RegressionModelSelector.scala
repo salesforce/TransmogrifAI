@@ -154,7 +154,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
   def withCrossValidation(
     dataSplitter: Option[DataSplitter] = Option(DataSplitter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
-    validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
+    validationMetric: OpRegressionEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,
@@ -199,7 +199,7 @@ case object RegressionModelSelector extends ModelSelectorFactory {
   def withTrainValidationSplit(
     dataSplitter: Option[DataSplitter] = Option(DataSplitter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
-    validationMetric: OpRegressionEvaluatorBase[_] = Evaluators.Regression.rmse(),
+    validationMetric: OpRegressionEvaluatorBase[_ <: EvaluationMetrics] = Evaluators.Regression.rmse(),
     trainTestEvaluators: Seq[OpRegressionEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     parallelism: Int = ValidatorParamDefaults.Parallelism,

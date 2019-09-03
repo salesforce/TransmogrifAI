@@ -27,38 +27,18 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+package com.salesforce.op.stages.impl.feature
 
-package com.salesforce.op.stages.impl.evaluator
-
-import com.salesforce.op.evaluators.{Evaluators, OpBinaryClassificationEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
-import com.twitter.algebird.AveragedValue
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.Dataset
-import com.salesforce.op.utils.spark.RichDataset.RichDataset
+import enumeratum.{Enum, EnumEntry}
 
 /**
- * Logarithmic Loss metric, implemented as both Binary and MultiClass evaluators
+ * Model Combination Strategies
  */
-object LogLoss {
+sealed trait CombinationStrategy extends EnumEntry with Serializable
 
-  private def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
-    import ds.sparkSession.implicits._
-    require(!ds.isEmpty, "Dataset is empty, log loss cannot be calculated")
-    val avg = ds.map { case (lbl, _, prob, _) =>
-      new AveragedValue(count = 1L, value = -math.log(prob.toArray(lbl.toInt)))
-    }.reduce(_ + _)
-    avg.value
-  }
-
-  def binaryLogLoss: OpBinaryClassificationEvaluatorBase[SingleMetric] = Evaluators.BinaryClassification.custom(
-    metricName = "BinarylogLoss",
-    largerBetter = false,
-    evaluateFn = logLossFun
-  )
-
-  def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
-    metricName = "MultiClasslogLoss",
-    largerBetter = false,
-    evaluateFn = logLossFun
-  )
+object CombinationStrategy extends Enum[CombinationStrategy] {
+  val values = findValues
+  case object Weighted extends CombinationStrategy
+  case object Equal extends CombinationStrategy
+  case object Best extends CombinationStrategy
 }
