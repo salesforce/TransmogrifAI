@@ -38,7 +38,7 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
@@ -48,7 +48,7 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.TextStats
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.twitter.algebird.Moments
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.scalactic.Equality
@@ -101,6 +101,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       new ParamGridBuilder().build()).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
     .setInput(label, features)
     .getOutput()
+
 
   val smallFeatureVariance = 10.0
   val mediumFeatureVariance = 1.0
@@ -179,7 +180,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
   val params = new OpParams()
 
-  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
+  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred)
+    .setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
 
@@ -362,12 +364,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
-    val reg = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel])
-    )
-    val lin = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
-    )
+    val predLinMod = workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel]
+    val reg = ModelInsights.getModelContributions(Option(predLinMod))
+
+    val linMod = workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel]
+    val lin = ModelInsights.getModelContributions(Option(linMod))
     reg.size shouldBe 1
     reg.head.size shouldBe 21
 
@@ -791,13 +792,45 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         df.select(avg(featureName), variance(featureName)).as[(Double, Double)].collect().head
       math.abs((value.mean - expectedMean) / expectedMean) < meanTol shouldBe true
       math.abs((value.variance - expectedVariance) / expectedVariance) < varTol shouldBe true
-      }
+    }
     }
 
     cardinality.foreach { case (featureName, value) => {
       val actualUniques = df.select(featureName).as[Double].collect().toSet
       value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
-      }
+    }
+    }
+  }
+
+  it should "return correct insights when a model combiner equal is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Equal)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val insights = workflowModel.modelInsights(predComb)
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.map(_.featureName).toSet shouldBe
+      Set(genderPL, age, height, description, weight, numericMap).map(_.name)
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.foreach(_.derivedFeatures.foreach(_.variance.nonEmpty shouldBe true))
+  }
+
+  it should "return correct insights when a model combiner best is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Best)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val predModel = workflowModel.getOriginStageOf(predComb).asInstanceOf[SelectedCombinerModel]
+    val winner = if (predModel.weight1 > 0.5) pred else predWithMaps
+    val insights = workflowModel.modelInsights(predComb)
+    val insightsWin = workflowModel.modelInsights(winner)
+
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.map(_.featureName).toSet shouldBe insightsWin.features.map(_.featureName).toSet
+    insights.features.zip(insightsWin.features).foreach{
+      case (c, w) => c.derivedFeatures.zip(w.derivedFeatures)
+        .foreach{ case (c1, w1) => c1.contribution shouldBe w1.contribution }
     }
   }
 
