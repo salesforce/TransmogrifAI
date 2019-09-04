@@ -41,7 +41,6 @@ import com.salesforce.op.stages.impl.tuning.{BestEstimator, _}
 import com.salesforce.op.stages.sparkwrappers.generic.SparkWrapperParams
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapperModel, SparkModelConverter}
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichParamMap._
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param._
