@@ -64,9 +64,32 @@ trait RecordInsightsLOCOParams extends Params {
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
   def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
 
+  final val dateAggregationStrategy = new Param[String](parent = this, name = "dateAggregationStrategy",
+    doc = "Whether vector for each time period - HourOfDay, DayOfWeek, etc is aggregated by " +
+      "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or" +
+      "2. Avg strategy - calculate the loco for each column of the vector and then average all the locos."
+  )
+  def setDateAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
+    set(dateAggregationStrategy, strategy.entryName)
+  def getDateAggregationStrategy: VectorAggregationStrategy = VectorAggregationStrategy.withName(
+    $(dateAggregationStrategy))
+
+  final val textAggregationStrategy = new Param[String](parent = this, name = "dateAggregationStrategy",
+    doc = "Whether text vector is aggregated by " +
+      "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or" +
+      "2. Avg strategy - calculate the loco for each column of the vector and then average all the locos."
+  )
+  def setTextAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
+    set(textAggregationStrategy, strategy.entryName)
+  def getTextAggregationStrategy: VectorAggregationStrategy = VectorAggregationStrategy.withName(
+    $(textAggregationStrategy))
+
+
   setDefault(
     topK -> 20,
-    topKStrategy -> TopKStrategy.Abs.entryName
+    topKStrategy -> TopKStrategy.Abs.entryName,
+    dateAggregationStrategy -> VectorAggregationStrategy.Avg.entryName,
+    textAggregationStrategy -> VectorAggregationStrategy.Avg.entryName
   )
 }
 
@@ -113,21 +136,24 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val dateMapTypes =
     Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
-  // Indices of features derived from hashed Text(Map)Vectorizer
-  private lazy val textFeatureIndices: Seq[Int] = getIndicesOfFeatureType(textTypes ++ textMapTypes,
-    h => h.indicatorValue.isEmpty && h.descriptorValue.isEmpty)
+  private lazy val textFeaturesCount: Map[String, Int] = histories
+    .filter(isTextIndex)
+    .groupBy { h => getRawFeatureName(h).get }
+    .mapValues(_.length).view.toMap
 
-  // Indices of features derived from unit Date(Map)Vectorizer
-  private lazy val dateFeatureIndices = getIndicesOfFeatureType(dateTypes ++ dateMapTypes, _.descriptorValue.isDefined)
+  private lazy val dateFeaturesCount: Map[String, Int] = histories
+    .filter(isDateIndex)
+    .groupBy { h => getRawFeatureName(h).get }
+    .mapValues(_.length).view.toMap
 
-  /**
-   * Return the indices of features derived from given types.
-   * @return Seq[Int]
-   */
-  private def getIndicesOfFeatureType(types: Set[String], predicate: OpVectorColumnHistory => Boolean): Seq[Int] =
-    histories.collect {
-      case h if h.parentFeatureType.exists(types.contains) && predicate(h) => h.index
-    }.distinct.sorted
+  private def isTextIndex(h: OpVectorColumnHistory): Boolean = {
+    h.parentFeatureType.exists((textTypes ++ textMapTypes).contains) &&
+      h.indicatorValue.isEmpty && h.descriptorValue.isEmpty
+  }
+
+  private def isDateIndex(h: OpVectorColumnHistory): Boolean = {
+    h.parentFeatureType.exists((dateTypes ++ dateMapTypes).contains) && h.descriptorValue.isDefined
+  }
 
   private def computeDiff
   (
@@ -168,82 +194,85 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
   }
 
+  private def aggregateDiffs(
+    featureSparse: SparseVector,
+    aggIndices: Array[(Int, Int)],
+    strategy: VectorAggregationStrategy,
+    baseScore: Array[Double],
+    featureCount: Int
+  ): Array[Double] = {
+    strategy match {
+      case VectorAggregationStrategy.Avg =>
+        aggIndices
+          .map { case (i, oldInd) => computeDiff(featureSparse.copy.updated(i, oldInd, 0.0), baseScore) }
+          .foldLeft(Array.empty[Double])(sumArrays)
+          .map( _ / featureCount)
+
+      case VectorAggregationStrategy.LeaveOutVector =>
+        val copyFeatureSparse = featureSparse.copy
+        aggIndices.map {case (i, oldInd) => copyFeatureSparse.updated(i, oldInd, 0.0)}
+        computeDiff(copyFeatureSparse, baseScore)
+    }
+  }
+
   private def returnTopPosNeg
   (
     featureSparse: SparseVector,
-    zeroCountByFeature: Map[String, Int],
-    featureSize: Int,
     baseScore: Array[Double],
     k: Int,
     indexToExamine: Int
   ): Seq[LOCOValue] = {
     val minMaxHeap = new MinMaxHeap(k)
-    val aggregationMap = mutable.Map.empty[String, (Array[Int], Array[Double])]
 
-    agggregateDiffs(featureSparse, indexToExamine, minMaxHeap, aggregationMap,
-      baseScore)
+    // Map[FeatureName, (Array[SparseVectorIndices], Array[ActualIndices])
+    val textActiveIndices = mutable.Map.empty[String, Array[(Int, Int)]]
+    val dateActiveIndices = mutable.Map.empty[String, Array[(Int, Int)]]
 
-    // Aggregation map contains aggregation of Unit Circle Dates and Hashed Text Features
-    // Adding LOCO results from aggregation map into heaps
-    for {(name, (indices, ar)) <- aggregationMap} {
-      // The index here is arbitrary
-      val (i, n) = (indices.head, indices.length)
-      val zeroCounts = zeroCountByFeature.get(name).getOrElse(0)
-      val diffToExamine = ar.map(_ / (n + zeroCounts))
-      minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
+    (0 until featureSparse.size, featureSparse.indices).zipped.map { case (i: Int, oldInd: Int) =>
+      val history = histories(oldInd)
+      history match {
+        case h if isTextIndex(h) => {
+          for {name <- getRawFeatureName(h)} {
+            val indices = textActiveIndices.getOrElse(name, (Array.empty[(Int, Int)]))
+            textActiveIndices.update(name, indices :+ (i, oldInd))
+          }
+        }
+        case h if isDateIndex(h) => {
+          for {name <- getRawFeatureName(h)} {
+            val indices = dateActiveIndices.getOrElse(name, (Array.empty[(Int, Int)]))
+            dateActiveIndices.update(name, indices :+ (i, oldInd))
+          }
+        }
+        case _ => {
+          val diffToExamine = computeDiff(featureSparse.copy.updated(i, oldInd, 0.0), baseScore)
+          minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
+        }
+      }
+    }
+
+    // Aggregate active indices of each text feature and date feature based on their respective strategy.
+    textActiveIndices.map {
+      case (name, aggIndices) =>
+        val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
+          getTextAggregationStrategy, baseScore, textFeaturesCount.get(name).get)
+        minMaxHeap enqueue LOCOValue(aggIndices.head._1, diffToExamine(indexToExamine), diffToExamine)
+    }
+    dateActiveIndices.map {
+      case (name, aggIndices) =>
+        val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
+          getDateAggregationStrategy, baseScore, dateFeaturesCount.get(name).get)
+        minMaxHeap enqueue LOCOValue(aggIndices.head._1, diffToExamine(indexToExamine), diffToExamine)
     }
 
     minMaxHeap.dequeueAll
   }
 
-  private def agggregateDiffs(
-    featureVec: SparseVector,
-    indexToExamine: Int,
-    minMaxHeap: MinMaxHeap,
-    aggregationMap: mutable.Map[String, (Array[Int], Array[Double])],
-    baseScore: Array[Double]
-  ): Unit = {
-    computeDiffs(featureVec, baseScore).foreach { case (i, oldInd, diffToExamine) =>
-      val history = histories(oldInd)
-      history match {
-        // If indicator value and descriptor value of a derived text feature are empty, then it is
-        // a hashing tf output. We aggregate such features for each (rawFeatureName).
-        case h if (textFeatureIndices ++ dateFeatureIndices).contains(oldInd) =>
-          for {name <- getRawFeatureName(h)} {
-            val (indices, array) = aggregationMap.getOrElse(name, (Array.empty[Int], Array.empty[Double]))
-            aggregationMap.update(name, (indices :+ i, sumArrays(array, diffToExamine)))
-          }
-        case _ => minMaxHeap enqueue LOCOValue(i, diffToExamine(indexToExamine), diffToExamine)
-      }
-    }
-  }
-
-  private def computeDiffs(
-    featureVec: SparseVector,
-    baseScore: Array[Double]
-  ) = {
-    (0 until featureVec.size, featureVec.indices).zipped.map { case (i, oldInd) =>
-      (i, oldInd, computeDiff(featureVec.copy.updated(i, oldInd, 0.0), baseScore))
-    }
-  }
-
   override def transformFn: OPVector => TextMap = features => {
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
-    val featureSize = features.value.size
 
     // TODO: sparse implementation only works if changing values to zero - use dense vector to test effect of zeros
     val featuresSparse = features.value.toSparse
-    val featureIndexSet = featuresSparse.indices.toSet
-
-    // Besides non 0 values, we want to check the text/date features as well
-    val zeroValIndices = (textFeatureIndices ++ dateFeatureIndices)
-      .filterNot(featureIndexSet.contains)
-
-    // Count zeros by feature name
-    val zeroCountByFeature = zeroValIndices
-      .groupBy(i => getRawFeatureName(histories(i)).get)
-      .mapValues(_.length).view.toMap
 
     val k = $(topK)
     // Index where to examine the difference in the prediction vector
@@ -254,14 +283,14 @@ class RecordInsightsLOCO[T <: Model[T]]
       // For MultiClassification, the value is from the predicted class(i.e. the class having the highest probability)
       case n if n > 2 => baseResult.prediction.toInt
     }
-    val topPosNeg = returnTopPosNeg(featuresSparse, zeroCountByFeature, featureSize, baseScore, k, indexToExamine)
+    val topPosNeg = returnTopPosNeg(featuresSparse, baseScore, k, indexToExamine)
     val top = getTopKStrategy match {
       case TopKStrategy.Abs => topPosNeg.sortBy { case LOCOValue(_, v, _) => -math.abs(v) }.take(k)
       // Take top K positive and top K negative LOCOs, hence 2 * K
       case TopKStrategy.PositiveNegative => topPosNeg.sortBy { case LOCOValue(_, v, _) => -v }.take(2 * k)
     }
 
-    val allIndices = featuresSparse.indices ++ zeroValIndices
+    val allIndices = featuresSparse.indices
     top.map { case LOCOValue(i, _, diffs) =>
       RecordInsightsParser.insightToText(featureInfo(allIndices(i)), diffs)
     }.toMap.toTextMap
@@ -328,4 +357,15 @@ object TopKStrategy extends Enum[TopKStrategy] {
   val values = findValues
   case object Abs extends TopKStrategy("abs")
   case object PositiveNegative extends TopKStrategy("positive and negative")
+}
+
+
+sealed abstract class VectorAggregationStrategy(val name: String) extends EnumEntry with Serializable
+
+object VectorAggregationStrategy extends Enum[VectorAggregationStrategy] {
+  val values = findValues
+  case object LeaveOutVector extends
+    VectorAggregationStrategy("calculate the loco by leaving out the entire vector")
+  case object Avg extends
+    VectorAggregationStrategy("calculate the loco for each column of the vector and then average all the locos")
 }
