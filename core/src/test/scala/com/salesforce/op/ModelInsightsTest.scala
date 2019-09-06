@@ -38,20 +38,20 @@ import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.SelectedModel
+import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.TextStats
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.twitter.algebird.Moments
 import org.apache.spark.sql.{DataFrame, Dataset}
+import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.apache.spark.sql.functions._
@@ -59,7 +59,7 @@ import org.apache.spark.sql.functions._
 import scala.util.{Failure, Success}
 
 @RunWith(classOf[JUnitRunner])
-class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality with OpXGBoostQuietLogging {
+class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with DoubleEquality {
 
   private val density = weight / height
   private val generVec = genderPL.vectorize(topK = 10, minSupport = 1, cleanText = true)
@@ -76,8 +76,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   val lrParams = new ParamGridBuilder().addGrid(lr.regParam, Array(0.01, 0.1)).build()
   val models = Seq(lr -> lrParams).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]]
 
-  val xgbClassifier = new OpXGBoostClassifier().setMissing(0.0f).setSilent(1).setSeed(42L)
-  val xgbRegressor = new OpXGBoostRegressor().setMissing(0.0f).setSilent(1).setSeed(42L)
+  val xgbClassifier = new OpXGBoostClassifier().setSilent(1).setSeed(42L)
+  val xgbRegressor = new OpXGBoostRegressor().setSilent(1).setSeed(42L)
   val xgbClassifierPred = xgbClassifier.setInput(label, features).getOutput()
   val xgbRegressorPred = xgbRegressor.setInput(label, features).getOutput()
   lazy val xgbWorkflow =
@@ -101,6 +101,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       new ParamGridBuilder().build()).asInstanceOf[Seq[(EstimatorType, Array[ParamMap])]])
     .setInput(label, features)
     .getOutput()
+
 
   val smallFeatureVariance = 10.0
   val mediumFeatureVariance = 1.0
@@ -179,7 +180,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
   val params = new OpParams()
 
-  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
+  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred)
+    .setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
 
@@ -362,12 +364,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
-    val reg = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel])
-    )
-    val lin = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
-    )
+    val predLinMod = workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel]
+    val reg = ModelInsights.getModelContributions(Option(predLinMod))
+
+    val linMod = workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel]
+    val lin = ModelInsights.getModelContributions(Option(linMod))
     reg.size shouldBe 1
     reg.head.size shouldBe 21
 
@@ -446,6 +447,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly serialize and deserialize from json when raw feature filter is used" in {
+
     val insights = modelWithRFF.modelInsights(predWithMaps)
     ModelInsights.fromJson(insights.toJson()) match {
       case Failure(e) => fail(e)
@@ -736,7 +738,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
   }
 
-  val tol = 0.03
+  val tol = 0.1
   it should "correctly return the descaled coefficient for linear regression, " +
     "when standardization is on" in {
 
@@ -755,8 +757,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
-    absError / bigCoeffSum < tol shouldBe true
-    absError2 / smallCoeffSum < tol shouldBe true
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
   }
 
   it should "correctly return the descaled coefficient for logistic regression, " +
@@ -771,8 +773,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
     val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
-    absError / bigCoeffSum < tol shouldBe true
-    absError2 / smallCoeffSum < tol shouldBe true
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
   }
 
   it should "correctly return moments calculation and cardinality calculation for numeric features" in {
@@ -790,13 +792,45 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         df.select(avg(featureName), variance(featureName)).as[(Double, Double)].collect().head
       math.abs((value.mean - expectedMean) / expectedMean) < meanTol shouldBe true
       math.abs((value.variance - expectedVariance) / expectedVariance) < varTol shouldBe true
-      }
+    }
     }
 
     cardinality.foreach { case (featureName, value) => {
       val actualUniques = df.select(featureName).as[Double].collect().toSet
       value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
-      }
+    }
+    }
+  }
+
+  it should "return correct insights when a model combiner equal is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Equal)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val insights = workflowModel.modelInsights(predComb)
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.map(_.featureName).toSet shouldBe
+      Set(genderPL, age, height, description, weight, numericMap).map(_.name)
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.foreach(_.derivedFeatures.foreach(_.variance.nonEmpty shouldBe true))
+  }
+
+  it should "return correct insights when a model combiner best is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Best)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val predModel = workflowModel.getOriginStageOf(predComb).asInstanceOf[SelectedCombinerModel]
+    val winner = if (predModel.weight1 > 0.5) pred else predWithMaps
+    val insights = workflowModel.modelInsights(predComb)
+    val insightsWin = workflowModel.modelInsights(winner)
+
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.map(_.featureName).toSet shouldBe insightsWin.features.map(_.featureName).toSet
+    insights.features.zip(insightsWin.features).foreach{
+      case (c, w) => c.derivedFeatures.zip(w.derivedFeatures)
+        .foreach{ case (c1, w1) => c1.contribution shouldBe w1.contribution }
     }
   }
 

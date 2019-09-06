@@ -317,7 +317,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)
@@ -340,7 +340,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)

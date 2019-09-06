@@ -122,10 +122,9 @@ final class OpPipelineStageReader private
 
     // Update [[SparkWrapperParams]] with path so we can load the [[SparkStageParam]] instance
     val updatedMetadata = stage match {
-      case _: SparkWrapperParams[_] => metadata.copy(
-        params = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path),
-        defaultParams = SparkStageParam.updateParamsMetadataWithPath(metadata.defaultParams, path)
-      )
+      case _: SparkWrapperParams[_] =>
+        val updatedParams = SparkStageParam.updateParamsMetadataWithPath(metadata.params, path)
+        metadata.copy(params = updatedParams)
       case _ => metadata
     }
 

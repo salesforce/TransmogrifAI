@@ -161,7 +161,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
   def withCrossValidation(
     splitter: Option[Splitter] = Option(DataSplitter()),
     numFolds: Int = ValidatorParamDefaults.NumFolds,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics] =
+    Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,
@@ -209,7 +210,8 @@ case object BinaryClassificationModelSelector extends ModelSelectorFactory {
   def withTrainValidationSplit(
     splitter: Option[Splitter] = Option(DataSplitter()),
     trainRatio: Double = ValidatorParamDefaults.TrainRatio,
-    validationMetric: OpBinaryClassificationEvaluatorBase[_] = Evaluators.BinaryClassification.auPR(),
+    validationMetric: OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics] =
+    Evaluators.BinaryClassification.auPR(),
     trainTestEvaluators: Seq[OpBinaryClassificationEvaluatorBase[_ <: EvaluationMetrics]] = Seq.empty,
     seed: Long = ValidatorParamDefaults.Seed,
     stratify: Boolean = ValidatorParamDefaults.Stratify,

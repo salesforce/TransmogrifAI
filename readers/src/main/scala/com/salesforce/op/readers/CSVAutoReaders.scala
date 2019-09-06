@@ -30,9 +30,10 @@
 
 package com.salesforce.op.readers
 
-import org.apache.spark.sql.avro.SchemaConverters
+import com.databricks.spark.avro.SchemaConverters
 import com.salesforce.op.OpParams
 import com.salesforce.op.utils.io.csv.{CSVInOut, CSVOptions, CSVToAvro}
+import org.apache.avro.SchemaBuilder
 import org.apache.avro.generic.GenericRecord
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.execution.datasources.csv.CSVSchemaUtils
@@ -73,11 +74,10 @@ class CSVAutoReader[T <: GenericRecord : ClassTag]
     val hdrsSet = hdrs.toSet
     val data = csvData.filter(_.exists(!hdrsSet.contains(_)))
 
-    val columnPrunning = spark.sessionState.conf.csvColumnPruning
-    val inferredSchema = CSVSchemaUtils.infer(data.map(_.toArray), hdrs, options, columnPrunning)
-    val schema = SchemaConverters.toAvroType(
-      inferredSchema, nullable = false, recordName = recordName, nameSpace = recordNamespace
-    )
+    val inferredSchema = CSVSchemaUtils.infer(data.map(_.toArray), hdrs, options)
+    val builder = SchemaBuilder.record(recordName).namespace(recordNamespace)
+    val schema = SchemaConverters.convertStructToAvro(inferredSchema, builder, recordNamespace)
+
     val avroData: RDD[T] = CSVToAvro.toAvroTyped[T](data, schema.toString, timeZone)
     maybeRepartition(avroData, params)
   }
