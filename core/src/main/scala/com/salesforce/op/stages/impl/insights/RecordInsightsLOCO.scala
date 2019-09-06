@@ -136,13 +136,11 @@ class RecordInsightsLOCO[T <: Model[T]]
   private val dateMapTypes =
     Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
-  private lazy val textFeaturesCount: Map[String, Int] = histories
-    .filter(isTextIndex)
-    .groupBy { h => getRawFeatureName(h).get }
-    .mapValues(_.length).view.toMap
+  private lazy val textFeaturesCount: Map[String, Int] = getFeatureCount(isTextIndex)
+  private lazy val dateFeaturesCount: Map[String, Int] = getFeatureCount(isDateIndex)
 
-  private lazy val dateFeaturesCount: Map[String, Int] = histories
-    .filter(isDateIndex)
+  private def getFeatureCount(predicate: OpVectorColumnHistory => Boolean): Map[String, Int] = histories
+    .filter(predicate)
     .groupBy { h => getRawFeatureName(h).get }
     .mapValues(_.length).view.toMap
 
