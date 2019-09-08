@@ -44,7 +44,7 @@ import com.salesforce.op.testkit.{RandomIntegral, RandomMap, RandomReal, RandomT
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.{FeatureHistory, OpWorkflow, _}
-import org.apache.spark.ml.PredictionModel
+import org.apache.spark.ml.Model
 import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.linalg._
 import org.apache.spark.ml.regression.LinearRegressionModel
@@ -300,18 +300,20 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
 
   it should "aggregate values for text and textMap derived features" in {
     val testData = generateTestTextData
+    val model = generateLRModel(testData)
+    val actualRecordInsights = generateRecordInsights(model, testData)
 
     withClue("TextArea can have two null indicator values") {
-      testData.actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
+      actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
     }
     withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
       "aggregation required for LOCO on this field.") {
-      testData.actualRecordInsights.foreach { p =>
+      actualRecordInsights.foreach { p =>
         assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
       }
     }
 
-    assertLOCOSum(testData.actualRecordInsights)
+    assertLOCOSum(actualRecordInsights)
     assertAggregatedText(textFeatureName)
     assertAggregatedTextMap(textMapFeatureName, "k0")
     assertAggregatedTextMap(textMapFeatureName, "k1")
@@ -329,7 +331,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
           history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData)
+        assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
       }
     }
 
@@ -342,7 +344,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
           history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData)
+        assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
       }
     }
   }
@@ -350,8 +352,10 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
 
   it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features" in {
     val testData = generateTestDateData
+    val model = generateLRModel(testData)
+    val actualRecordInsights = generateRecordInsights(model, testData)
 
-    assertLOCOSum(testData.actualRecordInsights)
+    assertLOCOSum(actualRecordInsights)
     assertAggregatedDate(dateFeatureName)
     assertAggregatedDate(dateTimeFeatureName)
     assertAggregatedDateMap(dateMapFeatureName, "k0")
@@ -370,7 +374,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
           val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
             history.descriptorValue.isDefined &&
             history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, testData)
+          assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
         }
       }
     }
@@ -387,7 +391,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
           val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
             history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
             history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, testData)
+          assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
         }
       }
     }
@@ -406,7 +410,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
    */
   private def assertAggregatedWithPredicate(
     predicate: OpVectorColumnHistory => Boolean,
-    testData: RecordInsightsTestData[LogisticRegressionModel]
+    testData: RecordInsightsTestData,
+    model: OpPredictorWrapperModel[_],
+    actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]
   ): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
@@ -422,9 +428,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
         val featureArray = v.toArray
         val locos = indices.map { i =>
           val oldVal = v(i)
-          val baseScore = testData.sparkModel.transformFn(l.toRealNN, v.toOPVector).score.toSeq
+          val baseScore = model.transformFn(l.toRealNN, v.toOPVector).score.toSeq
           featureArray.update(i, 0.0)
-          val newScore = testData.sparkModel.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
+          val newScore = model.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
           featureArray.update(i, oldVal)
           baseScore.zip(newScore).map { case (b, n) => b - n }
         }
@@ -433,7 +439,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
     val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
 
-    val actual = testData.actualRecordInsights
+    val actual = actualRecordInsights
       .flatMap(_.find { case (history, _) => predicate(history) })
       .map(_._2.map(_._2)).toSeq
     val zip = actual.zip(expected)
@@ -465,7 +471,7 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
   val textAreaFeatureName = "textArea"
   val textAreaMapFeatureName = "textAreaMap"
 
-  def generateTestDateData: RecordInsightsTestData[LogisticRegressionModel] = {
+  def generateTestDateData: RecordInsightsTestData = {
     val refDate = TransmogrifierDefaults.ReferenceDate.minusMillis(1)
 
     val minStep = 1000000
@@ -518,10 +524,10 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
     val parsedInsights = locoInsights.collect(locoTransformer.getOutput()).map(i =>
       RecordInsightsParser.parseInsights(i))
 
-    RecordInsightsTestData(rawData, featureTransformedDF, featureVector, label, sparkModel, parsedInsights)
+    RecordInsightsTestData(rawData, featureTransformedDF, featureVector, label)
   }
 
-  def generateTestTextData: RecordInsightsTestData[LogisticRegressionModel] = {
+  def generateTestTextData: RecordInsightsTestData = {
 
     // Random Text Data
     val textData: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.3).take(numRows).toList
@@ -603,25 +609,26 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
 
     val checkedFeatureVector = checker.getOutput()
 
-    // RecordInsightsLOCO
-    val sparkModel = new OpLogisticRegression().setInput(label, checkedFeatureVector).fit(checked)
+    RecordInsightsTestData(testData, checked, checkedFeatureVector, label)
+  }
 
-    val transformer = new RecordInsightsLOCO(sparkModel).setInput(checkedFeatureVector)
+  def generateLRModel(data: RecordInsightsTestData): OpPredictorWrapperModel[LogisticRegressionModel]  = {
+    new OpLogisticRegression().setInput(data.label, data.featureVector).fit(data.featureTransformedDF)
+  }
 
-    val insights = transformer.transform(checked)
-
-    val parsed = insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
-
-    RecordInsightsTestData(testData, checked, checkedFeatureVector, label, sparkModel, parsed)
+  def generateRecordInsights[T <: Model[T]](model: T,
+    data: RecordInsightsTestData): Array[Map[OpVectorColumnHistory, Insights]] = {
+    val transformer = new RecordInsightsLOCO(model).setInput(data.featureVector).setTopK(
+      data.featureTransformedDF.columns.length)
+    val insights = transformer.transform(data.featureTransformedDF)
+    insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
   }
 }
 
-case class RecordInsightsTestData[M <: PredictionModel[Vector, M]]
+case class RecordInsightsTestData
 (
   rawDF: DataFrame,
   featureTransformedDF: DataFrame,
   featureVector: FeatureLike[OPVector],
-  label: FeatureLike[RealNN],
-  sparkModel: OpPredictorWrapperModel[M],
-  actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]
+  label: FeatureLike[RealNN]
 )
