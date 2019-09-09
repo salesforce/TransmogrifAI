@@ -34,6 +34,7 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
+import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.OpGeneralizedLinearRegression
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
@@ -219,7 +220,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     justScores.length shouldEqual transformedData.count()
   }
 
-  it should "fit and predict for even when some models fail" in {
+  it should "fit and predict even when some models fail" in {
     val testEstimator = RegressionModelSelector
       .withCrossValidation(
         numFolds = 4,
@@ -240,8 +241,31 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
-    metaData.validationResults.foreach(println(_))
     metaData.validationResults.size shouldBe 42
+  }
+
+
+  it should "fit and predict even when some parameter settings fail for one of the models" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RegressionModelsToTry.OpGeneralizedLinearRegression)
+      )
+      .setInput(label, features)
+
+
+    val model = testEstimator.fit(data)
+    model.evaluateModel(data)
+
+    // evaluation metrics from train set should be in metadata
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+    metaData.validationResults.size shouldBe 34
   }
 
 

@@ -57,16 +57,20 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   private def findBestModel(
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
-    val metrics = folds.map(_.metrics).reduce(_ + _)
-    blas.dscal(metrics.length, 1.0 / numFolds, metrics, 1)
-    val ValidatedModel(est, _, _, grid) = folds.head
-    log.info(s"Average cross-validation for $est metrics: {}", metrics.toSeq.mkString(","))
-    val (bestMetric, bestIndex) =
-      if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
-      else metrics.zipWithIndex.minBy(_._1)
-    log.info(s"Best set of parameters:\n${grid(bestIndex)}")
+    require(folds.map(_.model.uid).toSet.size == 1) // Should be called only on instances of the same model
+    val gridCounts = folds.map(_.grids.map(_ -> 1).toMap).reduce(_ + _)
+    val gridMetrics = folds.map(f => f.grids.zip(f.metrics).toMap).reduce(_ + _)
+      .map{ case (key, met) => key -> met / gridCounts(key)}
+      .toSeq
+    val ((bestGrid, bestMetric), bestIndex) =
+      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy(_._1._2)
+      else gridMetrics.zipWithIndex.minBy(_._1._2)
+    val ValidatedModel(est, _, _, _) = folds.head
+    log.info(s"Average cross-validation for $est metrics: {}", gridMetrics.mkString(","))
+    log.info(s"Best set of parameters:\n$bestGrid")
     log.info(s"Best cross-validation metric: $bestMetric.")
-    ValidatedModel(est, bestIndex, metrics, grid)
+    val (grid, metrics) = gridMetrics.unzip
+    ValidatedModel(est, bestIndex, metrics.toArray, grid.toArray)
   }
 
   private[op] override def validate[T](
