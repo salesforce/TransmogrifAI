@@ -25,7 +25,6 @@ import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
-import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
@@ -59,15 +58,19 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   ): ValidatedModel[E] = {
     require(folds.map(_.model.uid).toSet.size == 1) // Should be called only on instances of the same model
     val gridCounts = folds.map(_.grids.map(_ -> 1).toMap).reduce(_ + _)
-    val maxFolds = gridCounts.maxBy(_._2)._2
-    val gridsIn = gridCounts.filter(_._2 == maxFolds).keySet
-    val gridMetrics = folds.map(f => f.grids.zip(f.metrics).toMap).reduce(_ + _)
+    val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
+    val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
+    val gridMetrics = folds.map(f => f.grids.zip(f.metrics).toMap)
+      .reduce{ (m1: Map[ParamMap, Double], m2: Map[ParamMap, Double]) =>
+        val keys = m1.keySet.union(m2.keySet)
+        keys.map(k => k -> (m1.getOrElse(k, 0.0) + m2.getOrElse(k, 0.0))).toMap
+      }
       .filterKeys(gridsIn.contains)
       .map{ case (key, met) => key -> met / maxFolds}
       .toSeq
     val ((bestGrid, bestMetric), bestIndex) =
-      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy(_._1._2)
-      else gridMetrics.zipWithIndex.minBy(_._1._2)
+      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
+      else gridMetrics.zipWithIndex.minBy{ case ((_, metric), _) => metric}
     val ValidatedModel(est, _, _, _) = folds.head
     log.info(s"Average cross-validation for $est metrics: {}", gridMetrics.mkString(","))
     log.info(s"Best set of parameters:\n$bestGrid")

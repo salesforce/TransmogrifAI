@@ -240,7 +240,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
-    metaData.validationResults.size shouldBe 42
+    metaData.validationResults.size shouldBe 40
   }
 
 
