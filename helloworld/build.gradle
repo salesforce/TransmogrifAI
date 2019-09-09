@@ -15,6 +15,7 @@ plugins {
 repositories {
     jcenter()
     mavenCentral()
+    mavenLocal()
 }
 
 apply plugin: 'application'
