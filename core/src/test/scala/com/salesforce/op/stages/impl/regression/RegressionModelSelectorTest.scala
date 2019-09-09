@@ -34,7 +34,6 @@ import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
-import com.salesforce.op.stages.impl.regression.RegressionModelsToTry.OpGeneralizedLinearRegression
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
@@ -251,7 +250,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
         numFolds = 4,
         validationMetric = Evaluators.Regression.mse(),
         seed = 10L,
-        modelTypesToUse = Seq(RegressionModelsToTry.OpGeneralizedLinearRegression)
+        modelTypesToUse = Seq(RMT.OpGeneralizedLinearRegression)
       )
       .setInput(label, features)
 
