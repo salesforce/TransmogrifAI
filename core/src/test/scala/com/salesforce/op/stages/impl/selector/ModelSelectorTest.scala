@@ -83,7 +83,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
   private val lr = new OpLogisticRegression()
   private val lrParams = new ParamGridBuilder()
     .addGrid(lr.regParam, Array(0.1, 10000))
-    .addGrid(lr.elasticNetParam, Array(0, 0.5)).build()
+    .addGrid(lr.elasticNetParam, Array(0.5)).build()
 
   private val rf = new OpRandomForestClassifier()
   private val rfParams = new ParamGridBuilder()
@@ -148,6 +148,7 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
+    println(ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).validationResults)
     model.modelStageIn.isInstanceOf[OpLogisticRegressionModel] shouldBe true
 
     val bestEstimator = model.modelStageIn.parent
