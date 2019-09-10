@@ -148,7 +148,6 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
     ).setInput(label, features)
 
     val model = testEstimator.fit(data)
-    println(ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata()).validationResults)
     model.modelStageIn.isInstanceOf[OpLogisticRegressionModel] shouldBe true
 
     val bestEstimator = model.modelStageIn.parent
