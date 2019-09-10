@@ -183,7 +183,7 @@ class BinaryClassificationModelSelectorTest extends FlatSpec with TestSparkConte
           numFolds = 4,
           validationMetric = Evaluators.BinaryClassification.error(),
           seed = 42,
-          modelTypesToUse = Seq(modelToTry)
+          modelTypesToUse = defaultModels //Seq(modelToTry)
         )
         .setInput(label, features)
 

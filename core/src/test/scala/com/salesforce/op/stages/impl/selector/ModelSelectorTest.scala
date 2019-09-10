@@ -82,23 +82,23 @@ class ModelSelectorTest extends OpEstimatorSpec[Prediction, SelectedModel, Model
 
   private val lr = new OpLogisticRegression()
   private val lrParams = new ParamGridBuilder()
-    .addGrid(lr.regParam, Array(0.1, 100))
+    .addGrid(lr.regParam, Array(0.1, 10000))
     .addGrid(lr.elasticNetParam, Array(0, 0.5)).build()
 
   private val rf = new OpRandomForestClassifier()
   private val rfParams = new ParamGridBuilder()
     .addGrid(rf.numTrees, Array(2, 4))
-    .addGrid(rf.minInfoGain, Array(100.0, 10.0)).build()
+    .addGrid(rf.minInfoGain, Array(1000.0, 100.0)).build()
 
   private val linR = new OpLinearRegression()
   private val linRParams = new ParamGridBuilder()
-    .addGrid(linR.regParam, Array(0.1, 100))
+    .addGrid(linR.regParam, Array(0.1, 1000))
     .addGrid(linR.maxIter, Array(10, 20)).build()
 
   private val rfR = new OpRandomForestRegressor()
   private val rfRParams = new ParamGridBuilder()
     .addGrid(rfR.numTrees, Array(2, 4))
-    .addGrid(rfR.minInfoGain, Array(100.0, 10.0)).build()
+    .addGrid(rfR.minInfoGain, Array(1000.0, 100.0)).build()
 
   val (inputData, rawFeature1, feature2) = TestFeatureBuilder("label", "features",
     Seq[(RealNN, OPVector)](
