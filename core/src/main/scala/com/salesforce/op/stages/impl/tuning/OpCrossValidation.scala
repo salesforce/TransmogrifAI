@@ -57,20 +57,19 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
     require(folds.map(_.model.uid).toSet.size == 1) // Should be called only on instances of the same model
-    val gridCounts = folds.map(_.grids.map(_ -> 1).toMap).reduce(_ + _)
+
+    val gridCounts = folds.flatMap(_.grids.map(_ -> 1).toMap).sumByKey
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
-    val gridMetrics = folds.map(f => f.grids.zip(f.metrics).toMap)
-      .reduce{ (m1: Map[ParamMap, Double], m2: Map[ParamMap, Double]) =>
-        val keys = m1.keySet.union(m2.keySet)
-        keys.map(k => k -> (m1.getOrElse(k, 0.0) + m2.getOrElse(k, 0.0))).toMap
-      }
-      .filterKeys(gridsIn.contains)
-      .map{ case (key, met) => key -> met / maxFolds}
-      .toSeq
+
+    val gridMetrics = folds.flatMap{
+      f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }.toMap
+    }.sumByKey.toSeq
+
     val ((bestGrid, bestMetric), bestIndex) =
       if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
       else gridMetrics.zipWithIndex.minBy{ case ((_, metric), _) => metric}
+
     val ValidatedModel(est, _, _, _) = folds.head
     log.info(s"Average cross-validation for $est metrics: {}", gridMetrics.mkString(","))
     log.info(s"Best set of parameters:\n$bestGrid")
