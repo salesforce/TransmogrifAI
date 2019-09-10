@@ -58,12 +58,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   ): ValidatedModel[E] = {
     require(folds.map(_.model.uid).toSet.size == 1) // Should be called only on instances of the same model
 
-    val gridCounts = folds.flatMap(_.grids.map(_ -> 1).toMap).sumByKey
+    val gridCounts = folds.flatMap(_.grids.map(_ -> 1)).sumByKey
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
 
     val gridMetrics = folds.flatMap{
-      f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }.toMap
+      f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
     }.sumByKey.toSeq
 
     val ((bestGrid, bestMetric), bestIndex) =
