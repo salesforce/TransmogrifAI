@@ -64,7 +64,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 
     val gridMetrics = folds.flatMap{
       f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
-    }.sumByKey.toSeq
+    }.sumByKey
 
     val ((bestGrid, bestMetric), bestIndex) =
       if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
