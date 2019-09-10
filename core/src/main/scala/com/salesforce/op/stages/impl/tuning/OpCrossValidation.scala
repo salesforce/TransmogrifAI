@@ -53,11 +53,13 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   override def getParams(): Map[String, Any] = Map("numFolds" -> numFolds, "seed" -> seed,
     "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
 
+  /**
+   * Should be called only on instances of the same model
+   */
   private def findBestModel(
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
-    require(folds.map(_.model.uid).toSet.size == 1) // Should be called only on instances of the same model
-
+   
     val gridCounts = folds.flatMap(_.grids.map(_ -> 1)).sumByKey
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
