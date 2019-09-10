@@ -50,10 +50,12 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorNames.CrossValResults
-  private val blas = BLAS.getInstance()
 
   override def getParams(): Map[String, Any] = Map("numFolds" -> numFolds, "seed" -> seed,
     "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
+
+  private implicit val doubleSemigroup = Semigroup.from[Double](_ + _)
+  private implicit val mapDoubleMonoid = Monoid.mapMonoid[String, Double](doubleSemigroup)
 
   /**
    * Should be called only on instances of the same model
@@ -66,8 +68,6 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
 
-    implicit val doubleSemigroup = Semigroup.from[Double](_ + _)
-    implicit val mapDoubleMonoid = Monoid.mapMonoid[String, Double](doubleSemigroup)
     val gridMetrics = folds.flatMap{
       f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
     }.sumByKey
