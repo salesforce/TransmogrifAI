@@ -59,14 +59,14 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
   private def findBestModel(
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
-   
+
     val gridCounts = folds.flatMap(_.grids.map(_ -> 1)).sumByKey
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
 
     val gridMetrics = folds.flatMap{
       f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
-    }.sumByKey
+    }.sumByKey.toSeq
 
     val ((bestGrid, bestMetric), bestIndex) =
       if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
