@@ -32,6 +32,8 @@ import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.util.SparkThreadUtils
+import com.twitter.algebird._
+import com.twitter.algebird.Operators._
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
@@ -64,9 +66,11 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
     val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
 
+    implicit val doubleSemigroup = Semigroup.from[Double](_ + _)
+    implicit val mapDoubleMonoid = Monoid.mapMonoid[String, Double](doubleSemigroup)
     val gridMetrics = folds.flatMap{
       f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
-    }.sumByKey.toSeq
+    }.sumByKey
 
     val ((bestGrid, bestMetric), bestIndex) =
       if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
