@@ -239,7 +239,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val crossEntropy = Evaluators.MultiClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 
@@ -268,7 +268,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val crossEntropy = Evaluators.MultiClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 

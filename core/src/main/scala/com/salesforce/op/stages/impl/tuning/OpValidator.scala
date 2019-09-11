@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.{OpBinaryClassificationEvaluatorBase, OpEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
+import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types.{OPVector, Prediction, RealNN}
 import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.OpPipelineStage2
@@ -97,7 +97,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
 
   def seed: Long
 
-  def evaluator: OpEvaluatorBase[_]
+  def evaluator: OpEvaluatorBase[_ <: EvaluationMetrics]
 
   def validationName: String
 

@@ -43,22 +43,18 @@ case object CSVSchemaUtils {
    *  2. Merge row types to find common type
    *  3. Replace any null types with string type
    *
-   * @param rdd           data
-   * @param header        CSV header
-   * @param options       CSV options
-   * @param columnPruning If it is set to true, column names of the requested schema are passed to CSV parser.
-   *                      Other column values can be ignored during parsing even if they are malformed.
+   * @param rdd     data
+   * @param header  CSV header
+   * @param options CSV options
    * @return inferred schema
    */
   def infer(
     rdd: RDD[Array[String]],
     header: Seq[String],
-    options: com.salesforce.op.utils.io.csv.CSVOptions,
-    columnPruning: Boolean = true
+    options: com.salesforce.op.utils.io.csv.CSVOptions
   ): StructType = {
     val opts = new org.apache.spark.sql.execution.datasources.csv.CSVOptions(
       parameters = options.copy(header = false).toSparkCSVOptionsMap + ("inferSchema" -> true.toString),
-      columnPruning = columnPruning,
       defaultTimeZoneId = "GMT"
     )
     CSVInferSchema.infer(rdd, header.toArray, opts)

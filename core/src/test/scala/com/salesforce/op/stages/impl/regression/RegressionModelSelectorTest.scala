@@ -219,7 +219,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     justScores.length shouldEqual transformedData.count()
   }
 
-  it should "fit and predict for even when some models fail" in {
+  it should "fit and predict even when some models fail" in {
     val testEstimator = RegressionModelSelector
       .withCrossValidation(
         numFolds = 4,
@@ -240,8 +240,31 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
         s"Metric ${metric.entryName} is not present in metadata: " + metaData)
     )
-    metaData.validationResults.foreach(println(_))
-    metaData.validationResults.size shouldBe 42
+    metaData.validationResults.size shouldBe 40
+  }
+
+
+  it should "fit and predict even when some parameter settings fail for one of the models" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RMT.OpGeneralizedLinearRegression)
+      )
+      .setInput(label, features)
+
+
+    val model = testEstimator.fit(data)
+    model.evaluateModel(data)
+
+    // evaluation metrics from train set should be in metadata
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+    metaData.validationResults.size shouldBe 32
   }
 
 
@@ -317,7 +340,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)
@@ -340,7 +363,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)
