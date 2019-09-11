@@ -299,9 +299,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
   }
 
   it should "aggregate values for text and textMap derived features" in {
-    val testData = generateTestTextData
-    val model = generateLRModel(testData)
-    val actualRecordInsights = generateRecordInsights(model, testData)
+    val (df, featureVector, label) = generateTestTextData
+    val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+    val actualRecordInsights = generateRecordInsights(model, df, featureVector)
 
     withClue("TextArea can have two null indicator values") {
       actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
@@ -331,7 +331,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
           history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
+        assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
       }
     }
 
@@ -344,16 +344,16 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
         val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
           history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
+        assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
       }
     }
   }
 
 
   it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features" in {
-    val testData = generateTestDateData
-    val model = generateLRModel(testData)
-    val actualRecordInsights = generateRecordInsights(model, testData)
+    val (df, featureVector, label) = generateTestDateData
+    val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+    val actualRecordInsights = generateRecordInsights(model, df, featureVector, topK = 40)
 
     assertLOCOSum(actualRecordInsights)
     assertAggregatedDate(dateFeatureName)
@@ -374,7 +374,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
           val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
             history.descriptorValue.isDefined &&
             history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
+          assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
         }
       }
     }
@@ -391,7 +391,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
           val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
             history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
             history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, testData, model, actualRecordInsights)
+          assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
         }
       }
     }
@@ -410,20 +410,22 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
    */
   private def assertAggregatedWithPredicate(
     predicate: OpVectorColumnHistory => Boolean,
-    testData: RecordInsightsTestData,
     model: OpPredictorWrapperModel[_],
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
     actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]
   ): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
-    val meta = OpVectorMetadata.apply(testData.featureTransformedDF.schema(testData.featureVector.name))
+    val meta = OpVectorMetadata.apply(df.schema(featureVector.name))
 
     val indices = meta.getColumnHistory()
       .filter(predicate)
       .map(_.index)
 
-    val expectedLocos = testData.featureTransformedDF.select(testData.label, testData.featureVector).map {
+    val expectedLocos = df.select(label, featureVector).map {
       case Row(l: Double, v: Vector) =>
         val featureArray = v.toArray
         val locos = indices.map { i =>
@@ -449,6 +451,17 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
       }
     }
   }
+
+  private def generateRecordInsights[T <: Model[T]](
+    model: T,
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    topK: Int = 20
+  ): Array[Map[OpVectorColumnHistory, Insights]] = {
+    val transformer = new RecordInsightsLOCO(model).setInput(featureVector).setTopK(topK)
+    val insights = transformer.transform(df)
+    insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
+  }
 }
 
 trait RecordInsightsTestDataGenerator extends TestSparkContext {
@@ -471,7 +484,7 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
   val textAreaFeatureName = "textArea"
   val textAreaMapFeatureName = "textAreaMap"
 
-  def generateTestDateData: RecordInsightsTestData = {
+  def generateTestDateData: (DataFrame, FeatureLike[OPVector], FeatureLike[RealNN]) = {
     val refDate = TransmogrifierDefaults.ReferenceDate.minusMillis(1)
 
     val minStep = 1000000
@@ -515,19 +528,10 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
     val featureVector = Seq(dateVector, datetimeVector, dateMapVector, datetimeMapVector).combine()
     val featureTransformedDF = new OpWorkflow().setResultFeatures(featureVector, label).transform(rawData)
 
-    // Train a model
-    val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(featureTransformedDF)
-
-    // RecordInsightsLOCO
-    val locoTransformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector).setTopK(40)
-    val locoInsights = locoTransformer.transform(featureTransformedDF)
-    val parsedInsights = locoInsights.collect(locoTransformer.getOutput()).map(i =>
-      RecordInsightsParser.parseInsights(i))
-
-    RecordInsightsTestData(rawData, featureTransformedDF, featureVector, label)
+    (featureTransformedDF, featureVector, label)
   }
 
-  def generateTestTextData: RecordInsightsTestData = {
+  def generateTestTextData: (DataFrame, FeatureLike[OPVector], FeatureLike[RealNN]) = {
 
     // Random Text Data
     val textData: Seq[Text] = RandomText.strings(5, 10).withProbabilityOfEmpty(0.3).take(numRows).toList
@@ -605,30 +609,10 @@ trait RecordInsightsTestDataGenerator extends TestSparkContext {
     // Sanity Checker
     val checker = new SanityChecker().setInput(label, featureVector)
 
-    val checked = checker.fit(vectorized).transform(vectorized)
+    val checkedDf = checker.fit(vectorized).transform(vectorized)
 
     val checkedFeatureVector = checker.getOutput()
 
-    RecordInsightsTestData(testData, checked, checkedFeatureVector, label)
-  }
-
-  def generateLRModel(data: RecordInsightsTestData): OpPredictorWrapperModel[LogisticRegressionModel]  = {
-    new OpLogisticRegression().setInput(data.label, data.featureVector).fit(data.featureTransformedDF)
-  }
-
-  def generateRecordInsights[T <: Model[T]](model: T,
-    data: RecordInsightsTestData): Array[Map[OpVectorColumnHistory, Insights]] = {
-    val transformer = new RecordInsightsLOCO(model).setInput(data.featureVector).setTopK(
-      data.featureTransformedDF.columns.length)
-    val insights = transformer.transform(data.featureTransformedDF)
-    insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
+    (checkedDf, checkedFeatureVector, label)
   }
 }
-
-case class RecordInsightsTestData
-(
-  rawDF: DataFrame,
-  featureTransformedDF: DataFrame,
-  featureVector: FeatureLike[OPVector],
-  label: FeatureLike[RealNN]
-)
