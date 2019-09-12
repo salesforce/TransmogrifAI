@@ -754,9 +754,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val descaledbigCoeff = coeffs(2)
     val orginalbigCoeff = coeffs(3)
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
-    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff
+    val bigCoeffSum = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff)
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
-    val smallCoeffSum = originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff
+    val smallCoeffSum = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff)
     absError should be < tol * bigCoeffSum / 2
     absError2 should be < tol * smallCoeffSum / 2
   }
@@ -770,9 +770,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val orginalbigCoeff = coeffs(3)
     // difference between the real coefficient and the analytical formula
     val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
-    val bigCoeffSum = orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff
+    val bigCoeffSum = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff)
     val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
-    val smallCoeffSum = originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff
+    val smallCoeffSum = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff)
     absError should be < tol * bigCoeffSum / 2
     absError2 should be < tol * smallCoeffSum / 2
   }
