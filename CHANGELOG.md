@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.1
+
+Bug fixes:
+- Ensure correct metrics despite model failures on some CV folds [#404](https://github.com/salesforce/TransmogrifAI/pull/404)
+- Fix flaky `ModelInsight` tests [#395](https://github.com/salesforce/TransmogrifAI/pull/395)
+- Avoid creating `SparseVector`s for LOCO [#377](https://github.com/salesforce/TransmogrifAI/pull/377)
+
+New features / updates:
+- Model combiner [#385](https://github.com/salesforce/TransmogrifAI/pull/399)
+- Added new sample for HousingPrices [#365](https://github.com/salesforce/TransmogrifAI/pull/365)
+- Test to verify that custom metrics appear in model insight metrics [#387](https://github.com/salesforce/TransmogrifAI/pull/387)
+- Add `FeatureDistribution` to `SerializationFormat`s [#383](https://github.com/salesforce/TransmogrifAI/pull/383)
+- Add metadata to `OpStandadrdScaler` to allow for descaling [#378](https://github.com/salesforce/TransmogrifAI/pull/378)
+- Improve json serde error in `evalMetFromJson` [#380](https://github.com/salesforce/TransmogrifAI/pull/380)
+- Track mean & standard deviation as metrics for numeric features and for text length of text features [#354](https://github.com/salesforce/TransmogrifAI/pull/354)
+- Making model selectors robust to failing models [#372](https://github.com/salesforce/TransmogrifAI/pull/372)
+- Use compact and compressed model json by default [#375](https://github.com/salesforce/TransmogrifAI/pull/375)
+- Descale feature contribution for Linear Regression & Logistic Regression [#345](https://github.com/salesforce/TransmogrifAI/pull/345)
+
+Dependency updates:   
+- Update tika version [#382](https://github.com/salesforce/TransmogrifAI/pull/382)
+
 ## 0.6.0
 
 Bug fixes:
