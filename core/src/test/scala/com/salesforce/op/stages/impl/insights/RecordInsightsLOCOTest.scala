@@ -45,7 +45,6 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnHistory, OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.{FeatureHistory, OpWorkflow, _}
 import org.apache.spark.ml.Model
-import org.apache.spark.ml.classification.LogisticRegressionModel
 import org.apache.spark.ml.linalg._
 import org.apache.spark.ml.regression.LinearRegressionModel
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -298,108 +297,150 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
         "feature importances from Spark's RandomForest")
   }
 
-  it should "aggregate values for text and textMap derived features" in {
-    val (df, featureVector, label) = generateTestTextData
-    val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
-    val actualRecordInsights = generateRecordInsights(model, df, featureVector)
+  for (strategy <- VectorAggregationStrategy.values) {
+    it should s"aggregate values for text and textMap derived features when " +
+      s"strategy=$strategy" in {
+      val (df, featureVector, label) = generateTestTextData
+      val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+      val actualInsights = generateRecordInsights(model, df, featureVector, strategy)
 
-    withClue("TextArea can have two null indicator values") {
-      actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
-    }
-    withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
-      "aggregation required for LOCO on this field.") {
-      actualRecordInsights.foreach { p =>
-        assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
+      withClue("TextArea can have two null indicator values") {
+        actualInsights.map(p => assert(p.size == 7 || p.size == 8))
       }
-    }
-
-    assertLOCOSum(actualRecordInsights)
-    assertAggregatedText(textFeatureName)
-    assertAggregatedTextMap(textMapFeatureName, "k0")
-    assertAggregatedTextMap(textMapFeatureName, "k1")
-    assertAggregatedText(textAreaFeatureName)
-    assertAggregatedTextMap(textAreaMapFeatureName, "k0")
-    assertAggregatedTextMap(textAreaMapFeatureName, "k1")
-
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
-     *
-     * @param textFeatureName Text Field Name
-     */
-    def assertAggregatedText(textFeatureName: String): Unit = {
-      withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
-        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
-          history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
+      withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
+        "aggregation required for LOCO on this field.") {
+        actualInsights.foreach { p =>
+          assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
+        }
       }
-    }
 
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually
-     *
-     * @param textMapFeatureName Text Map Field Name
-     */
-    def assertAggregatedTextMap(textMapFeatureName: String, keyName: String): Unit = {
-      withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
-        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
-          history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
-      }
+      assertLOCOSum(actualInsights)
+      assertAggregatedText(textFeatureName, strategy, model, df, featureVector, label, actualInsights)
+      assertAggregatedText(textAreaFeatureName, strategy, model, df, featureVector, label, actualInsights)
+      assertAggregatedTextMap(textMapFeatureName, "k0", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedTextMap(textMapFeatureName, "k1", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedTextMap(textAreaMapFeatureName, "k0", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedTextMap(textAreaMapFeatureName, "k1", strategy, model, df, featureVector, label,
+        actualInsights)
     }
   }
 
 
-  it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features" in {
-    val (df, featureVector, label) = generateTestDateData
-    val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
-    val actualRecordInsights = generateRecordInsights(model, df, featureVector, topK = 40)
+  for (strategy <- VectorAggregationStrategy.values) {
+    it should s"aggregate values for date, datetime, dateMap and dateTimeMap derived features when " +
+      s"strategy=$strategy" in {
+      val (df, featureVector, label) = generateTestDateData
+      val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+      val actualInsights = generateRecordInsights(model, df, featureVector, strategy, topK = 40)
 
-    assertLOCOSum(actualRecordInsights)
-    assertAggregatedDate(dateFeatureName)
-    assertAggregatedDate(dateTimeFeatureName)
-    assertAggregatedDateMap(dateMapFeatureName, "k0")
-    assertAggregatedDateMap(dateMapFeatureName, "k1")
-    assertAggregatedDateMap(dateTimeMapFeatureName, "k0")
-    assertAggregatedDateMap(dateTimeMapFeatureName, "k1")
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a Date/DateTime field to one made manually
-     *
-     * @param dateFeatureName Date/DateTime Field
-     */
-    def assertAggregatedDate(dateFeatureName: String): Unit = {
-      for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
-        withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
-          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
-            history.descriptorValue.isDefined &&
-            history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
-        }
-      }
-    }
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a DateMap/DateTimeMap field to one made manually
-     *
-     * @param dateMapFeatureName DateMap/DateTimeMap Field
-     */
-    def assertAggregatedDateMap(dateMapFeatureName: String, keyName: String): Unit = {
-      for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
-        withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawMapFeature - $dateMapFeatureName " +
-          s"with key as $keyName.") {
-          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
-            history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
-            history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, model, df, featureVector, label, actualRecordInsights)
-        }
-      }
+      assertLOCOSum(actualInsights)
+      assertAggregatedDate(dateFeatureName, strategy, model, df, featureVector, label, actualInsights)
+      assertAggregatedDate(dateTimeFeatureName, strategy, model, df, featureVector, label, actualInsights)
+      assertAggregatedDateMap(dateMapFeatureName, "k0", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedDateMap(dateMapFeatureName, "k1", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedDateMap(dateTimeMapFeatureName, "k0", strategy, model, df, featureVector, label,
+        actualInsights)
+      assertAggregatedDateMap(dateTimeMapFeatureName, "k1", strategy, model, df, featureVector, label,
+        actualInsights)
     }
   }
+
 
   private def assertLOCOSum(actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]): Unit = {
     withClue("LOCOs sum to 0") {
       actualRecordInsights.foreach(_.values.foreach(a => assert(math.abs(a.map(_._2).sum) < 1e-10)))
+    }
+  }
+
+  /**
+   * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
+   *
+   * @param textFeatureName Text Field Name
+   */
+  def assertAggregatedText(textFeatureName: String,
+    strategy: VectorAggregationStrategy,
+    model: OpPredictorWrapperModel[_],
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
+    actualInsights: Array[Map[OpVectorColumnHistory, Insights]]
+   ): Unit = {
+    withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
+      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
+        history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+      assertAggregatedWithPredicate(predicate, strategy, model, df, featureVector, label, actualInsights)
+    }
+  }
+
+  /**
+   * Compare the aggregation made by RecordInsightsLOCO to one made manually
+   *
+   * @param textMapFeatureName Text Map Field Name
+   */
+  def assertAggregatedTextMap(textMapFeatureName: String, keyName: String,
+    strategy: VectorAggregationStrategy,
+    model: OpPredictorWrapperModel[_],
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
+    actualInsights: Array[Map[OpVectorColumnHistory, Insights]]
+  ): Unit = {
+    withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
+      val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
+        history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+      assertAggregatedWithPredicate(predicate, strategy, model, df, featureVector, label, actualInsights)
+    }
+  }
+
+  /**
+   * Compare the aggregation made by RecordInsightsLOCO on a Date/DateTime field to one made manually
+   *
+   * @param dateFeatureName Date/DateTime Field
+   */
+  def assertAggregatedDate(dateFeatureName: String,
+    strategy: VectorAggregationStrategy,
+    model: OpPredictorWrapperModel[_],
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
+    actualInsights: Array[Map[OpVectorColumnHistory, Insights]]
+  ): Unit = {
+    for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
+      withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
+        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
+          history.descriptorValue.isDefined &&
+          history.descriptorValue.get.split("_").last == timePeriod.entryName
+        assertAggregatedWithPredicate(predicate, strategy, model, df, featureVector, label, actualInsights)
+      }
+    }
+  }
+
+  /**
+   * Compare the aggregation made by RecordInsightsLOCO on a DateMap/DateTimeMap field to one made manually
+   *
+   * @param dateMapFeatureName DateMap/DateTimeMap Field
+   */
+  def assertAggregatedDateMap(dateMapFeatureName: String, keyName: String,
+    strategy: VectorAggregationStrategy,
+    model: OpPredictorWrapperModel[_],
+    df: DataFrame,
+    featureVector: FeatureLike[OPVector],
+    label: FeatureLike[RealNN],
+    actualInsights: Array[Map[OpVectorColumnHistory, Insights]]
+  ): Unit = {
+    for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
+      withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawMapFeature - $dateMapFeatureName " +
+        s"with key as $keyName.") {
+        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
+          history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
+          history.descriptorValue.get.split("_").last == timePeriod.entryName
+        assertAggregatedWithPredicate(predicate, strategy, model, df, featureVector, label, actualInsights)
+      }
     }
   }
 
@@ -410,6 +451,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
    */
   private def assertAggregatedWithPredicate(
     predicate: OpVectorColumnHistory => Boolean,
+    strategy: VectorAggregationStrategy,
     model: OpPredictorWrapperModel[_],
     df: DataFrame,
     featureVector: FeatureLike[OPVector],
@@ -427,17 +469,24 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
 
     val expectedLocos = df.select(label, featureVector).map {
       case Row(l: Double, v: Vector) =>
-        val featureArray = v.toArray
-        val locos = indices.map { i =>
-          val oldVal = v(i)
-          val baseScore = model.transformFn(l.toRealNN, v.toOPVector).score.toSeq
-          featureArray.update(i, 0.0)
-          val newScore = model.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
-          featureArray.update(i, oldVal)
-          baseScore.zip(newScore).map { case (b, n) => b - n }
+        val featureArray = v.copy.toArray
+        val baseScore = model.transformFn(l.toRealNN, v.toOPVector).score.toSeq
+        strategy match {
+          case VectorAggregationStrategy.Avg =>
+            val locos = indices.map { i =>
+              val oldVal = v(i)
+              featureArray.update(i, 0.0)
+              val newScore = model.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
+              featureArray.update(i, oldVal)
+              baseScore.zip(newScore).map { case (b, n) => b - n }
+            }
+            val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
+            sumLOCOs.map(_ / indices.length)
+          case VectorAggregationStrategy.LeaveOutVector =>
+            indices.map { i => featureArray.update(i, 0.0) }
+            val newScore = model.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
+            baseScore.zip(newScore).map { case (b, n) => b - n }
         }
-        val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
-        sumLOCOs.map(_ / indices.length)
     }
     val expected = expectedLocos.collect().toSeq.filter(_.head != 0.0)
 
@@ -456,9 +505,12 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     model: T,
     df: DataFrame,
     featureVector: FeatureLike[OPVector],
+    strategy: VectorAggregationStrategy,
     topK: Int = 20
   ): Array[Map[OpVectorColumnHistory, Insights]] = {
     val transformer = new RecordInsightsLOCO(model).setInput(featureVector).setTopK(topK)
+      .setDateAggregationStrategy(strategy)
+      .setTextAggregationStrategy(strategy)
     val insights = transformer.transform(df)
     insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
   }
