@@ -58,7 +58,6 @@ import org.slf4j.LoggerFactory
 private[op] class OpMultiClassificationEvaluator
 (
   override val name: EvalMetric = OpEvaluatorNames.Multi,
-  override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpMultiClassificationEvaluator]
 ) extends OpMultiClassificationEvaluatorBase[MultiClassificationMetrics](uid) {
 

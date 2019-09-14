@@ -217,6 +217,7 @@ trait OpPipelineStageReadWriteFormats {
       EnumEntrySerializer.json4s[ScalingType](ScalingType) +
       EnumEntrySerializer.json4s[TimePeriod](TimePeriod) +
       EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
+      EnumEntrySerializer.json4s[CombinationStrategy](CombinationStrategy) +
       new SpecialDoubleSerializer
 
 }

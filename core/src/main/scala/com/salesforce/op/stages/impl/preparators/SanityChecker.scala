@@ -875,6 +875,13 @@ object CorrelationType extends Enum[CorrelationType] {
    * @see https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
    */
   case object Spearman extends CorrelationType("spearman")
+
+  /**
+   * Compute with Spearman's rank-order correlation
+   *
+   * @see https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient
+   */
+  case class Custom(name: String, spark: String) extends CorrelationType(spark)
 }
 
 /**

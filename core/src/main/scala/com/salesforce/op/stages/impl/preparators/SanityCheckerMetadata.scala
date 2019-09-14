@@ -179,6 +179,9 @@ case class SummaryStatistics
     meta.build()
   }
 
+  private[op] def +(sum: SummaryStatistics): SummaryStatistics = new SummaryStatistics(count, sampleFraction,
+    max ++ sum.max, min ++ sum.min, mean ++ sum.mean, variance ++ sum.variance)
+
 }
 
 /**
@@ -313,9 +316,31 @@ case class Correlations
     corrMeta.putString(SanityCheckerNames.CorrelationType, corrType.sparkName)
     corrMeta.build()
   }
+
+  private[op] def +(corr: Correlations): Correlations = {
+    val corrName =
+      if (corrType != corr.corrType) {
+        CorrelationType.Custom(
+          corrType.entryName + corr.corrType.entryName,
+          corrType.sparkName + corr.corrType.sparkName
+        )
+      } else {
+        corrType
+      }
+    new Correlations(featuresIn ++ corr.featuresIn, values ++ corr.values, nanCorrs ++ corr.nanCorrs, corrName)
+  }
 }
 
 case object SanityCheckerSummary {
+
+  def flatten(checkers: Seq[SanityCheckerSummary]): SanityCheckerSummary = {
+    val correlationsWLabel: Correlations = checkers.map(_.correlationsWLabel).reduce(_ + _)
+    val dropped: Seq[String] = checkers.flatMap(_.dropped)
+    val featuresStatistics: SummaryStatistics = checkers.map(_.featuresStatistics).reduce(_ + _)
+    val names: Seq[String] = checkers.flatMap(_.names)
+    val categoricalStats: Array[CategoricalGroupStats] = checkers.flatMap(_.categoricalStats).toArray
+    new SanityCheckerSummary(correlationsWLabel, dropped, featuresStatistics, names, categoricalStats)
+  }
 
   private def correlationsFromMetadata(meta: Metadata): Correlations = {
     val wrapped = meta.wrapped
