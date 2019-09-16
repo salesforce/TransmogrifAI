@@ -53,6 +53,8 @@ object RichNode {
       case _: LeafNode => Array.empty[Double]
     }
 
+    def getImpurityStats: Array[Double] = node.impurityStats.stats
+
   }
 
 }
