@@ -129,7 +129,7 @@ case class FeatureDistribution
     val n = distribution.length
     val average = distribution.sum / n
     val uniform = Array.fill[Double](n)(average)
-    val contingencyMatrix = new DenseMatrix(n, n, distribution ++ uniform)
+    val contingencyMatrix = new DenseMatrix(n, 2, distribution ++ uniform)
     val res = OpStatistics.contingencyStats(contingencyMatrix)
     return res.chiSquaredResults
   }
@@ -141,7 +141,7 @@ case class FeatureDistribution
       val n = vec.length
       val average = vec.sum / n
       val uniform = Array.fill[Double](n)(average)
-      val contingencyMatrix = new DenseMatrix(n, n, vec ++ uniform)
+      val contingencyMatrix = new DenseMatrix(n, 2, vec ++ uniform)
       val res = OpStatistics.contingencyStats(contingencyMatrix)
       return Array(Some(res.chiSquaredResults.pValue),
                   Some(res.chiSquaredResults.chiSquaredStat),
