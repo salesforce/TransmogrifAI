@@ -297,7 +297,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
         "feature importances from Spark's RandomForest")
   }
 
-  for (strategy <- VectorAggregationStrategy.values) {
+  for {strategy <- VectorAggregationStrategy.values} {
     it should s"aggregate values for text and textMap derived features when " +
       s"strategy=$strategy" in {
       val (df, featureVector, label) = generateTestTextData
@@ -328,8 +328,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
   }
 
-
-  for (strategy <- VectorAggregationStrategy.values) {
+  for {strategy <- VectorAggregationStrategy.values} {
     it should s"aggregate values for date, datetime, dateMap and dateTimeMap derived features when " +
       s"strategy=$strategy" in {
       val (df, featureVector, label) = generateTestDateData
@@ -369,7 +368,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     featureVector: FeatureLike[OPVector],
     label: FeatureLike[RealNN],
     actualInsights: Array[Map[OpVectorColumnHistory, Insights]]
-   ): Unit = {
+  ): Unit = {
     withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
       val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
         history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
