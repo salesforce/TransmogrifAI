@@ -105,7 +105,7 @@ case class FeatureDistribution
       else {
         Some(counts.sum.toFloat / count)
       }
-   case _ => None
+    case _ => None
   }
 
   def cardSize(): Option[Double] = cardEstimate match {
