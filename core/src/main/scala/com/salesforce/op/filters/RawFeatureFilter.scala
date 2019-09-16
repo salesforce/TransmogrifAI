@@ -221,10 +221,12 @@ class RawFeatureFilter[T]
     val rawcardSizes: Seq[Option[Double]] = trainingDistribs.map(_.cardSize())
     val rawavgcardCounts: Seq[Option[Double]] = trainingDistribs.map(_.avgcardCount())
     val rawmaxcardCounts: Seq[Option[Double]] = trainingDistribs.map(_.maxcardCount())
-    val rawchiSq_dist_pvals: Seq[Double] = trainingDistribs.map(_.chiSqUnifTestHash().pValue)
-    val rawchiSq_dist_stats: Seq[Double] = trainingDistribs.map(_.chiSqUnifTestHash().statistic)
-    val rawchiSq_card_pvals: Seq[Option[Double]] = trainingDistribs.map(_.chiSqUnifTestCard()._2)
-    val rawchiSq_card_stat: Seq[Option[Double]] = trainingDistribs.map(_.chiSqUnifTestCard()._1)
+    val rawchiSq_dist_pvals: Seq[Double] = trainingDistribs.map(_.cramersVHash().pValue)
+    val rawchiSq_dist_stats: Seq[Double] = trainingDistribs.map(_.cramersVHash().chiSquaredStat)
+    val rawchiSq_dist_cramersVs: Seq[Double] = trainingDistribs.map(_.cramersVHash().cramersV)
+    val rawchiSq_card_pvals: Seq[Option[Double]] = trainingDistribs.map(_.cramersVCard()(0))
+    val rawchiSq_card_stats: Seq[Option[Double]] = trainingDistribs.map(_.cramersVCard()(1))
+    val rawchiSq_card_cramersVs: Seq[Option[Double]] = trainingDistribs.map(_.cramersVCard()(2))
     val trainingNullLabelAbsoluteCorrs: Seq[Option[Double]] =
       if (correlationInfo.isEmpty) Seq.fill(featureSize)(None)
       else {
@@ -264,19 +266,22 @@ class RawFeatureFilter[T]
         .zip(rawchiSq_dist_pvals)
         .zip(rawchiSq_dist_stats)
         .zip(rawchiSq_card_pvals)
-        .zip(rawchiSq_card_stat)
+        .zip(rawchiSq_card_stats)
+        .zip(rawchiSq_dist_cramersVs)
+        .zip(rawchiSq_card_cramersVs)
         .map {
-          case (((((((((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
+          case (((((((((((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
           scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff),
           topKratio), rawMean), rawVariance), rawSkewness), rawKurtosis),
           rawcardSize), rawavgcardCount), rawmaxcardCount), rawchiSq_dist_pval), rawchiSq_dist_stat),
-          rawchiSq_card_pval), rawchiSq_card_stat) =>
+          rawchiSq_card_pval), rawchiSq_card_stat), rawchiSq_dist_cramersV), rawchiSq_card_cramersV) =>
             RawFeatureFilterMetrics(
               name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
               scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff,
               topKratio, rawMean, rawVariance, rawSkewness, rawKurtosis,
               rawcardSize, rawavgcardCount, rawmaxcardCount, rawchiSq_dist_pval,
-              rawchiSq_dist_stat, rawchiSq_card_pval, rawchiSq_card_stat)
+              rawchiSq_dist_stat, rawchiSq_card_pval, rawchiSq_card_stat,
+              rawchiSq_dist_cramersV, rawchiSq_card_cramersV)
         }
     }
 

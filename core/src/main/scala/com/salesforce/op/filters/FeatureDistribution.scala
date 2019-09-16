@@ -35,13 +35,13 @@ import java.util.Objects
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
 import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
+import com.salesforce.op.utils.stats.OpStatistics
+import com.salesforce.op.utils.stats.OpStatistics.ChiSquaredResults
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird._
 import com.twitter.algebird.Operators._
-import org.apache.spark.mllib.linalg.Vectors
+import org.apache.spark.mllib.linalg.{DenseMatrix}
 import org.apache.spark.mllib.feature.HashingTF
-import org.apache.spark.mllib.stat.Statistics
-import org.apache.spark.mllib.stat.test.ChiSqTestResult
 import org.json4s.jackson.Serialization
 import org.json4s.{DefaultFormats, Formats}
 
@@ -125,26 +125,32 @@ case class FeatureDistribution
     case _ => None
   }
 
-  def chiSqUnifTestHash(): ChiSqTestResult = {
-    val vectorizedDistr = Vectors.dense(distribution)
-    return Statistics.chiSqTest(vectorizedDistr)
+  def cramersVHash(): ChiSquaredResults = {
+    val n = distribution.length
+    val average = distribution.sum / n
+    val uniform = Array.fill[Double](n)(average)
+    val contingencyMatrix = new DenseMatrix(n, n, distribution ++ uniform)
+    val res = OpStatistics.contingencyStats(contingencyMatrix)
+    return res.chiSquaredResults
   }
 
-  def chiSqUnifTestCard(): (Option[Double], Option[Double]) = cardEstimate match {
+  def cramersVCard(): Array[Option[Double]] = cardEstimate match {
     case Some(x) => {
       val vec = x.valueCounts.values.toArray.map(_.toDouble)
-      if (vec.length > 0) {
-        val vectorizedDistr = Vectors.dense(vec)
-        println(vectorizedDistr)
-        val testResult = Statistics.chiSqTest(vectorizedDistr)
-        (Some(testResult.statistic), Some(testResult.pValue))
-      }
-      else {
-        (None, None)
-      }
+      println(vec)
+      val n = vec.length
+      val average = vec.sum / n
+      val uniform = Array.fill[Double](n)(average)
+      val contingencyMatrix = new DenseMatrix(n, n, vec ++ uniform)
+      val res = OpStatistics.contingencyStats(contingencyMatrix)
+      return Array(Some(res.chiSquaredResults.pValue),
+                  Some(res.chiSquaredResults.chiSquaredStat),
+                  Some(res.chiSquaredResults.cramersV)
+            )
     }
-    case _ => (None, None)
+    case _ => Array(None, None, None)
   }
+
   /**
    * Combine feature distributions
    *

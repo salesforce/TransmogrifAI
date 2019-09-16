@@ -154,7 +154,9 @@ case class RawFeatureFilterMetrics
   rawchiSq_dist_pval: Double,
   rawchiSq_dist_stat: Double,
   rawchiSq_card_pval: Option[Double],
-  rawchiSq_card_stat: Option[Double]
+  rawchiSq_card_stat: Option[Double],
+  rawchiSq_dist_cramersV: Double,
+  rawchiSq_card_cramersV: Option[Double]
 )
 
 /**
