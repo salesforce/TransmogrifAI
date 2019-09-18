@@ -20,6 +20,68 @@ val features = Seq(emailFeature, phone, age, subject, zipcode).transmogrify()
 
 For advanced users, you can also completely [customize automatic feature engineering](../developer-guide#transmogrification).
 
+## NLP - NER Detection
+
+This is the stage which can be used in feature engineering to detect NERs in a sentence.
+Please include following dependency:
+
+```
+compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.6.1
+```
+
+It can be done in the following steps:
+
+**Token generation**
+
+We will use NameEntityRecognizer tokenize the input text. It is  NameEntityType text recognizer class which encapsulates 
+OpenNLPAnalyzer. `com.salesforce.op.utils.text.OpenNLPAnalyzer` loads Open NLP models from disk using 
+`com.salesforce.op.utils.text.OpenNLPModels` class
+
+```scala
+val tokens: Seq[TextList] = input.map(x => NameEntityRecognizer.Analyzer.analyze(x, Language.English).toTextList)
+
+```
+
+Once text is tokenized , initialize the NamedEntity Tagger
+
+```scala
+import com.salesforce.op.utils.text.OpenNLPNameEntityTagger
+import com.salesforce.op.utils.text.NameEntityType
+import com.salesforce.op.features.types._
+
+val nerTagger = new OpenNLPNameEntityTagger()
+```
+
+**Extract Person Tags**
+
+We extract by passing following values to `nerTagger` instance defined above
+
+```scala
+val personEntities = tokens.map { tokenInput => 
+      nerTagger.tag(tokenInput.value, Language.English, Seq(NameEntityType.Person)).tokenTags
+}
+```
+
+**Extract Date**
+
+Following code listing shows how to extract Date from the tokenValue using `NameEntityType.Date`.
+
+```scala
+val dateEntities = tokens.map { tokenInput => 
+        nerTagger.tag(tokenInput.value, Language.English, Seq(NameEntityType.Date)).tokenTags
+}
+```
+
+**Extract Organization**
+
+Extract organization using `NameEntityType.Organization`.
+```scala
+val organizationEntities = tokens.map  { tokenInput => 
+      nerTagger.tag(tokenInput.value, Language.English, Seq(NameEntityType.Organization)).tokenTags
+}
+
+```
+
 ## Feature Validation
 
 #### SanityChecker
@@ -67,4 +129,8 @@ val pred = BinaryClassificationModelSelector().setInput(label, features).getOutp
 The ModelSelector is an Estimator that uses data to find the best model. BinaryClassificationModelSelector is for  binary classification tasks, multi classification tasks can be done using MultiClassificationModelSelector. Best Regression model are done through RegressionModelSelector. Currently the possible classification models that can be applied in the selector are `GBTCLassifier`, `LinearSVC`, `LogisticRegression`, `DecisionTrees`, `RandomForest` and `NaiveBayes`, though `GBTClassifier` and `LinearSVC` only support binary classification. The possible regression models are `GeneralizedLinearRegression`,  `LinearRegression`, `DecisionTrees`, `RandomForest` and `GBTreeRegressor`. The best model is selected via a CrossValidation or TrainingSplit, by picking the best model and wrapping it. By default each of these models comes with a predefined set of hyperparameters that will be tested in determining the best model.  
 
 For advanced users, check out how to specify specific models and hyperparameters, add your own models, set validation parameters, and balance datasets [here](../developer-guide#modelselector).
+
+
+
+
 
