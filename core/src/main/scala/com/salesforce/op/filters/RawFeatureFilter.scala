@@ -272,7 +272,7 @@ class RawFeatureFilter[T]
         .zip(rawchiSq_dist_cramersVs)
         .zip(rawchiSq_card_cramersVs)
         .map {
-          case (((((((((((((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
+          case ((((((((((((((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
           scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff),
           top1avg), top5avg), top10avg), rawMean), rawVariance), rawSkewness), rawKurtosis),
           rawcardSize), rawavgcardCount), rawchiSq_dist_pval), rawchiSq_dist_stat),
