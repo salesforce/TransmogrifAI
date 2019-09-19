@@ -96,14 +96,14 @@ case class FeatureDistribution
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
 
-  def topKCardRatio(): Option[Double] = cardEstimate match {
+  def topKCardAvg(k: Int): Option[Double] = cardEstimate match {
     case Some(x) =>
       val counts = x.valueCounts.values.toList.sortWith(_ > _)
-      if (counts.size > 100) {
-        Some(counts.take(100).sum.toFloat / count)
+      if (counts.size >= k) {
+        Some(counts.take(k).sum.toFloat / k)
       }
       else {
-        Some(counts.sum.toFloat / count)
+        Some(counts.sum.toFloat / counts.size)
       }
     case _ => None
   }
@@ -116,12 +116,6 @@ case class FeatureDistribution
   // average number of token per row
   def avgcardCount(): Option[Double] = cardEstimate match {
     case Some(x) => Some(x.valueCounts.values.sum.toFloat / count)
-    case _ => None
-  }
-
-  // highest token count ?
-  def maxcardCount(): Option[Double] = cardEstimate match {
-    case Some(x) => Some(x.valueCounts.values.max)
     case _ => None
   }
 
@@ -337,7 +331,7 @@ object FeatureDistribution {
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
     val population = values match {
-      case Left(seq) => seq.map(_.length.toString)
+      case Left(seq) => seq
       case Right(seq) => seq.map(_.toString)
     }
     TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
