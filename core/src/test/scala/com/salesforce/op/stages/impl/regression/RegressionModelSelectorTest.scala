@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
-import com.salesforce.op.stages.impl.tuning.BestEstimator
+import com.salesforce.op.stages.impl.tuning.{BestEstimator, DataSplitter}
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
@@ -62,6 +62,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
   with CompareParamGrid with OpXGBoostQuietLogging {
   val seed = 1234L
   val stageNames = "label_prediction"
+  val dataCount = 200
 
   import spark.implicits._
   val rand = new Random(seed)
@@ -120,9 +121,27 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
   it should "set the data splitting params correctly" in {
     val modelSelector = RegressionModelSelector()
-    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L)
+    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L).setMaxTrainingSample(1000)
+
     modelSelector.splitter.get.getSeed shouldBe 11L
     modelSelector.splitter.get.getReserveTestFraction shouldBe 0.1
+    modelSelector.splitter.get.getMaxTrainingSample shouldBe 1000
+  }
+
+  it should "set maxTrainingSample and down-sample" in {
+
+    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
+    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+    val maxTrainingSample = 100
+    val sampleF = maxTrainingSample / dataCount.toDouble
+    val downSampleFraction = if (sampleF < 1) sampleF else 1
+    val dataSplitter = DataSplitter(maxTrainingSample = maxTrainingSample, seed = seed, reserveTestFraction = 0.0)
+    val modelSelector = RegressionModelSelector.withCrossValidation(Option(dataSplitter), seed = seed)
+    val model = modelSelector.setInput(label, features).fit(data)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction" )
+
+    modelDownSampleFraction shouldBe downSampleFraction
   }
 
   it should "split into training and test" in {
