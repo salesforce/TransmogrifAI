@@ -43,6 +43,7 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
 
   val seed = 1234L
   val dataCount = 1000
+  val MaxTrainingSampleDefault = 1E6.toInt
 
   val data =
     RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
@@ -54,6 +55,32 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
     val (train, test) = dataSplitter.setReserveTestFraction(0.0).split(data)
     test.count() shouldBe 0
     train.count() shouldBe dataCount
+  }
+
+  it should "down-sample when the data count is above the max allowed" in {
+    val numRows = 1E6.toInt + 1E6.toInt
+    val data =
+      RandomRDDs.normalVectorRDD(sc, numRows, 3, seed = seed)
+        .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
+    dataSplitter.preValidationPrepare(data)
+    val dataBalanced = dataSplitter.validationPrepare(data)
+
+    // validationPrepare calls the data sample method that samples the data to a target ratio but there is an epsilon
+    // to how precise this function is which is why we need to check around that epsilon
+    val samplingErrorEpsilon = (0.1 * MaxTrainingSampleDefault).toInt
+
+    dataBalanced.count() shouldBe MaxTrainingSampleDefault.toLong +- samplingErrorEpsilon.toLong
+  }
+
+  it should "set and get maxTrainingSample" in {
+    val numRows = 2000
+    val maxRows = numRows / 2
+
+    dataSplitter
+      .setReserveTestFraction(0.0)
+      .setMaxTrainingSample(maxRows)
+
+    dataSplitter.getMaxTrainingSample shouldBe maxRows
   }
 
   it should "split the data in the appropriate proportion - 0.2" in {
@@ -71,8 +98,10 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
   it should "keep the data unchanged when prepare is called" in {
     val summary = dataSplitter.preValidationPrepare(data)
     val train = dataSplitter.validationPrepare(data)
+    val sampleF = MaxTrainingSampleDefault / dataCount.toDouble
+    val downSampleFraction = if (sampleF < 1) sampleF else 1
     train.collect().zip(data.collect()).foreach { case (a, b) => a shouldBe b }
-    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary() }
+    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary(downSampleFraction) }
   }
 
 }
