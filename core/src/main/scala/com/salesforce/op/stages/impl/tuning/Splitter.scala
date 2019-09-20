@@ -129,6 +129,24 @@ trait SplitterParams extends Params {
   def setReserveTestFraction(value: Double): this.type = set(reserveTestFraction, value)
   def getReserveTestFraction: Double = $(reserveTestFraction)
 
+  /**
+   * Maximum size of dataset want to train on.
+   * Value should be > 0.
+   * Default is 1000000.
+   *
+   * @group param
+   */
+  final val maxTrainingSample = new IntParam(this, "maxTrainingSample",
+    "maximum size of dataset want to train on", ParamValidators.inRange(
+      lowerBound = 0, upperBound = 1 << 30, lowerInclusive = false, upperInclusive = true
+    )
+  )
+  setDefault(maxTrainingSample, SplitterParamsDefault.MaxTrainingSampleDefault)
+
+  def setMaxTrainingSample(value: Int): this.type = set(maxTrainingSample, value)
+
+  def getMaxTrainingSample: Int = $(maxTrainingSample)
+
   final val labelColumnName = new Param[String](this, "labelColumnName",
     "label column name, column 0 if not specified")
   private[op] def getLabelColumnName = $(labelColumnName)
