@@ -170,7 +170,9 @@ private[op] object SplitterSummary {
 
   def fromMetadata(metadata: Metadata): Try[SplitterSummary] = Try {
     metadata.getString(ClassName) match {
-      case s if s == classOf[DataSplitterSummary].getName => DataSplitterSummary()
+      case s if s == classOf[DataSplitterSummary].getName => DataSplitterSummary(
+        downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample)
+      )
       case s if s == classOf[DataBalancerSummary].getName => DataBalancerSummary(
         positiveLabels = metadata.getLong(ModelSelectorNames.Positive),
         negativeLabels = metadata.getLong(ModelSelectorNames.Negative),
