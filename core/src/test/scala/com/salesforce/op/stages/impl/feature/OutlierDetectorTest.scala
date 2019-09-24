@@ -20,3 +20,4 @@ class OutlierDetectorTest extends FlatSpec with TestSparkContext{
 
   }
 }
+
