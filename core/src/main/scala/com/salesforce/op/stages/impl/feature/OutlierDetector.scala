@@ -10,7 +10,7 @@ import org.apache.spark.sql.{DataFrame, Dataset}
  * @since 214
  */
 class OutlierDetector(uid: String = UID[OutlierDetector], operationName: String = "outlier detector")
-  extends UnaryEstimator[RealNN, Binary](uid, operationName) {
+  extends UnaryEstimator[RealNN, Binary](uid = uid, operationName = operationName) {
   override def fitFn(dataset: Dataset[Option[Double]]): UnaryModel[RealNN, Binary] = {
     new OutlierDetectorModel(operationName = operationName, uid = uid)
 

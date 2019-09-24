@@ -11,11 +11,9 @@ class OutlierDetectorTest extends FlatSpec with TestSparkContext{
 
   val detector: UnaryEstimator[RealNN, Binary] = new OutlierDetector()
   it should "return an empty dataset when actually checking an empty dataset" in {
-
-    import spark.sqlContext.implicits._
-    val data = spark.sparkContext.parallelize(Seq.empty[Double]).toDS()
-    val result = detector.fit(data).transform(data).collect()
-
+    val emptySeq = Seq.empty[Double].map(_.toRealNN)
+    val (inputData, f1) = TestFeatureBuilder(emptySeq)
+    val result = detector.setInput(f1).fit(inputData).transform(inputData).collect()
     result shouldBe Array.empty[Row]
 
   }
