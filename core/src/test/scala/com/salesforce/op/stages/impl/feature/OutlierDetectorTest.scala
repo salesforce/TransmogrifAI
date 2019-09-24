@@ -46,5 +46,15 @@ class OutlierDetectorTest extends FlatSpec with TestSparkContext{
     result shouldBe Array.fill(100)(false.toBinary) :+ true.toBinary
 
   }
+
+  it should "detect an outlier if all the elements are the same but one is much smaller" in {
+    val element = 42.0
+    val multipleElementSeq = Seq.fill(100)(element).map(_.toRealNN)
+    val seqWithOutlier = multipleElementSeq :+ ((-element * 1e9).toRealNN)
+    val (inputData, f1) = TestFeatureBuilder(seqWithOutlier)
+    val result = detector.setInput(f1).fit(inputData).transform(inputData).collect(output)
+    result shouldBe Array.fill(100)(false.toBinary) :+ true.toBinary
+
+  }
 }
 
