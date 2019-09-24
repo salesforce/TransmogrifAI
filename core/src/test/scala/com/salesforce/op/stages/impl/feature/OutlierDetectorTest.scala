@@ -17,5 +17,12 @@ class OutlierDetectorTest extends FlatSpec with TestSparkContext{
     result shouldBe Array.empty[Row]
 
   }
+  it should "return the same dataset when the data contains only one element" in {
+    val oneElementSeq = Seq(42.0).map(_.toRealNN)
+    val (inputData, f1) = TestFeatureBuilder(oneElementSeq)
+    val result = detector.setInput(f1).fit(inputData).transform(inputData).collect()
+    result shouldBe Array(Row(42.0))
+
+  }
 }
 
