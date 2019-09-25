@@ -202,7 +202,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "marshall to/from json" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
     val fd2 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
-      Array.empty, Some(TextStats(Map("foo" -> 1, "bar" ->2))),
+      Array.empty, Some("String"), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
       FeatureDistributionType.Scoring)
     val json = FeatureDistribution.toJson(Array(fd1, fd2))
     FeatureDistribution.fromJson(json) match {
