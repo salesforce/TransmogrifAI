@@ -93,7 +93,6 @@ class RawFeatureFilter[T]
   val scoringReader: Option[Reader[T]],
   val bins: Int,
   val minFill: Double,
-  val minTop1: Int = 10,
   val maxFillDifference: Double,
   val maxFillRatioDiff: Double,
   val maxJSDivergence: Double,
@@ -103,7 +102,8 @@ class RawFeatureFilter[T]
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None,
-  val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
+  val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
+  val minTop1: Int = 10
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
