@@ -93,6 +93,7 @@ class RawFeatureFilter[T]
   val scoringReader: Option[Reader[T]],
   val bins: Int,
   val minFill: Double,
+  val minTop1: Int = 10,
   val maxFillDifference: Double,
   val maxFillRatioDiff: Double,
   val maxJSDivergence: Double,
@@ -124,9 +125,7 @@ class RawFeatureFilter[T]
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
-   * Get binned counts of the feature distribution and empty count for each raw feature. This computes all the
-   * statistics on the training and scoring data. It does two map reduce operations, the first to produce a Summary
-   * of each feature, the second to produce a binned histogram (Distribution) for each feature based on the Summary.
+   * Get binned counts of the feature distribution and empty count for each raw feature
    *
    * @param data                    data frame to compute counts on
    * @param features                list of raw, non-protected, features contained in the dataframe
@@ -153,7 +152,6 @@ class RawFeatureFilter[T]
       val predOut = allPredictors.map(TransientFeature(_))
       (respOut, predOut)
     }
-    // process all features based on raw type so that they can be summerized as either text or numeric
     val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
 
     implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
@@ -216,7 +214,8 @@ class RawFeatureFilter[T]
     val featureSize: Int = trainingDistribs.length
 
     val trainingFillRates: Seq[Double] = trainingDistribs.map(_.fillRate())
-
+    val top1avgs: Seq[Option[Double]] = trainingDistribs.map(_.topKCardAvg(1))
+    val top5avgs: Seq[Option[Double]] = trainingDistribs.map(_.topKCardAvg(5))
     val trainingNullLabelAbsoluteCorrs: Seq[Option[Double]] =
       if (correlationInfo.isEmpty) Seq.fill(featureSize)(None)
       else {
@@ -245,12 +244,16 @@ class RawFeatureFilter[T]
         .zip(jsDivergences)
         .zip(fillRateDiffs)
         .zip(fillRatioDiffs)
+        .zip(top1avgs)
+        .zip(top5avgs)
         .map {
-          case (((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
-          scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff) =>
+          case (((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
+          scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff),
+          top1avg), top5avg) =>
             RawFeatureFilterMetrics(
               name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
-              scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff)
+              scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff,
+              top1avg, top5avg)
         }
     }
 
@@ -322,6 +325,27 @@ class RawFeatureFilter[T]
       excluded = trainingUnfilledStates,
       message = s"Features excluded because training fill rate did not meet min required ($minFill)"
     )
+
+//    val trainingLowTop1: Seq[Boolean] = rawFeatureFilterMetrics.map(_.top1avg).map {
+//      //Note: this may filter out numeric features which don't have a value that's frequent enough...How to exclude??
+//      case Some(top1) => top1 < minTop1
+//      case None => false
+//    }
+
+    // val trainingHighCramersV: Seq[Boolean] = rawFeatureFilterMetrics.map(_.top1avg >= 10)
+
+    // uniform (high cramers v; True), and high top1 (False) ?
+    // -- this could be ID => eval to True. uniform dist is less useful in general?
+
+    // uniform (high cramers v; True), and low top 1 (True) ? -- this is definitely ID => eval to True
+
+    // non-uniform (low cramers V; False), and high top1 (False) ? -- Yes, but probably not ID  => eval to False
+
+    // non-uniform (low cramers V; False), and low top1 (True) ?
+    // -- impossible, since non-uniform means the
+    // frequency has to concentrate somewhere? could be numeric => eval to False
+
+    // val ID_detect: Seq[Boolean] =
 
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
       case Some(corr) => corr > maxCorrelation
@@ -598,7 +622,7 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  val MaxCardinality = 500
+  val MaxCardinality = 50
 
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName

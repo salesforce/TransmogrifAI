@@ -63,7 +63,7 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
-  moments: Option[Moments] = None,
+  rawFeatureType: Option[String] = None,
   cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
@@ -93,6 +93,31 @@ case class FeatureDistribution
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
 
+  def topKCardAvg(k: Int): Option[Double] = cardEstimate match {
+    case Some(x) =>
+      val counts = x.valueCounts.values.toList.sortWith(_ > _)
+      if (counts.size >= k) {
+        Option(counts.take(k).sum.toFloat / k)
+      }
+      else {
+        Option(counts.sum.toFloat / counts.size)
+      }
+    case _ => None
+  }
+
+  def topKCardRatio(r: Double): Option[Double] =
+  cardEstimate match {
+    case Some(x) =>
+      val counts = x.valueCounts.values.toList.sortWith(_ > _)
+      val n = counts.size
+      val topK = math.ceil(n * r).toInt
+      if (topK <= n && topK > 0) {
+        Some(counts.take(topK).sum.toFloat / counts.sum)
+      }
+      else None
+    case _ => None
+  }
+
   /**
    * Combine feature distributions
    *
@@ -109,11 +134,10 @@ case class FeatureDistribution
     // summary info can be empty or min max if hist is empty but should otherwise match so take the longest info
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
 
-    val combinedMoments = moments + fd.moments
     val combinedCard = cardEstimate + fd.cardEstimate
 
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
+      combinedSummaryInfo, rawFeatureType, combinedCard, `type`)
   }
 
   /**
@@ -168,21 +192,21 @@ case class FeatureDistribution
       "distribution" -> distribution.mkString("[", ",", "]"),
       "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
       "cardinality" -> cardEstimate.map(_.toString).getOrElse(""),
-      "moments" -> moments.map(_.toString).getOrElse("")
+      "rawFeatureType" -> rawFeatureType.map(_.toString).getOrElse("")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, c, `type`) =>
+    case (`name`, `key`, `count`, `nulls`, d, s, rft, c, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep &&
-        moments == m && cardEstimate == c
+        cardEstimate == c && rawFeatureType == rft
     case _ => false
   }
 
   override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
-    summaryInfo, moments, cardEstimate, `type`)
+    summaryInfo, cardEstimate, `type`)
 }
 
 object FeatureDistribution {
@@ -240,7 +264,7 @@ object FeatureDistribution {
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
-    val moments = value.map(momentsValues)
+    val rawFeatureType = value.map(rawFeatType)
     val cardEstimate = value.map(cardinalityValues)
 
     FeatureDistribution(
@@ -250,24 +274,10 @@ object FeatureDistribution {
       nulls = nullCount,
       summaryInfo = summaryInfo,
       distribution = distribution,
-      moments = moments,
+      rawFeatureType = rawFeatureType,
       cardEstimate = cardEstimate,
       `type` = `type`
     )
-  }
-
-  /**
-   * Function to calculate the first five central moments of numeric values, or length of tokens for text features
-   *
-   * @param values          values to calculate moments
-   * @return Moments object containing information about moments
-   */
-  private def momentsValues(values: ProcessedSeq): Moments = {
-    val population = values match {
-      case Left(seq) => seq.map(x => x.length.toDouble)
-      case Right(seq) => seq
-    }
-    MomentsGroup.sum(population.map(x => Moments(x)))
   }
 
   /**
@@ -283,6 +293,13 @@ object FeatureDistribution {
       case Right(seq) => seq.map(_.toString)
     }
     TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
+  }
+
+  private def rawFeatType(values: ProcessedSeq): String = {
+    values match {
+      case Left(_) => "String"
+      case Right(_) => "Numeric"
+    }
   }
 
   /**

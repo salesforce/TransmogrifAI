@@ -142,7 +142,9 @@ case class RawFeatureFilterMetrics
   scoringFillRate: Option[Double],
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
-  fillRatioDiff: Option[Double]
+  fillRatioDiff: Option[Double],
+  top1avg: Option[Double],
+  top5avg: Option[Double]
 )
 
 /**
