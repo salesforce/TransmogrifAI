@@ -622,7 +622,7 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  val MaxCardinality = 50
+  val MaxCardinality = 500
 
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName

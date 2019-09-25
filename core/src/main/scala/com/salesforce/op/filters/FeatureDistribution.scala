@@ -192,16 +192,16 @@ case class FeatureDistribution
       "distribution" -> distribution.mkString("[", ",", "]"),
       "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
       "cardinality" -> cardEstimate.map(_.toString).getOrElse(""),
-      "rawFeatureType" -> rawFeatureType.map(_.toString).getOrElse("")
+      "rawFeatureType" -> rawFeatureType.getOrElse("")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
   }
 
   override def equals(that: Any): Boolean = that match {
-    case (`name`, `key`, `count`, `nulls`, d, s, rft, c, `type`) =>
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, rft, c, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep &&
-        cardEstimate == c && rawFeatureType == rft
+      rawFeatureType == rft && cardEstimate == c
     case _ => false
   }
 
