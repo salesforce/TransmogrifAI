@@ -23,8 +23,9 @@ tasks.withType(Test) {
         showStackTraces true
         showStandardStreams true
     }
-    maxParallelForks = 1
-    maxHeapSize = "1500m"
+    maxParallelForks = Runtime.runtime.availableProcessors().intdiv(2) ?: 1
+    maxHeapSize = System.getenv('TEST_XMX') ?: "4g"
+
     failFast = System.getenv('TESTS_FAIL_FAST') == 'true'
 
     beforeSuite { suite ->

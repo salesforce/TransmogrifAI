@@ -89,7 +89,7 @@ case class AutomaticSchema(recordClassName: String)(dataFile: File) extends Sche
   val theReader = "ReaderWithHeaders"
 
   lazy val conf: SparkConf = new SparkConf()
-    .setMaster("local[1]")
+    .setMaster("local[*]")
     .setAppName("op-cli-schema")
     .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
     .set("spark.kryo.registrator", classOf[OpKryoRegistrator].getName)

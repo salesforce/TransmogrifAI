@@ -47,7 +47,7 @@ trait TestSparkContext extends TempDirectoryTest with TestCommon {
   lazy val conf: SparkConf = {
     val conf = new SparkConf()
     conf
-      .setMaster("local[2]")
+      .setMaster("local[*]")
       .setAppName(conf.get("spark.app.name", "op-test"))
       .registerKryoClasses(kryoClasses)
       .set("spark.serializer", classOf[org.apache.spark.serializer.KryoSerializer].getName)
