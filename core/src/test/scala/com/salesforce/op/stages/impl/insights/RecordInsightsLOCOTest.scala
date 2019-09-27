@@ -54,11 +54,11 @@ import org.apache.spark.sql.types.StructType
 import org.apache.spark.sql.{DataFrame, Encoder, Row}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.{FlatSpec, Suite}
+import org.scalatest.{FlatSpec, FunSpec, Suite}
 
 
 @RunWith(classOf[JUnitRunner])
-class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordInsightsTestDataGenerator {
+class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordInsightsTestDataGenerator {
 
   // scalastyle:off
   val data = Seq( // name, age, height, height_null, isBlueEyed, gender, testFeatNegCor
@@ -96,7 +96,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     )
   )
   // scalastyle:on
-  Spec[RecordInsightsLOCO[_]] should "work with randomly generated features and binary logistic regression" in {
+  it("should work with randomly generated features and binary logistic regression") {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -114,7 +114,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
   }
 
-  it should "work with randomly generated features and multiclass random forest" in {
+  it ("work with randomly generated features and multiclass random forest" ) {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomIntegral.integrals(0, 5).limit(1000).map(_.value.get.toRealNN)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -136,7 +136,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
   }
 
 
-  it should "work with randomly generated features and linear regression" in {
+  it ("work with randomly generated features and linear regression" ) {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomReal.normal[RealNN]().limit(1000)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -165,7 +165,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     spark.createDataFrame(df.rdd, StructType(fields))
   }
 
-  it should "return the most predictive features" in {
+  it ("return the most predictive features" ) {
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
@@ -185,7 +185,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
   }
 
-  it should "return the most predictive features when using top K Positives + top K negatives strat" in {
+  it ("return the most predictive features when using top K Positives + top K negatives strat" ) {
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
@@ -202,7 +202,8 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
   }
 
-  it should "return the most predictive features for data generated with a strong relation to the label" in {
+  describe("should return the most predictive features for data generated with a strong relation to the label") {
+    // Generate the data
     val numRows = 1000
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
     val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
@@ -236,69 +237,71 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     val insights = insightsTransformer.transform(fullDF).collect(insightsTransformer.getOutput())
     val parsed = insights.map(RecordInsightsParser.parseInsights)
 
-    // Grab the feature vector metadata for comparison against the LOCO record insights
-    val vectorMeta = OpVectorMetadata(fullDF.schema.last)
-    val numVectorColumns = vectorMeta.columns.length
+    it ("create an insight for each record"){
+      parsed.length shouldBe numRows
+    }
 
-    // Each feature vector should only have either three or four non-zero entries. One each from country and picklist,
-    // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
-    // one if it's not null.
-    parsed.length shouldBe numRows
-    parsed.foreach(m => m.size <= 4 shouldBe true)
+    it ("should only have between 1 and the 3 (number of features)") {
+      all (parsed.map(_.size)) should (be >= 1 and be <= 3)
+    }
 
-    // Want to check the average contribution strengths for each picklist response and compare them to the
-    // average contribution strengths of the other features. We should have a very high contribution when choices
-    // A, B, or C are present in the record (since they determine the label), and low average contributions otherwise.
-    val totalImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
-      m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 + v.last._2, res(k.index)._2 + 1)) }
-      res
-    })
-    val meanImportances = totalImportances.map(x => if (x._2 > 0) x._1 / x._2 else Double.NaN)
+    describe("checks the quality of insights"){
+      // Grab the feature vector metadata for comparison against the LOCO record insights
+      val vectorMeta = OpVectorMetadata(fullDF.schema.last)
+      val numVectorColumns = vectorMeta.columns.length
+      // Want to check the average contribution strengths for each picklist response and compare them to the
+      // average contribution strengths of the other features. We should have a very high contribution when choices
+      // A, B, or C are present in the record (since they determine the label), and low average contributions otherwise.
+      val totalImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
+        m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 + v.last._2, res(k.index)._2 + 1)) }
+        res
+      })
+      val meanImportances = totalImportances.map(x => if (x._2 > 0) x._1 / x._2 else Double.NaN)
 
-    // Determine all the indices for insights corresponding to both the "important" and "other" features
-    val nanIndices = meanImportances.zipWithIndex.filter(_._1.isNaN).map(_._2).toSet
-    val abcIndices = vectorMeta.columns.filter(x => Set("A", "B", "C").contains(x.indicatorValue.getOrElse("")))
-      .map(_.index).toSet -- nanIndices
-    val otherIndices = vectorMeta.columns.indices.filter(x => !abcIndices.contains(x)).toSet -- nanIndices
+      // Determine all the indices for insights corresponding to both the "important" and "other" features
+      val nanIndices = meanImportances.zipWithIndex.filter(_._1.isNaN).map(_._2).toSet
+      val abcIndices = vectorMeta.columns.filter(x => Set("A", "B", "C").contains(x.indicatorValue.getOrElse("")))
+        .map(_.index).toSet -- nanIndices
+      val otherIndices = vectorMeta.columns.indices.filter(x => !abcIndices.contains(x)).toSet -- nanIndices
 
-    // Combine quantities for all the "important" features together and all the "other" features together
-    val abcAvg = math.abs(abcIndices.map(meanImportances.apply).sum) / abcIndices.size
-    val otherAvg = math.abs(otherIndices.map(meanImportances.apply).sum) / otherIndices.size
+      // Combine quantities for all the "important" features together and all the "other" features together
+      val abcAvg = math.abs(abcIndices.map(meanImportances.apply).sum) / abcIndices.size
+      val otherAvg = math.abs(otherIndices.map(meanImportances.apply).sum) / otherIndices.size
 
-    // Similar calculation for the variance of each feature importance
-    val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
-      m.foreach { case (k, v) => if (abcIndices.contains(k.index)) {
-        res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - abcAvg, 2), res(k.index)._2 + 1))
-      } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))
+      // Similar calculation for the variance of each feature importance
+      val varImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
+        m.foreach { case (k, v) => if (abcIndices.contains(k.index)) {
+          res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - abcAvg, 2), res(k.index)._2 + 1))
+        } else res.update(k.index, (res(k.index)._1 + math.pow(v.last._2 - otherAvg, 2), res(k.index)._2 + 1))
+        }
+        res
+      }).map(x => if (x._2 > 1) x._1 / x._2 else Double.NaN)
+      val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
+      val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
+
+      it ("Strengths of features A, B, and C should be much larger the other feature strengths") {
+        abcAvg should be > 4 * otherAvg
       }
-      res
-    }).map(x => if (x._2 > 1) x._1 / x._2 else Double.NaN)
-    val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
-    val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
-    // Strengths of features "A", "B", and "C" should be much larger the other feature strengths
-    assert(abcAvg > 4 * otherAvg,
-      "Average feature strengths for features involved in label formula should be " +
-        "much larger than the average feature strengths of other features")
-    // There should be a really large t-value when comparing the two avg feature strengths
-    assert(math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar) / numRows) > 10,
-      "The t-value comparing the average feature strengths between important and other features should be large")
+      it ("There should be a really large t-value when comparing the two avg feature strengths") {
+        val tValue = math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar) / numRows)
+        tValue should be > 10.0
+      }
 
-    // Record insights averaged across all records should be similar to the feature importances from Spark's RF
-    val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
-    val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
-    val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
-    val avgRecordInsightRatio = math.abs(abcAvg / otherAvg)
-    val featureImportanceRatio = math.abs(abcAvgRF / otherAvgRF)
-
-    // Compare the ratio of importances between "important" and "other" features in both paradigms
-    assert(math.abs(avgRecordInsightRatio - featureImportanceRatio) * 2 /
-      (avgRecordInsightRatio + featureImportanceRatio) < 0.8,
-      "The ratio of feature strengths between important and other features should be similar to the ratio of " +
-        "feature importances from Spark's RandomForest")
+      it ("Compare the ratio of importances between important and other features in both paradigms") {
+        val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
+        val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
+        val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
+        val avgRecordInsightRatio = math.abs(abcAvg / otherAvg)
+        val featureImportanceRatio = math.abs(abcAvgRF / otherAvgRF)
+        val paradigmDiff = math.abs(avgRecordInsightRatio - featureImportanceRatio)
+        val paradigmRatio = paradigmDiff * 2 / (avgRecordInsightRatio + featureImportanceRatio)
+        paradigmRatio should be < 0.8
+      }
+    }
   }
 
-  it should "aggregate values for text and textMap derived features" in {
+  it ("aggregate values for text and textMap derived features" ) {
     val testData = generateTestTextData
 
     withClue("TextArea can have two null indicator values") {
@@ -347,8 +350,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     }
   }
 
-
-  it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features" in {
+  it ("aggregate values for date, datetime, dateMap and dateTimeMap derived features" ) {
     val testData = generateTestDateData
 
     assertLOCOSum(testData.actualRecordInsights)
@@ -405,9 +407,9 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
    * @param predicate  predicate used by RecordInsights in order to aggregate
    */
   private def assertAggregatedWithPredicate(
-    predicate: OpVectorColumnHistory => Boolean,
-    testData: RecordInsightsTestData[LogisticRegressionModel]
-  ): Unit = {
+                                             predicate: OpVectorColumnHistory => Boolean,
+                                             testData: RecordInsightsTestData[LogisticRegressionModel]
+                                           ): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
