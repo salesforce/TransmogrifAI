@@ -93,28 +93,26 @@ case class FeatureDistribution
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
 
-  def topKCardAvg(k: Int): Option[Double] = cardEstimate match {
+  /**
+   * Get the count of the k-th most frequent value in the raw feature
+   *
+   * @return
+   */
+  def topKCard(k: Int): Option[Int] = cardEstimate match {
     case Some(x) =>
       val counts = x.valueCounts.values.toList.sortWith(_ > _)
       if (counts.size >= k) {
-        Option(counts.take(k).sum.toFloat / k)
+        Option(counts(k-1))
       }
       else {
-        Option(counts.sum.toFloat / counts.size)
+        Option(counts.last)
       }
     case _ => None
   }
 
-  def topKCardRatio(r: Double): Option[Double] =
+  def cardSize(): Option[Int] =
   cardEstimate match {
-    case Some(x) =>
-      val counts = x.valueCounts.values.toList.sortWith(_ > _)
-      val n = counts.size
-      val topK = math.ceil(n * r).toInt
-      if (topK <= n && topK > 0) {
-        Some(counts.take(topK).sum.toFloat / counts.sum)
-      }
-      else None
+    case Some(x) => Option(x.valueCounts.size)
     case _ => None
   }
 

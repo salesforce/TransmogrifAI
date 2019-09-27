@@ -143,8 +143,9 @@ case class RawFeatureFilterMetrics
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
   fillRatioDiff: Option[Double],
-  top1avg: Option[Double],
-  top5avg: Option[Double]
+  trainingTop5Count: Option[Int],
+  trainingCardSize: Option[Int],
+  rawFeatureType: Option[String]
 )
 
 /**
