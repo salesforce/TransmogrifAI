@@ -354,8 +354,8 @@ class RawFeatureFilter[T]
     // will filter out text features that have > 30 unique value,
     // where the 5th most common value appear < minTopk
 
-    val isID: Seq[Boolean] = (trainingLowTop5 zip cardLimit zip TextOnly).map{
-      case ((a,b), c) => a && b && c
+    val isID: Seq[Boolean] = (trainingLowTop5 zip cardLimit zip TextOnly).map {
+      case ((a, b), c) => a && b && c
     }
 
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {

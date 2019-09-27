@@ -33,6 +33,7 @@ case class IDTextClassification
   faker_ipv4: Option[String],
   faker_ipv6: Option[String]
 )
+
 object IDClassification {
 
   /**
@@ -44,7 +45,7 @@ object IDClassification {
       println("You need to pass in the CSV file path as an argument")
       sys.exit(1)
     }
-    //TODO: replace this with the path to CSV file of all text fields
+    // TODO: replace this with the path to CSV file of all text fields
     val csvFilePath = args(0)
     println(s"Using user-supplied CSV file path: $csvFilePath")
 
@@ -72,7 +73,8 @@ object IDClassification {
     val faker_sentence = FeatureBuilder.Text[IDTextClassification].extract(_.faker_sentence.toText).asPredictor
     val variable_nb_words = FeatureBuilder.Text[IDTextClassification].extract(_.variable_nb_words.toText).asPredictor
     val faker_paragraph = FeatureBuilder.Text[IDTextClassification].extract(_.faker_paragraph.toText).asPredictor
-    val variable_nb_sentences = FeatureBuilder.Text[IDTextClassification].extract(_.variable_nb_sentences.toText).asPredictor
+    val variable_nb_sentences = FeatureBuilder.Text[IDTextClassification]
+      .extract(_.variable_nb_sentences.toText).asPredictor
     val faker_ipv4 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv4.toText).asPredictor
     val faker_ipv6 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv6.toText).asPredictor
 
@@ -98,12 +100,8 @@ object IDClassification {
     val modelInsights = model.modelInsights(IDFeatures)
     val exclusionReasons = modelInsights.features.flatMap( feature => feature.exclusionReasons)
     val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
-    
     // Stop Spark gracefully
     spark.stop()
   }
 }
-class IdDetectTest {
 
-
-}
