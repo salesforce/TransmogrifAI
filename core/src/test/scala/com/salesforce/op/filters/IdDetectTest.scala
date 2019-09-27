@@ -14,6 +14,7 @@ import org.apache.spark.sql.SparkSession
 
 case class IDTextClassification
 (
+  id: Int,
   eng_sentences: Option[String],
   eng_paragraphs: Option[String],
   news_data: Option[String],
@@ -86,20 +87,25 @@ object IDClassification {
       variable_nb_sentences, faker_ipv4, faker_ipv6
     ).transmogrify()
 
-    val dataReader = DataReaders.Simple.csvCase[IDTextClassification](path = Option(csvFilePath), key = _.id.toString)
-    val workflow = new OpWorkflow()
-      .withRawFeatureFilter(Some(dataReader), None)
-      .setResultFeatures(IDFeatures)
-      .setReader(dataReader)
+    def thresHoldRFF(minTopk: Int): Seq[String] = {
+      val dataReader = DataReaders.Simple.csvCase[IDTextClassification](
+        path = Option("~/TransmogrifAI/helloworld/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"),
+        key = _.id.toString)
+      val workflow = new OpWorkflow()
+        .withRawFeatureFilter(Some(dataReader), None, minTopk = minTopk)
+        .setResultFeatures(IDFeatures)
+        .setReader(dataReader)
 
-    // Fit the workflow to the data
-    val model = workflow.train()
-    println(s"Model summary:\n${model.summaryPretty()}")
+      // Fit the workflow to the data
+      val model = workflow.train()
+      println(s"Model summary:\n${model.summaryPretty()}")
 
-    // Extract information (i.e. feature importance) via model insights
-    val modelInsights = model.modelInsights(IDFeatures)
-    val exclusionReasons = modelInsights.features.flatMap( feature => feature.exclusionReasons)
-    val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
+      // Extract information (i.e. feature importance) via model insights
+      val modelInsights = model.modelInsights(IDFeatures)
+      val exclusionReasons = modelInsights.features.flatMap( feature => feature.exclusionReasons)
+      exclusionReasons.map(_.name)
+    }
+    
     // Stop Spark gracefully
     spark.stop()
   }
