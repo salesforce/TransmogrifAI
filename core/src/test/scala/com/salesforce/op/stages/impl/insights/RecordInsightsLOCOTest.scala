@@ -96,7 +96,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     )
   )
   // scalastyle:on
-  it("should work with randomly generated features and binary logistic regression") {
+  it ("should work with randomly generated features and binary logistic regression") {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -114,7 +114,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
   }
 
-  it ("work with randomly generated features and multiclass random forest" ) {
+  it ("should work with randomly generated features and multiclass random forest") {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomIntegral.integrals(0, 5).limit(1000).map(_.value.get.toRealNN)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -136,7 +136,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
   }
 
 
-  it ("work with randomly generated features and linear regression" ) {
+  it ("should work with randomly generated features and linear regression") {
     val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
     val labels = RandomReal.normal[RealNN]().limit(1000)
     val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
@@ -165,7 +165,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     spark.createDataFrame(df.rdd, StructType(fields))
   }
 
-  it ("return the most predictive features" ) {
+  it ("should return the most predictive features") {
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
@@ -185,7 +185,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     }
   }
 
-  it ("return the most predictive features when using top K Positives + top K negatives strat" ) {
+  it ("should return the most predictive features when using top K Positives + top K negatives strat") {
     val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
     val label = labelNoRes.copy(isResponse = true)
     val testDataMeta = addMetaData(testData, "features", 5)
@@ -202,7 +202,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     }
   }
 
-  describe("should return the most predictive features for data generated with a strong relation to the label") {
+  describe("data strongly related to label. ") {
     // Generate the data
     val numRows = 1000
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
@@ -237,15 +237,18 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     val insights = insightsTransformer.transform(fullDF).collect(insightsTransformer.getOutput())
     val parsed = insights.map(RecordInsightsParser.parseInsights)
 
-    it ("create an insight for each record"){
+    it ("should create an insight for each record"){
       parsed.length shouldBe numRows
     }
 
-    it ("should only have between 1 and the 3 (number of features)") {
-      all (parsed.map(_.size)) should (be >= 1 and be <= 3)
+    // Each feature vector should only have either three or four non-zero entries. One each from country and picklist,
+    // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
+    // one if it's not null.
+    it ("should pick between 1 and 4 of the features") {
+      all (parsed.map(_.size)) should (be >= 1 and be <= 4)
     }
 
-    describe("checks the quality of insights"){
+    describe("check the quality of insights. "){
       // Grab the feature vector metadata for comparison against the LOCO record insights
       val vectorMeta = OpVectorMetadata(fullDF.schema.last)
       val numVectorColumns = vectorMeta.columns.length
@@ -279,16 +282,18 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
       val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
-      it ("Strengths of features A, B, and C should be much larger the other feature strengths") {
+      it ("should have much larger feature strengths for features A, B, and C") {
         abcAvg should be > 4 * otherAvg
       }
 
-      it ("There should be a really large t-value when comparing the two avg feature strengths") {
+      it ("should have a really large t-value when comparing the two avg feature strengths") {
         val tValue = math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar) / numRows)
         tValue should be > 10.0
       }
 
-      it ("Compare the ratio of importances between important and other features in both paradigms") {
+      // The ratio of feature strengths between important and other features should be similar to the ratio of
+      // feature importance of Spark's RandomForest
+      it ("should have a ratio of importance between important and other features in both paradigms of less than 0.8") {
         val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
         val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
         val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
@@ -301,7 +306,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     }
   }
 
-  it ("aggregate values for text and textMap derived features" ) {
+  it ("should aggregate values for text and textMap derived features") {
     val testData = generateTestTextData
 
     withClue("TextArea can have two null indicator values") {
@@ -350,7 +355,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     }
   }
 
-  it ("aggregate values for date, datetime, dateMap and dateTimeMap derived features" ) {
+  it ("should aggregate values for date, datetime, dateMap and dateTimeMap derived features") {
     val testData = generateTestDateData
 
     assertLOCOSum(testData.actualRecordInsights)
@@ -406,10 +411,8 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
    *
    * @param predicate  predicate used by RecordInsights in order to aggregate
    */
-  private def assertAggregatedWithPredicate(
-                                             predicate: OpVectorColumnHistory => Boolean,
-                                             testData: RecordInsightsTestData[LogisticRegressionModel]
-                                           ): Unit = {
+  private def assertAggregatedWithPredicate(predicate: OpVectorColumnHistory => Boolean,
+                                            testData: RecordInsightsTestData[LogisticRegressionModel]): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
