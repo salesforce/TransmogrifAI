@@ -105,7 +105,6 @@ object IDClassification {
       val exclusionReasons = modelInsights.features.flatMap( feature => feature.exclusionReasons)
       exclusionReasons.map(_.name)
     }
-    
     // Stop Spark gracefully
     spark.stop()
   }
