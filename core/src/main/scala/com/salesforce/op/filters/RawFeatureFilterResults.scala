@@ -171,5 +171,6 @@ case class ExclusionReasons
   jsDivergenceMismatch: Boolean,
   fillRateDiffMismatch: Boolean,
   fillRatioDiffMismatch: Boolean,
+  trainingIsID: Boolean,
   excluded: Boolean
 )

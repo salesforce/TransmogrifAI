@@ -354,7 +354,7 @@ class RawFeatureFilter[T]
     // will filter out text features that have > 30 unique value,
     // where the 5th most common value appear < minTopk
 
-    val isID: Seq[Boolean] = (trainingLowTop5 zip cardLimit zip TextOnly).map {
+    val trainingIsID: Seq[Boolean] = (trainingLowTop5 zip cardLimit zip TextOnly).map {
       case ((a, b), c) => a && b && c
     }
 
@@ -377,7 +377,8 @@ class RawFeatureFilter[T]
       scoringUnfilledStates: Seq[Boolean],
       jsDivergenceMismatches: Seq[Boolean],
       fillRateDiffMismatches: Seq[Boolean],
-      fillRatioDiffMismatches: Seq[Boolean]
+      fillRatioDiffMismatches: Seq[Boolean],
+      trainingIsID: Seq[Boolean]
     ): Seq[ExclusionReasons] = {
 
       trainingDistribs.map(dist => dist.name-> dist.key)
@@ -387,9 +388,11 @@ class RawFeatureFilter[T]
         .zip(jsDivergenceMismatches)
         .zip(fillRateDiffMismatches)
         .zip(fillRatioDiffMismatches)
+        .zip(trainingIsID)
         .map {
-          case (((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
-          scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch) =>
+          case ((((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
+          scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch),
+          trainingIsID)=>
             ExclusionReasons(
               name,
               key,
@@ -399,13 +402,15 @@ class RawFeatureFilter[T]
               jsDivergenceMismatch,
               fillRateDiffMismatch,
               fillRatioDiffMismatch,
+              trainingIsID,
               excluded = List(
                 trainingUnfilledState,
                 trainingNullLabelLeaker,
                 scoringUnfilledState,
                 jsDivergenceMismatch,
                 fillRateDiffMismatch,
-                fillRatioDiffMismatch
+                fillRatioDiffMismatch,
+                trainingIsID
               ).exists(identity)
             )
         }
@@ -420,7 +425,8 @@ class RawFeatureFilter[T]
 
       val exclusionReasons: Seq[ExclusionReasons] = combineExclusionReasons(
         trainingDistribs, trainingUnfilledStates, trainingNullLabelLeakers,
-        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches, fillRatioDiffMismatches
+        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches,
+        fillRatioDiffMismatches, trainingIsID
       )
       exclusionReasons
 
@@ -460,7 +466,8 @@ class RawFeatureFilter[T]
 
       val exclusionReasons: Seq[ExclusionReasons] = combineExclusionReasons(
         trainingDistribs, trainingUnfilledStates, trainingNullLabelLeakers,
-        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches, fillRatioDiffMismatches
+        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches,
+        fillRatioDiffMismatches, trainingIsID
       )
       exclusionReasons
     }

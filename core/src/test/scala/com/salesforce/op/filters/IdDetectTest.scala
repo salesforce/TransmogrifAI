@@ -42,13 +42,13 @@ object IDClassification {
    * ./gradlew sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs=/full/path/to/csv/file
    */
   def main(args: Array[String]): Unit = {
-    if (args.isEmpty) {
-      println("You need to pass in the CSV file path as an argument")
-      sys.exit(1)
-    }
-    // TODO: replace this with the path to CSV file of all text fields
-    val csvFilePath = args(0)
-    println(s"Using user-supplied CSV file path: $csvFilePath")
+//    if (args.isEmpty) {
+//      println("You need to pass in the CSV file path as an argument")
+//      sys.exit(1)
+//    }
+//    // TODO: replace this with the path to CSV file of all text fields
+//    val csvFilePath = args(0)
+//    println(s"Using user-supplied CSV file path: $csvFilePath")
 
     // Set up a SparkSession as normal
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
@@ -89,7 +89,7 @@ object IDClassification {
 
     def thresHoldRFF(minTopk: Int): Seq[String] = {
       val dataReader = DataReaders.Simple.csvCase[IDTextClassification](
-        path = Option("~/TransmogrifAI/helloworld/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"),
+        path = Option("~/Downloads/3kData.csv"),
         key = _.id.toString)
       val workflow = new OpWorkflow()
         .withRawFeatureFilter(Some(dataReader), None, minTopk = minTopk)
@@ -106,6 +106,9 @@ object IDClassification {
       exclusionReasons.map(_.name)
     }
     // Stop Spark gracefully
+    println(thresHoldRFF(300))
+    println(thresHoldRFF(500))
+    println(thresHoldRFF(1000))
     spark.stop()
   }
 }
