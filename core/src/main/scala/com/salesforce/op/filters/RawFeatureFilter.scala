@@ -392,7 +392,7 @@ class RawFeatureFilter[T]
         .map {
           case ((((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
           scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch),
-          trainingIsID)=>
+          trainingIsID) =>
             ExclusionReasons(
               name,
               key,
