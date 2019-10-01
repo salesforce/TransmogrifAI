@@ -49,7 +49,6 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
 import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
-import com.twitter.algebird.Moments
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.scalactic.Equality
 import org.scalatest.FlatSpec

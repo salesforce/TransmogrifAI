@@ -80,12 +80,12 @@ object IdDetectTest {
       variable_nb_sentences, faker_ipv4, faker_ipv6
     ).transmogrify()
 
-    def thresHoldRFF(minTopk: Int): Seq[String] = {
+    def thresHoldRFF(mTK: Int): Seq[String] = {
       val dataReader = DataReaders.Simple.csvCase[IDTextClassification](
         path = Option("~/Downloads/3kData.csv"),
         key = _.id.toString)
       val workflow = new OpWorkflow()
-        .withRawFeatureFilter(Some(dataReader), None, minTopk = minTopk)
+        .withRawFeatureFilter(Some(dataReader), None, minTopk = mTK)
         .setResultFeatures(IDFeatures)
         .setReader(dataReader)
 
