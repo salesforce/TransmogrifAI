@@ -35,20 +35,13 @@ case class IDTextClassification
   faker_ipv6: Option[String]
 )
 
-object IDClassification {
+object IdDetectTest {
 
   /**
    * Run this from the command line with
-   * ./gradlew sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs=/full/path/to/csv/file
+   * ./gradlew sparkSubmit -Dmain=com.salesforce.op.filters.IdDetectTest -Dargs=/full/path/to/csv/file
    */
-  def main(args: Array[String]): Unit = {
-//    if (args.isEmpty) {
-//      println("You need to pass in the CSV file path as an argument")
-//      sys.exit(1)
-//    }
-//    // TODO: replace this with the path to CSV file of all text fields
-//    val csvFilePath = args(0)
-//    println(s"Using user-supplied CSV file path: $csvFilePath")
+  def main(): Unit = {
 
     // Set up a SparkSession as normal
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
