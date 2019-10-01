@@ -58,7 +58,7 @@ import org.apache.spark.sql.SparkSession
  */
 case class IDTextClassification
 (
-  id: Int,
+  id: Option[Int],
   eng_sentences: Option[String],
   eng_paragraphs: Option[String],
   news_data: Option[String],
@@ -79,13 +79,19 @@ case class IDTextClassification
   faker_ipv6: Option[String]
 )
 
-object IdDetectTest {
+object OpTitanicSimple {
 
   /**
    * Run this from the command line with
    * ./gradlew sparkSubmit -Dmain=com.salesforce.op.filters.IdDetectTest -Dargs=/full/path/to/csv/file
    */
-  def main(): Unit = {
+  def main(args: Array[String]): Unit = {
+    if (args.isEmpty) {
+      println("You need to pass in the CSV file path as an argument")
+      sys.exit(1)
+    }
+    val csvFilePath = args(0)
+    println(s"Using user-supplied CSV file path: $csvFilePath")
 
     // Set up a SparkSession as normal
     implicit val spark = SparkSession.builder.config(new SparkConf()).getOrCreate()
@@ -115,6 +121,7 @@ object IdDetectTest {
       .extract(_.variable_nb_sentences.toText).asPredictor
     val faker_ipv4 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv4.toText).asPredictor
     val faker_ipv6 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv6.toText).asPredictor
+    val id = FeatureBuilder.Integral[IDTextClassification].extract(_.id.toIntegral).asResponse
 
     val IDFeatures = Seq(
       eng_sentences, eng_paragraphs, news_data, tox_data,
@@ -126,11 +133,11 @@ object IdDetectTest {
 
     def thresHoldRFF(mTK: Int): Seq[String] = {
       val dataReader = DataReaders.Simple.csvCase[IDTextClassification](
-        path = Option("~/Downloads/3kData.csv"),
+        path = Option(csvFilePath),
         key = _.id.toString)
       val workflow = new OpWorkflow()
         .withRawFeatureFilter(Some(dataReader), None, minTopk = mTK)
-        .setResultFeatures(IDFeatures)
+        .setResultFeatures(id, IDFeatures)
         .setReader(dataReader)
 
       // Fit the workflow to the data
