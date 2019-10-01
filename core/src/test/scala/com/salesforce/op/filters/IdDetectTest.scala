@@ -1,4 +1,4 @@
-package com.salesforce.hw
+package com.salesforce.op.filters
 
 import com.salesforce.op._
 import com.salesforce.op.features.FeatureBuilder
