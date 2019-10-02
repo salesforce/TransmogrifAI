@@ -36,6 +36,7 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.{FeatureTestBase, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.sql.DataFrame
@@ -102,6 +103,17 @@ class EmailVectorizerTest
     result should contain theSameElementsAs expectedEmailMap
   }
 
+  it should "not remove punctuations by default from the domain when vectorizing EmailMaps" in {
+    val (ds1, f1) = TestFeatureBuilder(emails.map(e => Map(emailKey -> e.value.get).toEmailMap))
+    val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText,
+      cleanKeys = CleanKeys, trackNulls = false)
+    val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(ds1)
+    val metadata = transformed.schema(vectorized.name).metadata.getMetadataArray(OpVectorMetadata.ColumnsKey)
+    val actualIndicatorValues = metadata.map(_.getString(OpVectorColumnMetadata.IndicatorValueKey))
+    val expectedIndicatorValues = Seq("OTHER", "salesforce.com", "einstein.ai")
+    actualIndicatorValues should contain theSameElementsAs expectedIndicatorValues
+  }
+
   it should "track nulls" in {
     val (ds1, f1) = TestFeatureBuilder(emails.map(e => Map(emailKey -> e.value.get).toEmailMap))
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
@@ -166,8 +178,6 @@ class EmailVectorizerTest
   }
 
   it should "track nulls with whitelisted/ignore blacklisted keys in EmailMap" in {
-
-
     val (ds1, f1) = TestFeatureBuilder(emailMap)
     val vectorized = f1.vectorize(topK = TopK, minSupport = MinSupport,
       cleanText = CleanText, cleanKeys = CleanKeys, blackListKeys = Array(emailKey2), trackNulls = true)
@@ -197,6 +207,17 @@ class EmailVectorizerTest
     result(2) shouldBe result(3)
     result should contain theSameElementsAs expectedEmail
   }
+
+  it should "not remove punctuations by default from the domain when vectorizing Emails" in {
+    val (ds2, f2) = TestFeatureBuilder(emails)
+    val vectorized = f2.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = true)
+    val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(ds2)
+    val metadata = transformed.schema(vectorized.name).metadata.getMetadataArray(OpVectorMetadata.ColumnsKey)
+    val actualIndicatorValues = metadata.map(_.getString(OpVectorColumnMetadata.IndicatorValueKey))
+    val expectedIndicatorValues = Seq("OTHER", "salesforce.com", "einstein.ai")
+    actualIndicatorValues should contain theSameElementsAs expectedIndicatorValues
+  }
+
   it should "remove high cardinality features" in {
     val (ds2, f2) = TestFeatureBuilder(emails)
     val vectorized = f2.vectorize(topK = TopK, minSupport = MinSupport,
