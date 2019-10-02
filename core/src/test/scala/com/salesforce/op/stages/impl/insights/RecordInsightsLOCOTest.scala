@@ -283,7 +283,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
       it ("should have much larger feature strengths for features A, B, and C") {
-        abcAvg should be > 4 * otherAvg
+        abcAvg should be > 3 * otherAvg
       }
 
       it ("should have a really large t-value when comparing the two avg feature strengths") {
