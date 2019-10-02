@@ -202,7 +202,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     }
   }
 
-  describe("data strongly related to label. ") {
+  describe("return the most predictive features for data that is strongly related to label. ") {
     // Generate the data
     val numRows = 1000
     val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
