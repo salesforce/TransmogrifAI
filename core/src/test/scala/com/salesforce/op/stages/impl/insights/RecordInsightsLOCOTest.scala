@@ -411,8 +411,10 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
    *
    * @param predicate  predicate used by RecordInsights in order to aggregate
    */
-  private def assertAggregatedWithPredicate(predicate: OpVectorColumnHistory => Boolean,
-                                            testData: RecordInsightsTestData[LogisticRegressionModel]): Unit = {
+  private def assertAggregatedWithPredicate(
+    predicate: OpVectorColumnHistory => Boolean,
+    testData: RecordInsightsTestData[LogisticRegressionModel]
+  ): Unit = {
     implicit val enc: Encoder[(Array[Double], Long)] = ExpressionEncoder()
     implicit val enc2: Encoder[Seq[Double]] = ExpressionEncoder()
 
