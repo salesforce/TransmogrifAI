@@ -43,7 +43,7 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
 
   val seed = 1234L
   val dataCount = 1000
-  val MaxTrainingSampleDefault = 1E6.toInt
+  val MaxTrainingSampleDefault = 1E6.toLong
 
   val data =
     RandomRDDs.normalVectorRDD(sc, 1000, 3, seed = seed)
@@ -58,18 +58,18 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
   }
 
   it should "down-sample when the data count is above the max allowed" in {
-    val numRows = 1E6.toInt + 1E6.toInt
+    val numRows = MaxTrainingSampleDefault * 2
     val data =
       RandomRDDs.normalVectorRDD(sc, numRows, 3, seed = seed)
         .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
     dataSplitter.preValidationPrepare(data)
-    val dataBalanced = dataSplitter.validationPrepare(data)
 
+    val dataBalanced = dataSplitter.validationPrepare(data)
     // validationPrepare calls the data sample method that samples the data to a target ratio but there is an epsilon
     // to how precise this function is which is why we need to check around that epsilon
-    val samplingErrorEpsilon = (0.1 * MaxTrainingSampleDefault).toInt
+    val samplingErrorEpsilon = (0.1 * MaxTrainingSampleDefault).toLong
 
-    dataBalanced.count() shouldBe MaxTrainingSampleDefault.toLong +- samplingErrorEpsilon.toLong
+    dataBalanced.count() shouldBe MaxTrainingSampleDefault +- samplingErrorEpsilon
   }
 
   it should "set and get maxTrainingSample" in {

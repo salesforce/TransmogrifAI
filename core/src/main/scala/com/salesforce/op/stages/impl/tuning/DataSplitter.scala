@@ -73,7 +73,7 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
   override def preValidationPrepare(data: Dataset[Row]): PrevalidationVal = {
     val dataSetSize = data.count().toDouble
     val sampleF = getMaxTrainingSample / dataSetSize
-    val DownSampleFraction = if (sampleF < 1) sampleF else 1
+    val DownSampleFraction = if (getMaxTrainingSample < dataSetSize) sampleF else 1
     summary = Option(DataSplitterSummary(DownSampleFraction))
     setDownSampleFraction(DownSampleFraction)
     PrevalidationVal(summary, None)
