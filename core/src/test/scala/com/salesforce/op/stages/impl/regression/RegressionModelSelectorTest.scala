@@ -134,11 +134,16 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
     val maxTrainingSample = 100
     val sampleF = maxTrainingSample / dataCount.toDouble
-    val downSampleFraction = if (sampleF < 1) sampleF else 1
+    val downSampleFraction = if (maxTrainingSample < dataCount) sampleF else 1
     val dataSplitter = DataSplitter(maxTrainingSample = maxTrainingSample, seed = seed, reserveTestFraction = 0.0)
-    val modelSelector = RegressionModelSelector.withCrossValidation(Option(dataSplitter), seed = seed)
+    val modelSelector =
+      RegressionModelSelector.withTrainValidationSplit(
+        modelTypesToUse = Seq(RMT.OpLinearRegression),
+        dataSplitter = Option(dataSplitter),
+        seed = seed)
     val model = modelSelector.setInput(label, features).fit(data)
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+
     val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction" )
 
     modelDownSampleFraction shouldBe downSampleFraction
