@@ -161,6 +161,7 @@ object SplitterParamsDefault {
   val MaxTrainingSampleDefault = 1E6.toInt
   val MaxLabelCategoriesDefault = 100
   val MinLabelFractionDefault = 0.0
+  val DownSampleFractionDefault = 1.0
 }
 
 trait SplitterSummary extends MetadataLike
