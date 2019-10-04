@@ -72,14 +72,19 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
     dataBalanced.count() shouldBe MaxTrainingSampleDefault +- samplingErrorEpsilon
   }
 
-  it should "set and get maxTrainingSample" in {
-    val numRows = 2000
-    val maxRows = numRows / 2
+  it should "set and get all data splitter params" in {
+    val maxRows = dataCount / 2
+    val downSampleFraction = maxRows / dataCount.toDouble
 
-    dataSplitter
+    val dataSplitter = DataSplitter()
       .setReserveTestFraction(0.0)
+      .setSeed(seed)
       .setMaxTrainingSample(maxRows)
+      .setDownSampleFraction(downSampleFraction)
 
+    dataSplitter.getReserveTestFraction shouldBe 0.0
+    dataSplitter.getDownSampleFraction shouldBe downSampleFraction
+    dataSplitter.getSeed shouldBe seed
     dataSplitter.getMaxTrainingSample shouldBe maxRows
   }
 
