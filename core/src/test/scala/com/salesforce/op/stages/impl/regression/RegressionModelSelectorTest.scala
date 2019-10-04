@@ -134,7 +134,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
     val maxTrainingSample = 100
     val sampleF = maxTrainingSample / dataCount.toDouble
-    val downSampleFraction = if (maxTrainingSample < dataCount) sampleF else 1
+    val downSampleFraction = math.min(sampleF, 1.0)
     val dataSplitter = DataSplitter(maxTrainingSample = maxTrainingSample, seed = seed, reserveTestFraction = 0.0)
     val modelSelector =
       RegressionModelSelector.withTrainValidationSplit(
