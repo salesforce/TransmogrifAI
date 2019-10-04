@@ -163,6 +163,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
 
     // get eval results for metadata
     val trainingEval = evaluate(bestModel.transform(preparedData))
+    println(s"train eval $trainingEval")
 
     val metadataSummary = ModelSelectorSummary(
       validationType = ValidationType.fromValidator(validator),
@@ -182,6 +183,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     // We skip unsupported metadata values here so the model selector won't break
     // when non standard model parameters are present in param maps
     val meta = metadataSummary.toMetadata(skipUnsupported = true)
+    println(s"to summary metadata ${meta.toSummaryMetadata()}")
     setMetadata(meta.toSummaryMetadata())
 
     new SelectedModel(bestModel.asInstanceOf[ModelType], outputsColNamesMap, uid = uid, operationName = operationName)
