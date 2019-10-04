@@ -128,7 +128,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     modelSelector.splitter.get.getMaxTrainingSample shouldBe 1000
   }
 
-  it should "set maxTrainingSample and down-sample" in {
+  it should "down-sample when the training set is greater than the maxTrainingSample" in {
 
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
