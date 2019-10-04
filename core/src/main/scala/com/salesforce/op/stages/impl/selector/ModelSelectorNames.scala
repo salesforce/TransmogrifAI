@@ -90,7 +90,9 @@ private[op] trait HasEval {
     val metricsMap = evaluators.map { evaluator =>
       evaluator.setLabelCol(labelColName)
       fullPredictionColName.foreach(evaluator.setPredictionCol)
-      evaluator.name.humanFriendlyName -> evaluator.evaluateAll(data)
+      val allMetric = evaluator.evaluateAll(data)
+      println(s"All metric ${allMetric}")
+      evaluator.name.humanFriendlyName -> allMetric
     }.toMap
     data.unpersist()
     MultiMetrics(metricsMap)
