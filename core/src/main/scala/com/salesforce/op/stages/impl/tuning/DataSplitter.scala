@@ -109,16 +109,16 @@ trait DataSplitterParams extends Params {
    *
    * @group param
    */
-  private[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
+  protected[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
     "fraction to down sample data", ParamValidators.inRange(
       lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
     )
   )
   setDefault(downSampleFraction, SplitterParamsDefault.DownSampleFractionDefault)
 
-  private[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
+  protected[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
 
-  private[op] def getDownSampleFraction: Double = $(downSampleFraction)
+  protected[op] def getDownSampleFraction: Double = $(downSampleFraction)
 }
 
 /**
