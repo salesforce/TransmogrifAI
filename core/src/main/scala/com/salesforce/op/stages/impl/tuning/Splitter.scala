@@ -172,6 +172,7 @@ private[op] object SplitterSummary {
   def fromMetadata(metadata: Metadata): Try[SplitterSummary] = Try {
     metadata.getString(ClassName) match {
       case s if s == classOf[DataSplitterSummary].getName => DataSplitterSummary(
+        preSplitterDataCount = metadata.getLong(ModelSelectorNames.PreSplitterDataCount),
         downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample)
       )
       case s if s == classOf[DataBalancerSummary].getName => DataBalancerSummary(

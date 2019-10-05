@@ -71,10 +71,10 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: Dataset[Row]): PrevalidationVal = {
-    val dataSetSize = data.count().toDouble
-    val sampleF = getMaxTrainingSample / dataSetSize
+    val dataSetSize = data.count()
+    val sampleF = getMaxTrainingSample / dataSetSize.toDouble
     val downSampleFraction = math.min(sampleF, SplitterParamsDefault.DownSampleFractionDefault)
-    summary = Option(DataSplitterSummary(downSampleFraction))
+    summary = Option(DataSplitterSummary(dataSetSize, downSampleFraction))
     setDownSampleFraction(downSampleFraction)
     PrevalidationVal(summary, None)
   }
@@ -125,7 +125,7 @@ trait DataSplitterParams extends Params {
  * Summary for data splitter run for storage in metadata
  * @param downSamplingFraction down sampling fraction for training set
  */
-case class DataSplitterSummary(downSamplingFraction: Double) extends SplitterSummary {
+case class DataSplitterSummary(preSplitterDataCount: Long, downSamplingFraction: Double) extends SplitterSummary {
 
   /**
    * Converts to [[Metadata]]
@@ -137,6 +137,7 @@ case class DataSplitterSummary(downSamplingFraction: Double) extends SplitterSum
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .putLong(ModelSelectorNames.PreSplitterDataCount, preSplitterDataCount)
       .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
       .build()
   }

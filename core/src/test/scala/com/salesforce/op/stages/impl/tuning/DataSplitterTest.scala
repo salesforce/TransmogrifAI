@@ -101,12 +101,13 @@ class DataSplitterTest extends FlatSpec with TestSparkContext with SplitterSumma
   }
 
   it should "keep the data unchanged when prepare is called" in {
+    val dataCount = data.count()
     val summary = dataSplitter.preValidationPrepare(data)
     val train = dataSplitter.validationPrepare(data)
     val sampleF = trainingLimitDefault / dataCount.toDouble
     val downSampleFraction = math.min(sampleF, 1.0)
     train.collect().zip(data.collect()).foreach { case (a, b) => a shouldBe b }
-    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary(downSampleFraction) }
+    assertDataSplitterSummary(summary.summaryOpt) { s => s shouldBe DataSplitterSummary(dataCount, downSampleFraction) }
   }
 
 }
