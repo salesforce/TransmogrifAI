@@ -185,7 +185,8 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val meta = metadataSummary.toMetadata(skipUnsupported = true)
     println(s"to summary metadata ${meta.toSummaryMetadata()}")
 
-    println(s"from metadata ${ModelSelectorSummary.fromMetadata(meta.toSummaryMetadata()).trainEvaluation}")
+    println(s"from metadata ${ModelSelectorSummary.fromMetadata(meta.toSummaryMetadata().getSummaryMetadata)
+      .trainEvaluation}")
     setMetadata(meta.toSummaryMetadata())
 
     new SelectedModel(bestModel.asInstanceOf[ModelType], outputsColNamesMap, uid = uid, operationName = operationName)
