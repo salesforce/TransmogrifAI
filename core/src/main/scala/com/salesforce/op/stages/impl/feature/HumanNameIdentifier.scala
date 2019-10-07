@@ -35,8 +35,9 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.{Column, Dataset, Row}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.DoubleType
 
 import scala.io.Source
 
@@ -47,7 +48,7 @@ class HumanNameIdentifier
 ) extends UnaryEstimator[Text, Text](
   uid = uid,
   operationName = operationName
-) {
+) with UniqueCountFun {
   // Parameter
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -71,13 +72,16 @@ class HumanNameIdentifier
     nameDictionary
   }
 
+  private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
+
   private def averageBoolCol(dataset: Dataset[Boolean], column: Column): Double = {
-    dataset.select(
-      mean(column.cast("integer"))
-    ).collect().headOption.getOrElse(Row(0.0)).getDouble(0)
+    extractDouble(dataset.select(mean(column.cast("integer"))))
   }
 
   private def guardChecks(dataset: Dataset[Text#Value], column: Column): Boolean = {
+    val total = dataset.count()
+    val numUnique = extractDouble(dataset.select(approx_count_distinct(column).cast(DoubleType)))
+
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
       averageBoolCol(dataset.withColumn(
@@ -88,10 +92,10 @@ class HumanNameIdentifier
         column.toString, length(column) > 3).asInstanceOf[Dataset[Boolean]], column
       ) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
-      dataset.count() < 10 ||
-        dataset.select(stddev(length(column))).collect().headOption.getOrElse(Row(0.0)).getDouble(0) > 0.05,
+      total < 10 ||
+        extractDouble(dataset.select(stddev(length(column)))) > 0.05,
       // check that the number of unique entries is at least 10
-      dataset.count() < 100 || dataset.select(column).distinct().count() > 10
+      total < 100 || numUnique > 10
     )
     checks.forall(identity)
   }

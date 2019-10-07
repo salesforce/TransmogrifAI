@@ -90,4 +90,9 @@ class HumanNameIdentifierTest extends OpEstimatorSpec[Text, UnaryModel[Text, Tex
     val (_, _, model, _) = identifyName(Seq("1", "42", "0", "3000 michael").toText)
     model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe false
   }
+
+  it should "not identify a single repeated name as Name" in {
+    val (_, _, model, _) = identifyName(Seq.fill(200)("Michael").toText)
+    model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe false
+  }
 }
