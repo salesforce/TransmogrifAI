@@ -103,7 +103,7 @@ class RawFeatureFilter[T]
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None,
   val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-  val minTopk: Int = RawFeatureFilter.minTopK
+  val minUniqueToken: Int = RawFeatureFilter.minTok
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -331,16 +331,9 @@ class RawFeatureFilter[T]
       message = s"Features excluded because training fill rate did not meet min required ($minFill)"
     )
 
-    val trainingLowTop5: Seq[Boolean] = rawFeatureFilterMetrics.map(
-      x => x.trainingTop5Count match {
-        case Some(x) => x < minTopk
-        case _ => false
-      }
-    )
-
     val cardLimit: Seq[Boolean] = rawFeatureFilterMetrics.map(
       x => x.trainingCardSize match {
-        case Some(x) => x > 30
+        case Some(x) => x < minUniqueToken
         case _ => false
       }
     )
@@ -354,8 +347,8 @@ class RawFeatureFilter[T]
     // will filter out text features that have > 30 unique value,
     // where the 5th most common value appear < minTopk
 
-    val trainingIsID: Seq[Boolean] = (trainingLowTop5 zip cardLimit zip TextOnly).map {
-      case ((a, b), c) => a && b && c
+    val trainingIsID: Seq[Boolean] = (cardLimit zip TextOnly).map {
+      case (a, b) => a && b
     }
 
     val trainingNullLabelLeakers: Seq[Boolean] = rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr).map {
@@ -640,7 +633,7 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  val minTopK = 300
+  val minTok = 10
   val MaxCardinality = 500
 
 

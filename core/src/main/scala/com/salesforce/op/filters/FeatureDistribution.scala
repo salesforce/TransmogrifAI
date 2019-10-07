@@ -134,8 +134,13 @@ case class FeatureDistribution
 
     val combinedCard = cardEstimate + fd.cardEstimate
 
+    val combinedRawFtType = fd.rawFeatureType match {
+      case Some(x) => Some(x)
+      case _ => rawFeatureType
+    }
+
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, rawFeatureType, combinedCard, `type`)
+      combinedSummaryInfo, combinedRawFtType, combinedCard, `type`)
   }
 
   /**
@@ -287,7 +292,7 @@ object FeatureDistribution {
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
     val population = values match {
-      case Left(seq) => seq
+      case Left(seq) => seq.map(_.size.toString)
       case Right(seq) => seq.map(_.toString)
     }
     TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
