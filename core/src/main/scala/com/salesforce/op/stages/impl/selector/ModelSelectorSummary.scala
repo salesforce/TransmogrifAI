@@ -241,6 +241,7 @@ case object ModelSelectorSummary {
     }
 
 
+    println(s"class is ${ReflectionUtils.classForName(className)}")
     ReflectionUtils.classForName(className) match {
       case n if n == classOf[MultiMetrics] =>
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map { d =>
@@ -255,8 +256,10 @@ case object ModelSelectorSummary {
                 case Some(OpEvaluatorNames.Multi) => JsonUtils.fromString[MultiClassificationMetrics](valsJson)
                 case Some(OpEvaluatorNames.Regression) => JsonUtils.fromString[RegressionMetrics](valsJson)
                 case Some(OpEvaluatorNames.Forecast) => JsonUtils.fromString[ForecastMetrics](valsJson)
-                case _ => // assume a custom metric here, hence trying to parse as single metric value
+                case _ => { // assume a custom metric here, hence trying to parse as single metric value
+                  println(s"JSON ${JsonUtils.fromString[MultiMetrics](valsJson)}")
                   JsonUtils.fromString[MultiMetrics](valsJson)
+                }
               }).get
             }
           }
