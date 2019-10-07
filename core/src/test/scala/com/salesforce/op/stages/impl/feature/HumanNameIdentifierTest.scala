@@ -30,15 +30,18 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 
 @RunWith(classOf[JUnitRunner])
-class HumanNameIdentifierTest extends OpEstimatorSpec[Text, UnaryModel[Text, Text], UnaryEstimator[Text, Text]] {
+class HumanNameIdentifierTest
+  extends OpEstimatorSpec[NameList, UnaryModel[Text, NameList], UnaryEstimator[Text, NameList]] {
   /**
    * Input Dataset to fit & transform
    */
@@ -52,9 +55,9 @@ class HumanNameIdentifierTest extends OpEstimatorSpec[Text, UnaryModel[Text, Tex
   /**
    * Expected result of the transformer applied on the Input Dataset
    */
-  val expectedResult: Seq[Text] = Seq("Blah").map(_.toText)
+  val expectedResult: Seq[NameList] = Seq(Seq(Name("Blah"))).map(_.toNameList)
 
-  private def identifyName(data: Seq[Text]) = {
+  private def identifyName(data: Seq[Text]): (DataFrame, Feature[Text], UnaryModel[Text, NameList], DataFrame) = {
     val (newData, newFeature) = TestFeatureBuilder(data)
     val model = estimator.setInput(newFeature).fit(newData)
     val newResult = model.transform(newData)

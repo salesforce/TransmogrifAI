@@ -71,6 +71,7 @@ case object FeatureTypeDefaults {
 
   // Lists
   val TextList = new t.TextList(Seq.empty)
+  val NameList = new t.NameList(Seq.empty)
   val DateList = new t.DateList(Seq.empty)
   val DateTimeList = new t.DateTimeList(Seq.empty)
   val Geolocation = new t.Geolocation(Seq.empty)
