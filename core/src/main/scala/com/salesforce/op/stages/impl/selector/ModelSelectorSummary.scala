@@ -250,7 +250,7 @@ case object ModelSelectorSummary {
                 case Some(OpEvaluatorNames.Regression) => JsonUtils.fromString[RegressionMetrics](valsJson)
                 case Some(OpEvaluatorNames.Forecast) => JsonUtils.fromString[ForecastMetrics](valsJson)
                 case _ => // assume a custom metric here, hence trying to parse as single metric value
-                  JsonUtils.fromString[SingleMetric](valsJson)
+                  JsonUtils.fromString[MultiMetrics](valsJson)
               }).get
             }
           }
