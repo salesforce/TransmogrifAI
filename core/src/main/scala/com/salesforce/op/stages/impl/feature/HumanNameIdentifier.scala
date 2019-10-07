@@ -34,6 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.{Column, Dataset, Row}
 import org.apache.spark.sql.functions._
 
@@ -95,22 +96,18 @@ class HumanNameIdentifier
     checks.forall(identity)
   }
 
-  private def preProcess(column: Column): Column = {
-    regexp_replace(lower(column), "\\P{L}", "")
+  private def preProcess(s: String): Array[String] = {
+    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
   }
 
-  private def dictCheck = udf( (s: String) => nameDictionary contains s )
+  private def dictCheck: UserDefinedFunction = udf((s: String) => {
+    val tokens = preProcess(s)
+    val percentageMatched = tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
+    percentageMatched >= 0.5
+  }: Boolean)
 
-  private def predictName(dataset: Dataset[Text#Value], column: Column): Dataset[Boolean] = {
-    val withIDs = dataset.withColumn("ID", monotonically_increasing_id)
-    // split on all whitespace
-    val splitDF = withIDs.withColumn("tokens", explode(split(column, "\\s+")))
-    val tokensCheckedDF = splitDF.withColumn(
-      "inDictionary", dictCheck(preProcess(col("tokens"))).cast("integer")
-    )
-    tokensCheckedDF.groupBy("ID").agg(
-      (mean("inDictionary") >= 0.5).cast("boolean").alias(column.toString)
-    ).select(column).asInstanceOf[Dataset[Boolean]]
+  private def predictIfName(dataset: Dataset[Text#Value], column: Column): Dataset[Boolean] = {
+    dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
   }
 
   def fitFn(dataset: Dataset[Text#Value]): HumanNameIdentifierModel = {
@@ -119,7 +116,7 @@ class HumanNameIdentifier
     if (!guardChecks(dataset, column)) {
       new HumanNameIdentifierModel(uid, false)
     } else {
-      val predictedDF = predictName(dataset, column)
+      val predictedDF = predictIfName(dataset, column)
       val predictedProb: Double = averageBoolCol(predictedDF, column)
       val treatAsName: Boolean = predictedProb >= $(defaultThreshold)
       new HumanNameIdentifierModel(uid, treatAsName)
