@@ -237,12 +237,16 @@ case object ModelSelectorSummary {
       new IllegalArgumentException(s"Could not extract metrics of type $c from: $json", t)
     }
 
+    //println(ClassTag(ReflectionUtils.classForName(className)))
+    //println(ClassTag(ReflectionUtils.classForName(className)).[MultiMetrics])
     ReflectionUtils.classForName(className) match {
       case n if n == classOf[MultiMetrics] =>
         JsonUtils.fromString[Map[String, Map[String, Any]]](json).map { d =>
           val asMetrics = d.flatMap { case (_, values) =>
             values.collect { case (nm: String, mp: Map[String, Any]@unchecked) =>
               val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
+              println(nm)
+              println("Yo")
               nm -> (OpEvaluatorNames.withFriendlyNameInsensitive(nm) match {
                 case Some(OpEvaluatorNames.Binary) => JsonUtils.fromString[BinaryClassificationMetrics](valsJson)
                 case Some(OpEvaluatorNames.BinScore) => JsonUtils.fromString[BinaryClassificationBinMetrics](valsJson)
@@ -257,6 +261,10 @@ case object ModelSelectorSummary {
           MultiMetrics(asMetrics)
         }.recoverWith { case t: Throwable => error(n, t) }
       case n =>
+        println(s"n $n")
+        println(s"ClassTag ${ClassTag(n)}")
+        println(JsonUtils.fromString(json)(ClassTag(n)))
+
         JsonUtils.fromString(json)(ClassTag(n))
           .recoverWith { case t: Throwable => error(n, t) }
     }
