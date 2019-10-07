@@ -267,7 +267,7 @@ class RawFeatureFilter[T]
 
       val rawFeatureFilterMetrics = combineRawFeatureFilterMetrics(
         trainingDistribs, trainingFillRates, trainingNullLabelAbsoluteCorrs,
-        trainingTop5Counts, trainingCardSizes, scoringFillRates, jsDivergences, fillRateDiffs, fillRatioDiffs
+        trainingCardSizes, scoringFillRates, jsDivergences, fillRateDiffs, fillRatioDiffs
       )
       rawFeatureFilterMetrics
 
@@ -284,7 +284,7 @@ class RawFeatureFilter[T]
 
       val rawFeatureFilterMetrics = combineRawFeatureFilterMetrics(
         trainingDistribs, trainingFillRates, trainingNullLabelAbsoluteCorrs,
-        trainingTop5Counts, trainingCardSizes, scoringFillRates, jsDivergences,
+        trainingCardSizes, scoringFillRates, jsDivergences,
         fillRateDiffs, fillRatioDiffs
       )
 
