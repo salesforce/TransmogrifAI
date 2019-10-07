@@ -45,10 +45,10 @@ class HumanNameIdentifier
 (
   uid: String = UID[HumanNameIdentifier],
   operationName: String = "human name identifier"
-) extends UnaryEstimator[Text, NameList](
+) extends UnaryEstimator[Text, Text](
   uid = uid,
   operationName = operationName
-) {
+) with UniqueCountFun {
   // Parameter
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -128,9 +128,10 @@ class HumanNameIdentifier
   }
 }
 
-
 class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolean)
-  extends UnaryModel[Text, NameList]("human name identifier", uid) {
-  def transformFn: Text => NameList = input =>
-    if (treatAsName) NameList(Seq(Name(input.value))) else NameList(Seq.empty)
+  extends UnaryModel[Text, Text]("human name identifier", uid) {
+  // For now, will just return a copy of the text, typed correctly
+  // Eventually we will want to map into other fields like Race or Gender
+  def transformFn: Text => Text = input =>
+    if (treatAsName) Name(input.value) else input
 }

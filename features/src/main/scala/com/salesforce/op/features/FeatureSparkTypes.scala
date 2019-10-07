@@ -74,14 +74,12 @@ case object FeatureSparkTypes {
   val City = Text
   val PostalCode = Text
   val Street = Text
-  val Name = Text
 
   // Vector
   val OPVector = VectorType
 
   // Lists
   val TextList = ArrayType(Text, containsNull = true)
-  val NameList = ArrayType(Name, containsNull = true)
   val DateList = ArrayType(Date, containsNull = true)
   val DateTimeList = DateList
   val Geolocation = ArrayType(Real, containsNull = true)
@@ -129,7 +127,6 @@ case object FeatureSparkTypes {
 
     // Lists
     case wt if wt =:= weakTypeOf[t.TextList] => TextList
-      case wt if wt =:= weakTypeOf[t.NameList] => NameList
     case wt if wt =:= weakTypeOf[t.DateList] => DateList
     case wt if wt =:= weakTypeOf[t.DateTimeList] => DateTimeList
     case wt if wt =:= weakTypeOf[t.Geolocation] => Geolocation

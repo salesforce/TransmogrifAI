@@ -185,9 +185,6 @@ package object types extends FeatureTypeSparkConverters {
     def toText: Seq[Text] = v.map(_.toText)
     def toEmail: Seq[Email] = v.map(_.toEmail)
   }
-  implicit  class SeqNameConversions(val v: Seq[Name]) extends AnyVal {
-    def toNameList: NameList = new NameList(v)
-  }
   implicit class Tup3DoubleConversions(val v: (Double, Double, Double)) extends AnyVal {
     def toGeolocation: Geolocation = new Geolocation(v)
   }

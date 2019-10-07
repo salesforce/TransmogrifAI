@@ -309,10 +309,8 @@ object Street {
  *
  * @param value name
  */
-class Name(value: Option[String], isFemale: Option[Boolean] = None) extends Text(value){
+class Name(value: Option[String]) extends Text(value){
   def this(value: String) = this(Option(value))
-  def firstName: Option[String] = None
-  def lastName: Option[String] = None
 }
 object Name {
   def apply(value: Option[String]): Name = new Name(value)

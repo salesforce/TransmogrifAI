@@ -44,19 +44,6 @@ object TextList {
 }
 
 /**
- * A list of Name values
- *
- * @param value list of Name values
- */
-class NameList(val value: Seq[Name]) extends OPList[Text] {
-  def this(v: Name*)(implicit d: DummyImplicit) = this(v)
-}
-object NameList {
-  def apply(value: Seq[Name]): NameList = new NameList(value)
-  def empty: NameList = FeatureTypeDefaults.NameList
-}
-
-/**
  * A list of date values
  *
  * @param value list of date values (values assumed to be in ms since Epoch)
