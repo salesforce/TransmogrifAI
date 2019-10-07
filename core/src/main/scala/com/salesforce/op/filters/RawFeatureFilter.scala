@@ -214,7 +214,6 @@ class RawFeatureFilter[T]
     val featureSize: Int = trainingDistribs.length
 
     val trainingFillRates: Seq[Double] = trainingDistribs.map(_.fillRate())
-    val trainingTop5Counts: Seq[Option[Int]] = trainingDistribs.map(_.topKCard(5))
     val trainingCardSizes: Seq[Option[Int]] = trainingDistribs.map(_.cardSize)
     val rawFeatureTypes: Seq[Option[String]] = trainingDistribs.map(_.rawFeatureType)
     val trainingNullLabelAbsoluteCorrs: Seq[Option[Double]] =
@@ -232,7 +231,6 @@ class RawFeatureFilter[T]
       traininingDistribs: Seq[FeatureDistribution],
       trainingFillRates: Seq[Double],
       trainingNullLabelAbsoluteCorrs: Seq[Option[Double]],
-      trainingTop5Counts: Seq[Option[Int]],
       trainingCardSizes: Seq[Option[Int]],
       scoringFillRates: Seq[Option[Double]],
       jsDivergences: Seq[Option[Double]],
@@ -247,17 +245,16 @@ class RawFeatureFilter[T]
         .zip(jsDivergences)
         .zip(fillRateDiffs)
         .zip(fillRatioDiffs)
-        .zip(trainingTop5Counts)
         .zip(trainingCardSizes)
         .zip(rawFeatureTypes)
         .map {
-          case ((((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
-          scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff), top5avg),
+          case (((((((((name, key), trainingFillRate), trainingNullLabelAbsoluteCorr),
+          scoringFillRate), jsDivergence), fillRateDiff), fillRatioDiff),
           trainingCardSize), rawFeatureType) =>
             RawFeatureFilterMetrics(
               name, key, trainingFillRate, trainingNullLabelAbsoluteCorr,
               scoringFillRate, jsDivergence, fillRateDiff, fillRatioDiff,
-              top5avg, trainingCardSize, rawFeatureType)
+              trainingCardSize, rawFeatureType)
         }
     }
 
