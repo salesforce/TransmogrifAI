@@ -249,6 +249,8 @@ case object ModelSelectorSummary {
             values.collect { case (nm: String, mp: Map[String, Any]@unchecked) =>
               val valsJson = JsonUtils.toJsonString(mp) // TODO: gross but it works. try to find a better way
               println(nm)
+              println(mp)
+              println(valsJson)
               println("Yo")
               nm -> (OpEvaluatorNames.withFriendlyNameInsensitive(nm) match {
                 case Some(OpEvaluatorNames.Binary) => JsonUtils.fromString[BinaryClassificationMetrics](valsJson)
@@ -257,8 +259,8 @@ case object ModelSelectorSummary {
                 case Some(OpEvaluatorNames.Regression) => JsonUtils.fromString[RegressionMetrics](valsJson)
                 case Some(OpEvaluatorNames.Forecast) => JsonUtils.fromString[ForecastMetrics](valsJson)
                 case _ => { // assume a custom metric here, hence trying to parse as single metric value
-                  println(s"JSON ${JsonUtils.fromString[MultiMetrics](valsJson)}")
-                  JsonUtils.fromString[MultiMetrics](valsJson)
+                  println(s"JSON ${JsonUtils.fromString(valsJson)(ClassTag(n))}")
+                  JsonUtils.fromString(valsJson)(ClassTag(n))
                 }
               }).get
             }
