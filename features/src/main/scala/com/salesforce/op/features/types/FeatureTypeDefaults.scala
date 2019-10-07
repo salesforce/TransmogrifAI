@@ -64,6 +64,7 @@ case object FeatureTypeDefaults {
   val Street = new t.Street(None)
   val City = new t.City(None)
   val PostalCode = new t.PostalCode(None)
+  val Name = new t.Name(None)
 
   // Vector
   val OPVector = new t.OPVector(Vectors.zeros(0))

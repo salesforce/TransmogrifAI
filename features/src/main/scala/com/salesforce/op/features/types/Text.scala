@@ -303,3 +303,17 @@ object Street {
   def apply(value: String): Street = new Street(value)
   def empty: Street = FeatureTypeDefaults.Street
 }
+
+/**
+ * Name value representation
+ *
+ * @param value name
+ */
+class Name(value: Option[String]) extends Text(value){
+  def this(value: String) = this(Option(value))
+}
+object Name {
+  def apply(value: Option[String]): Name = new Name(value)
+  def apply(value: String): Name = new Name(value)
+  def empty: Name = FeatureTypeDefaults.Name
+}

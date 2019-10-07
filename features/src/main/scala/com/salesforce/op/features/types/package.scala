@@ -54,6 +54,7 @@ package object types extends FeatureTypeSparkConverters {
     def toPostalCode: PostalCode = new PostalCode(Option(v))
     def toCity: City = new City(Option(v))
     def toStreet: Street = new Street(Option(v))
+    def toName: Name = new Name(Option(v))
   }
   implicit class OptStringConversions(val v: Option[String]) extends AnyVal {
     def toText: Text = new Text(v)
@@ -70,6 +71,7 @@ package object types extends FeatureTypeSparkConverters {
     def toPostalCode: PostalCode = new PostalCode(v)
     def toCity: City = new City(v)
     def toStreet: Street = new Street(v)
+    def toName: Name = new Name(v)
   }
 
   // Numerics
@@ -181,6 +183,7 @@ package object types extends FeatureTypeSparkConverters {
     def toTextList: TextList = new TextList(v)
     def toMultiPickList: MultiPickList = new MultiPickList(v.toSet)
     def toText: Seq[Text] = v.map(_.toText)
+    def toEmail: Seq[Email] = v.map(_.toEmail)
   }
   implicit class Tup3DoubleConversions(val v: (Double, Double, Double)) extends AnyVal {
     def toGeolocation: Geolocation = new Geolocation(v)
