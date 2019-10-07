@@ -75,6 +75,44 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     decoded.holdoutEvaluation shouldEqual summary.holdoutEvaluation
   }
 
+  it should "be correctly converted to and from metadata with custom metrics" in {
+    val summary = ModelSelectorSummary(
+      validationType = ValidationType.CrossValidation,
+      validationParameters = Map("testA" -> 5, "otherB" -> Array(1, 2)),
+      dataPrepParameters = Map("testB" -> "5", "otherB" -> Seq("1", "2")),
+      dataPrepResults = Option(DataBalancerSummary(100L, 300L, 0.1, 2.0, 0.5)),
+      evaluationMetric = BinaryClassEvalMetrics.AuROC,
+      problemType = ProblemType.BinaryClassification,
+      bestModelUID = "test1",
+      bestModelName = "test2",
+      bestModelType = "test3",
+      validationResults = Seq(ModelEvaluation("test4", "test5", "test6", SingleMetric("test7", 0.1), Map.empty)),
+      trainEvaluation = MultiMetrics(Map( "regression evaluation metrics" -> RegressionMetrics(
+        RootMeanSquaredError = 1.3, MeanSquaredError = 1.4, R2 = 1.5, MeanAbsoluteError = 1.6),
+        "normalized root mean squared error" -> NRMSEMetrics(0.1, 0.2, 0.3, 0.4, 0.5))),
+      holdoutEvaluation = None
+    )
+
+    println(s"summary ${summary.trainEvaluation}")
+    val meta = summary.toMetadata()
+    println(s"meta ${meta}")
+    val decoded = ModelSelectorSummary.fromMetadata(meta)
+
+
+    decoded.validationType shouldEqual summary.validationType
+    decoded.validationParameters.keySet shouldEqual summary.validationParameters.keySet
+    decoded.dataPrepParameters.keySet should contain theSameElementsAs summary.dataPrepParameters.keySet
+    decoded.dataPrepResults shouldEqual summary.dataPrepResults
+    decoded.evaluationMetric.entryName shouldEqual summary.evaluationMetric.entryName
+    decoded.problemType shouldEqual summary.problemType
+    decoded.bestModelUID shouldEqual summary.bestModelUID
+    decoded.bestModelName shouldEqual summary.bestModelName
+    decoded.bestModelType shouldEqual summary.bestModelType
+    decoded.validationResults shouldEqual summary.validationResults
+    decoded.trainEvaluation shouldEqual summary.trainEvaluation
+    decoded.holdoutEvaluation shouldEqual summary.holdoutEvaluation
+  }
+
   it should "be correctly converted to and from metadata even when fields are missing or empty" in {
 
     val summary = ModelSelectorSummary(
@@ -126,7 +164,7 @@ class ModelSelectorSummaryTest extends FlatSpec with TestSparkContext {
     val thr = intercept[IllegalArgumentException](ModelSelectorSummary.evalMetFromJson(
       classOf[MultiClassificationMetrics].getName, corruptJson).get)
 
-    thr.getMessage should startWith ("Could not extract metrics of type class " +
+    thr.getMessage should startWith("Could not extract metrics of type class " +
       "com.salesforce.op.evaluators.MultiClassificationMetrics from: {")
 
     thr.getCause.getMessage shouldEqual "Unsupported format. Supported formats: json, yaml"

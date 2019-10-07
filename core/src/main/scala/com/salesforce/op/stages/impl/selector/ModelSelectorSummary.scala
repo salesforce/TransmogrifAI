@@ -208,6 +208,7 @@ case object ModelSelectorSummary {
     val validationResults: Seq[ModelEvaluation] = wrapped.get[Array[Metadata]](ValidationResults)
       .map(modelEvalFromMetadata)
     val Array(metName, metJson) = wrapped.get[Array[String]](TrainEvaluation)
+    println(s"$metName $metJson")
     val holdoutEvaluation: Option[EvaluationMetrics] =
       if (wrapped.contains(HoldoutEvaluation)) {
         val Array(metNameHold, metJsonHold) = wrapped.get[Array[String]](HoldoutEvaluation)
@@ -258,8 +259,8 @@ case object ModelSelectorSummary {
                 case Some(OpEvaluatorNames.Multi) => JsonUtils.fromString[MultiClassificationMetrics](valsJson)
                 case Some(OpEvaluatorNames.Regression) => JsonUtils.fromString[RegressionMetrics](valsJson)
                 case Some(OpEvaluatorNames.Forecast) => JsonUtils.fromString[ForecastMetrics](valsJson)
+                case Some(OpEvaluatorNames.NRMSE) => JsonUtils.fromString[NRMSEMetrics](valsJson)
                 case _ => { // assume a custom metric here, hence trying to parse as single metric value
-                  println(s"JSON ${JsonUtils.fromString(valsJson)(ClassTag(n))}")
                   JsonUtils.fromString(valsJson)(ClassTag(n))
                 }
               }).get

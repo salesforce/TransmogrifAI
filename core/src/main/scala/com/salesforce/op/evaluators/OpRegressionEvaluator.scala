@@ -42,9 +42,9 @@ import org.slf4j.LoggerFactory
  * The metrics are rmse, mse, r2 and mae
  * Default evaluation returns Root Mean Squared Error
  *
- * @param name name of default metric
+ * @param name           name of default metric
  * @param isLargerBetter is metric better if larger
- * @param uid uid for instance
+ * @param uid            uid for instance
  */
 
 private[op] class OpRegressionEvaluator
@@ -104,3 +104,107 @@ case class RegressionMetrics
   R2: Double,
   MeanAbsoluteError: Double
 ) extends EvaluationMetrics
+
+
+case class AllRegressionMetrics(RootMeanSquaredError: Double,
+  MeanSquaredError: Double,
+  R2: Double,
+  MeanAbsoluteError: Double,
+  ByMeanNRMSE: Double, BySDNRMSE: Double, ByMedianNRMSE: Double, ByRangeNRMSE: Double,
+  ByIQRNRMSE: Double) extends EvaluationMetrics
+
+
+case class NRMSEMetrics(ByMeanNRMSE: Double, BySDNRMSE: Double, ByMedianNRMSE: Double, ByRangeNRMSE: Double,
+  ByIQRNRMSE: Double) extends EvaluationMetrics
+
+class NRMSEEvaluator extends OpRegressionEvaluatorBase[NRMSEMetrics](uid = UID[NRMSEEvaluator]) {
+  def getDefaultMetric: NRMSEMetrics => Double = _.ByMeanNRMSE
+
+  override def name: EvalMetric = EvalMetric.withNameInsensitive(
+    "normalized root mean squared error",
+    false)
+
+  def divideBy(rmse: Double, withValue: Double): Double = if (withValue != 0.0) rmse / withValue else rmse
+
+  override def evaluateAll(dataset: Dataset[_]): NRMSEMetrics = {
+    val rmse = Evaluators.Regression.rmse().setPredictionCol(getPredictionCol).setLabelCol(getLabelCol)
+      .evaluate(dataset)
+    import dataset.sqlContext.implicits._
+    val labelDS = dataset.select(getLabelCol).as[Double]
+    val summary = labelDS.summary("mean", "stddev", "min", "max", "25%", "50%", "75%")
+    val (mean, sd, range, median, iqr) = {
+      val summaryCol = summary.select(getLabelCol).as[String].map(_.toDouble).as[Double].collect()
+      (summaryCol(0), summaryCol(1), summaryCol(3) - summaryCol(2), summaryCol(5), summaryCol(6) - summaryCol(4))
+    }
+    val nmrseMetrics = new NRMSEMetrics(
+      ByMeanNRMSE = divideBy(rmse, mean),
+      BySDNRMSE = divideBy(rmse, sd),
+      ByMedianNRMSE = divideBy(rmse, median),
+      ByRangeNRMSE = divideBy(rmse, range),
+      ByIQRNRMSE = divideBy(rmse, iqr)
+    )
+    println(s"NMRSE metrics ${nmrseMetrics}")
+    nmrseMetrics
+  }
+}
+
+class AllRegressionEvaluator extends OpRegressionEvaluatorBase[AllRegressionMetrics](
+  uid = UID[AllRegressionEvaluator]) {
+  def getDefaultMetric: AllRegressionMetrics => Double = _.RootMeanSquaredError
+
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("all regression",
+    false)
+
+  override def evaluateAll(dataset: Dataset[_]): AllRegressionMetrics = {
+    val regMetrics = Evaluators.Regression().setPredictionCol(getPredictionCol).setLabelCol(getLabelCol)
+      .evaluateAll(dataset)
+    val nrmseMetrics = new NRMSEEvaluator().setPredictionCol(getPredictionCol).setLabelCol(getLabelCol)
+      .evaluateAll(dataset)
+    val finalMetrics = new AllRegressionMetrics(RootMeanSquaredError = regMetrics.RootMeanSquaredError,
+      MeanAbsoluteError = regMetrics.MeanAbsoluteError,
+      MeanSquaredError = regMetrics.MeanAbsoluteError,
+      R2 = regMetrics.R2,
+      ByMeanNRMSE = nrmseMetrics.ByMeanNRMSE,
+      BySDNRMSE = nrmseMetrics.BySDNRMSE,
+      ByMedianNRMSE = nrmseMetrics.ByMedianNRMSE,
+      ByRangeNRMSE = nrmseMetrics.ByRangeNRMSE,
+      ByIQRNRMSE = nrmseMetrics.ByIQRNRMSE)
+    println(s"final metrics ${finalMetrics}")
+    finalMetrics
+  }
+}
+
+class MeanNRMSE extends NRMSEEvaluator {
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("mean normalized root mean squared error",
+    false)
+
+  override def getDefaultMetric: NRMSEMetrics => Double = _.ByMeanNRMSE
+}
+
+class SDNRMSE extends NRMSEEvaluator {
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("standard deviation normalized root" +
+    " mean squared error", false)
+
+  override def getDefaultMetric: NRMSEMetrics => Double = _.BySDNRMSE
+}
+
+class RangeNRMSE extends NRMSEEvaluator {
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("range normalized root" +
+    " mean squared error", false)
+
+  override def getDefaultMetric: NRMSEMetrics => Double = _.ByRangeNRMSE
+}
+
+class MedianNRMSE extends NRMSEEvaluator {
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("median normalized root" +
+    " mean squared error", false)
+
+  override def getDefaultMetric: NRMSEMetrics => Double = _.ByMedianNRMSE
+}
+
+class IQRNRMSE extends NRMSEEvaluator {
+  override def name: EvalMetric = EvalMetric.withNameInsensitive("inter quantile range normalized root" +
+    " mean squared error", false)
+
+  override def getDefaultMetric: NRMSEMetrics => Double = _.ByIQRNRMSE
+}

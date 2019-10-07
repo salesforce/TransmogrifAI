@@ -79,8 +79,11 @@ case class SingleMetric(name: String, value: Double) extends EvaluationMetrics {
  */
 case class MultiMetrics(metrics: Map[String, EvaluationMetrics]) extends EvaluationMetrics {
   override def toMap: Map[String, Any] = metrics.flatMap {
-    case (name, evalMetrics) => evalMetrics.toMap.map { case (k, v) => s"($name)_$k" -> v }
-  }
+    case (name, evalMetrics) =>
+      println(s"${name} ${evalMetrics}")
+      evalMetrics.toMap.map { case (k, v) => s"($name)_$k" -> v }
+
+}
   override def toString: String = JsonUtils.toJsonString(this.toMap, pretty = true)
 }
 
@@ -223,6 +226,7 @@ object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics", true)
   case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics", false)
   case object Forecast extends OpEvaluatorNames("regForecast", "regression evaluation metrics", false)
+  case object NRMSE extends OpEvaluatorNames("nmrse", "normalized root mean squared error", false)
   case class Custom(name: String, humanName: String, largeBetter: Boolean) extends
     OpEvaluatorNames(name, humanName, largeBetter) {
     override def entryName: String = name.toLowerCase
