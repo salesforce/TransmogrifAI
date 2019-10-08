@@ -339,24 +339,6 @@ trait DataBalancerParams extends Params {
   def getSampleFraction: Double = $(sampleFraction)
 
   /**
-   * Maximum size of dataset want to train on.
-   * Value should be > 0.
-   * Default is 5000.
-   *
-   * @group param
-   */
-  final val maxTrainingSample = new IntParam(this, "maxTrainingSample",
-    "maximum size of dataset want to train on", ParamValidators.inRange(
-      lowerBound = 0, upperBound = 1 << 30, lowerInclusive = false, upperInclusive = true
-    )
-  )
-  setDefault(maxTrainingSample, SplitterParamsDefault.MaxTrainingSampleDefault)
-
-  def setMaxTrainingSample(value: Int): this.type = set(maxTrainingSample, value)
-
-  def getMaxTrainingSample: Int = $(maxTrainingSample)
-
-  /**
    * Fraction to sample minority data
    * Value should be > 0.0
    *
