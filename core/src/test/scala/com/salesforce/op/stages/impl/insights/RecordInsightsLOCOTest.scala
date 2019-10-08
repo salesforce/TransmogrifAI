@@ -230,9 +230,9 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
         parsed.length shouldBe numRows
       }
 
-      // Each feature vector should only have either three or four non-zero entries. One each from country and picklist,
-      // while currency can have either two (if it's null since the currency column will be filled with the mean) or
-      // just one if it's not null.
+      info("Each feature vector should only have either three or four non-zero entries. One each from country and " +
+        "picklist, while currency can have either two (if it's null the currency column will be filled with the mean) "+
+        "or just one if it's not null.")
       it("should pick between 1 and 4 of the features") {
         all(parsed.map(_.size)) should (be >= 1 and be <= 4)
       }
@@ -279,8 +279,8 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
         tValue should be > 10.0
       }
 
-      // The ratio of feature strengths between important and other features should be similar to the ratio of
-      // feature importance of Spark's RandomForest
+      info("The ratio of feature strengths between important and other features should be similar to the ratio of" +
+        "feature importance of Spark's RandomForest")
       it("should have a ratio between the important and other features in both paradigms of less than 0.8") {
         val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
         val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
