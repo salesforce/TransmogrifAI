@@ -559,7 +559,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         textBinsFormula = textBinsFormula,
         timePeriod = timePeriod,
         minScoringRows = minScoringRows,
-        minUniqueToken = minTok)
+        minUniqueTokenLen = minTok)
     }
     this
   }

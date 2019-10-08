@@ -103,7 +103,7 @@ class RawFeatureFilter[T]
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None,
   val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-  val minUniqueToken: Int = RawFeatureFilter.minTok
+  val minUniqueTokenLen: Int = RawFeatureFilter.minTok
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -330,7 +330,7 @@ class RawFeatureFilter[T]
 
     val cardLimit: Seq[Boolean] = rawFeatureFilterMetrics.map(
       x => x.trainingCardSize match {
-        case Some(x) => x < minUniqueToken
+        case Some(x) => x < minUniqueTokenLen
         case _ => false
       }
     )
@@ -368,8 +368,9 @@ class RawFeatureFilter[T]
       jsDivergenceMismatches: Seq[Boolean],
       fillRateDiffMismatches: Seq[Boolean],
       fillRatioDiffMismatches: Seq[Boolean],
-      trainingIsID: Seq[Boolean]
+      trainingIsIDs: Seq[Boolean]
     ): Seq[ExclusionReasons] = {
+      println(trainingIsIDs)
 
       trainingDistribs.map(dist => dist.name-> dist.key)
         .zip(trainingUnfilledStates)
@@ -378,7 +379,7 @@ class RawFeatureFilter[T]
         .zip(jsDivergenceMismatches)
         .zip(fillRateDiffMismatches)
         .zip(fillRatioDiffMismatches)
-        .zip(trainingIsID)
+        .zip(trainingIsIDs)
         .map {
           case ((((((((name, key), trainingUnfilledState), trainingNullLabelLeaker),
           scoringUnfilledState), jsDivergenceMismatch), fillRateDiffMismatch), fillRatioDiffMismatch),
@@ -630,7 +631,7 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  val minTok = 10
+  val minTok = 0
   val MaxCardinality = 500
 
 
