@@ -536,7 +536,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
     timePeriod: Option[TimePeriod] = None,
     minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-    minTopk: Int = RawFeatureFilter.minTopK
+    minTok: Int = RawFeatureFilter.minTok
   ): this.type = {
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
@@ -559,7 +559,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
         textBinsFormula = textBinsFormula,
         timePeriod = timePeriod,
         minScoringRows = minScoringRows,
-        minTopk = minTopk)
+        minUniqueToken = minTok)
     }
     this
   }
