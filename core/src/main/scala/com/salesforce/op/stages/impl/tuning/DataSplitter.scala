@@ -102,6 +102,24 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
     copyValues(copy, extra)
   }
 }
+trait DataSplitterParams extends Params {
+  /**
+   * Fraction to down sample data
+   * Value should be in [0.0, 1.0]
+   *
+   * @group param
+   */
+  protected[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
+    "fraction to down sample data", ParamValidators.inRange(
+      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
+    )
+  )
+  setDefault(downSampleFraction, SplitterParamsDefault.DownSampleFractionDefault)
+
+  protected[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
+
+  protected[op] def getDownSampleFraction: Double = $(downSampleFraction)
+}
 
 /**
  * Summary for data splitter run for storage in metadata
