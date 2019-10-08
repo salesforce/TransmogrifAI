@@ -231,8 +231,8 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       }
 
       info("Each feature vector should only have either three or four non-zero entries. One each from country and " +
-        "picklist, while currency can have either two (if it's null the currency column will be filled with the mean) "+
-        "or just one if it's not null.")
+        "picklist, while currency can have either two (if it's null the currency column will be filled with the mean)" +
+        " or just one if it's not null.")
       it("should pick between 1 and 4 of the features") {
         all(parsed.map(_.size)) should (be >= 1 and be <= 4)
       }
