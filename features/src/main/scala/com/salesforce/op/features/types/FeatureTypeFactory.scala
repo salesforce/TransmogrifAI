@@ -110,6 +110,8 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.IDMap else new IDMap(value.asInstanceOf[Map[String, String]])
       case t if t =:= weakTypeOf[IntegralMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.IntegralMap else new IntegralMap(value.asInstanceOf[Map[String, Long]])
+      case t if t =:= weakTypeOf[NameMap] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.NameMap else new NameMap(value.asInstanceOf[Map[String, String]])
       case t if t =:= weakTypeOf[MultiPickListMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.MultiPickListMap
         else new MultiPickListMap(value.asInstanceOf[Map[String, Set[String]]])

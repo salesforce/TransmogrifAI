@@ -36,13 +36,16 @@ import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+import NameMap.Keys._
+import NameMap.BooleanStrings._
 
 @RunWith(classOf[JUnitRunner])
-class HumanNameIdentifierTest extends OpEstimatorSpec[Text, UnaryModel[Text, Text], UnaryEstimator[Text, Text]] {
+class HumanNameIdentifierTest
+  extends OpEstimatorSpec[NameMap, UnaryModel[Text, NameMap], UnaryEstimator[Text, NameMap]] {
   /**
    * Input Dataset to fit & transform
    */
-  val (inputData, f1) = TestFeatureBuilder(Seq("Blah").toText)
+  val (inputData, f1) = TestFeatureBuilder(Seq("NOTANAME").toText)
 
   /**
    * Estimator instance to be tested
@@ -52,7 +55,7 @@ class HumanNameIdentifierTest extends OpEstimatorSpec[Text, UnaryModel[Text, Tex
   /**
    * Expected result of the transformer applied on the Input Dataset
    */
-  val expectedResult: Seq[Text] = Seq("Blah").map(_.toText)
+  val expectedResult: Seq[NameMap] = Seq(NameMap(Map(IsNameIndicator -> False, OriginalName -> "NOTANAME")))
 
   private def identifyName(data: Seq[Text]) = {
     val (newData, newFeature) = TestFeatureBuilder(data)

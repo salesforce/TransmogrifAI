@@ -99,6 +99,41 @@ object URLMap {
 }
 
 /**
+ * Map containing information related to a particular name.
+ *
+ * @param value map of keys to values, where keys are one of the following:
+ * - "original"
+ * - "isName"
+ * - "firstName"
+ * - "lastName"
+ * - "gender"
+ */
+class NameMap(value: Map[String, String]) extends TextMap(value) {
+  import NameMap.Keys._
+
+  def isName: Boolean = value.getOrElse(IsNameIndicator, "false") == "true"
+  def isMale: Boolean = value.getOrElse(Gender, "") == "male"
+  def isFemale: Boolean = value.getOrElse(Gender, "") == "female"
+}
+object NameMap {
+  object Keys {
+    val OriginalName = "original"
+    val IsNameIndicator = "isName"
+    val FirstName = "firstName"
+    val LastName = "lastName"
+    val Gender = "gender"
+  }
+  object BooleanStrings {
+    val True = "true"
+    val False = "false"
+  }
+
+
+  def apply(value: Map[String, String]): NameMap = new NameMap(value)
+  def empty: NameMap = FeatureTypeDefaults.NameMap
+}
+
+/**
  * Map of text area values
  *
  * @param value map of text area values

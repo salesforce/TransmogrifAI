@@ -305,7 +305,8 @@ object Street {
 }
 
 /**
- * Name value representation
+ * Name value representation. Useful for just wrapping strings that should not be processed as Texts, i.e. with
+ * hashing. Typically, NameMaps will be more useful if you intend on building features related to name, like gender.
  *
  * @param value name
  */

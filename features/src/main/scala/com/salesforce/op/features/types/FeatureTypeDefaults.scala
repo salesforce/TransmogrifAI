@@ -87,6 +87,7 @@ case object FeatureTypeDefaults {
   val DateTimeMap = new t.DateTimeMap(Map.empty)
   val EmailMap = new t.EmailMap(Map.empty)
   val IDMap = new t.IDMap(Map.empty)
+  val NameMap = new t.NameMap(Map.empty)
   val IntegralMap = new t.IntegralMap(Map.empty)
   val MultiPickListMap = new t.MultiPickListMap(Map.empty)
   val PercentMap = new t.PercentMap(Map.empty)
