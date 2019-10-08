@@ -135,6 +135,38 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
   }
 
+  it should "set the data splitting params correctly" in {
+    val modelSelector = MultiClassificationModelSelector()
+    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L).setMaxTrainingSample(1000)
+
+    modelSelector.splitter.get.getSeed shouldBe 11L
+    modelSelector.splitter.get.getReserveTestFraction shouldBe 0.1
+    modelSelector.splitter.get.getMaxTrainingSample shouldBe 1000
+  }
+
+  it should "down-sample when the training set is greater than the maxTrainingSample" in {
+
+    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
+    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+    val maxTrainingSample = 100
+    val sampleF = maxTrainingSample / data.count().toDouble
+    val downSampleFraction = math.min(sampleF, 1.0)
+    val dataCutter = DataCutter(seed = 42, maxTrainingSample = maxTrainingSample)
+    val modelSelector =
+      MultiClassificationModelSelector
+        .withTrainValidationSplit(
+          modelTypesToUse = Seq(MTT.OpLogisticRegression),
+          splitter = Option(dataCutter),
+          seed = 10L
+        )
+    val model = modelSelector.setInput(label, features).fit(data)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction" )
+
+    modelDownSampleFraction shouldBe downSampleFraction
+  }
+
+
   it should "split into training and test" in {
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
