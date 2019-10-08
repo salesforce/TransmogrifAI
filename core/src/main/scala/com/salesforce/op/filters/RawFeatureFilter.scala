@@ -103,7 +103,7 @@ class RawFeatureFilter[T]
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None,
   val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-  val minUniqueTokenLen: Int = RawFeatureFilter.minTok
+  val minUniqueTokenLen: Int = RawFeatureFilter.minUniqueTokenLen
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -631,7 +631,7 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  val minTok = 0
+  val minUniqueTokenLen = 0
   val MaxCardinality = 500
 
 

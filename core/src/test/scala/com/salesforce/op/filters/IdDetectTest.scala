@@ -85,7 +85,7 @@ object IdDetectTest {
         path = Option("~/Downloads/3kData.csv"),
         key = _.id.toString)
       val workflow = new OpWorkflow()
-        .withRawFeatureFilter(Some(dataReader), None, minTok = minTok)
+        .withRawFeatureFilter(Some(dataReader), None, minUniqueTokenLen = minTok)
         .setResultFeatures(IDFeatures)
         .setReader(dataReader)
 
