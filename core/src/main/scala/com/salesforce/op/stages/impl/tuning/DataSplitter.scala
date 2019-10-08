@@ -62,7 +62,7 @@ case object DataSplitter {
  *
  * @param uid
  */
-class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) with DataSplitterParams {
+class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) with SplitterParams {
 
   /**
    * Function to set the down sampling fraction and parameters before passing into the validation step
@@ -101,24 +101,6 @@ class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) 
     val copy = new DataSplitter(uid)
     copyValues(copy, extra)
   }
-}
-trait DataSplitterParams extends Params {
-  /**
-   * Fraction to down sample data
-   * Value should be in [0.0, 1.0]
-   *
-   * @group param
-   */
-  protected[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
-    "fraction to down sample data", ParamValidators.inRange(
-      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
-    )
-  )
-  setDefault(downSampleFraction, SplitterParamsDefault.DownSampleFractionDefault)
-
-  protected[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
-
-  protected[op] def getDownSampleFraction: Double = $(downSampleFraction)
 }
 
 /**
