@@ -127,6 +127,11 @@ object NameMap {
     val True = "true"
     val False = "false"
   }
+  object GenderStrings {
+    val Male = "male"
+    val Female = "female"
+    val GenderNA = "NA"
+  }
 
 
   def apply(value: Map[String, String]): NameMap = new NameMap(value)

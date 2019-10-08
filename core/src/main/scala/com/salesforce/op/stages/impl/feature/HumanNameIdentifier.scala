@@ -60,6 +60,8 @@ class HumanNameIdentifier
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
+  // TODO: Extract following code into its own class
+  // TODO: Use more robust data sources + start repo for maintaining data
   lazy private val nameDictionary = {
     val nameDictionary = collection.mutable.Set.empty[String]
     val dictionaryPath = "/NameIdentification_JRC.txt"
@@ -130,12 +132,37 @@ class HumanNameIdentifier
 
 class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolean)
   extends UnaryModel[Text, NameMap]("human name identifier", uid) {
-  // TODO: Process gender map outputs correctly
+
+  lazy private val genderDictionary = {
+    val genderDictionary = collection.mutable.Map.empty[String, Double]
+    val dictionaryPath = "/GenderDictionary_SSA.csv"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {row <- buffer.getLines.drop(1)} {
+      val cols = row.split(",").map(_.trim)
+      val name = cols(0).toLowerCase().replace("\\P{L}", "")
+      val probMale = cols(6).toDouble
+      genderDictionary += (name -> probMale)
+    }
+    buffer.close
+    genderDictionary
+  }
 
   import NameMap.Keys._
   import NameMap.BooleanStrings._
+  import NameMap.GenderStrings._
 
-  def transformFn: Text => NameMap = input =>
-    if (treatAsName) NameMap(Map(IsNameIndicator -> True, OriginalName -> input.value.getOrElse("")))
-    else NameMap(Map(IsNameIndicator -> False, OriginalName -> input.value.getOrElse("")))
+
+  def transformFn: Text => NameMap = input => {
+    val name = input.value.getOrElse("")
+    val cleanName = name.toLowerCase().replace("\\P{L}", "")
+    if (treatAsName) NameMap(Map(
+      IsNameIndicator -> True,
+      OriginalName -> input.value.getOrElse(""),
+      Gender -> genderDictionary.get(cleanName).map(
+        probMale => if (probMale >= 0.5) Male else Female
+      ).getOrElse(GenderNA)
+    ))
+    else NameMap(Map(IsNameIndicator -> False, OriginalName -> name))
+  }
 }

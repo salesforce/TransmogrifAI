@@ -30,14 +30,14 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.types.NameMap.BooleanStrings._
+import com.salesforce.op.features.types.NameMap.Keys._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
-import NameMap.Keys._
-import NameMap.BooleanStrings._
 
 @RunWith(classOf[JUnitRunner])
 class HumanNameIdentifierTest
@@ -60,8 +60,8 @@ class HumanNameIdentifierTest
   private def identifyName(data: Seq[Text]) = {
     val (newData, newFeature) = TestFeatureBuilder(data)
     val model = estimator.setInput(newFeature).fit(newData)
-    val newResult = model.transform(newData)
-    (newData, newFeature, model, newResult)
+    val result: DataFrame = model.transform(newData)
+    (newData, newFeature, model, result)
   }
 
   it should "identify a Text column with a single first name entry as Name" in {
@@ -97,5 +97,14 @@ class HumanNameIdentifierTest
   it should "not identify a single repeated name as Name" in {
     val (_, _, model, _) = identifyName(Seq.fill(200)("Michael").toText)
     model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe false
+  }
+
+  it should "identify the gender of a single first Name correctly" in {
+    import NameMap.Keys._
+    import NameMap.GenderStrings._
+    val (_, _, model, result) = identifyName(Seq("Alyssa").toText)
+    model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe true
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    map.get(Gender) shouldBe Some(Female)
   }
 }
