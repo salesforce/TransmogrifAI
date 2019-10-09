@@ -41,6 +41,7 @@ import org.apache.spark.sql.types.DoubleType
 
 import scala.io.Source
 import scala.util.Try
+import scala.reflect.runtime.universe.TypeTag
 
 trait NameCleaner {
   def preProcess(s: String): Array[String] = {
@@ -48,11 +49,15 @@ trait NameCleaner {
   }
 }
 
-class HumanNameIdentifier
+class HumanNameIdentifier[T <: Text]
 (
-  uid: String = UID[HumanNameIdentifier],
+  uid: String = UID[HumanNameIdentifier[_]],
   operationName: String = "human name identifier"
-) extends UnaryEstimator[Text, NameStats](
+)
+(
+  implicit tti: TypeTag[T],
+  override val ttiv: TypeTag[T#Value]
+) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
 ) with NameCleaner {
@@ -91,7 +96,7 @@ class HumanNameIdentifier
     extractDouble(dataset.select(mean(column.cast("integer"))))
   }
 
-  private def guardChecks(dataset: Dataset[Text#Value], column: Column): Boolean = {
+  private def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
     val total = dataset.count()
     val numUnique = extractDouble(dataset.select(approx_count_distinct(column).cast(DoubleType)))
 
@@ -122,26 +127,31 @@ class HumanNameIdentifier
     percentageMatched >= 0.5
   }: Boolean)
 
-  private def predictIfName(dataset: Dataset[Text#Value], column: Column): Dataset[Boolean] = {
+  private def predictIfName(dataset: Dataset[T#Value], column: Column): Dataset[Boolean] = {
     dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
   }
 
-  def fitFn(dataset: Dataset[Text#Value]): HumanNameIdentifierModel = {
+  def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     assert(dataset.schema.fieldNames.length == 1)
     val column = col(dataset.schema.fieldNames.head)
     if (!guardChecks(dataset, column)) {
-      new HumanNameIdentifierModel(uid, false)
+      new HumanNameIdentifierModel[T](uid, false)
     } else {
       val predictedDF = predictIfName(dataset, column)
       val predictedProb: Double = averageBoolCol(predictedDF, column)
       val treatAsName: Boolean = predictedProb >= $(defaultThreshold)
-      new HumanNameIdentifierModel(uid, treatAsName)
+      new HumanNameIdentifierModel[T](uid, treatAsName)
     }
   }
 }
 
-class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolean)
-  extends UnaryModel[Text, NameStats]("human name identifier", uid) with NameCleaner {
+
+class HumanNameIdentifierModel[T <: Text]
+(
+  override val uid: String,
+  val treatAsName: Boolean
+)(implicit tti: TypeTag[T])
+  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameCleaner {
 
   lazy private val genderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]
@@ -151,7 +161,9 @@ class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolea
     for {row <- buffer.getLines.drop(1)} {
       val cols = row.split(",").map(_.trim)
       val name = cols(0).toLowerCase().replace("\\P{L}", "")
-      val probMale = Try { cols(6).toDouble }.toOption
+      val probMale = Try {
+        cols(6).toDouble
+      }.toOption
       probMale match {
         case Some(prob) => genderDictionary += (name -> prob)
         case None =>
@@ -181,6 +193,6 @@ class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolea
         Gender -> gender
       ))
     }
-    else NameStats(Map(IsNameIndicator -> False, OriginalName -> name))
+    else NameStats(Map.empty[String, String])
   }
 }
