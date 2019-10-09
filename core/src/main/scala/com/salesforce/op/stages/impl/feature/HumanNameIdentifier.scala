@@ -40,6 +40,13 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DoubleType
 
 import scala.io.Source
+import scala.util.Try
+
+trait NameCleaner {
+  def preProcess(s: String): Array[String] = {
+    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
+  }
+}
 
 class HumanNameIdentifier
 (
@@ -48,15 +55,19 @@ class HumanNameIdentifier
 ) extends UnaryEstimator[Text, NameMap](
   uid = uid,
   operationName = operationName
-) with UniqueCountFun {
-  // Parameter
+) with NameCleaner {
+  // Parameters
+  // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
   val defaultThreshold = new DoubleParam(
     parent = this,
     name = "defaultThreshold",
     doc = "default fraction of entries to be names before treating as name",
-    isValid = (value: Double) => ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
+    isValid = (value: Double) => {
+      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
+    }
   )
   setDefault(defaultThreshold, 0.50)
+
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
@@ -102,10 +113,9 @@ class HumanNameIdentifier
     checks.forall(identity)
   }
 
-  private def preProcess(s: String): Array[String] = {
-    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
-  }
-
+  // TODO: Eventually, we will want this to perform separate checks in first/last name dictionaries
+  // And then map from the original tokens to which dictionaries they were found in
+  // which can help us figure out what the order of names is
   private def dictCheck: UserDefinedFunction = udf((s: String) => {
     val tokens = preProcess(s)
     val percentageMatched = tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
@@ -130,8 +140,10 @@ class HumanNameIdentifier
   }
 }
 
-class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolean)
-  extends UnaryModel[Text, NameMap]("human name identifier", uid) {
+class HumanNameIdentifierModel(
+  override val uid: String,
+  val treatAsName: Boolean
+) extends UnaryModel[Text, NameMap]("human name identifier", uid) with NameCleaner {
 
   lazy private val genderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]
@@ -141,8 +153,11 @@ class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolea
     for {row <- buffer.getLines.drop(1)} {
       val cols = row.split(",").map(_.trim)
       val name = cols(0).toLowerCase().replace("\\P{L}", "")
-      val probMale = cols(6).toDouble
-      genderDictionary += (name -> probMale)
+      val probMale = Try { cols(6).toDouble }.toOption
+      probMale match {
+        case Some(prob) => genderDictionary += (name -> prob)
+        case None =>
+      }
     }
     buffer.close
     genderDictionary
@@ -155,14 +170,19 @@ class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolea
 
   def transformFn: Text => NameMap = input => {
     val name = input.value.getOrElse("")
-    val cleanName = name.toLowerCase().replace("\\P{L}", "")
-    if (treatAsName) NameMap(Map(
-      IsNameIndicator -> True,
-      OriginalName -> input.value.getOrElse(""),
-      Gender -> genderDictionary.get(cleanName).map(
-        probMale => if (probMale >= 0.5) Male else Female
-      ).getOrElse(GenderNA)
-    ))
+    val tokens = preProcess(name)
+    if (treatAsName) {
+      val gender = if (tokens.length != 1) GenderNotInferred else {
+        genderDictionary.get(tokens.head).map(
+          probMale => if (probMale >= 0.5) Male else Female
+        ).getOrElse(GenderNA)
+      }
+      NameMap(Map(
+        IsNameIndicator -> True,
+        OriginalName -> input.value.getOrElse(""),
+        Gender -> gender
+      ))
+    }
     else NameMap(Map(IsNameIndicator -> False, OriginalName -> name))
   }
 }

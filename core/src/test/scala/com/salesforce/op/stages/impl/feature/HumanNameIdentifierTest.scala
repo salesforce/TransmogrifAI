@@ -107,4 +107,13 @@ class HumanNameIdentifierTest
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
     map.get(Gender) shouldBe Some(Female)
   }
+
+  it should "not identify the gender of a full Name (yet)" in {
+    import NameMap.Keys._
+    import NameMap.GenderStrings._
+    val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
+    model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe true
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    map.get(Gender) shouldBe Some(GenderNotInferred)
+  }
 }

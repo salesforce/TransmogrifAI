@@ -131,6 +131,7 @@ object NameMap {
     val Male = "male"
     val Female = "female"
     val GenderNA = "NA"
+    val GenderNotInferred = "NotInferred"
   }
 
 
