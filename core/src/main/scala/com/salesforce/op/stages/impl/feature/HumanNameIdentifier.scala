@@ -140,10 +140,8 @@ class HumanNameIdentifier
   }
 }
 
-class HumanNameIdentifierModel(
-  override val uid: String,
-  val treatAsName: Boolean
-) extends UnaryModel[Text, NameStats]("human name identifier", uid) with NameCleaner {
+class HumanNameIdentifierModel(override val uid: String, val treatAsName: Boolean)
+  extends UnaryModel[Text, NameStats]("human name identifier", uid) with NameCleaner {
 
   lazy private val genderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]

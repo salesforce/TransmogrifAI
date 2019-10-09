@@ -39,6 +39,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 
 import scala.io.Source
+import scala.util.Try
 
 class PostalCodeIdentifier
 (
@@ -63,12 +64,16 @@ class PostalCodeIdentifier
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
   lazy private val postalCodeDictionary = {
-    val postalCodeDictionary = collection.mutable.Set.empty[String]
+    val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
     val dictionaryPath = "/USPostalCodes.txt"
     val stream = getClass.getResourceAsStream(dictionaryPath)
     val buffer = Source.fromInputStream(stream)
-    for {name <- buffer.getLines} {
-      postalCodeDictionary += name
+    for {row <- buffer.getLines} {
+      val cols = row.split(",").map(_.trim)
+      val code = cols(0)
+      val lat = Try { cols(1).toDouble }.toOption
+      val lng = Try { cols(2).toDouble }.toOption
+      postalCodeDictionary += (code -> (lat, lng))
     }
     buffer.close
     postalCodeDictionary
@@ -116,10 +121,30 @@ class PostalCodeIdentifier
 
 class PostalCodeIdentifierModel(override val uid: String, val treatAsPostalCode: Boolean)
   extends UnaryModel[Text, PostalCodeMap]("postal code identifier", uid) {
+  lazy private val postalCodeDictionary = {
+    val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
+    val dictionaryPath = "/USPostalCodes.txt"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {row <- buffer.getLines} {
+      val cols = row.split(",").map(_.trim)
+      val code = cols(0)
+      val lat = Try { cols(1).toDouble }.toOption
+      val lng = Try { cols(2).toDouble }.toOption
+      postalCodeDictionary += (code -> (lat, lng))
+    }
+    buffer.close
+    postalCodeDictionary
+  }
   def transformFn: Text => PostalCodeMap = input => {
     val postalCode = input.value.getOrElse("")
     if (treatAsPostalCode) {
-      PostalCodeMap(Map(postalCode -> "true"))
+      val (latOption, lngOption) = postalCodeDictionary.getOrElse(postalCode, (None, None))
+      (latOption, lngOption) match {
+        case (Some(lat), Some(lng)) =>
+          PostalCodeMap(Map(postalCode -> "true", "lat" -> lat.toString, "lng" -> lng.toString))
+        case _ => PostalCodeMap(Map(postalCode -> "true", "lat" -> "", "lng" -> ""))
+      }
     }
     else PostalCodeMap(Map.empty[String, String])
   }
