@@ -40,12 +40,17 @@ import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 
 import scala.io.Source
 import scala.util.Try
+import scala.reflect.runtime.universe.TypeTag
 
-class PostalCodeIdentifier
+class PostalCodeIdentifier[T <: Text]
 (
-  uid: String = UID[PostalCodeIdentifier],
+  uid: String = UID[PostalCodeIdentifier[_]],
   operationName: String = "postal code identifier"
-) extends UnaryEstimator[Text, PostalCodeMap](
+)
+(
+  implicit tti: TypeTag[T],
+  override val ttiv: TypeTag[T#Value]
+)extends UnaryEstimator[T, PostalCodeMap](
   uid = uid,
   operationName = operationName
 ) {
@@ -106,7 +111,7 @@ class PostalCodeIdentifier
     dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
   }
 
-  def fitFn(dataset: Dataset[Text#Value]): PostalCodeIdentifierModel = {
+  def fitFn(dataset: Dataset[Text#Value]): PostalCodeIdentifierModel[T] = {
     assert(dataset.schema.fieldNames.length == 1)
     val column = col(dataset.schema.fieldNames.head)
     val matches = attemptToExtractPostalCode(dataset, column)
@@ -114,13 +119,17 @@ class PostalCodeIdentifier
       guardChecks(matches, column) &&
       averageBoolCol(predictIfPostalCode(matches, column), column) >= $(defaultThreshold)
     ) {
-      new PostalCodeIdentifierModel(uid, true)
-    } else new PostalCodeIdentifierModel(uid, false)
+      new PostalCodeIdentifierModel[T](uid, true)
+    } else new PostalCodeIdentifierModel[T](uid, false)
   }
 }
 
-class PostalCodeIdentifierModel(override val uid: String, val treatAsPostalCode: Boolean)
-  extends UnaryModel[Text, PostalCodeMap]("postal code identifier", uid) {
+class PostalCodeIdentifierModel[T <: Text]
+(
+  override val uid: String,
+  val treatAsPostalCode: Boolean
+) (implicit tti: TypeTag[T])
+  extends UnaryModel[T, PostalCodeMap]("postal code identifier", uid) {
   lazy private val postalCodeDictionary = {
     val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
     val dictionaryPath = "/USPostalCodes.txt"

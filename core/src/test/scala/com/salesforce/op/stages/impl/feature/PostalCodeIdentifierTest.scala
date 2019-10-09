@@ -48,7 +48,7 @@ class PostalCodeIdentifierTest
   /**
    * Estimator instance to be tested
    */
-  val estimator: PostalCodeIdentifier = new PostalCodeIdentifier().setInput(f1)
+  val estimator: PostalCodeIdentifier[Text] = new PostalCodeIdentifier[Text]().setInput(f1)
 
   /**
    * Expected result of the transformer applied on the Input Dataset
@@ -64,7 +64,7 @@ class PostalCodeIdentifierTest
 
   it should "identify a Text column with a single postal code as Postal Code" in {
     val (_, _, model, _) = identifyPostalCode(Seq("11581").toText)
-    model.asInstanceOf[PostalCodeIdentifierModel].treatAsPostalCode shouldBe true
+    model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
   }
   it should "get the correct latitude and longitude" in {
     val (_, _, _, result) = identifyPostalCode(Seq("11581").toText)
