@@ -52,7 +52,7 @@ class HumanNameIdentifier
 (
   uid: String = UID[HumanNameIdentifier],
   operationName: String = "human name identifier"
-) extends UnaryEstimator[Text, NameMap](
+) extends UnaryEstimator[Text, NameStats](
   uid = uid,
   operationName = operationName
 ) with NameCleaner {
@@ -143,7 +143,7 @@ class HumanNameIdentifier
 class HumanNameIdentifierModel(
   override val uid: String,
   val treatAsName: Boolean
-) extends UnaryModel[Text, NameMap]("human name identifier", uid) with NameCleaner {
+) extends UnaryModel[Text, NameStats]("human name identifier", uid) with NameCleaner {
 
   lazy private val genderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]
@@ -163,12 +163,12 @@ class HumanNameIdentifierModel(
     genderDictionary
   }
 
-  import NameMap.Keys._
-  import NameMap.BooleanStrings._
-  import NameMap.GenderStrings._
+  import NameStats.Keys._
+  import NameStats.BooleanStrings._
+  import NameStats.GenderStrings._
 
 
-  def transformFn: Text => NameMap = input => {
+  def transformFn: Text => NameStats = input => {
     val name = input.value.getOrElse("")
     val tokens = preProcess(name)
     if (treatAsName) {
@@ -177,12 +177,12 @@ class HumanNameIdentifierModel(
           probMale => if (probMale >= 0.5) Male else Female
         ).getOrElse(GenderNA)
       }
-      NameMap(Map(
+      NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),
         Gender -> gender
       ))
     }
-    else NameMap(Map(IsNameIndicator -> False, OriginalName -> name))
+    else NameStats(Map(IsNameIndicator -> False, OriginalName -> name))
   }
 }

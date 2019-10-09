@@ -30,8 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.NameMap.BooleanStrings._
-import com.salesforce.op.features.types.NameMap.Keys._
+import com.salesforce.op.features.types.NameStats.BooleanStrings._
+import com.salesforce.op.features.types.NameStats.Keys._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
@@ -41,7 +41,7 @@ import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
 class HumanNameIdentifierTest
-  extends OpEstimatorSpec[NameMap, UnaryModel[Text, NameMap], UnaryEstimator[Text, NameMap]] {
+  extends OpEstimatorSpec[NameStats, UnaryModel[Text, NameStats], UnaryEstimator[Text, NameStats]] {
   /**
    * Input Dataset to fit & transform
    */
@@ -55,7 +55,7 @@ class HumanNameIdentifierTest
   /**
    * Expected result of the transformer applied on the Input Dataset
    */
-  val expectedResult: Seq[NameMap] = Seq(NameMap(Map(IsNameIndicator -> False, OriginalName -> "NOTANAME")))
+  val expectedResult: Seq[NameStats] = Seq(NameStats(Map(IsNameIndicator -> False, OriginalName -> "NOTANAME")))
 
   private def identifyName(data: Seq[Text]) = {
     val (newData, newFeature) = TestFeatureBuilder(data)
@@ -100,8 +100,8 @@ class HumanNameIdentifierTest
   }
 
   it should "identify the gender of a single first Name correctly" in {
-    import NameMap.Keys._
-    import NameMap.GenderStrings._
+    import NameStats.Keys._
+    import NameStats.GenderStrings._
     val (_, _, model, result) = identifyName(Seq("Alyssa").toText)
     model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
@@ -109,8 +109,8 @@ class HumanNameIdentifierTest
   }
 
   it should "not identify the gender of a full Name (yet)" in {
-    import NameMap.Keys._
-    import NameMap.GenderStrings._
+    import NameStats.Keys._
+    import NameStats.GenderStrings._
     val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
     model.asInstanceOf[HumanNameIdentifierModel].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]

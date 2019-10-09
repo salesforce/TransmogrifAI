@@ -144,7 +144,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.IDMap] => IDMap
     case wt if wt =:= weakTypeOf[t.IntegralMap] => IntegralMap
     case wt if wt =:= weakTypeOf[t.MultiPickListMap] => MultiPickListMap
-    case wt if wt =:= weakTypeOf[t.NameMap] => NameMap
+    case wt if wt =:= weakTypeOf[t.NameStats] => NameMap
     case wt if wt =:= weakTypeOf[t.PercentMap] => PercentMap
     case wt if wt =:= weakTypeOf[t.PhoneMap] => PhoneMap
     case wt if wt =:= weakTypeOf[t.PickListMap] => PickListMap
