@@ -93,7 +93,7 @@ class PostalCodeIdentifier[T <: Text]
   private def attemptToExtractPostalCode(dataset: Dataset[Text#Value], column: Column): Dataset[Text#Value] = {
     // Regex for all types of postal codes: ^\\d{5}(?:[-\\s]\\d{4})?$
     dataset.withColumn(
-      column.toString, regexp_extract(column, "^\\d{5}$", 0)
+      column.toString, regexp_extract(column, ".*(\\d{5}).*", 1)
     ).asInstanceOf[Dataset[Text#Value]]
   }
 
@@ -145,8 +145,10 @@ class PostalCodeIdentifierModel[T <: Text]
     buffer.close
     postalCodeDictionary
   }
+  private val zipRegex = ".*(\\d{5}).*".r
   def transformFn: Text => PostalCodeMap = input => {
-    val postalCode = input.value.getOrElse("")
+    val rawInput = input.value.getOrElse("")
+    val postalCode = zipRegex.findFirstMatchIn(rawInput).map(_.group(1)).getOrElse("")
     if (treatAsPostalCode) {
       val (latOption, lngOption) = postalCodeDictionary.getOrElse(postalCode, (None, None))
       (latOption, lngOption) match {
