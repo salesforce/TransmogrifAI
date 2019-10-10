@@ -15,9 +15,8 @@ class IdRemover(
   override protected def onSetInput(): Unit = {
     super.onSetInput()
     val dist = in1.asFeatureLike.distributions
-    val tokenLenCard = dist.flatMap(_.cardEstimate).map(_.valueCounts.size)
-    //TODO: is it correct to use .head here, or do i need to 
-    drop = tokenLenCard.map(_ < minUniqueTokLen).head
+    val tokenLenCardFilter = dist.flatMap(_.cardEstimate).map(_.valueCounts.size < minUniqueTokLen)
+    drop = tokenLenCardFilter.headOption.getOrElse(false)
   }
 
   override def transformFn: Text => Text = a => if (drop) Text.empty else a
