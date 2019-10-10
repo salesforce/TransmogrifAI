@@ -124,9 +124,10 @@ class RawFeatureFilter[T]
   @transient protected lazy val log = LoggerFactory.getLogger(this.getClass)
 
   /**
-   * Get binned counts of the feature distribution and empty count for each raw feature
+   * Get binned counts of the feature distribution and empty count for each raw feature. This computes all the
    * statistics on the training and scoring data. It does two map reduce operations, the first to produce a Summary
    * of each feature, the second to produce a binned histogram (Distribution) for each feature based on the Summary.
+   *
    * @param data                    data frame to compute counts on
    * @param features                list of raw, non-protected, features contained in the dataframe
    * @param featureDistributionType feature distribution type: training or scoring
