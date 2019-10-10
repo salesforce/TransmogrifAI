@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.TextStats
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
