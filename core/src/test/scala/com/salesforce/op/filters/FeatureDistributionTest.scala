@@ -30,11 +30,9 @@
 
 package com.salesforce.op.filters
 
-import com.salesforce.op.features.{FeatureDistributionType, TransientFeature}
-import com.salesforce.op.stages.impl.feature.TextStats
+import com.salesforce.op.features.{FeatureDistributionType, TextStats, TransientFeature}
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
-import com.twitter.algebird.Moments
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
