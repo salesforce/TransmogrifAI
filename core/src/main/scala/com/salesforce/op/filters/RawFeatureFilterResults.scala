@@ -143,8 +143,7 @@ case class RawFeatureFilterMetrics
   jsDivergence: Option[Double],
   fillRateDiff: Option[Double],
   fillRatioDiff: Option[Double],
-  trainingCardSize: Option[Int],
-  rawFeatureType: Option[String]
+  trainingCardSize: Option[Int]
 )
 
 /**
@@ -170,6 +169,5 @@ case class ExclusionReasons
   jsDivergenceMismatch: Boolean,
   fillRateDiffMismatch: Boolean,
   fillRatioDiffMismatch: Boolean,
-  trainingIsID: Boolean,
   excluded: Boolean
 )
