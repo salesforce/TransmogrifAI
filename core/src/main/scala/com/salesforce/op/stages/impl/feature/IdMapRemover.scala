@@ -23,8 +23,8 @@ class IdMapRemover(
     a => {
       val filteredMap = a.value.map { case (k, v) =>
         dropMap.get(k) match {
-          case Some(true) => (k,"")
-          case _ => (k,v)
+          case Some(true) => (k, "")
+          case _ => (k, v)
         }
       }
       TextMap(filteredMap)

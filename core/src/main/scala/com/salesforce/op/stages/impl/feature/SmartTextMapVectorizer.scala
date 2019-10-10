@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.TextStats
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._

@@ -2,6 +2,8 @@ package com.salesforce.op.features
 
 import com.salesforce.op.utils.json.JsonLike
 import com.twitter.algebird.Monoid
+import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
 
 /**
  * Summary statistics of a text feature
