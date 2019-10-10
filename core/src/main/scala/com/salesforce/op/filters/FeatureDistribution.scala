@@ -115,6 +115,19 @@ case class FeatureDistribution
   }
 
   /**
+   * Cardinality of the length of tokenized text, or numerical value for numbers (at most 500)
+   *
+   * @return cardinality count based on cardEstimate
+   */
+
+  def cardSize(): Option[Int] = {
+    cardEstimate match {
+      case Some(x) => Option(x.valueCounts.size)
+      case _ => None
+    }
+  }
+
+  /**
    * Ratio of fill rates between the two distributions symetric with larger value on the top
    *
    * @param fd feature distribution to compare to
