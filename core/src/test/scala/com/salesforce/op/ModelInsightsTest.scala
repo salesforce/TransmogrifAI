@@ -32,13 +32,13 @@ package com.salesforce.op
 
 import com.salesforce.op.evaluators._
 import com.salesforce.op.features.types._
-import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
+import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike, TextStats}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
+import com.salesforce.op.stages.impl.selector.{SelectedCombinerModel, SelectedModel, SelectedModelCombiner}
 import com.salesforce.op.stages.impl.selector.ValidationType._
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
@@ -48,7 +48,7 @@ import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.junit.runner.RunWith
 import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
+import com.salesforce.op.stages.impl.feature.CombinationStrategy
 import org.apache.spark.sql.{DataFrame, Dataset}
 import org.scalactic.Equality
 import org.scalatest.FlatSpec

@@ -125,7 +125,8 @@ class RawFeatureFilter[T]
 
   /**
    * Get binned counts of the feature distribution and empty count for each raw feature
-   *
+   * statistics on the training and scoring data. It does two map reduce operations, the first to produce a Summary
+   * of each feature, the second to produce a binned histogram (Distribution) for each feature based on the Summary.
    * @param data                    data frame to compute counts on
    * @param features                list of raw, non-protected, features contained in the dataframe
    * @param featureDistributionType feature distribution type: training or scoring
@@ -151,6 +152,7 @@ class RawFeatureFilter[T]
       val predOut = allPredictors.map(TransientFeature(_))
       (respOut, predOut)
     }
+    // process all features based on raw type so that they can be summerized as either text or numeric
     val preparedFeatures: RDD[PreparedFeatures] = data.rdd.map(PreparedFeatures(_, responses, predictors, timePeriod))
 
     implicit val sgTuple2Maps = new Tuple2Semigroup[Map[FeatureKey, Summary], Map[FeatureKey, Summary]]()
