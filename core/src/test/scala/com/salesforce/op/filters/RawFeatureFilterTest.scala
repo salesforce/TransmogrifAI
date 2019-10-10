@@ -273,7 +273,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val features: Array[OPFeature] =
       Array(survPred, age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap)
     val filter = new RawFeatureFilter(dataReader, Some(simpleReader), 10, 0.0, 1.0,
-      Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0)
+      Double.PositiveInfinity, 1.0, 1.0, minScoringRows = 0, minUniqueTokenLen = 0)
     val filteredRawData = filter.generateFilteredRaw(features, params)
     filteredRawData.featuresToDrop shouldBe empty
     filteredRawData.mapKeysToDrop shouldBe empty

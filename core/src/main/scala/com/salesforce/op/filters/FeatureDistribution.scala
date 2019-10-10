@@ -32,8 +32,8 @@ package com.salesforce.op.filters
 
 import java.util.Objects
 
-import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
+import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType, TextStats}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird._
@@ -63,7 +63,6 @@ case class FeatureDistribution
   nulls: Long,
   distribution: Array[Double],
   summaryInfo: Array[Double],
-  rawFeatureType: Option[String] = None,
   cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
@@ -117,13 +116,8 @@ case class FeatureDistribution
 
     val combinedCard = cardEstimate + fd.cardEstimate
 
-    val combinedRawFtType = fd.rawFeatureType match {
-      case Some(x) => Some(x)
-      case _ => rawFeatureType
-    }
-
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedRawFtType, combinedCard, `type`)
+      combinedSummaryInfo, combinedCard, `type`)
   }
 
   /**
@@ -178,16 +172,14 @@ case class FeatureDistribution
       "distribution" -> distribution.mkString("[", ",", "]"),
       "summaryInfo" -> summaryInfo.mkString("[", ",", "]"),
       "cardinality" -> cardEstimate.map(_.toString).getOrElse(""),
-      "rawFeatureType" -> rawFeatureType.getOrElse("")
     ).map { case (n, v) => s"$n = $v" }.mkString(", ")
 
     s"${getClass.getSimpleName}($valStr)"
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, rft, c, `type`) =>
-      distribution.deep == d.deep && summaryInfo.deep == s.deep &&
-      rawFeatureType == rft && cardEstimate == c
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, c, `type`) =>
+      distribution.deep == d.deep && summaryInfo.deep == s.deep && cardEstimate == c
     case _ => false
   }
 
@@ -250,7 +242,6 @@ object FeatureDistribution {
       value.map(seq => 0L -> histValues(seq, summary, bins, textBinsFormula))
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
-    val rawFeatureType = value.map(rawFeatType)
     val cardEstimate = value.map(cardinalityValues)
 
     FeatureDistribution(
@@ -260,7 +251,6 @@ object FeatureDistribution {
       nulls = nullCount,
       summaryInfo = summaryInfo,
       distribution = distribution,
-      rawFeatureType = rawFeatureType,
       cardEstimate = cardEstimate,
       `type` = `type`
     )
@@ -279,13 +269,6 @@ object FeatureDistribution {
       case Right(seq) => seq.map(_.toString)
     }
     TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
-  }
-
-  private def rawFeatType(values: ProcessedSeq): String = {
-    values match {
-      case Left(_) => "String"
-      case Right(_) => "Numeric"
-    }
   }
 
   /**

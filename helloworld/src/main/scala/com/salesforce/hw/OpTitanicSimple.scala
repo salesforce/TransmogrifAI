@@ -56,30 +56,32 @@ import org.apache.spark.sql.SparkSession
  * @param cabin    cabin id string
  * @param embarked location where passenger embarked
  */
-case class Passenger
+case class IDTextClassification
 (
-  id: Int,
-  survived: Int,
-  pClass: Option[Int],
-  name: Option[String],
-  sex: Option[String],
-  age: Option[Double],
-  sibSp: Option[Int],
-  parCh: Option[Int],
-  ticket: Option[String],
-  fare: Option[Double],
-  cabin: Option[String],
-  embarked: Option[String]
+  id: Option[Int],
+//  eng_sentences: Option[String],
+//  eng_paragraphs: Option[String],
+  news_data: Option[String],
+  tox_data: Option[String],
+  movie_data: Option[String],
+  movie_plot: Option[String],
+  reddit_science: Option[String],
+  fake_id_prefix: Option[String],
+  fake_id_sfdc: Option[String],
+  fake_uuid: Option[String],
+  fake_number_id: Option[String],
+  faker_sentence: Option[String],
+  faker_paragraph: Option[String],
+  faker_ipv4: Option[String],
+  faker_ipv6: Option[String],
+  faker_id_mix: Option[String]
 )
 
-/**
- * A simplified TransmogrifAI example classification app using the Titanic dataset
- */
 object OpTitanicSimple {
 
   /**
    * Run this from the command line with
-   * ./gradlew sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs=/full/path/to/csv/file
+   * ./gradlew sparkSubmit -Dmain=com.salesforce.op.hw.OpTitanicSimple -Dargs=/full/path/to/csv/file
    */
   def main(args: Array[String]): Unit = {
     if (args.isEmpty) {
@@ -98,80 +100,55 @@ object OpTitanicSimple {
     /////////////////////////////////////////////////////////////////////////////////
 
     // Define features using the OP types based on the data
-    val survived = FeatureBuilder.RealNN[Passenger].extract(_.survived.toRealNN).asResponse
-    val pClass = FeatureBuilder.PickList[Passenger].extract(_.pClass.map(_.toString).toPickList).asPredictor
-    val name = FeatureBuilder.Text[Passenger].extract(_.name.toText).asPredictor
-    val sex = FeatureBuilder.PickList[Passenger].extract(_.sex.map(_.toString).toPickList).asPredictor
-    val age = FeatureBuilder.Real[Passenger].extract(_.age.toReal).asPredictor
-    val sibSp = FeatureBuilder.Integral[Passenger].extract(_.sibSp.toIntegral).asPredictor
-    val parCh = FeatureBuilder.Integral[Passenger].extract(_.parCh.toIntegral).asPredictor
-    val ticket = FeatureBuilder.PickList[Passenger].extract(_.ticket.map(_.toString).toPickList).asPredictor
-    val fare = FeatureBuilder.Real[Passenger].extract(_.fare.toReal).asPredictor
-    val cabin = FeatureBuilder.PickList[Passenger].extract(_.cabin.map(_.toString).toPickList).asPredictor
-    val embarked = FeatureBuilder.PickList[Passenger].extract(_.embarked.map(_.toString).toPickList).asPredictor
+//    val eng_sentences = FeatureBuilder.Text[IDTextClassification].extract(_.eng_sentences.toText).asPredictor
+//    val eng_paragraphs = FeatureBuilder.Text[IDTextClassification].extract(_.eng_paragraphs.toText).asPredictor
+    val news_data = FeatureBuilder.Text[IDTextClassification].extract(_.news_data.toText).asPredictor
+    val tox_data = FeatureBuilder.Text[IDTextClassification].extract(_.tox_data.toText).asPredictor
+    val movie_data = FeatureBuilder.Text[IDTextClassification].extract(_.movie_data.toText).asPredictor
+    val movie_plot = FeatureBuilder.Text[IDTextClassification].extract(_.movie_plot.toText).asPredictor
+    val reddit_science = FeatureBuilder.Text[IDTextClassification].extract(_.reddit_science.toText).asPredictor
+    val fake_id_prefix = FeatureBuilder.Text[IDTextClassification].extract(_.fake_id_prefix.toText).asPredictor
+    val fake_id_sfdc = FeatureBuilder.Text[IDTextClassification].extract(_.fake_id_sfdc.toText).asPredictor
+    val fake_uuid = FeatureBuilder.Text[IDTextClassification].extract(_.fake_uuid.toText).asPredictor
+    val fake_number_id = FeatureBuilder.Text[IDTextClassification].extract(_.fake_number_id.toText).asPredictor
+    val faker_sentence = FeatureBuilder.Text[IDTextClassification].extract(_.faker_sentence.toText).asPredictor
+    val faker_paragraph = FeatureBuilder.Text[IDTextClassification].extract(_.faker_paragraph.toText).asPredictor
+    val faker_ipv4 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv4.toText).asPredictor
+    val faker_ipv6 = FeatureBuilder.Text[IDTextClassification].extract(_.faker_ipv6.toText).asPredictor
+    val faker_id_mix = FeatureBuilder.Text[IDTextClassification].extract(_.faker_id_mix.toText).asPredictor
 
-    ////////////////////////////////////////////////////////////////////////////////
-    // TRANSFORMED FEATURES
-    /////////////////////////////////////////////////////////////////////////////////
-
-    // Do some basic feature engineering using knowledge of the underlying dataset
-    val familySize = sibSp + parCh + 1
-    val estimatedCostOfTickets = familySize * fare
-    val pivotedSex = sex.pivot()
-    val normedAge = age.fillMissingWithMean().zNormalize()
-    val ageGroup = age.map[PickList](_.value.map(v => if (v > 18) "adult" else "child").toPickList)
-
-    // Define a feature of type vector containing all the predictors you'd like to use
-    val passengerFeatures = Seq(
-      pClass, name, age, sibSp, parCh, ticket,
-      cabin, embarked, familySize, estimatedCostOfTickets,
-      pivotedSex, ageGroup, normedAge
+    val IDFeatures = Seq(
+      // eng_sentences, eng_paragraphs,
+      news_data, tox_data,
+      movie_data, movie_plot, reddit_science, fake_id_prefix, fake_id_sfdc,
+      fake_uuid, fake_number_id, faker_sentence, faker_paragraph,
+      faker_ipv4, faker_ipv6, faker_id_mix
     ).transmogrify()
 
-    // Optionally check the features with a sanity checker
-    val checkedFeatures = survived.sanityCheck(passengerFeatures, removeBadFeatures = true)
+    def thresHoldRFF(mTK: Int): Seq[String] = {
+      val dataReader = DataReaders.Simple.csvCase[IDTextClassification](
+        path = Option(csvFilePath),
+        key = _.id.toString)
+      val workflow = new OpWorkflow()
+        .withRawFeatureFilter(Some(dataReader), None, minUniqueTokenLen = mTK)
+        .setResultFeatures(IDFeatures)
+        .setReader(dataReader)
 
-    // Define the model we want to use (here a simple logistic regression) and get the resulting output
-    val prediction = BinaryClassificationModelSelector.withTrainValidationSplit(
-      modelTypesToUse = Seq(OpLogisticRegression)
-    ).setInput(survived, checkedFeatures).getOutput()
+      // Fit the workflow to the data
+      val model = workflow.train()
+      val rFFresult = workflow.getRawFeatureFilterResults()
+      println(rFFresult.rawFeatureDistributions)
+      println(rFFresult.rawFeatureFilterMetrics)
 
-    val evaluator = Evaluators.BinaryClassification().setLabelCol(survived).setPredictionCol(prediction)
-
-    ////////////////////////////////////////////////////////////////////////////////
-    // WORKFLOW
-    /////////////////////////////////////////////////////////////////////////////////
-
-    // Define a way to read data into our Passenger class from our CSV file
-    val dataReader = DataReaders.Simple.csvCase[Passenger](path = Option(csvFilePath), key = _.id.toString)
-
-    // Define a new workflow and attach our data reader
-    val workflow = new OpWorkflow().setResultFeatures(survived, prediction).setReader(dataReader)
-
-    // Fit the workflow to the data
-    val model = workflow.train()
-    println(s"Model summary:\n${model.summaryPretty()}")
-
-    // Extract information (i.e. feature importance) via model insights
-    val modelInsights = model.modelInsights(prediction)
-    val modelFeatures = modelInsights.features.flatMap( feature => feature.derivedFeatures)
-    val featureContributions = modelFeatures.map( feature => (feature.derivedFeatureName,
-      feature.contribution.map( contribution => math.abs(contribution))
-        .foldLeft(0.0) { (max, contribution) => math.max(max, contribution)}))
-    val sortedContributions = featureContributions.sortBy( contribution => -contribution._2)
-
-    val topNum = math.min(20, sortedContributions.size)
-    println(s"Top $topNum feature contributions:")
-    sortedContributions.take(topNum).foreach( featureInfo => println(s"${featureInfo._1}: ${featureInfo._2}"))
-
-
-    // Manifest the result features of the workflow
-    println("Scoring the model")
-    val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
-
-    println("Metrics:\n" + metrics)
-
+      // Extract information (i.e. feature importance) via model insights
+      val modelInsights = model.modelInsights(IDFeatures)
+      val exclusionReasons = modelInsights.features.flatMap( feature => feature.exclusionReasons)
+      exclusionReasons.map(_.name)
+    }
     // Stop Spark gracefully
+    println(thresHoldRFF(10))
+//    println(thresHoldRFF(500))
+//    println(thresHoldRFF(1000))
     spark.stop()
   }
 }

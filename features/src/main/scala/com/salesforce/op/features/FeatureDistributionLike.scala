@@ -32,7 +32,6 @@ package com.salesforce.op.features
 
 import enumeratum._
 
-
 /**
  * Keeps the distribution information for features
  */
@@ -67,6 +66,11 @@ trait FeatureDistributionLike {
    * either min and max number of tokens for text data, or number of splits used for bins for numeric data
    */
   val summaryInfo: Array[Double]
+
+  /**
+   * track frequency of token length for text features, and numerical values for numerics)
+   */
+  val cardEstimate: Option[TextStats]
 
   /**
    * feature distribution type: training or scoring

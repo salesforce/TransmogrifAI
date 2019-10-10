@@ -31,14 +31,13 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.{TextStats, TransientFeature}
+import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.Semigroup
@@ -161,27 +160,6 @@ object SmartTextVectorizer {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }.toSeq.toArray, all.collect { case (item, false) => item }.toSeq.toArray)
   }
-}
-
-/**
- * Summary statistics of a text feature
- *
- * @param valueCounts counts of feature values
- */
-private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
-
-private[op] object TextStats {
-  def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
-    override def plus(l: TextStats, r: TextStats): TextStats = {
-      if (l.valueCounts.size > maxCardinality) l
-      else if (r.valueCounts.size > maxCardinality) r
-      else TextStats(l.valueCounts + r.valueCounts)
-    }
-
-    override def zero: TextStats = TextStats.empty
-  }
-
-  def empty: TextStats = TextStats(Map.empty)
 }
 
 /**
