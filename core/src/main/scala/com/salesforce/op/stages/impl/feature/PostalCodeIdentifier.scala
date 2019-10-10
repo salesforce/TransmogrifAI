@@ -153,7 +153,7 @@ class PostalCodeIdentifierModel[T <: Text]
       val (latOption, lngOption) = postalCodeDictionary.getOrElse(postalCode, (None, None))
       (latOption, lngOption) match {
         case (Some(lat), Some(lng)) =>
-          PostalCodeMap(Map(postalCode -> "true", "lat" -> lat.toString, "lng" -> lng.toString))
+          PostalCodeMap(Map("postalCode" -> postalCode, "lat" -> lat.toString, "lng" -> lng.toString))
         case _ => PostalCodeMap(Map(postalCode -> "true", "lat" -> "", "lng" -> ""))
       }
     }

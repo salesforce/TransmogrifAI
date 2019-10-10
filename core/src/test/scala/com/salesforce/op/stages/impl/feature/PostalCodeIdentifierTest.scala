@@ -70,7 +70,7 @@ class PostalCodeIdentifierTest
     val (_, _, model, result) = identifyPostalCode(Seq("1123 Birch Street, Amityville, NC, 72587").toText)
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
     model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
-    map contains "72587" shouldBe true
+    map.get("postalCode") shouldBe Some("72587")
   }
   it should "get the correct latitude and longitude" in {
     val (_, _, _, result) = identifyPostalCode(Seq("11581").toText)
