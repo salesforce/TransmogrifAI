@@ -85,7 +85,6 @@ import scala.util.Failure
  * @param minScoringRows                Minimum row threshold for scoring set comparisons to be used in checks. If
  *                                      the scoring set size is below this threshold, then only training data checks
  *                                      will be used
- * @param minUniqueTokenLen             Minimum threshold on the # of unique token length to hash a text feature.
  * @tparam T datatype of the reader
  */
 class RawFeatureFilter[T]
@@ -103,8 +102,7 @@ class RawFeatureFilter[T]
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
   val timePeriod: Option[TimePeriod] = None,
-  val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-  val minUniqueTokenLen: Int = RawFeatureFilter.minUniqueTokenLen
+  val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
 ) extends Serializable {
 
   require(bins > 1 && bins <= FeatureDistribution.MaxBins, s"Invalid bin size $bins," +
@@ -390,8 +388,7 @@ class RawFeatureFilter[T]
 
       val exclusionReasons: Seq[ExclusionReasons] = combineExclusionReasons(
         trainingDistribs, trainingUnfilledStates, trainingNullLabelLeakers,
-        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches,
-        fillRatioDiffMismatches
+        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches, fillRatioDiffMismatches
       )
       exclusionReasons
 
@@ -431,8 +428,7 @@ class RawFeatureFilter[T]
 
       val exclusionReasons: Seq[ExclusionReasons] = combineExclusionReasons(
         trainingDistribs, trainingUnfilledStates, trainingNullLabelLeakers,
-        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches,
-        fillRatioDiffMismatches
+        scoringUnfilledStates, jsDivergenceMismatches, fillRateDiffMismatches, fillRatioDiffMismatches
       )
       exclusionReasons
     }
@@ -605,8 +601,6 @@ object RawFeatureFilter {
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
-  // good default is 10, setting 0 so that old unit tests won't fail. Should I change this back to 10?
-  val minUniqueTokenLen = 0
   val MaxCardinality = 500
 
 

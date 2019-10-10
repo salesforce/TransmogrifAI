@@ -92,12 +92,6 @@ case class FeatureDistribution
    */
   def fillRate(): Double = if (count == 0L) 0.0 else (count - nulls) / count.toDouble
 
-  def cardSize(): Option[Int] =
-  cardEstimate match {
-    case Some(x) => Option(x.valueCounts.size)
-    case _ => None
-  }
-
   /**
    * Combine feature distributions
    *
