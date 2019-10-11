@@ -210,7 +210,7 @@ class EmailVectorizerTest
 
   it should "not remove punctuations by default from the domain when vectorizing Emails" in {
     val (ds2, f2) = TestFeatureBuilder(emails)
-    val vectorized = f2.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = true)
+    val vectorized = f2.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = false)
     val transformed = new OpWorkflow().setResultFeatures(vectorized).transform(ds2)
     val metadata = transformed.schema(vectorized.name).metadata.getMetadataArray(OpVectorMetadata.ColumnsKey)
     val actualIndicatorValues = metadata.map(_.getString(OpVectorColumnMetadata.IndicatorValueKey))
