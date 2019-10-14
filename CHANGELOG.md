@@ -6,7 +6,7 @@ Bug fixes
 - Fix `ModelInsightsTest` flakiness due to coefficients turning negative [#407](https://github.com/salesforce/TransmogrifAI/pull/407)
 
 New features/updates
-- Turn off logging for cardEstimate & track token length instead of token value [#416](https://github.com/salesforce/TransmogrifAI/pull/416)
+- Turn off logging of tokens [#420](https://github.com/salesforce/TransmogrifAI/pull/420)
 - Regression training limit [#413](https://github.com/salesforce/TransmogrifAI/pull/413)
 
 ## 0.6.1
