@@ -482,7 +482,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
             val sumLOCOs = locos.reduce((a1, a2) => a1.zip(a2).map { case (l, r) => l + r })
             sumLOCOs.map(_ / indices.length)
           case VectorAggregationStrategy.LeaveOutVector =>
-            indices.map { i => featureArray.update(i, 0.0) }
+            indices.foreach { i => featureArray.update(i, 0.0) }
             val newScore = model.transformFn(l.toRealNN, featureArray.toOPVector).score.toSeq
             baseScore.zip(newScore).map { case (b, n) => b - n }
         }

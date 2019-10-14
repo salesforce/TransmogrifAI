@@ -208,7 +208,7 @@ class RecordInsightsLOCO[T <: Model[T]]
 
       case VectorAggregationStrategy.LeaveOutVector =>
         val copyFeatureSparse = featureSparse.copy
-        aggIndices.map {case (i, oldInd) => copyFeatureSparse.updated(i, oldInd, 0.0)}
+        aggIndices.foreach {case (i, oldInd) => copyFeatureSparse.updated(i, oldInd, 0.0)}
         computeDiff(copyFeatureSparse, baseScore)
     }
   }
@@ -226,7 +226,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     val textActiveIndices = mutable.Map.empty[String, Array[(Int, Int)]]
     val dateActiveIndices = mutable.Map.empty[String, Array[(Int, Int)]]
 
-    (0 until featureSparse.size, featureSparse.indices).zipped.map { case (i: Int, oldInd: Int) =>
+    (0 until featureSparse.size, featureSparse.indices).zipped.foreach { case (i: Int, oldInd: Int) =>
       val history = histories(oldInd)
       history match {
         case h if isTextIndex(h) => {
@@ -249,13 +249,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
 
     // Aggregate active indices of each text feature and date feature based on their respective strategy.
-    textActiveIndices.map {
+    textActiveIndices.foreach {
       case (name, aggIndices) =>
         val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
           getTextAggregationStrategy, baseScore, textFeaturesCount.get(name).get)
         minMaxHeap enqueue LOCOValue(aggIndices.head._1, diffToExamine(indexToExamine), diffToExamine)
     }
-    dateActiveIndices.map {
+    dateActiveIndices.foreach {
       case (name, aggIndices) =>
         val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
           getDateAggregationStrategy, baseScore, dateFeaturesCount.get(name).get)
