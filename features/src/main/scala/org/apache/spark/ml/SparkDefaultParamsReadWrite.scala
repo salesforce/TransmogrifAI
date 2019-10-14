@@ -51,7 +51,7 @@ case object SparkDefaultParamsReadWrite {
     instance: OpPipelineStageBase,
     extraMetadata: Option[JObject] = None,
     paramMap: Option[JValue] = None
-  ): String = {
+  ): JObject = {
     val uid = instance.uid
     val cls = instance.getClass.getName
     val params = instance.paramMap.toSeq
@@ -74,8 +74,7 @@ case object SparkDefaultParamsReadWrite {
       case None =>
         basicMetadata
     }
-    val metadataJson: String = compact(render(metadata))
-    metadataJson
+    metadata
   }
 
   /**
