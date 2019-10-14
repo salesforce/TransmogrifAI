@@ -26,7 +26,7 @@ This is the stage which can be used in feature engineering to detect NERs in a s
 Please include following dependency:
 
 ```
-compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.6.1
+compile 'com.salesforce.transmogrifai:transmogrifai-models_2.11:0.6.2
 ```
 
 It can be done in the following steps:
