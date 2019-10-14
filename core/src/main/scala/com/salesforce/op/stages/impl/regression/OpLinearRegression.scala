@@ -160,7 +160,7 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
 
   /**
    * Set the type of loss function to be optimized.
-   * Supported options: squaredError (https://en.wikipedia.org/wiki/Mean_squared_error)
+   * Supported options: "squaredError" (https://en.wikipedia.org/wiki/Mean_squared_error)
    * and "huber" (https://en.wikipedia.org/wiki/Huber_loss).
    * Default is squaredError.
    *
