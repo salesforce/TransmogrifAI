@@ -183,7 +183,6 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
    */
   def setEpsilon(value: Double): this.type = set(epsilon, value)
   setDefault(epsilon -> 1.35)
-
 }
 
 
