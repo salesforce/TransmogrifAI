@@ -21,7 +21,7 @@
 package org.apache.spark.ml
 
 import com.salesforce.op.stages.OpPipelineStageBase
-import com.salesforce.op.stages.OpPipelineStageReadWriteShared.FieldNames._
+import com.salesforce.op.stages.OpPipelineStageReaderWriter.FieldNames._
 import org.apache.spark.ml.param.ParamPair
 import org.apache.spark.ml.util.{DefaultParamsReader, DefaultParamsWriter}
 import org.json4s.JsonDSL._
