@@ -33,14 +33,54 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.utils.text.TextUtils.getBestRegexMatch
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 
+import scala.collection.mutable
 import scala.io.Source
 import scala.util.Try
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.matching.Regex
+
+trait PostalCodeHelpers {
+  lazy val postalCodeDictionary: mutable.Map[String, (Option[Double], Option[Double])] = {
+    val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
+    val dictionaryPath = "/USPostalCodes.txt"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {row <- buffer.getLines} {
+      val cols = row.split(",").map(_.trim)
+      val code = cols(0)
+      val lat = Try {
+        cols(1).toDouble
+      }.toOption
+      val lng = Try {
+        cols(2).toDouble
+      }.toOption
+      postalCodeDictionary += (code -> (lat, lng))
+    }
+    buffer.close
+    postalCodeDictionary
+  }
+  val patterns: Seq[Regex] = Seq(
+    ".*(\\d{5}).*".r,
+    ".*(\\d{4}).*".r,
+    ".*(\\d{3}).*".r
+  )
+
+  def findBestPostalCodeMatch(s: String): String = {
+    val result = getBestRegexMatch(patterns, s)
+    // Pad result with leading zeros if needed
+    if (result.length < 5) {
+      val numMissingDigits = 5 - result.length
+      (Seq.fill(numMissingDigits)("0") :+ result).mkString("")
+    }
+    else result
+  }
+}
 
 class PostalCodeIdentifier[T <: Text]
 (
@@ -50,10 +90,10 @@ class PostalCodeIdentifier[T <: Text]
 (
   implicit tti: TypeTag[T],
   override val ttiv: TypeTag[T#Value]
-)extends UnaryEstimator[T, PostalCodeMap](
+) extends UnaryEstimator[T, PostalCodeMap](
   uid = uid,
   operationName = operationName
-) {
+) with PostalCodeHelpers {
   // Parameters
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -65,24 +105,7 @@ class PostalCodeIdentifier[T <: Text]
   )
   setDefault(defaultThreshold, 0.90)
 
-
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
-
-  lazy private val postalCodeDictionary = {
-    val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
-    val dictionaryPath = "/USPostalCodes.txt"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    for {row <- buffer.getLines} {
-      val cols = row.split(",").map(_.trim)
-      val code = cols(0)
-      val lat = Try { cols(1).toDouble }.toOption
-      val lng = Try { cols(2).toDouble }.toOption
-      postalCodeDictionary += (code -> (lat, lng))
-    }
-    buffer.close
-    postalCodeDictionary
-  }
 
   private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
 
@@ -90,34 +113,19 @@ class PostalCodeIdentifier[T <: Text]
     extractDouble(dataset.select(mean(column.cast("integer"))))
   }
 
-  private def attemptToExtractPostalCode(dataset: Dataset[Text#Value], column: Column): Dataset[Text#Value] = {
-    // Regex for all types of postal codes: ^\\d{5}(?:[-\\s]\\d{4})?$
-    dataset.withColumn(
-      column.toString, regexp_extract(column, ".*(\\d{5}).*", 1)
-    ).asInstanceOf[Dataset[Text#Value]]
-  }
-
-  private def guardChecks(dataset: Dataset[Text#Value], column: Column): Boolean = {
-    averageBoolCol(dataset.withColumn(
-      column.toString, column notEqual ""
-    ).asInstanceOf[Dataset[Boolean]], column) > $(defaultThreshold)
-  }
-
-  private def dictCheck: UserDefinedFunction = udf((s: String) => {
-    postalCodeDictionary contains s
+  private def checkIfPostalCode: UserDefinedFunction = udf((s: String) => {
+    val matched = findBestPostalCodeMatch(s)
+    matched != "" && (postalCodeDictionary contains matched)
   }: Boolean)
-
-  private def predictIfPostalCode(dataset: Dataset[Text#Value], column: Column): Dataset[Boolean] = {
-    dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
-  }
 
   def fitFn(dataset: Dataset[Text#Value]): PostalCodeIdentifierModel[T] = {
     assert(dataset.schema.fieldNames.length == 1)
     val column = col(dataset.schema.fieldNames.head)
-    val matches = attemptToExtractPostalCode(dataset, column)
     if (
-      guardChecks(matches, column) &&
-      averageBoolCol(predictIfPostalCode(matches, column), column) >= $(defaultThreshold)
+      averageBoolCol(
+        dataset.select(checkIfPostalCode(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]],
+        column
+      ) >= $(defaultThreshold)
     ) {
       new PostalCodeIdentifierModel[T](uid, true)
     } else new PostalCodeIdentifierModel[T](uid, false)
@@ -128,27 +136,12 @@ class PostalCodeIdentifierModel[T <: Text]
 (
   override val uid: String,
   val treatAsPostalCode: Boolean
-) (implicit tti: TypeTag[T])
-  extends UnaryModel[T, PostalCodeMap]("postal code identifier", uid) {
-  lazy private val postalCodeDictionary = {
-    val postalCodeDictionary = collection.mutable.Map.empty[String, (Option[Double], Option[Double])]
-    val dictionaryPath = "/USPostalCodes.txt"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    for {row <- buffer.getLines} {
-      val cols = row.split(",").map(_.trim)
-      val code = cols(0)
-      val lat = Try { cols(1).toDouble }.toOption
-      val lng = Try { cols(2).toDouble }.toOption
-      postalCodeDictionary += (code -> (lat, lng))
-    }
-    buffer.close
-    postalCodeDictionary
-  }
-  private val zipRegex = ".*(\\d{5}).*".r
+)(implicit tti: TypeTag[T])
+  extends UnaryModel[T, PostalCodeMap]("postal code identifier", uid)
+    with PostalCodeHelpers {
   def transformFn: Text => PostalCodeMap = input => {
     val rawInput = input.value.getOrElse("")
-    val postalCode = zipRegex.findFirstMatchIn(rawInput).map(_.group(1)).getOrElse("")
+    val postalCode = findBestPostalCodeMatch(rawInput)
     if (treatAsPostalCode) {
       val (latOption, lngOption) = postalCodeDictionary.getOrElse(postalCode, (None, None))
       (latOption, lngOption) match {

@@ -72,10 +72,39 @@ class PostalCodeIdentifierTest
     model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
     map.get("postalCode") shouldBe Some("72587")
   }
+  it should
+    """identify postal codes as part of full addresses
+      | even when there are other five digit numbers in the address""".stripMargin in {
+    val (_, _, model, result) = identifyPostalCode(
+      Seq("11235 Birch Street, Apartment 12345, Amityville, NC, 72587").toText)
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
+    map.get("postalCode") shouldBe Some("72587")
+  }
   it should "get the correct latitude and longitude" in {
     val (_, _, _, result) = identifyPostalCode(Seq("11581").toText)
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
     map.get("lat") shouldBe Some("40.6523")
     map.get("lng") shouldBe Some("-73.7118")
+  }
+  it should "identify a Text column with a postal code sans one leading zero as Postal Code" in {
+    val (_, _, model, result) = identifyPostalCode(Seq("8302").toText)
+    model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    map.get("lat") shouldBe Some("39.3762")
+    map.get("lng") shouldBe Some("-75.1617")
+  }
+  it should "identify a Text column with a postal code sans two leading zeros as Postal Code" in {
+    val (_, _, model, result) = identifyPostalCode(Seq("501").toText)
+    model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    map.get("lat") shouldBe Some("40.8154")
+    map.get("lng") shouldBe Some("-73.0451")
+  }
+  it should "identify the five digit part of a nine digit postal code" in {
+    val (_, _, model, result) = identifyPostalCode(Seq("1123 Birch Street, Amityville, NC, 72587-8302").toText)
+    val map = result.collect().head(1).asInstanceOf[Map[String, String]]
+    model.asInstanceOf[PostalCodeIdentifierModel[Text]].treatAsPostalCode shouldBe true
+    map.get("postalCode") shouldBe Some("72587")
   }
 }
