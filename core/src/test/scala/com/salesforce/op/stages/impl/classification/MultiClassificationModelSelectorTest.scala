@@ -100,6 +100,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     .drop("txtLabel")
     .select("label", "features")
 
+  val datacount = data.count().toDouble
+
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
@@ -148,8 +150,9 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
     implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
-    val maxTrainingSample = 100
-    val sampleF = maxTrainingSample / data.count().toDouble
+    val dataCount = data.count().toDouble
+    val maxTrainingSample = (dataCount / 1.2).toInt
+    val sampleF = maxTrainingSample / dataCount
     val downSampleFraction = math.min(sampleF, 1.0)
     val dataCutter = DataCutter(seed = 42, maxTrainingSample = maxTrainingSample)
     val modelSelector =
