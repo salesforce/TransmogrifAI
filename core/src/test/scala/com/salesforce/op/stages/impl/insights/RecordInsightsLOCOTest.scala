@@ -96,165 +96,153 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
     )
   )
   // scalastyle:on
-  it ("should work with randomly generated features and binary logistic regression") {
-    val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
-    val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
-    val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
-    val l1r = l1.copy(isResponse = true)
-    val dfWithMeta = addMetaData(df, "features", 40)
-    val sparkModel = new OpLogisticRegression().setInput(l1r, f1).fit(df)
+  describe(Spec[RecordInsightsLOCO[_]]) {
+    it("should work with randomly generated features and binary logistic regression") {
+      val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
+      val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
+      val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
+      val l1r = l1.copy(isResponse = true)
+      val dfWithMeta = addMetaData(df, "features", 40)
+      val sparkModel = new OpLogisticRegression().setInput(l1r, f1).fit(df)
 
-    // val model = sparkModel.getSparkMlStage().get
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
-    val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+      // val model = sparkModel.getSparkMlStage().get
+      val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
+      val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
 
-    insights.foreach(_.value.size shouldBe 20)
-    val parsed = insights.map(RecordInsightsParser.parseInsights)
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 20) // number insights per pred column
-    parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
-  }
-
-  it ("should work with randomly generated features and multiclass random forest") {
-    val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
-    val labels = RandomIntegral.integrals(0, 5).limit(1000).map(_.value.get.toRealNN)
-    val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
-    val l1r = l1.copy(isResponse = true)
-    val dfWithMeta = addMetaData(df, "features", 40)
-    val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
-
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
-
-    val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
-    insights.foreach(_.value.size shouldBe 2)
-    val parsed = insights.map(RecordInsightsParser.parseInsights)
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 5) } shouldBe 0) // no 6th column of insights
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 4) } shouldBe 2) // number insights per pred column
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 3) } shouldBe 2) // number insights per pred column
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 2) } shouldBe 2) // number insights per pred column
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 2) // number insights per pred column
-    parsed.map(_.count { case (_, v) => v.exists(_._1 == 0) } shouldBe 2) // number insights per pred column
-  }
-
-
-  it ("should work with randomly generated features and linear regression") {
-    val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
-    val labels = RandomReal.normal[RealNN]().limit(1000)
-    val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
-    val l1r = l1.copy(isResponse = true)
-    val dfWithMeta = addMetaData(df, "features", 40)
-    val sparkModel = new OpLinearRegression().setInput(l1r, f1).fit(df)
-    val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
-      .asInstanceOf[LinearRegressionModel]
-
-    val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
-    val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
-    insights.foreach(_.value.size shouldBe 20)
-    val parsed = insights.map(RecordInsightsParser.parseInsights)
-    parsed.foreach(_.values.foreach(i => i.foreach(v => v._1 shouldBe 0))) // has only one pred column
-    parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
-  }
-
-  private def addMetaData(df: DataFrame, fieldName: String, size: Int): DataFrame = {
-    val columns = (0 until size).map(_.toString).map(i => new OpVectorColumnMetadata(Seq(i), Seq(i), Some(i), Some(i)))
-    val hist = (0 until size).map(_.toString).map(i => i -> FeatureHistory(Seq(s"a_$i"), Seq(s"b_$i"))).toMap
-    val metadata = OpVectorMetadata(fieldName, columns.toArray, hist).toMetadata
-    val fields = df.schema.fields.map { f =>
-      if (f.name == fieldName) f.copy(metadata = metadata)
-      else f
+      insights.foreach(_.value.size shouldBe 20)
+      val parsed = insights.map(RecordInsightsParser.parseInsights)
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 20) // number insights per pred column
+      parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
     }
-    spark.createDataFrame(df.rdd, StructType(fields))
-  }
 
-  it ("should return the most predictive features") {
-    val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
-    val label = labelNoRes.copy(isResponse = true)
-    val testDataMeta = addMetaData(testData, "features", 5)
-    val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+    it("should work with randomly generated features and multiclass random forest") {
+      val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
+      val labels = RandomIntegral.integrals(0, 5).limit(1000).map(_.value.get.toRealNN)
+      val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
+      val l1r = l1.copy(isResponse = true)
+      val dfWithMeta = addMetaData(df, "features", 40)
+      val sparkModel = new OpRandomForestClassifier().setInput(l1r, f1).fit(df)
 
-    val transformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector)
+      val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
 
-    val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
-    val parsed = insights.map(RecordInsightsParser.parseInsights)
-    // the highest corr that value that is not zero should be the top feature
-    parsed.foreach { case in =>
-      withClue(s"top features : ${in.map(_._1.columnName)}") {
-        Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true
-        // the scores should be the same but opposite in sign
-        math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true
+      val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+      insights.foreach(_.value.size shouldBe 2)
+      val parsed = insights.map(RecordInsightsParser.parseInsights)
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 5) } shouldBe 0) // no 6th column of insights
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 4) } shouldBe 2) // number insights per pred column
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 3) } shouldBe 2) // number insights per pred column
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 2) } shouldBe 2) // number insights per pred column
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 1) } shouldBe 2) // number insights per pred column
+      parsed.map(_.count { case (_, v) => v.exists(_._1 == 0) } shouldBe 2) // number insights per pred column
+    }
+
+    it("should work with randomly generated features and linear regression") {
+      val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
+      val labels = RandomReal.normal[RealNN]().limit(1000)
+      val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
+      val l1r = l1.copy(isResponse = true)
+      val dfWithMeta = addMetaData(df, "features", 40)
+      val sparkModel = new OpLinearRegression().setInput(l1r, f1).fit(df)
+      val model = sparkModel.asInstanceOf[SparkWrapperParams[_]].getSparkMlStage().get
+        .asInstanceOf[LinearRegressionModel]
+
+      val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
+      val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+      insights.foreach(_.value.size shouldBe 20)
+      val parsed = insights.map(RecordInsightsParser.parseInsights)
+      parsed.foreach(_.values.foreach(i => i.foreach(v => v._1 shouldBe 0))) // has only one pred column
+      parsed.foreach(_.values.foreach(i => i.foreach(v => math.abs(v._2) > 0 shouldBe true)))
+    }
+
+    it("should return the most predictive features") {
+      val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
+      val label = labelNoRes.copy(isResponse = true)
+      val testDataMeta = addMetaData(testData, "features", 5)
+      val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+
+      val transformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector)
+
+      val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
+      val parsed = insights.map(RecordInsightsParser.parseInsights)
+      // the highest corr that value that is not zero should be the top feature
+      parsed.foreach { case in =>
+        withClue(s"top features : ${in.map(_._1.columnName)}") {
+          Set("3_3_3_3", "1_1_1_1").contains(in.head._1.columnName) shouldBe true
+          // the scores should be the same but opposite in sign
+          math.abs(in.head._2(0)._2 + in.head._2(1)._2) < 0.00001 shouldBe true
+        }
       }
     }
-  }
 
-  it ("should return the most predictive features when using top K Positives + top K negatives strat") {
-    val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
-    val label = labelNoRes.copy(isResponse = true)
-    val testDataMeta = addMetaData(testData, "features", 5)
-    val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
-    val transformer = new RecordInsightsLOCO(sparkModel).setTopKStrategy(TopKStrategy.PositiveNegative)
-      .setInput(featureVector)
-    val insights = transformer.transform(testDataMeta)
-    val parsed = insights.collect(name, transformer.getOutput())
-      .map { case (n, i) => n -> RecordInsightsParser.parseInsights(i) }
-    parsed.foreach { case (_, in) =>
-      withClue(s"top features : ${in.map(_._1.columnName)}") {
-        in.head._1.columnName == "1_1_1_1" || in.last._1.columnName == "3_3_3_3" shouldBe true
+    it("should return the most predictive features when using top K Positives + top K negatives strat") {
+      val (testData, name, labelNoRes, featureVector) = TestFeatureBuilder("name", "label", "features", data)
+      val label = labelNoRes.copy(isResponse = true)
+      val testDataMeta = addMetaData(testData, "features", 5)
+      val sparkModel = new OpLogisticRegression().setInput(label, featureVector).fit(testData)
+      val transformer = new RecordInsightsLOCO(sparkModel).setTopKStrategy(TopKStrategy.PositiveNegative)
+        .setInput(featureVector)
+      val insights = transformer.transform(testDataMeta)
+      val parsed = insights.collect(name, transformer.getOutput())
+        .map { case (n, i) => n -> RecordInsightsParser.parseInsights(i) }
+      parsed.foreach { case (_, in) =>
+        withClue(s"top features : ${in.map(_._1.columnName)}") {
+          in.head._1.columnName == "1_1_1_1" || in.last._1.columnName == "3_3_3_3" shouldBe true
+        }
       }
     }
-  }
 
-  describe("return the most predictive features for data that is strongly related to label. ") {
-    // Generate the data
-    val numRows = 1000
-    val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
-    val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
-      .withProbabilityOfEmpty(0.1).limit(numRows)
-    val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
-      .withProbabilityOfEmpty(0.3).limit(numRows)
+    describe("with data strongly related to label ") {
+      // Generate the data
+      val numRows = 1000
+      val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.3).take(numRows).toList
+      val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G"))
+        .withProbabilityOfEmpty(0.1).limit(numRows)
+      val currencyData: Seq[Currency] = RandomReal.logNormal[Currency](mean = 10.0, sigma = 1.0)
+        .withProbabilityOfEmpty(0.3).limit(numRows)
 
-    // Generate the label as a function of the features, so we know there should be strong record-level insights
-    val labelData: Seq[RealNN] = pickListData.map(p =>
-      p.value match {
-        case Some("A") | Some("B") | Some("C") => RealNN(1.0)
-        case _ => RealNN(0.0)
+      // Generate the label as a function of the features, so we know there should be strong record-level insights
+      val labelData: Seq[RealNN] = pickListData.map(p =>
+        p.value match {
+          case Some("A") | Some("B") | Some("C") => RealNN(1.0)
+          case _ => RealNN(0.0)
+        }
+      )
+
+      // Generate the raw features and corresponding dataframe
+      val generatedData: Seq[(Country, PickList, Currency, RealNN)] =
+        countryData.zip(pickListData).zip(currencyData).zip(labelData).map {
+          case (((co, pi), cu), la) => (co, pi, cu, la)
+        }
+      val (rawDF, rawCountry, rawPickList, rawCurrency, rawLabel) =
+        TestFeatureBuilder("country", "picklist", "currency", "label", generatedData)
+      val rawLabelResponse = rawLabel.copy(isResponse = true)
+      val genFeatureVector = Seq(rawCountry, rawPickList, rawCurrency).transmogrify()
+
+      // Materialize the feature vector along with the label
+      val fullDF = new OpWorkflow().setResultFeatures(genFeatureVector, rawLabelResponse).transform(rawDF)
+
+      val sparkModel = new OpRandomForestClassifier().setInput(rawLabelResponse, genFeatureVector).fit(fullDF)
+      val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(genFeatureVector).setTopK(10)
+      val insights = insightsTransformer.transform(fullDF).collect(insightsTransformer.getOutput())
+      val parsed = insights.map(RecordInsightsParser.parseInsights)
+
+      it("should create an insight for each record") {
+        parsed.length shouldBe numRows
       }
-    )
 
-    // Generate the raw features and corresponding dataframe
-    val generatedData: Seq[(Country, PickList, Currency, RealNN)] =
-      countryData.zip(pickListData).zip(currencyData).zip(labelData).map {
-        case (((co, pi), cu), la) => (co, pi, cu, la)
+      info("Each feature vector should only have either three or four non-zero entries. One each from country and " +
+        "picklist, while currency can have either two (if it's null the currency column will be filled with the mean)" +
+        " or just one if it's not null.")
+      it("should pick between 1 and 4 of the features") {
+        all(parsed.map(_.size)) should (be >= 1 and be <= 4)
       }
-    val (rawDF, rawCountry, rawPickList, rawCurrency, rawLabel) =
-      TestFeatureBuilder("country", "picklist", "currency", "label", generatedData)
-    val rawLabelResponse = rawLabel.copy(isResponse = true)
-    val genFeatureVector = Seq(rawCountry, rawPickList, rawCurrency).transmogrify()
 
-    // Materialize the feature vector along with the label
-    val fullDF = new OpWorkflow().setResultFeatures(genFeatureVector, rawLabelResponse).transform(rawDF)
-
-    val sparkModel = new OpRandomForestClassifier().setInput(rawLabelResponse, genFeatureVector).fit(fullDF)
-    val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(genFeatureVector).setTopK(10)
-    val insights = insightsTransformer.transform(fullDF).collect(insightsTransformer.getOutput())
-    val parsed = insights.map(RecordInsightsParser.parseInsights)
-
-    it ("should create an insight for each record"){
-      parsed.length shouldBe numRows
-    }
-
-    // Each feature vector should only have either three or four non-zero entries. One each from country and picklist,
-    // while currency can have either two (if it's null since the currency column will be filled with the mean) or just
-    // one if it's not null.
-    it ("should pick between 1 and 4 of the features") {
-      all (parsed.map(_.size)) should (be >= 1 and be <= 4)
-    }
-
-    describe("check the quality of insights. "){
       // Grab the feature vector metadata for comparison against the LOCO record insights
       val vectorMeta = OpVectorMetadata(fullDF.schema.last)
       val numVectorColumns = vectorMeta.columns.length
-      // Want to check the average contribution strengths for each picklist response and compare them to the
-      // average contribution strengths of the other features. We should have a very high contribution when choices
-      // A, B, or C are present in the record (since they determine the label), and low average contributions otherwise.
+      // Want to check the average contribution strengths for each picklist response and compare them to the average
+      // contribution strengths of the other features. We should have a very high contribution when choices A, B, or C
+      // are present in the record (since they determine the label), and low average contributions otherwise.
       val totalImportances = parsed.foldLeft(z = Array.fill[(Double, Int)](numVectorColumns)((0.0, 0)))((res, m) => {
         m.foreach { case (k, v) => res.update(k.index, (res(k.index)._1 + v.last._2, res(k.index)._2 + 1)) }
         res
@@ -282,18 +270,18 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       val abcVar = math.abs(abcIndices.map(varImportances.apply).sum) / abcIndices.size
       val otherVar = math.abs(otherIndices.map(varImportances.apply).sum) / otherIndices.size
 
-      it ("should have much larger feature strengths for features A, B, and C") {
+      it("should have much larger feature strengths for features A, B, and C") {
         abcAvg should be > 3 * otherAvg
       }
 
-      it ("should have a really large t-value when comparing the two avg feature strengths") {
+      it("should have a really large t-value when comparing the two avg feature strengths") {
         val tValue = math.abs(abcAvg - otherAvg) / math.sqrt((abcVar + otherVar) / numRows)
         tValue should be > 10.0
       }
 
-      // The ratio of feature strengths between important and other features should be similar to the ratio of
-      // feature importance of Spark's RandomForest
-      it ("should have a ratio of importance between important and other features in both paradigms of less than 0.8") {
+      info("The ratio of feature strengths between important and other features should be similar to the ratio of" +
+        "feature importance of Spark's RandomForest")
+      it("should have a ratio between the important and other features in both paradigms of less than 0.8") {
         val rfImportances = sparkModel.getSparkMlStage().get.featureImportances
         val abcAvgRF = abcIndices.map(rfImportances.apply).sum / abcIndices.size
         val otherAvgRF = otherIndices.map(rfImportances.apply).sum / otherIndices.size
@@ -304,100 +292,111 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
         paradigmRatio should be < 0.8
       }
     }
-  }
 
-  it ("should aggregate values for text and textMap derived features") {
-    val testData = generateTestTextData
+    it("should aggregate values for text and textMap derived features") {
+      val testData = generateTestTextData
 
-    withClue("TextArea can have two null indicator values") {
-      testData.actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
-    }
-    withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
-      "aggregation required for LOCO on this field.") {
-      testData.actualRecordInsights.foreach { p =>
-        assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
+      withClue("TextArea can have two null indicator values") {
+        testData.actualRecordInsights.map(p => assert(p.size == 7 || p.size == 8))
       }
-    }
-
-    assertLOCOSum(testData.actualRecordInsights)
-    assertAggregatedText(textFeatureName)
-    assertAggregatedTextMap(textMapFeatureName, "k0")
-    assertAggregatedTextMap(textMapFeatureName, "k1")
-    assertAggregatedText(textAreaFeatureName)
-    assertAggregatedTextMap(textAreaMapFeatureName, "k0")
-    assertAggregatedTextMap(textAreaMapFeatureName, "k1")
-
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
-     *
-     * @param textFeatureName Text Field Name
-     */
-    def assertAggregatedText(textFeatureName: String): Unit = {
-      withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
-        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
-          history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData)
+      withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
+        "aggregation required for LOCO on this field.") {
+        testData.actualRecordInsights.foreach { p =>
+          assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName) && r.indicatorValue.isDefined))
+        }
       }
-    }
 
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO to one made manually
-     *
-     * @param textMapFeatureName Text Map Field Name
-     */
-    def assertAggregatedTextMap(textMapFeatureName: String, keyName: String): Unit = {
-      withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
-        val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
-          history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
-        assertAggregatedWithPredicate(predicate, testData)
+      assertLOCOSum(testData.actualRecordInsights)
+      assertAggregatedText(textFeatureName)
+      assertAggregatedTextMap(textMapFeatureName, "k0")
+      assertAggregatedTextMap(textMapFeatureName, "k1")
+      assertAggregatedText(textAreaFeatureName)
+      assertAggregatedTextMap(textAreaMapFeatureName, "k0")
+      assertAggregatedTextMap(textAreaMapFeatureName, "k1")
+
+
+      /**
+       * Compare the aggregation made by RecordInsightsLOCO on a text field to one made manually
+       *
+       * @param textFeatureName Text Field Name
+       */
+      def assertAggregatedText(textFeatureName: String): Unit = {
+        withClue(s"Aggregate all the derived hashing tf features of rawFeature - $textFeatureName.") {
+          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textFeatureName) &&
+            history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
+          assertAggregatedWithPredicate(predicate, testData)
+        }
       }
-    }
-  }
 
-  it ("should aggregate values for date, datetime, dateMap and dateTimeMap derived features") {
-    val testData = generateTestDateData
-
-    assertLOCOSum(testData.actualRecordInsights)
-    assertAggregatedDate(dateFeatureName)
-    assertAggregatedDate(dateTimeFeatureName)
-    assertAggregatedDateMap(dateMapFeatureName, "k0")
-    assertAggregatedDateMap(dateMapFeatureName, "k1")
-    assertAggregatedDateMap(dateTimeMapFeatureName, "k0")
-    assertAggregatedDateMap(dateTimeMapFeatureName, "k1")
-
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a Date/DateTime field to one made manually
-     *
-     * @param dateFeatureName Date/DateTime Field
-     */
-    def assertAggregatedDate(dateFeatureName: String): Unit = {
-      for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
-        withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
-          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
-            history.descriptorValue.isDefined &&
-            history.descriptorValue.get.split("_").last == timePeriod.entryName
+      /**
+       * Compare the aggregation made by RecordInsightsLOCO to one made manually
+       *
+       * @param textMapFeatureName Text Map Field Name
+       */
+      def assertAggregatedTextMap(textMapFeatureName: String, keyName: String): Unit = {
+        withClue(s"Aggregate all the derived hashing tf of rawMapFeature - $textMapFeatureName for key - $keyName") {
+          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(textMapFeatureName) &&
+            history.grouping == Option(keyName) && history.indicatorValue.isEmpty && history.descriptorValue.isEmpty
           assertAggregatedWithPredicate(predicate, testData)
         }
       }
     }
 
-    /**
-     * Compare the aggregation made by RecordInsightsLOCO on a DateMap/DateTimeMap field to one made manually
-     *
-     * @param dateMapFeatureName DateMap/DateTimeMap Field
-     */
-    def assertAggregatedDateMap(dateMapFeatureName: String, keyName: String): Unit = {
-      for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
-        withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawMapFeature - $dateMapFeatureName " +
-          s"with key as $keyName.") {
-          val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
-            history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
-            history.descriptorValue.get.split("_").last == timePeriod.entryName
-          assertAggregatedWithPredicate(predicate, testData)
+    it("should aggregate values for date, datetime, dateMap and dateTimeMap derived features") {
+      val testData = generateTestDateData
+
+      assertLOCOSum(testData.actualRecordInsights)
+      assertAggregatedDate(dateFeatureName)
+      assertAggregatedDate(dateTimeFeatureName)
+      assertAggregatedDateMap(dateMapFeatureName, "k0")
+      assertAggregatedDateMap(dateMapFeatureName, "k1")
+      assertAggregatedDateMap(dateTimeMapFeatureName, "k0")
+      assertAggregatedDateMap(dateTimeMapFeatureName, "k1")
+
+      /**
+       * Compare the aggregation made by RecordInsightsLOCO on a Date/DateTime field to one made manually
+       *
+       * @param dateFeatureName Date/DateTime Field
+       */
+      def assertAggregatedDate(dateFeatureName: String): Unit = {
+        for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
+          withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawFeature - $dateFeatureName.") {
+            val predicate = (history: OpVectorColumnHistory) => history.parentFeatureOrigins == Seq(dateFeatureName) &&
+              history.descriptorValue.isDefined &&
+              history.descriptorValue.get.split("_").last == timePeriod.entryName
+            assertAggregatedWithPredicate(predicate, testData)
+          }
+        }
+      }
+
+      /**
+       * Compare the aggregation made by RecordInsightsLOCO on a DateMap/DateTimeMap field to one made manually
+       *
+       * @param dateMapFeatureName DateMap/DateTimeMap Field
+       */
+      def assertAggregatedDateMap(dateMapFeatureName: String, keyName: String): Unit = {
+        for {timePeriod <- TransmogrifierDefaults.CircularDateRepresentations} {
+          withClue(s"Aggregate x_$timePeriod and y_$timePeriod of rawMapFeature - $dateMapFeatureName " +
+            s"with key as $keyName.") {
+            val predicate = (history: OpVectorColumnHistory) =>
+              history.parentFeatureOrigins == Seq(dateMapFeatureName) &&
+              history.grouping == Option(keyName) && history.descriptorValue.isDefined &&
+              history.descriptorValue.get.split("_").last == timePeriod.entryName
+            assertAggregatedWithPredicate(predicate, testData)
+          }
         }
       }
     }
+  }
+  private def addMetaData(df: DataFrame, fieldName: String, size: Int): DataFrame = {
+    val columns = (0 until size).map(_.toString).map(i => new OpVectorColumnMetadata(Seq(i), Seq(i), Some(i), Some(i)))
+    val hist = (0 until size).map(_.toString).map(i => i -> FeatureHistory(Seq(s"a_$i"), Seq(s"b_$i"))).toMap
+    val metadata = OpVectorMetadata(fieldName, columns.toArray, hist).toMetadata
+    val fields = df.schema.fields.map { f =>
+      if (f.name == fieldName) f.copy(metadata = metadata)
+      else f
+    }
+    spark.createDataFrame(df.rdd, StructType(fields))
   }
 
   private def assertLOCOSum(actualRecordInsights: Array[Map[OpVectorColumnHistory, Insights]]): Unit = {
