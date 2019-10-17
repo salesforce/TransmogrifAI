@@ -86,7 +86,8 @@ class TextMapPivotVectorizer[T <: OPMap[String]]
       trackNulls = $(trackNulls),
       operationName = operationName,
       uid = uid
-    )
+    ).setCleanTextParams($(cleanTextParams))
+
   }
 }
 

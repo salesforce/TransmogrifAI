@@ -183,7 +183,8 @@ class OpSetVectorizer[T <: OPSet[_]]
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = shouldTrackNulls,
       operationName = operationName,
-      uid = uid)
+      uid = uid
+    ).setCleanTextParams($(cleanTextParams))
 
 }
 
@@ -231,7 +232,8 @@ class OpTextPivotVectorizer[T <: Text]
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = shouldTrackNulls,
       operationName = operationName,
-      uid = uid)
+      uid = uid
+    ).setCleanTextParams($(cleanTextParams))
 }
 
 final class OpTextPivotVectorizerModel[T <: Text] private[op]

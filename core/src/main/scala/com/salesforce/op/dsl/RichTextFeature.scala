@@ -74,12 +74,14 @@ trait RichTextFeature {
       minSupport: Int = TransmogrifierDefaults.MinSupport,
       cleanText: Boolean = TransmogrifierDefaults.CleanText,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
-      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality,
+      cleanTextParams: CleanTextParams = TransmogrifierDefaults.CleanParams
     ): FeatureLike[OPVector] = {
       val vectorizer = new OpTextPivotVectorizer[T]()
 
       f.transformWith[OPVector](
-        stage = vectorizer.setTopK(topK).setMinSupport(minSupport).setCleanText(cleanText)
+        stage = vectorizer.setTopK(topK).setMinSupport(minSupport)
+          .setCleanText(cleanText).setCleanTextParams(cleanTextParams)
           .setTrackNulls(trackNulls).setMaxPctCardinality(maxPctCardinality),
         fs = others
       )
@@ -600,11 +602,12 @@ trait RichTextFeature {
       minSupport: Int,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[Email]] = Array.empty,
-      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality,
+      cleanTextParams: CleanTextParams = CleanTextParams(true, false)
     ): FeatureLike[OPVector] = {
       val domains = (f +: others).map(_.map[PickList](new EmailDomainToPickList))
       domains.head.pivot(others = domains.tail, topK = topK, minSupport = minSupport, cleanText = cleanText,
-        trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
+        trackNulls = trackNulls, maxPctCardinality = maxPctCardinality, cleanTextParams = cleanTextParams
       )
     }
 

@@ -53,12 +53,18 @@ class TextUtilsTest extends FlatSpec with TestCommon {
     TextUtils.concat("", "", ",") shouldBe ""
   }
 
-  it should "clean a string with special chars" in {
+  it should "clean a string with special chars by default" in {
     TextUtils.cleanString("A string wit#h %bad pun&ctuation mark<=>s") shouldBe "AStringWitHBadPunCtuationMarkS"
   }
 
-  it should "clean an Option(string) with special chars" in {
+  it should "clean an Option(string) with special chars by default" in {
     val testString: Option[String] = Some("A string wit#h %bad pun&ctuation mark<=>s")
     TextUtils.cleanOptString(testString) shouldBe Some("AStringWitHBadPunCtuationMarkS")
+  }
+
+  it should "ignore the case and not clean a string with punctuations " +
+    "when cleanPunctuations=true & ignoreCase=true" in {
+    val actual = TextUtils.cleanString("Salesforce.com", cleanTextParams = CleanTextParams(true, false))
+    actual shouldBe "salesforce.com"
   }
 }

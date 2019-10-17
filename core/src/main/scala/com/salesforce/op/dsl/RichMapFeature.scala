@@ -33,7 +33,7 @@ package com.salesforce.op.dsl
 import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.feature._
-import com.salesforce.op.utils.text.Language
+import com.salesforce.op.utils.text.{CleanTextParams, Language}
 import org.apache.spark.ml.linalg.Vectors
 
 import scala.reflect.runtime.universe._
@@ -97,13 +97,15 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[T]] = Array.empty,
-      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality,
+      cleanTextParams: CleanTextParams = TransmogrifierDefaults.CleanParams
     ): FeatureLike[OPVector] = {
       new TextMapPivotVectorizer[T]()
         .setInput(f +: others)
         .setTopK(topK)
         .setCleanKeys(cleanKeys)
         .setCleanText(cleanText)
+        .setCleanTextParams(cleanTextParams)
         .setMinSupport(minSupport)
         .setWhiteListKeys(whiteListKeys)
         .setBlackListKeys(blackListKeys)
@@ -1026,7 +1028,8 @@ trait RichMapFeature {
       blackListKeys: Array[String] = Array.empty,
       trackNulls: Boolean = TransmogrifierDefaults.TrackNulls,
       others: Array[FeatureLike[EmailMap]] = Array.empty,
-      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality
+      maxPctCardinality: Double = OpOneHotVectorizer.MaxPctCardinality,
+      cleanTextParams: CleanTextParams = CleanTextParams(true, false)
     ): FeatureLike[OPVector] = {
       val domains: Array[FeatureLike[PickListMap]] = (f +: others).map { e =>
         new EmailToPickListMapTransformer().setInput(e).getOutput()
@@ -1034,7 +1037,7 @@ trait RichMapFeature {
 
       domains.head.vectorize(
         topK = topK, minSupport = minSupport, cleanText = cleanText, cleanKeys = cleanKeys,
-        whiteListKeys = whiteListKeys, blackListKeys = blackListKeys,
+        cleanTextParams = cleanTextParams, whiteListKeys = whiteListKeys, blackListKeys = blackListKeys,
         others = domains.tail, trackNulls = trackNulls, maxPctCardinality = maxPctCardinality
       )
     }

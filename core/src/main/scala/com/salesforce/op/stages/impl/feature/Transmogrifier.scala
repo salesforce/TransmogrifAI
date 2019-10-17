@@ -36,11 +36,11 @@ import com.salesforce.op.features.{FeatureLike, OPFeature, TransientFeature}
 import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
-import com.salesforce.op.utils.text.TextUtils
+import com.salesforce.op.utils.text.{CleanTextParams, TextUtils}
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.types.{Metadata, StructField}
+import org.apache.spark.sql.types.StructField
 import org.apache.spark.sql.{Dataset, Encoders}
 
 import scala.collection.mutable.ArrayBuffer
@@ -85,6 +85,9 @@ private[op] trait TransmogrifierDefaults {
   val AutoDetectLanguage: Boolean = TextTokenizer.AutoDetectLanguage
   val MinTokenLength: Int = TextTokenizer.MinTokenLength
   val ToLowercase: Boolean = TextTokenizer.ToLowercase
+
+  // CleanText Params
+  val CleanParams = TextUtils.defaultCleanParams
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
@@ -519,24 +522,34 @@ trait TrackTextLenParam extends Params {
   def setTrackTextLen(v: Boolean): this.type = set(trackTextLen, v)
 }
 
-trait CleanTextFun {
-  def cleanTextFn(s: String, shouldClean: Boolean): String = if (shouldClean) TextUtils.cleanString(s) else s
+trait CleanTextFun extends Params {
+  final val cleanTextParams = new Param[CleanTextParams](parent = this, name = "cleanTextParams",
+    doc = "Params associated with how to clean text") {
+    override def jsonEncode(value: CleanTextParams): String = CleanTextParams.jsonEncode(value)
+    override def jsonDecode(json: String): CleanTextParams = CleanTextParams.jsonDecode(json)
+  }
+  setDefault(cleanTextParams, TransmogrifierDefaults.CleanParams)
+  def setCleanTextParams(cleanTextParams: CleanTextParams): this.type = set(this.cleanTextParams, cleanTextParams)
+
+  def cleanTextFn(s: String, shouldClean: Boolean, cleanParams: CleanTextParams = $(cleanTextParams)): String =
+    if (shouldClean) TextUtils.cleanString(raw = s, cleanTextParams = cleanParams) else s
 }
 
 trait CleanTextMapFun extends CleanTextFun {
-
   def cleanMap[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     if (!shouldCleanKey && !shouldCleanValue) m
     else {
       m.map {
-        case (k: String, v: String) => cleanTextFn(k, shouldCleanKey) -> cleanTextFn(v, shouldCleanValue)
+        case (k: String, v: String) => cleanTextFn(k, shouldCleanKey, TransmogrifierDefaults.CleanParams) ->
+          cleanTextFn(v, shouldCleanValue, $(cleanTextParams))
         case (k: String, v: Traversable[_]) =>
           if (v.headOption.exists(_.isInstanceOf[String])) {
-            cleanTextFn(k, shouldCleanKey) -> v.asInstanceOf[Traversable[String]].map(cleanTextFn(_, shouldCleanValue))
+            cleanTextFn(k, shouldCleanKey, TransmogrifierDefaults.CleanParams) ->
+              v.asInstanceOf[Traversable[String]].map(cleanTextFn(_, shouldCleanValue, $(cleanTextParams)))
           } else {
-            cleanTextFn(k, shouldCleanKey) -> v
+            cleanTextFn(k, shouldCleanKey, TransmogrifierDefaults.CleanParams) -> v
           }
-        case (k: String, v) => cleanTextFn(k, shouldCleanKey) -> v
+        case (k: String, v) => cleanTextFn(k, shouldCleanKey, TransmogrifierDefaults.CleanParams) -> v
       }.asInstanceOf[Map[String, V]]
     }
   }
@@ -608,8 +621,8 @@ trait MapPivotParams extends Params {
   protected def filterKeys[V](m: Map[String, V], shouldCleanKey: Boolean, shouldCleanValue: Boolean): Map[String, V] = {
     val map = cleanMap[V](m, shouldCleanKey, shouldCleanValue)
     val (whiteList, blackList) = (
-      $(whiteListKeys).map(cleanTextFn(_, shouldCleanKey)),
-      $(blackListKeys).map(cleanTextFn(_, shouldCleanKey))
+      $(whiteListKeys).map(cleanTextFn(_, shouldCleanKey, TransmogrifierDefaults.CleanParams)),
+      $(blackListKeys).map(cleanTextFn(_, shouldCleanKey, TransmogrifierDefaults.CleanParams))
     )
     if (whiteList.nonEmpty) {
       map.filter { case (k, v) => whiteList.contains(k) && !blackList.contains(k) }

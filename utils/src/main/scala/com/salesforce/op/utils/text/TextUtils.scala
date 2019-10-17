@@ -30,23 +30,47 @@
 
 package com.salesforce.op.utils.text
 
+import org.json4s.DefaultFormats
+import org.json4s.jackson.Serialization
+
 
 case object TextUtils {
+  val defaultCleanParams = CleanTextParams(ignoreCase = true, cleanPunctuations = true)
 
-  def cleanOptString(raw: Option[String], splitOn: String = " "): Option[String] =
-    raw.map(t => cleanString(t, splitOn))
+  def cleanOptString(raw: Option[String], splitOn: String = " ",
+    cleanTextParams: CleanTextParams = defaultCleanParams): Option[String] =
+    raw.map(t => cleanString(t, splitOn, cleanTextParams))
 
-  def cleanString(raw: String, splitOn: String = " "): String = {
-    raw
-      .toLowerCase
+  def cleanString(raw: String, splitOn: String = " ", cleanTextParams: CleanTextParams = defaultCleanParams): String = {
+    val l = if (cleanTextParams.ignoreCase) raw.toLowerCase else raw
+    if (cleanTextParams.cleanPunctuations) {
+      l
       .replaceAll("[\\p{Punct}]", splitOn)
-      .replaceAll(s"$splitOn+", s"$splitOn")
-      .split(splitOn)
-      .map(w => w.capitalize)
-      .mkString("")
+        .replaceAll(s"$splitOn+", s"$splitOn")
+        .split(splitOn)
+        .map(w => w.capitalize)
+        .mkString("")
+    }
+    else {
+      l
+    }
   }
 
   def concat(l: String, r: String, separator: String): String =
     if (l.isEmpty) r else if (r.isEmpty) l else s"$l$separator$r"
 
+}
+
+case class CleanTextParams(ignoreCase: Boolean, cleanPunctuations: Boolean)
+
+object CleanTextParams {
+  def jsonEncode(value: CleanTextParams): String = {
+    implicit val formats = DefaultFormats
+    Serialization.write(value)
+  }
+
+  def jsonDecode(json: String): CleanTextParams = {
+    implicit val formats = DefaultFormats
+    Serialization.read[CleanTextParams](json)
+  }
 }
