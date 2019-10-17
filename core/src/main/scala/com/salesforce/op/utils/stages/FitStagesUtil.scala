@@ -220,7 +220,6 @@ private[op] case object FitStagesUtil {
     fittedTransformers: Seq[OPStage] = Seq.empty
   )(implicit spark: SparkSession): FittedDAG = {
     val alreadyFitted: ListBuffer[OPStage] = ListBuffer(fittedTransformers: _*)
-
     val (newTrain, newTest) =
       dag.foldLeft(train -> test) { case ((currTrain, currTest), stagesLayer) =>
         val index = stagesLayer.head._2
@@ -262,6 +261,7 @@ private[op] case object FitStagesUtil {
     val stages = stagesLayer.map(_._1)
     val (estimators, noFit) = stages.partition(_.isInstanceOf[Estimator[_]])
     val fitEstimators = estimators.map { case e: Estimator[_] =>
+      println(e.getInputFeatures().toSeq)
       e.fit(train) match {
         case m: HasTestEval if hasTest =>
           m.evaluateModel(test)
