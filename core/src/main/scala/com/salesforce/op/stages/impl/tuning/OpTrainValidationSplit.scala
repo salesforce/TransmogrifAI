@@ -80,7 +80,7 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
         features = features,
         splitter = splitter
       )).getOrElse {
-        splitter.map(s => (s.validationPrepare(trainingDataset),validationDataset))
+        splitter.map(s => (s.validationPrepare(trainingDataset), validationDataset))
           .getOrElse((trainingDataset, validationDataset))
       }
     }
