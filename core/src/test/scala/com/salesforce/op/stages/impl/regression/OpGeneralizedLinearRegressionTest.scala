@@ -34,26 +34,17 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.PredictionEquality
 import com.salesforce.op.stages.sparkwrappers.specific.{OpPredictorWrapper, OpPredictorWrapperModel}
 import com.salesforce.op.test._
-import com.salesforce.op.testkit.{RandomReal, RandomVector}
 import org.apache.spark.ml.linalg.Vectors
 import org.apache.spark.ml.regression.{GeneralizedLinearRegression, GeneralizedLinearRegressionModel}
 import org.junit.runner.RunWith
-import org.scalacheck.Gen
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.Checkers
 
 @RunWith(classOf[JUnitRunner])
 class OpGeneralizedLinearRegressionTest extends OpEstimatorSpec[Prediction,
   OpPredictorWrapperModel[GeneralizedLinearRegressionModel],
-  OpPredictorWrapper[GeneralizedLinearRegression, GeneralizedLinearRegressionModel]] with PredictionEquality
-  with Checkers  {
+  OpPredictorWrapper[GeneralizedLinearRegression, GeneralizedLinearRegressionModel]] with PredictionEquality {
 
   override def specName: String = Spec[OpGeneralizedLinearRegression]
-
-  import org.scalacheck.Prop
-
-  val rowInteger = Gen.choose(500, 1000)
-  val columnInteger = Gen.choose(10, 50)
 
   val (inputData, rawLabel, features) = TestFeatureBuilder(
     Seq[(RealNN, OPVector)](
@@ -90,31 +81,5 @@ class OpGeneralizedLinearRegressionTest extends OpEstimatorSpec[Prediction,
     estimator.predictor.getTol shouldBe 1E-4
     estimator.predictor.getSolver shouldBe "irls"
 
-  }
-
-  "Regression Model Selector" should "Not pick Linear Regression when the response are counts" in {
-    check(Prop.forAll(rowInteger) { n =>
-      Prop.forAll(columnInteger) { p =>
-        Prop.collect(n, p) {
-
-          println(s"n = $n p = $p")
-          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
-          val mean: Double = spark.sparkContext.parallelize(vectors.map(_.value.toArray.sum)).mean()
-          val labels = RandomReal.poisson[RealNN](mean = mean).limit(n).toSeq
-          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
-          val response = label.copy(isResponse = true)
-
-          data.show
-          val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
-            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
-              RegressionModelsToTry.OpLinearRegression),
-            numFolds = 5
-          ).setInput(response, features)
-          val model = selector.fit(data)
-          model.transform(data)
-          !model.getSparkMlStage().get.toString().contains("linReg")
-        }
-      }
-    })
   }
 }

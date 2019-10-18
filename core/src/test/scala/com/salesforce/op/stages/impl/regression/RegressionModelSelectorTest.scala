@@ -38,7 +38,8 @@ import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
 import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
 import com.salesforce.op.stages.impl.tuning.{BestEstimator, DataSplitter}
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.testkit.{RandomReal, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
@@ -49,8 +50,10 @@ import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
+import org.scalacheck.{Gen, Prop}
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.Checkers
 
 import scala.concurrent.TimeoutException
 import scala.concurrent.duration.Duration
@@ -59,7 +62,7 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
-  with CompareParamGrid with OpXGBoostQuietLogging {
+  with CompareParamGrid with OpXGBoostQuietLogging with Checkers {
   val seed = 1234L
   val stageNames = "label_prediction"
   val dataCount = 200
@@ -447,5 +450,90 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val res = scores.zip(labels)
       .map { case (score: Prediction, label: RealNN) => math.abs(score.prediction - label.v.get) }.sum
     assert(res <= scores.length, "prediction failed")
+  }
+
+
+
+
+  import org.scalacheck.Prop
+
+  val rowInteger = Gen.choose(500, 1000)
+  val columnInteger = Gen.choose(10, 50)
+
+  it should "pick Linear Regression or GLM when the response a linear combination of predictors" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(_.value.toArray.sum.toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+          val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
+            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+              RegressionModelsToTry.OpLinearRegression),
+            numFolds = 5
+          ).setInput(response, features)
+          val model = selector.fit(data)
+          model.transform(data)
+          val modelName = model.getSparkMlStage().get.toString()
+          modelName.contains("linReg") || modelName.contains("glm")
+        }
+      }
+    })
+  }
+
+  it should "pick RandomForest when the response a decision stump of a predictor" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(v => {
+            val head = v.value(0)
+            if (head > 1.0) 1000.0 else 500.0
+          }.toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+          val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
+            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+              RegressionModelsToTry.OpLinearRegression),
+            numFolds = 5
+          ).setInput(response, features)
+          val model = selector.fit(data)
+          model.transform(data)
+          val modelName = model.getSparkMlStage().get.toString()
+
+          modelName.contains("rfr")
+        }
+      }
+    })
+  }
+
+  it should "pick GLM when the response a the exponential of a linear combination of the predictors" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(v => math.exp(v.value.toArray.sum).toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+          val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
+            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+              RegressionModelsToTry.OpLinearRegression),
+            numFolds = 5
+          ).setInput(response, features)
+          val model = selector.fit(data)
+          model.transform(data)
+          val modelName = model.getSparkMlStage().get.toString()
+
+          modelName.contains("glm")
+        }
+      }
+    })
   }
 }
