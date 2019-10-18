@@ -59,7 +59,7 @@ First, build project with `./gradlew shadowJar`.
 #### Train
 ```shell
 $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
-  build/libs/transmogrifai-helloworld-0.0.1.jar \
+  build/libs/transmogrifai-helloworld-0.0.1-all.jar \
   --run-type train \
   --model-location /tmp/titanic-model \
   --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv
@@ -67,7 +67,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 #### Score
 ```shell
 $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
-  build/libs/transmogrifai-helloworld-0.0.1.jar \
+  build/libs/transmogrifai-helloworld-0.0.1-all.jar \
   --run-type score \
   --model-location /tmp/titanic-model \
   --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
@@ -76,7 +76,7 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 #### Evaluate
 ```shell
 $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
-  build/libs/transmogrifai-helloworld-0.0.1.jar \
+  build/libs/transmogrifai-helloworld-0.0.1-all.jar \
   --run-type evaluate \
   --model-location /tmp/titanic-model \
   --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
