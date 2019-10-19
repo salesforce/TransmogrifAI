@@ -158,6 +158,31 @@ class OpLinearRegression(uid: String = UID[OpLinearRegression])
   def setAggregationDepth(value: Int): this.type = set(aggregationDepth, value)
   setDefault(aggregationDepth -> 2)
 
+  /**
+   * Set the type of loss function to be optimized.
+   * Supported options: "squaredError" (https://en.wikipedia.org/wiki/Mean_squared_error)
+   * and "huber" (https://en.wikipedia.org/wiki/Huber_loss).
+   * Default is squaredError.
+   *
+   * @group setParam
+   */
+  def setLossType(value: String): this.type = set(loss, value)
+  setDefault(loss -> "squaredError")
+
+  /**
+   * The shape parameter to control the amount of robustness. Must be &gt; 1.0.
+   * At larger values of epsilon, the huber criterion becomes more similar to least squares
+   * regression; for small values of epsilon, the criterion is more similar to L1 regression.
+   * Default is 1.35 to get as much robustness as possible while retaining
+   * 95% statistical efficiency for normally distributed data. It matches sklearn
+   * HuberRegressor and is "M" from <a href="http://statweb.stanford.edu/~owen/reports/hhu.pdf">
+   * A robust hybrid of lasso and ridge regression</a>.
+   * Only valid when "loss" is "huber".
+   *
+   * @group expertParam
+   */
+  def setEpsilon(value: Double): this.type = set(epsilon, value)
+  setDefault(epsilon -> 1.35)
 }
 
 
