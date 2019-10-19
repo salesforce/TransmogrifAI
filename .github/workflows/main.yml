@@ -16,4 +16,4 @@ jobs:
     - name: Build
       run: ./gradlew scalaStyle reportScoverage
     - name: Build Helloworld
-      run: cd helloworld && ./gradlew scalaStyle test 
+      run: cd helloworld && ./gradlew scalaStyle test
