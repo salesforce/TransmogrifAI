@@ -31,8 +31,9 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.UID
+import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.{Dataset, Row}
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
 case object DataSplitter {
@@ -46,11 +47,13 @@ case object DataSplitter {
    */
   def apply(
     seed: Long = SplitterParamsDefault.seedDefault,
-    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault
+    reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault,
+    maxTrainingSample: Int = SplitterParamsDefault.MaxTrainingSampleDefault
   ): DataSplitter = {
     new DataSplitter()
       .setSeed(seed)
       .setReserveTestFraction(reserveTestFraction)
+      .setMaxTrainingSample(maxTrainingSample)
   }
 }
 
@@ -59,30 +62,70 @@ case object DataSplitter {
  *
  * @param uid
  */
-class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) {
+class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) with DataSplitterParams {
 
   /**
-   * Function to set parameters before passing into the validation step
-   * eg - do data balancing or dropping based on the labels
+   * Function to set the down sampling fraction and parameters before passing into the validation step
    *
    * @param data
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: Dataset[Row]): PrevalidationVal = {
-    summary = Option(DataSplitterSummary())
+    val dataSetSize = data.count()
+    val sampleF = getMaxTrainingSample / dataSetSize.toDouble
+    val downSampleFraction = math.min(sampleF, SplitterParamsDefault.DownSampleFractionDefault)
+    summary = Option(DataSplitterSummary(dataSetSize, downSampleFraction))
+    setDownSampleFraction(downSampleFraction)
     PrevalidationVal(summary, None)
   }
 
+  /**
+   * Rebalance the training data within the validation step
+   *
+   * @param data to prepare for model training. first column must be the label as a double
+   * @return balanced training set and a test set
+   */
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+
+    val dataPrep = super.validationPrepare(data)
+
+    // check if down sampling is needed
+    val balanced: DataFrame = if (getDownSampleFraction < 1) {
+      dataPrep.sample( false, getDownSampleFraction, getSeed)
+    } else {
+      dataPrep
+    }
+    balanced.persist()
+  }
   override def copy(extra: ParamMap): DataSplitter = {
     val copy = new DataSplitter(uid)
     copyValues(copy, extra)
   }
 }
+trait DataSplitterParams extends Params {
+  /**
+   * Fraction to down sample data
+   * Value should be in [0.0, 1.0]
+   *
+   * @group param
+   */
+  protected[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
+    "fraction to down sample data", ParamValidators.inRange(
+      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
+    )
+  )
+  setDefault(downSampleFraction, SplitterParamsDefault.DownSampleFractionDefault)
+
+  protected[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
+
+  protected[op] def getDownSampleFraction: Double = $(downSampleFraction)
+}
 
 /**
- * Empty class because no summary information for a data splitter
+ * Summary for data splitter run for storage in metadata
+ * @param downSamplingFraction down sampling fraction for training set
  */
-case class DataSplitterSummary() extends SplitterSummary {
+case class DataSplitterSummary(preSplitterDataCount: Long, downSamplingFraction: Double) extends SplitterSummary {
 
   /**
    * Converts to [[Metadata]]
@@ -94,6 +137,8 @@ case class DataSplitterSummary() extends SplitterSummary {
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .putLong(ModelSelectorNames.PreSplitterDataCount, preSplitterDataCount)
+      .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
       .build()
   }
 
