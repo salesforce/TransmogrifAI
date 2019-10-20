@@ -68,6 +68,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
   val dataCount = 200
 
   import spark.implicits._
+
   val rand = new Random(seed)
 
   val rawData: Seq[(Double, Vector)] = List.range(-100, 100, 1).map(i =>
@@ -147,7 +148,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val model = modelSelector.setInput(label, features).fit(data)
     val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
 
-    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction" )
+    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction")
 
     modelDownSampleFraction shouldBe downSampleFraction
   }
@@ -440,7 +441,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val fitted = modelSelector.fit(data)
 
     fitted.modelStageIn.parent.extractParamMap().toSeq
-      .collect{ case p: ParamPair[_] if p.param.name == "cacheNodeIds" => p.value }.head shouldBe myParam
+      .collect { case p: ParamPair[_] if p.param.name == "cacheNodeIds" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.bestModelName shouldBe myEstimatorName
@@ -451,8 +452,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
       .map { case (score: Prediction, label: RealNN) => math.abs(score.prediction - label.v.get) }.sum
     assert(res <= scores.length, "prediction failed")
   }
-
-
 
 
   import org.scalacheck.Prop
@@ -471,7 +470,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val response = label.copy(isResponse = true)
 
           val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
-            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,
+              RegressionModelsToTry.OpRandomForestRegressor,
               RegressionModelsToTry.OpLinearRegression),
             numFolds = 5
           ).setInput(response, features)
@@ -498,7 +498,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val response = label.copy(isResponse = true)
 
           val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
-            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,
+              RegressionModelsToTry.OpRandomForestRegressor,
               RegressionModelsToTry.OpLinearRegression),
             numFolds = 5
           ).setInput(response, features)
@@ -522,8 +523,9 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
           val response = label.copy(isResponse = true)
 
-          val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
-            Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,RegressionModelsToTry.OpRandomForestRegressor,
+          val selector = RegressionModelSelector.withCrossValidation(
+            modelTypesToUse = Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,
+              RegressionModelsToTry.OpRandomForestRegressor,
               RegressionModelsToTry.OpLinearRegression),
             numFolds = 5
           ).setInput(response, features)
