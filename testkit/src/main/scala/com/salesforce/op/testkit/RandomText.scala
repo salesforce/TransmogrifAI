@@ -244,6 +244,13 @@ object RandomText {
   def streets: RandomText[Street] = selectRandom[Street](StreetsOfSanJose)
 
   /**
+   * Produces random full names from a list that we keep in our resource file
+   *
+   * @return a random names generator
+   */
+  def names: RandomText[Name] = selectRandom[Name](FirstNames)
+
+  /**
    * Produces a random Base64 strings generator
    *
    * @param minLen minimum source string length

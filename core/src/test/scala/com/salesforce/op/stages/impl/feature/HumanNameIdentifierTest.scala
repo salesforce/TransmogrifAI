@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomText
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -40,6 +41,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class HumanNameIdentifierTest
   extends OpEstimatorSpec[NameStats, UnaryModel[Text, NameStats], UnaryEstimator[Text, NameStats]] {
+
   /**
    * Input Dataset to fit & transform
    */
@@ -69,11 +71,14 @@ class HumanNameIdentifierTest
 
   it should "not identify a Text column with a single non-name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Firetruck").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe false
+    model
+      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .treatAsName shouldBe false
   }
 
   it should "identify a Text column with multiple first name entries as Name" in {
-    val (_, _, model, _) = identifyName(Seq("Bob", "Michael", "Alice", "Juan", "Clara").toText)
+    val names = RandomText.names.withProbabilityOfEmpty(0.0).take(100).toList
+    val (_, _, model, _) = identifyName(names)
     model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
   }
 
@@ -84,17 +89,24 @@ class HumanNameIdentifierTest
 
   it should "not identify email addresses as Name" in {
     val (_, _, model, _) = identifyName(Seq("elizabeth@warren2020.com").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe false
+    model
+      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .treatAsName shouldBe false
   }
 
   it should "not identify numbers as Name" in {
-    val (_, _, model, _) = identifyName(Seq("1", "42", "0", "3000 michael").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe false
+    val (_, _, model, _) =
+      identifyName(Seq("1", "42", "0", "3000 michael").toText)
+    model
+      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .treatAsName shouldBe false
   }
 
   it should "not identify a single repeated name as Name" in {
     val (_, _, model, _) = identifyName(Seq.fill(200)("Michael").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe false
+    model
+      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .treatAsName shouldBe false
   }
 
   it should "return an empty map when the input is not a Name" in {
@@ -115,12 +127,33 @@ class HumanNameIdentifierTest
     map.get(Gender) shouldBe Some(Female)
   }
 
-  it should "not identify the gender of a full Name (yet)" in {
+  it should "identify which token is the first name in a single full name entry correctly" in {
+    val (_, _, model, _) = identifyName(Seq("Shelby Bouvet").toText)
+    model.asInstanceOf[HumanNameIdentifierModel[Text]].indexFirstName shouldBe 0
+  }
+
+  it should "identify the gender of a single full name entry correctly" in {
     import NameStats.GenderStrings._
     import NameStats.Keys._
     val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
     model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
-    map.get(Gender) shouldBe Some(GenderNotInferred)
+    map.get(Gender) shouldBe Some(Female)
+  }
+
+  it should "identify the gender of a multiple full name entries (with varying token lengths) correctly" in {
+    import NameStats.GenderStrings._
+    import NameStats.Keys._
+    val (_, _, model, result) = identifyName(Seq(
+      "Sherrod Brown",
+      "Maria Cantwell",
+      "Benjamin L. Cardin",
+      "Stephanie",
+      "Thomas R. Carper"
+    ).toText)
+    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
+    val identifiedGenders = resultingMaps.map(_.get(Gender))
+    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male))
   }
 }

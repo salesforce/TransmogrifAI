@@ -35,17 +35,59 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
-import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
 
+import scala.collection.mutable
 import scala.io.Source
-import scala.util.Try
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.Try
 
-trait NameCleaner {
+trait NameIdentificationHelpers {
   def preProcess(s: String): Array[String] = {
     s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
+  }
+
+  def preProcessUDF: UserDefinedFunction = udf(preProcess _)
+
+  // TODO: Extract following code into its own class
+  // TODO: Use more robust data sources + start repo for maintaining data
+  lazy final val nameDictionary = {
+    val nameDictionary = collection.mutable.Set.empty[String]
+    val dictionaryPath = "/NameIdentification_JRC.txt"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {name <- buffer.getLines} {
+      nameDictionary += name
+    }
+    buffer.close
+    nameDictionary
+  }
+
+  def dictCheck: UserDefinedFunction = udf((tokens: mutable.WrappedArray[String]) => {
+    val percentageMatched = tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
+    percentageMatched >= 0.5
+  }: Boolean)
+
+  lazy final val genderDictionary = {
+    val genderDictionary = collection.mutable.Map.empty[String, Double]
+    val dictionaryPath = "/GenderDictionary_SSA.csv"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {row <- buffer.getLines.drop(1)} {
+      val cols = row.split(",").map(_.trim)
+      val name = cols(0).toLowerCase().replace("\\P{L}", "")
+      val probMale = Try {
+        cols(6).toDouble
+      }.toOption
+      probMale match {
+        case Some(prob) => genderDictionary += (name -> prob)
+        case None =>
+      }
+    }
+    buffer.close
+    genderDictionary
   }
 }
 
@@ -60,7 +102,7 @@ class HumanNameIdentifier[T <: Text]
 ) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
-) with NameCleaner {
+) with NameIdentificationHelpers {
   // Parameters
   // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
   val defaultThreshold = new DoubleParam(
@@ -75,20 +117,6 @@ class HumanNameIdentifier[T <: Text]
 
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
-
-  // TODO: Extract following code into its own class
-  // TODO: Use more robust data sources + start repo for maintaining data
-  lazy private val nameDictionary = {
-    val nameDictionary = collection.mutable.Set.empty[String]
-    val dictionaryPath = "/NameIdentification_JRC.txt"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    for {name <- buffer.getLines} {
-      nameDictionary += name
-    }
-    buffer.close
-    nameDictionary
-  }
 
   private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
 
@@ -118,17 +146,22 @@ class HumanNameIdentifier[T <: Text]
     checks.forall(identity)
   }
 
-  // TODO: Eventually, we will want this to perform separate checks in first/last name dictionaries
-  // And then map from the original tokens to which dictionaries they were found in
-  // which can help us figure out what the order of names is
-  private def dictCheck: UserDefinedFunction = udf((s: String) => {
-    val tokens = preProcess(s)
-    val percentageMatched = tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
-    percentageMatched >= 0.5
-  }: Boolean)
-
-  private def predictIfName(dataset: Dataset[T#Value], column: Column): Dataset[Boolean] = {
+  // Keeping this helper function because it does some useful type checking
+  private def predictIfName(dataset: DataFrame, column: Column): Dataset[Boolean] = {
     dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
+  }
+
+  private def checkNthTokenForFirstName(N: Int): UserDefinedFunction = {
+    if (N == -1) {
+      udf((tokens: mutable.WrappedArray[String]) => {
+        genderDictionary contains tokens(tokens.length - 1)
+      }: Boolean)
+    }
+    else {
+      udf((tokens: mutable.WrappedArray[String]) => {
+        genderDictionary contains tokens(N)
+      }: Boolean)
+    }
   }
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
@@ -137,10 +170,29 @@ class HumanNameIdentifier[T <: Text]
     if (!guardChecks(dataset, column)) {
       new HumanNameIdentifierModel[T](uid, false)
     } else {
-      val predictedDF = predictIfName(dataset, column)
+      val tokenizedDF = dataset.withColumn(column.toString, preProcessUDF(column))
+
+      // Check if likely to be a name field
+      val predictedDF = predictIfName(tokenizedDF, column)
       val predictedProb: Double = averageBoolCol(predictedDF, column)
-      val treatAsName: Boolean = predictedProb >= $(defaultThreshold)
-      new HumanNameIdentifierModel[T](uid, treatAsName)
+      logInfo(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
+
+      if (predictedProb >= $(defaultThreshold)) {
+        // Also figure out the index of the likely first name
+        val percentageFirstNameByN = for { i <- List(0, -1) } yield {
+          val percentageMatched = averageBoolCol(
+            tokenizedDF.select(
+              checkNthTokenForFirstName(i)(column).alias(column.toString)
+            ).asInstanceOf[Dataset[Boolean]], column
+          )
+          (percentageMatched, i)
+        }
+        val (_, bestIndex) = percentageFirstNameByN.maxBy(_._1)
+        new HumanNameIdentifierModel[T](
+          uid, true, indexFirstName = bestIndex
+        )
+      }
+      else new HumanNameIdentifierModel[T](uid, false)
     }
   }
 }
@@ -149,44 +201,26 @@ class HumanNameIdentifier[T <: Text]
 class HumanNameIdentifierModel[T <: Text]
 (
   override val uid: String,
-  val treatAsName: Boolean
+  val treatAsName: Boolean,
+  val indexFirstName: Int = 0
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameCleaner {
+  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationHelpers {
 
-  lazy private val genderDictionary = {
-    val genderDictionary = collection.mutable.Map.empty[String, Double]
-    val dictionaryPath = "/GenderDictionary_SSA.csv"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    for {row <- buffer.getLines.drop(1)} {
-      val cols = row.split(",").map(_.trim)
-      val name = cols(0).toLowerCase().replace("\\P{L}", "")
-      val probMale = Try {
-        cols(6).toDouble
-      }.toOption
-      probMale match {
-        case Some(prob) => genderDictionary += (name -> prob)
-        case None =>
-      }
-    }
-    buffer.close
-    genderDictionary
-  }
-
-  import NameStats.Keys._
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings._
-
+  import NameStats.Keys._
 
   def transformFn: Text => NameStats = input => {
     val name = input.value.getOrElse("")
     val tokens = preProcess(name)
     if (treatAsName) {
-      val gender = if (tokens.length != 1) GenderNotInferred else {
-        genderDictionary.get(tokens.head).map(
-          probMale => if (probMale >= 0.5) Male else Female
-        ).getOrElse(GenderNA)
-      }
+      val nameToCheckGenderOf = if (tokens.length != 1) {
+        // Mod to accept -1 as valid index
+        tokens((indexFirstName + tokens.length) % tokens.length)
+      } else tokens.head
+      val gender = genderDictionary.get(nameToCheckGenderOf).map(
+        probMale => if (probMale >= 0.5) Male else Female
+      ).getOrElse(GenderNA)
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),

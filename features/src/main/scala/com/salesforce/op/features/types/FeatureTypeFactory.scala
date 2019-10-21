@@ -198,6 +198,8 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.PostalCode else new PostalCode(value.asInstanceOf[Option[String]])
       case t if t =:= weakTypeOf[Street] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Street else new Street(value.asInstanceOf[Option[String]])
+      case t if t =:= weakTypeOf[Name] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.Name else new Name(value.asInstanceOf[Option[String]])
 
       // Unknown
       case t => throw new IllegalArgumentException(s"No feature type available for type $t")
