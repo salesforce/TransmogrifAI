@@ -64,32 +64,21 @@ trait RecordInsightsLOCOParams extends Params {
   def setTopKStrategy(strategy: TopKStrategy): this.type = set(topKStrategy, strategy.entryName)
   def getTopKStrategy: TopKStrategy = TopKStrategy.withName($(topKStrategy))
 
-  final val dateAggregationStrategy = new Param[String](parent = this, name = "dateAggregationStrategy",
-    doc = "Whether vector for each time period - HourOfDay, DayOfWeek, etc is aggregated by " +
+  final val vectorAggregationStrategy = new Param[String](parent = this, name = "vectorAggregationStrategy",
+    doc = "Aggregate text/date vector by " +
       "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or" +
       "2. Avg strategy - calculate the loco for each column of the vector and then average all the locos."
   )
-  def setDateAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
-    set(dateAggregationStrategy, strategy.entryName)
-  def getDateAggregationStrategy: VectorAggregationStrategy = VectorAggregationStrategy.withName(
-    $(dateAggregationStrategy))
-
-  final val textAggregationStrategy = new Param[String](parent = this, name = "dateAggregationStrategy",
-    doc = "Whether text vector is aggregated by " +
-      "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or" +
-      "2. Avg strategy - calculate the loco for each column of the vector and then average all the locos."
-  )
-  def setTextAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
-    set(textAggregationStrategy, strategy.entryName)
-  def getTextAggregationStrategy: VectorAggregationStrategy = VectorAggregationStrategy.withName(
-    $(textAggregationStrategy))
+  def setVectorAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
+    set(vectorAggregationStrategy, strategy.entryName)
+  def getVectorAggregationStrategy: VectorAggregationStrategy = VectorAggregationStrategy.withName(
+    $(vectorAggregationStrategy))
 
 
   setDefault(
     topK -> 20,
     topKStrategy -> TopKStrategy.Abs.entryName,
-    dateAggregationStrategy -> VectorAggregationStrategy.Avg.entryName,
-    textAggregationStrategy -> VectorAggregationStrategy.Avg.entryName
+    vectorAggregationStrategy -> VectorAggregationStrategy.Avg.entryName
   )
 }
 
@@ -252,13 +241,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     textActiveIndices.foreach {
       case (name, aggIndices) =>
         val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
-          getTextAggregationStrategy, baseScore, textFeaturesCount.get(name).get)
+          getVectorAggregationStrategy, baseScore, textFeaturesCount.get(name).get)
         minMaxHeap enqueue LOCOValue(aggIndices.head._1, diffToExamine(indexToExamine), diffToExamine)
     }
     dateActiveIndices.foreach {
       case (name, aggIndices) =>
         val diffToExamine = aggregateDiffs(featureSparse, aggIndices,
-          getDateAggregationStrategy, baseScore, dateFeaturesCount.get(name).get)
+          getVectorAggregationStrategy, baseScore, dateFeaturesCount.get(name).get)
         minMaxHeap enqueue LOCOValue(aggIndices.head._1, diffToExamine(indexToExamine), diffToExamine)
     }
 

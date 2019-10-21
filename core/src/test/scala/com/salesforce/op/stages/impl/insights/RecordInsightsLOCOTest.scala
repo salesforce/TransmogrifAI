@@ -508,8 +508,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
     topK: Int = 20
   ): Array[Map[OpVectorColumnHistory, Insights]] = {
     val transformer = new RecordInsightsLOCO(model).setInput(featureVector).setTopK(topK)
-      .setDateAggregationStrategy(strategy)
-      .setTextAggregationStrategy(strategy)
+      .setVectorAggregationStrategy(strategy)
     val insights = transformer.transform(df)
     insights.collect(transformer.getOutput()).map(i => RecordInsightsParser.parseInsights(i))
   }
