@@ -2,6 +2,10 @@
 
 This page lists recommendations and requirements for how to best contribute to TransmogrifAI. We strive to obey these as best as possible. As always, thanks for contributing – we hope these guidelines make it easier and shed some light on our approach and processes.
 
+# Getting started
+
+Please join the community on Gitter [![Chat](https://badges.gitter.im/salesforce/TransmogrifAI.svg)](https://gitter.im/salesforce/TransmogrifAI?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge). Also please make sure to take a look at the project [roadmap](ROADMAP.md) to see where are headed.
+
 # Issues, requests & ideas
 
 Use GitHub [Issues](https://github.com/salesforce/TransmogrifAI/issues) page to submit issues, enhancement requests and discuss ideas.
