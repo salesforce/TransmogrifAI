@@ -153,7 +153,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val dataPrep = super.validationPrepare(data)
 
     // check if down sampling is needed
-    val balanced: DataFrame = if (getDownSampleFraction < 1) {
+    val balanced: DataFrame = if (getDownSampleFraction < 1.0) {
       dataPrep.sample( false, getDownSampleFraction, getSeed)
     } else {
       dataPrep
@@ -307,7 +307,7 @@ private[impl] trait DataCutterParams extends SplitterParams {
  */
 case class DataCutterSummary
 (
-  preSplitterDataCount: Long = 0,
+  preSplitterDataCount: Long = 0L,
   downSamplingFraction: Double = SplitterParamsDefault.DownSampleFractionDefault,
   labelsKept: Seq[Double],
   labelsDropped: Seq[Double],

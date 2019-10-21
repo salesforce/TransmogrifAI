@@ -131,7 +131,7 @@ trait SplitterParams extends Params {
 
   /**
    * Fraction to sample majority data
-   * Value should be in ]0.0, 1.0]
+   * Value should be in (0.0, 1.0]
    *
    * @group param
    */

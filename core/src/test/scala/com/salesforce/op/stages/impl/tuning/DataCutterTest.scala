@@ -69,7 +69,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -86,7 +86,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
@@ -154,7 +154,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDroppedTotal shouldBe 900
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -172,7 +172,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDroppedTotal shouldBe 997
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
@@ -193,7 +193,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsKept.length + s.labelsDroppedTotal shouldBe distinct
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -210,7 +210,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDropped.length shouldBe 10
       s shouldBe DataCutterSummary(
         preSplitterDataCount = dataSize,
-        downSamplingFraction = 1,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
