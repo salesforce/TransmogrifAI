@@ -45,6 +45,7 @@ case object ModelSelectorNames {
   val HoldOutEval = "testSetEvaluationResults"
   val ResampleValues = "resamplingValues"
   val CuttValues = "cuttValues"
+  val PreSplitterDataCount = "preSplitterDataCount"
   val BestModelUid = "bestModelUID"
   val BestModelName = "bestModelName"
   val Positive = "positiveLabels"
