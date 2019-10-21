@@ -298,8 +298,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
   }
 
   for {strategy <- VectorAggregationStrategy.values} {
-    it should s"aggregate values for text and textMap derived features when " +
-      s"strategy=$strategy" in {
+    it should s"aggregate values for text and textMap derived features when strategy=$strategy" in {
       val (df, featureVector, label) = generateTestTextData
       val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
       val actualInsights = generateRecordInsights(model, df, featureVector, strategy)
@@ -329,7 +328,7 @@ class RecordInsightsLOCOTest extends FlatSpec with TestSparkContext with RecordI
   }
 
   for {strategy <- VectorAggregationStrategy.values} {
-    it should s"aggregate values for date, datetime, dateMap and dateTimeMap derived features when " +
+    it should "aggregate values for date, datetime, dateMap and dateTimeMap derived features when " +
       s"strategy=$strategy" in {
       val (df, featureVector, label) = generateTestDateData
       val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
