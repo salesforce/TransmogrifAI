@@ -144,16 +144,19 @@ class HumanNameIdentifierTest
   it should "identify the gender of a multiple full name entries (with varying token lengths) correctly" in {
     import NameStats.GenderStrings._
     import NameStats.Keys._
+    // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
       "Sherrod Brown",
       "Maria Cantwell",
       "Benjamin L. Cardin",
-      "Stephanie",
-      "Thomas R. Carper"
+      "Lisa Maria Blunt Rochester",
+      "Thomas Robert Carper",
+      "Jennifer González-Colón"
     ).toText)
+    // scalastyle:on
     model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male))
+    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
   }
 }

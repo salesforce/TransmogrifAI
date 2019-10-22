@@ -65,11 +65,6 @@ trait NameIdentificationHelpers {
     nameDictionary
   }
 
-  def dictCheck: UserDefinedFunction = udf((tokens: mutable.WrappedArray[String]) => {
-    val percentageMatched = tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
-    percentageMatched >= 0.5
-  }: Boolean)
-
   lazy final val genderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]
     val dictionaryPath = "/GenderDictionary_SSA.csv"
@@ -120,8 +115,8 @@ class HumanNameIdentifier[T <: Text]
 
   private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
 
-  private def averageBoolCol(dataset: Dataset[Boolean], column: Column): Double = {
-    extractDouble(dataset.select(mean(column.cast("integer"))))
+  private def averageCol(df: DataFrame, column: Column): Double = {
+    extractDouble(df.select(mean(column.cast("double"))))
   }
 
   private def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
@@ -130,12 +125,12 @@ class HumanNameIdentifier[T <: Text]
 
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
-      averageBoolCol(dataset.withColumn(
-        column.toString, size(split(column, "\\s+")) < 10).asInstanceOf[Dataset[Boolean]], column
+      averageCol(dataset.withColumn(
+        column.toString, size(split(column, "\\s+")) < 10), column
       ) > 0.75,
       // check that at least 3/4 of the texts are longer than 3 characters
-      averageBoolCol(dataset.withColumn(
-        column.toString, length(column) > 3).asInstanceOf[Dataset[Boolean]], column
+      averageCol(dataset.withColumn(
+        column.toString, length(column) > 3), column
       ) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
       total < 10 ||
@@ -146,10 +141,9 @@ class HumanNameIdentifier[T <: Text]
     checks.forall(identity)
   }
 
-  // Keeping this helper function because it does some useful type checking
-  private def predictIfName(dataset: DataFrame, column: Column): Dataset[Boolean] = {
-    dataset.select(dictCheck(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]]
-  }
+  def dictCheck: UserDefinedFunction = udf((tokens: mutable.WrappedArray[String]) => {
+    tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
+  }: Double)
 
   private def checkNthTokenForFirstName(N: Int): UserDefinedFunction = {
     if (N == -1) {
@@ -173,18 +167,14 @@ class HumanNameIdentifier[T <: Text]
       val tokenizedDF = dataset.withColumn(column.toString, preProcessUDF(column))
 
       // Check if likely to be a name field
-      val predictedDF = predictIfName(tokenizedDF, column)
-      val predictedProb: Double = averageBoolCol(predictedDF, column)
+      val predictedProb: Double = averageCol(tokenizedDF.withColumn(column.toString, mean(dictCheck(column))), column)
       logInfo(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
 
       if (predictedProb >= $(defaultThreshold)) {
         // Also figure out the index of the likely first name
         val percentageFirstNameByN = for { i <- List(0, -1) } yield {
-          val percentageMatched = averageBoolCol(
-            tokenizedDF.select(
-              checkNthTokenForFirstName(i)(column).alias(column.toString)
-            ).asInstanceOf[Dataset[Boolean]], column
-          )
+          val percentageMatched = averageCol(
+            tokenizedDF.select(checkNthTokenForFirstName(i)(column).alias(column.toString)), column)
           (percentageMatched, i)
         }
         val (_, bestIndex) = percentageFirstNameByN.maxBy(_._1)
