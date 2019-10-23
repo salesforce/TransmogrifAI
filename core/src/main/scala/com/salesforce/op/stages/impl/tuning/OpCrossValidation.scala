@@ -126,7 +126,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
               label = label, features = features, splitter = splitter
             )
           ).getOrElse{
-            splitter.map(s => (s.validationPrepare(training), s.validationPrepare(validation)))
+            splitter.map(s => (s.validationPrepare(training), validation))
               .getOrElse((training, validation))
           }
           getSummary(modelInfo = modelInfo, label = label, features = features, train = newTrain, test = newTest)
