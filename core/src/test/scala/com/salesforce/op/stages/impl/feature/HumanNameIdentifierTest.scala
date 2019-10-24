@@ -129,7 +129,7 @@ class HumanNameIdentifierTest
 
   it should "identify which token is the first name in a single full name entry correctly" in {
     val (_, _, model, _) = identifyName(Seq("Shelby Bouvet").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].indexFirstName shouldBe 0
+    model.asInstanceOf[HumanNameIdentifierModel[Text]].indexFirstName shouldBe Some(0)
   }
 
   it should "identify the gender of a single full name entry correctly" in {

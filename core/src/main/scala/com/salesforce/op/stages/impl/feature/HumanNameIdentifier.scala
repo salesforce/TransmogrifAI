@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
@@ -44,15 +45,7 @@ import scala.io.Source
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
-trait NameIdentificationHelpers {
-  def preProcess(s: String): Array[String] = {
-    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
-  }
-
-  def preProcessUDF: UserDefinedFunction = udf(preProcess _)
-
-  // TODO: Extract following code into its own class
-  // TODO: Use more robust data sources + start repo for maintaining data
+private[op] trait NameIdentificationFun extends Logging {
   lazy final val nameDictionary = {
     val nameDictionary = collection.mutable.Set.empty[String]
     val dictionaryPath = "/NameIdentification_JRC.txt"
@@ -70,6 +63,7 @@ trait NameIdentificationHelpers {
     val dictionaryPath = "/GenderDictionary_SSA.csv"
     val stream = getClass.getResourceAsStream(dictionaryPath)
     val buffer = Source.fromInputStream(stream)
+    // TODO: Also make use of frequency information in this dictionary
     for {row <- buffer.getLines.drop(1)} {
       val cols = row.split(",").map(_.trim)
       val name = cols(0).toLowerCase().replace("\\P{L}", "")
@@ -84,57 +78,35 @@ trait NameIdentificationHelpers {
     buffer.close
     genderDictionary
   }
-}
 
-class HumanNameIdentifier[T <: Text]
-(
-  uid: String = UID[HumanNameIdentifier[_]],
-  operationName: String = "human name identifier"
-)
-(
-  implicit tti: TypeTag[T],
-  override val ttiv: TypeTag[T#Value]
-) extends UnaryEstimator[T, NameStats](
-  uid = uid,
-  operationName = operationName
-) with NameIdentificationHelpers {
-  // Parameters
-  // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
-  val defaultThreshold = new DoubleParam(
-    parent = this,
-    name = "defaultThreshold",
-    doc = "default fraction of entries to be names before treating as name",
-    isValid = (value: Double) => {
-      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
-    }
-  )
-  setDefault(defaultThreshold, 0.50)
+  def preProcess(s: String): Array[String] = {
+    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
+  }
 
+  def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
-  def setThreshold(value: Double): this.type = set(defaultThreshold, value)
+  def extractDouble(df: DataFrame): Double = df.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
 
-  private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
-
-  private def averageCol(df: DataFrame, column: Column): Double = {
+  def averageCol(df: DataFrame, column: Column): Double = {
     extractDouble(df.select(mean(column.cast("double"))))
   }
 
-  private def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
-    val total = dataset.count()
-    val numUnique = extractDouble(dataset.select(approx_count_distinct(column).cast(DoubleType)))
+  def guardChecks(df: DataFrame, column: Column): Boolean = {
+    val total = df.count()
+    val numUnique = extractDouble(df.select(approx_count_distinct(column).cast(DoubleType)))
 
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
-      averageCol(dataset.withColumn(
+      averageCol(df.withColumn(
         column.toString, size(split(column, "\\s+")) < 10), column
       ) > 0.75,
       // check that at least 3/4 of the texts are longer than 3 characters
-      averageCol(dataset.withColumn(
+      averageCol(df.withColumn(
         column.toString, length(column) > 3), column
       ) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
       total < 10 ||
-        extractDouble(dataset.select(stddev(length(column)))) > 0.05,
+        extractDouble(df.select(stddev(length(column)))) > 0.05,
       // check that the number of unique entries is at least 10
       total < 100 || numUnique > 10
     )
@@ -145,7 +117,7 @@ class HumanNameIdentifier[T <: Text]
     tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
   }: Double)
 
-  private def checkNthTokenForFirstName(N: Int): UserDefinedFunction = {
+  def checkNthTokenForFirstName(N: Int): UserDefinedFunction = {
     if (N == -1) {
       udf((tokens: mutable.WrappedArray[String]) => {
         genderDictionary contains tokens(tokens.length - 1)
@@ -158,59 +130,47 @@ class HumanNameIdentifier[T <: Text]
     }
   }
 
-  def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
-    assert(dataset.schema.fieldNames.length == 1)
-    val column = col(dataset.schema.fieldNames.head)
-    if (!guardChecks(dataset, column)) {
-      new HumanNameIdentifierModel[T](uid, false)
+  def estimatorFitFn(df: DataFrame, column: Column, threshold: Double): (Double, Boolean, Option[Int]) = {
+    if (log.isDebugEnabled) df.show(truncate = false)
+    if (!guardChecks(df, column)) {
+      (0.0, false, None)
     } else {
-      val tokenizedDF = dataset.withColumn(column.toString, preProcessUDF(column))
-
+      val tokenizedDF = df.withColumn(column.toString, preProcessUDF(column))
+      if (log.isDebugEnabled) tokenizedDF.show(truncate = false)
       // Check if likely to be a name field
       val predictedProb: Double = averageCol(tokenizedDF.withColumn(column.toString, mean(dictCheck(column))), column)
-      logInfo(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
-
-      if (predictedProb >= $(defaultThreshold)) {
+      logDebug(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
+      if (predictedProb < threshold) (0.0, false, None)
+      else {
         // Also figure out the index of the likely first name
-        val percentageFirstNameByN = for { i <- List(0, -1) } yield {
+        val percentageFirstNameByN = for {i <- List(0, -1)} yield {
           val percentageMatched = averageCol(
             tokenizedDF.select(checkNthTokenForFirstName(i)(column).alias(column.toString)), column)
           (percentageMatched, i)
         }
         val (_, bestIndex) = percentageFirstNameByN.maxBy(_._1)
-        new HumanNameIdentifierModel[T](
-          uid, true, indexFirstName = bestIndex
-        )
+        (predictedProb, true, Some(bestIndex))
       }
-      else new HumanNameIdentifierModel[T](uid, false)
     }
   }
-}
-
-
-class HumanNameIdentifierModel[T <: Text]
-(
-  override val uid: String,
-  val treatAsName: Boolean,
-  val indexFirstName: Int = 0
-)(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationHelpers {
 
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings._
   import NameStats.Keys._
 
-  def transformFn: Text => NameStats = input => {
+  def transformerFn(treatAsName: Boolean, indexFirstName: Option[Int], input: Text): NameStats = {
     val name = input.value.getOrElse("")
     val tokens = preProcess(name)
     if (treatAsName) {
+      assert(tokens.length == 1 || indexFirstName.isDefined)
       val nameToCheckGenderOf = if (tokens.length != 1) {
         // Mod to accept -1 as valid index
-        tokens((indexFirstName + tokens.length) % tokens.length)
+        tokens((indexFirstName.getOrElse(0) + tokens.length) % tokens.length)
       } else tokens.head
       val gender = genderDictionary.get(nameToCheckGenderOf).map(
         probMale => if (probMale >= 0.5) Male else Female
       ).getOrElse(GenderNA)
+
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),
@@ -219,4 +179,52 @@ class HumanNameIdentifierModel[T <: Text]
     }
     else NameStats(Map.empty[String, String])
   }
+}
+
+
+class HumanNameIdentifier[T <: Text]
+(
+  uid: String = UID[HumanNameIdentifier[T]],
+  operationName: String = "human name identifier"
+)
+(
+  implicit tti: TypeTag[T],
+  override val ttiv: TypeTag[T#Value]
+) extends UnaryEstimator[T, NameStats](
+  uid = uid,
+  operationName = operationName
+) with NameIdentificationFun {
+  // Parameters
+  // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
+  val defaultThreshold = new DoubleParam(
+    parent = this,
+    name = "defaultThreshold",
+    doc = "default fraction of entries to be names before treating as name",
+    isValid = (value: Double) => {
+      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
+    }
+  )
+  setDefault(defaultThreshold, 0.50)
+
+  def setThreshold(value: Double): this.type = set(defaultThreshold, value)
+
+  def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
+    require(dataset.schema.fieldNames.length == 1, "There is exactly one column in this dataset")
+    val column = col(dataset.schema.fieldNames.head)
+    val (_, treatAsName, indexFirstName) = estimatorFitFn(dataset.toDF(), column, $(defaultThreshold))
+    new HumanNameIdentifierModel[T](uid, treatAsName, indexFirstName = indexFirstName)
+  }
+}
+
+
+class HumanNameIdentifierModel[T <: Text]
+(
+  override val uid: String,
+  val treatAsName: Boolean,
+  val indexFirstName: Option[Int] = None
+)(implicit tti: TypeTag[T])
+  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun {
+  // Why doesn't the following line work
+  // def transformFn(input: T): NameStats = transformerFn(treatAsName, indexFirstName, input)
+  def transformFn: T => NameStats = (input: T) => transformerFn(treatAsName, indexFirstName, input)
 }

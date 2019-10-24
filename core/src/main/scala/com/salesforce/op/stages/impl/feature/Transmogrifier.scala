@@ -37,6 +37,7 @@ import com.salesforce.op.stages.OpPipelineStageBase
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata, SequenceAggregators}
 import com.salesforce.op.utils.text.TextUtils
+import org.slf4j.LoggerFactory
 import org.apache.spark.ml.PipelineStage
 import org.apache.spark.ml.linalg.{SQLDataTypes, Vector, Vectors}
 import org.apache.spark.ml.param._
@@ -90,6 +91,7 @@ private[op] trait TransmogrifierDefaults {
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
 
 private[op] case object Transmogrifier {
+  val log = LoggerFactory.getLogger(this.getClass)
 
   /**
    * Vectorize features by type applying default vectorizers
@@ -299,6 +301,15 @@ private[op] case object Transmogrifier {
             others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
+          // TODO: Delete the following and add proper flags for enabling the name detection
+          log.info("----------- SENSITIVE FEATURE DETECTION BEGINS -----------")
+          (f +: other).map { feature =>
+            val humanNameIdentResults = feature.identifyIfHumanName()
+            log.info(humanNameIdentResults.toString)
+            val postalCodeIdentResults = feature.identifyIfPostalCode()
+            log.info(postalCodeIdentResults.toString)
+          }
+          log.info("----------- SENSITIVE FEATURE DETECTION ENDS -----------")
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,

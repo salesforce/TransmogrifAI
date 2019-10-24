@@ -58,11 +58,16 @@ import scala.reflect.runtime.universe.TypeTag
  *
  * @param uid uid for instance
  */
-class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
-  extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
-    with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
+class SmartTextVectorizer[T <: Text]
+(
+  uid: String = UID[SmartTextVectorizer[T]],
+  operationName: String = "smartTxtVec"
+)(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
+  uid = uid,
+  operationName = operationName
+) with PivotParams with CleanTextFun with SaveOthersParams
+  with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
+  with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
@@ -101,10 +106,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
-      hashingParams = makeHashingParams()
+      hashingParams = makeHashingParams(),
+      isName = Array.empty
     )
 
-    val vecMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata: OpVectorMetadata = makeVectorMetadata(smartTextParams)
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
@@ -124,7 +130,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     TextStats(valueCounts)
   }
 
-  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+  protected def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
     require(inN.length == smartTextParams.isCategorical.length)
 
     val (categoricalFeatures, textFeatures) =
@@ -192,6 +198,7 @@ private[op] object TextStats {
  * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
  * @param hashingParams    hashing function params
+ * @param isName           keep track of which text columns look like names, None if no name identification
  */
 case class SmartTextVectorizerModelArgs
 (
@@ -199,7 +206,8 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  hashingParams: HashingFunctionParams
+  hashingParams: HashingFunctionParams,
+  isName: Array[Boolean]
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
     topValues.zip(isCategorical).collect { case (top, true) => top }
@@ -221,7 +229,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldCleanText = args.shouldCleanText,
       shouldTrackNulls = args.shouldTrackNulls
     )
-    (row: Seq[Text]) => {
+    row: Seq[Text] => {
       val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
