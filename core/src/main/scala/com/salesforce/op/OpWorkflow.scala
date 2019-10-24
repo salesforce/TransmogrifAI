@@ -335,7 +335,6 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     val (fittedStages, newResultFeatures) =
       if (stages.exists(_.isInstanceOf[Estimator[_]])) {
         val rawData = generateRawData()
-
         // Update features with fitted stages
         val fittedStgs = fitStages(data = rawData, stagesToFit = stages, persistEveryKStages)
         val newResultFtrs = resultFeatures.map(_.copyWithNewStages(fittedStgs))
