@@ -45,12 +45,12 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
 import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.param.ParamPair
+import org.apache.spark.ml.param.{ParamMap, ParamPair}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
-import org.scalacheck.{Gen, Prop}
+import org.scalacheck.Gen
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.Checkers
@@ -476,8 +476,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
           val response = label.copy(isResponse = true)
 
-          selector.setInput(response, features)
-          val model = selector.fit(data)
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
           val modelName = model.getSparkMlStage().get.toString()
           modelName.contains("linReg") || modelName.contains("glm")
         }
@@ -499,8 +499,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val response = label.copy(isResponse = true)
 
 
-          selector.bestEstimator = None
-          val model = selector.fit(data)
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
           val modelName = model.getSparkMlStage().get.toString()
           modelName.contains("rfr")
         }
@@ -518,9 +518,8 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
           val response = label.copy(isResponse = true)
 
-          selector.bestEstimator = None
-          selector.setInput(response, features)
-          val model = selector.fit(data)
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
           val modelName = model.getSparkMlStage().get.toString()
           modelName.contains("glm")
         }
