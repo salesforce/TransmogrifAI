@@ -502,9 +502,6 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
           selector.bestEstimator = None
           val model = selector.fit(data)
           val modelName = model.getSparkMlStage().get.toString()
-          println(model.getSparkMlStage().get.explainParams())
-          println(model.getSparkMlStage().get.extractParamMap())
-          println(modelName)
           modelName.contains("rfr")
         }
       }
