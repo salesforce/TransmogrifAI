@@ -37,15 +37,14 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.DoubleType
-import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
+import org.apache.spark.sql.types.{DoubleType, MetadataBuilder}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
 
-import scala.collection.mutable
 import scala.io.Source
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
-private[op] trait NameIdentificationFun extends Logging {
+private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   lazy final val nameDictionary = {
     val nameDictionary = collection.mutable.Set.empty[String]
     val dictionaryPath = "/NameIdentification_JRC.txt"
@@ -79,12 +78,14 @@ private[op] trait NameIdentificationFun extends Logging {
     genderDictionary
   }
 
-  def preProcess(s: String): Array[String] = {
-    s.toLowerCase().split("\\s+").map(_.replace("\\P{L}", ""))
+  def preProcess(s: T#Value): Array[String] = {
+    s.getOrElse("").toLowerCase().split("\\s+").map((token: String) =>
+      token.replace("\\P{L}", "")
+    )
   }
-
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
+  // TODO: Make these functions typed (e.g. take Dataset) when they are meant to operate on all numeric types
   def extractDouble(df: DataFrame): Double = df.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
 
   def averageCol(df: DataFrame, column: Column): Double = {
@@ -97,13 +98,13 @@ private[op] trait NameIdentificationFun extends Logging {
 
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
-      averageCol(df.withColumn(
-        column.toString, size(split(column, "\\s+")) < 10), column
-      ) > 0.75,
+      averageCol(df.select(
+        (size(split(column, "\\s+")) < 10).alias(column.toString)
+      ), column) > 0.75,
       // check that at least 3/4 of the texts are longer than 3 characters
-      averageCol(df.withColumn(
-        column.toString, length(column) > 3), column
-      ) > 0.75,
+      averageCol(df.select(
+        (length(column) > 3).alias(column.toString)
+      ), column) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
       total < 10 ||
         extractDouble(df.select(stddev(length(column)))) > 0.05,
@@ -113,39 +114,47 @@ private[op] trait NameIdentificationFun extends Logging {
     checks.forall(identity)
   }
 
-  def dictCheck: UserDefinedFunction = udf((tokens: mutable.WrappedArray[String]) => {
-    tokens.map(token => if (nameDictionary contains token) 1 else 0).sum / tokens.length
-  }: Double)
+  def dictCheck(tokens: Array[String]): Double = tokens.map({token: String =>
+    // Using genderDictionary because nameDictionary contains many junk entries ("hello", world")
+    // TODO: Clean and use nameDictionary because it has many more entries for non-European names
+    if (genderDictionary contains token) 1 else 0
+  }).sum.toDouble / tokens.length
+  def dictCheckUDF: UserDefinedFunction = udf(dictCheck _)
 
-  def checkNthTokenForFirstName(N: Int): UserDefinedFunction = {
-    if (N == -1) {
-      udf((tokens: mutable.WrappedArray[String]) => {
-        genderDictionary contains tokens(tokens.length - 1)
-      }: Boolean)
-    }
-    else {
-      udf((tokens: mutable.WrappedArray[String]) => {
-        genderDictionary contains tokens(N)
-      }: Boolean)
-    }
+  val tokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
+  def checkForFirstName(tokens: Array[String]): Array[Boolean] = {
+    tokensToCheckForFirstName.map({i: Int =>
+      genderDictionary contains tokens((i + tokens.length) % tokens.length)
+    }).toArray
   }
 
-  def estimatorFitFn(df: DataFrame, column: Column, threshold: Double): (Double, Boolean, Option[Int]) = {
-    if (log.isDebugEnabled) df.show(truncate = false)
-    if (!guardChecks(df, column)) {
+  def unaryEstimatorFitFn(
+    dataset: Dataset[T#Value], column: Column, threshold: Double
+  ): (Double, Boolean, Option[Int]) = {
+    val spark = SparkSession.builder().getOrCreate()
+    import spark.implicits._
+
+    if (log.isDebugEnabled) dataset.show(truncate = false)
+    if (!guardChecks(dataset.toDF(), column)) {
       (0.0, false, None)
     } else {
-      val tokenizedDF = df.withColumn(column.toString, preProcessUDF(column))
-      if (log.isDebugEnabled) tokenizedDF.show(truncate = false)
+      val tokenizedDS = dataset.map(preProcess)
+      if (log.isDebugEnabled) tokenizedDS.show(truncate = false)
       // Check if likely to be a name field
-      val predictedProb: Double = averageCol(tokenizedDF.withColumn(column.toString, mean(dictCheck(column))), column)
+      val checkedDS = tokenizedDS.map(dictCheck)
+      if (log.isDebugEnabled) checkedDS.show(truncate = false)
+      val predictedProb: Double = averageCol(checkedDS.toDF, column)
       logDebug(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
       if (predictedProb < threshold) (0.0, false, None)
       else {
         // Also figure out the index of the likely first name
-        val percentageFirstNameByN = for {i <- List(0, -1)} yield {
-          val percentageMatched = averageCol(
-            tokenizedDF.select(checkNthTokenForFirstName(i)(column).alias(column.toString)), column)
+        val checkedForFirstName = tokenizedDS.map(checkForFirstName)
+        if (log.isDebugEnabled) checkedForFirstName.show(truncate = false)
+        val percentageFirstNameByN = for {i <- tokensToCheckForFirstName} yield {
+          // Use one more map to extract the particular boolean result that we need
+          val percentageMatched = averageCol(checkedForFirstName.map(
+            bools => bools((i + bools.length) % bools.length)
+          ).toDF, column)
           (percentageMatched, i)
         }
         val (_, bestIndex) = percentageFirstNameByN.maxBy(_._1)
@@ -159,8 +168,7 @@ private[op] trait NameIdentificationFun extends Logging {
   import NameStats.Keys._
 
   def transformerFn(treatAsName: Boolean, indexFirstName: Option[Int], input: Text): NameStats = {
-    val name = input.value.getOrElse("")
-    val tokens = preProcess(name)
+    val tokens = preProcess(input.value)
     if (treatAsName) {
       assert(tokens.length == 1 || indexFirstName.isDefined)
       val nameToCheckGenderOf = if (tokens.length != 1) {
@@ -193,7 +201,7 @@ class HumanNameIdentifier[T <: Text]
 ) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
-) with NameIdentificationFun {
+) with NameIdentificationFun[T] {
   // Parameters
   // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
   val defaultThreshold = new DoubleParam(
@@ -211,7 +219,24 @@ class HumanNameIdentifier[T <: Text]
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     require(dataset.schema.fieldNames.length == 1, "There is exactly one column in this dataset")
     val column = col(dataset.schema.fieldNames.head)
-    val (_, treatAsName, indexFirstName) = estimatorFitFn(dataset.toDF(), column, $(defaultThreshold))
+    val (predictedProb, treatAsName, indexFirstName) = unaryEstimatorFitFn(dataset, column, $(defaultThreshold))
+
+    // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
+    // get a reference to the current metadata
+    val preExistingMetadata = getMetadata()
+    // create a new metadataBuilder and seed it with the current metadata
+    val metaDataBuilder = new MetadataBuilder().withMetadata(preExistingMetadata)
+    // add a new key value pair to the metadata (key is a string and value is a string array)
+    metaDataBuilder.putBoolean("treatAsName", treatAsName)
+    metaDataBuilder.putLong("predictedNameProb", predictedProb.toLong)
+    metaDataBuilder.putLong("indexFirstName", indexFirstName.getOrElse(-1).toLong)
+    // TODO: Compute some more stats here
+    // package the new metadata, which includes the preExistingMetadata
+    // and the updates/additions
+    val updatedMetadata = metaDataBuilder.build()
+    // save the updatedMetadata to the outputMetadata parameter
+    setMetadata(updatedMetadata)
+
     new HumanNameIdentifierModel[T](uid, treatAsName, indexFirstName = indexFirstName)
   }
 }
@@ -223,7 +248,7 @@ class HumanNameIdentifierModel[T <: Text]
   val treatAsName: Boolean,
   val indexFirstName: Option[Int] = None
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun {
+  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
   // Why doesn't the following line work
   // def transformFn(input: T): NameStats = transformerFn(treatAsName, indexFirstName, input)
   def transformFn: T => NameStats = (input: T) => transformerFn(treatAsName, indexFirstName, input)

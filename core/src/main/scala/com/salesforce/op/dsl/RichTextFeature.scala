@@ -235,10 +235,12 @@ trait RichTextFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
+      detectSensitive: Boolean = false,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
-      new SmartTextVectorizer[T]()
+      val vectorizer = if (detectSensitive) new SmartTextVectorizerWithBias[T]() else new SmartTextVectorizer[T]()
+      vectorizer
         .setInput(f +: others)
         .setMaxCardinality(maxCategoricalCardinality)
         .setCleanText(cleanText)

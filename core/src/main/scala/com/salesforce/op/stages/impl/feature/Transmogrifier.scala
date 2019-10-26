@@ -301,27 +301,18 @@ private[op] case object Transmogrifier {
             others = other, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[Text] =>
           val (f, other) = castAs[Text](g)
-          // TODO: Delete the following and add proper flags for enabling the name detection
-          log.info("----------- SENSITIVE FEATURE DETECTION BEGINS -----------")
-          (f +: other).map { feature =>
-            val humanNameIdentResults = feature.identifyIfHumanName()
-            log.info(humanNameIdentResults.toString)
-            val postalCodeIdentResults = feature.identifyIfPostalCode()
-            log.info(postalCodeIdentResults.toString)
-          }
-          log.info("----------- SENSITIVE FEATURE DETECTION ENDS -----------")
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, others = other)
+            prependFeatureName = PrependFeatureName, detectSensitive = true, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, others = other)
+            prependFeatureName = PrependFeatureName, detectSensitive = true, others = other)
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,

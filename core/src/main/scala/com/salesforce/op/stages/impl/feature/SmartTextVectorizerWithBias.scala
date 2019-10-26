@@ -33,11 +33,10 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types.{OPVector, Text}
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.utils.spark.OpVectorMetadata
+import org.apache.spark.sql.functions.col
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
-import org.apache.spark.sql.functions._
+import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -48,7 +47,7 @@ class SmartTextVectorizerWithBias[T <: Text]
 )(implicit tti: TypeTag[T]) extends SmartTextVectorizer(
   uid = uid,
   operationName = operationName
-) with NameIdentificationFun {
+) with NameIdentificationFun[T] {
 
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -62,20 +61,64 @@ class SmartTextVectorizerWithBias[T <: Text]
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
-  override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
+  private var guardCheckResults: Option[Array[Boolean]] = None
+
+  override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
+    // Set instance variable for guardCheck results
     val df = dataset.toDF()
-    // TODO: Change this to work correctly on Text#Value rather than Seq[Text#Value]
-    val isName = dataset.schema.fieldNames.map { name: String =>
-      val column = col(name)
-      val (_, treatAsName, _) = estimatorFitFn(df, column, $(defaultThreshold))
-      treatAsName
+    guardCheckResults = Some(inN.map(feature =>
+      guardChecks(df, col(feature.name))
+    ))
+    // then call super
+    super.fit(dataset).asInstanceOf[SequenceModel[T, OPVector]]
+  }
+
+  override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
+    val spark = SparkSession.builder().getOrCreate()
+    import spark.implicits._
+
+    val preprocessed = dataset.map(_.map(preProcess))
+    val checkedInDictionary = preprocessed.map(_.map(dictCheck))
+    val predictedProbs = checkedInDictionary.reduce({ (a: Seq[Double], b: Seq[Double]) =>
+      // Elementwise sum the contents of each row
+      a.zip(b).map { case (x, y) => x + y }
+    }).map(_ / checkedInDictionary.count()).toArray
+
+    if (log.isDebugEnabled) {
+      preprocessed.show(truncate = false)
+      checkedInDictionary.show(truncate = false)
+      logDebug(predictedProbs.toString)
     }
 
+    val isName: Array[Boolean] = guardCheckResults match {
+      case Some(results) => predictedProbs zip results map {
+        case (prob, guardCheck) => guardCheck && prob >= $(defaultThreshold)
+      }
+      case _ => {
+        require(false, "Guard check results were not generated but this should not happen.")
+        Array.emptyBooleanArray
+      }
+    }
+    // TODO: Handle gender checking`
+
+    // call SmartTextVectorizer normally
     val modelArgs: SmartTextVectorizerModelArgs = super.fitFn(dataset).asInstanceOf[SmartTextVectorizerModel[T]].args
     val newModelArgs: SmartTextVectorizerModelArgs = modelArgs.copy(isName = isName)
 
-    val newMetadata: OpVectorMetadata = makeVectorMetadata(newModelArgs)
-    setMetadata(newMetadata.toMetadata)
+    // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
+    // get a reference to the current metadata
+    val preExistingMetadata = getMetadata()
+    // create a new metadataBuilder and seed it with the current metadata
+    val metaDataBuilder = new MetadataBuilder().withMetadata(preExistingMetadata)
+    // add a new key value pair to the metadata (key is a string and value is a string array)
+    metaDataBuilder.putBooleanArray("treatAsName", isName)
+    metaDataBuilder.putDoubleArray("predictedNameProb", predictedProbs)
+    // TODO: Compute some more stats here, like gender
+    // package the new metadata, which includes the preExistingMetadata
+    // and the updates/additions
+    val updatedMetadata = metaDataBuilder.build()
+    // save the updatedMetadata to the outputMetadata parameter
+    setMetadata(updatedMetadata)
 
     new SmartTextVectorizerModel[T](args = newModelArgs, operationName = operationName, uid = uid)
       .setAutoDetectLanguage(getAutoDetectLanguage)
