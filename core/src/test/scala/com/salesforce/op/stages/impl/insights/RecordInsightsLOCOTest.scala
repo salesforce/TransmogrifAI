@@ -292,57 +292,56 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       }
     }
 
-    describe("with text data ") {
-      for {strategy <- VectorAggregationStrategy.values} {
-        it (s"aggregate values for text and textMap derived features when strategy=$strategy") {
-          val (df, featureVector, label) = generateTestTextData
-          val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
-          val actualInsights = generateRecordInsights(model, df, featureVector, strategy)
 
-          withClue("TextArea can have two null indicator values") {
-            actualInsights.map(p => assert(p.size == 7 || p.size == 8))
-          }
-          withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
-            "aggregation required for LOCO on this field.") {
-            actualInsights.foreach { p =>
-              assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName)
-                && r.indicatorValue.isDefined))
-            }
-          }
+    for {strategy <- VectorAggregationStrategy.values} {
+      it (s"aggregate values for text and textMap derived features when strategy=$strategy") {
+        val (df, featureVector, label) = generateTestTextData
+        val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+        val actualInsights = generateRecordInsights(model, df, featureVector, strategy)
 
-          assertLOCOSum(actualInsights)
-          assertAggregatedText(textFeatureName, strategy, model, df, featureVector, label, actualInsights)
-          assertAggregatedText(textAreaFeatureName, strategy, model, df, featureVector, label, actualInsights)
-          assertAggregatedTextMap(textMapFeatureName, "k0", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedTextMap(textMapFeatureName, "k1", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedTextMap(textAreaMapFeatureName, "k0", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedTextMap(textAreaMapFeatureName, "k1", strategy, model, df, featureVector, label,
-            actualInsights)
+        withClue("TextArea can have two null indicator values") {
+          actualInsights.map(p => assert(p.size == 7 || p.size == 8))
         }
+        withClue("SmartTextVectorizer detects country feature as a PickList, hence no " +
+          "aggregation required for LOCO on this field.") {
+          actualInsights.foreach { p =>
+            assert(p.keys.exists(r => r.parentFeatureOrigins == Seq(countryFeatureName)
+              && r.indicatorValue.isDefined))
+          }
+        }
+
+        assertLOCOSum(actualInsights)
+        assertAggregatedText(textFeatureName, strategy, model, df, featureVector, label, actualInsights)
+        assertAggregatedText(textAreaFeatureName, strategy, model, df, featureVector, label, actualInsights)
+        assertAggregatedTextMap(textMapFeatureName, "k0", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedTextMap(textMapFeatureName, "k1", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedTextMap(textAreaMapFeatureName, "k0", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedTextMap(textAreaMapFeatureName, "k1", strategy, model, df, featureVector, label,
+          actualInsights)
       }
     }
-    describe("with date data ") {
-      for {strategy <- VectorAggregationStrategy.values} {
-        it (s"aggregate values for date, datetime, dateMap and dateTimeMap derived features when strategy=$strategy") {
-          val (df, featureVector, label) = generateTestDateData
-          val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
-          val actualInsights = generateRecordInsights(model, df, featureVector, strategy, topK = 40)
 
-          assertLOCOSum(actualInsights)
-          assertAggregatedDate(dateFeatureName, strategy, model, df, featureVector, label, actualInsights)
-          assertAggregatedDate(dateTimeFeatureName, strategy, model, df, featureVector, label, actualInsights)
-          assertAggregatedDateMap(dateMapFeatureName, "k0", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedDateMap(dateMapFeatureName, "k1", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedDateMap(dateTimeMapFeatureName, "k0", strategy, model, df, featureVector, label,
-            actualInsights)
-          assertAggregatedDateMap(dateTimeMapFeatureName, "k1", strategy, model, df, featureVector, label,
-            actualInsights)
-        }
+
+    for {strategy <- VectorAggregationStrategy.values} {
+      it (s"aggregate values for date, datetime, dateMap and dateTimeMap derived features when strategy=$strategy") {
+        val (df, featureVector, label) = generateTestDateData
+        val model = new OpLogisticRegression().setInput(label, featureVector).fit(df)
+        val actualInsights = generateRecordInsights(model, df, featureVector, strategy, topK = 40)
+
+        assertLOCOSum(actualInsights)
+        assertAggregatedDate(dateFeatureName, strategy, model, df, featureVector, label, actualInsights)
+        assertAggregatedDate(dateTimeFeatureName, strategy, model, df, featureVector, label, actualInsights)
+        assertAggregatedDateMap(dateMapFeatureName, "k0", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedDateMap(dateMapFeatureName, "k1", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedDateMap(dateTimeMapFeatureName, "k0", strategy, model, df, featureVector, label,
+          actualInsights)
+        assertAggregatedDateMap(dateTimeMapFeatureName, "k1", strategy, model, df, featureVector, label,
+          actualInsights)
       }
     }
   }
