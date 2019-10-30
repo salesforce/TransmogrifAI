@@ -121,6 +121,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }).sum.toDouble / tokens.length
   def dictCheckUDF: UserDefinedFunction = udf(dictCheck _)
 
+  // Checking for first name might happen in a different dictionary, which is why this is a separate function
   val tokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
   def checkForFirstName(tokens: Array[String]): Array[Boolean] = {
     tokensToCheckForFirstName.map({i: Int =>
@@ -167,18 +168,21 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import NameStats.GenderStrings._
   import NameStats.Keys._
 
+  def identifyGender(tokens: Array[String], index: Int): String = {
+    val nameToCheckGenderOf = if (tokens.length != 1) {
+      // Mod to accept -1 as valid index
+      tokens((index + tokens.length) % tokens.length)
+    } else tokens.head
+    genderDictionary.get(nameToCheckGenderOf).map(
+      probMale => if (probMale >= 0.5) Male else Female
+    ).getOrElse(GenderNA)
+  }
+
   def transformerFn(treatAsName: Boolean, indexFirstName: Option[Int], input: Text): NameStats = {
     val tokens = preProcess(input.value)
     if (treatAsName) {
       assert(tokens.length == 1 || indexFirstName.isDefined)
-      val nameToCheckGenderOf = if (tokens.length != 1) {
-        // Mod to accept -1 as valid index
-        tokens((indexFirstName.getOrElse(0) + tokens.length) % tokens.length)
-      } else tokens.head
-      val gender = genderDictionary.get(nameToCheckGenderOf).map(
-        probMale => if (probMale >= 0.5) Male else Female
-      ).getOrElse(GenderNA)
-
+      val gender = identifyGender(tokens, indexFirstName.getOrElse(0))
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),

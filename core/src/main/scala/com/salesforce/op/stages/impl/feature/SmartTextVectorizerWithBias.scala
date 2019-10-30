@@ -65,6 +65,7 @@ class SmartTextVectorizerWithBias[T <: Text]
 
   override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
     // Set instance variable for guardCheck results
+    // NOTE: I can also use this trick here to call `unaryEstimatorFitFn` instead here, if that turns out to be faster
     val df = dataset.toDF()
     guardCheckResults = Some(inN.map(feature =>
       guardChecks(df, col(feature.name))
@@ -77,12 +78,14 @@ class SmartTextVectorizerWithBias[T <: Text]
     val spark = SparkSession.builder().getOrCreate()
     import spark.implicits._
 
-    val preprocessed = dataset.map(_.map(preProcess))
-    val checkedInDictionary = preprocessed.map(_.map(dictCheck))
-    val predictedProbs = checkedInDictionary.reduce({ (a: Seq[Double], b: Seq[Double]) =>
+    val N = dataset.count().toDouble
+
+    val preprocessed: Dataset[Seq[Array[String]]] = dataset.map(_.map(preProcess))
+    val checkedInDictionary: Dataset[Seq[Double]] = preprocessed.map(_.map(dictCheck))
+    val predictedProbs: Array[Double] = checkedInDictionary.reduce({ (a: Seq[Double], b: Seq[Double]) =>
       // Elementwise sum the contents of each row
       a.zip(b).map { case (x, y) => x + y }
-    }).map(_ / checkedInDictionary.count()).toArray
+    }).map(_ / N).toArray
 
     if (log.isDebugEnabled) {
       preprocessed.show(truncate = false)
@@ -99,8 +102,44 @@ class SmartTextVectorizerWithBias[T <: Text]
         Array.emptyBooleanArray
       }
     }
-    // TODO: Handle gender checking`
 
+    val checkedForFirstName: Dataset[Seq[Array[Boolean]]] = preprocessed.map(_.map(checkForFirstName))
+    val percentageFirstNameByN: Seq[(Array[Double], Int)] = for {i <- tokensToCheckForFirstName} yield {
+      // Use one more map to get the index of the result that we need
+      // And then reduce to sum over the rows
+      val percentageMatched = checkedForFirstName.map(_.map(
+        bools => if (bools((i + bools.length) % bools.length)) 1 else 0
+      )).reduce({ (a: Seq[Int], b: Seq[Int]) =>
+        // Elementwise sum the contents of each row
+        a.zip(b).map { case (x, y) => x + y }
+      }).map(_ / N).toArray
+      (percentageMatched, i)
+    }
+    val bestIndexes: Array[Int] = percentageFirstNameByN.foldLeft {
+      Array.fill[Int](percentageFirstNameByN.length)(0) zip Array.fill[Double](percentageFirstNameByN.length)(0)
+    }{ case (accBestResults, (probs, index)) =>
+      accBestResults zip probs map {
+        case ((bestIndex, bestProb), newProb) => if (newProb > bestProb) (index, newProb) else (bestIndex, bestProb)
+      }
+    }.map(_._1)
+
+    // Now, identify the likely gender
+    // The values in this new dataset will be (1, 0, 0) for male, (0, 1, 0) for female, and (0, 0, 0) otherwise
+    import com.salesforce.op.features.types.NameStats.GenderStrings._
+    val inferredGenders: Dataset[Seq[(Int, Int, Int)]] = preprocessed.map((row: Seq[Array[String]]) => {
+      row.zip(bestIndexes).map({ case (tokens: Array[String], index: Int) =>
+        identifyGender(tokens, index) match {
+          case Male => (1, 0, 0)
+          case Female => (0, 1, 0)
+          case _ => (0, 0, 1)
+        }
+      })
+    })
+    val (pctMale, pctFemale, pctOther) = inferredGenders.reduce({ (a, b) =>
+      a.zip(b).map({ case ((i, j, k), (x, y, z)) => (i + x, j + y, k + z) })
+    }).map({
+      case (numMale, numFemale, numOther) => (numMale / N, numFemale / N, numOther / N)
+    }).unzip3
     // call SmartTextVectorizer normally
     val modelArgs: SmartTextVectorizerModelArgs = super.fitFn(dataset).asInstanceOf[SmartTextVectorizerModel[T]].args
     val newModelArgs: SmartTextVectorizerModelArgs = modelArgs.copy(isName = isName)
@@ -113,7 +152,9 @@ class SmartTextVectorizerWithBias[T <: Text]
     // add a new key value pair to the metadata (key is a string and value is a string array)
     metaDataBuilder.putBooleanArray("treatAsName", isName)
     metaDataBuilder.putDoubleArray("predictedNameProb", predictedProbs)
-    // TODO: Compute some more stats here, like gender
+    metaDataBuilder.putDoubleArray("pctMale", pctMale.toArray)
+    metaDataBuilder.putDoubleArray("pctFemale", pctFemale.toArray)
+    metaDataBuilder.putDoubleArray("pctOther", pctOther.toArray)
     // package the new metadata, which includes the preExistingMetadata
     // and the updates/additions
     val updatedMetadata = metaDataBuilder.build()
