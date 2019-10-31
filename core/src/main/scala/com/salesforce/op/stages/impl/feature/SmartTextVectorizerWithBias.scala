@@ -67,9 +67,7 @@ class SmartTextVectorizerWithBias[T <: Text]
     // Set instance variable for guardCheck results
     // NOTE: I can also use this trick here to call `unaryEstimatorFitFn` instead here, if that turns out to be faster
     val df = dataset.toDF()
-    guardCheckResults = Some(inN.map(feature =>
-      guardChecks(df, col(feature.name))
-    ))
+    guardCheckResults = Some(inN.map(feature => guardChecks(df, col(feature.name))))
     // then call super
     super.fit(dataset).asInstanceOf[SequenceModel[T, OPVector]]
   }
@@ -155,6 +153,13 @@ class SmartTextVectorizerWithBias[T <: Text]
     metaDataBuilder.putDoubleArray("pctMale", pctMale.toArray)
     metaDataBuilder.putDoubleArray("pctFemale", pctFemale.toArray)
     metaDataBuilder.putDoubleArray("pctOther", pctOther.toArray)
+    // Also log the above results
+    logInfo(s"treatAsName: [${isName.mkString(",")}]")
+    logInfo(s"predictedNameProb: [${predictedProbs.mkString(",")}]")
+    logInfo(s"pctMale: [${pctMale.mkString(",")}]")
+    logInfo(s"pctFemale: [${pctFemale.mkString(",")}]")
+    logInfo(s"pctOther: [${pctOther.mkString(",")}]")
+
     // package the new metadata, which includes the preExistingMetadata
     // and the updates/additions
     val updatedMetadata = metaDataBuilder.build()
