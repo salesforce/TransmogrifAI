@@ -160,6 +160,15 @@ class SmartTextVectorizerWithBias[T <: Text]
     logInfo(s"pctFemale: [${pctFemale.mkString(",")}]")
     logInfo(s"pctOther: [${pctOther.mkString(",")}]")
 
+    // Get a small sample of rows to log for sanity checking that my code did identify names
+    val numSamples = if (N > 100) 5 else 1
+    for { (row, index) <- dataset.sample(fraction = numSamples / N).collect() zip (1 to numSamples)} {
+      val sample = row.map(_.getOrElse(" ")).toArray
+      metaDataBuilder.putStringArray(s"Sample #$index", sample)
+      logInfo(s"Sample #$index: ${sample.mkString(" |;| ")}")
+    }
+
+
     // package the new metadata, which includes the preExistingMetadata
     // and the updates/additions
     val updatedMetadata = metaDataBuilder.build()
