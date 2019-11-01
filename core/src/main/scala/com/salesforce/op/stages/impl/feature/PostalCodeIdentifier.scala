@@ -35,14 +35,15 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.text.TextUtils.getBestRegexMatch
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, DataFrame, Dataset, Row}
+import org.apache.spark.util.SparkUtils.averageCol
 
 import scala.collection.mutable
 import scala.io.Source
-import scala.util.Try
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.Try
 import scala.util.matching.Regex
 
 trait PostalCodeHelpers {
@@ -107,12 +108,6 @@ class PostalCodeIdentifier[T <: Text]
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
-  private def extractDouble(dataset: DataFrame): Double = dataset.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
-
-  private def averageBoolCol(dataset: Dataset[Boolean], column: Column): Double = {
-    extractDouble(dataset.select(mean(column.cast("integer"))))
-  }
-
   private def checkIfPostalCode: UserDefinedFunction = udf((s: String) => {
     val matched = findBestPostalCodeMatch(s)
     matched != "" && (postalCodeDictionary contains matched)
@@ -122,8 +117,8 @@ class PostalCodeIdentifier[T <: Text]
     assert(dataset.schema.fieldNames.length == 1)
     val column = col(dataset.schema.fieldNames.head)
     if (
-      averageBoolCol(
-        dataset.select(checkIfPostalCode(column).alias(column.toString)).asInstanceOf[Dataset[Boolean]],
+      averageCol(
+        dataset.select(checkIfPostalCode(column).alias(column.toString)),
         column
       ) >= $(defaultThreshold)
     ) {

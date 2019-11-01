@@ -30,10 +30,24 @@
 
 package org.apache.spark.util
 
+import org.apache.spark.sql.{Column, DataFrame, Row}
+import org.apache.spark.sql.functions.mean
+
 
 object SparkUtils {
 
   /** Preferred alternative to Class.forName(className) */
   def classForName(name: String): Class[_] = Utils.classForName(name)
+
+  // TODO: Make these functions typed (e.g. take Dataset) when they are meant to operate on all numeric types
+  def extractDouble(df: DataFrame): Double = {
+    val row: Row = df.collect().headOption.getOrElse(Row(0.0))
+    if (row.isNullAt(0)) 0.0
+    else row.getDouble(0)
+  }
+
+  def averageCol(df: DataFrame, column: Column): Double = {
+    extractDouble(df.select(mean(column.cast("double"))))
+  }
 
 }

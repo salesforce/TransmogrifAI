@@ -38,7 +38,8 @@ import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DoubleType, MetadataBuilder}
-import org.apache.spark.sql.{Column, DataFrame, Dataset, Row, SparkSession}
+import org.apache.spark.sql.{Column, DataFrame, Dataset, SparkSession}
+import org.apache.spark.util.SparkUtils.{averageCol, extractDouble}
 
 import scala.io.Source
 import scala.reflect.runtime.universe.TypeTag
@@ -84,13 +85,6 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     )
   }
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
-
-  // TODO: Make these functions typed (e.g. take Dataset) when they are meant to operate on all numeric types
-  def extractDouble(df: DataFrame): Double = df.collect().headOption.getOrElse(Row(0.0)).getDouble(0)
-
-  def averageCol(df: DataFrame, column: Column): Double = {
-    extractDouble(df.select(mean(column.cast("double"))))
-  }
 
   def guardChecks(df: DataFrame, column: Column): Boolean = {
     val total = df.count()
