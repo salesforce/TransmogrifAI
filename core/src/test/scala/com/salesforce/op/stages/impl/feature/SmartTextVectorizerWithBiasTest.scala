@@ -30,9 +30,11 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestFeatureBuilder
 import com.salesforce.op.testkit.RandomText
+import org.apache.spark.sql.DataFrame
 
 class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
   override val estimator: SmartTextVectorizerWithBias[Text] = new SmartTextVectorizerWithBias()
@@ -85,6 +87,62 @@ class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     model.args.isName shouldBe Array(false, false, true)
+  }
+
+  it should "compute gender probabilities for one column in the metadata" in {
+    val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    newEstimator.getMetadata().getDoubleArray("bestIndexes") shouldBe Array(0.0)
+    newEstimator.getMetadata().getDoubleArray("pctMale") shouldBe Array(0.4)
+  }
+
+  it should "compute gender probabilities for two columns in the metadata" in {
+    val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    newEstimator.getMetadata().getDoubleArray("bestIndexes").length shouldBe 2
+    newEstimator.getMetadata().getDoubleArray("pctMale").length shouldBe 2
+    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.4
+  }
+
+  it should "compute gender probabilities for three columns in the metadata" in {
+    val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(newF1, newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    newEstimator.getMetadata().getDoubleArray("bestIndexes").length shouldBe 3
+    newEstimator.getMetadata().getDoubleArray("pctMale").length shouldBe 3
+    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.4
+  }
+
+  it should "compute the same number of name check results as the number of feature columns" in {
+    val numFeatures = 10
+    val (ds, untypedFeatures) = TestFeatureBuilder(
+      Seq.fill[Seq[Text]](numFeatures)(Seq(Text("TESTSTRING"))): _*
+    )
+    val features = untypedFeatures.map(_.asInstanceOf[Feature[Text]])
+    for {i <- 4 to numFeatures} {
+      val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(features.slice(0, i): _*)
+      val model: SmartTextVectorizerModel[Text] = newEstimator
+        .fit(ds)
+        .asInstanceOf[SmartTextVectorizerModel[Text]]
+      newEstimator.guardCheckResults match {
+        case Some(results) => results.length shouldBe i
+        case None => fail("Guard check results were not generated")
+      }
+      newEstimator.getMetadata().getBooleanArray("treatAsName").length shouldBe i
+      newEstimator.getMetadata().getDoubleArray("predictedNameProb").length shouldBe i
+      newEstimator.getMetadata().getDoubleArray("bestIndexes").length shouldBe i
+      newEstimator.getMetadata().getDoubleArray("pctMale").length shouldBe i
+      newEstimator.getMetadata().getDoubleArray("pctFemale").length shouldBe i
+      newEstimator.getMetadata().getDoubleArray("pctOther").length shouldBe i
+    }
   }
 
   it should "not identify a single repeated name as Name" in {

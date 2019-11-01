@@ -61,7 +61,7 @@ class SmartTextVectorizerWithBias[T <: Text]
 
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
-  private var guardCheckResults: Option[Array[Boolean]] = None
+  var guardCheckResults: Option[Array[Boolean]] = None
 
   override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
     // Set instance variable for guardCheck results
@@ -83,11 +83,11 @@ class SmartTextVectorizerWithBias[T <: Text]
       // Elementwise sum the contents of each row
       a.zip(b).map { case (x, y) => x + y }
     }).map(_ / N).toArray
+    val numFeatures = predictedProbs.length
 
     if (log.isDebugEnabled) {
       preprocessed.show(truncate = false)
       checkedInDictionary.show(truncate = false)
-      logDebug(predictedProbs.toString)
     }
 
     val isName: Array[Boolean] = guardCheckResults match {
@@ -95,8 +95,7 @@ class SmartTextVectorizerWithBias[T <: Text]
         case (prob, guardCheck) => guardCheck && prob >= $(defaultThreshold)
       }
       case _ => {
-        require(false, "Guard check results were not generated but this should not happen.")
-        Array.emptyBooleanArray
+        throw new RuntimeException("Guard check results were not generated but this should not happen.")
       }
     }
 
@@ -113,7 +112,7 @@ class SmartTextVectorizerWithBias[T <: Text]
       (percentageMatched, i)
     }
     val bestIndexes: Array[Int] = percentageFirstNameByN.foldLeft {
-      Array.fill[Int](percentageFirstNameByN.length)(0) zip Array.fill[Double](percentageFirstNameByN.length)(0)
+      Array.fill[Int](numFeatures)(0) zip Array.fill[Double](numFeatures)(0)
     }{ case (accBestResults, (probs, index)) =>
       accBestResults zip probs map {
         case ((bestIndex, bestProb), newProb) => if (newProb > bestProb) (index, newProb) else (bestIndex, bestProb)
@@ -149,12 +148,14 @@ class SmartTextVectorizerWithBias[T <: Text]
     // add a new key value pair to the metadata (key is a string and value is a string array)
     metaDataBuilder.putBooleanArray("treatAsName", isName)
     metaDataBuilder.putDoubleArray("predictedNameProb", predictedProbs)
+    metaDataBuilder.putDoubleArray("bestIndexes", bestIndexes.map(_.toDouble))
     metaDataBuilder.putDoubleArray("pctMale", pctMale.toArray)
     metaDataBuilder.putDoubleArray("pctFemale", pctFemale.toArray)
     metaDataBuilder.putDoubleArray("pctOther", pctOther.toArray)
     // Also log the above results
     logInfo(s"treatAsName: [${isName.mkString(",")}]")
     logInfo(s"predictedNameProb: [${predictedProbs.mkString(",")}]")
+    logInfo(s"bestIndexes: [${bestIndexes.mkString(",")}]")
     logInfo(s"pctMale: [${pctMale.mkString(",")}]")
     logInfo(s"pctFemale: [${pctFemale.mkString(",")}]")
     logInfo(s"pctOther: [${pctOther.mkString(",")}]")
