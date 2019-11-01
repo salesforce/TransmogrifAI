@@ -30,48 +30,32 @@
 
 package org.apache.spark.util
 
-import org.apache.spark.sql.functions.{mean, when}
-import org.apache.spark.sql.{Column, Dataset, SparkSession}
+import com.salesforce.op.test.TestCommon
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.SparkSession
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
-import scala.util.{Try, Success, Failure}
+import org.apache.spark.util.SparkUtils._
 
-
-object SparkUtils {
-  private val spark = SparkSession.builder().getOrCreate()
+@RunWith(classOf[JUnitRunner])
+class SparkUtilsTest extends FlatSpec with TestCommon {
+  private val spark = SparkSession.builder().config("spark.master", "local").getOrCreate()
   import spark.implicits._
 
-  /** Preferred alternative to Class.forName(className) */
-  def classForName(name: String): Class[_] = Utils.classForName(name)
-
-  def extractDouble(dataset: Dataset[Double]): Double = {
-    // Try is necessary because .collect() will fail on an empty Dataset
-    // and there doesn't seem to be any other way to check for an empty Dataset,
-    // esp. when doing .count > 0 would be very expensive
-    Try(dataset.collect().headOption.getOrElse(0.0)) match {
-      case Success(value) => value
-      case Failure(_) => 0.0
-    }
+  it should "extract 0.0 from an empty Dataset" in {
+    val dataset = spark.emptyDataset[Double]
+    extractDouble(dataset) shouldBe 0.0
   }
 
-  private def averageCol(dataset: Dataset[_], column: Column): Double = {
-    extractDouble(dataset.select(mean(column).as[Double]))
+  it should "extract 0.0 from an empty Dataset converted from an empty DataFrame" in {
+    val dataset = Seq.empty[Int].toDF("value").as[Double]
+    extractDouble(dataset) shouldBe 0.0
   }
 
-  def averageDoubleCol(dataset: Dataset[Double], column: Column): Double = {
-    averageCol(dataset, column)
-  }
-
-  def averageFloatCol(dataset: Dataset[Float], column: Column): Double = {
-    averageCol(dataset, column)
-  }
-
-  def averageIntCol(dataset: Dataset[Int], column: Column): Double = {
-    averageCol(dataset, column)
-  }
-
-  def averageBoolCol(dataset: Dataset[Boolean], column: Column): Double = {
-    averageCol(dataset.select(
-      when(column, 1.0).otherwise(0.0).alias(column.toString())
-    ), column)
+  it should "average an empty boolean column" in {
+    val dataset = spark.emptyDataset[Boolean]
+    averageBoolCol(dataset, col("value")) shouldBe 0.0
   }
 }

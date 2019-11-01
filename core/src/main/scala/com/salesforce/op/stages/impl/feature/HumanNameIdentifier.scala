@@ -37,15 +37,18 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DoubleType, MetadataBuilder}
-import org.apache.spark.sql.{Column, DataFrame, Dataset, SparkSession}
-import org.apache.spark.util.SparkUtils.{averageCol, extractDouble}
+import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.{Column, Dataset, SparkSession}
+import org.apache.spark.util.SparkUtils.{averageBoolCol, averageDoubleCol, extractDouble}
 
 import scala.io.Source
 import scala.reflect.runtime.universe.TypeTag
 import scala.util.Try
 
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
+  private val spark = SparkSession.builder().getOrCreate()
+  import spark.implicits._
+
   lazy final val nameDictionary = {
     val nameDictionary = collection.mutable.Set.empty[String]
     val dictionaryPath = "/NameIdentification_JRC.txt"
@@ -86,22 +89,21 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
-  def guardChecks(df: DataFrame, column: Column): Boolean = {
-    val total = df.count()
-    val numUnique = extractDouble(df.select(approx_count_distinct(column).cast(DoubleType)))
-
+  def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
+    val total = dataset.count()
+    val numUnique = extractDouble(dataset.select(approx_count_distinct(column).as[Double]))
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
-      averageCol(df.select(
-        (size(split(column, "\\s+")) < 10).alias(column.toString)
+      averageBoolCol(dataset.select(
+        (size(split(column, "\\s+")) < 10).alias(column.toString).as[Boolean]
       ), column) > 0.75,
       // check that at least 3/4 of the texts are longer than 3 characters
-      averageCol(df.select(
-        (length(column) > 3).alias(column.toString)
+      averageBoolCol(dataset.select(
+        (length(column) > 3).alias(column.toString).as[Boolean]
       ), column) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
       total < 10 ||
-        extractDouble(df.select(stddev(length(column)))) > 0.05,
+        extractDouble(dataset.select(stddev(length(column)).as[Double])) > 0.05,
       // check that the number of unique entries is at least 10
       total < 100 || numUnique > 10
     )
@@ -130,7 +132,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     import spark.implicits._
 
     if (log.isDebugEnabled) dataset.show(truncate = false)
-    if (!guardChecks(dataset.toDF(), column)) {
+    if (!guardChecks(dataset, column)) {
       (0.0, false, None)
     } else {
       val tokenizedDS = dataset.map(preProcess)
@@ -138,7 +140,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
       // Check if likely to be a name field
       val checkedDS = tokenizedDS.map(dictCheck)
       if (log.isDebugEnabled) checkedDS.show(truncate = false)
-      val predictedProb: Double = averageCol(checkedDS.toDF, column)
+      val predictedProb: Double = averageDoubleCol(checkedDS, column)
       logDebug(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
       if (predictedProb < threshold) (0.0, false, None)
       else {
@@ -147,9 +149,9 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
         if (log.isDebugEnabled) checkedForFirstName.show(truncate = false)
         val percentageFirstNameByN = for {i <- tokensToCheckForFirstName} yield {
           // Use one more map to extract the particular boolean result that we need
-          val percentageMatched = averageCol(checkedForFirstName.map(
+          val percentageMatched = averageBoolCol(checkedForFirstName.map(
             bools => bools((i + bools.length) % bools.length)
-          ).toDF, column)
+          ), column)
           (percentageMatched, i)
         }
         val (_, bestIndex) = percentageFirstNameByN.maxBy(_._1)

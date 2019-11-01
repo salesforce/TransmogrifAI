@@ -30,16 +30,9 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op._
 import com.salesforce.op.features.types._
-import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import com.salesforce.op.test.TestFeatureBuilder
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.spark.RichDataset._
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.ml.linalg.Vectors
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
   override val estimator: SmartTextVectorizerWithBias[Text] = new SmartTextVectorizerWithBias()

@@ -66,8 +66,7 @@ class SmartTextVectorizerWithBias[T <: Text]
   override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
     // Set instance variable for guardCheck results
     // NOTE: I can also use this trick here to call `unaryEstimatorFitFn` instead here, if that turns out to be faster
-    val df = dataset.toDF()
-    guardCheckResults = Some(inN.map(feature => guardChecks(df, col(feature.name))))
+    guardCheckResults = Some(inN.map(feature => guardChecks(dataset.asInstanceOf[Dataset[T#Value]], col(feature.name))))
     // then call super
     super.fit(dataset).asInstanceOf[SequenceModel[T, OPVector]]
   }

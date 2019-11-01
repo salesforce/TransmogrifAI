@@ -35,10 +35,10 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.text.TextUtils.getBestRegexMatch
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
-import org.apache.spark.util.SparkUtils.averageCol
+import org.apache.spark.util.SparkUtils.averageBoolCol
 
 import scala.collection.mutable
 import scala.io.Source
@@ -95,6 +95,8 @@ class PostalCodeIdentifier[T <: Text]
   uid = uid,
   operationName = operationName
 ) with PostalCodeHelpers {
+  private val spark = SparkSession.builder().getOrCreate()
+  import spark.implicits._
   // Parameters
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -117,8 +119,8 @@ class PostalCodeIdentifier[T <: Text]
     assert(dataset.schema.fieldNames.length == 1)
     val column = col(dataset.schema.fieldNames.head)
     if (
-      averageCol(
-        dataset.select(checkIfPostalCode(column).alias(column.toString)),
+      averageBoolCol(
+        dataset.select(checkIfPostalCode(column).alias(column.toString).as[Boolean]),
         column
       ) >= $(defaultThreshold)
     ) {
