@@ -32,6 +32,8 @@ package com.salesforce.op.stages.impl.tuning
 
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.testkit.{RandomIntegral, RandomReal, RandomVector}
+import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.mllib.random.RandomRDDs
 import org.apache.spark.sql.Dataset
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
@@ -49,6 +51,7 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
   }
   val vectors = RandomVector.sparse(RandomReal.poisson(2), 10).limit(100000)
 
+  val trainingLimitDefault = 1E6.toLong
   val data = labels.zip(vectors).zip(labelsBiased)
   val dataSize = data.size
   val randDF = sc.makeRDD(data.map { case ((l, v), b) => (l.toDouble.get, v.value, b.toString) }).toDF()
@@ -65,6 +68,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsKept.length shouldBe 1000
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -80,11 +85,50 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsKept.length shouldBe 1000
       s.labelsDropped.length shouldBe 0
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
       )
     }
+  }
+
+  it should "set and get all data cutter params" in {
+    val maxRows = dataSize / 2
+    val downSampleFraction = maxRows / dataSize.toDouble
+
+    val dataCutter = DataCutter()
+      .setSeed(seed)
+      .setReserveTestFraction(0.0)
+      .setMaxLabelCategories(100000)
+      .setMinLabelFraction(0.0)
+      .setMaxTrainingSample(maxRows)
+      .setDownSampleFraction(downSampleFraction)
+
+    dataCutter.getSeed shouldBe seed
+    dataCutter.getReserveTestFraction shouldBe 0.0
+    dataCutter.getMaxLabelCategories shouldBe 100000
+    dataCutter.getMinLabelFraction shouldBe 0.0
+    dataCutter.getMaxTrainingSample shouldBe maxRows
+    dataCutter.getDownSampleFraction shouldBe downSampleFraction
+  }
+
+  it should "down-sample when the data count is above the default training limit" in {
+    val numRows = trainingLimitDefault * 2
+    val dataCutter = DataCutter()
+    val data =
+      RandomRDDs.normalVectorRDD(sc, numRows, 3, seed = seed)
+        .map(v => (1.0, Vectors.dense(v.toArray), "A")).toDF()
+
+    dataCutter.preValidationPrepare(data)
+    val dataBalanced = dataCutter.validationPrepare(data)
+    // validationPrepare calls the data sample method that samples the data to a target ratio but there is an epsilon
+    // to how precise this function is which is why we need to check around that epsilon
+    val samplingErrorEpsilon = (0.1 * trainingLimitDefault).toLong
+
+    dataCutter.getDownSampleFraction shouldBe 0.5
+    dataBalanced.count() shouldBe trainingLimitDefault +- samplingErrorEpsilon
   }
 
   it should "throw an error when all the data is filtered out" in {
@@ -109,6 +153,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDropped.length shouldBe 10
       s.labelsDroppedTotal shouldBe 900
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -125,6 +171,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDropped.length shouldBe 10
       s.labelsDroppedTotal shouldBe 997
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
@@ -144,6 +192,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
     assertDataCutterSummary(s1.summaryOpt) { s =>
       s.labelsKept.length + s.labelsDroppedTotal shouldBe distinct
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc1.getLabelsToKeep,
         dc1.getLabelsToDrop,
         dc1.getLabelsDroppedTotal
@@ -159,6 +209,8 @@ class DataCutterTest extends FlatSpec with TestSparkContext with SplitterSummary
       s.labelsDroppedTotal shouldBe 997
       s.labelsDropped.length shouldBe 10
       s shouldBe DataCutterSummary(
+        preSplitterDataCount = dataSize,
+        downSamplingFraction = 1.0,
         dc2.getLabelsToKeep,
         dc2.getLabelsToDrop,
         dc2.getLabelsDroppedTotal
