@@ -133,8 +133,7 @@ class RecordInsightsLOCO[T <: Model[T]]
    * @return Boolean
    */
   private def isTextFeature(h: OpVectorColumnHistory): Boolean = {
-    h.parentFeatureType.exists(textTypes.contains) &&
-      h.indicatorValue.isEmpty && h.descriptorValue.isEmpty
+    h.parentFeatureType.exists(textTypes.contains) && h.indicatorValue.isEmpty && h.descriptorValue.isEmpty
   }
 
   /**
