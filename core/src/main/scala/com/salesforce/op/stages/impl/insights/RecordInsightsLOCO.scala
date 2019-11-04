@@ -66,7 +66,7 @@ trait RecordInsightsLOCOParams extends Params {
 
   final val vectorAggregationStrategy = new Param[String](parent = this, name = "vectorAggregationStrategy",
     doc = "Aggregate text/date vector by " +
-      "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or" +
+      "1. LeaveOutVector strategy - calculate the loco by leaving out the entire vector or " +
       "2. Avg strategy - calculate the loco for each column of the vector and then average all the locos."
   )
   def setVectorAggregationStrategy(strategy: VectorAggregationStrategy): this.type =
@@ -116,30 +116,33 @@ class RecordInsightsLOCO[T <: Model[T]]
   /**
    * These are the name of the types we want to perform an aggregation of the LOCO results over derived features
    */
-  private val textTypes =
-    Set(FeatureType.typeName[Text], FeatureType.typeName[TextArea], FeatureType.typeName[TextList])
-  private val textMapTypes =
-    Set(FeatureType.typeName[TextMap], FeatureType.typeName[TextAreaMap])
-  private val dateTypes =
-    Set(FeatureType.typeName[Date], FeatureType.typeName[DateTime])
-  private val dateMapTypes =
-    Set(FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
+  private val textTypes = Set(FeatureType.typeName[Text], FeatureType.typeName[TextArea],
+    FeatureType.typeName[TextList], FeatureType.typeName[TextMap], FeatureType.typeName[TextAreaMap])
+  private val dateTypes = Set(FeatureType.typeName[Date], FeatureType.typeName[DateTime],
+    FeatureType.typeName[DateMap], FeatureType.typeName[DateTimeMap])
 
-  // Map[FeatureName(Date/Text), VectorSize]
-  private lazy val aggFeaturesSize: Map[String, Int] = getFeaturesSize(isTextIndex) ++ getFeaturesSize(isDateIndex)
-
-  private def getFeaturesSize(predicate: OpVectorColumnHistory => Boolean): Map[String, Int] = histories
-    .filter(predicate)
+  // Map of RawFeatureName to the size of its derived features that needs to be aggregated
+  // for the above textTypes and dateTypes.
+  private lazy val aggFeaturesSize: Map[String, Int] = histories
+    .filter(h => isTextFeature(h) || isDateFeature(h))
     .groupBy { h => getRawFeatureName(h).get }
-    .mapValues(_.length).view.toMap
+    .mapValues(_.length)
 
-  private def isTextIndex(h: OpVectorColumnHistory): Boolean = {
-    h.parentFeatureType.exists((textTypes ++ textMapTypes).contains) &&
+  /**
+   * Return whether this feature derived from hashed Text(Map)Vectorizer
+   * @return Boolean
+   */
+  private def isTextFeature(h: OpVectorColumnHistory): Boolean = {
+    h.parentFeatureType.exists(textTypes.contains) &&
       h.indicatorValue.isEmpty && h.descriptorValue.isEmpty
   }
 
-  private def isDateIndex(h: OpVectorColumnHistory): Boolean = {
-    h.parentFeatureType.exists((dateTypes ++ dateMapTypes).contains) && h.descriptorValue.isDefined
+  /**
+   * Return whether this feature derived from unit circle Date(Map)Vectorizer
+   * @return Boolean
+   */
+  private def isDateFeature(h: OpVectorColumnHistory): Boolean = {
+    h.parentFeatureType.exists(dateTypes.contains) && h.descriptorValue.isDefined
   }
 
   private def computeDiff
@@ -172,7 +175,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     // TODO : Filter by parentStage (DateToUnitCircleTransformer & DateToUnitCircleVectorizer) once the bug in the
     //  feature history after multiple transformations has been fixed
     name.map { n =>
-      val timePeriodName = if ((dateTypes ++ dateMapTypes).exists(history.parentFeatureType.contains)) {
+      val timePeriodName = if (dateTypes.exists(history.parentFeatureType.contains)) {
         history.descriptorValue
           .flatMap(convertToTimePeriod)
           .map(p => "_" + p.entryName)
@@ -217,7 +220,7 @@ class RecordInsightsLOCO[T <: Model[T]]
     (0 until featureSparse.size, featureSparse.indices).zipped.foreach { case (i: Int, oldInd: Int) =>
       val history = histories(oldInd)
       history match {
-        case h if isTextIndex(h) || isDateIndex(h) => {
+        case h if isTextFeature(h) || isDateFeature(h) => {
           for {name <- getRawFeatureName(h)} {
             val indices = aggActiveIndices.getOrElse(name, (Array.empty[(Int, Int)]))
             aggActiveIndices.update(name, indices :+ (i, oldInd))
