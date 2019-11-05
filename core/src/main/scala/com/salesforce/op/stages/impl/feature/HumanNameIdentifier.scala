@@ -90,7 +90,8 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
   def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
-    val total = dataset.count()
+    // TODO: Figure out reasonable values for the timeout
+    val total = dataset.rdd.countApprox(timeout = 500).getFinalValue().mean
     val numUnique = extractDouble(dataset.select(approx_count_distinct(column).as[Double]))
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
@@ -111,13 +112,10 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
 
   def dictCheck(tokens: Array[String]): Double = tokens.map({token: String =>
-    // Using genderDictionary because nameDictionary contains many junk entries ("hello", world")
-    // TODO: Clean and use nameDictionary because it has many more entries for non-European names
-    if (genderDictionary contains token) 1 else 0
+    if (nameDictionary contains token) 1 else 0
   }).sum.toDouble / tokens.length
   def dictCheckUDF: UserDefinedFunction = udf(dictCheck _)
 
-  // Checking for first name might happen in a different dictionary, which is why this is a separate function
   val tokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
   def checkForFirstName(tokens: Array[String]): Array[Boolean] = {
     tokensToCheckForFirstName.map({i: Int =>
