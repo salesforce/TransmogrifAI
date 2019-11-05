@@ -171,7 +171,6 @@ class HumanNameIdentifier[T <: Text]
   operationName = operationName
 ) with NameIdentificationFun[T] {
   // Parameters
-  // TODO: Create additional ones for: uniqueness checking, attempting to do name parsing, flag for data source
   val defaultThreshold = new DoubleParam(
     parent = this,
     name = "defaultThreshold",
@@ -207,7 +206,6 @@ class HumanNameIdentifier[T <: Text]
     metaDataBuilder.putBoolean("treatAsName", treatAsName)
     metaDataBuilder.putLong("predictedNameProb", predictedProb.toLong)
     metaDataBuilder.putLong("indexFirstName", indexFirstName.getOrElse(-1).toLong)
-    // TODO: Compute some more stats here
     // package the new metadata, which includes the preExistingMetadata
     // and the updates/additions
     val updatedMetadata = metaDataBuilder.build()

@@ -207,7 +207,8 @@ case class SmartTextVectorizerModelArgs
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams,
-  isName: Array[Boolean]
+  isName: Array[Boolean],
+  removeSensitive: Boolean = false
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
     topValues.zip(isCategorical).collect { case (top, true) => top }

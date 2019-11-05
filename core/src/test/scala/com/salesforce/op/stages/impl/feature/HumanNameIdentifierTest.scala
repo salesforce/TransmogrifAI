@@ -113,8 +113,6 @@ class HumanNameIdentifierTest
     val (_, _, _, result) = identifyName(Seq("Firetruck").toText)
     result.show()
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
-    // TODO: Figure out if there's a way to return an empty Map correctly instead of null
-    // map.isEmpty shouldBe true
     map shouldBe null
   }
 

@@ -236,10 +236,13 @@ trait RichTextFeature {
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
       detectSensitive: Boolean = false,
+      removeSensitive: Boolean = false,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
-      val vectorizer = if (detectSensitive) new SmartTextVectorizerWithBias[T]() else new SmartTextVectorizer[T]()
+      val vectorizer = if (detectSensitive) {
+        new SmartTextVectorizerWithBias[T]().setRemoveSensitive(removeSensitive)
+      } else new SmartTextVectorizer[T]()
       vectorizer
         .setInput(f +: others)
         .setMaxCardinality(maxCategoricalCardinality)

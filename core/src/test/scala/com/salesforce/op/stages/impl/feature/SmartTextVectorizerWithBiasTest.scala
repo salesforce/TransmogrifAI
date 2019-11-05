@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestFeatureBuilder
@@ -53,30 +54,13 @@ class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
   )
 
   // TODO: Return empty vectors for identified name features
-  it should "detect a single name feature (and eventually return empty vectors)" in {
+  it should "detect a single name feature and return empty vectors" in {
     val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     model.args.isName shouldBe Array(true)
-
-    // val smartVectorized = newEstimator.getOutput()
-    //
-    // val tokenizedText = new TextTokenizer[Text]().setInput(newF3).getOutput()
-    // val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
-    //
-    // val transformed = new OpWorkflow()
-    //   .setResultFeatures(smartVectorized, nullIndicator).transform(newInputData)
-    // val result = transformed.collect(smartVectorized, nullIndicator)
-    // val field = transformed.schema(smartVectorized.name)
-    // // TODO: Understand what this line is meant to do
-    // // assertNominal(field, Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
-    // val (smart, expected) = result.map { case (smartVector, _) =>
-    //   smartVector -> OPVector.empty
-    // }.unzip
-    //
-    // smart shouldBe expected
   }
 
   it should "detect a single name column among other non-name Text columns" in {

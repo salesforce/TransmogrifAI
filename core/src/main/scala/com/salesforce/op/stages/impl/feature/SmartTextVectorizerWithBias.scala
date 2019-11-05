@@ -36,7 +36,7 @@ import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.stages.NameIdentificationUtils._
 import com.twitter.algebird.Operators._
-import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
+import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators}
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.MetadataBuilder
@@ -73,10 +73,24 @@ class SmartTextVectorizerWithBias[T <: Text]
   setDefault(defaultThreshold, 0.50)
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
+  val removeSensitive = new BooleanParam(
+    parent = this,
+    name = "removeSensitive",
+    doc = "whether to remove (i.e. output empty vectors) for columns detected as name"
+  )
+  setDefault(removeSensitive, false)
+  def setRemoveSensitive(value: Boolean): this.type = set(removeSensitive, value)
+
+
   var guardCheckResults: Option[Array[Boolean]] = None
 
   override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
-    // Set instance variable for guardCheck results
+    /* Set instance variable for guardCheck results here.
+    We compute guardChecks here because all of the logical checks can be implemented efficiently in native Spark,
+    and we would like to use the individual Text columns before they are combined in SequenceEstimator.fit().
+    It is not directly possible to do this computation in the treeAggregate() call below in fitFn() because one of the
+    logical checks computes a standard deviation, which requires knowing the mean beforehand. We could implement the
+    functionality in treeAggregate() if we could replace the standard deviation computation. */
     guardCheckResults = Some(inN.map(feature => guardChecks(dataset.asInstanceOf[Dataset[T#Value]], col(feature.name))))
     // then call super
     super.fit(dataset).asInstanceOf[SequenceModel[T, OPVector]]
@@ -135,8 +149,6 @@ class SmartTextVectorizerWithBias[T <: Text]
     val N = agg.headOption.getOrElse(NameIdentificationResults(count = 1.0)).count
 
     val predictedProbs = agg map { _.predictedNameProb / N }
-    // TODO: Move guard check to aggregation?
-    // Transform the guard check into two collections: a collection of transforms and a collection of conditions
     val isName = guardCheckResults match {
       case Some(results) => predictedProbs zip results map {
         case (prob, guardCheck) => guardCheck && prob >= $(defaultThreshold)
@@ -161,7 +173,9 @@ class SmartTextVectorizerWithBias[T <: Text]
 
     // call SmartTextVectorizer normally
     val modelArgs: SmartTextVectorizerModelArgs = super.fitFn(dataset).asInstanceOf[SmartTextVectorizerModel[T]].args
-    val newModelArgs: SmartTextVectorizerModelArgs = modelArgs.copy(isName = isName.toArray)
+    val newModelArgs: SmartTextVectorizerModelArgs = modelArgs.copy(
+      isName = isName.toArray, removeSensitive = $(removeSensitive)
+    )
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     // get a reference to the current metadata
@@ -195,7 +209,11 @@ class SmartTextVectorizerWithBias[T <: Text]
     // save the updatedMetadata to the outputMetadata parameter
     setMetadata(updatedMetadata)
 
-    new SmartTextVectorizerModel[T](args = newModelArgs, operationName = operationName, uid = uid)
+    new SmartTextVectorizerModel[T](
+      args = newModelArgs,
+      operationName = operationName,
+      uid = uid
+    )
       .setAutoDetectLanguage(getAutoDetectLanguage)
       .setAutoDetectThreshold(getAutoDetectThreshold)
       .setDefaultLanguage(getDefaultLanguage)
