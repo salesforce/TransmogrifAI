@@ -31,15 +31,26 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.{FeatureTypeSparkConverter, OPVector, Text}
+import com.salesforce.op.features.types.{OPVector, Text}
 import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.stages.NameIdentificationUtils.{emptyTokensMap, tokensToCheckForFirstName}
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
-import org.apache.spark.sql.{Dataset, Encoder, Encoders, SparkSession}
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.MetadataBuilder
 
 import scala.reflect.runtime.universe.TypeTag
+
+case class NameIdentificationResults
+(
+  predictedNameProb: Double = 0.0,
+  tokenInFirstNameDictionary: Map[Int, Int] = emptyTokensMap,
+  tokenIsMale: Map[Int, Int] = emptyTokensMap,
+  tokenIsFemale: Map[Int, Int] = emptyTokensMap,
+  tokenIsOther: Map[Int, Int] = emptyTokensMap
+) extends JsonLike
 
 class SmartTextVectorizerWithBias[T <: Text]
 (
@@ -72,21 +83,10 @@ class SmartTextVectorizerWithBias[T <: Text]
   }
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
-    val emptyTokensMap = Map(tokensToCheckForFirstName map { i => i -> 0 }: _*)
-
-    case class NameIdentificationResultsMap
-    (
-      predictedNameProb: Double = 0.0,
-      tokenInFirstNameDictionary: Map[Int, Int] = emptyTokensMap,
-      tokenIsMale: Map[Int, Int] = emptyTokensMap,
-      tokenIsFemale: Map[Int, Int] = emptyTokensMap,
-      tokenIsOther: Map[Int, Int] = emptyTokensMap
-    )
-
     def aggregateTwoResults(
-      one: NameIdentificationResultsMap, two: NameIdentificationResultsMap
-    ): NameIdentificationResultsMap = {
-      NameIdentificationResultsMap(
+      one: NameIdentificationResults, two: NameIdentificationResults
+    ): NameIdentificationResults = {
+      NameIdentificationResults(
         one.predictedNameProb + two.predictedNameProb,
         one.tokenInFirstNameDictionary + two.tokenInFirstNameDictionary,
         one.tokenIsMale + two.tokenIsMale,
@@ -96,14 +96,14 @@ class SmartTextVectorizerWithBias[T <: Text]
     }
 
     def aggregateSeqResults(
-      one: Seq[NameIdentificationResultsMap], two: Seq[NameIdentificationResultsMap]
-    ): Seq[NameIdentificationResultsMap] = {
+      one: Seq[NameIdentificationResults], two: Seq[NameIdentificationResults]
+    ): Seq[NameIdentificationResults] = {
       one zip two map { case (x, y) => aggregateTwoResults(x, y) }
     }
 
     import com.salesforce.op.features.types.NameStats.GenderStrings._
-    def computeResults(input: T#Value): NameIdentificationResultsMap = {
-      val tokens = preProcess(input)
+    def computeResults(input: T#Value): NameIdentificationResults = {
+      val tokens: Seq[String] = preProcess(input)
       val (firstHalf, secondHalf) = (tokensToCheckForFirstName map { index: Int =>
         val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index) match {
           case Male => (1, 1, 0, 0)
@@ -114,7 +114,7 @@ class SmartTextVectorizerWithBias[T <: Text]
       }).unzip
       val (inFirstNameDictSeq, isMaleSeq) = firstHalf.unzip
       val (isFemaleSeq, isOtherSeq) = secondHalf.unzip
-      NameIdentificationResultsMap(
+      NameIdentificationResults(
         dictCheck(tokens),
         Map(inFirstNameDictSeq: _*),
         Map(isMaleSeq: _*),
@@ -122,18 +122,19 @@ class SmartTextVectorizerWithBias[T <: Text]
         Map(isOtherSeq: _*)
       )
     }
+
     val rdd = dataset.rdd
     // TODO: Figure out reasonable values for the timeout
     val N = rdd.countApprox(timeout = 500).getFinalValue().mean
-    val zeroValue = Seq.fill[NameIdentificationResultsMap](inN.length)(NameIdentificationResultsMap())
-    val agg = rdd.treeAggregate[Seq[NameIdentificationResultsMap]](zeroValue)(
+    val zeroValue = Seq.fill[NameIdentificationResults](inN.length)(NameIdentificationResults())
+    val agg = rdd.treeAggregate[Seq[NameIdentificationResults]](zeroValue)(
       combOp = aggregateSeqResults, seqOp = {
         case (result, row) => aggregateSeqResults(result, row.map(computeResults))
       }
     )
 
     val predictedProbs = agg map { _.predictedNameProb / N }
-    // TODO: Move guard check to treeAggregate
+    // TODO: Move guard check to aggregation?
     // Transform the guard check into two collections: a collection of transforms and a collection of conditions
     val isName = guardCheckResults match {
       case Some(results) => predictedProbs zip results map {
@@ -143,12 +144,13 @@ class SmartTextVectorizerWithBias[T <: Text]
         throw new RuntimeException("Guard check results were not generated but this should not happen.")
       }
     }
-    val bestIndexes: Seq[Int] = agg map { result: NameIdentificationResultsMap =>
-      val (bestIndex, _) = result.tokenInFirstNameDictionary.maxBy(_._2)
+    val bestIndexes: Seq[Int] = agg map { result: NameIdentificationResults =>
+      val (bestIndex, _) = if (result.tokenInFirstNameDictionary.isEmpty) (0, 0)
+      else result.tokenInFirstNameDictionary.maxBy(_._2)
       bestIndex
     }
-    val (pctMale: Seq[Double], pctFemale: Seq[Double], pctOther: Seq[Double]) = (agg zip bestIndexes).map {
-      case (result: NameIdentificationResultsMap, index: Int) =>
+    val (pctMale, pctFemale, pctOther) = (agg zip bestIndexes).map {
+      case (result: NameIdentificationResults, index: Int) =>
       (
         result.tokenIsMale.getOrElse(index, 0),
         result.tokenIsFemale.getOrElse(index, 0),

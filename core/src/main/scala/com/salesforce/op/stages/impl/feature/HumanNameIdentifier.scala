@@ -33,6 +33,12 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.utils.stages.NameIdentificationUtils.{
+  GenderDictionary,
+  NameDictionary,
+  tokensToCheckForFirstName
+}
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -41,51 +47,19 @@ import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Column, Dataset, SparkSession}
 import org.apache.spark.util.SparkUtils.{averageBoolCol, averageDoubleCol, extractDouble}
 
-import scala.io.Source
 import scala.reflect.runtime.universe.TypeTag
-import scala.util.Try
 
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
-  private val spark = SparkSession.builder().getOrCreate()
+  val spark: SparkSession = SparkSession.builder().getOrCreate()
   import spark.implicits._
 
-  lazy final val nameDictionary = {
-    val nameDictionary = collection.mutable.Set.empty[String]
-    val dictionaryPath = "/NameIdentification_JRC.txt"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    for {name <- buffer.getLines} {
-      nameDictionary += name
-    }
-    buffer.close
-    nameDictionary
-  }
+  implicit val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+  implicit val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
-  lazy final val genderDictionary = {
-    val genderDictionary = collection.mutable.Map.empty[String, Double]
-    val dictionaryPath = "/GenderDictionary_SSA.csv"
-    val stream = getClass.getResourceAsStream(dictionaryPath)
-    val buffer = Source.fromInputStream(stream)
-    // TODO: Also make use of frequency information in this dictionary
-    for {row <- buffer.getLines.drop(1)} {
-      val cols = row.split(",").map(_.trim)
-      val name = cols(0).toLowerCase().replace("\\P{L}", "")
-      val probMale = Try {
-        cols(6).toDouble
-      }.toOption
-      probMale match {
-        case Some(prob) => genderDictionary += (name -> prob)
-        case None =>
-      }
-    }
-    buffer.close
-    genderDictionary
-  }
-
-  def preProcess(s: T#Value): Array[String] = {
+  def preProcess(s: T#Value): Seq[String] = {
     s.getOrElse("").toLowerCase().split("\\s+").map((token: String) =>
       token.replace("\\P{L}", "")
-    )
+    ).toSeq
   }
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
@@ -111,16 +85,17 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     checks.forall(identity)
   }
 
-  def dictCheck(tokens: Array[String]): Double = tokens.map({token: String =>
-    if (nameDictionary contains token) 1 else 0
+  def dictCheck(tokens: Seq[String])(implicit dict: Broadcast[NameDictionary]): Double = tokens.map({token: String =>
+    if (dict.value.value contains token) 1 else 0
   }).sum.toDouble / tokens.length
-  def dictCheckUDF: UserDefinedFunction = udf(dictCheck _)
+  def dictCheckUDF: UserDefinedFunction = {
+    udf(dictCheck _)
+  }
 
-  val tokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
-  def checkForFirstName(tokens: Array[String]): Array[Boolean] = {
+  def checkForFirstName(tokens: Seq[String])(implicit dict: Broadcast[GenderDictionary]): Seq[Boolean] = {
     tokensToCheckForFirstName.map({i: Int =>
-      genderDictionary contains tokens((i + tokens.length) % tokens.length)
-    }).toArray
+      dict.value.value contains tokens((i + tokens.length) % tokens.length)
+    })
   }
 
   def unaryEstimatorFitFn(
@@ -162,12 +137,12 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import NameStats.GenderStrings._
   import NameStats.Keys._
 
-  def identifyGender(tokens: Array[String], index: Int): String = {
+  def identifyGender(tokens: Seq[String], index: Int)(implicit dict: Broadcast[GenderDictionary]): String = {
     val nameToCheckGenderOf = if (tokens.length != 1) {
       // Mod to accept -1 as valid index
       tokens((index + tokens.length) % tokens.length)
     } else tokens.head
-    genderDictionary.get(nameToCheckGenderOf).map(
+    dict.value.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
