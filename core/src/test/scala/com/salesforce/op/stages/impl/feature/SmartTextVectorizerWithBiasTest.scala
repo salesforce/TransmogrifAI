@@ -34,7 +34,6 @@ import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestFeatureBuilder
 import com.salesforce.op.testkit.RandomText
-import org.apache.spark.sql.DataFrame
 
 class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
   override val estimator: SmartTextVectorizerWithBias[Text] = new SmartTextVectorizerWithBias()
