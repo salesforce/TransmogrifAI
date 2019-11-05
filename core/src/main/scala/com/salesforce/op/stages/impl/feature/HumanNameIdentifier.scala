@@ -33,14 +33,10 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
-import com.salesforce.op.utils.stages.NameIdentificationUtils.{
-  GenderDictionary,
-  NameDictionary,
-  tokensToCheckForFirstName
-}
+import com.salesforce.op.utils.stages.NameIdentificationUtils._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
+import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.MetadataBuilder
@@ -63,9 +59,8 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
-  def guardChecks(dataset: Dataset[T#Value], column: Column): Boolean = {
-    // TODO: Figure out reasonable values for the timeout
-    val total = dataset.rdd.countApprox(timeout = 500).getFinalValue().mean
+  def guardChecks(dataset: Dataset[T#Value], column: Column)(implicit timeout: Int = 1000): Boolean = {
+    val total = dataset.rdd.countApprox(timeout = timeout).getFinalValue().mean
     val numUnique = extractDouble(dataset.select(approx_count_distinct(column).as[Double]))
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
@@ -93,14 +88,14 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
 
   def checkForFirstName(tokens: Seq[String])(implicit dict: Broadcast[GenderDictionary]): Seq[Boolean] = {
-    tokensToCheckForFirstName.map({i: Int =>
+    TokensToCheckForFirstName.map({i: Int =>
       dict.value.value contains tokens((i + tokens.length) % tokens.length)
     })
   }
 
   def unaryEstimatorFitFn(
     dataset: Dataset[T#Value], column: Column, threshold: Double
-  ): (Double, Boolean, Option[Int]) = {
+  )(implicit timeout: Int = 1000): (Double, Boolean, Option[Int]) = {
     val spark = SparkSession.builder().getOrCreate()
     import spark.implicits._
 
@@ -120,7 +115,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
         // Also figure out the index of the likely first name
         val checkedForFirstName = tokenizedDS.map(checkForFirstName)
         if (log.isDebugEnabled) checkedForFirstName.show(truncate = false)
-        val percentageFirstNameByN = for {i <- tokensToCheckForFirstName} yield {
+        val percentageFirstNameByN = for {i <- TokensToCheckForFirstName} yield {
           // Use one more map to extract the particular boolean result that we need
           val percentageMatched = averageBoolCol(checkedForFirstName.map(
             bools => bools((i + bools.length) % bools.length)
@@ -186,12 +181,21 @@ class HumanNameIdentifier[T <: Text]
     }
   )
   setDefault(defaultThreshold, 0.50)
-
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
+
+  val countApproxTimeout = new IntParam(
+    parent = this,
+    name = "countApproxTimeout",
+    doc = "how long to wait (in milliseconds) for result of dataset.rdd.countApprox",
+    isValid = (value: Int) => { ParamValidators.gt(0)(value) }
+  )
+  setDefault(countApproxTimeout, 3 * 60 * 1000)
+  def setCountApproxTimeout(value: Int): this.type = set(countApproxTimeout, value)
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     require(dataset.schema.fieldNames.length == 1, "There is exactly one column in this dataset")
     val column = col(dataset.schema.fieldNames.head)
+    implicit val timeout: Int = $(countApproxTimeout)
     val (predictedProb, treatAsName, indexFirstName) = unaryEstimatorFitFn(dataset, column, $(defaultThreshold))
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata

@@ -35,6 +35,9 @@ import com.salesforce.op.utils.json.JsonLike
 import scala.io.Source
 import scala.util.Try
 
+/**
+ * * Documentation for the sources of name data, configuration settings
+ */
 object NameIdentificationUtils {
   case class NameDictionary
   (
@@ -75,6 +78,6 @@ object NameIdentificationUtils {
     }
   ) extends JsonLike
 
-  val tokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
-  val emptyTokensMap: Map[Int, Int] = Map(tokensToCheckForFirstName map { i => i -> 0 }: _*)
+  val TokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
+  val EmptyTokensMap: Map[Int, Int] = Map(TokensToCheckForFirstName map { i => i -> 0 }: _*)
 }
