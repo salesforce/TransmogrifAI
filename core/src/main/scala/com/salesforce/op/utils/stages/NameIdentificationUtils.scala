@@ -44,12 +44,9 @@ import scala.util.Try
 
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import com.salesforce.op.utils.stages.NameIdentificationUtils._
-  // TODO: Check that this is OK for instantiating the Spark session?
-  val spark: SparkSession = SparkSession.builder().master("local").getOrCreate()
-  import spark.implicits._
-
-  implicit val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
-  implicit val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+  val spark: SparkSession
+  lazy val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+  lazy val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
   def preProcess(s: T#Value): Seq[String] = {
     s.getOrElse("").toLowerCase().split("\\s+").map((token: String) =>
@@ -58,7 +55,10 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
   def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
-  def guardChecks(dataset: Dataset[T#Value], column: Column)(implicit timeout: Int = 1000): Boolean = {
+  def guardChecks(dataset: Dataset[T#Value], column: Column, timeout: Int = 1000): Boolean = {
+    val spark = dataset.sparkSession
+    import spark.implicits._
+
     val total = dataset.rdd.countApprox(timeout = timeout).getFinalValue().mean
     val numUnique = extractDouble(dataset.select(approx_count_distinct(column).as[Double]))
     val checks = List(
@@ -79,40 +79,42 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     checks.forall(identity)
   }
 
-  def dictCheck(tokens: Seq[String])(implicit dict: Broadcast[NameDictionary]): Double = tokens.map({token: String =>
-    if (dict.value.value contains token) 1 else 0
-  }).sum.toDouble / tokens.length
+  def dictCheck(
+    tokens: Seq[String], dict: Broadcast[NameDictionary] = broadcastNameDict
+  ): Double = {
+    tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+  }
   def dictCheckUDF: UserDefinedFunction = {
     udf(dictCheck _)
   }
 
-  def checkForFirstName(tokens: Seq[String])(implicit dict: Broadcast[GenderDictionary]): Seq[Boolean] = {
+  def checkForFirstName(tokens: Seq[String], dict: Broadcast[GenderDictionary] = broadcastGenderDict): Seq[Boolean] = {
     TokensToCheckForFirstName.map({i: Int =>
       dict.value.value contains tokens((i + tokens.length) % tokens.length)
     })
   }
 
   def unaryEstimatorFitFn(
-    dataset: Dataset[T#Value], column: Column, threshold: Double
-  )(implicit timeout: Int = 1000): (Double, Boolean, Option[Int]) = {
-    val spark = SparkSession.builder().getOrCreate()
+    dataset: Dataset[T#Value], column: Column, threshold: Double, timeout: Int = 1000
+  ): (Double, Boolean, Option[Int]) = {
+    val spark = dataset.sparkSession
     import spark.implicits._
 
     if (log.isDebugEnabled) dataset.show(truncate = false)
     if (!guardChecks(dataset, column)) {
       (0.0, false, None)
     } else {
-      val tokenizedDS = dataset.map(preProcess)
+      val tokenizedDS: Dataset[Seq[String]] = dataset.map(preProcess)
       if (log.isDebugEnabled) tokenizedDS.show(truncate = false)
       // Check if likely to be a name field
-      val checkedDS = tokenizedDS.map(dictCheck)
+      val checkedDS: Dataset[Double] = tokenizedDS.map(row => dictCheck(row))
       if (log.isDebugEnabled) checkedDS.show(truncate = false)
       val predictedProb: Double = averageDoubleCol(checkedDS, column)
       logDebug(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
       if (predictedProb < threshold) (0.0, false, None)
       else {
         // Also figure out the index of the likely first name
-        val checkedForFirstName = tokenizedDS.map(checkForFirstName)
+        val checkedForFirstName = tokenizedDS.map(row => checkForFirstName(row))
         if (log.isDebugEnabled) checkedForFirstName.show(truncate = false)
         val percentageFirstNameByN = for {i <- TokensToCheckForFirstName} yield {
           // Use one more map to extract the particular boolean result that we need
@@ -131,7 +133,10 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import NameStats.GenderStrings._
   import NameStats.Keys._
 
-  def identifyGender(tokens: Seq[String], index: Int)(implicit dict: Broadcast[GenderDictionary]): String = {
+  def identifyGender(
+    tokens: Seq[String], index: Int,
+    dict: Broadcast[GenderDictionary] = broadcastGenderDict
+  ): String = {
     val nameToCheckGenderOf = if (tokens.length != 1) {
       // Mod to accept -1 as valid index
       tokens((index + tokens.length) % tokens.length)

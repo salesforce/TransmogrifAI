@@ -45,7 +45,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.MetadataBuilder
 
@@ -72,6 +72,8 @@ class SmartTextVectorizer[T <: Text]
   with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
   with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
   with BiasDetectionParams with NameIdentificationFun[T] {
+  // Required by NameIdentificationFun to broadcast dictionaries
+  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 

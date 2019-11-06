@@ -35,7 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameIdentificationFun
 import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators}
-import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.{Dataset, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.MetadataBuilder
 
@@ -53,6 +53,9 @@ class HumanNameIdentifier[T <: Text]
   uid = uid,
   operationName = operationName
 ) with NameIdentificationFun[T] {
+  // Required by NameIdentificationFun to broadcast dictionaries
+  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
+
   // Parameters
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -76,9 +79,11 @@ class HumanNameIdentifier[T <: Text]
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     require(dataset.schema.fieldNames.length == 1, "There is exactly one column in this dataset")
+
     val column = col(dataset.schema.fieldNames.head)
-    implicit val timeout: Int = $(countApproxTimeout)
-    val (predictedProb, treatAsName, indexFirstName) = unaryEstimatorFitFn(dataset, column, $(defaultThreshold))
+    val (predictedProb, treatAsName, indexFirstName) = unaryEstimatorFitFn(
+      dataset, column, $(defaultThreshold), $(countApproxTimeout)
+    )
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     // get a reference to the current metadata
@@ -107,7 +112,6 @@ class HumanNameIdentifierModel[T <: Text]
   val indexFirstName: Option[Int] = None
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
-  // Why doesn't the following line work
-  // def transformFn(input: T): NameStats = transformerFn(treatAsName, indexFirstName, input)
+  val spark: SparkSession = SparkSession.builder().getOrCreate()
   def transformFn: T => NameStats = (input: T) => transformerFn(treatAsName, indexFirstName, input)
 }
