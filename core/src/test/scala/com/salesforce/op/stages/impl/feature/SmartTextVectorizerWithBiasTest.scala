@@ -34,13 +34,19 @@ import com.salesforce.op.OpWorkflow
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.test.TestFeatureBuilder
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.testkit.RandomText
+import org.junit.runner.RunWith
+import org.scalatest.junit.JUnitRunner
 
+
+@RunWith(classOf[JUnitRunner])
 class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
   override val estimator: SmartTextVectorizerWithBias[Text] = new SmartTextVectorizerWithBias()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+    .setRemoveSensitive(true)
     .setInput(f1, f2)
 
   lazy val (newInputData, newF1, newF2, newF3) = TestFeatureBuilder("text1", "text2", "name",
@@ -53,7 +59,6 @@ class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
     )
   )
 
-  // TODO: Return empty vectors for identified name features
   it should "detect a single name feature and return empty vectors" in {
     val newEstimator: SmartTextVectorizerWithBias[Text] = estimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
@@ -61,6 +66,18 @@ class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     model.args.isName shouldBe Array(true)
+
+    val smartVectorized = newEstimator.getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized).transform(newInputData)
+    val result = transformed.collect(smartVectorized)
+
+    val (smart, expected) = result.map { case smartVector =>
+      smartVector -> OPVector.empty
+    }.unzip
+
+    smart shouldBe expected
   }
 
   it should "detect a single name column among other non-name Text columns" in {
@@ -70,6 +87,34 @@ class SmartTextVectorizerWithBiasTest extends SmartTextVectorizerTest {
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     model.args.isName shouldBe Array(false, false, true)
+
+    val smartVectorized = newEstimator.getOutput()
+
+    val categoricalVectorized = new OpTextPivotVectorizer[Text]()
+      .setMinSupport(1).setTopK(2).setInput(newF1).getOutput()
+    val tokenizedText = new TextTokenizer[Text]().setInput(newF2).getOutput()
+    val textVectorized = new OPCollectionHashingVectorizer[TextList]()
+      .setNumFeatures(4).setPrependFeatureName(false).setInput(tokenizedText).getOutput()
+    val nullIndicator = new TextListNullTransformer[TextList]().setInput(tokenizedText).getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized, categoricalVectorized, textVectorized, nullIndicator).transform(newInputData)
+    val result = transformed.collect(smartVectorized, categoricalVectorized, textVectorized, nullIndicator)
+    val field = transformed.schema(smartVectorized.name)
+    // TODO: Figure out what these test results should be?
+    assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(smartVectorized))
+    val fieldCategorical = transformed.schema(categoricalVectorized.name)
+    val catRes = transformed.collect(categoricalVectorized)
+    assertNominal(fieldCategorical, Array.fill(catRes.head.value.size)(true), catRes)
+    val fieldText = transformed.schema(textVectorized.name)
+    val textRes = transformed.collect(textVectorized)
+    assertNominal(fieldText, Array.fill(textRes.head.value.size)(false), textRes)
+    val (smart, expected) = result.map { case (smartVector, categoricalVector, textVector, nullVector) =>
+      val combined = categoricalVector.combine(textVector, nullVector)
+      smartVector -> combined
+    }.unzip
+
+    smart shouldBe expected
   }
 
   it should "compute gender probabilities for one column in the metadata" in {

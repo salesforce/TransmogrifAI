@@ -32,16 +32,15 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+import com.twitter.algebird.{Monoid, Semigroup}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -231,9 +230,17 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     row: Seq[Text] => {
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+      val nonNameRows = if (args.removeSensitive) {
+        SmartTextVectorizer.partition[Text](row.toArray, args.isName)._2
+      } else row.toArray
+      val nonNameIsCategorical = if (args.removeSensitive) {
+        SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
+      } else args.isCategorical
+      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](nonNameRows, nonNameIsCategorical)
+
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
+
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
       val textLenVector = if ($(trackTextLen)) getLenVector(textTokens) else OPVector.empty
@@ -242,8 +249,12 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     }
   }
 
-  private def getTextTransientFeatures: Array[TransientFeature] =
-    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
+  private def getTextTransientFeatures: Array[TransientFeature] = {
+    val nonNameIsCategorical = if (args.removeSensitive) {
+      SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
+    } else args.isCategorical
+    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), nonNameIsCategorical)._2
+  }
 
   private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
     val nullIndicators = textTokens.map { tokens =>

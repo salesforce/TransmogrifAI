@@ -35,6 +35,7 @@ import com.salesforce.op.features.types.{OPVector, Text}
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.stages.NameIdentificationUtils._
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators}
 import org.apache.spark.sql.Dataset
@@ -94,6 +95,11 @@ class SmartTextVectorizerWithBias[T <: Text]
     guardCheckResults = Some(inN.map(feature => guardChecks(dataset.asInstanceOf[Dataset[T#Value]], col(feature.name))))
     // then call super
     super.fit(dataset).asInstanceOf[SequenceModel[T, OPVector]]
+  }
+
+  override def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+    // TODO
+    OpVectorMetadata(getOutputFeatureName, Array.empty, Transmogrifier.inputFeaturesToHistory(inN, stageName))
   }
 
   override def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
