@@ -240,10 +240,7 @@ trait RichTextFeature {
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
-      val vectorizer = if (detectSensitive) {
-        new SmartTextVectorizerWithBias[T]().setRemoveSensitive(removeSensitive)
-      } else new SmartTextVectorizer[T]()
-      vectorizer
+      new SmartTextVectorizer[T]()
         .setInput(f +: others)
         .setMaxCardinality(maxCategoricalCardinality)
         .setCleanText(cleanText)
@@ -263,6 +260,8 @@ trait RichTextFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
+        .setDetectSensitive(detectSensitive)
+        .setRemoveSensitive(removeSensitive)
         .getOutput()
     }
 

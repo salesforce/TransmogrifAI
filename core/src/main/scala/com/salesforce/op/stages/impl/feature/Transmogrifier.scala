@@ -305,14 +305,14 @@ private[op] case object Transmogrifier {
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, detectSensitive = true, others = other)
+            prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[TextArea] =>
           val (f, other) = castAs[TextArea](g)
           f.smartVectorize(maxCategoricalCardinality = MaxCategoricalCardinality,
             trackNulls = TrackNulls, numHashes = DefaultNumOfFeatures,
             hashSpaceStrategy = defaults.HashSpaceStrategy, autoDetectLanguage = AutoDetectLanguage,
             minTokenLength = MinTokenLength, toLowercase = ToLowercase,
-            prependFeatureName = PrependFeatureName, detectSensitive = true, others = other)
+            prependFeatureName = PrependFeatureName, others = other)
         case t if t =:= weakTypeOf[URL] =>
           val (f, other) = castAs[URL](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, trackNulls = TrackNulls,
