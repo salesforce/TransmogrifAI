@@ -63,9 +63,8 @@ class HumanNameIdentifier[T <: Text]
   uid = uid,
   operationName = operationName
 ) with NameIdentificationFun[T] {
-  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
+  override lazy val spark: SparkSession = SparkSession.builder().config("spark.master", "local").getOrCreate()
 
-  // Parameters
   val defaultThreshold = new DoubleParam(
     parent = this,
     name = "defaultThreshold",

@@ -79,7 +79,7 @@ class SmartTextVectorizer[T <: Text]
   with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
   with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
   with BiasDetectionParams with NameIdentificationFun[T] {
-  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
+  override lazy val spark: SparkSession = SparkSession.builder().config("spark.master", "local").getOrCreate()
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
