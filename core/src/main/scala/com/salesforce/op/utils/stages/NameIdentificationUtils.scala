@@ -42,6 +42,11 @@ import org.apache.spark.util.SparkUtils.{averageBoolCol, averageDoubleCol, extra
 import scala.io.Source
 import scala.util.Try
 
+/**
+ * Provides shared helper functions and variables (namely, broadcast dictionaries) for name identification
+ * and name to gender transformation.
+ * @tparam T     the FeatureType (subtype of Text) to operate over
+ */
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import com.salesforce.op.utils.stages.NameIdentificationUtils._
   val spark: SparkSession
@@ -162,14 +167,23 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
 }
 
 /**
- * * Documentation for the sources of name data, configuration settings
+ * Defines static values for name identification:
+ * - Dictionary filenames and how to read them in
+ * - Which parts of a string to check for first name (used in transforming from name to gender)
+ *
+ * Name and gender data are maintained by and taken from this repository:
+ *  https://github.com/MWYang/InternationalNames
+ * which itself sources data from:
+ *  https://ec.europa.eu/jrc/en/language-technologies/jrc-names
+ *  https://github.com/OpenGenderTracking/globalnamedata
+ *  https://github.com/first20hours/google-10000-english
  */
 object NameIdentificationUtils {
   case class NameDictionary
   (
     value: Set[String] = {
       val nameDictionary = collection.mutable.Set.empty[String]
-      val dictionaryPath = "/NameIdentification_JRC.txt"
+      val dictionaryPath = "/Names_JRC_Combined.txt"
       val stream = getClass.getResourceAsStream(dictionaryPath)
       val buffer = Source.fromInputStream(stream)
       for {name <- buffer.getLines} {
@@ -184,7 +198,7 @@ object NameIdentificationUtils {
   (
     value: Map[String, Double] = {
       val genderDictionary = collection.mutable.Map.empty[String, Double]
-      val dictionaryPath = "/GenderDictionary_SSA.csv"
+      val dictionaryPath = "/GenderDictionary_USandUK.csv"
       val stream = getClass.getResourceAsStream(dictionaryPath)
       val buffer = Source.fromInputStream(stream)
       // TODO: Also make use of frequency information in this dictionary
