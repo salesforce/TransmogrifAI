@@ -34,8 +34,10 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameIdentificationFun
+import com.salesforce.op.utils.stages.NameIdentificationUtils.GenderDictionary
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators}
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.MetadataBuilder
 
@@ -63,7 +65,6 @@ class HumanNameIdentifier[T <: Text]
   uid = uid,
   operationName = operationName
 ) with NameIdentificationFun[T] {
-  override lazy val spark: SparkSession = SparkSession.builder().config("spark.master", "local").getOrCreate()
 
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -114,6 +115,16 @@ class HumanNameIdentifierModel[T <: Text]
   val indexFirstName: Option[Int] = None
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
-  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
-  def transformFn: T => NameStats = (input: T) => transformerFn(treatAsName, indexFirstName, input)
+
+  var broadcastGenderDict: Option[Broadcast[GenderDictionary]] = None
+
+  override def transform(dataset: Dataset[_]): DataFrame = {
+    val spark: SparkSession = dataset.sparkSession
+    this.broadcastGenderDict = Some(spark.sparkContext.broadcast(GenderDictionary()))
+    super.transform(dataset)
+  }
+
+  def transformFn: T => NameStats = (input: T) => {
+    transformerFn(treatAsName, indexFirstName, input, this.broadcastGenderDict.get)
+  }
 }

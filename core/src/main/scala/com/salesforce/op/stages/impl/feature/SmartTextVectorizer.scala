@@ -43,11 +43,12 @@ import com.salesforce.op.utils.stages.NameIdentificationUtils._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder, SparkSession}
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -79,7 +80,6 @@ class SmartTextVectorizer[T <: Text]
   with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
   with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
   with BiasDetectionParams with NameIdentificationFun[T] {
-  override lazy val spark: SparkSession = SparkSession.builder().config("spark.master", "local").getOrCreate()
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
@@ -114,6 +114,10 @@ class SmartTextVectorizer[T <: Text]
   }
 
   private def detectSensitive(dataset: Dataset[Seq[T#Value]]): DetectSensitiveResults = {
+    val spark = dataset.sparkSession
+    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+
     def aggregateTwoResults(
       one: NameIdentificationResults, two: NameIdentificationResults
     ): NameIdentificationResults = {
@@ -137,7 +141,7 @@ class SmartTextVectorizer[T <: Text]
     def computeResults(input: T#Value): NameIdentificationResults = {
       val tokens: Seq[String] = preProcess(input)
       val (firstHalf, secondHalf) = (TokensToCheckForFirstName map { index: Int =>
-        val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index) match {
+        val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index, broadcastGenderDict) match {
           case Male => (1, 1, 0, 0)
           case Female => (1, 0, 1, 0)
           case _ => (0, 0, 0, 1)
@@ -148,7 +152,7 @@ class SmartTextVectorizer[T <: Text]
       val (isFemaleSeq, isOtherSeq) = secondHalf.unzip
       NameIdentificationResults(
         1.0,
-        dictCheck(tokens),
+        dictCheck(tokens, broadcastNameDict),
         Map(inFirstNameDictSeq: _*),
         Map(isMaleSeq: _*),
         Map(isFemaleSeq: _*),

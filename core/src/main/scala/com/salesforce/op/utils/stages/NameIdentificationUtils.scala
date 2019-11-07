@@ -34,9 +34,9 @@ import com.salesforce.op.features.types.{NameStats, Text}
 import com.salesforce.op.utils.json.JsonLike
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{Column, Dataset, SparkSession}
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.{Column, Dataset}
 import org.apache.spark.util.SparkUtils.{averageBoolCol, averageDoubleCol, extractDouble}
 
 import scala.io.Source
@@ -49,9 +49,6 @@ import scala.util.Try
  */
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import com.salesforce.op.utils.stages.NameIdentificationUtils._
-  val spark: SparkSession
-  lazy val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
-  lazy val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
   def preProcess(s: T#Value): Seq[String] = {
     s.getOrElse("").toLowerCase().split("\\s+").map((token: String) =>
@@ -84,16 +81,14 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     checks.forall(identity)
   }
 
-  def dictCheck(
-    tokens: Seq[String], dict: Broadcast[NameDictionary] = broadcastNameDict
-  ): Double = {
+  def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
     tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
   }
   def dictCheckUDF: UserDefinedFunction = {
     udf(dictCheck _)
   }
 
-  def checkForFirstName(tokens: Seq[String], dict: Broadcast[GenderDictionary] = broadcastGenderDict): Seq[Boolean] = {
+  def checkForFirstName(tokens: Seq[String], dict: Broadcast[GenderDictionary]): Seq[Boolean] = {
     TokensToCheckForFirstName.map({i: Int =>
       dict.value.value contains tokens((i + tokens.length) % tokens.length)
     })
@@ -104,6 +99,8 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   ): (Double, Boolean, Option[Int]) = {
     val spark = dataset.sparkSession
     import spark.implicits._
+    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
     if (log.isDebugEnabled) dataset.show(truncate = false)
     if (!guardChecks(dataset, column)) {
@@ -112,14 +109,14 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
       val tokenizedDS: Dataset[Seq[String]] = dataset.map(preProcess)
       if (log.isDebugEnabled) tokenizedDS.show(truncate = false)
       // Check if likely to be a name field
-      val checkedDS: Dataset[Double] = tokenizedDS.map(row => dictCheck(row))
+      val checkedDS: Dataset[Double] = tokenizedDS.map(row => dictCheck(row, broadcastNameDict))
       if (log.isDebugEnabled) checkedDS.show(truncate = false)
       val predictedProb: Double = averageDoubleCol(checkedDS, column)
       logDebug(s"PREDICTED NAME PROB FOR ${column.toString()}: $predictedProb")
       if (predictedProb < threshold) (0.0, false, None)
       else {
         // Also figure out the index of the likely first name
-        val checkedForFirstName = tokenizedDS.map(row => checkForFirstName(row))
+        val checkedForFirstName = tokenizedDS.map(row => checkForFirstName(row, broadcastGenderDict))
         if (log.isDebugEnabled) checkedForFirstName.show(truncate = false)
         val percentageFirstNameByN = for {i <- TokensToCheckForFirstName} yield {
           // Use one more map to extract the particular boolean result that we need
@@ -138,10 +135,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import NameStats.GenderStrings._
   import NameStats.Keys._
 
-  def identifyGender(
-    tokens: Seq[String], index: Int,
-    dict: Broadcast[GenderDictionary] = broadcastGenderDict
-  ): String = {
+  def identifyGender(tokens: Seq[String], index: Int, dict: Broadcast[GenderDictionary]): String = {
     val nameToCheckGenderOf = if (tokens.length != 1) {
       // Mod to accept -1 as valid index
       tokens((index + tokens.length) % tokens.length)
@@ -151,11 +145,13 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     ).getOrElse(GenderNA)
   }
 
-  def transformerFn(treatAsName: Boolean, indexFirstName: Option[Int], input: Text): NameStats = {
+  def transformerFn(
+    treatAsName: Boolean, indexFirstName: Option[Int], input: Text, broadcastGenderDict: Broadcast[GenderDictionary]
+  ): NameStats = {
     val tokens = preProcess(input.value)
     if (treatAsName) {
       assert(tokens.length == 1 || indexFirstName.isDefined)
-      val gender = identifyGender(tokens, indexFirstName.getOrElse(0))
+      val gender = identifyGender(tokens, indexFirstName.getOrElse(0), broadcastGenderDict)
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),
