@@ -59,7 +59,14 @@ import scala.reflect.runtime.universe.TypeTag
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
  *
- * @param uid uid for instance
+ * Detection of names in the input columns can be enabled with `detectSensitive`. Outputs of this step will be logged.
+ * In the future, the `removeSensitive` flag will enable removing automatically identified name columns from the output
+ * of SmartTextVectorizer.
+ *
+ * @param uid           uid for instance
+ * @param operationName unique name of the operation this stage performs
+ * @param tti           type tag for input
+ * @tparam T
  */
 class SmartTextVectorizer[T <: Text]
 (
@@ -72,7 +79,6 @@ class SmartTextVectorizer[T <: Text]
   with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
   with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
   with BiasDetectionParams with NameIdentificationFun[T] {
-  // Required by NameIdentificationFun to broadcast dictionaries
   override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
@@ -221,9 +227,26 @@ class SmartTextVectorizer[T <: Text]
 
     nameIdentificationResults match {
       case Some(results) =>
-        // create a new metadataBuilder and seed it with the current metadata
+        if (results.isName exists identity) {
+          logWarning(
+            """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
+              |model with that information in them? There could be potential bias as a result! Here's what I found:
+              |""".stripMargin
+          )
+          val problemColIndexes = results.isName.zipWithIndex.filter(_._1).map(_._2)
+          problemColIndexes foreach { index: Int =>
+            logWarning {
+              s"""Column Name: ${inN(index).name}
+              |Predicted Probability of Name: ${results.predictedNameProbs(index)}
+              |Percentage Likely Male Names: ${results.pctMale(index)}
+              |Percentage Likely Female Names: ${results.pctFemale(index)}
+              |Percentage Where No Gender Found: ${results.pctOther(index)}
+              |""".stripMargin
+            }
+          }
+        }
+        // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
         val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata())
-        // add a new key value pair to the metadata (key is a string and value is a string array)
         metaDataBuilder.putBooleanArray("treatAsName", results.isName)
         metaDataBuilder.putDoubleArray("predictedNameProb", results.predictedNameProbs)
         metaDataBuilder.putDoubleArray("bestFirstNameIndexes", results.bestFirstNameIndexes.map(_.toDouble))
@@ -231,13 +254,12 @@ class SmartTextVectorizer[T <: Text]
         metaDataBuilder.putDoubleArray("pctFemale", results.pctFemale)
         metaDataBuilder.putDoubleArray("pctOther", results.pctOther)
         setMetadata(metaDataBuilder.build())
-        // Also log the above results
-        logInfo(s"treatAsName: [${results.isName.mkString(",")}]")
-        logInfo(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
-        logInfo(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
-        logInfo(s"pctMale: [${results.pctMale.mkString(",")}]")
-        logInfo(s"pctFemale: [${results.pctFemale.mkString(",")}]")
-        logInfo(s"pctOther: [${results.pctOther.mkString(",")}]")
+        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
+        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
+        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
+        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
+        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
+        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
       case _ =>
     }
 
@@ -440,6 +462,15 @@ trait BiasDetectionParams extends Params {
   def setRemoveSensitive(value: Boolean): this.type = set(removeSensitive, value)
 }
 
+/**
+ * Case class for gathering results in the Spark dataset during treeAggregate
+ * @param count
+ * @param predictedNameProb
+ * @param tokenInFirstNameDictionary
+ * @param tokenIsMale
+ * @param tokenIsFemale
+ * @param tokenIsOther
+ */
 case class NameIdentificationResults
 (
   count: Double = 0.0,
@@ -450,6 +481,15 @@ case class NameIdentificationResults
   tokenIsOther: Map[Int, Int] = EmptyTokensMap
 ) extends JsonLike
 
+/**
+ * Case class for collecting the overall results from the name identification step
+ * @param isName
+ * @param predictedNameProbs
+ * @param bestFirstNameIndexes
+ * @param pctMale
+ * @param pctFemale
+ * @param pctOther
+ */
 case class DetectSensitiveResults
 (
   isName: Array[Boolean],

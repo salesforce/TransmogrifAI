@@ -41,6 +41,16 @@ import org.apache.spark.sql.types.MetadataBuilder
 
 import scala.reflect.runtime.universe.TypeTag
 
+/**
+ * Unary estimator for identifying whether a single Text column is a name or not. If the column does appear to be a
+ * name, a custom map will be returned that contains the guessed gender for each entry. If the column does not appear
+ * to be a name, then the output will be an empty map.
+ * @param uid           uid for instance
+ * @param operationName unique name of the operation this stage performs
+ * @param tti           type tag for input
+ * @param ttiv          type tag for input value
+ * @tparam T            the FeatureType (subtype of Text) to operate over
+ */
 class HumanNameIdentifier[T <: Text]
 (
   uid: String = UID[HumanNameIdentifier[T]],
@@ -53,7 +63,6 @@ class HumanNameIdentifier[T <: Text]
   uid = uid,
   operationName = operationName
 ) with NameIdentificationFun[T] {
-  // Required by NameIdentificationFun to broadcast dictionaries
   override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
 
   // Parameters
@@ -81,26 +90,20 @@ class HumanNameIdentifier[T <: Text]
     require(dataset.schema.fieldNames.length == 1, "There is exactly one column in this dataset")
 
     val column = col(dataset.schema.fieldNames.head)
-    val (predictedProb, treatAsName, indexFirstName) = unaryEstimatorFitFn(
+    val (predictedNameProb, treatAsName, bestFirstNameIndex) = unaryEstimatorFitFn(
       dataset, column, $(defaultThreshold), $(countApproxTimeout)
     )
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
-    // get a reference to the current metadata
     val preExistingMetadata = getMetadata()
-    // create a new metadataBuilder and seed it with the current metadata
     val metaDataBuilder = new MetadataBuilder().withMetadata(preExistingMetadata)
-    // add a new key value pair to the metadata (key is a string and value is a string array)
     metaDataBuilder.putBoolean("treatAsName", treatAsName)
-    metaDataBuilder.putLong("predictedNameProb", predictedProb.toLong)
-    metaDataBuilder.putLong("indexFirstName", indexFirstName.getOrElse(-1).toLong)
-    // package the new metadata, which includes the preExistingMetadata
-    // and the updates/additions
+    metaDataBuilder.putLong("predictedNameProb", predictedNameProb.toLong)
+    metaDataBuilder.putLong("bestFirstNameIndex", bestFirstNameIndex.getOrElse(-1).toLong)
     val updatedMetadata = metaDataBuilder.build()
-    // save the updatedMetadata to the outputMetadata parameter
     setMetadata(updatedMetadata)
 
-    new HumanNameIdentifierModel[T](uid, treatAsName, indexFirstName = indexFirstName)
+    new HumanNameIdentifierModel[T](uid, treatAsName, indexFirstName = bestFirstNameIndex)
   }
 }
 
@@ -112,6 +115,6 @@ class HumanNameIdentifierModel[T <: Text]
   val indexFirstName: Option[Int] = None
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
-  val spark: SparkSession = SparkSession.builder().getOrCreate()
+  override lazy val spark: SparkSession = SparkSession.builder().getOrCreate()
   def transformFn: T => NameStats = (input: T) => transformerFn(treatAsName, indexFirstName, input)
 }
