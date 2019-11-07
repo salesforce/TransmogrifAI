@@ -354,22 +354,6 @@ trait DataBalancerParams extends Params {
 
 
   /**
-   * Fraction to sample majority data
-   * Value should be in ]0.0, 1.0]
-   *
-   * @group param
-   */
-  private[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
-    "fraction to sample majority data", ParamValidators.inRange(
-      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
-    )
-  )
-
-  private[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
-
-  private[op] def getDownSampleFraction: Double = $(downSampleFraction)
-
-  /**
    * Whether or not positive data is in minority
    * Value should be in true or false
    *
