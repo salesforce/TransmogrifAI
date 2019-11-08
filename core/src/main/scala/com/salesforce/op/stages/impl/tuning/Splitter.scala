@@ -130,6 +130,23 @@ trait SplitterParams extends Params {
   def getReserveTestFraction: Double = $(reserveTestFraction)
 
   /**
+   * Fraction to sample majority data
+   * Value should be in (0.0, 1.0]
+   *
+   * @group param
+   */
+  private[op] final val downSampleFraction = new DoubleParam(this, "downSampleFraction",
+    "fraction to sample majority data", ParamValidators.inRange(
+      lowerBound = 0.0, upperBound = 1.0, lowerInclusive = false, upperInclusive = true
+    )
+  )
+  setDefault(downSampleFraction, SplitterParamsDefault.DownSampleFractionDefault)
+
+  private[op] def setDownSampleFraction(value: Double): this.type = set(downSampleFraction, value)
+
+  private[op] def getDownSampleFraction: Double = $(downSampleFraction)
+
+  /**
    * Maximum size of dataset want to train on.
    * Value should be > 0.
    * Default is 1000000.
@@ -183,6 +200,8 @@ private[op] object SplitterSummary {
         downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample)
       )
       case s if s == classOf[DataCutterSummary].getName => DataCutterSummary(
+        preSplitterDataCount = metadata.getLong(ModelSelectorNames.PreSplitterDataCount),
+        downSamplingFraction = metadata.getDouble(ModelSelectorNames.DownSample),
         labelsKept = metadata.getDoubleArray(ModelSelectorNames.LabelsKept),
         labelsDropped = metadata.getDoubleArray(ModelSelectorNames.LabelsDropped),
         labelsDroppedTotal = metadata.getLong(ModelSelectorNames.LabelsDroppedTotal)
