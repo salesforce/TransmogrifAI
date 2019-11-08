@@ -125,7 +125,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val dataPrep = data
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
       .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
-
+    log.info(s"number of rows after only using top 100 labels ${dataPrep.count()}")
     // calculate the down sample fraction
     val dataSetSize = data.count()
     val sampleF = getMaxTrainingSample / dataSetSize.toDouble
@@ -151,6 +151,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
   override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
 
     val dataPrep = super.validationPrepare(data)
+    log.info(s"count of dataset before down-sampling for this fold ${dataPrep.count()}")
 
     // check if down sampling is needed
     val balanced: DataFrame = if (getDownSampleFraction < 1.0) {
@@ -158,6 +159,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     } else {
       dataPrep
     }
+    log.info(s"count of dataset after down-sampling for this fold ${balanced.count()}")
     balanced.persist()
   }
 
