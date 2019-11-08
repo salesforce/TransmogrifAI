@@ -122,6 +122,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
     val dataPrep = data
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
       .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
+    log.info("after filtering to max of 100 cols: " + dataPrep.count())
 
     summary = Option(DataCutterSummary(
       labelsKept = getLabelsToKeep,
