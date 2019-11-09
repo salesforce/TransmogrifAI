@@ -102,6 +102,8 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
       stratifyCondition = stratifyCondition, dataset = dataset, label = label, splitter = splitter
     )
 
+
+
     // Prepare copies of the DAG for each CV split so we can parallelize it safely
     val splitsWithDags =
       splits.zipWithIndex.map { case (data, splitIndex) =>
@@ -118,6 +120,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
       Future {
         suppressLoggingForFun() {
           val training = spark.createDataFrame(trainingRDD, schema)
+          log.info(s"count of data set: ${training.count()}")
           val validation = spark.createDataFrame(validationRDD, schema)
           val (newTrain, newTest) = theDAG.map((d: StagesDAG) =>
             // If there is a CV DAG, then run it
@@ -136,6 +139,7 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
     // Await for all the evaluations to complete
     val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), maxWait)
 
+    log.info(s"finding best model")
     // Find the best model & return it
     val groupedSummary = modelSummaries.flatten.groupBy(_.model).map { case (_, folds) => findBestModel(folds) }.toArray
     val model = getValidatedModel(groupedSummary)
