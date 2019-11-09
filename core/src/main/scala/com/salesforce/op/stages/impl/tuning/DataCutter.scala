@@ -34,7 +34,7 @@ import com.salesforce.op.UID
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import org.apache.spark.ml.attribute.{MetadataHelper, NominalAttribute}
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.{DataFrame, Dataset, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
@@ -56,10 +56,12 @@ case object DataCutter {
     seed: Long = SplitterParamsDefault.seedDefault,
     reserveTestFraction: Double = SplitterParamsDefault.ReserveTestFractionDefault,
     maxLabelCategories: Int = SplitterParamsDefault.MaxLabelCategoriesDefault,
-    minLabelFraction: Double = SplitterParamsDefault.MinLabelFractionDefault
+    minLabelFraction: Double = SplitterParamsDefault.MinLabelFractionDefault,
+    maxTrainingSample: Int = SplitterParamsDefault.MaxTrainingSampleDefault
   ): DataCutter = {
     new DataCutter()
       .setSeed(seed)
+      .setMaxTrainingSample(maxTrainingSample)
       .setReserveTestFraction(reserveTestFraction)
       .setMaxLabelCategories(maxLabelCategories)
       .setMinLabelFraction(minLabelFraction)
@@ -83,6 +85,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
    * @return Parameters set in examining data
    */
   override def preValidationPrepare(data: DataFrame): PrevalidationVal = {
+
     val labelColName = if (isSet(labelColumnName)) {
       getLabelColumnName
     } else {
@@ -123,12 +126,39 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       .filter(r => labelSet.contains(r.getDouble(labelColIdx)))
       .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
 
+    // calculate the down sample fraction
+    val dataSetSize = data.count()
+    val sampleF = getMaxTrainingSample / dataSetSize.toDouble
+    val downSampleFraction = math.min(sampleF, SplitterParamsDefault.DownSampleFractionDefault)
+    setDownSampleFraction(downSampleFraction)
+
     summary = Option(DataCutterSummary(
+      preSplitterDataCount = dataSetSize,
+      downSamplingFraction = getDownSampleFraction,
       labelsKept = getLabelsToKeep,
       labelsDropped = getLabelsToDrop,
       labelsDroppedTotal = getLabelsDroppedTotal
     ))
     PrevalidationVal(summary, Option(dataPrep))
+  }
+
+  /**
+   * Rebalance the training data within the validation step
+   *
+   * @param data to prepare for model training. first column must be the label as a double
+   * @return balanced training set and a test set
+   */
+  override def validationPrepare(data: Dataset[Row]): Dataset[Row] = {
+
+    val dataPrep = super.validationPrepare(data)
+
+    // check if down sampling is needed
+    val balanced: DataFrame = if (getDownSampleFraction < 1.0) {
+      dataPrep.sample( false, getDownSampleFraction, getSeed)
+    } else {
+      dataPrep
+    }
+    balanced.persist()
   }
 
 
@@ -203,7 +233,11 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
         s" minLabelFraction = $minLabelFract, maxLabelCategories = $maxLabels. \n" +
         s"Label counts were: ${labelCounts.collect().toSeq}")
     }
-    DataCutterSummary(labelsKept.toSeq, labelsDropped.toSeq, labelsDroppedTotal.toLong)
+    DataCutterSummary(
+      labelsKept = labelsKept.toSeq,
+      labelsDropped = labelsDropped.toSeq,
+      labelsDroppedTotal = labelsDroppedTotal.toLong
+    )
   }
 
   override def copy(extra: ParamMap): DataCutter = {
@@ -273,6 +307,8 @@ private[impl] trait DataCutterParams extends SplitterParams {
  */
 case class DataCutterSummary
 (
+  preSplitterDataCount: Long = 0L,
+  downSamplingFraction: Double = SplitterParamsDefault.DownSampleFractionDefault,
   labelsKept: Seq[Double],
   labelsDropped: Seq[Double],
   labelsDroppedTotal: Long
@@ -288,6 +324,8 @@ case class DataCutterSummary
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     new MetadataBuilder()
       .putString(SplitterSummary.ClassName, this.getClass.getName)
+      .putLong(ModelSelectorNames.PreSplitterDataCount, preSplitterDataCount)
+      .putDouble(ModelSelectorNames.DownSample, downSamplingFraction)
       .putDoubleArray(ModelSelectorNames.LabelsKept, labelsKept.toArray)
       .putDoubleArray(ModelSelectorNames.LabelsDropped, labelsDropped.toArray)
       .putLong(ModelSelectorNames.LabelsDroppedTotal, labelsDroppedTotal)
