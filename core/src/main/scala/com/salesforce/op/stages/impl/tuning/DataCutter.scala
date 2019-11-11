@@ -127,7 +127,7 @@ class DataCutter(uid: String = UID[DataCutter]) extends Splitter(uid = uid) with
       .withColumn(labelColName, data(labelColName).as(labelColName, metadataNA.toMetadata))
     log.info(s"number of rows after only using top 100 labels ${dataPrep.count()}")
     // calculate the down sample fraction
-    val dataSetSize = data.count()
+    val dataSetSize = dataPrep.count()
     val sampleF = getMaxTrainingSample / dataSetSize.toDouble
     val downSampleFraction = math.min(sampleF, SplitterParamsDefault.DownSampleFractionDefault)
     setDownSampleFraction(downSampleFraction)
