@@ -43,6 +43,7 @@ import com.salesforce.op.utils.stages.NameIdentificationUtils._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
+import enumeratum.EnumEntry
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -104,7 +105,7 @@ class SmartTextVectorizer[T <: Text]
     It is not directly possible to do this computation in the treeAggregate() call below in fitFn() because one of the
     logical checks computes a standard deviation, which requires knowing the mean beforehand. We could implement the
     functionality in treeAggregate() if we could replace the standard deviation computation. */
-    if ($(detectSensitive)) {
+    if (getRemoveSensitive) {
       guardCheckResults = Some(
         inN.map(feature => guardChecks(dataset.asInstanceOf[Dataset[T#Value]], col(feature.name)))
       )
@@ -213,7 +214,7 @@ class SmartTextVectorizer[T <: Text]
       isCategorical -> topValues
     }.unzip
 
-    val nameIdentificationResults = if ($(detectSensitive)) Some(detectSensitive(dataset)) else None
+    val nameIdentificationResults = if (getRemoveSensitive) Some(detectSensitive(dataset)) else None
 
     val smartTextParams = SmartTextVectorizerModelArgs(
       isCategorical = isCategorical,
@@ -222,7 +223,7 @@ class SmartTextVectorizer[T <: Text]
       shouldTrackNulls = $(trackNulls),
       hashingParams = makeHashingParams(),
       isName = nameIdentificationResults.map(_.isName).getOrElse(Array.empty[Boolean]),
-      removeSensitive = $(removeSensitive)
+      removeSensitive = getRemoveSensitive
     )
     // TODO: Handle removeSensitive in metaData creation and in transformFn
 
@@ -344,15 +345,25 @@ private[op] object TextStats {
   def empty: TextStats = TextStats(Map.empty)
 }
 
+import enumeratum._
+sealed trait SensitiveFeatureMode extends EnumEntry with Serializable
+object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
+  val values = findValues
+
+  case object Off extends SensitiveFeatureMode
+  case object DetectOnly extends SensitiveFeatureMode
+  case object DetectAndRemove extends SensitiveFeatureMode
+}
+
 /**
  * Arguments for [[SmartTextVectorizerModel]]
  *
- * @param isCategorical    is feature a categorical or not
- * @param topValues        top values to each feature
- * @param shouldCleanText  should clean text value
- * @param shouldTrackNulls should track nulls
- * @param hashingParams    hashing function params
- * @param isName           keep track of which text columns look like names, None if no name identification
+ * @param isCategorical       is feature a categorical or not
+ * @param topValues           top values to each feature
+ * @param shouldCleanText     should clean text value
+ * @param shouldTrackNulls    should track nulls
+ * @param hashingParams       hashing function params
+ * @param removeSensitive     whether to remove detected sensitive fields
  */
 case class SmartTextVectorizerModelArgs
 (
@@ -439,12 +450,16 @@ trait MaxCardinalityParams extends Params {
 
 /* CODE FOR DETECTING SENSITIVE FEATURES BEGIN */
 trait BiasDetectionParams extends Params {
-  final val detectSensitive = new BooleanParam(
-    parent = this, name = "detectSensitive",
-    doc = "whether to detect sensitive fields in the text columns"
+  final val sensitiveFeatureMode: Param[String] = new Param[String](this, "sensitiveFeatureMode",
+    "Whether to detect sensitive features and how to handle them",
+    (value: String) => SensitiveFeatureMode.withNameInsensitiveOption(value).isDefined
   )
-  setDefault(detectSensitive, false)
-  final def setDetectSensitive(v: Boolean): this.type = set(detectSensitive, v)
+  setDefault(sensitiveFeatureMode, SensitiveFeatureMode.Off.toString)
+  def setSensitiveFeatureMode(v: SensitiveFeatureMode): this.type = set(sensitiveFeatureMode, v.entryName)
+  def getSensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode))
+  def getRemoveSensitive: Boolean = {
+    SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode)) == SensitiveFeatureMode.DetectAndRemove
+  }
 
   final val defaultThreshold = new DoubleParam(
     parent = this,
@@ -456,14 +471,6 @@ trait BiasDetectionParams extends Params {
   )
   setDefault(defaultThreshold, 0.50)
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
-
-  final val removeSensitive = new BooleanParam(
-    parent = this,
-    name = "removeSensitive",
-    doc = "whether to remove (i.e. output empty vectors) for columns detected as name"
-  )
-  setDefault(removeSensitive, false)
-  def setRemoveSensitive(value: Boolean): this.type = set(removeSensitive, value)
 }
 
 /**

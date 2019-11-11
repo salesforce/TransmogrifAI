@@ -381,8 +381,7 @@ class SmartTextVectorizerTest
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-    .setDetectSensitive(true)
-    .setRemoveSensitive(true)
+    .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
     .setInput(f1, f2)
 
   lazy val (newInputData, newF1, newF2, newF3) = TestFeatureBuilder("text1", "text2", "name",

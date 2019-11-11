@@ -235,8 +235,7 @@ trait RichTextFeature {
       hashSpaceStrategy: HashSpaceStrategy = TransmogrifierDefaults.HashSpaceStrategy,
       defaultLanguage: Language = TextTokenizer.DefaultLanguage,
       hashAlgorithm: HashAlgorithm = TransmogrifierDefaults.HashAlgorithm,
-      detectSensitive: Boolean = false,
-      removeSensitive: Boolean = false,
+      sensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.Off,
       others: Array[FeatureLike[T]] = Array.empty
     ): FeatureLike[OPVector] = {
       // scalastyle:on parameter.number
@@ -260,8 +259,7 @@ trait RichTextFeature {
         .setHashSpaceStrategy(hashSpaceStrategy)
         .setHashAlgorithm(hashAlgorithm)
         .setBinaryFreq(binaryFreq)
-        .setDetectSensitive(detectSensitive)
-        .setRemoveSensitive(removeSensitive)
+        .setSensitiveFeatureMode(sensitiveFeatureMode)
         .getOutput()
     }
 
