@@ -344,7 +344,7 @@ private[op] trait OpValidator[M <: Model[_], E <: Estimator[_]] extends Serializ
     val summaryOfAttempts = summaryFuts.map { f => f.map(Option(_)).recover {
       case e: Throwable =>
         log.warn("Model attempted in model selector failed with following issue: \n", e)
-        None
+        throw new RuntimeException(s"train set: ${train.count()}, test set: ${test.count()}, error:${e.toString}")
     }}
     val summary = SparkThreadUtils.utils.awaitResult(Future.sequence(summaryOfAttempts), maxWait).flatten.toArray
     if (summary.isEmpty) {
