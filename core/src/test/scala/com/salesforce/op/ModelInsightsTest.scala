@@ -166,7 +166,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
   }
 
-  def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
+  def getFeatureMoments(inputModel: FeatureLike[Prediction],
     DF: DataFrame): Map[String, Moments] = {
     lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
     lazy val dummyReader = workFlow.getReader()
@@ -782,7 +782,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val df = linRegDF._3
     val meanTol = 0.01
     val varTol = 0.01
-    val moments = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+    val moments = getFeatureMoments(standardizedLinpred, linRegDF._3)
 
     // Go through each feature and check that the mean, variance, and unique counts match the data
     moments.foreach { case (featureName, value) => {
