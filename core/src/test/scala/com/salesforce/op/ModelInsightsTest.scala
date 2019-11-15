@@ -167,15 +167,14 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
-    DF: DataFrame): (Map[String, Moments], Map[String, TextStats]) = {
+    DF: DataFrame): Map[String, Moments] = {
     lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
     lazy val dummyReader = workFlow.getReader()
     lazy val workFlowRFF = workFlow.withRawFeatureFilter(Some(dummyReader), None)
     lazy val model = workFlowRFF.train()
     val insights = model.modelInsights(inputModel)
     val featureMoments = insights.features.map(f => f.featureName -> f.distributions.head.moments.get).toMap
-    val featureCardinality = insights.features.map(f => f.featureName -> f.distributions.head.cardEstimate.get).toMap
-    return (featureMoments, featureCardinality)
+    return featureMoments
   }
 
   val params = new OpParams()
