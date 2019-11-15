@@ -782,7 +782,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val df = linRegDF._3
     val meanTol = 0.01
     val varTol = 0.01
-    val (moments, cardinality) = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+    val moments = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
 
     // Go through each feature and check that the mean, variance, and unique counts match the data
     moments.foreach { case (featureName, value) => {
@@ -791,12 +791,6 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         df.select(avg(featureName), variance(featureName)).as[(Double, Double)].collect().head
       math.abs((value.mean - expectedMean) / expectedMean) < meanTol shouldBe true
       math.abs((value.variance - expectedVariance) / expectedVariance) < varTol shouldBe true
-    }
-    }
-
-    cardinality.foreach { case (featureName, value) => {
-      val actualUniques = df.select(featureName).as[Double].collect().toSet
-      value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
     }
     }
   }
