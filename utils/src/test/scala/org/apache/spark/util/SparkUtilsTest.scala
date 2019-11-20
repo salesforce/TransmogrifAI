@@ -28,43 +28,34 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.utils.text
+package org.apache.spark.util
 
-import scala.util.matching.Regex
+import com.salesforce.op.test.TestCommon
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.SparkSession
+import org.junit.runner.RunWith
+import org.scalatest.FlatSpec
+import org.scalatest.junit.JUnitRunner
 
+import org.apache.spark.util.SparkUtils._
 
-case object TextUtils {
+@RunWith(classOf[JUnitRunner])
+class SparkUtilsTest extends FlatSpec with TestCommon {
+  private val spark = SparkSession.builder().config("spark.master", "local").getOrCreate()
+  import spark.implicits._
 
-  def cleanOptString(raw: Option[String], splitOn: String = " "): Option[String] =
-    raw.map(t => cleanString(t, splitOn))
-
-  def cleanString(raw: String, splitOn: String = " "): String = {
-    raw
-      .toLowerCase
-      .replaceAll("[\\p{Punct}]", splitOn)
-      .replaceAll(s"$splitOn+", s"$splitOn")
-      .split(splitOn)
-      .map(w => w.capitalize)
-      .mkString("")
+  it should "extract 0.0 from an empty Dataset" in {
+    val dataset = spark.emptyDataset[Double]
+    extractDouble(dataset) shouldBe 0.0
   }
 
-  def concat(l: String, r: String, separator: String): String =
-    if (l.isEmpty) r else if (r.isEmpty) l else s"$l$separator$r"
+  it should "extract 0.0 from an empty Dataset converted from an empty DataFrame" in {
+    val dataset = Seq.empty[Int].toDF("value").as[Double]
+    extractDouble(dataset) shouldBe 0.0
+  }
 
-  /**
-   * Helper function to conditionally extract groups from Text using RegEx.
-   * @param patterns: Seq[Regex] where earlier entries are preferred to later ones;
-   *                each RegEx must contain exactly one matching group
-   * @param string: the string to find matches in
-   * @return the first matched group found, an empty string if no matches were found
-   */
-  def getBestRegexMatch(patterns: Seq[Regex], string: String): String = {
-    patterns.foldLeft("")({ (acc: String, pattern: Regex) =>
-      if (acc == "") string match {
-        case pattern(possibleZip) => possibleZip
-        case _ => ""
-      }
-      else acc
-    })
+  it should "average an empty boolean column" in {
+    val dataset = spark.emptyDataset[Boolean]
+    averageBoolCol(dataset, col("value")) shouldBe 0.0
   }
 }
