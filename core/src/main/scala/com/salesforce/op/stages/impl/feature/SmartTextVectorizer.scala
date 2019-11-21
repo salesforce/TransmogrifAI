@@ -32,18 +32,23 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Monoid
+import com.salesforce.op.utils.stages.NameIdentificationFun
+import com.salesforce.op.utils.stages.NameIdentificationUtils._
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+import com.twitter.algebird.{Monoid, Semigroup}
+import enumeratum.EnumEntry
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.ClassTag
@@ -56,13 +61,26 @@ import scala.reflect.runtime.universe.TypeTag
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
  *
- * @param uid uid for instance
+ * Detection of names in the input columns can be enabled with `detectSensitive`. Outputs of this step will be logged.
+ * In the future, the `removeSensitive` flag will enable removing automatically identified name columns from the output
+ * of SmartTextVectorizer.
+ *
+ * @param uid           uid for instance
+ * @param operationName unique name of the operation this stage performs
+ * @param tti           type tag for input
+ * @tparam T
  */
-class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
-  extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
-    with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
+class SmartTextVectorizer[T <: Text]
+(
+  uid: String = UID[SmartTextVectorizer[T]],
+  operationName: String = "smartTxtVec"
+)(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
+  uid = uid,
+  operationName = operationName
+) with PivotParams with CleanTextFun with SaveOthersParams
+  with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
+  with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
+  with BiasDetectionParams with NameIdentificationFun[T] {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
@@ -76,6 +94,106 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     hashAlgorithm = getHashAlgorithm,
     hashSpaceStrategy = getHashSpaceStrategy
   )
+
+  /* CODE FOR DETECTING SENSITIVE FEATURES BEGIN */
+  var guardCheckResults: Option[Array[Boolean]] = None
+
+  override def fit(dataset: Dataset[_]): SequenceModel[T, OPVector] = {
+    /* Set instance variable for guardCheck results here.
+    We compute guardChecks here because all of the logical checks can be implemented efficiently in native Spark,
+    and we would like to use the individual Text columns before they are combined in SequenceEstimator.fit().
+    It is not directly possible to do this computation in the treeAggregate() call below in fitFn() because one of the
+    logical checks computes a standard deviation, which requires knowing the mean beforehand. We could implement the
+    functionality in treeAggregate() if we could replace the standard deviation computation. */
+    if (getRemoveSensitive) {
+      guardCheckResults = Some(
+        inN.map(feature => guardChecks(dataset.asInstanceOf[Dataset[T#Value]], col(feature.name)))
+      )
+    }
+    // then call super
+    super.fit(dataset)
+  }
+
+  private def detectSensitive(dataset: Dataset[Seq[T#Value]]): DetectSensitiveResults = {
+    val spark = dataset.sparkSession
+    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+
+    def aggregateTwoResults(
+      one: NameIdentificationResults, two: NameIdentificationResults
+    ): NameIdentificationResults = {
+      NameIdentificationResults(
+        one.count + two.count,
+        one.predictedNameProb + two.predictedNameProb,
+        one.tokenInFirstNameDictionary + two.tokenInFirstNameDictionary,
+        one.tokenIsMale + two.tokenIsMale,
+        one.tokenIsFemale + two.tokenIsFemale,
+        one.tokenIsOther + two.tokenIsOther
+      )
+    }
+
+    def aggregateSeqResults(
+      one: Seq[NameIdentificationResults], two: Seq[NameIdentificationResults]
+    ): Seq[NameIdentificationResults] = {
+      one zip two map { case (x, y) => aggregateTwoResults(x, y) }
+    }
+
+    import com.salesforce.op.features.types.NameStats.GenderStrings._
+    def computeResults(input: T#Value): NameIdentificationResults = {
+      val tokens: Seq[String] = preProcess(input)
+      val (firstHalf, secondHalf) = (TokensToCheckForFirstName map { index: Int =>
+        val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index, broadcastGenderDict) match {
+          case Male => (1, 1, 0, 0)
+          case Female => (1, 0, 1, 0)
+          case _ => (0, 0, 0, 1)
+        }
+        ((index -> inFirstNameDict, index -> isMale), (index -> isFemale, index -> isOther))
+      }).unzip
+      val (inFirstNameDictSeq, isMaleSeq) = firstHalf.unzip
+      val (isFemaleSeq, isOtherSeq) = secondHalf.unzip
+      NameIdentificationResults(
+        1.0,
+        dictCheck(tokens, broadcastNameDict),
+        Map(inFirstNameDictSeq: _*),
+        Map(isMaleSeq: _*),
+        Map(isFemaleSeq: _*),
+        Map(isOtherSeq: _*)
+      )
+    }
+
+    val rdd = dataset.rdd
+    val zeroValue = Seq.fill[NameIdentificationResults](inN.length)(NameIdentificationResults())
+    val agg = rdd.treeAggregate[Seq[NameIdentificationResults]](zeroValue)(
+      combOp = aggregateSeqResults, seqOp = {
+        case (result, row) => aggregateSeqResults(result, row.map(computeResults))
+      }
+    ).toArray
+    val N = agg.headOption.getOrElse(NameIdentificationResults(count = 1.0)).count
+
+    val predictedProbs = agg map { _.predictedNameProb / N }
+    val isName = guardCheckResults match {
+      case Some(results) => predictedProbs zip results map {
+        case (prob, guardCheck) => guardCheck && prob >= $(defaultThreshold)
+      }
+      case _ =>
+        throw new RuntimeException("Guard check results were not generated but this should not happen.")
+    }
+    val bestFirstNameIndexes: Array[Int] = agg map { result: NameIdentificationResults =>
+      val (bestIndex, _) = if (result.tokenInFirstNameDictionary.isEmpty) (0, 0)
+      else result.tokenInFirstNameDictionary.maxBy(_._2)
+      bestIndex
+    }
+    val (pctMale, pctFemale, pctOther) = (agg zip bestFirstNameIndexes).map {
+      case (result: NameIdentificationResults, index: Int) =>
+      (
+        result.tokenIsMale.getOrElse(index, 0),
+        result.tokenIsFemale.getOrElse(index, 0),
+        result.tokenIsOther.getOrElse(index, 0)
+      )
+    }.map{ case (numMale: Int, numFemale: Int, numOther: Int) => (numMale / N, numFemale / N, numOther / N) }.unzip3
+    DetectSensitiveResults(isName, predictedProbs, bestFirstNameIndexes, pctMale, pctFemale, pctOther)
+  }
+  /* CODE FOR DETECTING SENSITIVE FEATURES END */
 
   def fitFn(dataset: Dataset[Seq[T#Value]]): SequenceModel[T, OPVector] = {
     require(!dataset.isEmpty, "Input dataset cannot be empty")
@@ -96,16 +214,59 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       isCategorical -> topValues
     }.unzip
 
+    val nameIdentificationResults = if (getRemoveSensitive) Some(detectSensitive(dataset)) else None
+
     val smartTextParams = SmartTextVectorizerModelArgs(
       isCategorical = isCategorical,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
-      hashingParams = makeHashingParams()
+      hashingParams = makeHashingParams(),
+      isName = nameIdentificationResults.map(_.isName).getOrElse(Array.empty[Boolean]),
+      removeSensitive = getRemoveSensitive
     )
+    // TODO: Handle removeSensitive in metaData creation and in transformFn
 
-    val vecMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata: OpVectorMetadata = makeVectorMetadata(smartTextParams)
     setMetadata(vecMetadata.toMetadata)
+
+    nameIdentificationResults match {
+      case Some(results) =>
+        if (results.isName exists identity) {
+          logWarning(
+            """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
+              |model with that information in them? There could be potential bias as a result! Here's what I found:
+              |""".stripMargin
+          )
+          val problemColIndexes = results.isName.zipWithIndex.filter(_._1).map(_._2)
+          problemColIndexes foreach { index: Int =>
+            logWarning {
+              s"""Column Name: ${inN(index).name}
+              |Predicted Probability of Name: ${results.predictedNameProbs(index)}
+              |Percentage Likely Male Names: ${results.pctMale(index)}
+              |Percentage Likely Female Names: ${results.pctFemale(index)}
+              |Percentage Where No Gender Found: ${results.pctOther(index)}
+              |""".stripMargin
+            }
+          }
+        }
+        // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
+        val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata())
+        metaDataBuilder.putBooleanArray("treatAsName", results.isName)
+        metaDataBuilder.putDoubleArray("predictedNameProb", results.predictedNameProbs)
+        metaDataBuilder.putDoubleArray("bestFirstNameIndexes", results.bestFirstNameIndexes.map(_.toDouble))
+        metaDataBuilder.putDoubleArray("pctMale", results.pctMale)
+        metaDataBuilder.putDoubleArray("pctFemale", results.pctFemale)
+        metaDataBuilder.putDoubleArray("pctOther", results.pctOther)
+        setMetadata(metaDataBuilder.build())
+        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
+        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
+        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
+        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
+        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
+        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
+      case _ =>
+    }
 
     new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
       .setAutoDetectLanguage(getAutoDetectLanguage)
@@ -124,7 +285,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     TextStats(valueCounts)
   }
 
-  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+  protected def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
     require(inN.length == smartTextParams.isCategorical.length)
 
     val (categoricalFeatures, textFeatures) =
@@ -184,14 +345,25 @@ private[op] object TextStats {
   def empty: TextStats = TextStats(Map.empty)
 }
 
+import enumeratum._
+sealed trait SensitiveFeatureMode extends EnumEntry with Serializable
+object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
+  val values = findValues
+
+  case object Off extends SensitiveFeatureMode
+  case object DetectOnly extends SensitiveFeatureMode
+  case object DetectAndRemove extends SensitiveFeatureMode
+}
+
 /**
  * Arguments for [[SmartTextVectorizerModel]]
  *
- * @param isCategorical    is feature a categorical or not
- * @param topValues        top values to each feature
- * @param shouldCleanText  should clean text value
- * @param shouldTrackNulls should track nulls
- * @param hashingParams    hashing function params
+ * @param isCategorical       is feature a categorical or not
+ * @param topValues           top values to each feature
+ * @param shouldCleanText     should clean text value
+ * @param shouldTrackNulls    should track nulls
+ * @param hashingParams       hashing function params
+ * @param removeSensitive     whether to remove detected sensitive fields
  */
 case class SmartTextVectorizerModelArgs
 (
@@ -199,7 +371,9 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  hashingParams: HashingFunctionParams
+  hashingParams: HashingFunctionParams,
+  isName: Array[Boolean],
+  removeSensitive: Boolean = false
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
     topValues.zip(isCategorical).collect { case (top, true) => top }
@@ -221,10 +395,18 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldCleanText = args.shouldCleanText,
       shouldTrackNulls = args.shouldTrackNulls
     )
-    (row: Seq[Text]) => {
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+    row: Seq[Text] => {
+      val nonNameRows = if (args.removeSensitive) {
+        SmartTextVectorizer.partition[Text](row.toArray, args.isName)._2
+      } else row.toArray
+      val nonNameIsCategorical = if (args.removeSensitive) {
+        SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
+      } else args.isCategorical
+      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](nonNameRows, nonNameIsCategorical)
+
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
+
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
       val textLenVector = if ($(trackTextLen)) getLenVector(textTokens) else OPVector.empty
@@ -233,8 +415,12 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     }
   }
 
-  private def getTextTransientFeatures: Array[TransientFeature] =
-    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
+  private def getTextTransientFeatures: Array[TransientFeature] = {
+    val nonNameIsCategorical = if (args.removeSensitive) {
+      SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
+    } else args.isCategorical
+    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), nonNameIsCategorical)._2
+  }
 
   private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
     val nullIndicators = textTokens.map { tokens =>
@@ -261,3 +447,67 @@ trait MaxCardinalityParams extends Params {
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
 }
+
+/* CODE FOR DETECTING SENSITIVE FEATURES BEGIN */
+trait BiasDetectionParams extends Params {
+  final val sensitiveFeatureMode: Param[String] = new Param[String](this, "sensitiveFeatureMode",
+    "Whether to detect sensitive features and how to handle them",
+    (value: String) => SensitiveFeatureMode.withNameInsensitiveOption(value).isDefined
+  )
+  setDefault(sensitiveFeatureMode, SensitiveFeatureMode.Off.toString)
+  def setSensitiveFeatureMode(v: SensitiveFeatureMode): this.type = set(sensitiveFeatureMode, v.entryName)
+  def getSensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode))
+  def getRemoveSensitive: Boolean = {
+    SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode)) == SensitiveFeatureMode.DetectAndRemove
+  }
+
+  final val defaultThreshold = new DoubleParam(
+    parent = this,
+    name = "defaultThreshold",
+    doc = "default fraction of entries to be names before treating as name",
+    isValid = (value: Double) => {
+      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
+    }
+  )
+  setDefault(defaultThreshold, 0.50)
+  def setThreshold(value: Double): this.type = set(defaultThreshold, value)
+}
+
+/**
+ * Case class for gathering results in the Spark dataset during treeAggregate
+ * @param count
+ * @param predictedNameProb
+ * @param tokenInFirstNameDictionary
+ * @param tokenIsMale
+ * @param tokenIsFemale
+ * @param tokenIsOther
+ */
+case class NameIdentificationResults
+(
+  count: Double = 0.0,
+  predictedNameProb: Double = 0.0,
+  tokenInFirstNameDictionary: Map[Int, Int] = EmptyTokensMap,
+  tokenIsMale: Map[Int, Int] = EmptyTokensMap,
+  tokenIsFemale: Map[Int, Int] = EmptyTokensMap,
+  tokenIsOther: Map[Int, Int] = EmptyTokensMap
+) extends JsonLike
+
+/**
+ * Case class for collecting the overall results from the name identification step
+ * @param isName
+ * @param predictedNameProbs
+ * @param bestFirstNameIndexes
+ * @param pctMale
+ * @param pctFemale
+ * @param pctOther
+ */
+case class DetectSensitiveResults
+(
+  isName: Array[Boolean],
+  predictedNameProbs: Array[Double],
+  bestFirstNameIndexes: Array[Int],
+  pctMale: Array[Double],
+  pctFemale: Array[Double],
+  pctOther: Array[Double]
+) extends JsonLike
+/* CODE FOR DETECTING SENSITIVE FEATURES END */
