@@ -100,6 +100,7 @@ case object FeatureSparkTypes {
   val IDMap = mapType(ID)
   val IntegralMap = mapType(Integral)
   val MultiPickListMap = mapType(MultiPickList)
+  val NameStats = mapType(Text)
   val PercentMap = mapType(Percent)
   val PhoneMap = mapType(Phone)
   val PickListMap = mapType(PickList)
@@ -142,6 +143,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.IDMap] => IDMap
     case wt if wt =:= weakTypeOf[t.IntegralMap] => IntegralMap
     case wt if wt =:= weakTypeOf[t.MultiPickListMap] => MultiPickListMap
+    case wt if wt =:= weakTypeOf[t.NameStats] => NameStats
     case wt if wt =:= weakTypeOf[t.PercentMap] => PercentMap
     case wt if wt =:= weakTypeOf[t.PhoneMap] => PhoneMap
     case wt if wt =:= weakTypeOf[t.PickListMap] => PickListMap
