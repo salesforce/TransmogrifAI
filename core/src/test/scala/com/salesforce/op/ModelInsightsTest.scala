@@ -31,30 +31,28 @@
 package com.salesforce.op
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{Real, _}
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
+import com.salesforce.op.stages.impl.feature.CombinationStrategy
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
+import com.salesforce.op.stages.impl.selector.{SelectedCombinerModel, SelectedModel, SelectedModelCombiner}
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.twitter.algebird.Moments
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
-import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
-import com.twitter.algebird.Moments
-import org.apache.spark.sql.{DataFrame, Dataset}
-import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.apache.spark.sql.functions._
 
 import scala.util.{Failure, Success}
 
@@ -575,7 +573,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         indicatorValue = Option(name)
       )
     },
-    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
+    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
+    Map(
+      "f0" -> SensitiveFeatureInformation.Name(false, 0.0, Seq.empty[String], 0.0, 0.0, 1.0)
+    )
   )
 
   it should "correctly extract the LabelSummary from the label and sanity checker info" in {
@@ -624,6 +625,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f0In.featureName shouldBe "f0"
     f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
+    f0In.sensitiveInformation match {
+      case Some(SensitiveFeatureInformation.Name(actionTaken, probName, names, probMale, probFemale, probOther)) =>
+        actionTaken shouldBe false
+        probName shouldBe 0.0
+        names shouldBe Seq.empty[String]
+        probMale shouldBe 0.0
+        probFemale shouldBe 0.0
+        probOther shouldBe 1.0
+      case _ => fail("SensitiveFeatureInformation was not found.")
+    }
 
     val f0InDer2 = f0In.derivedFeatures.head
     f0InDer2.derivedFeatureName shouldBe "f0_f0_f2_1"
@@ -689,6 +700,56 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
     val insights = workflowModel.modelInsights(pred)
     insights.features.foreach(f => f.distributions shouldBe empty)
+  }
+
+  it should
+    """include sensitive feature information
+      |even for sensitive features that are removed from output vector and output vector metadata""".stripMargin in {
+    // Copy metadata from above but add new feature that was removed in vectorizing to sensitive info
+    val f_notInMeta = Feature[Text]("f_notInMeta", false, null, Seq(), "test")
+    val newMeta = OpVectorMetadata(
+      "fv",
+      OpVectorColumnMetadata(
+        parentFeatureName = Seq("f1"),
+        parentFeatureType = Seq(classOf[Real].getName),
+        grouping = None,
+        indicatorValue = None
+      ) +: Array("f2", "f3").map { name =>
+        OpVectorColumnMetadata(
+          parentFeatureName = Seq("f0"),
+          parentFeatureType = Seq(classOf[PickList].getName),
+          grouping = Option("f0"),
+          indicatorValue = Option(name)
+        )
+      },
+      Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
+      Map(
+        "f0" -> SensitiveFeatureInformation.Name(false, 0.0, Seq.empty[String], 0.0, 0.0, 1.0),
+        "f_notInMeta" -> SensitiveFeatureInformation.Name(true, 1.0, Seq.empty[String], 0.0, 0.0, 1.0)
+      )
+    )
+
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
+    val featureInsights = ModelInsights.getFeatureInsights(
+      Option(newMeta), Option(summary), None, Array(f1, f0, f_notInMeta), Array.empty, Map.empty[String, Set[String]],
+      RawFeatureFilterResults(), labelSum
+    )
+    featureInsights.size shouldBe 3
+    val f_notInMeta_butInInsights = featureInsights.find(_.featureName == "f_notInMeta").get
+    f_notInMeta_butInInsights.featureName shouldBe "f_notInMeta"
+    f_notInMeta_butInInsights.featureType shouldBe classOf[Text].getName
+    f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
+    f_notInMeta_butInInsights.sensitiveInformation match {
+      case Some(SensitiveFeatureInformation.Name(actionTaken, probName, names, probMale, probFemale, probOther)) =>
+        actionTaken shouldBe true
+        probName shouldBe 1.0
+        names shouldBe Seq.empty[String]
+        probMale shouldBe 0.0
+        probFemale shouldBe 0.0
+        probOther shouldBe 1.0
+      case _ => fail("SensitiveFeatureInformation was not found.")
+    }
   }
 
   it should "return model insights for xgboost classification" in {

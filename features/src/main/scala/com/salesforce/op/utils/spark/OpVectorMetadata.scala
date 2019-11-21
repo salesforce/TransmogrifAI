@@ -30,7 +30,7 @@
 
 package com.salesforce.op.utils.spark
 
-import com.salesforce.op.FeatureHistory
+import com.salesforce.op.{FeatureHistory, SensitiveFeatureInformation}
 import com.salesforce.op.features.types.{FeatureType, _}
 import org.apache.spark.ml.attribute.{AttributeGroup, BinaryAttribute, NumericAttribute}
 import org.apache.spark.ml.linalg.SQLDataTypes._
@@ -43,14 +43,17 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder, StructField}
  *
  * @param name    name of the feature vector
  * @param col     information about each element in the vector
- * @param history history of parent features used to create the vector map is from
+ * @param history history of parent features used to create the vector; map is from
  *                OpVectorColumnMetadata.parentFeatureName (String) to FeatureHistory
+ * @param sensitive parent features that were detected as sensitive in the creation of the vector;
+ *                  map is from OpVectorColumnMetadata.parentFeatureName (String) to SensitiveFeatureInformation
  */
 class OpVectorMetadata private
 (
   val name: String,
   col: Array[OpVectorColumnMetadata],
-  val history: Map[String, FeatureHistory] // TODO fix map -> causes problems when multiple vectorizers used on feature
+  val history: Map[String, FeatureHistory], // TODO fix map -> causes problems when multiple vectorizers used on feature
+  val sensitive: Map[String, SensitiveFeatureInformation] = Map.empty[String, SensitiveFeatureInformation]
 ) {
 
   /**
@@ -92,6 +95,7 @@ class OpVectorMetadata private
     val meta = new MetadataBuilder()
       .putMetadataArray(OpVectorMetadata.ColumnsKey, colMeta.toArray)
       .putMetadata(OpVectorMetadata.HistoryKey, FeatureHistory.toMetadata(history))
+      .putMetadata(OpVectorMetadata.SensitiveKey, SensitiveFeatureInformation.toMetadata(sensitive))
       .build()
     val attributes = columns.map {
       case c if (c.indicatorValue.isDefined || binaryTypes.exists(c.parentFeatureType.contains)) &&
@@ -161,7 +165,10 @@ class OpVectorMetadata private
   override def equals(obj: Any): Boolean =
     obj match {
       case o: OpVectorMetadata
-        if o.name == name && o.columns.toSeq == columns.toSeq && history == o.history => true
+        if o.name == name &&
+          o.columns.toSeq == columns.toSeq &&
+          history == o.history &&
+          sensitive == o.sensitive => true
       case _ => false
     }
 
@@ -169,7 +176,7 @@ class OpVectorMetadata private
   override def hashCode(): Int = 37 * columns.toSeq.hashCode()
 
   override def toString: String =
-    s"${this.getClass.getSimpleName}($name,${columns.mkString("Array(", ",", ")")},$history)"
+    s"${this.getClass.getSimpleName}($name,${columns.mkString("Array(", ",", ")")},$history,$sensitive)"
 
 }
 
@@ -179,6 +186,7 @@ object OpVectorMetadata {
 
   val ColumnsKey = "vector_columns"
   val HistoryKey = "vector_history"
+  val SensitiveKey = "vector_detected_sensitive"
 
   /**
    * Construct an [[OpVectorMetadata]] from a [[StructField]], assuming that [[ColumnsKey]] is present and conforms
@@ -197,9 +205,14 @@ object OpVectorMetadata {
       if (wrapped.underlyingMap(HistoryKey).asInstanceOf[Metadata].isEmpty) Map.empty[String, FeatureHistory]
       else FeatureHistory.fromMetadataMap(field.metadata.getMetadata(HistoryKey))
 
-    new OpVectorMetadata(field.name, columns, history)
-  }
+    val sensitive =
+      if (wrapped.underlyingMap(SensitiveKey).asInstanceOf[Metadata].isEmpty) {
+        Map.empty[String, SensitiveFeatureInformation]
+      }
+      else SensitiveFeatureInformation.fromMetadataMap(field.metadata.getMetadata(SensitiveKey))
 
+    new OpVectorMetadata(field.name, columns, history, sensitive)
+  }
 
   /**
    * Construct an [[OpVectorMetadata]] from a string representing its name, and an array of [[OpVectorColumnMetadata]]
@@ -208,14 +221,16 @@ object OpVectorMetadata {
    * @param name    The name of the column the metadata represents
    * @param columns The columns within the vectors
    * @param history The history of the parent features
+   * @param sensitive Which columns have been marked as sensitive and related information
    * @return The constructed vector metadata
    */
   def apply(
     name: String,
     columns: Array[OpVectorColumnMetadata],
-    history: Map[String, FeatureHistory]
+    history: Map[String, FeatureHistory],
+    sensitive: Map[String, SensitiveFeatureInformation] = Map.empty[String, SensitiveFeatureInformation]
   ): OpVectorMetadata = {
-    new OpVectorMetadata(name, columns, history)
+    new OpVectorMetadata(name, columns, history, sensitive)
   }
 
   /**
@@ -242,7 +257,8 @@ object OpVectorMetadata {
   def flatten(outputName: String, vectors: Seq[OpVectorMetadata]): OpVectorMetadata = {
     val allColumns = vectors.flatMap(_.columns).toArray
     val allHist = vectors.flatMap(_.history).toMap
-    new OpVectorMetadata(outputName, allColumns, allHist)
+    val allSensitive = vectors.flatMap(_.sensitive).toMap
+    new OpVectorMetadata(outputName, allColumns, allHist, allSensitive)
   }
 
 }

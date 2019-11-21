@@ -30,7 +30,6 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
@@ -40,6 +39,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.NameIdentificationFun
 import com.salesforce.op.utils.stages.NameIdentificationUtils._
+import com.salesforce.op.{SensitiveFeatureInformation, UID}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
@@ -48,7 +48,6 @@ import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.ClassTag
@@ -61,9 +60,7 @@ import scala.reflect.runtime.universe.TypeTag
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
  *
- * Detection of names in the input columns can be enabled with `detectSensitive`. Outputs of this step will be logged.
- * In the future, the `removeSensitive` flag will enable removing automatically identified name columns from the output
- * of SmartTextVectorizer.
+ * Detection and removal of names in the input columns can be enabled with the `sensitiveFeatureMode` param.
  *
  * @param uid           uid for instance
  * @param operationName unique name of the operation this stage performs
@@ -233,48 +230,9 @@ class SmartTextVectorizer[T <: Text]
       isName = nameIdentificationResults.map(_.isName).getOrElse(Array.empty[Boolean]),
       removeSensitive = getRemoveSensitive
     )
-    // TODO: Handle removeSensitive in metaData creation and in transformFn
 
-    val vecMetadata: OpVectorMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata: OpVectorMetadata = makeVectorMetadata(smartTextParams, nameIdentificationResults)
     setMetadata(vecMetadata.toMetadata)
-
-    nameIdentificationResults match {
-      case Some(results) =>
-        if (results.isName exists identity) {
-          logWarning(
-            """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
-              |model with that information in them? There could be potential bias as a result! Here's what I found:
-              |""".stripMargin
-          )
-          val problemColIndexes = results.isName.zipWithIndex.filter(_._1).map(_._2)
-          problemColIndexes foreach { index: Int =>
-            logWarning {
-              s"""Column Name: ${inN(index).name}
-              |Predicted Probability of Name: ${results.predictedNameProbs(index)}
-              |Percentage Likely Male Names: ${results.pctMale(index)}
-              |Percentage Likely Female Names: ${results.pctFemale(index)}
-              |Percentage Where No Gender Found: ${results.pctOther(index)}
-              |""".stripMargin
-            }
-          }
-        }
-        // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
-        val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata())
-        metaDataBuilder.putBooleanArray("treatAsName", results.isName)
-        metaDataBuilder.putDoubleArray("predictedNameProb", results.predictedNameProbs)
-        metaDataBuilder.putDoubleArray("bestFirstNameIndexes", results.bestFirstNameIndexes.map(_.toDouble))
-        metaDataBuilder.putDoubleArray("pctMale", results.pctMale)
-        metaDataBuilder.putDoubleArray("pctFemale", results.pctFemale)
-        metaDataBuilder.putDoubleArray("pctOther", results.pctOther)
-        setMetadata(metaDataBuilder.build())
-        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
-        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
-        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
-        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
-        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
-        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
-      case _ =>
-    }
 
     new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
       .setAutoDetectLanguage(getAutoDetectLanguage)
@@ -293,11 +251,23 @@ class SmartTextVectorizer[T <: Text]
     TextStats(valueCounts)
   }
 
-  protected def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+  protected def makeVectorMetadata(
+    smartTextParams: SmartTextVectorizerModelArgs,
+    nameIdentificationResults: Option[NameIdentificationResults]
+  ): OpVectorMetadata = {
     require(inN.length == smartTextParams.isCategorical.length)
 
+    val (features, isCategorical): (Array[TransientFeature], Array[Boolean]) = nameIdentificationResults match {
+      case Some(results) if getRemoveSensitive =>
+        (
+          SmartTextVectorizer.partition[TransientFeature](inN, results.isName)._2,
+          SmartTextVectorizer.partition[Boolean](smartTextParams.isCategorical, results.isName)._2
+        )
+      case _ => (inN, smartTextParams.isCategorical)
+    }
+
     val (categoricalFeatures, textFeatures) =
-      SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.isCategorical)
+      SmartTextVectorizer.partition[TransientFeature](features, isCategorical)
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -320,7 +290,48 @@ class SmartTextVectorizer[T <: Text]
     } else Array.empty[OpVectorColumnMetadata]
 
     val columns = categoricalColumns ++ textColumns
-    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+
+    val sensitive: Map[String, SensitiveFeatureInformation] =
+      nameIdentificationResults map { results: NameIdentificationResults =>
+        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
+        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
+        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
+        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
+        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
+        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
+
+        if (results.isName exists identity) {
+          logWarning(
+            """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
+              |model with that information in them? There could be potential bias as a result! Here's what I found:
+              |""".stripMargin
+          )
+          val problemColIndexes = results.isName.zipWithIndex.filter(_._1).map(_._2)
+          problemColIndexes foreach { index: Int =>
+            logWarning {
+              s"""Column Name: ${inN(index).name}
+              |Predicted Probability of Name: ${results.predictedNameProbs(index)}
+              |Percentage Likely Male Names: ${results.pctMale(index)}
+              |Percentage Likely Female Names: ${results.pctFemale(index)}
+              |Percentage Where No Gender Found: ${results.pctOther(index)}
+              |""".stripMargin
+            }
+          }
+        }
+
+        // Transform into the tuple from feature name to SensitiveFeatureInformation
+        inN.zipWithIndex map { case (feature: TransientFeature, index: Int) =>
+          feature.name -> SensitiveFeatureInformation.Name(
+            getRemoveSensitive && results.isName(index),
+            results.predictedNameProbs(index),
+            Seq.empty[String], // TODO: Keep track of the detected names here
+            results.pctMale(index),
+            results.pctFemale(index),
+            results.pctOther(index)
+          )
+        } toMap
+    } getOrElse Map.empty[String, SensitiveFeatureInformation]
+    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }
 }
 
@@ -404,13 +415,13 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     row: Seq[Text] => {
-      val nonNameRows = if (args.removeSensitive) {
-        SmartTextVectorizer.partition[Text](row.toArray, args.isName)._2
-      } else row.toArray
-      val nonNameIsCategorical = if (args.removeSensitive) {
-        SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
-      } else args.isCategorical
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](nonNameRows, nonNameIsCategorical)
+      val (cleanedRow, isCategorical) = if (args.removeSensitive) {
+        (
+          SmartTextVectorizer.partition[Text](row.toArray, args.isName)._2,
+          SmartTextVectorizer.partition[Boolean](args.isCategorical, args.isName)._2
+        )
+      } else (row.toArray, args.isCategorical)
+      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](cleanedRow, isCategorical)
 
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
