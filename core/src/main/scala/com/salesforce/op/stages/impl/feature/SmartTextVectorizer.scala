@@ -114,15 +114,15 @@ class SmartTextVectorizer[T <: Text]
     super.fit(dataset)
   }
 
-  private def detectSensitive(dataset: Dataset[Seq[T#Value]]): DetectSensitiveResults = {
+  private def detectSensitive(dataset: Dataset[Seq[T#Value]]): NameIdentificationResults = {
     val spark = dataset.sparkSession
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
     def aggregateTwoResults(
-      one: NameIdentificationResults, two: NameIdentificationResults
-    ): NameIdentificationResults = {
-      NameIdentificationResults(
+      one: NameIdentificationAccumulator, two: NameIdentificationAccumulator
+    ): NameIdentificationAccumulator = {
+      NameIdentificationAccumulator(
         one.count + two.count,
         one.predictedNameProb + two.predictedNameProb,
         one.tokenInFirstNameDictionary + two.tokenInFirstNameDictionary,
@@ -133,44 +133,49 @@ class SmartTextVectorizer[T <: Text]
     }
 
     def aggregateSeqResults(
-      one: Seq[NameIdentificationResults], two: Seq[NameIdentificationResults]
-    ): Seq[NameIdentificationResults] = {
+      one: Seq[NameIdentificationAccumulator], two: Seq[NameIdentificationAccumulator]
+    ): Seq[NameIdentificationAccumulator] = {
       one zip two map { case (x, y) => aggregateTwoResults(x, y) }
     }
 
     import com.salesforce.op.features.types.NameStats.GenderStrings._
-    def computeResults(input: T#Value): NameIdentificationResults = {
-      val tokens: Seq[String] = preProcess(input)
-      val (firstHalf, secondHalf) = (TokensToCheckForFirstName map { index: Int =>
-        val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index, broadcastGenderDict) match {
-          case Male => (1, 1, 0, 0)
-          case Female => (1, 0, 1, 0)
-          case _ => (0, 0, 0, 1)
-        }
-        ((index -> inFirstNameDict, index -> isMale), (index -> isFemale, index -> isOther))
-      }).unzip
-      val (inFirstNameDictSeq, isMaleSeq) = firstHalf.unzip
-      val (isFemaleSeq, isOtherSeq) = secondHalf.unzip
-      NameIdentificationResults(
-        1.0,
-        dictCheck(tokens, broadcastNameDict),
-        Map(inFirstNameDictSeq: _*),
-        Map(isMaleSeq: _*),
-        Map(isFemaleSeq: _*),
-        Map(isOtherSeq: _*)
-      )
+    def computeResults(input: T#Value): NameIdentificationAccumulator = {
+      if (input.isEmpty) NameIdentificationAccumulator()
+      else {
+        val tokens: Seq[String] = preProcess(input)
+        val (firstHalf, secondHalf) = (TokensToCheckForFirstName map { index: Int =>
+          val (inFirstNameDict, isMale, isFemale, isOther) = identifyGender(tokens, index, broadcastGenderDict) match {
+            case Male => (1, 1, 0, 0)
+            case Female => (1, 0, 1, 0)
+            case _ => (0, 0, 0, 1)
+          }
+          ((index -> inFirstNameDict, index -> isMale), (index -> isFemale, index -> isOther))
+        }).unzip
+        val (inFirstNameDictSeq, isMaleSeq) = firstHalf.unzip
+        val (isFemaleSeq, isOtherSeq) = secondHalf.unzip
+        NameIdentificationAccumulator(
+          1.0,
+          dictCheck(tokens, broadcastNameDict),
+          Map(inFirstNameDictSeq: _*),
+          Map(isMaleSeq: _*),
+          Map(isFemaleSeq: _*),
+          Map(isOtherSeq: _*)
+        )
+      }
     }
 
     val rdd = dataset.rdd
-    val zeroValue = Seq.fill[NameIdentificationResults](inN.length)(NameIdentificationResults())
-    val agg = rdd.treeAggregate[Seq[NameIdentificationResults]](zeroValue)(
+    val zeroValue = Seq.fill[NameIdentificationAccumulator](inN.length)(NameIdentificationAccumulator())
+    val agg = rdd.treeAggregate[Seq[NameIdentificationAccumulator]](zeroValue)(
       combOp = aggregateSeqResults, seqOp = {
         case (result, row) => aggregateSeqResults(result, row.map(computeResults))
       }
     ).toArray
-    val N = agg.headOption.getOrElse(NameIdentificationResults(count = 1.0)).count
 
-    val predictedProbs = agg map { _.predictedNameProb / N }
+    val nonNullCounts = agg map { _.count }
+    def normalize(arr: Seq[Double]): Seq[Double] = arr zip nonNullCounts map { case (x, count) => x / count }
+
+    val predictedProbs = normalize(agg map { _.predictedNameProb }).toArray
     val isName = guardCheckResults match {
       case Some(results) => predictedProbs zip results map {
         case (prob, guardCheck) => guardCheck && prob >= $(defaultThreshold)
@@ -178,20 +183,23 @@ class SmartTextVectorizer[T <: Text]
       case _ =>
         throw new RuntimeException("Guard check results were not generated but this should not happen.")
     }
-    val bestFirstNameIndexes: Array[Int] = agg map { result: NameIdentificationResults =>
+    val bestFirstNameIndexes: Array[Int] = agg map { result: NameIdentificationAccumulator =>
       val (bestIndex, _) = if (result.tokenInFirstNameDictionary.isEmpty) (0, 0)
       else result.tokenInFirstNameDictionary.maxBy(_._2)
       bestIndex
     }
-    val (pctMale, pctFemale, pctOther) = (agg zip bestFirstNameIndexes).map {
-      case (result: NameIdentificationResults, index: Int) =>
+    val (numMale, numFemale, numOther) = (agg zip bestFirstNameIndexes).map {
+      case (result: NameIdentificationAccumulator, index: Int) =>
       (
-        result.tokenIsMale.getOrElse(index, 0),
-        result.tokenIsFemale.getOrElse(index, 0),
-        result.tokenIsOther.getOrElse(index, 0)
+        result.tokenIsMale.getOrElse(index, 0).toDouble,
+        result.tokenIsFemale.getOrElse(index, 0).toDouble,
+        result.tokenIsOther.getOrElse(index, 0).toDouble
       )
-    }.map{ case (numMale: Int, numFemale: Int, numOther: Int) => (numMale / N, numFemale / N, numOther / N) }.unzip3
-    DetectSensitiveResults(isName, predictedProbs, bestFirstNameIndexes, pctMale, pctFemale, pctOther)
+    }.unzip3
+    val (pctMale, pctFemale, pctOther) = (
+      normalize(numMale).toArray, normalize(numFemale).toArray, normalize(numOther).toArray
+    )
+    NameIdentificationResults(isName, predictedProbs, bestFirstNameIndexes, pctMale, pctFemale, pctOther)
   }
   /* CODE FOR DETECTING SENSITIVE FEATURES END */
 
@@ -482,7 +490,7 @@ trait BiasDetectionParams extends Params {
  * @param tokenIsFemale
  * @param tokenIsOther
  */
-case class NameIdentificationResults
+case class NameIdentificationAccumulator
 (
   count: Double = 0.0,
   predictedNameProb: Double = 0.0,
@@ -501,7 +509,7 @@ case class NameIdentificationResults
  * @param pctFemale
  * @param pctOther
  */
-case class DetectSensitiveResults
+case class NameIdentificationResults
 (
   isName: Array[Boolean],
   predictedNameProbs: Array[Double],

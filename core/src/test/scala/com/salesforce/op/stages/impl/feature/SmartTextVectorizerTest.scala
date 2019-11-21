@@ -389,7 +389,7 @@ class SmartTextVectorizerTest
       ("hello world".toText, "Hello world!".toText, "Michael".toText),
       ("hello world".toText, "What's up".toText, "Michelle".toText),
       ("good evening".toText, "How are you doing, my friend?".toText, "Roxanne".toText),
-      ("hello world".toText, "Not bad, my friend.".toText, "Ross".toText),
+      (Text.empty, "Not bad, my friend.".toText, "Ross".toText),
       (Text.empty, Text.empty, Text.empty)
     )
   )
@@ -429,7 +429,7 @@ class SmartTextVectorizerTest
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     newEstimator.getMetadata().getDoubleArray("bestFirstNameIndexes") shouldBe Array(0.0)
-    newEstimator.getMetadata().getDoubleArray("pctMale") shouldBe Array(0.4)
+    newEstimator.getMetadata().getDoubleArray("pctMale") shouldBe Array(0.5)
   }
 
   it should "compute gender probabilities for two columns in the metadata" in {
@@ -440,7 +440,7 @@ class SmartTextVectorizerTest
     newInputData.show()
     newEstimator.getMetadata().getDoubleArray("bestFirstNameIndexes").length shouldBe 2
     newEstimator.getMetadata().getDoubleArray("pctMale").length shouldBe 2
-    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.4
+    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.5
   }
 
   it should "compute gender probabilities for three columns in the metadata" in {
@@ -451,7 +451,7 @@ class SmartTextVectorizerTest
     newInputData.show()
     newEstimator.getMetadata().getDoubleArray("bestFirstNameIndexes").length shouldBe 3
     newEstimator.getMetadata().getDoubleArray("pctMale").length shouldBe 3
-    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.4
+    newEstimator.getMetadata().getDoubleArray("pctMale").last shouldBe 0.5
   }
 
   it should "compute the same number of name check results as the number of feature columns" in {
