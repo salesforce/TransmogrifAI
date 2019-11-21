@@ -495,12 +495,11 @@ class SmartTextVectorizerTest
             println((probName, probMale, probFemale, probOther))
             // following test values are sensitive to name dictionary and randomness
             probName should be > 0.0
-            probName should be < 1.0
-            probMale should be < 1.0
-            probFemale should be < 1.0
-            probOther should be < 1.0
+            probName should be <= 1.0
+            probMale should be <= 1.0
+            probFemale should be <= 1.0
+            probOther should be <= 1.0
             (probMale + probFemale + probOther) - 1.0 should be < 0.01
-            probOther should be < 1.0
           case None =>
             println(sensitive)
             fail("Sensitive information not found in the metadata.")
