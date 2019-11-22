@@ -5,8 +5,7 @@ Here we describe a very simple TransmogrifAI workflow for predicting survivors i
 You can run this code as follows:
 ```bash
 cd helloworld
-./gradlew compileTestScala installDist
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpTitanicSimple -Dargs="\
 `pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 

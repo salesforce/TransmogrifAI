@@ -39,10 +39,6 @@ jobs:
         sed -i 's/\\n$//g' "$TESTS_FILES_PREFIX"*
         popd
         ./gradlew scalaStyle testScoverageClasses --parallel
-    - stage: 'Compile Helloworld project'
-      name: 'Compile Helloworld project'
-      script: |
-        cd helloworld && ./gradlew scalaStyle test --parallel
     - stage: 'Build'
       name: 'Build Part 1'
       script: |

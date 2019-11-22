@@ -66,7 +66,6 @@ You can run the code using the following command:
 
 ```bash
 cd helloworld
-./gradlew compileTestScala installDist
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpBostonSimple -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpBostonSimple -Dargs="\
 `pwd`/src/main/resources/BostonDataset/housingData.csv"
 ```

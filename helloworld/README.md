@@ -16,27 +16,25 @@ Note: make sure you have all the [prerequisites](http://docs.transmogrif.ai/en/s
 
 ### Titanic Mini
 
-First, build project with `./gradlew installDist`. Then run:
+Run:
 
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanicMini -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanicMini -Dargs="\
 `pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 
 ### Titanic model - run with gradle (**recommended**)
 
-First, build project with `./gradlew installDist`.
-
 #### Train
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=train \
 --model-location=/tmp/titanic-model \
 --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv"
 ```
 #### Score
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=score \
 --model-location=/tmp/titanic-model \
 --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
@@ -44,7 +42,7 @@ First, build project with `./gradlew installDist`.
 ```
 #### Evaluate
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.titanic.OpTitanic -Dargs="\
 --run-type=evaluate \
 --model-location=/tmp/titanic-model \
 --read-location Passenger=`pwd`/src/main/resources/TitanicDataset/TitanicPassengersTrainData.csv \
@@ -54,7 +52,7 @@ First, build project with `./gradlew installDist`.
 
 ### Titanic model - run with `spark-submit`
 
-First, build project with `./gradlew shadowJar`.
+First, build project with `../gradlew shadowJar`.
 
 #### Train
 ```shell
@@ -86,18 +84,16 @@ $SPARK_HOME/bin/spark-submit --class com.salesforce.hw.titanic.OpTitanic \
 
 ### Boston model
 
-First, build project with `./gradlew installDist`.
-
 #### Train
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
 --run-type=train \
 --model-location=/tmp/boston-model \
 --read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data"
 ```
 #### Score
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
 --run-type=score \
 --model-location=/tmp/boston-model \
 --read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
@@ -105,7 +101,7 @@ First, build project with `./gradlew installDist`.
 ```
 #### Evaluate
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.boston.OpBoston -Dargs="\
 --run-type=evaluate \
 --read-location BostonHouse=`pwd`/src/main/resources/BostonDataset/housing.data \
 --write-location=/tmp/boston-eval \
@@ -119,14 +115,14 @@ First, build project with `./gradlew installDist`.
 
 #### Train
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
 --run-type=train \
 --model-location=/tmp/iris-model \
 --read-location Iris=`pwd`/src/main/resources/IrisDataset/iris.data"
 ```
 #### Score
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
 --run-type=score \
 --model-location=/tmp/iris-model \
 --read-location Iris=`pwd`/src/main/resources/IrisDataset/bezdekIris.data \
@@ -134,7 +130,7 @@ First, build project with `./gradlew installDist`.
 ```
 #### Evaluate
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.iris.OpIris -Dargs="\
 --run-type=evaluate \
 --model-location=/tmp/iris-model \
 --metrics-location=/tmp/iris-metrics \
@@ -144,13 +140,13 @@ First, build project with `./gradlew installDist`.
 
 ### Data Preparation
 
-First, build project with `./gradlew installDist`. Then run:
+Run:
 
 ```shell
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.JoinsAndAggregates -Dargs="\
 `pwd`/src/main/resources/EmailDataset/Clicks.csv `pwd`/src/main/resources/EmailDataset/Sends.csv"
 
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.dataprep.ConditionalAggregation -Dargs="\
 `pwd`/src/main/resources/WebVisitsDataset/WebVisits.csv"
 ```
 

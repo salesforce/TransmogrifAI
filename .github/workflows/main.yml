@@ -19,5 +19,3 @@ jobs:
         java-version: 1.8
     - name: Build
       run: ./gradlew scalaStyle reportScoverage
-    - name: Build Helloworld
-      run: cd helloworld && ./gradlew scalaStyle test

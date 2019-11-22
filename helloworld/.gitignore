@@ -15,8 +15,6 @@ logs/
 *.swp
 
 *.DS_Store
-.gradle
-gradlew.bat
 
 *.pem
 *.der

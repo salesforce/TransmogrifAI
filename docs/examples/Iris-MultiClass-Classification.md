@@ -72,7 +72,6 @@ val (scores, metrics) = model.scoreAndEvaluate(evaluator = evaluator)
 You can run the code using the following command:
 ```bash
 cd helloworld
-./gradlew compileTestScala installDist
-./gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpIrisSimple -Dargs="\
+../gradlew -q sparkSubmit -Dmain=com.salesforce.hw.OpIrisSimple -Dargs="\
 `pwd`/src/main/resources/IrisDataset/iris.csv"
 ```
