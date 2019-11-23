@@ -463,7 +463,7 @@ class SmartTextVectorizerTest
       case Some(SensitiveFeatureInformation.Name(actionTaken, probName, firstNames, probMale, probFemale, probOther)) =>
         actionTaken shouldBe true
         probName shouldBe 1.0
-        firstNames shouldBe Seq()
+        firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
         probMale shouldBe 0.5
         probFemale shouldBe 0.5
         probOther shouldBe 0.0

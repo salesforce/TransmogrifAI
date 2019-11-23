@@ -52,6 +52,7 @@ import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
+import scala.util.Random
 
 /**
  * Convert a sequence of text features into a vector by detecting categoricals that are disguised as text.
@@ -116,6 +117,7 @@ class SmartTextVectorizer[T <: Text]
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
+    val MAX_NUM_NAMES = 50
     def aggregateTwoResults(
       one: NameIdentificationAccumulator, two: NameIdentificationAccumulator
     ): NameIdentificationAccumulator = {
@@ -125,7 +127,10 @@ class SmartTextVectorizer[T <: Text]
         one.tokenInFirstNameDictionary + two.tokenInFirstNameDictionary,
         one.tokenIsMale + two.tokenIsMale,
         one.tokenIsFemale + two.tokenIsFemale,
-        one.tokenIsOther + two.tokenIsOther
+        one.tokenIsOther + two.tokenIsOther,
+        if (one.sampleOfNames.length + two.sampleOfNames.length <= MAX_NUM_NAMES) {
+          one.sampleOfNames ++ two.sampleOfNames
+        } else Random.shuffle(one.sampleOfNames ++ two.sampleOfNames).take(MAX_NUM_NAMES)
       )
     }
 
@@ -156,7 +161,8 @@ class SmartTextVectorizer[T <: Text]
           Map(inFirstNameDictSeq: _*),
           Map(isMaleSeq: _*),
           Map(isFemaleSeq: _*),
-          Map(isOtherSeq: _*)
+          Map(isOtherSeq: _*),
+          if (log.isDebugEnabled) Seq(input.getOrElse("")) else Seq.empty[String]
         )
       }
     }
@@ -196,7 +202,8 @@ class SmartTextVectorizer[T <: Text]
     val (pctMale, pctFemale, pctOther) = (
       normalize(numMale).toArray, normalize(numFemale).toArray, normalize(numOther).toArray
     )
-    NameIdentificationResults(isName, predictedProbs, bestFirstNameIndexes, pctMale, pctFemale, pctOther)
+    val sampleOfNames = agg map { _.sampleOfNames }
+    NameIdentificationResults(isName, predictedProbs, bestFirstNameIndexes, pctMale, pctFemale, pctOther, sampleOfNames)
   }
   /* CODE FOR DETECTING SENSITIVE FEATURES END */
 
@@ -324,7 +331,7 @@ class SmartTextVectorizer[T <: Text]
           feature.name -> SensitiveFeatureInformation.Name(
             getRemoveSensitive && results.isName(index),
             results.predictedNameProbs(index),
-            Seq.empty[String], // TODO: Keep track of the detected names here
+            s"Best Index: ${results.bestFirstNameIndexes(index)}" +: results.nameSamples(index),
             results.pctMale(index),
             results.pctFemale(index),
             results.pctOther(index)
@@ -493,13 +500,14 @@ trait BiasDetectionParams extends Params {
 }
 
 /**
- * Case class for gathering results in the Spark dataset during treeAggregate
+* Case class for gathering results in the Spark dataset during treeAggregate
  * @param count
  * @param predictedNameProb
  * @param tokenInFirstNameDictionary
  * @param tokenIsMale
  * @param tokenIsFemale
  * @param tokenIsOther
+ * @param sampleOfNames
  */
 case class NameIdentificationAccumulator
 (
@@ -508,17 +516,19 @@ case class NameIdentificationAccumulator
   tokenInFirstNameDictionary: Map[Int, Int] = EmptyTokensMap,
   tokenIsMale: Map[Int, Int] = EmptyTokensMap,
   tokenIsFemale: Map[Int, Int] = EmptyTokensMap,
-  tokenIsOther: Map[Int, Int] = EmptyTokensMap
+  tokenIsOther: Map[Int, Int] = EmptyTokensMap,
+  sampleOfNames: Seq[String] = Seq.empty[String]
 ) extends JsonLike
 
 /**
- * Case class for collecting the overall results from the name identification step
+* Case class for collecting the overall results from the name identification step
  * @param isName
  * @param predictedNameProbs
  * @param bestFirstNameIndexes
  * @param pctMale
  * @param pctFemale
  * @param pctOther
+ * @param nameSamples
  */
 case class NameIdentificationResults
 (
@@ -527,6 +537,7 @@ case class NameIdentificationResults
   bestFirstNameIndexes: Array[Int],
   pctMale: Array[Double],
   pctFemale: Array[Double],
-  pctOther: Array[Double]
+  pctOther: Array[Double],
+  nameSamples: Seq[Seq[String]]
 ) extends JsonLike
 /* CODE FOR DETECTING SENSITIVE FEATURES END */
