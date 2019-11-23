@@ -66,7 +66,7 @@ import scala.util.Random
  * @param uid           uid for instance
  * @param operationName unique name of the operation this stage performs
  * @param tti           type tag for input
- * @tparam T
+ * @tparam T            a subtype of Text corresponding to the input column type
  */
 class SmartTextVectorizer[T <: Text]
 (
@@ -374,7 +374,7 @@ private[op] object TextStats {
 import enumeratum._
 sealed trait SensitiveFeatureMode extends EnumEntry with Serializable
 object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
-  val values = findValues
+  val values: Seq[SensitiveFeatureMode] = findValues
 
   case object Off extends SensitiveFeatureMode
   case object DetectOnly extends SensitiveFeatureMode
@@ -501,13 +501,13 @@ trait BiasDetectionParams extends Params {
 
 /**
 * Case class for gathering results in the Spark dataset during treeAggregate
- * @param count
- * @param predictedNameProb
- * @param tokenInFirstNameDictionary
- * @param tokenIsMale
- * @param tokenIsFemale
- * @param tokenIsOther
- * @param sampleOfNames
+ * @param count                       the number of non-empty rows seen
+ * @param predictedNameProb           (non-normalized) i.e. average probability of name in rows seen * count
+ * @param tokenInFirstNameDictionary  map from index to count of rows with that indexed token in first name dict
+ * @param tokenIsMale                 map from index to count of rows with that indexed token being male
+ * @param tokenIsFemale               map from index to count of rows with that indexed token being female
+ * @param tokenIsOther                map from index to count of rows with that indexed token being other
+ * @param sampleOfNames               if debug is enabled, a sample (max 50, see MAX_NUM_NAMES) of rows
  */
 case class NameIdentificationAccumulator
 (
@@ -522,13 +522,13 @@ case class NameIdentificationAccumulator
 
 /**
 * Case class for collecting the overall results from the name identification step
- * @param isName
- * @param predictedNameProbs
- * @param bestFirstNameIndexes
- * @param pctMale
- * @param pctFemale
- * @param pctOther
- * @param nameSamples
+ * @param isName               per feature, whether the feature was identified as name (predicted prob >= threshold)
+ * @param predictedNameProbs   per feature, the predicted prob
+ * @param bestFirstNameIndexes per feature, the best first name index
+ * @param pctMale              per feature, the percentage male
+ * @param pctFemale            per feature, the percentage female
+ * @param pctOther             per feature, the percentage other (i.e. not identified)
+ * @param nameSamples          per feature, a sample of names (if debug enabled)
  */
 case class NameIdentificationResults
 (
