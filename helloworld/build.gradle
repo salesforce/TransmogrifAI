@@ -5,6 +5,7 @@ buildscript {
     }
     dependencies {
         classpath 'org.github.ngbinh.scalastyle:gradle-scalastyle-plugin_2.11:1.0.1'
+        classpath 'com.commercehub.gradle.plugin:gradle-avro-plugin:0.16.0'
     }
 }
 plugins {
