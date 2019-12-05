@@ -9,7 +9,6 @@ buildscript {
 }
 plugins {
     id 'com.github.johnrengelman.shadow' version '5.0.0'
-    id 'com.commercehub.gradle.plugin.avro' version '0.8.0'
     id 'org.scoverage' version '2.5.0'
 }
 repositories {
@@ -36,7 +35,7 @@ mainClassName = "please.set.main.class.in.build.gradle"
 ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '12'
-    junitVersion = '4.11'
+    junitVersion = '4.12'
     sparkVersion = '2.4.4'
     scalatestVersion = '3.0.0'
     transmogrifaiVersion ='0.7.0'
