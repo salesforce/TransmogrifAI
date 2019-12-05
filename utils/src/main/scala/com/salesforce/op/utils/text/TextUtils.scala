@@ -30,6 +30,8 @@
 
 package com.salesforce.op.utils.text
 
+import scala.util.matching.Regex
+
 
 case object TextUtils {
 
@@ -49,4 +51,20 @@ case object TextUtils {
   def concat(l: String, r: String, separator: String): String =
     if (l.isEmpty) r else if (r.isEmpty) l else s"$l$separator$r"
 
+  /**
+   * Helper function to conditionally extract groups from Text using RegEx.
+   * @param patterns: Seq[Regex] where earlier entries are preferred to later ones;
+   *                each RegEx must contain exactly one matching group
+   * @param string: the string to find matches in
+   * @return the first matched group found, an empty string if no matches were found
+   */
+  def getBestRegexMatch(patterns: Seq[Regex], string: String): String = {
+    patterns.foldLeft("")({ (acc: String, pattern: Regex) =>
+      if (acc == "") string match {
+        case pattern(possibleZip) => possibleZip
+        case _ => ""
+      }
+      else acc
+    })
+  }
 }

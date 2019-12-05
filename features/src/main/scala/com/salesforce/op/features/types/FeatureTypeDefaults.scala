@@ -102,6 +102,8 @@ case object FeatureTypeDefaults {
   val StreetMap = new t.StreetMap(Map.empty)
   val GeolocationMap = new t.GeolocationMap(Map.empty)
 
+  val NameStats = new t.NameStats(Map.empty)
+
   /**
    * Return a default value for specified feature type
    *
