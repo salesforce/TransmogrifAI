@@ -1,4 +1,4 @@
-# The TransmogrifAI Roadmap
+# TransmogrifAI Roadmap
 
 ## Short Term
 

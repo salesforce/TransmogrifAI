@@ -43,25 +43,33 @@ import org.scalatest.junit.JUnitRunner
 class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]] {
 
   // scalastyle:off
-  val (inputData, english, japanese, french) = TestFeatureBuilder(
+  val (inputData, english, japanese, french, chinese, korean) = TestFeatureBuilder(
     Seq(
       ("I've got a lovely bunch of coconuts".toText,
         "古池や蛙飛び込む水の音".toText,
-        "Première détection d’une atmosphère autour d’une exoplanète de la taille de la Terre".toText
+        "Première détection d’une atmosphère autour d’une exoplanète de la taille de la Terre".toText,
+        "外面的大氣層依緯度成不同的區與帶，在彼此的交界處有湍流和風暴作用著".toText,
+        "외곽 대기는 위도에 따라 몇가지의 띠들로 눈에 띄게 구분되는데, 서로 상호작용하는 경계선을 따라 발생하는 난류와 폭풍에 의한 것이다".toText
       ),
       ("There they are, all standing in a row".toText,
         "地磁気発生の謎に迫る地球内部の環境、再現実験".toText,
-        "Les deux commissions, créées respectivement en juin 2016 et janvier 2017".toText
+        "Les deux commissions, créées respectivement en juin 2016 et janvier 2017".toText,
+        "理論模型顯示如果木星的質量比現在更大，而不是僅有目前的質量，它將會繼續收縮".toText,
+        "상층부 대기의 네온은 질량비로 차지하는데".toText
       ),
       ("Big ones, small ones, some as big as your head".toText,
         "初めまして私はケビンです".toText,
-        "Il publie sa théorie de la relativité restreinte en 1905".toText
+        "Il publie sa théorie de la relativité restreinte en 1905".toText,
+        "假設它確實存在，它可能因為現存的熱液態金屬氫與地函混合的對流而萎縮，並且熔融在行星內部的較上層".toText,
+        "금속성 수소층 위에는 수소로 이루어진 투명한 안쪽 대기가 자리잡고 있다".toText
       ),
       ("<body>Big ones, small <h1>ones</h1>, some as big as your head</body>".toText,
         "初めまして私はケビンです, <h1>初めまして私はケビンです</h1>".toText,
-        "Il <h2 class=\"a\">publie sa théorie de la relativité restreinte en 1905".toText
+        "Il <h2 class=\"a\">publie sa théorie de la relativité restreinte en 1905".toText,
+        "<div>在南半球有一個外觀與大紅斑類似，但較小的大氣特徵出現</div>".toText,
+        "목성의 중심으로부터 목성반경 <b>지점에서</b> 자기권과 태양풍의 <a href=www.google.com>상호작용으로</a> 활꼴 충격파가 발생한다".toText
       ),
-      ("".toText, Text.empty, Text.empty)
+      ("".toText, Text.empty, Text.empty, Text.empty, Text.empty)
     )
   )
   // scalastyle:on
@@ -125,9 +133,50 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
       List("h2", "clas", "a", "publ", "theo", "relativit", "restreint", "1905").toTextList,
       TextList.empty
     )
+
     val expectedHtml = {
       val copy = expected.toList.toArray
       copy(3) = List("publ", "theo", "relativit", "restreint", "1905").toTextList
+      copy
+    }
+    // scalastyle:on
+  }
+
+  trait Chinese {
+    // scalastyle:off
+    val expectedHtml = Array(
+      "外面的大氣層依緯度成不同的區與帶，在彼此的交界處有湍流和風暴作用著",
+      "理論模型顯示如果木星的質量比現在更大，而不是僅有目前的質量，它將會繼續收縮",
+      "假設它確實存在，它可能因為現存的熱液態金屬氫與地函混合的對流而萎縮，並且熔融在行星內部的較上層",
+      "在南半球有一個外觀與大紅斑類似，但較小的大氣特徵出現",
+      ""
+    ).map(_.sliding(2, 1).filterNot(_.contains("，")).toList.toTextList)
+
+    val expected = {
+      val copy = expectedHtml.clone()
+      copy(3) = (Seq("div") ++ expectedHtml(3).value ++ Seq("div")).toTextList
+      copy
+    }
+    // scalastyle:on
+  }
+
+  trait Korean {
+    // scalastyle:off
+    val expectedHtml = Array(
+      "외곽 대기는 위도에 따라 몇가지의 띠들로 눈에 띄게 구분되는데, 서로 상호작용하는 경계선을 따라 발생하는 난류와 폭풍에 의한 것이다",
+      "상층부 대기의 네온은 질량비로 차지하는데",
+      "금속성 수소층 위에는 수소로 이루어진 투명한 안쪽 대기가 자리잡고 있다",
+      "목성의 중심으로부터 목성반경 지점에서 자기권과 태양풍의 상호작용으로 활꼴 충격파가 발생한다",
+      ""
+    ).map(_.sliding(2, 1).filterNot(s => s.contains(" ") || s.contains(",")).toList.toTextList)
+
+    println(expectedHtml.toList)
+
+    val expected = {
+      val copy = expectedHtml.clone()
+      copy(3) = List("목성", "성의", "중심", "심으", "으로", "로부", "부터", "목성", "성반", "반경", "b", "지점", "점에",
+        "에서", "b", "자기", "기권", "권과", "태양", "양풍", "풍의", "href", "www.google.com", "상호", "호작", "작용",
+        "용으", "으로", "활꼴", "충격", "격파", "파가", "발생", "생한", "한다").toTextList
       copy
     }
     // scalastyle:on
@@ -151,6 +200,19 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
       tokenizer = new TextTokenizer[Text]().setDefaultLanguage(Language.French)
     )
   }
+  it should "tokenize text correctly [Chinese (Simplified)]" in new Chinese {
+    assertTextTokenizer(
+      input = chinese, expected = expected,
+      tokenizer = new TextTokenizer[Text]().setDefaultLanguage(Language.SimplifiedChinese)
+    )
+  }
+  it should "tokenize text correctly [Korean]" in new Korean {
+    assertTextTokenizer(
+      input = korean, expected = expected,
+      tokenizer = new TextTokenizer[Text]().setDefaultLanguage(Language.Korean)
+    )
+  }
+
   it should "strip html tags and tokenize text correctly [English]" in new English {
     assertTextTokenizer(
       input = english, expected = expectedHtml,
@@ -172,6 +234,21 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
         .setDefaultLanguage(Language.French)
     )
   }
+  it should "strip html tags and tokenize text correctly [Chinese (Simplified)]" in new Chinese {
+    assertTextTokenizer(
+      input = chinese, expected = expectedHtml,
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+        .setDefaultLanguage(Language.SimplifiedChinese)
+    )
+  }
+  it should "strip html tags and tokenize text correctly [Korean]" in new Korean {
+    assertTextTokenizer(
+      input = korean, expected = expectedHtml,
+      tokenizer = new TextTokenizer[Text](analyzer = TextTokenizer.AnalyzerHtmlStrip)
+        .setDefaultLanguage(Language.Korean)
+    )
+  }
+
   it should "auto detect languages and tokenize accordingly [English]" in new English {
     assertTextTokenizer(
       input = english, expected = expected,
@@ -187,6 +264,18 @@ class TextTokenizerTest extends OpTransformerSpec[TextList, TextTokenizer[Text]]
   it should "auto detect languages and tokenize accordingly [French]" in new French {
     assertTextTokenizer(
       input = french, expected = expected,
+      tokenizer = new TextTokenizer[Text]().setAutoDetectLanguage(true)
+    )
+  }
+  it should "auto detect languages and tokenize accordingly [Chinese (Simplified)]" in new Chinese {
+    assertTextTokenizer(
+      input = chinese, expected = expected,
+      tokenizer = new TextTokenizer[Text]().setAutoDetectLanguage(true)
+    )
+  }
+  it should "auto detect languages and tokenize accordingly [Korean]" in new Korean {
+    assertTextTokenizer(
+      input = korean, expected = expected,
       tokenizer = new TextTokenizer[Text]().setAutoDetectLanguage(true)
     )
   }
