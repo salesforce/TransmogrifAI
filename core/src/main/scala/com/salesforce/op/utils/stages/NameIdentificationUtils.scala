@@ -35,12 +35,9 @@ import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.JsonLike
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
-import com.twitter.algebird.{AveragedGroup, AveragedValue, Moments, Monoid}
+import com.twitter.algebird.{AveragedValue, HLL, HyperLogLogMonoid, Moments, Monoid}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.functions._
-import org.apache.spark.sql.{Column, Dataset}
-import org.apache.spark.util.SparkUtils.{averageBoolCol, extractDouble}
 
 import scala.io.Source
 import scala.util.Try
@@ -58,30 +55,6 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     TextTokenizer.tokenize(Text(s)).tokens.toArray
   }
 
-  def guardChecks(dataset: Dataset[T#Value], column: Column, timeout: Int = 1000): Boolean = {
-    val spark = dataset.sparkSession
-    import spark.implicits._
-
-    val total = dataset.rdd.countApprox(timeout = timeout).getFinalValue().mean
-    val numUnique = extractDouble(dataset.select(approx_count_distinct(column).as[Double]))
-    val checks = List(
-      // check that in at least 3/4 of the texts there are no more than 10 tokens
-      averageBoolCol(dataset.select(
-        (size(split(column, "\\s+")) < 10).alias(column.toString).as[Boolean]
-      ), column) > 0.75,
-      // check that at least 3/4 of the texts are longer than 3 characters
-      averageBoolCol(dataset.select(
-        (length(column) > 3).alias(column.toString).as[Boolean]
-      ), column) > 0.75,
-      // check that the standard deviation of the text length is greater than a small number
-      total < 10 ||
-        extractDouble(dataset.select(stddev(length(column)).as[Double])) > 0.05,
-      // check that the number of unique entries is at least 10
-      total < 100 || numUnique > 10
-    )
-    checks.forall(identity)
-  }
-
   def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
     tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
   }
@@ -95,23 +68,35 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
 
   import NameStats.GenderStrings._
   def identifyGender(tokens: Seq[String], index: Int, dict: Broadcast[GenderDictionary]): String = {
-    val nameToCheckGenderOf = if (tokens.length != 1) {
-      // Mod to accept -1 as valid index
-      tokens((index + tokens.length) % tokens.length)
-    } else tokens.head
+    val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
     dict.value.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
 
-  def computeGuardCheckQuantities(s: T#Value, tokens: Seq[String]): GuardCheckStats = {
+  def computeGuardCheckQuantities(s: T#Value, tokens: Seq[String], hll: HyperLogLogMonoid): GuardCheckStats = {
     // TODO: Make params out of these numbers
     GuardCheckStats(
       countBelowMaxNumTokens = if (tokens.length > 10) 1 else 0,
       countAboveMinCharLength = if (s.getOrElse("").length > 3) 1 else 0,
       approxMomentsOfNumTokens = Moments(tokens.length),
-      approxNumUnique = 1
+      approxNumUnique = hll.create(s.getOrElse("").getBytes)
     )
+  }
+
+  def performGuardChecks(stats: GuardCheckStats, hll: HyperLogLogMonoid): Boolean = {
+    val N = stats.approxMomentsOfNumTokens.count
+    val checks = List(
+      // check that in at least 3/4 of the texts there are no more than 10 tokens
+      (stats.countBelowMaxNumTokens / N) > 0.75,
+      // check that at least 3/4 of the texts are longer than 3 characters
+      (stats.countAboveMinCharLength / N) > 0.75,
+      // check that the standard deviation of the text length is greater than a small number
+      N < 10 || stats.approxMomentsOfNumTokens.m2 > math.pow(0.05, 2),
+      // check that the number of unique entries is at least 10
+      N < 100 || hll.sizeOf(stats.approxNumUnique).estimate > 10
+    )
+    checks.forall(identity)
   }
 
   def computeResultsByStrategy(
@@ -138,12 +123,13 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   def computeResults(
     s: T#Value,
     nameDict: Broadcast[NameDictionary],
-    genderDict: Broadcast[GenderDictionary]
+    genderDict: Broadcast[GenderDictionary],
+    hll: HyperLogLogMonoid
   ): NameDetectStats = {
     val tokens = preProcess(s)
     NameDetectStats(
-      computeGuardCheckQuantities(s, tokens),
-      AveragedValue(dictCheck(tokens, nameDict)),
+      computeGuardCheckQuantities(s, tokens, hll),
+      AveragedValue(1L, dictCheck(tokens, nameDict)),
       computeResultsByStrategy(s, tokens, nameDict, genderDict)
     )
   }
@@ -203,6 +189,12 @@ private[op] object NameIdentificationUtils {
     }
   )
 
+  /**
+   * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
+   * Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.
+   */
+  val HLLBits = 12
+
   val NameDetectStrategies: Seq[NameDetectStrategy] = Seq(
     NameDetectStrategy.ByIndex(0), NameDetectStrategy.ByIndex(-1)
   )
@@ -213,7 +205,7 @@ private[op] case class GuardCheckStats
   countBelowMaxNumTokens: Int = 0,
   countAboveMinCharLength: Int = 0,
   approxMomentsOfNumTokens: Moments = Moments(0.0),
-  approxNumUnique: Int = 0
+  approxNumUnique: HLL = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits).zero
 )
 
 private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
@@ -226,16 +218,13 @@ private[op] case class NameDetectStats
   dictCheckResult: AveragedValue,
   genderResultsByStrategy: Map[String, GenderStats]
 ) extends JsonLike
-
-private[op] object NameDetectStats {
+private[op] case object NameDetectStats {
   def monoid: Monoid[NameDetectStats] = new Monoid[NameDetectStats] {
     override def plus(l: NameDetectStats, r: NameDetectStats): NameDetectStats = l + r
     override def zero: NameDetectStats = NameDetectStats.empty
   }
 
-  def empty: NameDetectStats = {
-    NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
-  }
+  def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedValue(0L, 0), Map.empty[String, GenderStats])
 }
 
 import enumeratum._

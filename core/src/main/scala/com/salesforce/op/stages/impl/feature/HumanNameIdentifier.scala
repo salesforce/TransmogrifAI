@@ -34,11 +34,11 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameIdentificationUtils.{GenderDictionary, NameDictionary}
-import com.salesforce.op.utils.stages.{NameDetectStats, NameIdentificationFun}
+import com.salesforce.op.utils.stages.{NameDetectStats, NameIdentificationFun, NameIdentificationUtils}
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.ml.param.{DoubleParam, IntParam, ParamValidators}
+import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
 
@@ -78,15 +78,6 @@ class HumanNameIdentifier[T <: Text]
   setDefault(defaultThreshold, 0.50)
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
-  val countApproxTimeout = new IntParam(
-    parent = this,
-    name = "countApproxTimeout",
-    doc = "how long to wait (in milliseconds) for result of dataset.rdd.countApprox",
-    isValid = (value: Int) => { ParamValidators.gt(0)(value) }
-  )
-  setDefault(countApproxTimeout, 3 * 60 * 1000)
-  def setCountApproxTimeout(value: Int): this.type = set(countApproxTimeout, value)
-
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     val spark = dataset.sparkSession
     import spark.implicits._
@@ -94,13 +85,24 @@ class HumanNameIdentifier[T <: Text]
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
 
     implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
+    val hll = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
     val aggResults: NameDetectStats = dataset.map(
-      computeResults(_, broadcastNameDict, broadcastGenderDict)
+      computeResults(_, broadcastNameDict, broadcastGenderDict, hll)
     ).reduce(_ + _)
+    // TODO: Delete these debug logs
+    dataset.map(preProcess).show(truncate = false)
+    dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
+    println(aggResults)
 
+    // There seems to be a bug with Algebird where AveragedValue nested in a case class does not average
+    val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hll)
+    val predictedNameProb = aggResults.dictCheckResult.value / aggResults.dictCheckResult.count
+    require(
+      0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,
+      "Predicted name probability must be in [0, 1]"
+    )
+    val treatAsName = guardChecksPassed && predictedNameProb >= $(defaultThreshold)
     val (bestStrategy, genderQuantities) = aggResults.genderResultsByStrategy.minBy(_._2.numOther)
-    val predictedNameProb = aggResults.dictCheckResult.value
-    val treatAsName = predictedNameProb >= $(defaultThreshold)
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     val preExistingMetadata = getMetadata()
