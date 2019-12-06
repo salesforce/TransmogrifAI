@@ -93,11 +93,6 @@ class HumanNameIdentifier[T <: Text]
     val aggResults: NameDetectStats = dataset.map(
       computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
     ).reduce(_ + _)
-    // TODO: Delete these debug logs
-    import spark.implicits._
-    dataset.map(preProcess).show(truncate = false)
-    dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
-    println(aggResults)
 
     val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
     val predictedNameProb = aggResults.dictCheckResult.value
@@ -107,6 +102,14 @@ class HumanNameIdentifier[T <: Text]
     )
     val treatAsName = guardChecksPassed && predictedNameProb >= $(defaultThreshold)
     val (bestStrategy, genderQuantities) = aggResults.genderResultsByStrategy.minBy(_._2.numOther)
+
+    // TODO: Delete these debug logs
+    import spark.implicits._
+    dataset.map(preProcess).show(truncate = false)
+    dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
+    println(aggResults)
+    println(guardChecksPassed)
+    println(predictedNameProb)
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     val preExistingMetadata = getMetadata()

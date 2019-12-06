@@ -80,23 +80,24 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     hllMonoid: HyperLogLogMonoid
   ): GuardCheckStats = {
     // TODO: Make params out of these numbers
+    val textLength = input.getOrElse("").length
     GuardCheckStats(
       countBelowMaxNumTokens = if (tokens.length < 10) 1 else 0,
-      countAboveMinCharLength = if (input.getOrElse("").length > 2) 1 else 0,
-      approxMomentsOfNumTokens = Moments(tokens.length),
+      countAboveMinCharLength = if (textLength > 2) 1 else 0,
+      approxMomentsOfTextLength = Moments(textLength),
       approxNumUnique = hllMonoid.create(input.getOrElse("").getBytes)
     )
   }
 
   def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
-    val N = stats.approxMomentsOfNumTokens.count
+    val N = stats.approxMomentsOfTextLength.count
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
       (stats.countBelowMaxNumTokens / N) > 0.75,
       // check that at least 3/4 of the texts are longer than 3 characters
       (stats.countAboveMinCharLength / N) > 0.75,
       // check that the standard deviation of the text length is greater than a small number
-      N < 10 || stats.approxMomentsOfNumTokens.m2 > math.pow(0.05, 2),
+      N < 10 || stats.approxMomentsOfTextLength.stddev > 0.05,
       // check that the number of unique entries is at least 10
       N < 100 || hllMonoid.sizeOf(stats.approxNumUnique).estimate > 10
     )
@@ -207,7 +208,7 @@ private[op] case class GuardCheckStats
 (
   countBelowMaxNumTokens: Int = 0,
   countAboveMinCharLength: Int = 0,
-  approxMomentsOfNumTokens: Moments = Moments(0.0),
+  approxMomentsOfTextLength: Moments = Moments(0.0),
   approxNumUnique: HLL = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits).zero
 ) extends JsonLike
 
@@ -227,8 +228,11 @@ private[op] case class NameDetectStats
       "guardCheckQuantities" -> Map(
         "countBelowMaxNumTokens" -> this.guardCheckQuantities.countBelowMaxNumTokens,
         "countAboveMinCharLength" -> this.guardCheckQuantities.countAboveMinCharLength,
-        "approxMomentsOfNumTokens" -> this.guardCheckQuantities.approxMomentsOfNumTokens,
-        "approxNumUnique" -> this.guardCheckQuantities.approxNumUnique.toString
+        "approxMomentsOfTextLength" -> this.guardCheckQuantities.approxMomentsOfTextLength,
+        "approxNumUnique" -> {
+          val hllMonoid = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
+          hllMonoid.sizeOf(this.guardCheckQuantities.approxNumUnique).toString
+        }
       ),
       "dictCheckResults" -> this.dictCheckResult,
       "genderResultsByStrategy" -> this.genderResultsByStrategy
@@ -244,7 +248,7 @@ private[op] case object NameDetectStats {
       GuardCheckStats(
         l.guardCheckQuantities.countBelowMaxNumTokens + r.guardCheckQuantities.countBelowMaxNumTokens,
         l.guardCheckQuantities.countAboveMinCharLength + r.guardCheckQuantities.countAboveMinCharLength,
-        l.guardCheckQuantities.approxMomentsOfNumTokens + r.guardCheckQuantities.approxMomentsOfNumTokens,
+        l.guardCheckQuantities.approxMomentsOfTextLength + r.guardCheckQuantities.approxMomentsOfTextLength,
         l.guardCheckQuantities.approxNumUnique + r.guardCheckQuantities.approxNumUnique
       ),
       l.dictCheckResult + r.dictCheckResult,
