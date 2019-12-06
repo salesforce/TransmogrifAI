@@ -74,13 +74,17 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     ).getOrElse(GenderNA)
   }
 
-  def computeGuardCheckQuantities(s: T#Value, tokens: Seq[String], hll: HyperLogLogMonoid): GuardCheckStats = {
+  def computeGuardCheckQuantities(
+    input: T#Value,
+    tokens: Seq[String],
+    hllMonoid: HyperLogLogMonoid
+  ): GuardCheckStats = {
     // TODO: Make params out of these numbers
     GuardCheckStats(
-      countBelowMaxNumTokens = if (tokens.length > 10) 1 else 0,
-      countAboveMinCharLength = if (s.getOrElse("").length > 3) 1 else 0,
+      countBelowMaxNumTokens = if (tokens.length < 10) 1 else 0,
+      countAboveMinCharLength = if (input.getOrElse("").length > 2) 1 else 0,
       approxMomentsOfNumTokens = Moments(tokens.length),
-      approxNumUnique = hll.create(s.getOrElse("").getBytes)
+      approxNumUnique = hllMonoid.create(input.getOrElse("").getBytes)
     )
   }
 
