@@ -33,12 +33,11 @@ package com.salesforce.op.utils.stages
 import com.salesforce.op.features.types.{NameStats, Text}
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.JsonLike
-import com.twitter.algebird.{Moments, Monoid}
-import com.twitter.algebird.macros.caseclass._
 import com.twitter.algebird.Operators._
+import com.twitter.algebird.macros.caseclass._
+import com.twitter.algebird.{AveragedGroup, AveragedValue, Moments, Monoid}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{Column, Dataset}
 import org.apache.spark.util.SparkUtils.{averageBoolCol, extractDouble}
@@ -58,7 +57,6 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   def preProcess(s: T#Value): Seq[String] = {
     TextTokenizer.tokenize(Text(s)).tokens.toArray
   }
-  def preProcessUDF: UserDefinedFunction = udf(preProcess _)
 
   def guardChecks(dataset: Dataset[T#Value], column: Column, timeout: Int = 1000): Boolean = {
     val spark = dataset.sparkSession
@@ -87,14 +85,12 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
     tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
   }
-  def dictCheckUDF: UserDefinedFunction = {
-    udf(dictCheck _)
-  }
 
-  def checkForFirstName(tokens: Seq[String], dict: Broadcast[GenderDictionary]): Seq[Boolean] = {
-    TokensToCheckForFirstName.map({i: Int =>
-      dict.value.value contains tokens((i + tokens.length) % tokens.length)
-    })
+  def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
+    if (tokens.length != 1) {
+      // Mod to accept -1 as valid index
+      tokens((index + tokens.length) % tokens.length)
+    } else tokens.head
   }
 
   import NameStats.GenderStrings._
@@ -108,9 +104,9 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     ).getOrElse(GenderNA)
   }
 
-  def computeGuardCheckQuantities(s: T#Value, tokens: Seq[String]): GuardCheckQuantities = {
+  def computeGuardCheckQuantities(s: T#Value, tokens: Seq[String]): GuardCheckStats = {
     // TODO: Make params out of these numbers
-    GuardCheckQuantities(
+    GuardCheckStats(
       countBelowMaxNumTokens = if (tokens.length > 10) 1 else 0,
       countAboveMinCharLength = if (s.getOrElse("").length > 3) 1 else 0,
       approxMomentsOfNumTokens = Moments(tokens.length),
@@ -118,30 +114,20 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     )
   }
 
-  def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
-    if (tokens.length != 1) {
-      // Mod to accept -1 as valid index
-      tokens((index + tokens.length) % tokens.length)
-    } else tokens.head
-  }
-
-  val nameDetectStrategies: Seq[NameDetectStrategy] = Seq(
-    NameDetectStrategy.ByIndex(0), NameDetectStrategy.ByIndex(-1)
-  )
   def computeResultsByStrategy(
     s: T#Value,
     tokens: Seq[String],
     nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary]
-  ): Map[String, NameDetectQuantities] = {
-    nameDetectStrategies map { strategy: NameDetectStrategy =>
+  ): Map[String, GenderStats] = {
+    NameDetectStrategies map { strategy: NameDetectStrategy =>
       val genderResult: String = strategy match {
         case NameDetectStrategy.ByIndex(index) => identifyGender(tokens, index, genderDict)
         case _ =>
           sys.error("Not yet implemented")
           "Not yet implemented"
       }
-      strategy.toString -> NameDetectQuantities(
+      strategy.toString -> GenderStats(
         if (genderResult == Male) 1 else 0,
         if (genderResult == Female) 1 else 0,
         if (genderResult == GenderNA) 1 else 0
@@ -155,7 +141,11 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     genderDict: Broadcast[GenderDictionary]
   ): NameDetectStats = {
     val tokens = preProcess(s)
-    NameDetectStats(computeGuardCheckQuantities(s, tokens), computeResultsByStrategy(s, tokens, nameDict, genderDict))
+    NameDetectStats(
+      computeGuardCheckQuantities(s, tokens),
+      AveragedValue(dictCheck(tokens, nameDict)),
+      computeResultsByStrategy(s, tokens, nameDict, genderDict)
+    )
   }
 }
 
@@ -174,7 +164,19 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
 private[op] object NameIdentificationUtils {
   case class NameDictionary
   (
-    value: Set[String] = GenderDictionary().value.keySet
+    // Use the following line to use the smaller but less noisy gender dictionary as a source for names
+    // value: Set[String] = GenderDictionary().value.keySet
+    value: Set[String] = {
+      val nameDictionary = collection.mutable.Set.empty[String]
+      val dictionaryPath = "/Names_JRC_Combined.txt"
+      val stream = getClass.getResourceAsStream(dictionaryPath)
+      val buffer = Source.fromInputStream(stream)
+      for {name <- buffer.getLines} {
+        nameDictionary += name
+      }
+      buffer.close
+      nameDictionary.toSet[String]
+    }
   )
 
   case class GenderDictionary
@@ -201,13 +203,12 @@ private[op] object NameIdentificationUtils {
     }
   )
 
-  // TODO: Eventually, this will be a Seq of case classes to define whether to check an indexed token
-  //  (e.g. first or last) or use some RegEx to extract the token to be checked
-  val TokensToCheckForFirstName: Seq[Int] = Seq(0, -1)
-  val EmptyTokensMap: Map[Int, Int] = Map(TokensToCheckForFirstName map { i => i -> 0 }: _*)
+  val NameDetectStrategies: Seq[NameDetectStrategy] = Seq(
+    NameDetectStrategy.ByIndex(0), NameDetectStrategy.ByIndex(-1)
+  )
 }
 
-private[op] case class GuardCheckQuantities
+private[op] case class GuardCheckStats
 (
   countBelowMaxNumTokens: Int = 0,
   countAboveMinCharLength: Int = 0,
@@ -215,14 +216,15 @@ private[op] case class GuardCheckQuantities
   approxNumUnique: Int = 0
 )
 
-private[op] case class NameDetectQuantities(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
+private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
 
 // TODO: Make proper documentation
 // Defines the monoid accumulator for detecting names
 private[op] case class NameDetectStats
 (
-  guardCheckQuantities: GuardCheckQuantities,
-  resultsByStrategy: Map[String, NameDetectQuantities]
+  guardCheckQuantities: GuardCheckStats,
+  dictCheckResult: AveragedValue,
+  genderResultsByStrategy: Map[String, GenderStats]
 ) extends JsonLike
 
 private[op] object NameDetectStats {
@@ -232,7 +234,7 @@ private[op] object NameDetectStats {
   }
 
   def empty: NameDetectStats = {
-    NameDetectStats(GuardCheckQuantities(), Map.empty[String, NameDetectQuantities])
+    NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
   }
 }
 

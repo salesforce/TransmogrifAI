@@ -98,9 +98,8 @@ class HumanNameIdentifier[T <: Text]
       computeResults(_, broadcastNameDict, broadcastGenderDict)
     ).reduce(_ + _)
 
-    val (bestStrategy, quantities) = aggResults.resultsByStrategy.minBy(_._2.numOther)
-    val N = quantities.numFemale + quantities.numMale + quantities.numOther
-    val predictedNameProb = 1.0 - (quantities.numOther.toDouble / N)
+    val (bestStrategy, genderQuantities) = aggResults.genderResultsByStrategy.minBy(_._2.numOther)
+    val predictedNameProb = aggResults.dictCheckResult.value
     val treatAsName = predictedNameProb >= $(defaultThreshold)
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
