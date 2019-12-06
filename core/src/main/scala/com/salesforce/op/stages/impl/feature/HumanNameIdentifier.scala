@@ -97,12 +97,9 @@ class HumanNameIdentifier[T <: Text]
     import spark.implicits._
     dataset.map(preProcess).show(truncate = false)
     dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
-    // TODO: Fix printing
-    // println(aggResults)
+    println(aggResults)
 
     val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
-    // There seems to be a bug with Algebird where AveragedValue nested in a case class does not average
-    // val predictedNameProb = aggResults.dictCheckResult.value / aggResults.dictCheckResult.count
     val predictedNameProb = aggResults.dictCheckResult.value
     require(
       0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,

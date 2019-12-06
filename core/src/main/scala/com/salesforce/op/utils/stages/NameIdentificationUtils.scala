@@ -32,10 +32,10 @@ package com.salesforce.op.utils.stages
 
 import com.salesforce.op.features.types.{NameStats, Text}
 import com.salesforce.op.stages.impl.feature.TextTokenizer
-import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
-import com.twitter.algebird.{AveragedValue, HLL, HyperLogLogMonoid, Moments, Monoid}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 
@@ -220,7 +220,22 @@ private[op] case class NameDetectStats
   guardCheckQuantities: GuardCheckStats,
   dictCheckResult: AveragedValue,
   genderResultsByStrategy: Map[String, GenderStats]
-) extends JsonLike
+) extends JsonLike {
+  // TransmogrifAI's JsonUtils doesn't play nice with HLL
+  override def toJson(pretty: Boolean): String = {
+    val result: Map[String, Any] = Map(
+      "guardCheckQuantities" -> Map(
+        "countBelowMaxNumTokens" -> this.guardCheckQuantities.countBelowMaxNumTokens,
+        "countAboveMinCharLength" -> this.guardCheckQuantities.countAboveMinCharLength,
+        "approxMomentsOfNumTokens" -> this.guardCheckQuantities.approxMomentsOfNumTokens,
+        "approxNumUnique" -> this.guardCheckQuantities.approxNumUnique.toString
+      ),
+      "dictCheckResults" -> this.dictCheckResult,
+      "genderResultsByStrategy" -> this.genderResultsByStrategy
+    )
+    JsonUtils.toJsonString(result, pretty = pretty)
+  }
+}
 private[op] case object NameDetectStats {
   def monoid: Monoid[NameDetectStats] = new Monoid[NameDetectStats] {
     // Ideally, we could have avoided defining all of this
