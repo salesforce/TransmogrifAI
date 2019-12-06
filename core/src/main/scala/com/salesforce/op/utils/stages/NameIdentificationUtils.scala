@@ -51,8 +51,8 @@ import scala.util.matching.Regex
 private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   import com.salesforce.op.utils.stages.NameIdentificationUtils._
 
-  def preProcess(s: T#Value): Seq[String] = {
-    TextTokenizer.tokenize(Text(s)).tokens.toArray
+  def preProcess(input: T#Value): Seq[String] = {
+    TextTokenizer.tokenize(Text(input)).tokens.toArray
   }
 
   def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
@@ -88,7 +88,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     )
   }
 
-  def performGuardChecks(stats: GuardCheckStats, hll: HyperLogLogMonoid): Boolean = {
+  def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
     val N = stats.approxMomentsOfNumTokens.count
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
@@ -98,15 +98,14 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
       // check that the standard deviation of the text length is greater than a small number
       N < 10 || stats.approxMomentsOfNumTokens.m2 > math.pow(0.05, 2),
       // check that the number of unique entries is at least 10
-      N < 100 || hll.sizeOf(stats.approxNumUnique).estimate > 10
+      N < 100 || hllMonoid.sizeOf(stats.approxNumUnique).estimate > 10
     )
     checks.forall(identity)
   }
 
-  def computeResultsByStrategy(
-    s: T#Value,
+  def computeGenderResultsByStrategy(
+    input: T#Value,
     tokens: Seq[String],
-    nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary]
   ): Map[String, GenderStats] = {
     NameDetectStrategies map { strategy: NameDetectStrategy =>
@@ -125,16 +124,16 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
 
   def computeResults(
-    s: T#Value,
+    input: T#Value,
     nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary],
     hll: HyperLogLogMonoid
   ): NameDetectStats = {
-    val tokens = preProcess(s)
+    val tokens = preProcess(input)
     NameDetectStats(
-      computeGuardCheckQuantities(s, tokens, hll),
+      computeGuardCheckQuantities(input, tokens, hll),
       AveragedValue(1L, dictCheck(tokens, nameDict)),
-      computeResultsByStrategy(s, tokens, nameDict, genderDict)
+      computeGenderResultsByStrategy(input, tokens, genderDict)
     )
   }
 }
@@ -210,9 +209,9 @@ private[op] case class GuardCheckStats
   countAboveMinCharLength: Int = 0,
   approxMomentsOfNumTokens: Moments = Moments(0.0),
   approxNumUnique: HLL = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits).zero
-)
+) extends JsonLike
 
-private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
+private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)  extends JsonLike
 
 // TODO: Make proper documentation
 // Defines the monoid accumulator for detecting names
@@ -224,7 +223,18 @@ private[op] case class NameDetectStats
 ) extends JsonLike
 private[op] case object NameDetectStats {
   def monoid: Monoid[NameDetectStats] = new Monoid[NameDetectStats] {
-    override def plus(l: NameDetectStats, r: NameDetectStats): NameDetectStats = l + r
+    // Ideally, we could have avoided defining all of this
+    // but Algebird's case class macro is not documented (at all) and spotty
+    override def plus(l: NameDetectStats, r: NameDetectStats): NameDetectStats = NameDetectStats(
+      GuardCheckStats(
+        l.guardCheckQuantities.countBelowMaxNumTokens + r.guardCheckQuantities.countBelowMaxNumTokens,
+        l.guardCheckQuantities.countAboveMinCharLength + r.guardCheckQuantities.countAboveMinCharLength,
+        l.guardCheckQuantities.approxMomentsOfNumTokens + r.guardCheckQuantities.approxMomentsOfNumTokens,
+        l.guardCheckQuantities.approxNumUnique + r.guardCheckQuantities.approxNumUnique
+      ),
+      l.dictCheckResult + r.dictCheckResult,
+      l.genderResultsByStrategy + r.genderResultsByStrategy
+    )
     override def zero: NameDetectStats = NameDetectStats.empty
   }
 

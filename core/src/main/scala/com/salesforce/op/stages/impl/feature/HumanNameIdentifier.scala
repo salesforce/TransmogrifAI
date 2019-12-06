@@ -80,23 +80,28 @@ class HumanNameIdentifier[T <: Text]
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
     val spark = dataset.sparkSession
-    import spark.implicits._
+    // Load broadcast variables
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
-
+    // Create HyperLogLog factory
+    val hllMonoid = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
+    // Load/create implicits necessary for Spark
+    import spark.implicits._
+    // Create implicit monoid for NameStats
     implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
-    val hll = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
+
     val aggResults: NameDetectStats = dataset.map(
-      computeResults(_, broadcastNameDict, broadcastGenderDict, hll)
+      computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
     ).reduce(_ + _)
     // TODO: Delete these debug logs
     dataset.map(preProcess).show(truncate = false)
     dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
     println(aggResults)
 
+    val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
     // There seems to be a bug with Algebird where AveragedValue nested in a case class does not average
-    val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hll)
-    val predictedNameProb = aggResults.dictCheckResult.value / aggResults.dictCheckResult.count
+    // val predictedNameProb = aggResults.dictCheckResult.value / aggResults.dictCheckResult.count
+    val predictedNameProb = aggResults.dictCheckResult.value
     require(
       0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,
       "Predicted name probability must be in [0, 1]"
