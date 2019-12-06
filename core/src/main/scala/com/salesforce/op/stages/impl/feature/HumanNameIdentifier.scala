@@ -40,7 +40,7 @@ import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.types.MetadataBuilder
-import org.apache.spark.sql.{DataFrame, Dataset, SparkSession}
+import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, SparkSession}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -85,18 +85,20 @@ class HumanNameIdentifier[T <: Text]
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
     // Create HyperLogLog factory
     val hllMonoid = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
-    // Load/create implicits necessary for Spark
-    import spark.implicits._
-    // Create implicit monoid for NameStats
+    // Create Spark encoder for our accumulator class
+    implicit val nameDetectStatsEncoder: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]
+    // Tell Algebird that our accumulator class is also a monoid
     implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
 
     val aggResults: NameDetectStats = dataset.map(
       computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
     ).reduce(_ + _)
     // TODO: Delete these debug logs
+    import spark.implicits._
     dataset.map(preProcess).show(truncate = false)
     dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
-    println(aggResults)
+    // TODO: Fix printing
+    // println(aggResults)
 
     val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
     // There seems to be a bug with Algebird where AveragedValue nested in a case class does not average
