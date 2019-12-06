@@ -60,10 +60,12 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
   }
 
   def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
-    if (tokens.length != 1) {
+    if (tokens.isEmpty) ""
+    else if (tokens.length == 1) tokens.head
+    else {
       // Mod to accept -1 as valid index
       tokens((index + tokens.length) % tokens.length)
-    } else tokens.head
+    }
   }
 
   import NameStats.GenderStrings._
@@ -248,7 +250,10 @@ private[op] case object NameDetectStats {
       GuardCheckStats(
         l.guardCheckQuantities.countBelowMaxNumTokens + r.guardCheckQuantities.countBelowMaxNumTokens,
         l.guardCheckQuantities.countAboveMinCharLength + r.guardCheckQuantities.countAboveMinCharLength,
-        l.guardCheckQuantities.approxMomentsOfTextLength + r.guardCheckQuantities.approxMomentsOfTextLength,
+        MomentsGroup.plus(
+          l.guardCheckQuantities.approxMomentsOfTextLength,
+          r.guardCheckQuantities.approxMomentsOfTextLength
+        ),
         l.guardCheckQuantities.approxNumUnique + r.guardCheckQuantities.approxNumUnique
       ),
       l.dictCheckResult + r.dictCheckResult,
