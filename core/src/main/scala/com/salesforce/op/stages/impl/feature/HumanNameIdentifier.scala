@@ -34,7 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameIdentificationUtils.{GenderDictionary, NameDictionary}
-import com.salesforce.op.utils.stages.{NameDetectStats, NameIdentificationFun, NameIdentificationUtils}
+import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectStats, NameIdentificationFun, NameIdentificationUtils}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
@@ -98,10 +98,11 @@ class HumanNameIdentifier[T <: Text]
     val predictedNameProb = aggResults.dictCheckResult.value
     require(
       0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,
-      "Predicted name probability must be in [0, 1]"
+      f"Predicted name probability must be in [0, 1]: $predictedNameProb"
     )
     val treatAsName = guardChecksPassed && predictedNameProb >= $(defaultThreshold)
-    val (bestStrategy, genderQuantities) = aggResults.genderResultsByStrategy.minBy(_._2.numOther)
+    val (bestStrategy, _) = aggResults.genderResultsByStrategy.minBy(_._2.numOther)
+    val genderDetectStrategy = if (treatAsName) Some(GenderDetectStrategy.fromString(bestStrategy)) else None
 
     // TODO: Delete these debug logs
     import spark.implicits._
@@ -120,7 +121,7 @@ class HumanNameIdentifier[T <: Text]
     val updatedMetadata = metaDataBuilder.build()
     setMetadata(updatedMetadata)
 
-    new HumanNameIdentifierModel[T](uid, treatAsName, indexFirstName = None)
+    new HumanNameIdentifierModel[T](uid, treatAsName, genderDetectStrategy)
   }
 }
 
@@ -129,7 +130,7 @@ class HumanNameIdentifierModel[T <: Text]
 (
   override val uid: String,
   val treatAsName: Boolean,
-  val indexFirstName: Option[Int] = None
+  val genderDetectStrategy: Option[GenderDetectStrategy] = None
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
 
@@ -143,11 +144,17 @@ class HumanNameIdentifierModel[T <: Text]
 
   import NameStats.BooleanStrings._
   import NameStats.Keys._
+  import NameStats.GenderStrings._
   def transformFn: T => NameStats = (input: T) => {
     val tokens = preProcess(input.value)
     if (treatAsName) {
-      assert(tokens.length == 1 || indexFirstName.isDefined)
-      val gender = identifyGender(tokens, indexFirstName.getOrElse(0), broadcastGenderDict.get)
+      val gender: String = genderDetectStrategy match {
+        case None => GenderNotInferred
+        case Some(GenderDetectStrategy.ByIndex(index)) => identifyGender(tokens, index, broadcastGenderDict.get)
+        case _ =>
+          sys.error("Not yet implemented")
+          "Not yet implemented"
+      }
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),

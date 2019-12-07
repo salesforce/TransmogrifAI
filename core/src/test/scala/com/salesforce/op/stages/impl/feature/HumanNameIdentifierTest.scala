@@ -34,6 +34,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.utils.stages.GenderDetectStrategy
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -127,7 +128,8 @@ class HumanNameIdentifierTest
 
   it should "identify which token is the first name in a single full name entry correctly" in {
     val (_, _, model, _) = identifyName(Seq("Shelby Bouvet").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].indexFirstName shouldBe Some(0)
+    model.asInstanceOf[HumanNameIdentifierModel[Text]].genderDetectStrategy shouldBe
+      Some(GenderDetectStrategy.ByIndex())
   }
 
   it should "identify the gender of a single full name entry correctly" in {
@@ -142,6 +144,7 @@ class HumanNameIdentifierTest
   it should "identify the gender of a multiple full name entries (with varying token lengths) correctly" in {
     import NameStats.GenderStrings._
     import NameStats.Keys._
+    // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
       "Sherrod Brown",

@@ -111,9 +111,9 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
     tokens: Seq[String],
     genderDict: Broadcast[GenderDictionary]
   ): Map[String, GenderStats] = {
-    NameDetectStrategies map { strategy: NameDetectStrategy =>
+    GenderDetectStrategies map { strategy: GenderDetectStrategy =>
       val genderResult: String = strategy match {
-        case NameDetectStrategy.ByIndex(index) => identifyGender(tokens, index, genderDict)
+        case GenderDetectStrategy.ByIndex(index) => identifyGender(tokens, index, genderDict)
         case _ =>
           sys.error("Not yet implemented")
           "Not yet implemented"
@@ -201,8 +201,8 @@ private[op] object NameIdentificationUtils {
    */
   val HLLBits = 12
 
-  val NameDetectStrategies: Seq[NameDetectStrategy] = Seq(
-    NameDetectStrategy.ByIndex(0), NameDetectStrategy.ByIndex(-1)
+  val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
+    GenderDetectStrategy.ByIndex(), GenderDetectStrategy.ByIndex(-1)
   )
 }
 
@@ -266,12 +266,20 @@ private[op] case object NameDetectStats {
 }
 
 import enumeratum._
-private[op] sealed class NameDetectStrategy extends EnumEntry
-case object NameDetectStrategy extends Enum[NameDetectStrategy] {
-  val values: Seq[NameDetectStrategy] = findValues
-  case class ByIndex(index: Int) extends NameDetectStrategy {
-    override def toString: String = f"ByIndex($index)"
+private[op] sealed class GenderDetectStrategy extends EnumEntry
+case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
+  val values: Seq[GenderDetectStrategy] = findValues
+  case class ByIndex(index: Int = 0) extends GenderDetectStrategy
+  case class ByRegex(pattern: Regex = "".r) extends GenderDetectStrategy
+  case class FindSalutation() extends GenderDetectStrategy
+
+  def fromString(s: String): GenderDetectStrategy = {
+    val parts = s.split("""[()]""")
+    val entryName: String = parts(0)
+    entryName match {
+      case "ByIndex" => ByIndex(parts(1).toInt)
+      case "ByRegex" => ByRegex(parts(1).r)
+      case "FindSalutation" => FindSalutation()
+    }
   }
-  case class ByRegex(pattern: Regex) extends NameDetectStrategy
-  case class FindSalutation() extends NameDetectStrategy
 }
