@@ -238,9 +238,13 @@ private[op] object NameDetectUtils {
   import GenderDetectStrategy._
   /**
    * The strategies to use for transforming name to gender; Order does not matter.
+   *
+   * The first RegEx pattern will extract all text after the first comma;
+   * The second RegEx pattern will extract all text after both the first comma and the immediately next token,
+   *   which accounts for patterns like `LastName, Honorific FirstName MiddleNames`
    */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    FindHonorific(), ByIndex(0), ByIndex(-1), ByRegex(""".*,(.*)""".r)
+    FindHonorific(), ByIndex(0), ByIndex(-1), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
   )
 }
 
@@ -252,7 +256,7 @@ private[op] case class GuardCheckStats
   approxNumUnique: HLL = new HyperLogLogMonoid(NameDetectUtils.HLLBits).zero
 ) extends JsonLike
 
-private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)  extends JsonLike
+private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0) extends JsonLike
 
 // TODO: Make proper documentation
 // Defines the monoid accumulator for detecting names

@@ -129,8 +129,8 @@ class HumanNameDetectorTest
 
   it should "identify which token is the first name in a single full name entry correctly" in {
     val (_, _, model, _) = identifyName(Seq("Shelby Bouvet").toText)
-    model.asInstanceOf[HumanNameDetectorModel[Text]].genderDetectStrategy shouldBe
-      Some(GenderDetectStrategy.ByIndex(0))
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies.head shouldBe
+      GenderDetectStrategy.ByIndex(0)
   }
 
   it should "identify the gender of a single full name entry correctly" in {
@@ -189,7 +189,7 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
-    model.asInstanceOf[HumanNameDetectorModel[Text]].genderDetectStrategy should not be Some(FindHonorific())
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies should not be Some(FindHonorific())
   }
 
   it should
@@ -235,6 +235,42 @@ class HumanNameDetectorTest
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
   }
 
+  it should
+    """identify the gender of multiple full name entries by using RegEx
+      |to detect `LastName, Honorific FirstName MiddleNames` patterns
+      |when the honorifics do not convey gender information""".stripMargin in {
+    import NameStats.GenderStrings._
+    import NameStats.Keys._
+    // noinspection SpellCheckingInspection
+    // scalastyle:off
+    val (_, _, model, result) = identifyName(Seq(
+      "Brown, Dr. Sherrod L.",
+      "Cantwell, Prof. Maria Blunt"
+    ).toText)
+    // scalastyle:on
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
+    val identifiedGenders = resultingMaps.map(_.get(Gender))
+    identifiedGenders shouldBe Seq(Some(Male), Some(Female))
+  }
+
   it should "use mixed strategies to detect gender" in {
+    import NameStats.GenderStrings._
+    import NameStats.Keys._
+    // noinspection SpellCheckingInspection
+    // scalastyle:off
+    val (_, _, model, result) = identifyName(Seq(
+      "Sherrod Brown",
+      "Cantwell, Maria",
+      "Mr. Benjamin L. Cardin",
+      "Rochester, Lisa Maria Blunt",
+      "Carper, Dr. Thomas Robert",
+      "González-Colón, Ms. Jennifer"
+    ).toText)
+    // scalastyle:on
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
+    val identifiedGenders = resultingMaps.map(_.get(Gender))
+    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
   }
 }
