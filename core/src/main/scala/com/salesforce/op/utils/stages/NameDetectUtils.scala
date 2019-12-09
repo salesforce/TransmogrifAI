@@ -33,7 +33,6 @@ package com.salesforce.op.utils.stages
 import com.salesforce.op.features.types.{NameStats, Text}
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
-import com.salesforce.op.utils.stages.GenderDetectStrategy.FindHonorific
 import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
@@ -72,7 +71,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
   }
 
   def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
-    val N = stats.approxMomentsOfTextLength.count
+    val N: Double = stats.approxMomentsOfTextLength.count.toDouble
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
       (stats.countBelowMaxNumTokens / N) > 0.75,
@@ -115,21 +114,30 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
     strategy: GenderDetectStrategy,
     genderDict: Broadcast[GenderDictionary]
   ): String = {
+    import GenderDetectStrategy._
     strategy match {
-      case GenderDetectStrategy.FindHonorific() =>
+      case FindHonorific() =>
         val matched = tokens filter { NameDetectUtils.AllHonorifics contains }
         if (matched.length == 1) {
           if (MaleHonorifics contains matched.head) Male else Female
         }
         else GenderNA
-      case GenderDetectStrategy.ByIndex(index) =>
+      case ByIndex(index) =>
         val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
         genderDict.value.value.get(nameToCheckGenderOf).map(
           probMale => if (probMale >= 0.5) Male else Female
         ).getOrElse(GenderNA)
-      case GenderDetectStrategy.ByRegex(pattern) =>
-        sys.error("Not yet implemented")
-        "Not yet implemented"
+      case ByRegex(pattern) =>
+        input.getOrElse("") match {
+          case pattern(nameToCheckGenderOf) =>
+            genderDict.value.value.get(preProcess(Some(nameToCheckGenderOf)).headOption.getOrElse("")).map(
+              probMale => if (probMale >= 0.5) Male else Female
+            ).getOrElse(GenderNA)
+          case _ => GenderNA
+        }
+      case _ =>
+        logError("Unimplemented gender detection strategy found")
+        GenderNA
     }
   }
 
@@ -227,11 +235,12 @@ private[op] object NameDetectUtils {
    */
   val HLLBits = 12
 
+  import GenderDetectStrategy._
   /**
    * The strategies to use for transforming name to gender; Order does not matter.
    */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    FindHonorific(), GenderDetectStrategy.ByIndex(0), GenderDetectStrategy.ByIndex(-1)
+    FindHonorific(), ByIndex(0), ByIndex(-1), ByRegex(""".*,(.*)""".r)
   )
 }
 
@@ -298,12 +307,19 @@ import enumeratum._
 private[op] sealed class GenderDetectStrategy extends EnumEntry
 case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   val values: Seq[GenderDetectStrategy] = findValues
-  case class ByIndex(index: Int) extends GenderDetectStrategy
-  case class ByRegex(pattern: Regex) extends GenderDetectStrategy
-  case class FindHonorific() extends GenderDetectStrategy
+  val delimiter = " WITH VALUE "
+  case class ByIndex(index: Int) extends GenderDetectStrategy {
+    override def toString: String = "ByIndex" + delimiter + index.toString
+  }
+  case class ByRegex(pattern: Regex) extends GenderDetectStrategy {
+    override def toString: String = "ByRegex" + delimiter + pattern.toString
+  }
+  case class FindHonorific() extends GenderDetectStrategy {
+    override def toString: String = "FindHonorific"
+  }
 
   def fromString(s: String): GenderDetectStrategy = {
-    val parts = s.split("""[()]""")
+    val parts = s.split(delimiter)
     val entryName: String = parts(0)
     entryName match {
       case "ByIndex" => ByIndex(parts(1).toInt)

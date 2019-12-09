@@ -112,6 +112,7 @@ class HumanNameDetector[T <: Text]
     println(aggResults)
     println(guardChecksPassed)
     println(predictedNameProb)
+    println(genderDetectStrategy)
 
     // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     val preExistingMetadata = getMetadata()
