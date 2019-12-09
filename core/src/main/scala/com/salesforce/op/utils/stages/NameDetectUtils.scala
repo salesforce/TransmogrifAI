@@ -164,7 +164,9 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
 /**
  * Defines static values for name identification:
  * - Dictionary filenames and how to read them in
- * - Which parts of a string to check for first name (used in transforming from name to gender)
+ * - The number of bits to use for HyperLogLog unique entry detection (part of guard checks)
+ * - List of male/female honorifics (English only so far)
+ * - The different gender detection strategies to try
  *
  * Name and gender data are maintained by and taken from this repository:
  *  https://github.com/MWYang/InternationalNames
@@ -215,15 +217,15 @@ private[op] object NameDetectUtils {
     }
   )
 
-  val MaleHonorifics: Set[String] = Set("mr", "mister")
-  val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss")
-  val AllHonorifics: Set[String] = MaleHonorifics ++ FemaleHonorifics
-
   /**
    * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
    * Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.
    */
   val HLLBits = 12
+
+  val MaleHonorifics: Set[String] = Set("mr", "mister")
+  val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss")
+  val AllHonorifics: Set[String] = MaleHonorifics ++ FemaleHonorifics
 
   import GenderDetectStrategy._
   /**
@@ -304,6 +306,14 @@ private[op] case object NameDetectStats {
 }
 
 import enumeratum._
+
+/**
+ * Defines the different kinds of gender detection strategies that are possible
+ *
+ * We need to overwrite `toString` in order to provide serialization during the Spark map and reduce steps and then
+ * the `fromString` function provides deserialization back to the `GenderDetectStrategy` class for the companion
+ * transformer
+ */
 private[op] sealed class GenderDetectStrategy extends EnumEntry
 case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   val values: Seq[GenderDetectStrategy] = findValues
