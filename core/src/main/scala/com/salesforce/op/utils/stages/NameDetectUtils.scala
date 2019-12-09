@@ -237,8 +237,8 @@ private[op] object NameDetectUtils {
    */
   val HLLBits = 12
 
-  val MaleHonorifics: Set[String] = Set("mr", "mister")
-  val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss")
+  val MaleHonorifics: Set[String] = Set("mr", "mister, sir")
+  val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss, madam")
   val AllHonorifics: Set[String] = MaleHonorifics ++ FemaleHonorifics
 
   import GenderDetectStrategy._
