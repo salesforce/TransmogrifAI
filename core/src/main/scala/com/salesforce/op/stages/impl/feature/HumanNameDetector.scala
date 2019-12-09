@@ -34,13 +34,13 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
-import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectStats, NameDetectFun, NameDetectUtils}
+import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectFun, NameDetectStats, NameDetectUtils}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
 import org.apache.spark.sql.types.MetadataBuilder
-import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders, SparkSession}
+import org.apache.spark.sql._
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -96,6 +96,7 @@ class HumanNameDetector[T <: Text]
 
     val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
     val predictedNameProb = aggResults.dictCheckResult.value
+    // TODO: Delete this
     require(
       0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,
       f"Predicted name probability must be in [0, 1]: $predictedNameProb"
@@ -144,17 +145,12 @@ class HumanNameDetectorModel[T <: Text]
 
   import NameStats.BooleanStrings._
   import NameStats.Keys._
-  import NameStats.GenderStrings._
   def transformFn: T => NameStats = (input: T) => {
     val tokens = preProcess(input.value)
     if (treatAsName) {
-      val gender: String = genderDetectStrategy match {
-        case None => GenderNotInferred
-        case Some(GenderDetectStrategy.ByIndex(index)) => identifyGender(tokens, index, broadcastGenderDict.get)
-        case _ =>
-          sys.error("Not yet implemented")
-          "Not yet implemented"
-      }
+      require(genderDetectStrategy.nonEmpty, "There must be a gender extraction strategy if treating as name.")
+      require(this.broadcastGenderDict.nonEmpty, "Gender dictionary broadcast variable was not initialized correctly.")
+      val gender: String = identifyGender(input.value, tokens, genderDetectStrategy.get, this.broadcastGenderDict.get)
       NameStats(Map(
         IsNameIndicator -> True,
         OriginalName -> input.value.getOrElse(""),

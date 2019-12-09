@@ -33,6 +33,7 @@ package com.salesforce.op.utils.stages
 import com.salesforce.op.features.types.{NameStats, Text}
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.salesforce.op.utils.stages.GenderDetectStrategy.FindHonorific
 import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
@@ -53,27 +54,6 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
 
   def preProcess(input: T#Value): Seq[String] = {
     TextTokenizer.tokenize(Text(input)).tokens.toArray
-  }
-
-  def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
-    tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
-  }
-
-  def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
-    if (tokens.isEmpty) ""
-    else if (tokens.length == 1) tokens.head
-    else {
-      // Mod to accept -1 as valid index
-      tokens((index + tokens.length) % tokens.length)
-    }
-  }
-
-  import NameStats.GenderStrings._
-  def identifyGender(tokens: Seq[String], index: Int, dict: Broadcast[GenderDictionary]): String = {
-    val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
-    dict.value.value.get(nameToCheckGenderOf).map(
-      probMale => if (probMale >= 0.5) Male else Female
-    ).getOrElse(GenderNA)
   }
 
   def computeGuardCheckQuantities(
@@ -103,7 +83,54 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
       // check that the number of unique entries is at least 10
       N < 100 || hllMonoid.sizeOf(stats.approxNumUnique).estimate > 10
     )
+    // TODO: Delete this
+    println(checks)
     checks.forall(identity)
+  }
+
+  def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
+    tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+  }
+
+  def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
+    if (tokens.isEmpty) ""
+    else if (tokens.length == 1) tokens.head
+    else {
+      // Mod to accept -1 as valid index
+      tokens((index + tokens.length) % tokens.length)
+    }
+  }
+
+  import NameStats.GenderStrings._
+  def identifyGenderByIndex(tokens: Seq[String], index: Int, dict: Broadcast[GenderDictionary]): String = {
+    val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
+    dict.value.value.get(nameToCheckGenderOf).map(
+      probMale => if (probMale >= 0.5) Male else Female
+    ).getOrElse(GenderNA)
+  }
+
+  def identifyGender(
+    input: T#Value,
+    tokens: Seq[String],
+    strategy: GenderDetectStrategy,
+    genderDict: Broadcast[GenderDictionary]
+  ): String = {
+    strategy match {
+      case GenderDetectStrategy.FindHonorific() =>
+        val matched = tokens filter { NameDetectUtils.AllHonorifics contains }
+        if (matched.length == 1) {
+          if (MaleHonorifics contains matched.head) Male else Female
+        }
+        else GenderNA
+      case GenderDetectStrategy.ByIndex(index) =>
+        val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
+        genderDict.value.value.get(nameToCheckGenderOf).map(
+          probMale => if (probMale >= 0.5) Male else Female
+        ).getOrElse(GenderNA)
+      case GenderDetectStrategy.ByRegex(pattern) =>
+        sys.error("Not yet implemented")
+        "Not yet implemented"
+    }
   }
 
   def computeGenderResultsByStrategy(
@@ -112,12 +139,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
     genderDict: Broadcast[GenderDictionary]
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-      val genderResult: String = strategy match {
-        case GenderDetectStrategy.ByIndex(index) => identifyGender(tokens, index, genderDict)
-        case _ =>
-          sys.error("Not yet implemented")
-          "Not yet implemented"
-      }
+      val genderResult: String = identifyGender(input, tokens, strategy, genderDict)
       strategy.toString -> GenderStats(
         if (genderResult == Male) 1 else 0,
         if (genderResult == Female) 1 else 0,
@@ -195,6 +217,10 @@ private[op] object NameDetectUtils {
     }
   )
 
+  val MaleHonorifics: Set[String] = Set("mr", "mister")
+  val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss")
+  val AllHonorifics: Set[String] = MaleHonorifics ++ FemaleHonorifics
+
   /**
    * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
    * Default is 12 bits for 1% error which means each HLL instance is about 2^{12} = 4kb per instance.
@@ -205,7 +231,7 @@ private[op] object NameDetectUtils {
    * The strategies to use for transforming name to gender; Order does not matter.
    */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    GenderDetectStrategy.ByIndex(0), GenderDetectStrategy.ByIndex(-1)
+    FindHonorific(), GenderDetectStrategy.ByIndex(0), GenderDetectStrategy.ByIndex(-1)
   )
 }
 
