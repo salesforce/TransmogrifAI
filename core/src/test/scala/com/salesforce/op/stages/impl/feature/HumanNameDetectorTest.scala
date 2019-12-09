@@ -40,7 +40,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 @RunWith(classOf[JUnitRunner])
-class HumanNameIdentifierTest
+class HumanNameDetectorTest
   extends OpEstimatorSpec[NameStats, UnaryModel[Text, NameStats], UnaryEstimator[Text, NameStats]] {
 
   /**
@@ -51,7 +51,7 @@ class HumanNameIdentifierTest
   /**
    * Estimator instance to be tested
    */
-  val estimator: HumanNameIdentifier[Text] = new HumanNameIdentifier().setInput(f1)
+  val estimator: HumanNameDetector[Text] = new HumanNameDetector().setInput(f1)
 
   /**
    * Expected result of the transformer applied on the Input Dataset
@@ -67,31 +67,31 @@ class HumanNameIdentifierTest
 
   it should "identify a Text column with a single first name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Robert").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
   it should "not identify a Text column with a single non-name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Firetruck").toText)
     model
-      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .asInstanceOf[HumanNameDetectorModel[Text]]
       .treatAsName shouldBe false
   }
 
   it should "identify a Text column with multiple first name entries as Name" in {
     val names = RandomText.names.withProbabilityOfEmpty(0.0).take(100).toList
     val (_, _, model, _) = identifyName(names)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
   it should "identify a Text column with a single full name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Elizabeth Warren").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
   it should "not identify email addresses as Name" in {
     val (_, _, model, _) = identifyName(Seq("elizabeth@warren2020.com").toText)
     model
-      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .asInstanceOf[HumanNameDetectorModel[Text]]
       .treatAsName shouldBe false
   }
 
@@ -99,14 +99,14 @@ class HumanNameIdentifierTest
     val (_, _, model, _) =
       identifyName(Seq("1", "42", "0", "3000 michael").toText)
     model
-      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .asInstanceOf[HumanNameDetectorModel[Text]]
       .treatAsName shouldBe false
   }
 
   it should "not identify a single repeated name as Name" in {
     val (_, _, model, _) = identifyName(Seq.fill(200)("Michael").toText)
     model
-      .asInstanceOf[HumanNameIdentifierModel[Text]]
+      .asInstanceOf[HumanNameDetectorModel[Text]]
       .treatAsName shouldBe false
   }
 
@@ -121,22 +121,22 @@ class HumanNameIdentifierTest
     import NameStats.GenderStrings._
     import NameStats.Keys._
     val (_, _, model, result) = identifyName(Seq("Alyssa").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
     map.get(Gender) shouldBe Some(Female)
   }
 
   it should "identify which token is the first name in a single full name entry correctly" in {
     val (_, _, model, _) = identifyName(Seq("Shelby Bouvet").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].genderDetectStrategy shouldBe
-      Some(GenderDetectStrategy.ByIndex())
+    model.asInstanceOf[HumanNameDetectorModel[Text]].genderDetectStrategy shouldBe
+      Some(GenderDetectStrategy.ByIndex(0))
   }
 
   it should "identify the gender of a single full name entry correctly" in {
     import NameStats.GenderStrings._
     import NameStats.Keys._
     val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
     map.get(Gender) shouldBe Some(Female)
   }
@@ -155,9 +155,40 @@ class HumanNameIdentifierTest
       "Jennifer González-Colón"
     ).toText)
     // scalastyle:on
-    model.asInstanceOf[HumanNameIdentifierModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+  }
+
+  it should "identify the gender of multiple full name entries by finding honorifics" in {
+    import NameStats.GenderStrings._
+    import NameStats.Keys._
+    // noinspection SpellCheckingInspection
+    // scalastyle:off
+    val (_, _, model, result) = identifyName(Seq(
+      "Mr. Sherrod Brown",
+      "Mrs. Maria Cantwell",
+      "Mr. Benjamin L. Cardin",
+      "Ms. Lisa Maria Blunt Rochester",
+      "Mister Thomas Robert Carper",
+      "Miss Jennifer González-Colón"
+    ).toText)
+    // scalastyle:on
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
+    val identifiedGenders = resultingMaps.map(_.get(Gender))
+    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+  }
+
+  it should "not use the honorific strategy to find gender when there are multiple honorifics per entry" in {
+  }
+
+  it should
+    """identify the gender of multiple full name entries by using RegEx
+      |to detect `LastName, FirstName MiddleNames` patterns""".stripMargin in {
+  }
+
+  it should "use mixed strategies to detect gender" in {
   }
 }

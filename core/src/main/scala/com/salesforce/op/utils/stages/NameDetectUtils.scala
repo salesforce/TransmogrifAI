@@ -48,8 +48,8 @@ import scala.util.matching.Regex
  * and name to gender transformation.
  * @tparam T     the FeatureType (subtype of Text) to operate over
  */
-private[op] trait NameIdentificationFun[T <: Text] extends Logging {
-  import com.salesforce.op.utils.stages.NameIdentificationUtils._
+private[op] trait NameDetectFun[T <: Text] extends Logging {
+  import com.salesforce.op.utils.stages.NameDetectUtils._
 
   def preProcess(input: T#Value): Seq[String] = {
     TextTokenizer.tokenize(Text(input)).tokens.toArray
@@ -153,7 +153,7 @@ private[op] trait NameIdentificationFun[T <: Text] extends Logging {
  *  https://github.com/OpenGenderTracking/globalnamedata
  *  https://github.com/first20hours/google-10000-english
  */
-private[op] object NameIdentificationUtils {
+private[op] object NameDetectUtils {
   case class NameDictionary
   (
     // Use the following line to use the smaller but less noisy gender dictionary as a source for names
@@ -201,8 +201,11 @@ private[op] object NameIdentificationUtils {
    */
   val HLLBits = 12
 
+  /**
+   * The strategies to use for transforming name to gender; Order does not matter.
+   */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    GenderDetectStrategy.ByIndex(), GenderDetectStrategy.ByIndex(-1)
+    GenderDetectStrategy.ByIndex(0), GenderDetectStrategy.ByIndex(-1)
   )
 }
 
@@ -211,7 +214,7 @@ private[op] case class GuardCheckStats
   countBelowMaxNumTokens: Int = 0,
   countAboveMinCharLength: Int = 0,
   approxMomentsOfTextLength: Moments = Moments(0.0),
-  approxNumUnique: HLL = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits).zero
+  approxNumUnique: HLL = new HyperLogLogMonoid(NameDetectUtils.HLLBits).zero
 ) extends JsonLike
 
 private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)  extends JsonLike
@@ -232,7 +235,7 @@ private[op] case class NameDetectStats
         "countAboveMinCharLength" -> this.guardCheckQuantities.countAboveMinCharLength,
         "approxMomentsOfTextLength" -> this.guardCheckQuantities.approxMomentsOfTextLength,
         "approxNumUnique" -> {
-          val hllMonoid = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
+          val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
           hllMonoid.sizeOf(this.guardCheckQuantities.approxNumUnique).toString
         }
       ),
@@ -269,9 +272,9 @@ import enumeratum._
 private[op] sealed class GenderDetectStrategy extends EnumEntry
 case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   val values: Seq[GenderDetectStrategy] = findValues
-  case class ByIndex(index: Int = 0) extends GenderDetectStrategy
-  case class ByRegex(pattern: Regex = "".r) extends GenderDetectStrategy
-  case class FindSalutation() extends GenderDetectStrategy
+  case class ByIndex(index: Int) extends GenderDetectStrategy
+  case class ByRegex(pattern: Regex) extends GenderDetectStrategy
+  case class FindHonorific() extends GenderDetectStrategy
 
   def fromString(s: String): GenderDetectStrategy = {
     val parts = s.split("""[()]""")
@@ -279,7 +282,7 @@ case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
     entryName match {
       case "ByIndex" => ByIndex(parts(1).toInt)
       case "ByRegex" => ByRegex(parts(1).r)
-      case "FindSalutation" => FindSalutation()
+      case "FindHonorific" => FindHonorific()
     }
   }
 }

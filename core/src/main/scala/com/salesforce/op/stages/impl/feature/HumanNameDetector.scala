@@ -33,8 +33,8 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
-import com.salesforce.op.utils.stages.NameIdentificationUtils.{GenderDictionary, NameDictionary}
-import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectStats, NameIdentificationFun, NameIdentificationUtils}
+import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
+import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectStats, NameDetectFun, NameDetectUtils}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
@@ -54,10 +54,10 @@ import scala.reflect.runtime.universe.TypeTag
  * @param ttiv          type tag for input value
  * @tparam T            the FeatureType (subtype of Text) to operate over
  */
-class HumanNameIdentifier[T <: Text]
+class HumanNameDetector[T <: Text]
 (
-  uid: String = UID[HumanNameIdentifier[T]],
-  operationName: String = "human name identifier"
+  uid: String = UID[HumanNameDetector[T]],
+  operationName: String = "human name detector"
 )
 (
   implicit tti: TypeTag[T],
@@ -65,7 +65,7 @@ class HumanNameIdentifier[T <: Text]
 ) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
-) with NameIdentificationFun[T] {
+) with NameDetectFun[T] {
 
   val defaultThreshold = new DoubleParam(
     parent = this,
@@ -78,13 +78,13 @@ class HumanNameIdentifier[T <: Text]
   setDefault(defaultThreshold, 0.50)
   def setThreshold(value: Double): this.type = set(defaultThreshold, value)
 
-  def fitFn(dataset: Dataset[T#Value]): HumanNameIdentifierModel[T] = {
+  def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
     val spark = dataset.sparkSession
-    // Load broadcast variables
+    // Load name and gender data into broadcast variables
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
     // Create HyperLogLog factory
-    val hllMonoid = new HyperLogLogMonoid(NameIdentificationUtils.HLLBits)
+    val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
     // Create Spark encoder for our accumulator class
     implicit val nameDetectStatsEncoder: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]
     // Tell Algebird that our accumulator class is also a monoid
@@ -121,18 +121,18 @@ class HumanNameIdentifier[T <: Text]
     val updatedMetadata = metaDataBuilder.build()
     setMetadata(updatedMetadata)
 
-    new HumanNameIdentifierModel[T](uid, treatAsName, genderDetectStrategy)
+    new HumanNameDetectorModel[T](uid, treatAsName, genderDetectStrategy)
   }
 }
 
 
-class HumanNameIdentifierModel[T <: Text]
+class HumanNameDetectorModel[T <: Text]
 (
   override val uid: String,
   val treatAsName: Boolean,
   val genderDetectStrategy: Option[GenderDetectStrategy] = None
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name identifier", uid) with NameIdentificationFun[T] {
+  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun[T] {
 
   var broadcastGenderDict: Option[Broadcast[GenderDictionary]] = None
 
