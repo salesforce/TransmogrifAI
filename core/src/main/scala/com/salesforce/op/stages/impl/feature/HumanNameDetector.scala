@@ -34,13 +34,12 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
-import com.salesforce.op.utils.stages.{GenderDetectStrategy, GenderStats, NameDetectFun, NameDetectStats, NameDetectUtils}
+import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
-import org.apache.spark.ml.param.{DoubleParam, ParamValidators}
-import org.apache.spark.sql.types.MetadataBuilder
 import org.apache.spark.sql._
+import org.apache.spark.sql.types.MetadataBuilder
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -67,17 +66,6 @@ class HumanNameDetector[T <: Text]
   operationName = operationName
 ) with NameDetectFun[T] {
 
-  val defaultThreshold = new DoubleParam(
-    parent = this,
-    name = "defaultThreshold",
-    doc = "default fraction of entries to be names before treating as name",
-    isValid = (value: Double) => {
-      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
-    }
-  )
-  setDefault(defaultThreshold, 0.50)
-  def setThreshold(value: Double): this.type = set(defaultThreshold, value)
-
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
     val spark = dataset.sparkSession
     // Load name and gender data into broadcast variables
@@ -96,28 +84,13 @@ class HumanNameDetector[T <: Text]
 
     val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
     val predictedNameProb = aggResults.dictCheckResult.value
-    // TODO: Delete this
-    require(
-      0.0 <= predictedNameProb && predictedNameProb <= predictedNameProb,
-      f"Predicted name probability must be in [0, 1]: $predictedNameProb"
-    )
-    val treatAsName = guardChecksPassed && predictedNameProb >= $(defaultThreshold)
+    val treatAsName = guardChecksPassed && predictedNameProb >= $(nameThreshold)
 
     val orderedGenderDetectStrategies = if (treatAsName) {
       val ordered: Seq[(String, GenderStats)] = aggResults.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
       ordered map { case (strategy, _) => GenderDetectStrategy.fromString(strategy) }
     } else Seq.empty[GenderDetectStrategy]
 
-    // TODO: Delete these debug logs
-    import spark.implicits._
-    dataset.map(preProcess).show(truncate = false)
-    dataset.map(s => dictCheck(preProcess(s), broadcastNameDict)).show(truncate = false)
-    println(aggResults)
-    println(guardChecksPassed)
-    println(predictedNameProb)
-    println(orderedGenderDetectStrategies)
-
-    // modified from: https://docs.transmogrif.ai/en/stable/developer-guide/index.html#metadata
     val preExistingMetadata = getMetadata()
     val metaDataBuilder = new MetadataBuilder().withMetadata(preExistingMetadata)
     metaDataBuilder.putBoolean("treatAsName", treatAsName)
@@ -148,8 +121,8 @@ class HumanNameDetectorModel[T <: Text]
   }
 
   import NameStats.BooleanStrings._
-  import NameStats.Keys._
   import NameStats.GenderStrings.GenderNA
+  import NameStats.Keys._
   def transformFn: T => NameStats = (input: T) => {
     val tokens = preProcess(input.value)
     if (treatAsName) {

@@ -183,8 +183,9 @@ class HumanNameDetectorTest
   }
 
   it should "not use the honorific strategy to find gender when there are multiple honorifics per entry" in {
+    // noinspection SpellCheckingInspection
     // scalastyle:off
-    val (_, _, model, result) = identifyName(Seq(
+    val (_, _, model, _) = identifyName(Seq(
       "Jennifer González-Colón (Miss) (Mr.)"
     ).toText)
     // scalastyle:on

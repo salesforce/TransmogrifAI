@@ -38,18 +38,18 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
+import org.apache.spark.ml.param.{DoubleParam, ParamValidators, Params}
 
 import scala.io.Source
 import scala.util.Try
 import scala.util.matching.Regex
 
 /**
- * Provides shared helper functions and variables (namely, broadcast dictionaries) for name identification
- * and name to gender transformation.
+ * Provides shared helper functions and variables for name identification and name to gender transformation.
  * @tparam T     the FeatureType (subtype of Text) to operate over
  */
-private[op] trait NameDetectFun[T <: Text] extends Logging {
-  import com.salesforce.op.utils.stages.NameDetectUtils._
+private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging {
+  import NameDetectUtils._
 
   def preProcess(input: T#Value): Seq[String] = {
     TextTokenizer.tokenize(Text(input)).tokens.toArray
@@ -60,7 +60,6 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
     tokens: Seq[String],
     hllMonoid: HyperLogLogMonoid
   ): GuardCheckStats = {
-    // TODO: Make params out of these numbers
     val textLength = input.getOrElse("").length
     GuardCheckStats(
       countBelowMaxNumTokens = if (tokens.length < 10) 1 else 0,
@@ -82,8 +81,6 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
       // check that the number of unique entries is at least 10
       N < 100 || hllMonoid.sizeOf(stats.approxNumUnique).estimate > 10
     )
-    // TODO: Delete this
-    println(checks)
     checks.forall(identity)
   }
 
@@ -101,13 +98,6 @@ private[op] trait NameDetectFun[T <: Text] extends Logging {
   }
 
   import NameStats.GenderStrings._
-  def identifyGenderByIndex(tokens: Seq[String], index: Int, dict: Broadcast[GenderDictionary]): String = {
-    val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
-    dict.value.value.get(nameToCheckGenderOf).map(
-      probMale => if (probMale >= 0.5) Male else Female
-    ).getOrElse(GenderNA)
-  }
-
   def identifyGender(
     input: T#Value,
     tokens: Seq[String],
@@ -208,7 +198,7 @@ private[op] object NameDetectUtils {
       val dictionaryPath = "/GenderDictionary_USandUK.csv"
       val stream = getClass.getResourceAsStream(dictionaryPath)
       val buffer = Source.fromInputStream(stream)
-      // TODO: Also make use of frequency information in this dictionary
+      // In the future, we could also make use of frequency information in this dictionary
       for {row <- buffer.getLines.drop(1)} {
         val cols = row.split(",").map(_.trim)
         val name = cols(0).toLowerCase().replace("\\P{L}", "")
@@ -258,8 +248,14 @@ private[op] case class GuardCheckStats
 
 private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0) extends JsonLike
 
-// TODO: Make proper documentation
-// Defines the monoid accumulator for detecting names
+/**
+ * Defines the case class monoid that will accumulate stats on name detection in a single pass over the data
+ * @param guardCheckQuantities     a GuardCheckStats object that uses Algebird approximate algorithms to compute stats
+ * @param dictCheckResult          an Algebird AveragedValue object to automatically compute the percentage of name
+ *                                 tokens per entry, averaged over all rows
+ * @param genderResultsByStrategy  a map from the serialized GenderDetectStrategy to GenderStats case class;
+ *                                 the `numOther` value will be used to sort and find the best gender detection strategy
+ */
 private[op] case class NameDetectStats
 (
   guardCheckQuantities: GuardCheckStats,
@@ -331,4 +327,17 @@ case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
       case "FindHonorific" => FindHonorific()
     }
   }
+}
+
+private[op] trait NameDetectParams extends Params {
+  val nameThreshold = new DoubleParam(
+    parent = this,
+    name = "nameThreshold",
+    doc = "fraction of entries to be names before treating as name",
+    isValid = (value: Double) => {
+      ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
+    }
+  )
+  setDefault(nameThreshold, 0.50)
+  def setThreshold(value: Double): this.type = set(nameThreshold, value)
 }
