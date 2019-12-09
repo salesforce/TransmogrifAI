@@ -38,7 +38,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.ml.param.{DoubleParam, ParamValidators, Params}
+import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators, Params}
 
 import scala.io.Source
 import scala.util.Try
@@ -163,7 +163,14 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
           AveragedValue(1L, dictCheck(tokens, nameDict)),
           computeGenderResultsByStrategy(text, tokens, genderDict)
         )
-      case None => NameDetectStats.empty
+      case None if $(ignoreNulls) => NameDetectStats.empty
+      case _ =>
+        val tokens = Seq.empty[String]
+        NameDetectStats(
+          computeGuardCheckQuantities("", tokens, hll),
+          AveragedValue(1L, dictCheck(tokens, nameDict)),
+          computeGenderResultsByStrategy("", tokens, genderDict)
+        )
     }
   }
 }
@@ -357,4 +364,12 @@ private[op] trait NameDetectParams extends Params {
   )
   setDefault(nameThreshold, 0.50)
   def setThreshold(value: Double): this.type = set(nameThreshold, value)
+
+  val ignoreNulls = new BooleanParam(
+    parent = this,
+    name = "ignoreNulls",
+    doc = "whether to ignore null values when detecting names and gender"
+  )
+  setDefault(ignoreNulls, true)
+  def setIgnoreNulls(value: Boolean): this.type = set(ignoreNulls, value)
 }

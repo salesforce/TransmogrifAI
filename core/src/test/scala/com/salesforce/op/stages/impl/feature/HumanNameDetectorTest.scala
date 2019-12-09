@@ -276,8 +276,12 @@ class HumanNameDetectorTest
   }
 
   it should "ignore null values in calculating stats" in {
-    val names = RandomText.names.withProbabilityOfEmpty(0.75).take(100).toList
-    val (_, _, model, _) = identifyName(names)
+    val names = RandomText.names.withProbabilityOfEmpty(0.90).take(200).toList
+    val (newData, newFeature) = TestFeatureBuilder(names)
+    val model = estimator.setInput(newFeature).fit(newData)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+
+    val countNullsModel = estimator.setIgnoreNulls(false).setInput(newFeature).fit(newData)
+    countNullsModel.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe false
   }
 }
