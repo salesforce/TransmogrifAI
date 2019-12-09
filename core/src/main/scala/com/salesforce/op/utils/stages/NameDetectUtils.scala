@@ -56,16 +56,16 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   def computeGuardCheckQuantities(
-    input: T#Value,
+    text: String,
     tokens: Seq[String],
     hllMonoid: HyperLogLogMonoid
   ): GuardCheckStats = {
-    val textLength = input.getOrElse("").length
+    val textLength = text.length
     GuardCheckStats(
       countBelowMaxNumTokens = if (tokens.length < 10) 1 else 0,
       countAboveMinCharLength = if (textLength > 2) 1 else 0,
       approxMomentsOfTextLength = Moments(textLength),
-      approxNumUnique = hllMonoid.create(input.getOrElse("").getBytes)
+      approxNumUnique = hllMonoid.create(text.getBytes)
     )
   }
 
@@ -98,8 +98,14 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   import NameStats.GenderStrings._
+  def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
+    genderDict.value.value.get(nameToCheckGenderOf).map(
+      probMale => if (probMale >= 0.5) Male else Female
+    ).getOrElse(GenderNA)
+  }
+
   def identifyGender(
-    input: T#Value,
+    text: String,
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
     genderDict: Broadcast[GenderDictionary]
@@ -114,15 +120,12 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
         else GenderNA
       case ByIndex(index) =>
         val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
-        genderDict.value.value.get(nameToCheckGenderOf).map(
-          probMale => if (probMale >= 0.5) Male else Female
-        ).getOrElse(GenderNA)
+        genderDictCheck(nameToCheckGenderOf, genderDict)
       case ByRegex(pattern) =>
-        input.getOrElse("") match {
-          case pattern(nameToCheckGenderOf) =>
-            genderDict.value.value.get(preProcess(Some(nameToCheckGenderOf)).headOption.getOrElse("")).map(
-              probMale => if (probMale >= 0.5) Male else Female
-            ).getOrElse(GenderNA)
+        text match {
+          case pattern(matchedGroup) =>
+            val nameToCheckGenderOf = preProcess(Some(matchedGroup)).headOption.getOrElse("")
+            genderDictCheck(nameToCheckGenderOf, genderDict)
           case _ => GenderNA
         }
       case _ =>
@@ -132,12 +135,12 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   def computeGenderResultsByStrategy(
-    input: T#Value,
+    text: String,
     tokens: Seq[String],
     genderDict: Broadcast[GenderDictionary]
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-      val genderResult: String = identifyGender(input, tokens, strategy, genderDict)
+      val genderResult: String = identifyGender(text, tokens, strategy, genderDict)
       strategy.toString -> GenderStats(
         if (genderResult == Male) 1 else 0,
         if (genderResult == Female) 1 else 0,
@@ -152,12 +155,16 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     genderDict: Broadcast[GenderDictionary],
     hll: HyperLogLogMonoid
   ): NameDetectStats = {
-    val tokens = preProcess(input)
-    NameDetectStats(
-      computeGuardCheckQuantities(input, tokens, hll),
-      AveragedValue(1L, dictCheck(tokens, nameDict)),
-      computeGenderResultsByStrategy(input, tokens, genderDict)
-    )
+    input match {
+      case Some(text) =>
+        val tokens = preProcess(input)
+        NameDetectStats(
+          computeGuardCheckQuantities(text, tokens, hll),
+          AveragedValue(1L, dictCheck(tokens, nameDict)),
+          computeGenderResultsByStrategy(text, tokens, genderDict)
+        )
+      case None => NameDetectStats.empty
+    }
   }
 }
 
@@ -244,7 +251,7 @@ private[op] case class GuardCheckStats
 (
   countBelowMaxNumTokens: Int = 0,
   countAboveMinCharLength: Int = 0,
-  approxMomentsOfTextLength: Moments = Moments(0.0),
+  approxMomentsOfTextLength: Moments = MomentsGroup.zero,
   approxNumUnique: HLL = new HyperLogLogMonoid(NameDetectUtils.HLLBits).zero
 ) extends JsonLike
 
@@ -302,7 +309,7 @@ private[op] case object NameDetectStats {
     override def zero: NameDetectStats = NameDetectStats.empty
   }
 
-  def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedValue(0L, 0), Map.empty[String, GenderStats])
+  def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
 }
 
 import enumeratum._

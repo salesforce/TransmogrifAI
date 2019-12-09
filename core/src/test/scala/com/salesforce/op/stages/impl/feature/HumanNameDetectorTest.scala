@@ -274,4 +274,10 @@ class HumanNameDetectorTest
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
   }
+
+  it should "ignore null values in calculating stats" in {
+    val names = RandomText.names.withProbabilityOfEmpty(0.75).take(100).toList
+    val (_, _, model, _) = identifyName(names)
+    model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+  }
 }

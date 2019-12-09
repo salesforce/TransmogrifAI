@@ -129,7 +129,7 @@ class HumanNameDetectorModel[T <: Text]
       require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
       require(this.broadcastGenderDict.nonEmpty, "Gender dictionary broadcast variable was not initialized correctly.")
       val genders: Seq[String] = orderedGenderDetectStrategies map {
-        identifyGender(input.value, tokens, _, this.broadcastGenderDict.get)
+        identifyGender(input.value.getOrElse(""), tokens, _, this.broadcastGenderDict.get)
       }
       val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
       NameStats(Map(
