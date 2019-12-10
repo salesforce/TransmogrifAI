@@ -71,7 +71,7 @@ class HumanNameDetector[T <: Text]
     // Load name and gender data into broadcast variables
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
-    // Create HyperLogLog factory
+    // Instantiate HyperLogLog monoid
     val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
     // Create Spark encoder for our accumulator class
     implicit val nameDetectStatsEncoder: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]

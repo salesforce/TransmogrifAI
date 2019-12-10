@@ -30,15 +30,17 @@
 
 package com.salesforce.op.utils.stages
 
-import com.salesforce.op.features.types.{NameStats, Text}
+import com.salesforce.op.features.types.Text
+import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
-import com.twitter.algebird._
+import com.twitter.algebird.{AveragedGroup, AveragedValue, HLL, HyperLogLogMonoid, Moments, MomentsGroup, Monoid}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators, Params}
+import enumeratum.{Enum, EnumEntry}
 
 import scala.io.Source
 import scala.util.Try
@@ -49,6 +51,7 @@ import scala.util.matching.Regex
  * @tparam T     the FeatureType (subtype of Text) to operate over
  */
 private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging {
+  import GenderDetectStrategy._
   import NameDetectUtils._
 
   def preProcess(input: T#Value): Seq[String] = {
@@ -85,7 +88,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
-    if (tokens.length == 0) 0.0 else {
+    if (tokens.isEmpty) 0.0 else {
       tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
@@ -99,7 +102,6 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     }
   }
 
-  import NameStats.GenderStrings._
   def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
     genderDict.value.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
@@ -112,7 +114,6 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     strategy: GenderDetectStrategy,
     genderDict: Broadcast[GenderDictionary]
   ): String = {
-    import GenderDetectStrategy._
     strategy match {
       case FindHonorific() =>
         val matched = tokens filter { NameDetectUtils.AllHonorifics contains }
@@ -192,6 +193,8 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
  *  https://github.com/first20hours/google-10000-english
  */
 private[op] object NameDetectUtils {
+  import GenderDetectStrategy._
+
   case class NameDictionary
   (
     // Use the following line to use the smaller but less noisy gender dictionary as a source for names
@@ -243,7 +246,6 @@ private[op] object NameDetectUtils {
   val FemaleHonorifics: Set[String] = Set("ms", "mrs", "miss", "madam")
   val AllHonorifics: Set[String] = MaleHonorifics ++ FemaleHonorifics
 
-  import GenderDetectStrategy._
   /**
    * The strategies to use for transforming name to gender; Order does not matter.
    *
@@ -320,8 +322,6 @@ private[op] case object NameDetectStats {
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
 }
-
-import enumeratum._
 
 /**
  * Defines the different kinds of gender detection strategies that are possible
