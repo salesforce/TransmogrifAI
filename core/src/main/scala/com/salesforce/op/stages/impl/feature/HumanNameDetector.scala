@@ -33,13 +33,14 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.stages.impl.MetadataLike
 import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
 import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql._
-import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -91,15 +92,58 @@ class HumanNameDetector[T <: Text]
       ordered map { case (strategy, _) => GenderDetectStrategy.fromString(strategy) }
     } else Seq.empty[GenderDetectStrategy]
 
-    val preExistingMetadata = getMetadata()
-    val metaDataBuilder = new MetadataBuilder().withMetadata(preExistingMetadata)
-    metaDataBuilder.putBoolean("treatAsName", treatAsName)
-    metaDataBuilder.putLong("predictedNameProb", predictedNameProb.toLong)
-    metaDataBuilder.putString("orderedGenderDetectStrategies", orderedGenderDetectStrategies.mkString("[", ",", "]"))
-    val updatedMetadata = metaDataBuilder.build()
-    setMetadata(updatedMetadata)
+    val newMetadata = HumanNameDetectorMetadata(
+      treatAsName, predictedNameProb, aggResults.genderResultsByStrategy
+    ).toMetadata()
+    val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata()).withMetadata(newMetadata)
+    setMetadata(metaDataBuilder.build())
 
     new HumanNameDetectorModel[T](uid, treatAsName, orderedGenderDetectStrategies)
+  }
+}
+
+case class HumanNameDetectorMetadata
+(
+  treatAsName: Boolean,
+  predictedNameProb: Double,
+  genderResultsByStrategy: Map[String, GenderStats]
+) extends MetadataLike {
+  import HumanNameDetectorMetadata._
+
+  override def toMetadata(): Metadata = {
+    val metaDataBuilder = new MetadataBuilder()
+    metaDataBuilder.putBoolean(TreatAsNameKey, treatAsName)
+    metaDataBuilder.putDouble(PredictedNameProbKey, predictedNameProb)
+    val genderResultsMetaDataBuilder = new MetadataBuilder()
+    genderResultsByStrategy foreach { case (strategyString, stats) =>
+      genderResultsMetaDataBuilder.putDoubleArray(strategyString, Array(stats.numMale, stats.numFemale, stats.numOther))
+    }
+    metaDataBuilder.putMetadata(GenderResultsByStrategyKey, genderResultsMetaDataBuilder.build())
+    metaDataBuilder.build()
+  }
+
+  override def toMetadata(skipUnsupported: Boolean): Metadata = toMetadata()
+}
+case object HumanNameDetectorMetadata {
+  val TreatAsNameKey = "treatAsName"
+  val PredictedNameProbKey = "predictedNameProb"
+  val GenderResultsByStrategyKey = "genderResultsByStrategy"
+
+  def fromMetadata(metadata: Metadata): HumanNameDetectorMetadata = {
+    val genderResultsMetadata = metadata.getMetadata(GenderResultsByStrategyKey)
+    val genderResultsByStrategy: Map[String, GenderStats] = {
+      NameDetectUtils.GenderDetectStrategies map { strategy: GenderDetectStrategy =>
+        val strategyString = strategy.toString
+        val resultsArray = genderResultsMetadata.getDoubleArray(strategyString)
+        require(resultsArray.length == 3, "There must be exactly three values for each gender detection strategy.")
+        strategyString -> GenderStats(resultsArray(0).toInt, resultsArray(1).toInt, resultsArray(2).toInt)
+      } toMap
+    }
+    HumanNameDetectorMetadata(
+      metadata.getBoolean(TreatAsNameKey),
+      metadata.getDouble(PredictedNameProbKey),
+      genderResultsByStrategy
+    )
   }
 }
 
