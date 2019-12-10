@@ -38,7 +38,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators, Params}
+import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, ParamValidators, Params}
 
 import scala.io.Source
 import scala.util.Try
@@ -322,7 +322,6 @@ private[op] case object NameDetectStats {
 }
 
 import enumeratum._
-
 /**
  * Defines the different kinds of gender detection strategies that are possible
  *
@@ -330,7 +329,7 @@ import enumeratum._
  * the `fromString` function provides deserialization back to the `GenderDetectStrategy` class for the companion
  * transformer
  */
-private[op] sealed class GenderDetectStrategy extends EnumEntry
+private[op] sealed class GenderDetectStrategy extends EnumEntry with Serializable
 case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   val values: Seq[GenderDetectStrategy] = findValues
   val delimiter = " WITH VALUE "
@@ -355,6 +354,15 @@ case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   }
 }
 
+private[op] sealed class SensitiveFeatureMode extends EnumEntry with Serializable
+object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
+  val values: Seq[SensitiveFeatureMode] = findValues
+
+  case object Off extends SensitiveFeatureMode
+  case object DetectOnly extends SensitiveFeatureMode
+  case object DetectAndRemove extends SensitiveFeatureMode
+}
+
 private[op] trait NameDetectParams extends Params {
   val nameThreshold = new DoubleParam(
     parent = this,
@@ -374,4 +382,15 @@ private[op] trait NameDetectParams extends Params {
   )
   setDefault(ignoreNulls, true)
   def setIgnoreNulls(value: Boolean): this.type = set(ignoreNulls, value)
+
+  val sensitiveFeatureMode: Param[String] = new Param[String](this, "sensitiveFeatureMode",
+    "Whether to detect sensitive features and how to handle them",
+    (value: String) => SensitiveFeatureMode.withNameInsensitiveOption(value).isDefined
+  )
+  setDefault(sensitiveFeatureMode, SensitiveFeatureMode.Off.toString)
+  def setSensitiveFeatureMode(v: SensitiveFeatureMode): this.type = set(sensitiveFeatureMode, v.entryName)
+  def getSensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode))
+  def getRemoveSensitive: Boolean = {
+    SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode)) == SensitiveFeatureMode.DetectAndRemove
+  }
 }

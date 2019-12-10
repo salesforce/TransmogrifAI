@@ -32,12 +32,13 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.stages.NameDetectFun
 import com.twitter.algebird.Monoid
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
@@ -56,13 +57,24 @@ import scala.reflect.runtime.universe.TypeTag
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
  *
- * @param uid uid for instance
+ * Detection and removal of names in the input columns can be enabled with the `sensitiveFeatureMode` param.
+ *
+ * @param uid           uid for instance
+ * @param operationName unique name of the operation this stage performs
+ * @param tti           type tag for input
+ * @tparam T            a subtype of Text corresponding to the input column type
  */
-class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
-  extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
-    with PivotParams with CleanTextFun with SaveOthersParams
-    with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
+class SmartTextVectorizer[T <: Text]
+(
+  uid: String = UID[SmartTextVectorizer[T]],
+  operationName: String = "smartTxtVec"
+)(implicit tti: TypeTag[T]) extends SequenceEstimator[T, OPVector](
+  uid = uid,
+  operationName = operationName
+) with PivotParams with CleanTextFun with SaveOthersParams
+  with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
+  with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
+  with NameDetectFun[T] {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
@@ -187,11 +199,12 @@ private[op] object TextStats {
 /**
  * Arguments for [[SmartTextVectorizerModel]]
  *
- * @param isCategorical    is feature a categorical or not
- * @param topValues        top values to each feature
- * @param shouldCleanText  should clean text value
- * @param shouldTrackNulls should track nulls
- * @param hashingParams    hashing function params
+ * @param isCategorical       is feature a categorical or not
+ * @param topValues           top values to each feature
+ * @param shouldCleanText     should clean text value
+ * @param shouldTrackNulls    should track nulls
+ * @param hashingParams       hashing function params
+ * @param removeSensitive     whether to remove detected sensitive fields
  */
 case class SmartTextVectorizerModelArgs
 (
@@ -199,7 +212,9 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  hashingParams: HashingFunctionParams
+  hashingParams: HashingFunctionParams,
+  isName: Array[Boolean] = Array.empty[Boolean],
+  removeSensitive: Boolean = false
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
     topValues.zip(isCategorical).collect { case (top, true) => top }
@@ -221,7 +236,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldCleanText = args.shouldCleanText,
       shouldTrackNulls = args.shouldTrackNulls
     )
-    (row: Seq[Text]) => {
+    row: Seq[Text] => {
       val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)

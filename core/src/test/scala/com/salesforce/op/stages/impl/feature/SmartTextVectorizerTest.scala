@@ -34,8 +34,10 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.stages.SensitiveFeatureMode
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -54,13 +56,13 @@ class SmartTextVectorizerTest
       (Text.empty, Text.empty)
     )
   )
-  val estimator = new SmartTextVectorizer()
+  val estimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setInput(f1, f2)
 
-  val expectedResult = Seq(
+  val expectedResult: Seq[OPVector] = Seq(
     Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
     Vectors.sparse(9, Array(1, 6), Array(1.0, 1.0)),
@@ -374,6 +376,181 @@ class SmartTextVectorizerTest
     }
   }
 
+  /* TESTS FOR DETECTING SENSITIVE FEATURES BEGIN */
+  val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
+    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+    .setTopK(2).setPrependFeatureName(false)
+    .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+    .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
+    .setInput(f1, f2)
+
+  lazy val (newInputData, newF1, newF2, newF3) = TestFeatureBuilder("text1", "text2", "name",
+    Seq[(Text, Text, Text)](
+      ("hello world".toText, "Hello world!".toText, "Michael".toText),
+      ("hello world".toText, "What's up".toText, "Michelle".toText),
+      ("good evening".toText, "How are you doing, my friend?".toText, "Roxanne".toText),
+      (Text.empty, "Not bad, my friend.".toText, "Ross".toText),
+      (Text.empty, Text.empty, Text.empty)
+    )
+  )
+
+  it should "detect a single name feature and return empty vectors" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    model.args.isName shouldBe Array(x = true)
+
+    val smartVectorized = newEstimator.getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized).transform(newInputData)
+    val result = transformed.collect(smartVectorized)
+
+    val (smart, expected) = result.map(smartVector => smartVector -> OPVector.empty).unzip
+
+    smart shouldBe expected
+
+    OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe 0
+  }
+
+  it should "detect a single name column among other non-name Text columns" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    model.args.isName shouldBe Array(false, false, true)
+  }
+
+  it should "not create information in the vector for a single name column among other non-name Text columns" in {
+    newInputData.show()
+
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val withNamesVectorized = newEstimator.getOutput()
+
+    val oldEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer(uid = UID("newEstimator"))
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+      .setTopK(2).setPrependFeatureName(false)
+      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+      .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
+      .setInput(newF1, newF2)
+    val withoutNamesVectorized = oldEstimator.getOutput()
+
+    val transformed = new OpWorkflow()
+      .setResultFeatures(withNamesVectorized, withoutNamesVectorized).transform(newInputData)
+    val result = transformed.collect(withNamesVectorized, withoutNamesVectorized)
+
+    val (withNames, withoutNames) = result.unzip
+
+    withNames shouldBe withoutNames
+
+    OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe
+      OpVectorMetadata("OutputVector", oldEstimator.getMetadata()).size
+  }
+
+  // it should "compute sensitive information in the metadata for one detected name column" in {
+  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+  //   val model: SmartTextVectorizerModel[Text] = newEstimator
+  //     .fit(newInputData)
+  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
+  //   newInputData.show()
+  //   val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+  //   println(sensitive)
+  //   sensitive.get("name") match {
+  //     case Some(SensitiveFeatureInformation.Name(
+  //      actionTaken, probName, firstNames, probMale, probFemale, probOther
+  //     )) =>
+  //       actionTaken shouldBe true
+  //       probName shouldBe 1.0
+  //       firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+  //       probMale shouldBe 0.5
+  //       probFemale shouldBe 0.5
+  //       probOther shouldBe 0.0
+  //     case None => fail("Sensitive information not found in the metadata.")
+  //     case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+  //   }
+  // }
+  //
+  // it should "compute sensitive information in the metadata for multiple detected name columns" in {
+  //   val numFeatures = 5
+  //   val (ds, untypedFeatures) = TestFeatureBuilder(
+  //     1 to numFeatures map {_ =>
+  //       RandomText.names.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
+  //   )
+  //   val features = untypedFeatures.map(_.asInstanceOf[Feature[Text]])
+  //   for {i <- 1 to numFeatures} {
+  //     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(features.slice(0, i): _*)
+  //     val model: SmartTextVectorizerModel[Text] = newEstimator
+  //       .fit(ds)
+  //       .asInstanceOf[SmartTextVectorizerModel[Text]]
+  //     newEstimator.guardCheckResults match {
+  //       case Some(results) => results.length shouldBe i
+  //       case None => fail("Guard check results were not generated")
+  //     }
+  //     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+  //     for {j <- 1 to i} {
+  //       sensitive.get(s"f$j") match {
+  //         case Some(SensitiveFeatureInformation.Name(_, probName, _, probMale, probFemale, probOther)) =>
+  //           println((probName, probMale, probFemale, probOther))
+  //           // following test values are sensitive to name dictionary and randomness
+  //           probName should be > 0.0
+  //           probName should be <= 1.0
+  //           probMale should be <= 1.0
+  //           probFemale should be <= 1.0
+  //           probOther should be <= 1.0
+  //           (probMale + probFemale + probOther) - 1.0 should be < 0.01
+  //         case None =>
+  //           println(sensitive)
+  //           fail("Sensitive information not found in the metadata.")
+  //         case Some(_) =>
+  //           println(sensitive)
+  //           fail("Wrong kind of sensitive information found in the metadata.")
+  //       }
+  //     }
+  //   }
+  // }
+  //
+  // it should "compute sensitive information in the metadata for all columns" in {
+  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+  //   val model: SmartTextVectorizerModel[Text] = newEstimator
+  //     .fit(newInputData)
+  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
+  //   newInputData.show()
+  //   val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+  //   println(sensitive)
+  //   newInputData.columns foreach { name: String =>
+  //     sensitive contains name shouldBe true
+  //     sensitive get name match {
+  //       case Some(
+  //         SensitiveFeatureInformation.Name(actionTaken, _, _, _, _, _)
+  //       ) =>
+  //         if (name == newF3.name) {
+  //           actionTaken shouldBe true
+  //         } else {
+  //           actionTaken shouldBe false
+  //         }
+  //       case None => fail("Sensitive information not found in the metadata.")
+  //       case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+  //     }
+  //   }
+  // }
+
+  it should "not identify a single repeated name as Name" in {
+    val (newNewInputData, newNewF1, newNewF2) = TestFeatureBuilder("Repeated Name", "Random Names",
+      Seq.fill(200)("Michael").toText zip
+        RandomText.names.withProbabilityOfEmpty(0.0).take(200).toSeq
+    )
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newNewF1, newNewF2)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newNewInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newNewInputData.show()
+    model.args.isName shouldBe Array(false, true)
+  }
+  /* TESTS FOR DETECTING SENSITIVE FEATURES END */
+
   Spec[TextStats] should "aggregate correctly" in {
     val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
     val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
@@ -386,5 +563,4 @@ class SmartTextVectorizerTest
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
   }
-
 }
