@@ -87,6 +87,23 @@ class HumanNameDetectorTest
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
+  it should "detect names based on the threshold correctly" in {
+    for {i <- 1 to 9} {
+      val numberNames = 10 * i
+      val names = RandomText.names.withProbabilityOfEmpty(0.0).take(numberNames).toList ++
+        RandomText.phones.withProbabilityOfEmpty(0.0).take(100 - numberNames).toList.map(_.toString.toText)
+
+      val (newData, newFeature) = TestFeatureBuilder(names)
+      val newEstimator = new HumanNameDetector().setInput(newFeature)
+
+      val threshold = numberNames.toDouble / 100.0
+      val modelBelowThreshold = newEstimator.setThreshold(threshold - 0.09).fit(newData)
+      val modelAboveThreshold = newEstimator.setThreshold(threshold + 0.09).fit(newData)
+      modelBelowThreshold.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+      modelAboveThreshold.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe false
+    }
+  }
+
   it should "identify a Text column with a single full name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Elizabeth Warren").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
