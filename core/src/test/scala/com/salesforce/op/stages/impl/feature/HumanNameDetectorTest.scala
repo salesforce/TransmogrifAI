@@ -35,7 +35,6 @@ import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.stages.GenderDetectStrategy
-import com.salesforce.op.utils.stages.GenderDetectStrategy.FindHonorific
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -190,7 +189,8 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
-    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies should not be Some(FindHonorific())
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies should not be
+      Some(GenderDetectStrategy.FindHonorific())
   }
 
   it should
