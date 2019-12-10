@@ -375,13 +375,13 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
+    val l1 = TextStats(Map("hello" -> 1, "world" -> 2), Map(5 -> 3))
+    val r1 = TextStats(Map("hello" -> 1, "world" -> 1), Map(5 -> 2))
+    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3), Map(5 -> 5))
 
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-    val r2 = TextStats(Map("hello" -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
+    val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 1))
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2

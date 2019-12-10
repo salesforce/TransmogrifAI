@@ -117,11 +117,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
-    val valueCounts = text match {
-      case Some(v) => Map(cleanTextFn(v, shouldCleanText) -> 1)
-      case None => Map.empty[String, Int]
+    val (valueCounts, lengthCounts) = text match {
+      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1), Map(cleanTextFn(v, shouldCleanText).length -> 1))
+      case None => (Map.empty[String, Int], Map.empty[Int, Int])
     }
-    TextStats(valueCounts)
+    TextStats(valueCounts, lengthCounts)
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
@@ -168,20 +168,30 @@ object SmartTextVectorizer {
  *
  * @param valueCounts counts of feature values
  */
-private[op] case class TextStats(valueCounts: Map[String, Int]) extends JsonLike
+private[op] case class TextStats(
+  valueCounts: Map[String, Int],
+  lengthCounts: Map[Int, Int]
+) extends JsonLike
 
 private[op] object TextStats {
   def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
     override def plus(l: TextStats, r: TextStats): TextStats = {
-      if (l.valueCounts.size > maxCardinality) l
-      else if (r.valueCounts.size > maxCardinality) r
-      else TextStats(l.valueCounts + r.valueCounts)
+      val newValueCounts = if (l.valueCounts.size > maxCardinality) l.valueCounts
+        else if (r.valueCounts.size > maxCardinality) r.valueCounts
+        else l.valueCounts + r.valueCounts
+
+      val newLengthCounts = if (l.lengthCounts.size > maxCardinality) l.lengthCounts
+        else if (r.lengthCounts.size > maxCardinality) r.lengthCounts
+        else l.lengthCounts + r.lengthCounts
+
+
+      TextStats(newValueCounts, newLengthCounts)
     }
 
     override def zero: TextStats = TextStats.empty
   }
 
-  def empty: TextStats = TextStats(Map.empty)
+  def empty: TextStats = TextStats(Map.empty, Map.empty)
 }
 
 /**
