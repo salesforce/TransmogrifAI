@@ -281,17 +281,6 @@ object StreetMap {
 }
 
 /**
- * Map of geolocation values
- *
- * @param value map of geolocation values
- */
-class GeolocationMap(val value: Map[String, Seq[Double]]) extends OPMap[Seq[Double]] with Location
-object GeolocationMap {
-  def apply(value: Map[String, Seq[Double]]): GeolocationMap = new GeolocationMap(value)
-  def empty: GeolocationMap = FeatureTypeDefaults.GeolocationMap
-}
-
-/**
  * Name representation - map containing information related to a particular name.
  *
  * @param value map of keys to values, where keys are one of the following:
@@ -329,6 +318,17 @@ object NameStats {
 
   def apply(value: Map[String, String]): NameStats = new NameStats(value)
   def empty: NameStats = FeatureTypeDefaults.NameStats
+}
+
+/**
+ * Map of geolocation values
+ *
+ * @param value map of geolocation values
+ */
+class GeolocationMap(val value: Map[String, Seq[Double]]) extends OPMap[Seq[Double]] with Location
+object GeolocationMap {
+  def apply(value: Map[String, Seq[Double]]): GeolocationMap = new GeolocationMap(value)
+  def empty: GeolocationMap = FeatureTypeDefaults.GeolocationMap
 }
 
 /**

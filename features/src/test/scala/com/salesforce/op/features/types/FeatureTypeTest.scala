@@ -74,6 +74,7 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
     CityMap.empty,
     PostalCodeMap.empty,
     StreetMap.empty,
+    NameStats.empty,
     GeolocationMap.empty,
     // Numerics
     Binary.empty,
@@ -133,6 +134,10 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
     CityMap(Map("a" -> "Palo Alto")),
     PostalCodeMap(Map("a" -> "94071")),
     StreetMap(Map("a" -> "Emerson Ave")),
+    NameStats(Map(
+      NameStats.Keys.IsNameIndicator -> NameStats.BooleanStrings.True,
+      NameStats.Keys.Gender -> NameStats.GenderStrings.Female
+    )),
     GeolocationMap(Map("a" -> Seq(1.0, 1.0, 1.0))),
     Prediction(1.0, Array(0.0, 1.0), Array(2.0, 3.0)),
     // Numerics

@@ -317,6 +317,20 @@ class MapTest extends FlatSpec with TestCommon {
     Map("aaa" -> Set("b")).toMultiPickListMap shouldBe a[MultiPickListMap]
   }
 
+  /* NameStats tests */
+  Spec[NameStats] should "extend correct base classes and have a working shortcut" in {
+    val m = new NameStats(Map.empty[String, String])
+    m shouldBe a[FeatureType]
+    m shouldBe a[OPCollection]
+    m shouldBe a[OPMap[_]]
+    m shouldBe a[TextMap]
+
+    Map(
+      NameStats.Keys.IsNameIndicator -> NameStats.BooleanStrings.True,
+      NameStats.Keys.Gender -> NameStats.GenderStrings.Female
+    ).toNameStats shouldBe a[NameStats]
+  }
+
   /* Prediction tests */
   Spec[Prediction] should "extend correct base classes" in {
     val m = Prediction(0.0)
