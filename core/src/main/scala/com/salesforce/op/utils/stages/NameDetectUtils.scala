@@ -85,7 +85,9 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
-    tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+    if (tokens.length == 0) 0.0 else {
+      tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+    }
   }
 
   def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
