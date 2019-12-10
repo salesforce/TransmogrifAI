@@ -30,12 +30,16 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.salesforce.op.features.types.NameStats.GenderStrings._
+import com.salesforce.op.features.types.NameStats.Keys._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.stages.GenderDetectStrategy
+import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -83,6 +87,23 @@ class HumanNameDetectorTest
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
+  it should "detect names based on the threshold correctly" in {
+    for {i <- 1 to 9} {
+      val numberNames = 10 * i
+      val names = RandomText.names.withProbabilityOfEmpty(0.0).take(numberNames).toList ++
+        RandomText.phones.withProbabilityOfEmpty(0.0).take(100 - numberNames).toList.map(_.toString.toText)
+
+      val (newData, newFeature) = TestFeatureBuilder(names)
+      val newEstimator = new HumanNameDetector().setInput(newFeature)
+
+      val threshold = numberNames.toDouble / 100.0
+      val modelBelowThreshold = newEstimator.setThreshold(threshold - 0.09).fit(newData)
+      val modelAboveThreshold = newEstimator.setThreshold(threshold + 0.09).fit(newData)
+      modelBelowThreshold.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+      modelAboveThreshold.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe false
+    }
+  }
+
   it should "identify a Text column with a single full name entry as Name" in {
     val (_, _, model, _) = identifyName(Seq("Elizabeth Warren").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
@@ -118,8 +139,6 @@ class HumanNameDetectorTest
   }
 
   it should "identify the gender of a single first Name correctly" in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     val (_, _, model, result) = identifyName(Seq("Alyssa").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
@@ -133,8 +152,6 @@ class HumanNameDetectorTest
   }
 
   it should "identify the gender of a single full name entry correctly" in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
@@ -142,8 +159,6 @@ class HumanNameDetectorTest
   }
 
   it should "identify the gender of a multiple full name entries (with varying token lengths) correctly" in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -162,8 +177,6 @@ class HumanNameDetectorTest
   }
 
   it should "identify the gender of multiple full name entries by finding honorifics" in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -195,8 +208,6 @@ class HumanNameDetectorTest
 
   it should
     """identify the gender of multiple full name entries in `LastName, FirstName` patterns""".stripMargin in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -217,8 +228,6 @@ class HumanNameDetectorTest
   it should
     """identify the gender of multiple full name entries by using RegEx
       |to detect `LastName, FirstName MiddleNames` patterns""".stripMargin in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -240,8 +249,6 @@ class HumanNameDetectorTest
     """identify the gender of multiple full name entries by using RegEx
       |to detect `LastName, Honorific FirstName MiddleNames` patterns
       |when the honorifics do not convey gender information""".stripMargin in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -256,8 +263,6 @@ class HumanNameDetectorTest
   }
 
   it should "use mixed strategies to detect gender" in {
-    import NameStats.GenderStrings._
-    import NameStats.Keys._
     // noinspection SpellCheckingInspection
     // scalastyle:off
     val (_, _, model, result) = identifyName(Seq(
@@ -283,5 +288,31 @@ class HumanNameDetectorTest
 
     val countNullsModel = estimator.setIgnoreNulls(false).setInput(newFeature).fit(newData)
     countNullsModel.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe false
+  }
+
+  it should "produce the correct metadata" in {
+    val text = "Elizabeth Warren"
+    val (data, _, model, _) = identifyName(Seq(text).toText)
+    val metadata: Metadata = model.getMetadata()
+    metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
+      genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
+        text, estimator.preProcess(Some(text)), data.sparkSession.sparkContext.broadcast(GenderDictionary()))
+    ).toMetadata()
+  }
+
+  it should "have correctly working metadata helpers" in {
+    // noinspection SpellCheckingInspection
+    // scalastyle:off
+    val (_, _, model, _) = identifyName(Seq(
+      "Sherrod Brown",
+      "Cantwell, Maria",
+      "Mr. Benjamin L. Cardin",
+      "Rochester, Lisa Maria Blunt",
+      "Carper, Dr. Thomas Robert",
+      "González-Colón, Ms. Jennifer"
+    ).toText)
+    // scalastyle:on
+    val metadata: Metadata = model.getMetadata()
+    metadata shouldBe HumanNameDetectorMetadata.fromMetadata(metadata).toMetadata()
   }
 }
