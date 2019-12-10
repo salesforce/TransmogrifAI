@@ -282,7 +282,8 @@ private[op] case class NameDetectStats
   dictCheckResult: AveragedValue,
   genderResultsByStrategy: Map[String, GenderStats]
 ) extends JsonLike {
-  // TransmogrifAI's JsonUtils doesn't play nice with HLL
+  // Overwriting because TransmogrifAI's JsonUtils doesn't play nice with HLL and will throw an exception
+  // when we try to print NameDetectStats for debugging
   override def toJson(pretty: Boolean): String = {
     val result: Map[String, Any] = Map(
       "guardCheckQuantities" -> Map(
