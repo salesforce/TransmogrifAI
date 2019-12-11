@@ -46,7 +46,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -165,7 +165,7 @@ class SmartTextVectorizer[T <: Text]
     require(inN.length == smartTextParams.whichAction.length)
 
     val (categoricalFeatures, textFeatures) =
-      SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.whichAction)
+      SmartTextVectorizer.partitionByCategoricalOrText[TransientFeature](inN, smartTextParams.whichAction)
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -194,7 +194,7 @@ class SmartTextVectorizer[T <: Text]
 
 object SmartTextVectorizer {
   val MaxCardinality = 100
-  private[op] def partition[T: ClassTag](
+  private[op] def partitionByCategoricalOrText[T: ClassTag](
     input: Array[T],
     actions: Array[SmartTextVectorizerAction]
   ): (Array[T], Array[T]) = {
@@ -262,7 +262,8 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     row: Seq[Text] => {
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.whichAction)
+      val (rowCategorical, rowText) =
+        SmartTextVectorizer.partitionByCategoricalOrText[Text](row.toArray, args.whichAction)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
@@ -274,7 +275,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   }
 
   private def getTextTransientFeatures: Array[TransientFeature] =
-    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.whichAction)._2
+    SmartTextVectorizer.partitionByCategoricalOrText[TransientFeature](getTransientFeatures(), args.whichAction)._2
 
   private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
     val nullIndicators = textTokens.map { tokens =>
