@@ -563,4 +563,5 @@ class SmartTextVectorizerTest
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
   }
+
 }

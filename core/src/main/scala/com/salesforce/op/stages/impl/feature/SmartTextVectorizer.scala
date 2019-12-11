@@ -38,11 +38,13 @@ import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.salesforce.op.utils.stages.NameDetectFun
-import com.twitter.algebird.Monoid
+import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats, NameDetectUtils}
+import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
+import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
+import com.twitter.algebird.{HyperLogLogMonoid, Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -77,6 +79,8 @@ class SmartTextVectorizer[T <: Text]
   with NameDetectFun[T] {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
+  private implicit val nameDetectStatsSeqEnc: Encoder[Array[NameDetectStats]] =
+    ExpressionEncoder[Array[NameDetectStats]]()
 
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
@@ -108,13 +112,43 @@ class SmartTextVectorizer[T <: Text]
       isCategorical -> topValues
     }.unzip
 
-    val smartTextParams = SmartTextVectorizerModelArgs(
-      isCategorical = isCategorical,
-      topValues = topValues,
-      shouldCleanText = shouldCleanText,
-      shouldTrackNulls = $(trackNulls),
-      hashingParams = makeHashingParams()
-    )
+    val smartTextParams = if (getSensitiveFeatureMode == Off) {
+      SmartTextVectorizerModelArgs(
+        isCategorical = isCategorical,
+        topValues = topValues,
+        shouldCleanText = shouldCleanText,
+        shouldTrackNulls = $(trackNulls),
+        hashingParams = makeHashingParams()
+      )
+    } else {
+      val spark = dataset.sparkSession
+      // Load name and gender data into broadcast variables
+      val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+      val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+      // Instantiate HyperLogLog monoid
+      val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
+      // Tell Algebird that our accumulator classes are also monoids
+      implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
+
+      val aggResultsArr: Array[NameDetectStats] = dataset.map(_.map(
+        computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)).toArray
+      ).reduce(_ + _)
+      val isName: Array[Boolean] = aggResultsArr map { aggResults: NameDetectStats =>
+        val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
+        val predictedNameProb = aggResults.dictCheckResult.value
+        guardChecksPassed && predictedNameProb >= $(nameThreshold)
+      }
+
+      SmartTextVectorizerModelArgs(
+        isCategorical = isCategorical,
+        topValues = topValues,
+        shouldCleanText = shouldCleanText,
+        shouldTrackNulls = $(trackNulls),
+        hashingParams = makeHashingParams(),
+        isName = isName,
+        removeSensitive = getRemoveSensitive
+      )
+    }
 
     val vecMetadata = makeVectorMetadata(smartTextParams)
     setMetadata(vecMetadata.toMetadata)
