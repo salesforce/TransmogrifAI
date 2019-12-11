@@ -36,7 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.GenderDetectStrategy
+import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectUtils}
 import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
@@ -62,6 +62,10 @@ class HumanNameDetectorTest
    */
   val expectedResult: Seq[NameStats] = Seq(NameStats(Map.empty[String, String]))
 
+  private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
+    NameDetectUtils.DefaultNameDictionary.value.toList
+  )
+
   private def identifyName(data: Seq[Text]) = {
     val (newData, newFeature) = TestFeatureBuilder(data)
     val model = estimator.setInput(newFeature).fit(newData)
@@ -82,21 +86,22 @@ class HumanNameDetectorTest
   }
 
   it should "identify a Text column with multiple first name entries as Name" in {
-    val names = RandomText.names.withProbabilityOfEmpty(0.0).take(100).toList
+    val names = NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(100).toList
     val (_, _, model, _) = identifyName(names)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
   }
 
   it should "detect names based on the threshold correctly" in {
+    val N = 50
     for {i <- 1 to 9} {
-      val numberNames = 10 * i
-      val names = RandomText.names.withProbabilityOfEmpty(0.0).take(numberNames).toList ++
-        RandomText.phones.withProbabilityOfEmpty(0.0).take(100 - numberNames).toList.map(_.toString.toText)
-
+      val numberNames = (N / 10) * i
+      val names =
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(numberNames).toList ++
+        RandomText.phones.withProbabilityOfEmpty(0.0).take(N - numberNames).toList.map(_.toString.toText)
       val (newData, newFeature) = TestFeatureBuilder(names)
       val newEstimator = new HumanNameDetector().setInput(newFeature)
 
-      val threshold = numberNames.toDouble / 100.0
+      val threshold = numberNames.toDouble / N
       val modelBelowThreshold = newEstimator.setThreshold(threshold - 0.09).fit(newData)
       val modelAboveThreshold = newEstimator.setThreshold(threshold + 0.09).fit(newData)
       modelBelowThreshold.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
@@ -281,7 +286,7 @@ class HumanNameDetectorTest
   }
 
   it should "ignore null values in calculating stats" in {
-    val names = RandomText.names.withProbabilityOfEmpty(0.90).take(200).toList
+    val names = NameDictionaryGroundTruth.withProbabilityOfEmpty(0.90).take(200).toList
     val (newData, newFeature) = TestFeatureBuilder(names)
     val model = estimator.setInput(newFeature).fit(newData)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true

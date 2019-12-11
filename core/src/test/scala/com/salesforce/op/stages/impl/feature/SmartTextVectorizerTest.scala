@@ -37,7 +37,7 @@ import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.salesforce.op.utils.stages.SensitiveFeatureMode
+import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -394,6 +394,10 @@ class SmartTextVectorizerTest
     )
   )
 
+  private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
+    NameDetectUtils.DefaultNameDictionary.value.toList
+  )
+
   it should "detect a single name feature and return empty vectors" in {
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
@@ -477,7 +481,7 @@ class SmartTextVectorizerTest
   //   val numFeatures = 5
   //   val (ds, untypedFeatures) = TestFeatureBuilder(
   //     1 to numFeatures map {_ =>
-  //       RandomText.names.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
+  //       NameDictionaryGroundTruth.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
   //   )
   //   val features = untypedFeatures.map(_.asInstanceOf[Feature[Text]])
   //   for {i <- 1 to numFeatures} {
@@ -540,7 +544,7 @@ class SmartTextVectorizerTest
   it should "not identify a single repeated name as Name" in {
     val (newNewInputData, newNewF1, newNewF2) = TestFeatureBuilder("Repeated Name", "Random Names",
       Seq.fill(200)("Michael").toText zip
-        RandomText.names.withProbabilityOfEmpty(0.0).take(200).toSeq
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(200).toSeq
     )
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newNewF1, newNewF2)
     val model: SmartTextVectorizerModel[Text] = newEstimator
