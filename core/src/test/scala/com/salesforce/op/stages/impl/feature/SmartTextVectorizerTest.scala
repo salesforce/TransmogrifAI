@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
@@ -404,7 +405,7 @@ class SmartTextVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
-    model.args.isName shouldBe Array(x = true)
+    model.args.whichAction shouldBe Array(Sensitive)
   }
 
   it should "detect a single name feature and return empty vectors" in {
@@ -427,7 +428,7 @@ class SmartTextVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
-    model.args.isName shouldBe Array(false, false, true)
+    model.args.whichAction shouldBe Array(Categorical, NonCategorical, Sensitive)
   }
 
   it should "not create information in the vector for a single name column among other non-name Text columns" in {
@@ -553,7 +554,7 @@ class SmartTextVectorizerTest
       .fit(newNewInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newNewInputData.show()
-    model.args.isName shouldBe Array(false, true)
+    model.args.whichAction shouldBe Array(Categorical, Sensitive)
   }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
 

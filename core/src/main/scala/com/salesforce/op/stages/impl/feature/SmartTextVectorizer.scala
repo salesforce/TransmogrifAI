@@ -34,18 +34,19 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
 import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
-import com.twitter.algebird.Operators._
 import com.twitter.algebird.Monoid._
+import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -105,7 +106,7 @@ class SmartTextVectorizer[T <: Text]
     val (aggTextStats, aggNameDetectStats) = if (getSensitiveFeatureMode == Off) {
       (
         dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray).reduce(_ + _),
-        Array.empty[NameDetectStats]
+        Array.fill[NameDetectStats](inN.length)(NameDetectStats.empty)
       )
     } else {
       val mapFun = makeMapFunction(dataset.sparkSession)
@@ -125,17 +126,19 @@ class SmartTextVectorizer[T <: Text]
         .take($(topK)).map(_._1)
       isCategorical -> topValues
     }.unzip
-
     val isName: Array[Boolean] = aggNameDetectStats.map(computeTreatAsName)
+    val actionsToTake: Array[SmartTextVectorizerAction] = isCategorical.zip(isName).map({
+      case (_, true) if shouldRemoveSensitive => Sensitive
+      case (true, _) => Categorical
+      case (_, _) => NonCategorical
+    })
 
     val smartTextParams = SmartTextVectorizerModelArgs(
-      isCategorical = isCategorical,
+      whichAction = actionsToTake,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
-      hashingParams = makeHashingParams(),
-      isName = isName,
-      removeSensitive = getRemoveSensitive
+      hashingParams = makeHashingParams()
     )
 
     val vecMetadata = makeVectorMetadata(smartTextParams)
@@ -159,10 +162,10 @@ class SmartTextVectorizer[T <: Text]
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
-    require(inN.length == smartTextParams.isCategorical.length)
+    require(inN.length == smartTextParams.whichAction.length)
 
     val (categoricalFeatures, textFeatures) =
-      SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.isCategorical)
+      SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.whichAction)
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -191,9 +194,12 @@ class SmartTextVectorizer[T <: Text]
 
 object SmartTextVectorizer {
   val MaxCardinality = 100
-  private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
-    val all = input.zip(condition)
-    (all.collect { case (item, true) => item }.toSeq.toArray, all.collect { case (item, false) => item }.toSeq.toArray)
+  private[op] def partition[T: ClassTag](
+    input: Array[T],
+    actions: Array[SmartTextVectorizerAction]
+  ): (Array[T], Array[T]) = {
+    val all = input.zip(actions)
+    (all.collect { case (item, Categorical) => item }, all.collect { case (item, NonCategorical) => item })
   }
 }
 
@@ -221,25 +227,22 @@ private[op] object TextStats {
 /**
  * Arguments for [[SmartTextVectorizerModel]]
  *
- * @param isCategorical       is feature a categorical or not
+ * @param whichAction         how to process each input column
  * @param topValues           top values to each feature
  * @param shouldCleanText     should clean text value
  * @param shouldTrackNulls    should track nulls
  * @param hashingParams       hashing function params
- * @param removeSensitive     whether to remove detected sensitive fields
  */
 case class SmartTextVectorizerModelArgs
 (
-  isCategorical: Array[Boolean],
+  whichAction: Array[SmartTextVectorizerAction],
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  hashingParams: HashingFunctionParams,
-  isName: Array[Boolean] = Array.empty[Boolean],
-  removeSensitive: Boolean = false
+  hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] =
-    topValues.zip(isCategorical).collect { case (top, true) => top }
+    topValues.zip(whichAction).collect { case (top, Categorical) => top }
 }
 
 final class SmartTextVectorizerModel[T <: Text] private[op]
@@ -259,7 +262,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     row: Seq[Text] => {
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.whichAction)
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
@@ -271,7 +274,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   }
 
   private def getTextTransientFeatures: Array[TransientFeature] =
-    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
+    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.whichAction)._2
 
   private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
     val nullIndicators = textTokens.map { tokens =>

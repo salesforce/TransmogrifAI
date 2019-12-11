@@ -416,7 +416,7 @@ private[op] trait NameDetectParams extends Params {
   setDefault(sensitiveFeatureMode, SensitiveFeatureMode.Off.toString)
   def setSensitiveFeatureMode(v: SensitiveFeatureMode): this.type = set(sensitiveFeatureMode, v.entryName)
   def getSensitiveFeatureMode: SensitiveFeatureMode = SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode))
-  def getRemoveSensitive: Boolean = {
+  def shouldRemoveSensitive: Boolean = {
     SensitiveFeatureMode.withNameInsensitive($(sensitiveFeatureMode)) == SensitiveFeatureMode.DetectAndRemove
   }
 }
