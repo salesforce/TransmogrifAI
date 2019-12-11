@@ -34,10 +34,9 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.stages.impl.MetadataLike
-import com.salesforce.op.utils.stages.NameDetectUtils.{GenderDictionary, NameDictionary}
+import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{HyperLogLogMonoid, Semigroup}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
@@ -68,24 +67,10 @@ class HumanNameDetector[T <: Text]
 ) with NameDetectFun[T] {
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
-    val spark = dataset.sparkSession
-    // Load name and gender data into broadcast variables
-    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
-    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
-    // Instantiate HyperLogLog monoid
-    val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
-    // Create Spark encoder for our accumulator class
-    implicit val nameDetectStatsEncoder: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]
-    // Tell Algebird that our accumulator class is also a monoid
-    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
-
-    val aggResults: NameDetectStats = dataset.map(
-      computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
-    ).reduce(_ + _)
-
-    val guardChecksPassed = performGuardChecks(aggResults.guardCheckQuantities, hllMonoid)
-    val predictedNameProb = aggResults.dictCheckResult.value
-    val treatAsName = guardChecksPassed && predictedNameProb >= $(nameThreshold)
+    implicit val (nameDetectStatsEnc, nameDetectStatsMonoid) = makeImplicits
+    val mapFun = makeMapFunction(dataset.sparkSession)
+    val aggResults: NameDetectStats = dataset.map(mapFun).reduce(_ + _)
+    val treatAsName = computeTreatAsName(aggResults)
 
     val orderedGenderDetectStrategies = if (treatAsName) {
       val ordered: Seq[(String, GenderStats)] = aggResults.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
@@ -93,7 +78,7 @@ class HumanNameDetector[T <: Text]
     } else Seq.empty[GenderDetectStrategy]
 
     val newMetadata = HumanNameDetectorMetadata(
-      treatAsName, predictedNameProb, aggResults.genderResultsByStrategy
+      treatAsName, aggResults.dictCheckResult.value, aggResults.genderResultsByStrategy
     ).toMetadata()
     val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata()).withMetadata(newMetadata)
     setMetadata(metaDataBuilder.build())

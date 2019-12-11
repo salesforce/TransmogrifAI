@@ -30,17 +30,18 @@
 
 package com.salesforce.op.utils.stages
 
-import com.salesforce.op.features.types.Text
 import com.salesforce.op.features.types.NameStats.GenderStrings._
+import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.TextTokenizer
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
-import com.twitter.algebird.{AveragedGroup, AveragedValue, HLL, HyperLogLogMonoid, Moments, MomentsGroup, Monoid}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
+import com.twitter.algebird._
+import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators, Params}
-import enumeratum.{Enum, EnumEntry}
+import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
 import scala.util.Try
@@ -175,6 +176,27 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
           computeGenderResultsByStrategy("", tokens, genderDict)
         )
     }
+  }
+
+  private[op] def makeImplicits: (Encoder[NameDetectStats], Monoid[NameDetectStats]) = {
+    // Create Spark encoder for our accumulator class
+    // And tell Algebird that our accumulator class is also a monoid
+    (Encoders.kryo[NameDetectStats], NameDetectStats.monoid)
+  }
+
+  private[op] def makeMapFunction(spark: SparkSession): T#Value => NameDetectStats = {
+    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
+    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+    val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
+
+    computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
+  }
+
+  private[op] def computeTreatAsName(results: NameDetectStats): Boolean = {
+    val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
+    val guardChecksPassed = performGuardChecks(results.guardCheckQuantities, hllMonoid)
+    val predictedNameProb = results.dictCheckResult.value
+    guardChecksPassed && predictedNameProb >= $(nameThreshold)
   }
 }
 
