@@ -64,6 +64,7 @@ case class FeatureDistribution
   distribution: Array[Double],
   summaryInfo: Array[Double],
   moments: Option[Moments] = None,
+  cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -109,9 +110,10 @@ case class FeatureDistribution
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
 
     val combinedMoments = moments + fd.moments
+    val combinedCard = cardEstimate + fd.cardEstimate
 
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedMoments, `type`)
+      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
   }
 
   /**
@@ -172,14 +174,14 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, `type`) =>
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, c, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep &&
-        moments == m
+        moments == m && cardEstimate == c
     case _ => false
   }
 
   override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
-    summaryInfo, moments, `type`)
+    summaryInfo, moments, cardEstimate, `type`)
 }
 
 object FeatureDistribution {
@@ -238,6 +240,7 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val moments = value.map(momentsValues)
+    val cardEstimate = value.map(cardinalityValues)
 
     FeatureDistribution(
       name = name,
@@ -247,6 +250,7 @@ object FeatureDistribution {
       summaryInfo = summaryInfo,
       distribution = distribution,
       moments = moments,
+      cardEstimate = cardEstimate,
       `type` = `type`
     )
   }
@@ -263,6 +267,21 @@ object FeatureDistribution {
       case Right(seq) => seq
     }
     MomentsGroup.sum(population.map(x => Moments(x)))
+  }
+
+  /**
+   * Function to track frequency of the first $(MaxCardinality) unique values
+   * (number for numeric features, token for text features)
+   *
+   * @param values          values to track distribution / frequency
+   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   */
+  private def cardinalityValues(values: ProcessedSeq): TextStats = {
+    val population = values match {
+      case Left(seq) => seq
+      case Right(seq) => seq.map(_.toString)
+    }
+    TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
   }
 
   /**
