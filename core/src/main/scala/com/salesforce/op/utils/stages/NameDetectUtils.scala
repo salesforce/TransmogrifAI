@@ -30,10 +30,13 @@
 
 package com.salesforce.op.utils.stages
 
+import com.fasterxml.jackson.core.JsonGenerator
+import com.fasterxml.jackson.databind.SerializerProvider
+import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.TextTokenizer
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils}
+import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.macros.caseclass._
 import com.twitter.algebird._
@@ -306,23 +309,19 @@ private[op] case class NameDetectStats
   dictCheckResult: AveragedValue,
   genderResultsByStrategy: Map[String, GenderStats]
 ) extends JsonLike {
-  // Overwriting because TransmogrifAI's JsonUtils doesn't play nice with HLL and will throw an exception
-  // when we try to print NameDetectStats for debugging
   override def toJson(pretty: Boolean): String = {
-    val result: Map[String, Any] = Map(
-      "guardCheckQuantities" -> Map(
-        "countBelowMaxNumTokens" -> this.guardCheckQuantities.countBelowMaxNumTokens,
-        "countAboveMinCharLength" -> this.guardCheckQuantities.countAboveMinCharLength,
-        "approxMomentsOfTextLength" -> this.guardCheckQuantities.approxMomentsOfTextLength,
-        "approxNumUnique" -> {
-          val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
-          hllMonoid.sizeOf(this.guardCheckQuantities.approxNumUnique).toString
-        }
-      ),
-      "dictCheckResults" -> this.dictCheckResult,
-      "genderResultsByStrategy" -> this.genderResultsByStrategy
-    )
-    JsonUtils.toJsonString(result, pretty = pretty)
+    val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
+    val serializer = new StdSerializer[HLL](classOf[HLL]) {
+      override def serialize(value: HLL, gen: JsonGenerator, provider: SerializerProvider): Unit = {
+        val sizeEstimate = hllMonoid.sizeOf(value)
+        gen.writeArray(
+          Array(sizeEstimate.min, sizeEstimate.estimate, sizeEstimate.max, sizeEstimate.probWithinBounds),
+          0, 4
+        )
+      }
+    }
+    val deserializer = null // will not need to deserialize HLL values
+    JsonUtils.toJsonString(this, pretty = pretty, Seq(SerDes[HLL](classOf[HLL], serializer, deserializer)))
   }
 }
 private[op] case object NameDetectStats {
