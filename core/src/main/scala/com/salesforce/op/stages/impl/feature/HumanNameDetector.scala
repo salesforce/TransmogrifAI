@@ -145,7 +145,7 @@ class HumanNameDetectorModel[T <: Text]
 
   override def transform(dataset: Dataset[_]): DataFrame = {
     val spark: SparkSession = dataset.sparkSession
-    this.broadcastGenderDict = Some(spark.sparkContext.broadcast(GenderDictionary()))
+    this.broadcastGenderDict = Some(spark.sparkContext.broadcast(NameDetectUtils.DefaultGenderDictionary))
     super.transform(dataset)
   }
 

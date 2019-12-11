@@ -185,8 +185,8 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   private[op] def makeMapFunction(spark: SparkSession): T#Value => NameDetectStats = {
-    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(NameDictionary())
-    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(GenderDictionary())
+    val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(DefaultNameDictionary)
+    val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(DefaultGenderDictionary)
     val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
 
     computeResults(_, broadcastNameDict, broadcastGenderDict, hllMonoid)
@@ -217,6 +217,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
 private[op] object NameDetectUtils {
   import GenderDetectStrategy._
 
+  val DefaultNameDictionary = NameDictionary()
   case class NameDictionary
   (
     // Use the following line to use the smaller but less noisy gender dictionary as a source for names
@@ -234,6 +235,7 @@ private[op] object NameDetectUtils {
     }
   )
 
+  val DefaultGenderDictionary = GenderDictionary()
   case class GenderDictionary
   (
     value: Map[String, Double] = {
