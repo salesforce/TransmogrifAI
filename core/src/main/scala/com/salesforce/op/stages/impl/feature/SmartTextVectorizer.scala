@@ -40,9 +40,9 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
 import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
+import com.twitter.algebird.Operators._
 import com.twitter.algebird.Monoid._
-import com.twitter.algebird.{Monoid, Semigroup}
-import com.twitter.algebird._
+import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder, Encoders}
@@ -77,7 +77,8 @@ class SmartTextVectorizer[T <: Text]
   with NameDetectFun[T] {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
-  type StatsTupleArray = Array[(TextStats, NameDetectStats)]
+  type StatsTuple = (TextStats, NameDetectStats)
+  type StatsTupleArray = Array[StatsTuple]
   private implicit val statsTupleSeqEnc: Encoder[StatsTupleArray] = Encoders.kryo[StatsTupleArray]
 
   private def makeHashingParams() = HashingFunctionParams(
@@ -98,13 +99,12 @@ class SmartTextVectorizer[T <: Text]
     val shouldCleanText = $(cleanText)
 
     implicit val textStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
-    implicit val nameDetectStatsMonoid: Monoid[NameDetectStats] = makeImplicits._2
-    implicit val statsTupleMonoid: Semigroup[(TextStats, NameDetectStats)] =
-      new Tuple2Semigroup[TextStats, NameDetectStats]()
+    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = makeImplicits._2
+    implicit val statsTupleMonoid: Semigroup[StatsTuple] = new Tuple2Semigroup[TextStats, NameDetectStats]()
 
     val (aggTextStats, aggNameDetectStats) = if (getSensitiveFeatureMode == Off) {
       (
-        dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray).reduce(Semigroup.plus[Array[TextStats]](_, _)),
+        dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray).reduce(_ + _),
         Array.empty[NameDetectStats]
       )
     } else {
@@ -114,7 +114,7 @@ class SmartTextVectorizer[T <: Text]
           computeTextStats(input, shouldCleanText),
           mapFun(input)
         )
-      ).toArray).reduce(Semigroup.plus[StatsTupleArray](_, _)).unzip
+      ).toArray).reduce(_ + _).unzip
     }
 
     val (isCategorical, topValues) = aggTextStats.map { stats =>
@@ -209,7 +209,7 @@ private[op] object TextStats {
     override def plus(l: TextStats, r: TextStats): TextStats = {
       if (l.valueCounts.size > maxCardinality) l
       else if (r.valueCounts.size > maxCardinality) r
-      else TextStats(Semigroup.plus[Map[String, Int]](l.valueCounts, r.valueCounts))
+      else TextStats(l.valueCounts + r.valueCounts)
     }
 
     override def zero: TextStats = TextStats.empty
