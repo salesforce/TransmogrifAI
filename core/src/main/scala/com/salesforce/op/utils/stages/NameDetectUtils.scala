@@ -54,11 +54,11 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   import GenderDetectStrategy._
   import NameDetectUtils._
 
-  def preProcess(input: T#Value): Seq[String] = {
+  private[op] def preProcess(input: T#Value): Seq[String] = {
     TextTokenizer.tokenize(Text(input)).tokens.toArray
   }
 
-  def computeGuardCheckQuantities(
+  private[op] def computeGuardCheckQuantities(
     text: String,
     tokens: Seq[String],
     hllMonoid: HyperLogLogMonoid
@@ -72,7 +72,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     )
   }
 
-  def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
+  private[op] def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
     val N: Double = stats.approxMomentsOfTextLength.count.toDouble
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
@@ -87,13 +87,13 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     checks.forall(identity)
   }
 
-  def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
+  private[op] def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
     if (tokens.isEmpty) 0.0 else {
       tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
 
-  def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
+  private[op] def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
     if (tokens.isEmpty) ""
     else if (tokens.length == 1) tokens.head
     else {
@@ -102,13 +102,13 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     }
   }
 
-  def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
+  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
     genderDict.value.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
 
-  def identifyGender(
+  private[op] def identifyGender(
     text: String,
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
@@ -137,7 +137,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     }
   }
 
-  def computeGenderResultsByStrategy(
+  private[op] def computeGenderResultsByStrategy(
     text: String,
     tokens: Seq[String],
     genderDict: Broadcast[GenderDictionary]
@@ -152,7 +152,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     } toMap
   }
 
-  def computeResults(
+  private[op] def computeResults(
     input: T#Value,
     nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary],
