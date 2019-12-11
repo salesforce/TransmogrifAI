@@ -398,24 +398,26 @@ class SmartTextVectorizerTest
     NameDetectUtils.DefaultNameDictionary.value.toList
   )
 
-  it should "detect a single name feature and return empty vectors" in {
+  it should "detect a single name feature" in {
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     model.args.isName shouldBe Array(x = true)
+  }
+
+  it should "detect a single name feature and return empty vectors" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+    newInputData.show()
 
     val smartVectorized = newEstimator.getOutput()
-
     val transformed = new OpWorkflow()
       .setResultFeatures(smartVectorized).transform(newInputData)
     val result = transformed.collect(smartVectorized)
-
     val (smart, expected) = result.map(smartVector => smartVector -> OPVector.empty).unzip
 
     smart shouldBe expected
-
     OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe 0
   }
 

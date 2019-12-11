@@ -95,12 +95,20 @@ class SmartTextVectorizer[T <: Text]
 
     val maxCard = $(maxCardinality)
     val shouldCleanText = $(cleanText)
-
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
-    val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
-    val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (isCategorical, topValues) = aggregatedStats.map { stats =>
+    val aggTextStats: Array[TextStats] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray).reduce(_ + _)
+    // Doing both agg computations in one pass would be more efficient
+    // but requires a lot of code changes to get Algebird operators to play nice
+    val aggNameDetectStats: Array[NameDetectStats] = if (getSensitiveFeatureMode == Off) {
+      Array.empty[NameDetectStats]
+    } else {
+      implicit val (_, nameDetectStatsMonoid) = makeImplicits
+      val mapFun = makeMapFunction(dataset.sparkSession)
+      dataset.map(_.map(mapFun).toArray).reduce(_ + _)
+    }
+
+    val (isCategorical, topValues) = aggTextStats.map { stats =>
       val isCategorical = stats.valueCounts.size <= maxCard
       val topValues = stats.valueCounts
         .filter { case (_, count) => count >= $(minSupport) }
@@ -109,31 +117,17 @@ class SmartTextVectorizer[T <: Text]
       isCategorical -> topValues
     }.unzip
 
-    val smartTextParams = if (getSensitiveFeatureMode == Off) {
-      SmartTextVectorizerModelArgs(
-        isCategorical = isCategorical,
-        topValues = topValues,
-        shouldCleanText = shouldCleanText,
-        shouldTrackNulls = $(trackNulls),
-        hashingParams = makeHashingParams()
-      )
-    } else {
-      implicit val (_, nameDetectStatsMonoid) = makeImplicits
-      val mapFun = makeMapFunction(dataset.sparkSession)
+    val isName: Array[Boolean] = aggNameDetectStats.map(computeTreatAsName)
 
-      val aggResultsArr: Array[NameDetectStats] = dataset.map(_.map(mapFun).toArray).reduce(_ + _)
-      val isName: Array[Boolean] = aggResultsArr.map(computeTreatAsName)
-
-      SmartTextVectorizerModelArgs(
-        isCategorical = isCategorical,
-        topValues = topValues,
-        shouldCleanText = shouldCleanText,
-        shouldTrackNulls = $(trackNulls),
-        hashingParams = makeHashingParams(),
-        isName = isName,
-        removeSensitive = getRemoveSensitive
-      )
-    }
+    val smartTextParams = SmartTextVectorizerModelArgs(
+      isCategorical = isCategorical,
+      topValues = topValues,
+      shouldCleanText = shouldCleanText,
+      shouldTrackNulls = $(trackNulls),
+      hashingParams = makeHashingParams(),
+      isName = isName,
+      removeSensitive = getRemoveSensitive
+    )
 
     val vecMetadata = makeVectorMetadata(smartTextParams)
     setMetadata(vecMetadata.toMetadata)
