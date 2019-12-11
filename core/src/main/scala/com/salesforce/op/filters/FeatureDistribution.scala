@@ -40,7 +40,7 @@ import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, FieldSerializer, Formats}
 
 import scala.util.Try
 
@@ -192,8 +192,13 @@ object FeatureDistribution {
     override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
   }
 
+  val FeatureDistributionSerializer = FieldSerializer[FeatureDistribution](
+    FieldSerializer.ignore("cardEstimate")
+  )
+
   implicit val formats: Formats = DefaultFormats +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
+    FeatureDistributionSerializer
 
   /**
    * Feature distributions to json

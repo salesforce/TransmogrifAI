@@ -202,7 +202,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
   it should "marshall to/from json" in {
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6), Array.empty)
     val fd2 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
-      Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
+      Array.empty, Some(Moments(1.0)), Option.empty,
       FeatureDistributionType.Scoring)
     val json = FeatureDistribution.toJson(Array(fd1, fd2))
     FeatureDistribution.fromJson(json) match {
@@ -240,5 +240,13 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
 
     intercept[IllegalArgumentException](fd1.jsDivergence(fd1.copy(name = "boo"))) should have message
       "requirement failed: Name must match to compare or combine feature distributions: A != boo"
+  }
+
+  it should "not serialize cardEstimate field" in {
+    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
+      Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
+      FeatureDistributionType.Scoring)
+
+    FeatureDistribution.toJson(Seq(fd1)) shouldNot contain theSameElementsAs "cardEstimate"
   }
 }
