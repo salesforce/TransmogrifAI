@@ -34,6 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.OpVectorMetadata
@@ -411,54 +412,75 @@ class SmartTextMapVectorizerTest
     val baseNames = Seq("Michael", "Michelle", "Roxanne", "Ross").toText :+ Text.empty
 
     val textMap1: Seq[TextMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextMap(Map("text1" -> a.toString, "text2" -> b.toString, "names" -> c.toString))
+      TextMap(Map("text1" -> a.toString, "text2" -> b.toString, "name" -> c.toString))
     }
     val textMap2: Seq[TextMap] = Seq.fill[TextMap](N)(TextMap.empty)
 
     val textAreaMap1: Seq[TextAreaMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextAreaMap(Map("text1" -> a.toString, "text2" -> b.toString, "names" -> c.toString))
+      TextAreaMap(Map("text1" -> a.toString, "text2" -> b.toString, "name" -> c.toString))
     }
     val textAreaMap2: Seq[TextAreaMap] = Seq.fill[TextAreaMap](N)(TextAreaMap.empty)
 
+    val nameTextMap: Seq[TextMap] = baseNames map { v => TextMap(Map("name" -> v.toString)) }
+    val nameTextAreaMap: Seq[TextAreaMap] = baseNames map { v => TextAreaMap(Map("name" -> v.toString)) }
+
     val allFeatures = Seq(
-      baseText1,    // f0
-      baseText2,    // f1
-      baseNames,    // f2
-      textMap1,     // f3
-      textMap2,     // f4
-      textAreaMap1, // f5
-      textAreaMap2  // f6
+      baseText1,      // f0
+      baseText2,      // f1
+      baseNames,      // f2
+      textMap1,       // f3
+      textMap2,       // f4
+      textAreaMap1,   // f5
+      textAreaMap2,   // f6
+      nameTextMap,    // f7
+      nameTextAreaMap // f8
     )
     assert(allFeatures.forall(_.length == N))
     TestFeatureBuilder(allFeatures: _*)
   }
+
+  val newF0: Feature[Text] = features(0).asInstanceOf[Feature[Text]]
+  val newF1: Feature[Text] = features(1).asInstanceOf[Feature[Text]]
+  val newF2: Feature[Text] = features(2).asInstanceOf[Feature[Text]]
+  val newF3: Feature[TextMap] = features(3).asInstanceOf[Feature[TextMap]]
+  val newF4: Feature[TextMap] = features(4).asInstanceOf[Feature[TextMap]]
+  val newF5: Feature[TextAreaMap] = features(5).asInstanceOf[Feature[TextAreaMap]]
+  val newF6: Feature[TextAreaMap] = features(6).asInstanceOf[Feature[TextAreaMap]]
+  val newF7: Feature[TextMap] = features(7).asInstanceOf[Feature[TextMap]]
+  val newF8: Feature[TextAreaMap] = features(8).asInstanceOf[Feature[TextAreaMap]]
 
   val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
-    .setInput(features(0).asInstanceOf[Feature[Text]], features(1).asInstanceOf[Feature[Text]])
+    .setInput(newF0, newF1)
 
   val biasMapEstimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
-    .setInput(features(3).asInstanceOf[Feature[TextMap]], features(4).asInstanceOf[Feature[TextMap]])
+    .setInput(newF3, newF4)
+
+  val biasMapAreaEstimator: SmartTextMapVectorizer[TextAreaMap] = new SmartTextMapVectorizer()
+    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+    .setTopK(2).setPrependFeatureName(false)
+    .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+    .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
+    .setInput(newF5, newF6)
 
   private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
     NameDetectUtils.DefaultNameDictionary.value.toList
   )
 
-  // it should "detect a single name feature" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
-  //   val model: SmartTextVectorizerModel[Text] = newEstimator
-  //     .fit(newInputData)
-  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
-  //   newInputData.show()
-  //   model.args.whichAction shouldBe Array(Sensitive)
-  // }
+  it should "detect a single name feature" in {
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF7)
+    val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+    mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Sensitive)
+  }
   //
   // it should "detect a single name feature and return empty vectors" in {
   //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)

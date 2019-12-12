@@ -33,6 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
+import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
@@ -53,6 +54,8 @@ import scala.reflect.runtime.universe.TypeTag
  * plus occurrences of non top k values and a null indicator (if enabled).
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
+ *
+ * Detection and removal of names in the input columns can be enabled with the `sensitiveFeatureMode` param.
  *
  * @param uid uid for instance
  */
@@ -131,14 +134,14 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
-        val isCat = textStats.valueCounts.size <= maxCard
-        val topVals = if (isCat) {
+        val whichAction = if (textStats.valueCounts.size <= maxCard) Categorical else NonCategorical
+        val topVals = if (whichAction == Categorical) {
           textStats.valueCounts
             .filter { case (_, count) => count >= minSup }
             .toSeq.sortBy(v => -v._2 -> v._1)
             .take($(topK)).map(_._1).toArray
         } else Array.empty[String]
-        SmartTextFeatureInfo(key = k, isCategorical = isCat, topValues = topVals)
+        SmartTextFeatureInfo(key = k, whichAction = whichAction, topValues = topVals)
       }
     }
 
@@ -199,10 +202,15 @@ private[op] object TextMapStats {
  * Info about each feature within a text map
  *
  * @param key           name of a feature
- * @param isCategorical indicate whether a feature is categorical or not
+ * @param whichAction indicate whether a feature is categorical or not
  * @param topValues     most common values of a feature (only for categoricals)
  */
-case class SmartTextFeatureInfo(key: String, isCategorical: Boolean, topValues: Array[String]) extends JsonLike
+case class SmartTextFeatureInfo
+(
+  key: String,
+  whichAction: SmartTextVectorizerAction,
+  topValues: Array[String]
+) extends JsonLike
 
 
 /**
@@ -223,10 +231,10 @@ case class SmartTextMapVectorizerModelArgs
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
-    featureInfoSeq.partition{_ .isCategorical }
+    featureInfoSeq.partition{ _.whichAction == Categorical }
   }.unzip
-  val categoricalKeys = categoricalFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
-  val textKeys = textFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
+  val categoricalKeys: Seq[Seq[String]] = categoricalFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
+  val textKeys: Seq[Seq[String]] = textFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
 }
 
 
