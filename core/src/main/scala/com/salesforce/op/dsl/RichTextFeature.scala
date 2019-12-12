@@ -434,6 +434,15 @@ trait RichTextFeature {
       toLowercase: Boolean = TextTokenizer.ToLowercase
     ): FeatureLike[Binary] =
       f.transformWith(new SubstringTransformer[T, T2]().setToLowercase(toLowercase), f2)
+
+    /**
+     * Check if feature is actual human names, and if so, return related demographic information
+     *
+     * @param threshold optional, fraction of rows containing names before processing (default = 0.50)
+     * @return NameStats, a custom map that will be empty if no name was found
+     */
+    def identifyIfHumanName(threshold: Double = 0.50): FeatureLike[NameStats] =
+      new HumanNameDetector[T]().setThreshold(threshold).setInput(f).getOutput()
   }
 
   implicit class RichPhoneFeature(val f: FeatureLike[Phone]) {
