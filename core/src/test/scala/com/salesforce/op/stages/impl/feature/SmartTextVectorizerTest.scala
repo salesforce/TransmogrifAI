@@ -34,6 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import com.salesforce.op.testkit.{RandomReal, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
@@ -59,7 +60,6 @@ class SmartTextVectorizerTest
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setInput(f1, f2)
-
   val expectedResult = Seq(
     Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
@@ -67,6 +67,27 @@ class SmartTextVectorizerTest
     Vectors.sparse(9, Array(0, 6), Array(1.0, 2.0)),
     Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
   ).map(_.toOPVector)
+
+  /* Generate some more complicated input data to check things a little closer. There are three text fields with
+    different token distributions:
+    Country: Uniformly distributed from a larger list of ~few hundred countries
+    Picklist: Unitformly distributed from a small list of 9 choices
+    Text: Uniformly distributed unicode strings with lengths ranging from 0-100
+
+    The Picklist should be picked up as a categorical
+    The country distribution would depend on the cutoffs (need an
+    easier way to generate stuff with a probability distribution that follows a specified function)
+    The text distribution should be picked up as text and pass the length distribution
+   */
+  val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.2).take(1000).toList
+  val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+    .withProbabilityOfEmpty(0.2).limit(1000)
+  val textData: Seq[Text] = RandomText.strings(minLen = 0, maxLen = 100).withProbabilityOfEmpty(0.2).limit(1000)
+  val generatedData: Seq[(Country, PickList, Text)] =
+    countryData.zip(pickListData).zip(textData).map {
+      case ((co, pi), te) => (co, pi, te)
+    }
+  val (rawDF, rawCountry, rawPickList, rawText) = TestFeatureBuilder("country", "picklist", "text", generatedData)
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
@@ -381,7 +402,7 @@ class SmartTextVectorizerTest
 
     val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
     val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7))
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2

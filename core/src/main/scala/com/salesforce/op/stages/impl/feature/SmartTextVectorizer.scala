@@ -62,7 +62,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams {
+    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams with MinLengthStdDevParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
 
@@ -81,23 +81,35 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     require(!dataset.isEmpty, "Input dataset cannot be empty")
 
     val maxCard = $(maxCardinality)
+    val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (isCategorical, topValues) = aggregatedStats.map { stats =>
+    val (isCategorical, isIgnorable, topValues) = aggregatedStats.map { stats =>
       val isCategorical = stats.valueCounts.size <= maxCard
+      // Simplest method is a std deviation of the lengths
+      val lengthSize = stats.lengthCounts.values.sum
+      val lengthMean = stats.lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2)/lengthSize
+      val lengthVariance = stats.lengthCounts.foldLeft(0.0)(
+        (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
+      )
+      val lengthStdDev = math.sqrt(lengthVariance / lengthSize)
+      println(s"LengthStdDev: $lengthStdDev \n")
+      val isIgnorable = lengthStdDev <= minLenStdDev
       val topValues = stats.valueCounts
         .filter { case (_, count) => count >= $(minSupport) }
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
-      isCategorical -> topValues
-    }.unzip
+
+      (isCategorical, isIgnorable, topValues)
+    }.unzip3
 
     val smartTextParams = SmartTextVectorizerModelArgs(
       isCategorical = isCategorical,
+      isIgnorable = isIgnorable,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
@@ -156,10 +168,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 }
 
 object SmartTextVectorizer {
-  val MaxCardinality = 100
+  val MaxCardinality: Int = 100
+  val MinTextLengthStdDev: Double = 0
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
-    (all.collect { case (item, true) => item }.toSeq.toArray, all.collect { case (item, false) => item }.toSeq.toArray)
+    (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
   }
 }
 
@@ -198,6 +211,7 @@ private[op] object TextStats {
  * Arguments for [[SmartTextVectorizerModel]]
  *
  * @param isCategorical    is feature a categorical or not
+ * @param isIgnorable      is a text feature that we think is ignorable? high cardinality + low length variance
  * @param topValues        top values to each feature
  * @param shouldCleanText  should clean text value
  * @param shouldTrackNulls should track nulls
@@ -206,6 +220,7 @@ private[op] object TextStats {
 case class SmartTextVectorizerModelArgs
 (
   isCategorical: Array[Boolean],
+  isIgnorable: Array[Boolean],
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
@@ -232,7 +247,9 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     (row: Seq[Text]) => {
-      val (rowCategorical, rowText) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+      val (rowCategorical, rowTextAll) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+      val (rowTextIgnorable, rowText) = SmartTextVectorizer.partition[Text](rowTextAll, args.isIgnorable)
+
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
@@ -270,4 +287,16 @@ trait MaxCardinalityParams extends Params {
   final def setMaxCardinality(v: Int): this.type = set(maxCardinality, v)
   final def getMaxCardinality: Int = $(maxCardinality)
   setDefault(maxCardinality -> SmartTextVectorizer.MaxCardinality)
+}
+
+trait MinLengthStdDevParams extends Params {
+  final val minLengthStdDev = new DoubleParam(
+    parent = this, name = "minLengthStdDev",
+    doc = "minimum standard deviation of the lengths of tokens in a text field for it to be hashed instead " +
+      "of ignored",
+    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = 100)
+  )
+  final def setMinLengthStdDev(v: Double): this.type = set(minLengthStdDev, v)
+  final def getMinLengthStdDev: Double = $(minLengthStdDev)
+  setDefault(minLengthStdDev -> SmartTextVectorizer.MinTextLengthStdDev)
 }
