@@ -301,7 +301,7 @@ class HumanNameDetectorTest
     val metadata: Metadata = model.getMetadata()
     metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
       genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
-        text, estimator.preProcess(Some(text)), data.sparkSession.sparkContext.broadcast(GenderDictionary()))
+        text, estimator.preProcess(text), data.sparkSession.sparkContext.broadcast(GenderDictionary()))
     ).toMetadata()
   }
 

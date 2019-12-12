@@ -65,7 +65,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams
-    with NameDetectFun[T] {
+    with NameDetectFun {
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 

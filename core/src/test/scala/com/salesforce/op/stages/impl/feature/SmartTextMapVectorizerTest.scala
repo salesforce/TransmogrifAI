@@ -31,17 +31,17 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.{Feature, FeatureLike}
+import com.salesforce.op.features.Feature
+import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
+import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.features.types._
-import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -440,7 +440,7 @@ class SmartTextMapVectorizerTest
     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
     .setInput(features(0).asInstanceOf[Feature[Text]], features(1).asInstanceOf[Feature[Text]])
 
-  val biasMapEstimator: SmartTextMapVectorizer[Text] = new SmartTextMapVectorizer()
+  val biasMapEstimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
