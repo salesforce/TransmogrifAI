@@ -52,13 +52,18 @@ import scala.util.matching.Regex
 
 /**
  * Provides shared helper functions and variables for name identification and name to gender transformation.
- * @tparam T     the FeatureType (subtype of Text) to operate over
  */
-private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging {
+private[op] trait NameDetectFun extends Logging with NameDetectParams {
   import GenderDetectStrategy._
   import NameDetectUtils._
 
-  private[op] def preProcess(input: T#Value): Seq[String] = {
+  private[op] implicit def textValue2String[T <: Text](input: T#Value): String = input.getOrElse("")
+  private[op] implicit def string2Text[T <: Text](input: String): T#Value = input match {
+    case "" => Text.empty.value
+    case _ => Text(input).value
+  }
+
+  private[op] def preProcess(input: String): Seq[String] = {
     TextTokenizer.tokenize(Text(input)).tokens.toArray
   }
 
@@ -157,28 +162,19 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
   }
 
   private[op] def computeResults(
-    input: T#Value,
+    input: String,
     nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary],
     hll: HyperLogLogMonoid
-  ): NameDetectStats = {
-    input match {
-      case Some(text) =>
-        val tokens = preProcess(input)
-        NameDetectStats(
-          computeGuardCheckQuantities(text, tokens, hll),
-          AveragedValue(1L, dictCheck(tokens, nameDict)),
-          computeGenderResultsByStrategy(text, tokens, genderDict)
-        )
-      case None if $(ignoreNulls) => NameDetectStats.empty
-      case _ =>
-        val tokens = Seq.empty[String]
-        NameDetectStats(
-          computeGuardCheckQuantities("", tokens, hll),
-          AveragedValue(1L, dictCheck(tokens, nameDict)),
-          computeGenderResultsByStrategy("", tokens, genderDict)
-        )
-    }
+  ): NameDetectStats = input match {
+    case "" if $(ignoreNulls) => NameDetectStats.empty
+    case _ =>
+      val tokens = preProcess(input)
+      NameDetectStats(
+        computeGuardCheckQuantities(input, tokens, hll),
+        AveragedValue(1L, dictCheck(tokens, nameDict)),
+        computeGenderResultsByStrategy(input, tokens, genderDict)
+      )
   }
 
   private[op] def makeImplicits: (Encoder[NameDetectStats], Monoid[NameDetectStats]) = {
@@ -187,7 +183,7 @@ private[op] trait NameDetectFun[T <: Text] extends NameDetectParams with Logging
     (Encoders.kryo[NameDetectStats], NameDetectStats.monoid)
   }
 
-  private[op] def makeMapFunction(spark: SparkSession): T#Value => NameDetectStats = {
+  private[op] def makeMapFunction[T <: Text](spark: SparkSession): T#Value => NameDetectStats = {
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(DefaultNameDictionary)
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(DefaultGenderDictionary)
     val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)

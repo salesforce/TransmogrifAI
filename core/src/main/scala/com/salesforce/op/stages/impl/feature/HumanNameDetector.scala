@@ -64,11 +64,11 @@ class HumanNameDetector[T <: Text]
 ) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
-) with NameDetectFun[T] {
+) with NameDetectFun {
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
     implicit val (nameDetectStatsEnc, nameDetectStatsMonoid) = makeImplicits
-    val mapFun = makeMapFunction(dataset.sparkSession)
+    val mapFun: T#Value => NameDetectStats = makeMapFunction(dataset.sparkSession)
     val aggResults: NameDetectStats = dataset.map(mapFun).reduce(_ + _)
     val treatAsName = computeTreatAsName(aggResults)
 
@@ -139,7 +139,7 @@ class HumanNameDetectorModel[T <: Text]
   val treatAsName: Boolean,
   val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun[T] {
+  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun {
 
   var broadcastGenderDict: Option[Broadcast[GenderDictionary]] = None
 
