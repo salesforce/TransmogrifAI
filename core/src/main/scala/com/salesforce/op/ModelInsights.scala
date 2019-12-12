@@ -333,7 +333,7 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param metrics          sequence containing metrics computed in RawFeatureFilter
  * @param distributions    distribution information for the raw feature (if calculated in RawFeatureFilter)
  * @param exclusionReasons exclusion reasons for the raw feature (if calculated in RawFeatureFilter)
- *
+ * @param sensitiveInformation derived information about sensitive field checks (if performed)
  */
 case class FeatureInsights
 (
@@ -342,7 +342,8 @@ case class FeatureInsights
   derivedFeatures: Seq[Insights],
   metrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   distributions: Seq[FeatureDistribution] = Seq.empty,
-  exclusionReasons: Seq[ExclusionReasons] = Seq.empty
+  exclusionReasons: Seq[ExclusionReasons] = Seq.empty,
+  sensitiveInformation: Option[SensitiveFeatureInformation] = None
 )
 
 /**
@@ -697,8 +698,37 @@ case object ModelInsights {
           val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
           val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
-          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
-            metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons)
+          // TODO: Hide the logging of this sensitive feature metadata behind a debugging flag
+          // Sensitive information metadata will be recorded here for columns that were not removed
+          // (Either b/c the remove flag was not turned on or b/c the remove flag was turned on and
+          // these did not make the cut
+          val sensitiveFeatureInformation = vectorInfo.flatMap(_.sensitive.get(fname))
+          FeatureInsights(
+            featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
+            metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
+            sensitiveInformation = sensitiveFeatureInformation
+          )
+      }.toSeq ++ {
+        // Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata
+        vectorInfo match {
+          case Some(v) =>
+            // Find keys where `actionTaken` is true
+            v.sensitive.collect {
+              case (fname, sensitiveFeatureInformation) if sensitiveFeatureInformation.actionTaken =>
+              val ftype = allFeatures.find(_.name == fname)
+                .map(_.typeName)
+                .getOrElse("")
+              val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
+              val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
+              val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
+              FeatureInsights(
+                featureName = fname, featureType = ftype, derivedFeatures = Seq.empty,
+                metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
+                sensitiveInformation = Some(sensitiveFeatureInformation)
+              )
+            }
+          case None => Seq.empty[FeatureInsights]
+        }
       }.toSeq
   }
 

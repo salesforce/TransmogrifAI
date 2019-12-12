@@ -376,7 +376,7 @@ trait VectorizerDefaults extends OpPipelineStageBase {
     val cols =
       if (withNullTracking) tf.flatMap { f => Seq(f.toColumnMetaData(), f.toColumnMetaData(isNull = true)) }
       else tf.map { f => f.toColumnMetaData() }
-    OpVectorMetadata(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
+    OpVectorMetadata.apply(vectorOutputName, cols, Transmogrifier.inputFeaturesToHistory(tf, stageName))
   }
 
   /**
@@ -693,6 +693,6 @@ trait MapStringPivotHelper extends SaveOthersParams {
   ): OpVectorMetadata = {
     val otherValueString = $(unseenName)
     val cols = makeVectorColumnMetadata(topValues, inputFeatures, otherValueString, trackNulls)
-    OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
+    OpVectorMetadata.apply(outputName, cols, Transmogrifier.inputFeaturesToHistory(inputFeatures, stageName))
   }
 }
