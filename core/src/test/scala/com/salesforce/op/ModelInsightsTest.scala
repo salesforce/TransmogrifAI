@@ -795,7 +795,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
 
     cardinality.foreach { case (featureName, value) =>
         val actualUniques = df.select(featureName).as[Double].distinct.collect.toSet
-        actualUniques should contain (value.valueCounts.keySet)
+        actualUniques should contain allElementsOf value.valueCounts.keySet.map(_.toDouble)
     }
   }
 
