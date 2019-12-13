@@ -35,12 +35,11 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
-import com.salesforce.op.stages.impl.feature.TextTokenizer
+import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.macros.caseclass._
 import com.twitter.algebird._
-import enumeratum.{Enum, EnumEntry}
+import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, ParamValidators, Params}
@@ -48,7 +47,6 @@ import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
 import scala.util.Try
-import scala.util.matching.Regex
 
 /**
  * Provides shared helper functions and variables for name identification and name to gender transformation.
@@ -96,23 +94,14 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     checks.forall(identity)
   }
 
-  private[op] def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
+  private[op] def dictCheck(tokens: Seq[String], dict: NameDictionary): Double = {
     if (tokens.isEmpty) 0.0 else {
-      tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+      tokens.map({ token: String => if (dict contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
 
-  private[op] def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
-    if (tokens.isEmpty) ""
-    else if (tokens.length == 1) tokens.head
-    else {
-      // Mod to accept -1 as valid index
-      tokens((index + tokens.length) % tokens.length)
-    }
-  }
-
-  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
-    genderDict.value.value.get(nameToCheckGenderOf).map(
+  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: GenderDictionary): String = {
+    genderDict.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
@@ -121,7 +110,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     text: String,
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
-    genderDict: Broadcast[GenderDictionary]
+    genderDict: GenderDictionary
   ): String = {
     strategy match {
       case FindHonorific() =>
@@ -131,7 +120,10 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
         }
         else GenderNA
       case ByIndex(index) =>
-        val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
+        val nameToCheckGenderOf = tokens.lift(index).getOrElse("")
+        genderDictCheck(nameToCheckGenderOf, genderDict)
+      case ByLast() =>
+        val nameToCheckGenderOf = tokens.lastOption.getOrElse("")
         genderDictCheck(nameToCheckGenderOf, genderDict)
       case ByRegex(pattern) =>
         text match {
@@ -149,7 +141,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
   private[op] def computeGenderResultsByStrategy(
     text: String,
     tokens: Seq[String],
-    genderDict: Broadcast[GenderDictionary]
+    genderDict: GenderDictionary
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
       val genderResult: String = identifyGender(text, tokens, strategy, genderDict)
@@ -172,8 +164,8 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       val tokens = preProcess(input)
       NameDetectStats(
         computeGuardCheckQuantities(input, tokens, hll),
-        AveragedValue(1L, dictCheck(tokens, nameDict)),
-        computeGenderResultsByStrategy(input, tokens, genderDict)
+        AveragedValue(1L, dictCheck(tokens, nameDict.value)),
+        computeGenderResultsByStrategy(input, tokens, genderDict.value)
       )
   }
 
@@ -209,55 +201,49 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
  * Name and gender data are maintained by and taken from this repository:
  *  https://github.com/MWYang/InternationalNames
  * which itself sources data from:
- *  https://ec.europa.eu/jrc/en/language-technologies/jrc-names (currently unused)
+ *  https://ec.europa.eu/jrc/en/language-technologies/jrc-names
  *  https://github.com/OpenGenderTracking/globalnamedata
  *  https://github.com/first20hours/google-10000-english
  */
 private[op] object NameDetectUtils {
   import GenderDetectStrategy._
 
-  val DefaultNameDictionary = NameDictionary()
-  case class NameDictionary
-  (
-    // Use the following line to use the smaller but less noisy gender dictionary as a source for names
-    // value: Set[String] = GenderDictionary().value.keySet
-    value: Set[String] = {
-      val nameDictionary = collection.mutable.Set.empty[String]
-      val dictionaryPath = "/Names_JRC_Combined.txt"
-      val stream = getClass.getResourceAsStream(dictionaryPath)
-      val buffer = Source.fromInputStream(stream)
-      for {name <- buffer.getLines} {
-        nameDictionary += name
-      }
-      buffer.close
-      nameDictionary.toSet[String]
+  type NameDictionary = Set[String]
+  val DefaultNameDictionary: NameDictionary = {
+    val nameDictionary = collection.mutable.Set.empty[String]
+    val dictionaryPath = "/Names_JRC_Combined.txt"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {name <- buffer.getLines} {
+      nameDictionary += name
     }
-  )
+    buffer.close
+    nameDictionary.toSet[String]
+  }
+  // Use the following line to use the smaller but less noisy gender dictionary as a source for names
+  // val DefaultNameDictionary: NameDictionary = DefaultGenderDictionary.value.keySet
 
-  val DefaultGenderDictionary = GenderDictionary()
-  case class GenderDictionary
-  (
-    value: Map[String, Double] = {
-      val genderDictionary = collection.mutable.Map.empty[String, Double]
-      val dictionaryPath = "/GenderDictionary_USandUK.csv"
-      val stream = getClass.getResourceAsStream(dictionaryPath)
-      val buffer = Source.fromInputStream(stream)
-      // In the future, we could also make use of frequency information in this dictionary
-      for {row <- buffer.getLines.drop(1)} {
-        val cols = row.split(",").map(_.trim)
-        val name = cols(0).toLowerCase().replace("\\P{L}", "")
-        val probMale = Try {
-          cols(6).toDouble
-        }.toOption
-        probMale match {
-          case Some(prob) => genderDictionary += (name -> prob)
-          case None =>
-        }
+  type GenderDictionary = Map[String, Double]
+  val DefaultGenderDictionary: GenderDictionary = {
+    val genderDictionary = collection.mutable.Map.empty[String, Double]
+    val dictionaryPath = "/GenderDictionary_USandUK.csv"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    // In the future, we could also make use of frequency information in this dictionary
+    for {row <- buffer.getLines.drop(1)} {
+      val cols = row.split(",").map(_.trim)
+      val name = cols(0).toLowerCase().replace("\\P{L}", "")
+      val probMale = Try {
+        cols(6).toDouble
+      }.toOption
+      probMale match {
+        case Some(prob) => genderDictionary += (name -> prob)
+        case None =>
       }
-      buffer.close
-      genderDictionary.toMap[String, Double]
     }
-  )
+    buffer.close
+    genderDictionary.toMap[String, Double]
+  }
 
   /**
    * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
@@ -277,7 +263,7 @@ private[op] object NameDetectUtils {
    *   which accounts for patterns like `LastName, Honorific FirstName MiddleNames`
    */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    FindHonorific(), ByIndex(0), ByIndex(-1), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
+    FindHonorific(), ByIndex(0), ByLast(), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
   )
 }
 
@@ -287,9 +273,9 @@ private[op] case class GuardCheckStats
   countAboveMinCharLength: Int = 0,
   approxMomentsOfTextLength: Moments = MomentsGroup.zero,
   approxNumUnique: HLL = new HyperLogLogMonoid(NameDetectUtils.HLLBits).zero
-) extends JsonLike
+)
 
-private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0) extends JsonLike
+private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
 
 /**
  * Defines the case class monoid that will accumulate stats on name detection in a single pass over the data
@@ -341,47 +327,6 @@ private[op] case object NameDetectStats {
   }
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
-}
-
-/**
- * Defines the different kinds of gender detection strategies that are possible
- *
- * We need to overwrite `toString` in order to provide serialization during the Spark map and reduce steps and then
- * the `fromString` function provides deserialization back to the `GenderDetectStrategy` class for the companion
- * transformer
- */
-private[op] sealed class GenderDetectStrategy extends EnumEntry with Serializable
-case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
-  val values: Seq[GenderDetectStrategy] = findValues
-  val delimiter = " WITH VALUE "
-  case class ByIndex(index: Int) extends GenderDetectStrategy {
-    override def toString: String = "ByIndex" + delimiter + index.toString
-  }
-  case class ByRegex(pattern: Regex) extends GenderDetectStrategy {
-    override def toString: String = "ByRegex" + delimiter + pattern.toString
-  }
-  case class FindHonorific() extends GenderDetectStrategy {
-    override def toString: String = "FindHonorific"
-  }
-
-  def fromString(s: String): GenderDetectStrategy = {
-    val parts = s.split(delimiter)
-    val entryName: String = parts(0)
-    entryName match {
-      case "ByIndex" => ByIndex(parts(1).toInt)
-      case "ByRegex" => ByRegex(parts(1).r)
-      case "FindHonorific" => FindHonorific()
-    }
-  }
-}
-
-private[op] sealed class SensitiveFeatureMode extends EnumEntry with Serializable
-object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
-  val values: Seq[SensitiveFeatureMode] = findValues
-
-  case object Off extends SensitiveFeatureMode
-  case object DetectOnly extends SensitiveFeatureMode
-  case object DetectAndRemove extends SensitiveFeatureMode
 }
 
 private[op] trait NameDetectParams extends Params {

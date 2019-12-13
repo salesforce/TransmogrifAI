@@ -34,10 +34,8 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.stages.impl.MetadataLike
-import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
@@ -45,8 +43,8 @@ import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Unary estimator for identifying whether a single Text column is a name or not. If the column does appear to be a
- * name, a custom map will be returned that contains the guessed gender for each entry. If the column does not appear
- * to be a name, then the output will be an empty map.
+ * name, a custom map will be returned that contains the guessed gender for each entry (gender detection only supported
+ * for English at the moment). If the column does not appear to be a name, then the output will be an empty map.
  * @param uid           uid for instance
  * @param operationName unique name of the operation this stage performs
  * @param tti           type tag for input
@@ -87,6 +85,36 @@ class HumanNameDetector[T <: Text]
   }
 }
 
+class HumanNameDetectorModel[T <: Text]
+(
+  override val uid: String,
+  val treatAsName: Boolean,
+  val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
+)(implicit tti: TypeTag[T])
+  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun {
+
+  import NameStats.BooleanStrings._
+  import NameStats.GenderStrings.GenderNA
+  import NameStats.Keys._
+  def transformFn: T => NameStats = (input: T) => {
+    val tokens = preProcess(input.value)
+    if (treatAsName) {
+      require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
+      // TODO: Figure out how to use a broadcast variable for the gender dictionary within a unary transformer
+      val genders: Seq[String] = orderedGenderDetectStrategies map {
+        identifyGender(input.value.getOrElse(""), tokens, _, NameDetectUtils.DefaultGenderDictionary)
+      }
+      val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
+      NameStats(Map(
+        IsNameIndicator -> True,
+        OriginalName -> input.value.getOrElse(""),
+        Gender -> gender
+      ))
+    }
+    else NameStats(Map.empty[String, String])
+  }
+}
+
 case class HumanNameDetectorMetadata
 (
   treatAsName: Boolean,
@@ -109,6 +137,7 @@ case class HumanNameDetectorMetadata
 
   override def toMetadata(skipUnsupported: Boolean): Metadata = toMetadata()
 }
+
 case object HumanNameDetectorMetadata {
   val TreatAsNameKey = "treatAsName"
   val PredictedNameProbKey = "predictedNameProb"
@@ -129,44 +158,5 @@ case object HumanNameDetectorMetadata {
       metadata.getDouble(PredictedNameProbKey),
       genderResultsByStrategy
     )
-  }
-}
-
-
-class HumanNameDetectorModel[T <: Text]
-(
-  override val uid: String,
-  val treatAsName: Boolean,
-  val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
-)(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun {
-
-  var broadcastGenderDict: Option[Broadcast[GenderDictionary]] = None
-
-  override def transform(dataset: Dataset[_]): DataFrame = {
-    val spark: SparkSession = dataset.sparkSession
-    this.broadcastGenderDict = Some(spark.sparkContext.broadcast(NameDetectUtils.DefaultGenderDictionary))
-    super.transform(dataset)
-  }
-
-  import NameStats.BooleanStrings._
-  import NameStats.GenderStrings.GenderNA
-  import NameStats.Keys._
-  def transformFn: T => NameStats = (input: T) => {
-    val tokens = preProcess(input.value)
-    if (treatAsName) {
-      require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
-      require(this.broadcastGenderDict.nonEmpty, "Gender dictionary broadcast variable was not initialized correctly.")
-      val genders: Seq[String] = orderedGenderDetectStrategies map {
-        identifyGender(input.value.getOrElse(""), tokens, _, this.broadcastGenderDict.get)
-      }
-      val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
-      NameStats(Map(
-        IsNameIndicator -> True,
-        OriginalName -> input.value.getOrElse(""),
-        Gender -> gender
-      ))
-    }
-    else NameStats(Map.empty[String, String])
   }
 }

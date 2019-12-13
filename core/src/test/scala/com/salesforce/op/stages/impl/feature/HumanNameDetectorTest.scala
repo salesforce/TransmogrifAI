@@ -36,8 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectUtils}
-import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
+import com.salesforce.op.utils.stages.NameDetectUtils
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
@@ -63,7 +62,7 @@ class HumanNameDetectorTest
   val expectedResult: Seq[NameStats] = Seq(NameStats(Map.empty[String, String]))
 
   private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
-    NameDetectUtils.DefaultNameDictionary.value.toList
+    NameDetectUtils.DefaultNameDictionary.toList
   )
 
   private def identifyName(data: Seq[Text]) = {
@@ -93,7 +92,7 @@ class HumanNameDetectorTest
 
   it should "detect names based on the threshold correctly" in {
     val N = 50
-    for {i <- 1 to 9} {
+    for {i <- Seq(2, 6)} {
       val numberNames = (N / 10) * i
       val names =
         NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(numberNames).toList ++
@@ -297,11 +296,11 @@ class HumanNameDetectorTest
 
   it should "produce the correct metadata" in {
     val text = "Elizabeth Warren"
-    val (data, _, model, _) = identifyName(Seq(text).toText)
+    val (_, _, model, _) = identifyName(Seq(text).toText)
     val metadata: Metadata = model.getMetadata()
     metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
       genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
-        text, estimator.preProcess(text), data.sparkSession.sparkContext.broadcast(GenderDictionary()))
+        text, estimator.preProcess(text), NameDetectUtils.DefaultGenderDictionary)
     ).toMetadata()
   }
 
