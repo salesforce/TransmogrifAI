@@ -36,7 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectUtils}
+import com.salesforce.op.utils.stages.NameDetectUtils
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith

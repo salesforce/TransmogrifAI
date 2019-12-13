@@ -35,12 +35,11 @@ import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
-import com.salesforce.op.stages.impl.feature.TextTokenizer
+import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.macros.caseclass._
 import com.twitter.algebird._
-import enumeratum.{Enum, EnumEntry}
+import com.twitter.algebird.macros.caseclass._
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, ParamValidators, Params}
@@ -48,7 +47,6 @@ import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
 import scala.util.Try
-import scala.util.matching.Regex
 
 /**
  * Provides shared helper functions and variables for name identification and name to gender transformation.
@@ -101,7 +99,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       tokens.map({ token: String => if (dict contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
-2
+
   private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: GenderDictionary): String = {
     genderDict.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
@@ -275,9 +273,9 @@ private[op] case class GuardCheckStats
   countAboveMinCharLength: Int = 0,
   approxMomentsOfTextLength: Moments = MomentsGroup.zero,
   approxNumUnique: HLL = new HyperLogLogMonoid(NameDetectUtils.HLLBits).zero
-) extends JsonLike
+)
 
-private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0) extends JsonLike
+private[op] case class GenderStats(numMale: Int = 0, numFemale: Int = 0, numOther: Int = 0)
 
 /**
  * Defines the case class monoid that will accumulate stats on name detection in a single pass over the data
@@ -329,42 +327,6 @@ private[op] case object NameDetectStats {
   }
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
-}
-
-/**
- * Defines the different kinds of gender detection strategies that are possible
- *
- * We need to overwrite `toString` in order to provide serialization during the Spark map and reduce steps and then
- * the `fromString` function provides deserialization back to the `GenderDetectStrategy` class for the companion
- * transformer
- */
-private[op] sealed class GenderDetectStrategy extends EnumEntry
-case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
-  val values: Seq[GenderDetectStrategy] = findValues
-  val delimiter = " WITH VALUE "
-  case class ByIndex(index: Int) extends GenderDetectStrategy {
-    override def toString: String = "ByIndex" + delimiter + index.toString
-  }
-  case class ByLast() extends GenderDetectStrategy {
-    override def toString: String = "ByLast"
-  }
-  case class ByRegex(pattern: Regex) extends GenderDetectStrategy {
-    override def toString: String = "ByRegex" + delimiter + pattern.toString
-  }
-  case class FindHonorific() extends GenderDetectStrategy {
-    override def toString: String = "FindHonorific"
-  }
-
-  def fromString(s: String): GenderDetectStrategy = {
-    val parts = s.split(delimiter)
-    val entryName: String = parts(0)
-    entryName match {
-      case "ByIndex" => ByIndex(parts(1).toInt)
-      case "ByLast" => ByLast()
-      case "ByRegex" => ByRegex(parts(1).r)
-      case "FindHonorific" => FindHonorific()
-    }
-  }
 }
 
 private[op] trait NameDetectParams extends Params {
