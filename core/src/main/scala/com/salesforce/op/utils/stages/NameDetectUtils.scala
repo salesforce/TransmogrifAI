@@ -102,15 +102,6 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     }
   }
 
-  private[op] def getNameFromCustomIndex(tokens: Seq[String], index: Int): String = {
-    if (tokens.isEmpty) ""
-    else if (tokens.length == 1) tokens.head
-    else {
-      // Mod to accept -1 as valid index
-      tokens((index + tokens.length) % tokens.length)
-    }
-  }
-
   private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
     genderDict.value.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
@@ -131,7 +122,10 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
         }
         else GenderNA
       case ByIndex(index) =>
-        val nameToCheckGenderOf = getNameFromCustomIndex(tokens, index)
+        val nameToCheckGenderOf = tokens.lift(index).getOrElse("")
+        genderDictCheck(nameToCheckGenderOf, genderDict)
+      case ByLast() =>
+        val nameToCheckGenderOf = tokens.lastOption.getOrElse("")
         genderDictCheck(nameToCheckGenderOf, genderDict)
       case ByRegex(pattern) =>
         text match {
@@ -277,7 +271,7 @@ private[op] object NameDetectUtils {
    *   which accounts for patterns like `LastName, Honorific FirstName MiddleNames`
    */
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    FindHonorific(), ByIndex(0), ByIndex(-1), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
+    FindHonorific(), ByIndex(0), ByLast(), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
   )
 }
 
@@ -357,6 +351,9 @@ case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   case class ByIndex(index: Int) extends GenderDetectStrategy {
     override def toString: String = "ByIndex" + delimiter + index.toString
   }
+  case class ByLast() extends GenderDetectStrategy {
+    override def toString: String = "ByLast"
+  }
   case class ByRegex(pattern: Regex) extends GenderDetectStrategy {
     override def toString: String = "ByRegex" + delimiter + pattern.toString
   }
@@ -369,6 +366,7 @@ case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
     val entryName: String = parts(0)
     entryName match {
       case "ByIndex" => ByIndex(parts(1).toInt)
+      case "ByLast" => ByLast()
       case "ByRegex" => ByRegex(parts(1).r)
       case "FindHonorific" => FindHonorific()
     }
