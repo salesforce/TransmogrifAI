@@ -247,6 +247,6 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
       FeatureDistributionType.Scoring)
 
-    FeatureDistribution.toJson(Seq(fd1)) shouldNot contain theSameElementsAs "cardEstimate"
+    FeatureDistribution.toJson(Seq(fd1)) shouldNot include ("cardEstimate")
   }
 }
