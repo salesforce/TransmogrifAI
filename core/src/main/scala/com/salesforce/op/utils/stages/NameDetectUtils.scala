@@ -203,7 +203,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
  * Name and gender data are maintained by and taken from this repository:
  *  https://github.com/MWYang/InternationalNames
  * which itself sources data from:
- *  https://ec.europa.eu/jrc/en/language-technologies/jrc-names (currently unused)
+ *  https://ec.europa.eu/jrc/en/language-technologies/jrc-names
  *  https://github.com/OpenGenderTracking/globalnamedata
  *  https://github.com/first20hours/google-10000-english
  */

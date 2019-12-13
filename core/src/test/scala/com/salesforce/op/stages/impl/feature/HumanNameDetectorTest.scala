@@ -92,7 +92,7 @@ class HumanNameDetectorTest
 
   it should "detect names based on the threshold correctly" in {
     val N = 50
-    for {i <- 1 to 9} {
+    for {i <- Seq(2, 6)} {
       val numberNames = (N / 10) * i
       val names =
         NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(numberNames).toList ++

@@ -45,8 +45,8 @@ import scala.reflect.runtime.universe.TypeTag
 
 /**
  * Unary estimator for identifying whether a single Text column is a name or not. If the column does appear to be a
- * name, a custom map will be returned that contains the guessed gender for each entry. If the column does not appear
- * to be a name, then the output will be an empty map.
+ * name, a custom map will be returned that contains the guessed gender for each entry (gender detection only supported
+ * for English at the moment). If the column does not appear to be a name, then the output will be an empty map.
  * @param uid           uid for instance
  * @param operationName unique name of the operation this stage performs
  * @param tti           type tag for input
@@ -87,52 +87,6 @@ class HumanNameDetector[T <: Text]
   }
 }
 
-case class HumanNameDetectorMetadata
-(
-  treatAsName: Boolean,
-  predictedNameProb: Double,
-  genderResultsByStrategy: Map[String, GenderStats]
-) extends MetadataLike {
-  import HumanNameDetectorMetadata._
-
-  override def toMetadata(): Metadata = {
-    val metaDataBuilder = new MetadataBuilder()
-    metaDataBuilder.putBoolean(TreatAsNameKey, treatAsName)
-    metaDataBuilder.putDouble(PredictedNameProbKey, predictedNameProb)
-    val genderResultsMetaDataBuilder = new MetadataBuilder()
-    genderResultsByStrategy foreach { case (strategyString, stats) =>
-      genderResultsMetaDataBuilder.putDoubleArray(strategyString, Array(stats.numMale, stats.numFemale, stats.numOther))
-    }
-    metaDataBuilder.putMetadata(GenderResultsByStrategyKey, genderResultsMetaDataBuilder.build())
-    metaDataBuilder.build()
-  }
-
-  override def toMetadata(skipUnsupported: Boolean): Metadata = toMetadata()
-}
-case object HumanNameDetectorMetadata {
-  val TreatAsNameKey = "treatAsName"
-  val PredictedNameProbKey = "predictedNameProb"
-  val GenderResultsByStrategyKey = "genderResultsByStrategy"
-
-  def fromMetadata(metadata: Metadata): HumanNameDetectorMetadata = {
-    val genderResultsMetadata = metadata.getMetadata(GenderResultsByStrategyKey)
-    val genderResultsByStrategy: Map[String, GenderStats] = {
-      NameDetectUtils.GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-        val strategyString = strategy.toString
-        val resultsArray = genderResultsMetadata.getDoubleArray(strategyString)
-        require(resultsArray.length == 3, "There must be exactly three values for each gender detection strategy.")
-        strategyString -> GenderStats(resultsArray(0).toInt, resultsArray(1).toInt, resultsArray(2).toInt)
-      } toMap
-    }
-    HumanNameDetectorMetadata(
-      metadata.getBoolean(TreatAsNameKey),
-      metadata.getDouble(PredictedNameProbKey),
-      genderResultsByStrategy
-    )
-  }
-}
-
-
 class HumanNameDetectorModel[T <: Text]
 (
   override val uid: String,
@@ -168,5 +122,51 @@ class HumanNameDetectorModel[T <: Text]
       ))
     }
     else NameStats(Map.empty[String, String])
+  }
+}
+
+case class HumanNameDetectorMetadata
+(
+  treatAsName: Boolean,
+  predictedNameProb: Double,
+  genderResultsByStrategy: Map[String, GenderStats]
+) extends MetadataLike {
+  import HumanNameDetectorMetadata._
+
+  override def toMetadata(): Metadata = {
+    val metaDataBuilder = new MetadataBuilder()
+    metaDataBuilder.putBoolean(TreatAsNameKey, treatAsName)
+    metaDataBuilder.putDouble(PredictedNameProbKey, predictedNameProb)
+    val genderResultsMetaDataBuilder = new MetadataBuilder()
+    genderResultsByStrategy foreach { case (strategyString, stats) =>
+      genderResultsMetaDataBuilder.putDoubleArray(strategyString, Array(stats.numMale, stats.numFemale, stats.numOther))
+    }
+    metaDataBuilder.putMetadata(GenderResultsByStrategyKey, genderResultsMetaDataBuilder.build())
+    metaDataBuilder.build()
+  }
+
+  override def toMetadata(skipUnsupported: Boolean): Metadata = toMetadata()
+}
+
+case object HumanNameDetectorMetadata {
+  val TreatAsNameKey = "treatAsName"
+  val PredictedNameProbKey = "predictedNameProb"
+  val GenderResultsByStrategyKey = "genderResultsByStrategy"
+
+  def fromMetadata(metadata: Metadata): HumanNameDetectorMetadata = {
+    val genderResultsMetadata = metadata.getMetadata(GenderResultsByStrategyKey)
+    val genderResultsByStrategy: Map[String, GenderStats] = {
+      NameDetectUtils.GenderDetectStrategies map { strategy: GenderDetectStrategy =>
+        val strategyString = strategy.toString
+        val resultsArray = genderResultsMetadata.getDoubleArray(strategyString)
+        require(resultsArray.length == 3, "There must be exactly three values for each gender detection strategy.")
+        strategyString -> GenderStats(resultsArray(0).toInt, resultsArray(1).toInt, resultsArray(2).toInt)
+      } toMap
+    }
+    HumanNameDetectorMetadata(
+      metadata.getBoolean(TreatAsNameKey),
+      metadata.getDouble(PredictedNameProbKey),
+      genderResultsByStrategy
+    )
   }
 }

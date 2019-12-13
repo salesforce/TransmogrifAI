@@ -436,7 +436,7 @@ trait RichTextFeature {
       f.transformWith(new SubstringTransformer[T, T2]().setToLowercase(toLowercase), f2)
 
     /**
-     * Check if feature is actual human names, and if so, return related demographic information
+     * Check if feature is actual human names, and if so, return related gender information (English language only)
      *
      * @param threshold optional, fraction of rows containing names before processing (default = 0.50)
      * @return NameStats, a custom map that will be empty if no name was found

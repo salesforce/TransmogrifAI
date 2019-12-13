@@ -55,7 +55,7 @@ import scala.reflect.runtime.universe.TypeTag
  * plus occurrences of non top k values and a null indicator (if enabled).
  * Non-categoricals will be converted into a vector using the hashing trick. In addition, a null indicator is created
  * for each non-categorical (if enabled).
- *
+ *r
  * @param uid uid for instance
  */
 class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(implicit tti: TypeTag[T])
