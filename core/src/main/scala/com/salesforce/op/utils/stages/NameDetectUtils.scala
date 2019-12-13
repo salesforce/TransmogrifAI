@@ -40,6 +40,7 @@ import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.twitter.algebird.Operators._
 import com.twitter.algebird._
 import com.twitter.algebird.macros.caseclass._
+import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, ParamValidators, Params}
@@ -327,6 +328,15 @@ private[op] case object NameDetectStats {
   }
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
+}
+
+private[op] sealed class SensitiveFeatureMode extends EnumEntry with Serializable
+object SensitiveFeatureMode extends Enum[SensitiveFeatureMode] {
+  val values: Seq[SensitiveFeatureMode] = findValues
+
+  case object Off extends SensitiveFeatureMode
+  case object DetectOnly extends SensitiveFeatureMode
+  case object DetectAndRemove extends SensitiveFeatureMode
 }
 
 private[op] trait NameDetectParams extends Params {

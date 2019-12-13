@@ -396,7 +396,7 @@ class SmartTextVectorizerTest
   )
 
   private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
-    NameDetectUtils.DefaultNameDictionary.value.toList
+    NameDetectUtils.DefaultNameDictionary.toList
   )
 
   it should "detect a single name feature" in {
