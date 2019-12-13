@@ -100,7 +100,7 @@ class SmartTextVectorizer[T <: Text]
     val shouldCleanText = $(cleanText)
 
     implicit val textStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
-    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = makeImplicits._2
+    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
     implicit val statsTupleMonoid: Semigroup[StatsTuple] = new Tuple2Semigroup[TextStats, NameDetectStats]()
 
     val (aggTextStats, aggNameDetectStats) = if (getSensitiveFeatureMode == Off) {

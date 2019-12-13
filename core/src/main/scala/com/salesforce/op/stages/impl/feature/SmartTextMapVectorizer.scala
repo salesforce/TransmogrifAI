@@ -38,13 +38,12 @@ import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.salesforce.op.utils.stages.NameDetectFun
+import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Monoid
 import com.twitter.algebird.macros.caseclass
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import com.twitter.algebird.{Monoid, Semigroup}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -70,7 +69,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams
     with NameDetectFun {
 
-  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
+  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
 
   private def computeTextMapStats
   (
@@ -161,7 +160,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
 
-    implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
+    implicit val textStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
       _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues)).toArray
     )
@@ -187,12 +186,17 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
  *
  * @param keyValueCounts counts of feature values
  */
-private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) extends JsonLike
+private[op] case class TextMapStats
+(
+  keyValueCounts: Map[String, TextStats],
+  nameDetectStats: Map[String, NameDetectStats] = Map.empty[String, NameDetectStats]
+) extends JsonLike
 
 private[op] object TextMapStats {
 
   def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
+    implicit val textStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCardinality)
+    implicit val nameDetectStatsMonoid: Semigroup[NameDetectStats] = NameDetectStats.monoid
     caseclass.monoid[TextMapStats]
   }
 

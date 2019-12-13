@@ -170,12 +170,6 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       )
   }
 
-  private[op] def makeImplicits: (Encoder[NameDetectStats], Monoid[NameDetectStats]) = {
-    // Create Spark encoder for our accumulator class
-    // And tell Algebird that our accumulator class is also a monoid
-    (Encoders.kryo[NameDetectStats], NameDetectStats.monoid)
-  }
-
   private[op] def makeMapFunction[T <: Text](spark: SparkSession): T#Value => NameDetectStats = {
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(DefaultNameDictionary)
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(DefaultGenderDictionary)
@@ -328,6 +322,8 @@ private[op] case object NameDetectStats {
   }
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
+
+  val kryo: Encoder[NameDetectStats] = Encoders.kryo[NameDetectStats]
 }
 
 private[op] sealed class SensitiveFeatureMode extends EnumEntry with Serializable
