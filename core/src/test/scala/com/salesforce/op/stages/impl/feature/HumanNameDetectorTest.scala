@@ -37,7 +37,6 @@ import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.stages.{GenderDetectStrategy, NameDetectUtils}
-import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
@@ -63,7 +62,7 @@ class HumanNameDetectorTest
   val expectedResult: Seq[NameStats] = Seq(NameStats(Map.empty[String, String]))
 
   private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
-    NameDetectUtils.DefaultNameDictionary.value.toList
+    NameDetectUtils.DefaultNameDictionary.toList
   )
 
   private def identifyName(data: Seq[Text]) = {
@@ -301,7 +300,9 @@ class HumanNameDetectorTest
     val metadata: Metadata = model.getMetadata()
     metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
       genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
-        text, estimator.preProcess(text), data.sparkSession.sparkContext.broadcast(GenderDictionary()))
+        text, estimator.preProcess(text),
+        data.sparkSession.sparkContext.broadcast(NameDetectUtils.DefaultGenderDictionary)
+      )
     ).toMetadata()
   }
 

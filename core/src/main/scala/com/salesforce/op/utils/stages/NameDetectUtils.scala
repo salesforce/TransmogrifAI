@@ -98,12 +98,12 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
 
   private[op] def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
     if (tokens.isEmpty) 0.0 else {
-      tokens.map({ token: String => if (dict.value.value contains token) 1 else 0}).sum.toDouble / tokens.length
+      tokens.map({ token: String => if (dict.value contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
-
+2
   private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
-    genderDict.value.value.get(nameToCheckGenderOf).map(
+    genderDict.value.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
@@ -210,48 +210,42 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
 private[op] object NameDetectUtils {
   import GenderDetectStrategy._
 
-  val DefaultNameDictionary = NameDictionary()
-  case class NameDictionary
-  (
-    // Use the following line to use the smaller but less noisy gender dictionary as a source for names
-    // value: Set[String] = GenderDictionary().value.keySet
-    value: Set[String] = {
-      val nameDictionary = collection.mutable.Set.empty[String]
-      val dictionaryPath = "/Names_JRC_Combined.txt"
-      val stream = getClass.getResourceAsStream(dictionaryPath)
-      val buffer = Source.fromInputStream(stream)
-      for {name <- buffer.getLines} {
-        nameDictionary += name
-      }
-      buffer.close
-      nameDictionary.toSet[String]
+  type NameDictionary = Set[String]
+  val DefaultNameDictionary: NameDictionary = {
+    val nameDictionary = collection.mutable.Set.empty[String]
+    val dictionaryPath = "/Names_JRC_Combined.txt"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    for {name <- buffer.getLines} {
+      nameDictionary += name
     }
-  )
+    buffer.close
+    nameDictionary.toSet[String]
+  }
+  // Use the following line to use the smaller but less noisy gender dictionary as a source for names
+  // val DefaultNameDictionary: NameDictionary = DefaultGenderDictionary.value.keySet
 
-  val DefaultGenderDictionary = GenderDictionary()
-  case class GenderDictionary
-  (
-    value: Map[String, Double] = {
-      val genderDictionary = collection.mutable.Map.empty[String, Double]
-      val dictionaryPath = "/GenderDictionary_USandUK.csv"
-      val stream = getClass.getResourceAsStream(dictionaryPath)
-      val buffer = Source.fromInputStream(stream)
-      // In the future, we could also make use of frequency information in this dictionary
-      for {row <- buffer.getLines.drop(1)} {
-        val cols = row.split(",").map(_.trim)
-        val name = cols(0).toLowerCase().replace("\\P{L}", "")
-        val probMale = Try {
-          cols(6).toDouble
-        }.toOption
-        probMale match {
-          case Some(prob) => genderDictionary += (name -> prob)
-          case None =>
-        }
+  type GenderDictionary = Map[String, Double]
+  val DefaultGenderDictionary: GenderDictionary = {
+    val genderDictionary = collection.mutable.Map.empty[String, Double]
+    val dictionaryPath = "/GenderDictionary_USandUK.csv"
+    val stream = getClass.getResourceAsStream(dictionaryPath)
+    val buffer = Source.fromInputStream(stream)
+    // In the future, we could also make use of frequency information in this dictionary
+    for {row <- buffer.getLines.drop(1)} {
+      val cols = row.split(",").map(_.trim)
+      val name = cols(0).toLowerCase().replace("\\P{L}", "")
+      val probMale = Try {
+        cols(6).toDouble
+      }.toOption
+      probMale match {
+        case Some(prob) => genderDictionary += (name -> prob)
+        case None =>
       }
-      buffer.close
-      genderDictionary.toMap[String, Double]
     }
-  )
+    buffer.close
+    genderDictionary.toMap[String, Double]
+  }
 
   /**
    * Number of bits used for hashing in HyperLogLog (HLL). Error is about 1.04/sqrt(2^{bits}).
