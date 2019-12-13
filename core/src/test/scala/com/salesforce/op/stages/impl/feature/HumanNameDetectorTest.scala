@@ -296,13 +296,11 @@ class HumanNameDetectorTest
 
   it should "produce the correct metadata" in {
     val text = "Elizabeth Warren"
-    val (data, _, model, _) = identifyName(Seq(text).toText)
+    val (_, _, model, _) = identifyName(Seq(text).toText)
     val metadata: Metadata = model.getMetadata()
     metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
       genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
-        text, estimator.preProcess(text),
-        data.sparkSession.sparkContext.broadcast(NameDetectUtils.DefaultGenderDictionary)
-      )
+        text, estimator.preProcess(text), NameDetectUtils.DefaultGenderDictionary)
     ).toMetadata()
   }
 

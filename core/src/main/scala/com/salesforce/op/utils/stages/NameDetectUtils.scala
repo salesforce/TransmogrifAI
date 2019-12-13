@@ -96,14 +96,14 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     checks.forall(identity)
   }
 
-  private[op] def dictCheck(tokens: Seq[String], dict: Broadcast[NameDictionary]): Double = {
+  private[op] def dictCheck(tokens: Seq[String], dict: NameDictionary): Double = {
     if (tokens.isEmpty) 0.0 else {
-      tokens.map({ token: String => if (dict.value contains token) 1 else 0}).sum.toDouble / tokens.length
+      tokens.map({ token: String => if (dict contains token) 1 else 0}).sum.toDouble / tokens.length
     }
   }
 2
-  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: Broadcast[GenderDictionary]): String = {
-    genderDict.value.get(nameToCheckGenderOf).map(
+  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: GenderDictionary): String = {
+    genderDict.get(nameToCheckGenderOf).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
@@ -112,7 +112,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     text: String,
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
-    genderDict: Broadcast[GenderDictionary]
+    genderDict: GenderDictionary
   ): String = {
     strategy match {
       case FindHonorific() =>
@@ -143,7 +143,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
   private[op] def computeGenderResultsByStrategy(
     text: String,
     tokens: Seq[String],
-    genderDict: Broadcast[GenderDictionary]
+    genderDict: GenderDictionary
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
       val genderResult: String = identifyGender(text, tokens, strategy, genderDict)
@@ -166,8 +166,8 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       val tokens = preProcess(input)
       NameDetectStats(
         computeGuardCheckQuantities(input, tokens, hll),
-        AveragedValue(1L, dictCheck(tokens, nameDict)),
-        computeGenderResultsByStrategy(input, tokens, genderDict)
+        AveragedValue(1L, dictCheck(tokens, nameDict.value)),
+        computeGenderResultsByStrategy(input, tokens, genderDict.value)
       )
   }
 

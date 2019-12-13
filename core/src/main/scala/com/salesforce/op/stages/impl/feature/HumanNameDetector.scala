@@ -34,10 +34,8 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.stages.impl.MetadataLike
-import com.salesforce.op.utils.stages.NameDetectUtils.GenderDictionary
 import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
-import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 
@@ -95,14 +93,6 @@ class HumanNameDetectorModel[T <: Text]
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun {
 
-  var broadcastGenderDict: Option[Broadcast[GenderDictionary]] = None
-
-  override def transform(dataset: Dataset[_]): DataFrame = {
-    val spark: SparkSession = dataset.sparkSession
-    this.broadcastGenderDict = Some(spark.sparkContext.broadcast(NameDetectUtils.DefaultGenderDictionary))
-    super.transform(dataset)
-  }
-
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings.GenderNA
   import NameStats.Keys._
@@ -110,9 +100,9 @@ class HumanNameDetectorModel[T <: Text]
     val tokens = preProcess(input.value)
     if (treatAsName) {
       require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
-      require(this.broadcastGenderDict.nonEmpty, "Gender dictionary broadcast variable was not initialized correctly.")
+      // TODO: Figure out how to use a broadcast variable for the gender dictionary within a unary transformer
       val genders: Seq[String] = orderedGenderDetectStrategies map {
-        identifyGender(input.value.getOrElse(""), tokens, _, this.broadcastGenderDict.get)
+        identifyGender(input.value.getOrElse(""), tokens, _, NameDetectUtils.DefaultGenderDictionary)
       }
       val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
       NameStats(Map(
