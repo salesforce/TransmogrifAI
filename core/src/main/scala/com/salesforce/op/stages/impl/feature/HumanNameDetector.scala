@@ -65,7 +65,7 @@ class HumanNameDetector[T <: Text]
 ) with NameDetectFun {
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
-    implicit val (nameDetectStatsEnc, nameDetectStatsMonoid) = makeImplicits
+    implicit val (nameDetectStatsEnc, nameDetectStatsMonoid) = (NameDetectStats.kryo, NameDetectStats.monoid)
     val mapFun: T#Value => NameDetectStats = makeMapFunction(dataset.sparkSession)
     val aggResults: NameDetectStats = dataset.map(mapFun).reduce(_ + _)
     val treatAsName = computeTreatAsName(aggResults)
