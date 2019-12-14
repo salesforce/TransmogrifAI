@@ -37,9 +37,8 @@ import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
-import com.twitter.algebird.Operators._
 import com.twitter.algebird._
-import com.twitter.algebird.macros.caseclass._
+import com.twitter.algebird.macros.caseclass
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
@@ -303,23 +302,13 @@ private[op] case class NameDetectStats
   }
 }
 private[op] case object NameDetectStats {
-  def monoid: Monoid[NameDetectStats] = new Monoid[NameDetectStats] {
-    // Ideally, we could have avoided defining all of this
-    // but Algebird's case class macro is not documented (at all) and spotty
-    override def plus(l: NameDetectStats, r: NameDetectStats): NameDetectStats = NameDetectStats(
-      GuardCheckStats(
-        l.guardCheckQuantities.countBelowMaxNumTokens + r.guardCheckQuantities.countBelowMaxNumTokens,
-        l.guardCheckQuantities.countAboveMinCharLength + r.guardCheckQuantities.countAboveMinCharLength,
-        MomentsGroup.plus(
-          l.guardCheckQuantities.approxMomentsOfTextLength,
-          r.guardCheckQuantities.approxMomentsOfTextLength
-        ),
-        l.guardCheckQuantities.approxNumUnique + r.guardCheckQuantities.approxNumUnique
-      ),
-      l.dictCheckResult + r.dictCheckResult,
-      l.genderResultsByStrategy + r.genderResultsByStrategy
-    )
-    override def zero: NameDetectStats = NameDetectStats.empty
+  def monoid: Monoid[NameDetectStats] = {
+    implicit val hllMonoid: Monoid[HLL] = new HyperLogLogMonoid(NameDetectUtils.HLLBits)
+    implicit val momentsMonoid: Monoid[Moments] = MomentsAggregator.monoid
+    implicit val averagedValueMonoid: Monoid[AveragedValue] = AveragedGroup
+    implicit val guardCheckStatsMonoid: Monoid[GuardCheckStats] = caseclass.monoid[GuardCheckStats]
+    implicit val genderStatsMonoid: Monoid[GenderStats] = caseclass.monoid[GenderStats]
+    caseclass.monoid[NameDetectStats]
   }
 
   def empty: NameDetectStats = NameDetectStats(GuardCheckStats(), AveragedGroup.zero, Map.empty[String, GenderStats])
