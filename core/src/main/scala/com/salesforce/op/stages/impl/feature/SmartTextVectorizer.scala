@@ -109,11 +109,11 @@ class SmartTextVectorizer[T <: Text]
         Array.fill[NameDetectStats](inN.length)(NameDetectStats.empty)
       )
     } else {
-      val mapFun = makeMapFunction(dataset.sparkSession)
+      val nameDetectMapFun = makeMapFunction(dataset.sparkSession)
       dataset.map(_.map(input =>
         (
           computeTextStats(input, shouldCleanText),
-          mapFun(input)
+          nameDetectMapFun(input)
         )
       ).toArray).reduce(_ + _).unzip
     }

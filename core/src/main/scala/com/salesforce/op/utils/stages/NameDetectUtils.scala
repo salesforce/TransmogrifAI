@@ -170,7 +170,8 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       )
   }
 
-  private[op] def makeMapFunction[T <: Text](spark: SparkSession): T#Value => NameDetectStats = {
+  type NameDetectMapFun[T <: Text] = T#Value => NameDetectStats
+  private[op] def makeMapFunction[T <: Text](spark: SparkSession): NameDetectMapFun[T] = {
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(DefaultNameDictionary)
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(DefaultGenderDictionary)
     val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)

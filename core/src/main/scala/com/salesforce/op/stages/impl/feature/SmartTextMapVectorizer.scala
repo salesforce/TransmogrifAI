@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.stages.SensitiveFeatureMode._
 import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
@@ -73,12 +74,14 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
   private def computeTextMapStats
   (
-    textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean
+    textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean, nameDetectMapFun: NameDetectMapFun[Text]
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1))
     }
-    TextMapStats(keyValueCounts)
+    val nameDetectStats = if (getSensitiveFeatureMode == Off) Map.empty[String, NameDetectStats]
+    else textMap.map{ case (k, v) => cleanTextFn(k, shouldCleanKeys) -> nameDetectMapFun(v) }
+    TextMapStats(keyValueCounts, nameDetectStats)
   }
 
   private def makeHashingParams() = HashingFunctionParams(
@@ -132,7 +135,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldTrackNulls = $(trackNulls)
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
-      textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
+      val featureInfoBeforeSensitive = textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         val whichAction = if (textStats.valueCounts.size <= maxCard) Categorical else NonCategorical
         val topVals = if (whichAction == Categorical) {
           textStats.valueCounts
@@ -142,6 +145,15 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         } else Array.empty[String]
         SmartTextFeatureInfo(key = k, whichAction = whichAction, topValues = topVals)
       }
+
+      if (shouldRemoveSensitive) textMapStats.nameDetectStats.toSeq.zip(featureInfoBeforeSensitive) map {
+        case ((k, nameDetectStats), previousFeatureInfo) =>
+        val treatAsName = computeTreatAsName(nameDetectStats)
+        SmartTextFeatureInfo(key = k,
+          whichAction = if (treatAsName) Sensitive else previousFeatureInfo.whichAction,
+          topValues = previousFeatureInfo.topValues
+        )
+      } else featureInfoBeforeSensitive
     }
 
     SmartTextMapVectorizerModelArgs(
@@ -161,10 +173,22 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanValues = $(cleanText)
 
     implicit val textStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
+    val nameDetectMapFun = makeMapFunction(dataset.sparkSession)
+
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues)).toArray
+      _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, nameDetectMapFun)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
+
+    // TODO: Delete the following debugging tests
+    println(
+      aggregatedStats.flatMap(_.nameDetectStats.toSeq.map { case (k, v) => f"$k -> ${v.toString}" })
+        .mkString(",")
+    )
+    import dataset.sparkSession.implicits._
+    dataset.map(_.map(
+      _.toSeq.map { case (k, v) => k -> (v, preProcess(v)) }
+    )).show(truncate = false)
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 

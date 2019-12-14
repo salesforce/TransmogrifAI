@@ -412,17 +412,19 @@ class SmartTextMapVectorizerTest
     val baseNames = Seq("Michael", "Michelle", "Roxanne", "Ross").toText :+ Text.empty
 
     val textMap1: Seq[TextMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextMap(Map("text1" -> a.toString, "text2" -> b.toString, "name" -> c.toString))
+      TextMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse(""), "name" -> c.value.getOrElse("")))
     }
     val textMap2: Seq[TextMap] = Seq.fill[TextMap](N)(TextMap.empty)
 
     val textAreaMap1: Seq[TextAreaMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextAreaMap(Map("text1" -> a.toString, "text2" -> b.toString, "name" -> c.toString))
+      TextAreaMap(Map(
+        "text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse(""), "name" -> c.value.getOrElse("")
+      ))
     }
     val textAreaMap2: Seq[TextAreaMap] = Seq.fill[TextAreaMap](N)(TextAreaMap.empty)
 
-    val nameTextMap: Seq[TextMap] = baseNames map { v => TextMap(Map("name" -> v.toString)) }
-    val nameTextAreaMap: Seq[TextAreaMap] = baseNames map { v => TextAreaMap(Map("name" -> v.toString)) }
+    val nameTextMap: Seq[TextMap] = baseNames map { v => TextMap(Map("name" -> v.value.getOrElse(""))) }
+    val nameTextAreaMap: Seq[TextAreaMap] = baseNames map { v => TextAreaMap(Map("name" -> v.value.getOrElse(""))) }
 
     val allFeatures = Seq(
       baseText1,      // f0
@@ -438,6 +440,7 @@ class SmartTextMapVectorizerTest
     assert(allFeatures.forall(_.length == N))
     TestFeatureBuilder(allFeatures: _*)
   }
+  newInputData.show(truncate = false)
 
   val newF0: Feature[Text] = features(0).asInstanceOf[Feature[Text]]
   val newF1: Feature[Text] = features(1).asInstanceOf[Feature[Text]]
