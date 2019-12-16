@@ -90,12 +90,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val (isCategorical, isIgnorable, topValues) = aggregatedStats.map { stats =>
       val isCategorical = stats.valueCounts.size <= maxCard
-      // Simplest method is a std deviation of the lengths
-      println(s"stats.lengthStdDev: ${stats.lengthStdDev}")
       val isIgnorable = stats.lengthStdDev <= minLenStdDev
-      println(s"isCategorical: $isCategorical")
-      println(s"isIgnorable: $isIgnorable")
-      println()
       val topValues = stats.valueCounts
         .filter { case (_, count) => count >= $(minSupport) }
         .toSeq.sortBy(v => -v._2 -> v._1)
@@ -143,13 +138,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       SmartTextVectorizer.partition[Boolean](smartTextParams.isIgnorable, smartTextParams.isCategorical)
     val (textFeaturesIgnorable, textFeatures) = SmartTextVectorizer
       .partition[TransientFeature](allTextFeatures, isIgnorableText)
-
-    println(s"allTextFeatures:")
-    allTextFeatures.foreach(f => println(f.name))
-    println()
-    println(s"textFeatures: ${textFeatures.toList}")
-    textFeatures.foreach(f => println(f.name))
-    println()
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -266,6 +254,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     )
     (row: Seq[Text]) => {
       val (rowCategorical, rowTextAll) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
+      // Also need to partition the masking array so that the correct features are still split out as ignorable
       val (_, isIgnorableText) = SmartTextVectorizer.partition[Boolean](args.isIgnorable, args.isCategorical)
       val (rowTextIgnorable, rowText) = SmartTextVectorizer.partition[Text](rowTextAll, isIgnorableText)
 

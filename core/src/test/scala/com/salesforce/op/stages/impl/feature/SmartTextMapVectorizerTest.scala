@@ -108,7 +108,7 @@ class SmartTextMapVectorizerTest
     )
     TextMapStats.monoid(2).sumOption(data) shouldBe Some(TextMapStats(Map(
       "f1" -> TextStats(Map("hello" -> 3, "world" -> 1), Map(5 -> 4)),
-      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5), Map(5 -> 10)),
+      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5), Map(5 -> 11)),
       "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
     )))
   }
