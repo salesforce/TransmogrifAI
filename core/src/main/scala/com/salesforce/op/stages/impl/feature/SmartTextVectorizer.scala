@@ -91,14 +91,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val (isCategorical, isIgnorable, topValues) = aggregatedStats.map { stats =>
       val isCategorical = stats.valueCounts.size <= maxCard
       // Simplest method is a std deviation of the lengths
-      val lengthSize = stats.lengthCounts.values.sum
-      val lengthMean = stats.lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2)/lengthSize
-      val lengthVariance = stats.lengthCounts.foldLeft(0.0)(
-        (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
-      )
-      val lengthStdDev = math.sqrt(lengthVariance / lengthSize)
-      println(s"LengthStdDev: $lengthStdDev \n")
-      val isIgnorable = lengthStdDev <= minLenStdDev
+      println(s"stats.lengthStdDev: ${stats.lengthStdDev}")
+      val isIgnorable = stats.lengthStdDev <= minLenStdDev
+      println(s"isCategorical: $isCategorical")
+      println(s"isIgnorable: $isIgnorable")
+      println()
       val topValues = stats.valueCounts
         .filter { case (_, count) => count >= $(minSupport) }
         .toSeq.sortBy(v => -v._2 -> v._1)
@@ -139,8 +136,13 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
     require(inN.length == smartTextParams.isCategorical.length)
 
-    val (categoricalFeatures, textFeatures) =
+    val (categoricalFeatures, allTextFeatures) =
       SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.isCategorical)
+    val (textFeaturesIgnorable, textFeatures) = SmartTextVectorizer
+      .partition[TransientFeature](allTextFeatures, smartTextParams.isIgnorable)
+
+    println(s"allTextFeatures: $allTextFeatures")
+    println(s"textFeatures: $textFeatures")
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -153,12 +155,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val textColumns = if (textFeatures.nonEmpty) {
       if (shouldTrackLen) {
         makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
-          textFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
-          textFeatures.map(_.toColumnMetaData(isNull = true))
+          allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
+          allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
         makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
-          textFeatures.map(_.toColumnMetaData(isNull = true))
+          allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
 
@@ -179,12 +181,21 @@ object SmartTextVectorizer {
 /**
  * Summary statistics of a text feature
  *
- * @param valueCounts counts of feature values
+ * @param valueCounts  counts of feature values
+ * @param lengthCounts counts of token lengths
  */
 private[op] case class TextStats(
   valueCounts: Map[String, Int],
   lengthCounts: Map[Int, Int]
-) extends JsonLike
+) extends JsonLike {
+
+  val lengthSize = lengthCounts.values.sum
+  val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
+  val lengthVariance: Double = lengthCounts.foldLeft(0.0)(
+    (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
+  )
+  val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
+}
 
 private[op] object TextStats {
   def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
@@ -252,9 +263,12 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
 
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
+      val ignorableTextTokens: Seq[TextList] = rowTextIgnorable.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
-      val textNullIndicatorsVector = if (args.shouldTrackNulls) getNullIndicatorsVector(textTokens) else OPVector.empty
-      val textLenVector = if ($(trackTextLen)) getLenVector(textTokens) else OPVector.empty
+      val textNullIndicatorsVector = if (args.shouldTrackNulls) {
+        getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
+      } else OPVector.empty
+      val textLenVector = if ($(trackTextLen)) getLenVector(textTokens ++ ignorableTextTokens) else OPVector.empty
 
       categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
     }

@@ -71,7 +71,7 @@ class SmartTextVectorizerTest
   /* Generate some more complicated input data to check things a little closer. There are three text fields with
     different token distributions:
     Country: Uniformly distributed from a larger list of ~few hundred countries
-    Picklist: Unitformly distributed from a small list of 9 choices
+    Picklist: Uniformly distributed from a small list of 9 choices
     Text: Uniformly distributed unicode strings with lengths ranging from 0-100
 
     The Picklist should be picked up as a categorical
@@ -79,15 +79,20 @@ class SmartTextVectorizerTest
     easier way to generate stuff with a probability distribution that follows a specified function)
     The text distribution should be picked up as text and pass the length distribution
    */
-  val countryData: Seq[Country] = RandomText.countries.withProbabilityOfEmpty(0.2).take(1000).toList
-  val pickListData: Seq[PickList] = RandomText.pickLists(domain = List("A", "B", "C", "D", "E", "F", "G", "H", "I"))
+  val countryData: Seq[Text] = RandomText.countries.withProbabilityOfEmpty(0.2).limit(1000)
+  val categoricalTextData: Seq[Text] = RandomText.textFromDomain(domain = List("A", "B", "C", "D", "E", "F"))
     .withProbabilityOfEmpty(0.2).limit(1000)
+  // Generate List containing elements like 040231, 040232, ...
+  val textIdData: Seq[Text] = RandomText.textFromDomain(
+    domain = (1 to 1000).map(x => "%06d".format(40230 + x)).toList
+  ).withProbabilityOfEmpty(0.2).limit(1000)
   val textData: Seq[Text] = RandomText.strings(minLen = 0, maxLen = 100).withProbabilityOfEmpty(0.2).limit(1000)
-  val generatedData: Seq[(Country, PickList, Text)] =
-    countryData.zip(pickListData).zip(textData).map {
-      case ((co, pi), te) => (co, pi, te)
+  val generatedData: Seq[(Text, Text, Text, Text)] =
+    countryData.zip(categoricalTextData).zip(textIdData).zip(textData).map {
+      case (((co, ca), id), te) => (co, ca, id, te)
     }
-  val (rawDF, rawCountry, rawPickList, rawText) = TestFeatureBuilder("country", "picklist", "text", generatedData)
+  val (rawDF, rawCountry, rawCategorical, rawTextId, rawText) = TestFeatureBuilder(
+    "country", "categorical", "textId", "text", generatedData)
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
@@ -191,6 +196,32 @@ class SmartTextVectorizerTest
     regular shouldBe shortcut
   }
 
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low token length variance" in {
+    rawDF.show(20)
+
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(10).setNumFeatures(5).setMinSupport(10).setTopK(3).setMinLengthStdDev(1.0)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+    result.take(10).foreach(println)
+    println()
+
+    // Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+    // one ignored text field
+    // Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+    // Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+    // Ignored text: (1 length + 1 null indicator) = 2 elements
+
+    // result.head.v.size shouldBe 21
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.foreach(println)
+  }
+
   it should "fail with an error" in {
     val emptyDF = inputData.filter(inputData("text1") === "").toDF()
 
@@ -212,6 +243,7 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.foreach(println)
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 9
     meta.columns.foreach { col =>
@@ -406,6 +438,15 @@ class SmartTextVectorizerTest
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
+  }
+
+  it should "compute correct statistics on the length distributions" in {
+    val ts = TextStats(Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2))
+
+    ts.lengthSize shouldBe 5
+    ts.lengthMean shouldBe 4.0
+    ts.lengthVariance shouldBe 4.0
+    ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
   }
 
 }
