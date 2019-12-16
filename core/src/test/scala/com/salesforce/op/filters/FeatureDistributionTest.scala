@@ -253,11 +253,9 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val json =
       """[{"name":"A","count":10,"nulls":1,"distribution":[1.0,4.0,0.0,0.0,6.0],
         |"summaryInfo":[],"moments":{"m0":1,"m1":1.0,"m2":0.0,"m3":0.0,"m4":0.0},
-        |"cardEstimate":{"valueCounts":{"foo":1,"bar":2}},"type":"Scoring"}]
-        |""".stripMargin
-    FeatureDistribution.fromJson(json) match {
-      case Success(r) => r shouldBe Seq(fd1)
-      case Failure(e) => fail(e)
-    }
+        |"cardEstimate":{"valueCounts":{"foo":1,"bar":2}},"type":"Scoring"},
+        |{"name":"A","count":20,"nulls":20,"distribution":[2.0,8.0,0.0,0.0,12.0],
+        |"summaryInfo":[],"type":"Scoring"}]""".stripMargin
+    FeatureDistribution.fromJson(json) shouldBe Success(Seq(fd1, fd2))
   }
 }
