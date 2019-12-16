@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.Feature
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -396,6 +397,69 @@ class SmartTextMapVectorizerTest
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
+  }
+
+  it should "treat null entries the same way as SmartTextVectorizer (i.e. ignoring them)" in {
+    // Note that if nulls are treated as their own category, the following feature has three categories
+    // while the maxCardinality is set for 2 for each estimator in the test
+    val categoricalText: Seq[Text] = Seq("red", "blue", "blue").toText ++ Seq(Text.empty, Text.empty)
+    val nonCategoricalText: Seq[Text] =
+      Seq("hello, how are you", "good yourself?", "not bad").toText ++ Seq(Text.empty, Text.empty)
+    val textMap: Seq[TextMap] = categoricalText.zip(nonCategoricalText) map { case (categorical, nonCategorical) =>
+      TextMap(Map("categorical" -> categorical.value.getOrElse(""),
+        "nonCategorical" -> nonCategorical.value.getOrElse("")))
+    }
+    val textAreaMap: Seq[TextMap] = categoricalText.zip(nonCategoricalText) map { case (categorical, nonCategorical) =>
+      TextAreaMap(Map("categorical" -> categorical.value.getOrElse(""),
+        "nonCategorical" -> nonCategorical.value.getOrElse("")))
+    }
+    val (data, features) = TestFeatureBuilder(categoricalText, nonCategoricalText, textMap, textAreaMap)
+    val (f_categorical, f_nonCategorical, f_textMap, f_textAreaMap) = (
+      features(0).asInstanceOf[Feature[Text]],
+      features(1).asInstanceOf[Feature[Text]],
+      features(2).asInstanceOf[Feature[TextMap]],
+      features(3).asInstanceOf[Feature[TextAreaMap]]
+    )
+
+    val textVectorized = new SmartTextVectorizer[Text]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setInput(f_categorical, f_nonCategorical).getOutput()
+    val textMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setInput(f_textMap).getOutput()
+    val textAreaMapVectorized = new SmartTextMapVectorizer[TextAreaMap]()
+      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setInput(f_textAreaMap).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(
+      textVectorized, textMapVectorized, textAreaMapVectorized).transform(data)
+    val result = transformed.collect(textVectorized, textMapVectorized, textAreaMapVectorized)
+
+    val field = transformed.schema(textVectorized.name)
+      assertNominal(field, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(textVectorized))
+    val meta = OpVectorMetadata(transformed.schema(textVectorized.name))
+
+    Seq((textMapVectorized, f_textMap), (textAreaMapVectorized, f_textAreaMap)) foreach { case (output, input) =>
+      val fieldMap = transformed.schema(output.name)
+      assertNominal(fieldMap, Array.fill(4)(true) ++ Array.fill(4)(false) :+ true, transformed.collect(output))
+      val mapMeta = OpVectorMetadata(transformed.schema(output.name))
+      mapMeta.history.keys shouldBe Set(input.name)
+      mapMeta.columns.length shouldBe meta.columns.length
+
+      mapMeta.columns.zip(meta.columns).foreach { case (m, f) =>
+        m.parentFeatureName shouldBe Array(input.name)
+        m.parentFeatureType shouldBe Array(input.typeName)
+        m.grouping shouldBe f.grouping
+        m.indicatorValue shouldBe f.indicatorValue
+      }
+    }
+
+    result.foreach { case (vec1, vec2, vec3) =>
+      vec1 shouldBe vec2
+      vec2 shouldBe vec3
+    }
   }
 
 }
