@@ -138,11 +138,18 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val (categoricalFeatures, allTextFeatures) =
       SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.isCategorical)
+    // Also need to partition the masking array so that the correct features are still split out as ignorable
+    val (_, isIgnorableText) =
+      SmartTextVectorizer.partition[Boolean](smartTextParams.isIgnorable, smartTextParams.isCategorical)
     val (textFeaturesIgnorable, textFeatures) = SmartTextVectorizer
-      .partition[TransientFeature](allTextFeatures, smartTextParams.isIgnorable)
+      .partition[TransientFeature](allTextFeatures, isIgnorableText)
 
-    println(s"allTextFeatures: $allTextFeatures")
-    println(s"textFeatures: $textFeatures")
+    println(s"allTextFeatures:")
+    allTextFeatures.foreach(f => println(f.name))
+    println()
+    println(s"textFeatures: ${textFeatures.toList}")
+    textFeatures.foreach(f => println(f.name))
+    println()
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
@@ -259,7 +266,8 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
     )
     (row: Seq[Text]) => {
       val (rowCategorical, rowTextAll) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
-      val (rowTextIgnorable, rowText) = SmartTextVectorizer.partition[Text](rowTextAll, args.isIgnorable)
+      val (_, isIgnorableText) = SmartTextVectorizer.partition[Boolean](args.isIgnorable, args.isCategorical)
+      val (rowTextIgnorable, rowText) = SmartTextVectorizer.partition[Text](rowTextAll, isIgnorableText)
 
       val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
       val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)

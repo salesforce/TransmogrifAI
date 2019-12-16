@@ -197,10 +197,11 @@ class SmartTextVectorizerTest
   }
 
   it should "detect and ignore fields that looks like machine-generated IDs by having a low token length variance" in {
-    rawDF.show(20)
+    val topKCategorial = 3
+    val hashSize = 5
 
     val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(10).setNumFeatures(5).setMinSupport(10).setTopK(3).setMinLengthStdDev(1.0)
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial).setMinLengthStdDev(1.0)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()
@@ -215,11 +216,16 @@ class SmartTextVectorizerTest
     // Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
     // Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
     // Ignored text: (1 length + 1 null indicator) = 2 elements
-
-    // result.head.v.size shouldBe 21
+    val firstRes = result.head
+    firstRes.v.size shouldBe 2 * (hashSize + 2) + (topKCategorial + 2) + 2
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
-    meta.columns.foreach(println)
+    meta.columns.size shouldBe 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
   it should "fail with an error" in {
