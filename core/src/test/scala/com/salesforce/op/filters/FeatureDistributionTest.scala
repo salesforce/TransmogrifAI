@@ -246,7 +246,9 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
       Array.empty, Some(Moments(1.0)), Some(TextStats(Map("foo" -> 1, "bar" ->2))),
       FeatureDistributionType.Scoring)
-    FeatureDistribution.toJson(Seq(fd1)) shouldNot include ("cardEstimate")
+    val fd2 = FeatureDistribution("A", None, 20, 20, Array(2, 8, 0, 0, 12),
+      Array.empty, None, None, FeatureDistributionType.Scoring)
+    FeatureDistribution.toJson(Seq(fd1, fd2)) shouldNot include ("cardEstimate")
 
     val json =
       """[{"name":"A","count":10,"nulls":1,"distribution":[1.0,4.0,0.0,0.0,6.0],
