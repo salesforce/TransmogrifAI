@@ -259,7 +259,9 @@ case class SmartTextMapVectorizerModelArgs
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
-    featureInfoSeq.partition{ _.whichAction == Categorical }
+    featureInfoSeq
+      .filter { _.whichAction != Sensitive }
+      .partition { _.whichAction == Categorical }
   }.unzip
   val categoricalKeys: Seq[Seq[String]] = categoricalFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
   val textKeys: Seq[Seq[String]] = textFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))

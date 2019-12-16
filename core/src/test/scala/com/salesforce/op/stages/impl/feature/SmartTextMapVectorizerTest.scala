@@ -466,7 +466,7 @@ class SmartTextMapVectorizerTest
     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
     .setInput(newF3, newF4)
 
-  val biasMapAreaEstimator: SmartTextMapVectorizer[TextAreaMap] = new SmartTextMapVectorizer()
+  val biasAreaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = new SmartTextMapVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -483,34 +483,57 @@ class SmartTextMapVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
     mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Sensitive)
+
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF8)
+    val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+    areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Sensitive)
   }
-  //
-  // it should "detect a single name feature and return empty vectors" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
-  //   newInputData.show()
-  //
-  //   val smartVectorized = newEstimator.getOutput()
-  //   val transformed = new OpWorkflow()
-  //     .setResultFeatures(smartVectorized).transform(newInputData)
-  //   val result = transformed.collect(smartVectorized)
-  //   val (smart, expected) = result.map(smartVector => smartVector -> OPVector.empty).unzip
-  //
-  //   smart shouldBe expected
-  //   OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe 0
-  // }
-  //
-  // it should "detect a single name column among other non-name Text columns" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
-  //   val model: SmartTextVectorizerModel[Text] = newEstimator
-  //     .fit(newInputData)
-  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
-  //   newInputData.show()
-  //   model.args.whichAction shouldBe Array(Categorical, NonCategorical, Sensitive)
-  // }
-  //
+
+  it should "detect a single name feature and return empty vectors" in {
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF7)
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF8)
+
+    val smartVectorized = mapEstimator.getOutput()
+    val smartAreaVectorized = areaMapEstimator.getOutput()
+    val transformed = new OpWorkflow()
+      .setResultFeatures(smartVectorized, smartAreaVectorized).transform(newInputData)
+    val result1 = transformed.collect(smartVectorized)
+    val result2 = transformed.collect(smartAreaVectorized)
+    val (smart1, expected1) = result1.map(smartVector => smartVector -> OPVector.empty).unzip
+    val (smart2, expected2) = result2.map(smartVector => smartVector -> OPVector.empty).unzip
+
+    smart1 shouldBe expected1
+    smart2 shouldBe expected2
+
+    OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe 0
+    OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe 0
+  }
+
+  it should "detect a single name column among other non-name Text columns" in {
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4)
+    val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+    println(mapModel.args.allFeatureInfo)
+    mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
+      Array(NonCategorical, NonCategorical, Sensitive)
+      // If we fix null tracking this should actually be:
+      // Array(Categorical, NonCategorical, Sensitive)
+
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
+    val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+    areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
+      Array(NonCategorical, NonCategorical, Sensitive)
+      // If we fix null tracking this should actually be:
+      // Array(Categorical, NonCategorical, Sensitive)
+
+  }
+
   // it should "not create information in the vector for a single name column among other non-name Text columns" in {
-  //   newInputData.show()
-  //
   //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
   //   val withNamesVectorized = newEstimator.getOutput()
   //
@@ -521,7 +544,7 @@ class SmartTextMapVectorizerTest
   //     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
   //     .setInput(newF1, newF2)
   //   val withoutNamesVectorized = oldEstimator.getOutput()
-  //
+
   //   val transformed = new OpWorkflow()
   //     .setResultFeatures(withNamesVectorized, withoutNamesVectorized).transform(newInputData)
   //   val result = transformed.collect(withNamesVectorized, withoutNamesVectorized)
