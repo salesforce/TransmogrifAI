@@ -133,6 +133,11 @@ class SmartTextVectorizer[T <: Text]
       case (_, _) => NonCategorical
     })
 
+    // TODO: Delete these printing logs
+    aggTextStats foreach { stats =>
+      println(stats)
+    }
+
     val smartTextParams = SmartTextVectorizerModelArgs(
       whichAction = actionsToTake,
       topValues = topValues,

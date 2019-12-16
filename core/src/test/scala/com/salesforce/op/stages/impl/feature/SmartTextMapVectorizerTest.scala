@@ -415,6 +415,9 @@ class SmartTextMapVectorizerTest
       TextMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse(""), "name" -> c.value.getOrElse("")))
     }
     val textMap2: Seq[TextMap] = Seq.fill[TextMap](N)(TextMap.empty)
+    val textMap3: Seq[TextMap] = (baseText1, baseText2).zipped.map { case (a, b) =>
+      TextMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse("")))
+    }
 
     val textAreaMap1: Seq[TextAreaMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
       TextAreaMap(Map(
@@ -422,20 +425,25 @@ class SmartTextMapVectorizerTest
       ))
     }
     val textAreaMap2: Seq[TextAreaMap] = Seq.fill[TextAreaMap](N)(TextAreaMap.empty)
+    val textAreaMap3: Seq[TextAreaMap] = (baseText1, baseText2).zipped.map { case (a, b) =>
+      TextAreaMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse("")))
+    }
 
     val nameTextMap: Seq[TextMap] = baseNames map { v => TextMap(Map("name" -> v.value.getOrElse(""))) }
     val nameTextAreaMap: Seq[TextAreaMap] = baseNames map { v => TextAreaMap(Map("name" -> v.value.getOrElse(""))) }
 
     val allFeatures = Seq(
-      baseText1,      // f0
-      baseText2,      // f1
-      baseNames,      // f2
-      textMap1,       // f3
-      textMap2,       // f4
-      textAreaMap1,   // f5
-      textAreaMap2,   // f6
-      nameTextMap,    // f7
-      nameTextAreaMap // f8
+      baseText1,       // f0
+      baseText2,       // f1
+      baseNames,       // f2
+      textMap1,        // f3
+      textMap2,        // f4
+      textAreaMap1,    // f5
+      textAreaMap2,    // f6
+      nameTextMap,     // f7
+      nameTextAreaMap, // f8
+      textMap3,        // f9
+      textAreaMap3     // f10
     )
     assert(allFeatures.forall(_.length == N))
     TestFeatureBuilder(allFeatures: _*)
@@ -451,6 +459,8 @@ class SmartTextMapVectorizerTest
   val newF6: Feature[TextAreaMap] = features(6).asInstanceOf[Feature[TextAreaMap]]
   val newF7: Feature[TextMap] = features(7).asInstanceOf[Feature[TextMap]]
   val newF8: Feature[TextAreaMap] = features(8).asInstanceOf[Feature[TextAreaMap]]
+  val newF9: Feature[TextMap] = features(9).asInstanceOf[Feature[TextMap]]
+  val newF10: Feature[TextAreaMap] = features(10).asInstanceOf[Feature[TextAreaMap]]
 
   val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
@@ -533,28 +543,41 @@ class SmartTextMapVectorizerTest
 
   }
 
-  // it should "not create information in the vector for a single name column among other non-name Text columns" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
-  //   val withNamesVectorized = newEstimator.getOutput()
-  //
-  //   val oldEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer(uid = UID("newEstimator"))
-  //     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
-  //     .setTopK(2).setPrependFeatureName(false)
-  //     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-  //     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
-  //     .setInput(newF1, newF2)
-  //   val withoutNamesVectorized = oldEstimator.getOutput()
+  it should "not create information in the vector for a single name column among other non-name Text columns" in {
+    {
+      val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4)
+      val mapOutput = mapEstimator.getOutput()
 
-  //   val transformed = new OpWorkflow()
-  //     .setResultFeatures(withNamesVectorized, withoutNamesVectorized).transform(newInputData)
-  //   val result = transformed.collect(withNamesVectorized, withoutNamesVectorized)
-  //
-  //   val (withNames, withoutNames) = result.unzip
-  //
-  //   withNames shouldBe withoutNames
-  //
-  //   OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe
-  //     OpVectorMetadata("OutputVector", oldEstimator.getMetadata()).size
-  // }
+      val oldMapEstimator: SmartTextMapVectorizer[TextMap] = estimator.setInput(newF9, newF4)
+      val withoutNamesVectorized = oldMapEstimator.getOutput()
+
+      val transformed = new OpWorkflow()
+        .setResultFeatures(mapOutput, withoutNamesVectorized).transform(newInputData)
+      val result = transformed.collect(mapOutput, withoutNamesVectorized)
+      val (withNames, withoutNames) = result.unzip
+      withNames shouldBe withoutNames
+
+      OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe
+        OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size
+    }
+    {
+      val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
+      val areaMapOutput = areaMapEstimator.getOutput()
+
+      val oldMapEstimator: SmartTextMapVectorizer[TextAreaMap] = new SmartTextMapVectorizer[TextAreaMap]()
+        .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
+        .setCleanKeys(false).setInput(newF10, newF6)
+      val withoutNamesVectorized = oldMapEstimator.getOutput()
+
+      val transformed = new OpWorkflow()
+        .setResultFeatures(areaMapOutput, withoutNamesVectorized).transform(newInputData)
+      val result = transformed.collect(areaMapOutput, withoutNamesVectorized)
+      val (withNames, withoutNames) = result.unzip
+      withNames shouldBe withoutNames
+
+      OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe
+        OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size
+    }
+  }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
 }
