@@ -32,7 +32,7 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{Text, _}
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
@@ -411,26 +411,27 @@ class SmartTextMapVectorizerTest
       "Hello world!", "What's up", "How are you doing, my friend?", "Not bad, my friend").toText :+ Text.empty
     val baseNames = Seq("Michael", "Michelle", "Roxanne", "Ross").toText :+ Text.empty
 
-    val textMap1: Seq[TextMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse(""), "name" -> c.value.getOrElse("")))
+    def convertToMap(texts: Seq[Text]): Map[String, String] = texts.map(_.value).zipWithIndex.collect {
+      case (Some(text), index) => (if (index == 3) "name" else s"text${index + 1}") -> text } toMap
+    val textMap1: Seq[TextMap] = (baseText1, baseText2, baseNames).zipped.map {
+      case (a, b, c) => TextMap(convertToMap(Seq(a, b, c)))
     }
     val textMap2: Seq[TextMap] = Seq.fill[TextMap](N)(TextMap.empty)
-    val textMap3: Seq[TextMap] = (baseText1, baseText2).zipped.map { case (a, b) =>
-      TextMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse("")))
+    val textMap3: Seq[TextMap] = (baseText1, baseText2).zipped.map {
+      case (a, b) => TextMap(convertToMap(Seq(a, b)))
     }
 
-    val textAreaMap1: Seq[TextAreaMap] = (baseText1, baseText2, baseNames).zipped.map { case (a, b, c) =>
-      TextAreaMap(Map(
-        "text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse(""), "name" -> c.value.getOrElse("")
-      ))
+    val textAreaMap1: Seq[TextAreaMap] = (baseText1, baseText2, baseNames).zipped.map {
+      case (a, b, c) => TextAreaMap(convertToMap(Seq(a, b, c)))
     }
     val textAreaMap2: Seq[TextAreaMap] = Seq.fill[TextAreaMap](N)(TextAreaMap.empty)
-    val textAreaMap3: Seq[TextAreaMap] = (baseText1, baseText2).zipped.map { case (a, b) =>
-      TextAreaMap(Map("text1" -> a.value.getOrElse(""), "text2" -> b.value.getOrElse("")))
+    val textAreaMap3: Seq[TextAreaMap] = (baseText1, baseText2).zipped.map {
+      case (a, b) => TextAreaMap(convertToMap(Seq(a, b)))
     }
 
-    val nameTextMap: Seq[TextMap] = baseNames map { v => TextMap(Map("name" -> v.value.getOrElse(""))) }
-    val nameTextAreaMap: Seq[TextAreaMap] = baseNames map { v => TextAreaMap(Map("name" -> v.value.getOrElse(""))) }
+    val nameTextMap: Seq[TextMap] = baseNames.map(_.value).collect { case Some(text) => TextMap(Map("name" -> text)) }
+    val nameTextAreaMap: Seq[TextAreaMap] =
+      baseNames.map(_.value).collect { case Some(text) => TextAreaMap(Map("name" -> text)) }
 
     val allFeatures = Seq(
       baseText1,       // f0
@@ -445,7 +446,6 @@ class SmartTextMapVectorizerTest
       textMap3,        // f9
       textAreaMap3     // f10
     )
-    assert(allFeatures.forall(_.length == N))
     TestFeatureBuilder(allFeatures: _*)
   }
   newInputData.show(truncate = false)
@@ -528,19 +528,14 @@ class SmartTextMapVectorizerTest
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
     println(mapModel.args.allFeatureInfo)
     mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
-      Array(NonCategorical, NonCategorical, Sensitive)
-      // If we fix null tracking this should actually be:
-      // Array(Categorical, NonCategorical, Sensitive)
+      Array(Categorical, NonCategorical, Sensitive)
 
     val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
     val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
     areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
-      Array(NonCategorical, NonCategorical, Sensitive)
-      // If we fix null tracking this should actually be:
-      // Array(Categorical, NonCategorical, Sensitive)
-
+      Array(Categorical, NonCategorical, Sensitive)
   }
 
   it should "not create information in the vector for a single name column among other non-name Text columns" in {

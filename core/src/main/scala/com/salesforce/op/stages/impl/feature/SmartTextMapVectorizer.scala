@@ -145,10 +145,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         } else Array.empty[String]
         SmartTextFeatureInfo(key = k, whichAction = whichAction, topValues = topVals)
       }
-      // TODO: Delete these debugging logs
-      println(textMapStats.keyValueCounts.toSeq)
-      println(textMapStats.nameDetectStats.toSeq)
-      println(featureInfoBeforeSensitive)
 
       if (shouldRemoveSensitive) textMapStats.nameDetectStats.toSeq.zip(featureInfoBeforeSensitive) map {
         case ((k, nameDetectStats), previousFeatureInfo) =>
