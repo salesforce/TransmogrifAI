@@ -543,35 +543,43 @@ class SmartTextMapVectorizerTest
       val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4)
       val mapOutput = mapEstimator.getOutput()
 
-      val oldMapEstimator: SmartTextMapVectorizer[TextMap] = estimator.setInput(newF9, newF4)
-      val withoutNamesVectorized = oldMapEstimator.getOutput()
+      val withoutNamesEstimator: SmartTextMapVectorizer[TextMap] = new SmartTextMapVectorizer[TextMap]()
+        .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+        .setTopK(2).setPrependFeatureName(false)
+        .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+        .setSensitiveFeatureMode(SensitiveFeatureMode.Off)
+        .setInput(newF9, newF4)
+      val withoutNamesOutput = withoutNamesEstimator.getOutput()
 
-      val transformed = new OpWorkflow()
-        .setResultFeatures(mapOutput, withoutNamesVectorized).transform(newInputData)
-      val result = transformed.collect(mapOutput, withoutNamesVectorized)
+      val transformed = new OpWorkflow().setResultFeatures(mapOutput, withoutNamesOutput).transform(newInputData)
+      val result = transformed.collect(mapOutput, withoutNamesOutput)
       val (withNames, withoutNames) = result.unzip
-      withNames shouldBe withoutNames
 
       OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe
-        OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size
+        OpVectorMetadata("OutputVector", withoutNamesEstimator.getMetadata()).size
+
+      withNames shouldBe withoutNames
     }
     {
       val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
       val areaMapOutput = areaMapEstimator.getOutput()
 
       val oldMapEstimator: SmartTextMapVectorizer[TextAreaMap] = new SmartTextMapVectorizer[TextAreaMap]()
-        .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
-        .setCleanKeys(false).setInput(newF10, newF6)
-      val withoutNamesVectorized = oldMapEstimator.getOutput()
+        .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
+        .setTopK(2).setPrependFeatureName(false)
+        .setHashSpaceStrategy(HashSpaceStrategy.Shared)
+        .setSensitiveFeatureMode(SensitiveFeatureMode.Off)
+        .setInput(newF10, newF6)
+      val oldMapOutput = oldMapEstimator.getOutput()
 
-      val transformed = new OpWorkflow()
-        .setResultFeatures(areaMapOutput, withoutNamesVectorized).transform(newInputData)
-      val result = transformed.collect(areaMapOutput, withoutNamesVectorized)
+      val transformed = new OpWorkflow().setResultFeatures(areaMapOutput, oldMapOutput).transform(newInputData)
+      val result = transformed.collect(areaMapOutput, oldMapOutput)
       val (withNames, withoutNames) = result.unzip
-      withNames shouldBe withoutNames
 
       OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe
         OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size
+
+      withNames shouldBe withoutNames
     }
   }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */

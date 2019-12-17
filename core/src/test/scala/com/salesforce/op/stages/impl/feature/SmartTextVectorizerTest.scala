@@ -451,10 +451,10 @@ class SmartTextVectorizerTest
 
     val (withNames, withoutNames) = result.unzip
 
-    withNames shouldBe withoutNames
-
     OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe
       OpVectorMetadata("OutputVector", oldEstimator.getMetadata()).size
+
+    withNames shouldBe withoutNames
   }
 
   // it should "compute sensitive information in the metadata for one detected name column" in {
