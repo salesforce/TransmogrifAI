@@ -444,12 +444,7 @@ class SmartTextMapVectorizerTest
 
     result foreach { case (vec1, vec2, vec3) =>
       vec2 shouldBe vec3
-      // NOTE: vec1 will not be exactly equal to vec2 or vec3 because only empty _maps_ are treated as null
-      // Null entries for the categorical key in a map will instead get matched to the "OTHER" column in the vector
-      // However, the overall contribution from this row as a feature should stay the same regardless if the info
-      // comes in a map or as its column, hence the following checks:
-      Vectors.norm(vec1.value, 1) shouldBe Vectors.norm(vec2.value, 1)
-      Vectors.norm(vec1.value, 1) shouldBe Vectors.norm(vec3.value, 1)
+      vec1 shouldBe vec2
     }
   }
 

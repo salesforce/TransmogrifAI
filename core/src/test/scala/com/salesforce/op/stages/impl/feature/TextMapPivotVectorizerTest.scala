@@ -66,6 +66,14 @@ class TextMapPivotVectorizerTest
     ).map(v => v._1.toTextMap -> v._2.toTextMap)
   )
 
+  lazy val (dataSetEmptyStrings, _, _) = TestFeatureBuilder(top.name, bot.name,
+    Seq(
+      (Map("a" -> "d", "b" -> "d"), Map("x" -> "")),
+      (Map("a" -> "e", "b" -> ""), Map[String, String]()),
+      (Map("a" -> ""), Map[String, String]())
+    ).map(v => v._1.toTextMap -> v._2.toTextMap)
+  )
+
   lazy val (dataSetAllEmpty, _, _) = TestFeatureBuilder(top.name, bot.name,
     Seq(
       (Map[String, String](), Map[String, String]()),
@@ -434,4 +442,22 @@ class TextMapPivotVectorizerTest
     result shouldBe expected
   }
 
+  it should "treat present but empty string entries as nulls" in {
+    val newVectorizer = new TextMapPivotVectorizer[TextMap]().setInput(top, bot)
+      .setCleanKeys(true).setMinSupport(0).setTopK(10).setTrackNulls(false)
+    val expected = {
+      val fitted = newVectorizer.setCleanText(true).setTrackNulls(true).setMinSupport(0).fit(dataSetEmpty)
+      val transformed = fitted.transform(dataSetEmpty)
+      transformed.collect(fitted.getOutput())
+    }
+
+    val fitted = newVectorizer.setCleanText(true).setTrackNulls(true).setMinSupport(0).fit(dataSetEmptyStrings)
+    val transformed = fitted.transform(dataSetEmptyStrings)
+    val vectorMetadata = fitted.getMetadata()
+    log.info(OpVectorMetadata(newVectorizer.getOutputFeatureName, vectorMetadata).toString)
+    val field = transformed.schema(fitted.getOutput().name)
+    val result = transformed.collect(fitted.getOutput())
+    assertNominal(field, Array.fill(expected.head.value.size)(true), result)
+    result shouldBe expected
+  }
 }
