@@ -34,13 +34,9 @@ import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
-import com.salesforce.op.utils.reflection.ReflectionUtils
-import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.Dataset
 
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
-import scala.reflect.runtime.universe.typeTag
 
 /**
  * Converts a sequence of KeyString features into a vector keeping the top K most common occurrences of each
@@ -127,8 +123,10 @@ private[op] trait TextMapPivotVectorizerModelFun[T <: OPMap[String]] extends Cle
 
         topMap.map { case (mapKey, top) =>
           val sizeOfVector = top.length
+          def nullCase = if (shouldTrackNulls) Seq(sizeOfVector + 1 -> 1.0) else Seq(sizeOfVector -> 0.0)
           cleanedMap.get(mapKey) match {
-            case None => if (shouldTrackNulls) Seq(sizeOfVector + 1 -> 1.0) else Seq(sizeOfVector -> 0.0)
+            case None => nullCase
+            case Some(cv) if cv.isEmpty => nullCase
             case Some(cv) =>
               val v = top.indexOf(cv) match {
                 case i if i < 0 => Seq(sizeOfVector -> 1.0)
