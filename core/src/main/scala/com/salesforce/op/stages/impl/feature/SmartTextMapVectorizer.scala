@@ -72,7 +72,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
-      cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1))
+      cleanTextFn(k, shouldCleanKeys) -> TextStats(
+        if (v.isEmpty) Map.empty[String, Int] else Map(cleanTextFn(v, shouldCleanValues) -> 1)
+      )
     }
     TextMapStats(keyValueCounts)
   }
