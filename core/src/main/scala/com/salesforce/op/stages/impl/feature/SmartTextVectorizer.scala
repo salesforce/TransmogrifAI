@@ -192,6 +192,7 @@ class SmartTextVectorizer[T <: Text]
     val columns = categoricalColumns ++ textColumns
 
     val isName = aggNameDetectStats.map(computeTreatAsName)
+    val genderStrategies = aggNameDetectStats.map(orderGenderStrategies)
     if (isName exists identity) {
       logWarning(
         """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
@@ -200,13 +201,17 @@ class SmartTextVectorizer[T <: Text]
       )
       val problemColIndexes = isName.zipWithIndex.filter(_._1).map(_._2)
       problemColIndexes foreach { index: Int =>
-        logWarning {
+        val genderStats = genderStrategies(index).headOption.flatMap( genderStrat =>
+          aggNameDetectStats(index).genderResultsByStrategy.get(genderStrat.toString)
+        )
+        genderStats foreach { stats => logWarning {
           s"""Column Name: ${inN(index).name}
-          |Predicted Probability of Name: ${aggNameDetectStats(index).dictCheckResult.value}
-          |Percentage Likely Male Names: ${results.pctMale(index)}
-          |Percentage Likely Female Names: ${results.pctFemale(index)}
-          |Percentage Where No Gender Found: ${results.pctOther(index)}
-          |""".stripMargin
+             |Predicted Probability of Name: ${aggNameDetectStats(index).dictCheckResult.value}
+             |Percentage Likely Male Names: ${stats.numMale.toDouble / aggNameDetectStats(index).dictCheckResult.count}
+             |Percentage Likely Female Names: ${stats.numFemale / aggNameDetectStats(index).dictCheckResult.count}
+             |Percentage Where No Gender Found: ${stats.numOther / aggNameDetectStats(index).dictCheckResult.count}
+             |""".stripMargin
+          }
         }
       }
     }
