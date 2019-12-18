@@ -44,12 +44,12 @@ sealed class SensitiveFeatureInformation(val actionTaken: Boolean = false) exten
    */
   def toMetadata: Metadata = {
     this match {
-      case SensitiveFeatureInformation.Name(actionTaken, probName, firstName, probMale, probFemale, probOther) =>
+      case SensitiveFeatureInformation.Name(actionTaken, probName, genderStrats, probMale, probFemale, probOther) =>
         new MetadataBuilder()
           .putString(SensitiveFeatureInformation.TypeKey, SensitiveFeatureInformation.Name.entryName)
           .putBoolean(SensitiveFeatureInformation.ActionTakenKey, actionTaken)
           .putDouble(SensitiveFeatureInformation.Name.ProbNameKey, probName)
-          .putStringArray(SensitiveFeatureInformation.Name.FirstNameKey, firstName.toArray)
+          .putStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey, genderStrats.toArray)
           .putDouble(SensitiveFeatureInformation.Name.ProbMaleKey, probMale)
           .putDouble(SensitiveFeatureInformation.Name.ProbFemaleKey, probFemale)
           .putDouble(SensitiveFeatureInformation.Name.ProbOtherKey, probOther)
@@ -69,7 +69,7 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
   (
     override val actionTaken: Boolean,
     probName: Double,
-    firstNames: Seq[String], // TODO: Change this to GenderResultsByStrategy
+    genderDetectionStratsByPerformance: Seq[String],
     probMale: Double,
     probFemale: Double,
     probOther: Double
@@ -80,7 +80,7 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
   case object Name extends SensitiveFeatureInformation {
     override val entryName = "Name"
     val ProbNameKey = "ProbName"
-    val FirstNameKey = "FirstNames"
+    val GenderDetectStratsKey = "GenderDetectStrats"
     val ProbMaleKey = "ProbMale"
     val ProbFemaleKey = "ProbFemale"
     val ProbOtherKey = "ProbOther"
@@ -127,7 +127,7 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
         SensitiveFeatureInformation.Name(
           meta.getBoolean(SensitiveFeatureInformation.ActionTakenKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbNameKey),
-          meta.getStringArray(SensitiveFeatureInformation.Name.FirstNameKey),
+          meta.getStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbMaleKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey)

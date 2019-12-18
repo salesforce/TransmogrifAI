@@ -589,11 +589,12 @@ class SmartTextMapVectorizerTest
       println(sensitive)
       sensitive.get("name") match {
         case Some(SensitiveFeatureInformation.Name(
-          actionTaken, probName, firstNames, probMale, probFemale, probOther
+          actionTaken, probName, genderStrats, probMale, probFemale, probOther
         )) =>
           actionTaken shouldBe true
           probName shouldBe 1.0
-          firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+          // TODO
+          // genderStrats shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
           probMale shouldBe 0.5
           probFemale shouldBe 0.5
           probOther shouldBe 0.0

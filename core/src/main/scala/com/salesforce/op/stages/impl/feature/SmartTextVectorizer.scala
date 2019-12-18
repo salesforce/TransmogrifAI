@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
+import com.salesforce.op.{SensitiveFeatureInformation, UID}
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
@@ -133,11 +133,6 @@ class SmartTextVectorizer[T <: Text]
       case (_, _) => NonCategorical
     })
 
-    // TODO: Delete these printing logs
-    aggTextStats foreach { stats =>
-      println(stats)
-    }
-
     val smartTextParams = SmartTextVectorizerModelArgs(
       whichAction = actionsToTake,
       topValues = topValues,
@@ -146,7 +141,7 @@ class SmartTextVectorizer[T <: Text]
       hashingParams = makeHashingParams()
     )
 
-    val vecMetadata = makeVectorMetadata(smartTextParams)
+    val vecMetadata = makeVectorMetadata(smartTextParams, aggNameDetectStats)
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextVectorizerModel[T](args = smartTextParams, operationName = operationName, uid = uid)
@@ -166,7 +161,10 @@ class SmartTextVectorizer[T <: Text]
     TextStats(valueCounts)
   }
 
-  private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
+  private def makeVectorMetadata(
+    smartTextParams: SmartTextVectorizerModelArgs,
+    aggNameDetectStats: Array[NameDetectStats]
+  ): OpVectorMetadata = {
     require(inN.length == smartTextParams.whichAction.length)
 
     val (categoricalFeatures, textFeatures) =
@@ -191,9 +189,56 @@ class SmartTextVectorizer[T <: Text]
           textFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
-
     val columns = categoricalColumns ++ textColumns
-    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+
+    val isName = aggNameDetectStats.map(computeTreatAsName)
+    if (isName exists identity) {
+      logWarning(
+        """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
+          |model with that information in them? There could be potential bias as a result! Here's what I found:
+          |""".stripMargin
+      )
+      val problemColIndexes = isName.zipWithIndex.filter(_._1).map(_._2)
+      problemColIndexes foreach { index: Int =>
+        logWarning {
+          s"""Column Name: ${inN(index).name}
+          |Predicted Probability of Name: ${aggNameDetectStats(index).dictCheckResult.value}
+          |Percentage Likely Male Names: ${results.pctMale(index)}
+          |Percentage Likely Female Names: ${results.pctFemale(index)}
+          |Percentage Where No Gender Found: ${results.pctOther(index)}
+          |""".stripMargin
+        }
+      }
+    }
+
+    val sensitive: Map[String, SensitiveFeatureInformation] = aggNameDetectStats.zip(inN) map {
+      case (stats: NameDetectStats, feature: TransientFeature) =>
+
+        feature.name -> SensitiveFeatureInformation.Name()
+    } toMap
+
+      aggNameDetectStats map { results: NameDetectStats =>
+        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
+        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
+        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
+        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
+        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
+        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
+
+        // Transform into the tuple from feature name to SensitiveFeatureInformation
+        inN.zipWithIndex map { case (feature: TransientFeature, index: Int) =>
+          feature.name -> SensitiveFeatureInformation.Name(
+            getRemoveSensitive && results.isName(index),
+            results.predictedNameProbs(index),
+            s"Best Index: ${results.bestFirstNameIndexes(index)}" +: results.nameSamples(index),
+            results.pctMale(index),
+            results.pctFemale(index),
+            results.pctOther(index)
+          )
+        } toMap
+    } getOrElse Map.empty[String, SensitiveFeatureInformation]
+
+    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }
 }
 

@@ -626,10 +626,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
     f0In.sensitiveInformation match {
-      case Some(SensitiveFeatureInformation.Name(actionTaken, probName, names, probMale, probFemale, probOther)) =>
+      case Some(SensitiveFeatureInformation.Name(
+        actionTaken, probName, genderStrats, probMale, probFemale, probOther
+      )) =>
         actionTaken shouldBe false
         probName shouldBe 0.0
-        names shouldBe Seq.empty[String]
+        genderStrats shouldBe Seq.empty[String]
         probMale shouldBe 0.0
         probFemale shouldBe 0.0
         probOther shouldBe 1.0
@@ -741,10 +743,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f_notInMeta_butInInsights.featureType shouldBe classOf[Text].getName
     f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
     f_notInMeta_butInInsights.sensitiveInformation match {
-      case Some(SensitiveFeatureInformation.Name(actionTaken, probName, names, probMale, probFemale, probOther)) =>
+      case Some(SensitiveFeatureInformation.Name(
+        actionTaken, probName, genderStrats, probMale, probFemale, probOther
+      )) =>
         actionTaken shouldBe true
         probName shouldBe 1.0
-        names shouldBe Seq.empty[String]
+        genderStrats shouldBe Seq.empty[String]
         probMale shouldBe 0.0
         probFemale shouldBe 0.0
         probOther shouldBe 1.0

@@ -41,31 +41,31 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
 
   val actionTaken = true
   val probName = 1.0
-  val firstNames: Seq[String] = Seq("Michael", "Carrie", "Jesse", "Kathy")
+  val genderStrats: Seq[String] = Seq("BYINDEX", "ANOTHERSTRATEGY", "BLAH")
   val probMale = 0.25
   val probFemale = 0.50
   val probOther = 0.25
 
   Spec[SensitiveFeatureInformation] should "convert sensitive feature information to metadata" in {
-    val info = SensitiveFeatureInformation.Name(actionTaken, probName, firstNames, probMale, probFemale, probOther)
+    val info = SensitiveFeatureInformation.Name(actionTaken, probName, genderStrats, probMale, probFemale, probOther)
     val metadata = info.toMetadata
 
     metadata.contains(SensitiveFeatureInformation.TypeKey) shouldBe true
     metadata.contains(SensitiveFeatureInformation.Name.ProbNameKey) shouldBe true
-    metadata.contains(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe true
+    metadata.contains(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe true
     metadata.contains(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe true
     metadata.contains(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe true
     metadata.contains(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe true
 
     metadata.getDouble(SensitiveFeatureInformation.Name.ProbNameKey) shouldBe probName
-    metadata.getStringArray(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe firstNames
+    metadata.getStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe genderStrats
     metadata.getDouble(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe probMale
     metadata.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe probFemale
     metadata.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe probOther
   }
 
   it should "create metadata from a map" in {
-    val info1 = SensitiveFeatureInformation.Name(actionTaken, probName, firstNames, probMale, probFemale, probOther)
+    val info1 = SensitiveFeatureInformation.Name(actionTaken, probName, genderStrats, probMale, probFemale, probOther)
     val info2 = SensitiveFeatureInformation.Name(actionTaken = false, 0.0, Seq(""), 0.0, 0.0, 0.0)
     val map = Map("1" -> info1, "2" -> info2)
     val metadata = SensitiveFeatureInformation.toMetadata(map)
@@ -75,29 +75,29 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
 
     val f1 = metadata.getMetadata("1")
     f1.contains(SensitiveFeatureInformation.TypeKey) shouldBe true
-    f1.contains(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe true
+    f1.contains(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe true
     f1.contains(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe true
     f1.contains(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe true
     f1.contains(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe true
-    f1.getStringArray(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe firstNames
+    f1.getStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe genderStrats
     f1.getDouble(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe probMale
     f1.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe probFemale
     f1.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe probOther
 
     val f2 = metadata.getMetadata("2")
     f2.contains(SensitiveFeatureInformation.TypeKey) shouldBe true
-    f2.contains(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe true
+    f2.contains(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe true
     f2.contains(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe true
     f2.contains(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe true
     f2.contains(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe true
-    f2.getStringArray(SensitiveFeatureInformation.Name.FirstNameKey) shouldBe Seq("")
+    f2.getStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey) shouldBe Seq("")
     f2.getDouble(SensitiveFeatureInformation.Name.ProbMaleKey) shouldBe 0.0
     f2.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe 0.0
     f2.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe 0.0
   }
 
   it should "create a map from metadata" in {
-    val info1 = SensitiveFeatureInformation.Name(actionTaken, probName, firstNames, probMale, probFemale, probOther)
+    val info1 = SensitiveFeatureInformation.Name(actionTaken, probName, genderStrats, probMale, probFemale, probOther)
     val info2 = SensitiveFeatureInformation.Name(actionTaken = false, 0.0, Seq(""), 0.0, 0.0, 0.0)
 
     val mapMetadata = new MetadataBuilder()
