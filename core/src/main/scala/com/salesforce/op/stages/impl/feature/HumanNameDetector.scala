@@ -70,10 +70,8 @@ class HumanNameDetector[T <: Text]
     val aggResults: NameDetectStats = dataset.map(mapFun).reduce(_ + _)
     val treatAsName = computeTreatAsName(aggResults)
 
-    val orderedGenderDetectStrategies = if (treatAsName) {
-      val ordered: Seq[(String, GenderStats)] = aggResults.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
-      ordered map { case (strategy, _) => GenderDetectStrategy.fromString(strategy) }
-    } else Seq.empty[GenderDetectStrategy]
+    val orderedGenderDetectStrategies =
+      if (treatAsName) orderGenderStrategies(aggResults) else Seq.empty[GenderDetectStrategy]
 
     val newMetadata = HumanNameDetectorMetadata(
       treatAsName, aggResults.dictCheckResult.value, aggResults.genderResultsByStrategy

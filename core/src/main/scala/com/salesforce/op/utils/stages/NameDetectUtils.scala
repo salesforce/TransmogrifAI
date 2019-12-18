@@ -184,6 +184,11 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     val predictedNameProb = results.dictCheckResult.value
     guardChecksPassed && predictedNameProb >= $(nameThreshold)
   }
+
+  private[op] def orderGenderStrategies(results: NameDetectStats): Seq[GenderDetectStrategy] = {
+    val ordered: Seq[(String, GenderStats)] = results.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
+    ordered map { case (strategy, _) => GenderDetectStrategy.fromString(strategy) }
+  }
 }
 
 /**
