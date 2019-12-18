@@ -68,16 +68,15 @@ class SmartTextVectorizerTest
     Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
   ).map(_.toOPVector)
 
-  /* Generate some more complicated input data to check things a little closer. There are three text fields with
+  /*
+    Generate some more complicated input data to check things a little closer. There are four text fields with
     different token distributions:
-    Country: Uniformly distributed from a larger list of ~few hundred countries
-    Picklist: Uniformly distributed from a small list of 9 choices
-    Text: Uniformly distributed unicode strings with lengths ranging from 0-100
 
-    The Picklist should be picked up as a categorical
-    The country distribution would depend on the cutoffs (need an
-    easier way to generate stuff with a probability distribution that follows a specified function)
-    The text distribution should be picked up as text and pass the length distribution
+    country: Uniformly distributed from a larger list of ~few hundred countries, should be hashed
+    categoricalText: Uniformly distributed from a small list of choices, should be pivoted (also has fixed lengths,
+      so serves as a test that the categorical check happens before the token length variance check)
+    textId: Uniformly distributed high cardinality Ids with fixed lengths, should be ignored
+    text: Uniformly distributed unicode strings with lengths ranging from 0-100, should be hashed
    */
   val countryData: Seq[Text] = RandomText.countries.withProbabilityOfEmpty(0.2).limit(1000)
   val categoricalTextData: Seq[Text] = RandomText.textFromDomain(domain = List("A", "B", "C", "D", "E", "F"))
@@ -208,19 +207,21 @@ class SmartTextVectorizerTest
 
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
     val result = transformed.collect(smartVectorized)
-    result.take(10).foreach(println)
-    println()
 
-    // Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
-    // one ignored text field
-    // Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
-    // Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
-    // Ignored text: (1 length + 1 null indicator) = 2 elements
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
     val firstRes = result.head
-    firstRes.v.size shouldBe 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
-    meta.columns.size shouldBe 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    meta.columns.length shouldBe featureVectorSize
     meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
     meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
     meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
