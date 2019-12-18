@@ -457,29 +457,29 @@ class SmartTextVectorizerTest
     withNames shouldBe withoutNames
   }
 
-  // it should "compute sensitive information in the metadata for one detected name column" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
-  //   val model: SmartTextVectorizerModel[Text] = newEstimator
-  //     .fit(newInputData)
-  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
-  //   newInputData.show()
-  //   val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-  //   println(sensitive)
-  //   sensitive.get("name") match {
-  //     case Some(SensitiveFeatureInformation.Name(
-  //      actionTaken, probName, firstNames, probMale, probFemale, probOther
-  //     )) =>
-  //       actionTaken shouldBe true
-  //       probName shouldBe 1.0
-  //       firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
-  //       probMale shouldBe 0.5
-  //       probFemale shouldBe 0.5
-  //       probOther shouldBe 0.0
-  //     case None => fail("Sensitive information not found in the metadata.")
-  //     case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
-  //   }
-  // }
-  //
+  it should "compute sensitive information in the metadata for one detected name column" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+    println(sensitive)
+    sensitive.get("name") match {
+      case Some(SensitiveFeatureInformation.Name(
+      actionTaken, probName, firstNames, probMale, probFemale, probOther
+      )) =>
+        actionTaken shouldBe true
+        probName shouldBe 1.0
+        firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+        probMale shouldBe 0.5
+        probFemale shouldBe 0.5
+        probOther shouldBe 0.0
+      case None => fail("Sensitive information not found in the metadata.")
+      case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+    }
+  }
+
   // it should "compute sensitive information in the metadata for multiple detected name columns" in {
   //   val numFeatures = 5
   //   val (ds, untypedFeatures) = TestFeatureBuilder(

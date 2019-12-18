@@ -69,7 +69,7 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
   (
     override val actionTaken: Boolean,
     probName: Double,
-    firstNames: Seq[String],
+    firstNames: Seq[String], // TODO: Change this to GenderResultsByStrategy
     probMale: Double,
     probFemale: Double,
     probOther: Double

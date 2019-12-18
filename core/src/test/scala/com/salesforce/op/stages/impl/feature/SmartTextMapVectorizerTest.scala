@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{Text, _}
-import com.salesforce.op.stages.base.sequence.SequenceModel
+import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
@@ -581,6 +581,39 @@ class SmartTextMapVectorizerTest
 
       withNames shouldBe withoutNames
     }
+  }
+
+  it should "compute sensitive information in the metadata for one detected name column" in {
+    def assertSensitive(estimator: SequenceEstimator[_, _]): Unit = {
+      val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
+      println(sensitive)
+      sensitive.get("name") match {
+        case Some(SensitiveFeatureInformation.Name(
+          actionTaken, probName, firstNames, probMale, probFemale, probOther
+        )) =>
+          actionTaken shouldBe true
+          probName shouldBe 1.0
+          firstNames shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+          probMale shouldBe 0.5
+          probFemale shouldBe 0.5
+          probOther shouldBe 0.0
+        case None => fail("Sensitive information not found in the metadata.")
+        case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+      }
+    }
+
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF7)
+    val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF8)
+    val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+
+    assertSensitive(mapEstimator)
+    assertSensitive(areaMapEstimator)
   }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
 }
