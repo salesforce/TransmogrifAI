@@ -40,7 +40,7 @@ import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, FieldSerializer, Formats}
 
 import scala.util.Try
 
@@ -64,6 +64,7 @@ case class FeatureDistribution
   distribution: Array[Double],
   summaryInfo: Array[Double],
   moments: Option[Moments] = None,
+  cardEstimate: Option[TextStats] = None,
   `type`: FeatureDistributionType = FeatureDistributionType.Training
 ) extends FeatureDistributionLike {
 
@@ -109,9 +110,10 @@ case class FeatureDistribution
     val combinedSummaryInfo = if (summaryInfo.length > fd.summaryInfo.length) summaryInfo else fd.summaryInfo
 
     val combinedMoments = moments + fd.moments
+    val combinedCard = cardEstimate + fd.cardEstimate
 
     FeatureDistribution(name, key, count + fd.count, nulls + fd.nulls, combinedDist,
-      combinedSummaryInfo, combinedMoments, `type`)
+      combinedSummaryInfo, combinedMoments, combinedCard, `type`)
   }
 
   /**
@@ -172,14 +174,14 @@ case class FeatureDistribution
   }
 
   override def equals(that: Any): Boolean = that match {
-    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, `type`) =>
+    case FeatureDistribution(`name`, `key`, `count`, `nulls`, d, s, m, c, `type`) =>
       distribution.deep == d.deep && summaryInfo.deep == s.deep &&
-        moments == m
+        moments == m && cardEstimate == c
     case _ => false
   }
 
   override def hashCode(): Int = Objects.hashCode(name, key, count, nulls, distribution,
-    summaryInfo, moments, `type`)
+    summaryInfo, moments, cardEstimate, `type`)
 }
 
 object FeatureDistribution {
@@ -190,8 +192,13 @@ object FeatureDistribution {
     override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
   }
 
+  val FeatureDistributionSerializer = FieldSerializer[FeatureDistribution](
+    FieldSerializer.ignore("cardEstimate")
+  )
+
   implicit val formats: Formats = DefaultFormats +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
+    FeatureDistributionSerializer
 
   /**
    * Feature distributions to json
@@ -238,6 +245,7 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val moments = value.map(momentsValues)
+    val cardEstimate = value.map(cardinalityValues)
 
     FeatureDistribution(
       name = name,
@@ -247,6 +255,7 @@ object FeatureDistribution {
       summaryInfo = summaryInfo,
       distribution = distribution,
       moments = moments,
+      cardEstimate = cardEstimate,
       `type` = `type`
     )
   }
@@ -263,6 +272,21 @@ object FeatureDistribution {
       case Right(seq) => seq
     }
     MomentsGroup.sum(population.map(x => Moments(x)))
+  }
+
+  /**
+   * Function to track frequency of the first $(MaxCardinality) unique values
+   * (number for numeric features, token for text features)
+   *
+   * @param values          values to track distribution / frequency
+   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   */
+  private def cardinalityValues(values: ProcessedSeq): TextStats = {
+    TextStats(countStringValues(values.left.getOrElse(values.right.get)))
+  }
+
+  private def countStringValues[T](seq: Seq[T]): Map[String, Int] = {
+    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size }
   }
 
   /**
