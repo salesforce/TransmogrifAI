@@ -88,20 +88,21 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (isCategorical, isIgnorable, topValues) = aggregatedStats.map { stats =>
-      val isCategorical = stats.valueCounts.size <= maxCard
-      val isIgnorable = stats.lengthStdDev <= minLenStdDev
+    val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
+      val vecMethod: TextVectorizationMethod = stats match {
+        case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+        case _ if stats.lengthStdDev <= minLenStdDev => TextVectorizationMethod.Ignore
+        case _ => TextVectorizationMethod.Hash
+      }
       val topValues = stats.valueCounts
         .filter { case (_, count) => count >= $(minSupport) }
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
-
-      (isCategorical, isIgnorable, topValues)
-    }.unzip3
+      (vecMethod, topValues)
+    }.unzip
 
     val smartTextParams = SmartTextVectorizerModelArgs(
-      isCategorical = isCategorical,
-      isIgnorable = isIgnorable,
+      vectorizationMethods = vectorizationMethods,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
@@ -129,32 +130,31 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
-    require(inN.length == smartTextParams.isCategorical.length)
+    require(inN.length == smartTextParams.vectorizationMethods.length)
 
-    val (categoricalFeatures, allTextFeatures) =
-      SmartTextVectorizer.partition[TransientFeature](inN, smartTextParams.isCategorical)
-    // Also need to partition the masking array so that the correct features are still split out as ignorable
-    val (_, isIgnorableText) =
-      SmartTextVectorizer.partition[Boolean](smartTextParams.isIgnorable, smartTextParams.isCategorical)
-    val (textFeaturesIgnorable, textFeatures) = SmartTextVectorizer
-      .partition[TransientFeature](allTextFeatures, isIgnorableText)
+    val groups = inN.toArray.zip(smartTextParams.vectorizationMethods).groupBy(_._2)
+    val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
+    val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
+    val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
+    val allTextFeatures = textToHash ++ textToIgnore
 
     // build metadata describing output
     val shouldTrackNulls = $(trackNulls)
     val shouldTrackLen = $(trackTextLen)
     val unseen = Option($(unseenName))
 
-    val categoricalColumns = if (categoricalFeatures.nonEmpty) {
-      makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, categoricalFeatures)
+    val categoricalColumns = if (textToPivot.nonEmpty) {
+      makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, textToPivot)
     } else Array.empty[OpVectorColumnMetadata]
-    val textColumns = if (textFeatures.nonEmpty) {
+
+    val textColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {
-        makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
           allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
-        makeVectorColumnMetadata(textFeatures, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
@@ -216,24 +216,25 @@ private[op] object TextStats {
 /**
  * Arguments for [[SmartTextVectorizerModel]]
  *
- * @param isCategorical    is feature a categorical or not
- * @param isIgnorable      is a text feature that we think is ignorable? high cardinality + low length variance
- * @param topValues        top values to each feature
- * @param shouldCleanText  should clean text value
- * @param shouldTrackNulls should track nulls
- * @param hashingParams    hashing function params
+ * @param vectorizationMethods method to use for text vectorization (either pivot, hashing, or ignoring)
+ * @param isCategorical        is feature a categorical or not
+ * @param isIgnorable          is a text feature that we think is ignorable? high cardinality + low length variance
+ * @param topValues            top values to each feature
+ * @param shouldCleanText      should clean text value
+ * @param shouldTrackNulls     should track nulls
+ * @param hashingParams        hashing function params
  */
 case class SmartTextVectorizerModelArgs
 (
-  isCategorical: Array[Boolean],
-  isIgnorable: Array[Boolean],
+  vectorizationMethods: Array[TextVectorizationMethod],
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
-  def categoricalTopValues: Array[Seq[String]] =
-    topValues.zip(isCategorical).collect { case (top, true) => top }
+  def categoricalTopValues: Array[Seq[String]] = {
+    topValues.zip(vectorizationMethods.map(_ == TextVectorizationMethod.Pivot)).collect { case (top, true) => top }
+  }
 }
 
 final class SmartTextVectorizerModel[T <: Text] private[op]
@@ -253,14 +254,14 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     (row: Seq[Text]) => {
-      val (rowCategorical, rowTextAll) = SmartTextVectorizer.partition[Text](row.toArray, args.isCategorical)
-      // Also need to partition the masking array so that the correct features are still split out as ignorable
-      val (_, isIgnorableText) = SmartTextVectorizer.partition[Boolean](args.isIgnorable, args.isCategorical)
-      val (rowTextIgnorable, rowText) = SmartTextVectorizer.partition[Text](rowTextAll, isIgnorableText)
+      val groups = row.toArray.zip(args.vectorizationMethods).groupBy(_._2)
+      val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
+      val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
+      val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
 
-      val categoricalVector: OPVector = categoricalPivotFn(rowCategorical)
-      val textTokens: Seq[TextList] = rowText.map(tokenize(_).tokens)
-      val ignorableTextTokens: Seq[TextList] = rowTextIgnorable.map(tokenize(_).tokens)
+      val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
+      val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
+      val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
@@ -272,7 +273,9 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
   }
 
   private def getTextTransientFeatures: Array[TransientFeature] =
-    SmartTextVectorizer.partition[TransientFeature](getTransientFeatures(), args.isCategorical)._2
+    getTransientFeatures().zip(args.vectorizationMethods).collect {
+      case (tf, method) if method != TextVectorizationMethod.Pivot => tf
+    }
 
   private def getNullIndicatorsVector(textTokens: Seq[TextList]): OPVector = {
     val nullIndicators = textTokens.map { tokens =>
