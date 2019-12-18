@@ -249,7 +249,6 @@ class SmartTextVectorizerTest
     val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(inputData)
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
-    meta.columns.foreach(println)
     meta.history.keys shouldBe Set(f1.name, f2.name)
     meta.columns.length shouldBe 9
     meta.columns.foreach { col =>
