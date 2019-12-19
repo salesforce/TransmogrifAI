@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.UID
+import com.salesforce.op.{SensitiveFeatureInformation, UID}
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
@@ -95,7 +95,10 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     hashSpaceStrategy = getHashSpaceStrategy
   )
 
-  private def makeVectorMetadata(args: SmartTextMapVectorizerModelArgs): OpVectorMetadata = {
+  private def makeVectorMetadata(
+    args: SmartTextMapVectorizerModelArgs,
+    aggNameDetectStats: Array[NameDetectStats]
+  ): OpVectorMetadata = {
     val categoricalColumns = if (args.categoricalFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
         inN.toSeq.zip(args.categoricalFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
@@ -122,9 +125,12 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         shouldTrackLen = $(trackTextLen)
       )
     } else Array.empty[OpVectorColumnMetadata]
-
     val columns = categoricalColumns ++ textColumns
-    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
+
+    val sensitive: Map[String, SensitiveFeatureInformation] =
+      createSensitiveFeatureInformation(aggNameDetectStats, inN)
+
+    OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }
 
   def makeSmartTextMapVectorizerModelArgs(aggregatedStats: Array[TextMapStats]): SmartTextMapVectorizerModelArgs = {
@@ -192,7 +198,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 
-    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs)
+    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, Array.empty)
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextMapVectorizerModel[T](args = smartTextMapVectorizerModelArgs, operationName = operationName, uid = uid)

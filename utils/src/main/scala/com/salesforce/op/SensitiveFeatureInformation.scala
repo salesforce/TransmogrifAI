@@ -36,7 +36,13 @@ import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import enumeratum._
 
 // TODO: Make documentation
-sealed class SensitiveFeatureInformation(val actionTaken: Boolean = false) extends EnumEntry with JsonLike {
+sealed class SensitiveFeatureInformation
+(
+  val name: String,
+  val key: Option[String] = None,
+  val actionTaken: Boolean = false
+) extends EnumEntry with JsonLike {
+  // TODO: Add an extra val for map keys
   /**
    * Convert to Spark metadata
    *
@@ -44,12 +50,16 @@ sealed class SensitiveFeatureInformation(val actionTaken: Boolean = false) exten
    */
   def toMetadata: Metadata = {
     this match {
-      case SensitiveFeatureInformation.Name(actionTaken, probName, genderStrats, probMale, probFemale, probOther) =>
+      case SensitiveFeatureInformation.Name(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, key, actionTaken
+      ) =>
         new MetadataBuilder()
-          .putString(SensitiveFeatureInformation.TypeKey, SensitiveFeatureInformation.Name.entryName)
+          .putString(SensitiveFeatureInformation.NameKey, name)
+          .putString(SensitiveFeatureInformation.MapKeyKey, key.getOrElse(""))
           .putBoolean(SensitiveFeatureInformation.ActionTakenKey, actionTaken)
+          .putString(SensitiveFeatureInformation.TypeKey, this.entryName)
           .putDouble(SensitiveFeatureInformation.Name.ProbNameKey, probName)
-          .putStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey, genderStrats.toArray)
+          .putStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey, genderDetectResults.toArray)
           .putDouble(SensitiveFeatureInformation.Name.ProbMaleKey, probMale)
           .putDouble(SensitiveFeatureInformation.Name.ProbFemaleKey, probFemale)
           .putDouble(SensitiveFeatureInformation.Name.ProbOtherKey, probOther)
@@ -60,25 +70,28 @@ sealed class SensitiveFeatureInformation(val actionTaken: Boolean = false) exten
   }
 }
 case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation] {
-  val TypeKey = "DetectedSensitiveFeatureKind"
+  val NameKey = "FeatureName"
+  val MapKeyKey = "MapKey"
   val ActionTakenKey = "ActionTaken"
+  val TypeKey = "DetectedSensitiveFeatureKind"
   val values: Seq[SensitiveFeatureInformation] = findValues
 
   // Utilized by SmartTextVectorizer's name detection
   case class Name
   (
-    override val actionTaken: Boolean,
     probName: Double,
-    genderDetectionStratsByPerformance: Seq[String],
+    genderDetectResults: Seq[String],
     probMale: Double,
     probFemale: Double,
-    probOther: Double
-  ) extends SensitiveFeatureInformation(actionTaken = actionTaken) {
-    // TODO: Override toString for more automatic logging
-    override def toString: String = super.toString
+    probOther: Double,
+    override val name: String,
+    override val key: Option[String] = None,
+    override val actionTaken: Boolean = false
+  ) extends SensitiveFeatureInformation(name, key, actionTaken) {
+    override val entryName: String = SensitiveFeatureInformation.Name.EntryName
   }
-  case object Name extends SensitiveFeatureInformation {
-    override val entryName = "Name"
+  case object Name {
+    val EntryName = "Name"
     val ProbNameKey = "ProbName"
     val GenderDetectStratsKey = "GenderDetectStrats"
     val ProbMaleKey = "ProbMale"
@@ -86,11 +99,11 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
     val ProbOtherKey = "ProbOther"
   }
 
-  // Not yet utilized
-  case object Salutation extends SensitiveFeatureInformation
-  case object BirthDate extends SensitiveFeatureInformation
-  case object PostalCode extends SensitiveFeatureInformation
-  case object Other extends SensitiveFeatureInformation
+  // Not yet implemented
+  case object Salutation extends SensitiveFeatureInformation("None", None, false)
+  case object BirthDate extends SensitiveFeatureInformation("None", None, false)
+  case object PostalCode extends SensitiveFeatureInformation("None", None, false)
+  case object Other extends SensitiveFeatureInformation("None", None, false)
 
   /**
    * Build metadata from Map of [[SensitiveFeatureInformation]] instances
@@ -123,14 +136,19 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
    */
   def fromMetadata(meta: Metadata): SensitiveFeatureInformation = {
     meta.getString(SensitiveFeatureInformation.TypeKey) match {
-      case SensitiveFeatureInformation.Name.entryName =>
+      case SensitiveFeatureInformation.Name.EntryName =>
         SensitiveFeatureInformation.Name(
-          meta.getBoolean(SensitiveFeatureInformation.ActionTakenKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbNameKey),
           meta.getStringArray(SensitiveFeatureInformation.Name.GenderDetectStratsKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbMaleKey),
           meta.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey),
-          meta.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey)
+          meta.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey),
+          meta.getString(SensitiveFeatureInformation.NameKey),
+          {
+            val mapKey = meta.getString(SensitiveFeatureInformation.MapKeyKey)
+            if (mapKey.isEmpty) None else Some(mapKey)
+          },
+          meta.getBoolean(SensitiveFeatureInformation.ActionTakenKey)
         )
       case _ => throw new RuntimeException(
         "Metadata for sensitive features other than names have not been implemented.")

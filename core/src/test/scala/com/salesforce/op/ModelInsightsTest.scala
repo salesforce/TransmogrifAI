@@ -575,7 +575,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     },
     Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
     Map(
-      "f0" -> SensitiveFeatureInformation.Name(false, 0.0, Seq.empty[String], 0.0, 0.0, 1.0)
+      "f0" -> SensitiveFeatureInformation.Name(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false)
     )
   )
 
@@ -626,12 +626,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
     f0In.sensitiveInformation match {
-      case Some(SensitiveFeatureInformation.Name(
-        actionTaken, probName, genderStrats, probMale, probFemale, probOther
+      case Seq(SensitiveFeatureInformation.Name(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
       )) =>
         actionTaken shouldBe false
         probName shouldBe 0.0
-        genderStrats shouldBe Seq.empty[String]
+        genderDetectResults shouldBe Seq.empty[String]
         probMale shouldBe 0.0
         probFemale shouldBe 0.0
         probOther shouldBe 1.0
@@ -726,8 +726,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       },
       Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
       Map(
-        "f0" -> SensitiveFeatureInformation.Name(false, 0.0, Seq.empty[String], 0.0, 0.0, 1.0),
-        "f_notInMeta" -> SensitiveFeatureInformation.Name(true, 1.0, Seq.empty[String], 0.0, 0.0, 1.0)
+        "f0" -> SensitiveFeatureInformation.Name(
+          0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false
+        ),
+        "f_notInMeta" -> SensitiveFeatureInformation.Name(
+          1.0, Seq.empty[String], 0.0, 0.0, 1.0, "f_notInMeta", None, true
+        )
       )
     )
 
@@ -743,12 +747,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f_notInMeta_butInInsights.featureType shouldBe classOf[Text].getName
     f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
     f_notInMeta_butInInsights.sensitiveInformation match {
-      case Some(SensitiveFeatureInformation.Name(
-        actionTaken, probName, genderStrats, probMale, probFemale, probOther
+      case Seq(SensitiveFeatureInformation.Name(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
       )) =>
         actionTaken shouldBe true
         probName shouldBe 1.0
-        genderStrats shouldBe Seq.empty[String]
+        genderDetectResults shouldBe Seq.empty[String]
         probMale shouldBe 0.0
         probFemale shouldBe 0.0
         probOther shouldBe 1.0

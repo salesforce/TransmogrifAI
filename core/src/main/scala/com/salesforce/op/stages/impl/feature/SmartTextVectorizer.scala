@@ -40,7 +40,7 @@ import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
-import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
+import com.salesforce.op.utils.stages.{GenderStats, NameDetectFun, NameDetectStats}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
@@ -191,57 +191,8 @@ class SmartTextVectorizer[T <: Text]
     } else Array.empty[OpVectorColumnMetadata]
     val columns = categoricalColumns ++ textColumns
 
-    val isName = aggNameDetectStats.map(computeTreatAsName)
-    val genderStrategies = aggNameDetectStats.map(orderGenderStrategies)
-    if (isName exists identity) {
-      logWarning(
-        """Hey! Some of your text columns look like they have names in them. Are you sure you want to build a
-          |model with that information in them? There could be potential bias as a result! Here's what I found:
-          |""".stripMargin
-      )
-      val problemColIndexes = isName.zipWithIndex.filter(_._1).map(_._2)
-      problemColIndexes foreach { index: Int =>
-        val genderStats = genderStrategies(index).headOption.flatMap( genderStrat =>
-          aggNameDetectStats(index).genderResultsByStrategy.get(genderStrat.toString)
-        )
-        genderStats foreach { stats => logWarning {
-          s"""Column Name: ${inN(index).name}
-             |Predicted Probability of Name: ${aggNameDetectStats(index).dictCheckResult.value}
-             |Percentage Likely Male Names: ${stats.numMale.toDouble / aggNameDetectStats(index).dictCheckResult.count}
-             |Percentage Likely Female Names: ${stats.numFemale / aggNameDetectStats(index).dictCheckResult.count}
-             |Percentage Where No Gender Found: ${stats.numOther / aggNameDetectStats(index).dictCheckResult.count}
-             |""".stripMargin
-          }
-        }
-      }
-    }
-
-    val sensitive: Map[String, SensitiveFeatureInformation] = aggNameDetectStats.zip(inN) map {
-      case (stats: NameDetectStats, feature: TransientFeature) =>
-
-        feature.name -> SensitiveFeatureInformation.Name()
-    } toMap
-
-      aggNameDetectStats map { results: NameDetectStats =>
-        logDebug(s"treatAsName: [${results.isName.mkString(",")}]")
-        logDebug(s"predictedNameProb: [${results.predictedNameProbs.mkString(",")}]")
-        logDebug(s"bestFirstNameIndexes: [${results.bestFirstNameIndexes.mkString(",")}]")
-        logDebug(s"pctMale: [${results.pctMale.mkString(",")}]")
-        logDebug(s"pctFemale: [${results.pctFemale.mkString(",")}]")
-        logDebug(s"pctOther: [${results.pctOther.mkString(",")}]")
-
-        // Transform into the tuple from feature name to SensitiveFeatureInformation
-        inN.zipWithIndex map { case (feature: TransientFeature, index: Int) =>
-          feature.name -> SensitiveFeatureInformation.Name(
-            getRemoveSensitive && results.isName(index),
-            results.predictedNameProbs(index),
-            s"Best Index: ${results.bestFirstNameIndexes(index)}" +: results.nameSamples(index),
-            results.pctMale(index),
-            results.pctFemale(index),
-            results.pctOther(index)
-          )
-        } toMap
-    } getOrElse Map.empty[String, SensitiveFeatureInformation]
+    val sensitive: Map[String, SensitiveFeatureInformation] =
+      createSensitiveFeatureInformation(aggNameDetectStats, inN)
 
     OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }

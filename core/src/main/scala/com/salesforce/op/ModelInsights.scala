@@ -343,7 +343,7 @@ case class FeatureInsights
   metrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   distributions: Seq[FeatureDistribution] = Seq.empty,
   exclusionReasons: Seq[ExclusionReasons] = Seq.empty,
-  sensitiveInformation: Option[SensitiveFeatureInformation] = None
+  sensitiveInformation: Seq[SensitiveFeatureInformation] = Seq.empty
 )
 
 /**
@@ -698,11 +698,10 @@ case object ModelInsights {
           val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
           val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
-          // TODO: Hide the logging of this sensitive feature metadata behind a debugging flag
-          // Sensitive information metadata will be recorded here for columns that were not removed
-          // (Either b/c the remove flag was not turned on or b/c the remove flag was turned on and
-          // these did not make the cut
-          val sensitiveFeatureInformation = vectorInfo.flatMap(_.sensitive.get(fname))
+          val sensitiveFeatureInformation = vectorInfo.flatMap(_.sensitive.get(fname)) match {
+            case Some(info) => Seq(info)
+            case _ => Seq.empty
+          }
           FeatureInsights(
             featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
             metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
@@ -724,7 +723,7 @@ case object ModelInsights {
               FeatureInsights(
                 featureName = fname, featureType = ftype, derivedFeatures = Seq.empty,
                 metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
-                sensitiveInformation = Some(sensitiveFeatureInformation)
+                sensitiveInformation = Seq(sensitiveFeatureInformation)
               )
             }
           case None => Seq.empty[FeatureInsights]
