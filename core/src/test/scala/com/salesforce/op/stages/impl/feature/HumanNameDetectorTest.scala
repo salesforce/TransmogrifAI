@@ -193,12 +193,8 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
-    val metadataMap = model.getMetadata()
-    val metadata = HumanNameDetectorMetadata.fromMetadata(metadataMap)
-    println(metadata.genderResultsByStrategy)
-    val orderedGenderDetectStrategies = estimator.orderGenderStrategies(
-      NameDetectStats.empty.copy(genderResultsByStrategy = metadata.genderResultsByStrategy))
-    orderedGenderDetectStrategies.headOption shouldBe Some(GenderDetectStrategy.FindHonorific())
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies.headOption shouldBe
+      Some(GenderDetectStrategy.FindHonorific())
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
@@ -213,7 +209,7 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
-    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies should not be
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies.headOption should not be
       Some(GenderDetectStrategy.FindHonorific())
   }
 
@@ -231,6 +227,7 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
@@ -251,6 +248,9 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies.headOption.map(_.entryName) shouldBe
+      Some(GenderDetectStrategy.ByRegex(NameDetectUtils.TextAfterFirstComma).entryName)
+
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
@@ -268,6 +268,9 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    model.asInstanceOf[HumanNameDetectorModel[Text]].orderedGenderDetectStrategies.headOption.map(_.entryName) shouldBe
+      Some(GenderDetectStrategy.ByRegex(NameDetectUtils.TextAfterFirstCommaAndNextToken).entryName)
+
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female))
