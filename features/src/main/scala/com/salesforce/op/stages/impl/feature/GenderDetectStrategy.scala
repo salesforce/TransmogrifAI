@@ -33,6 +33,7 @@ import enumeratum.{Enum, EnumEntry}
 import org.json4s.CustomSerializer
 import org.json4s.JsonAST.JString
 
+import scala.util.Try
 import scala.util.matching.Regex
 
 /**
@@ -46,28 +47,32 @@ sealed class GenderDetectStrategy extends EnumEntry
 case object GenderDetectStrategy extends Enum[GenderDetectStrategy] {
   val values: Seq[GenderDetectStrategy] = findValues
   val delimiter = " WITH VALUE "
+  val ByIndexString = "ByIndex"
+  val ByLastString = "ByLast"
+  val ByRegexString = "ByRegex"
+  val FindHonorificString = "FindHonorific"
+
   case class ByIndex(index: Int) extends GenderDetectStrategy {
-    override def toString: String = "ByIndex" + delimiter + index.toString
+    override def toString: String = ByIndexString + delimiter + index.toString
   }
   case class ByLast() extends GenderDetectStrategy {
-    override def toString: String = "ByLast"
+    override def toString: String = ByLastString
   }
   case class ByRegex(pattern: Regex) extends GenderDetectStrategy {
-    override def toString: String = "ByRegex" + delimiter + pattern.toString
+    override def toString: String = ByRegexString + delimiter + pattern.toString
   }
   case class FindHonorific() extends GenderDetectStrategy {
-    override def toString: String = "FindHonorific"
+    override def toString: String = FindHonorificString
   }
 
   def fromString(s: String): GenderDetectStrategy = {
-    val parts = s.split(delimiter)
-    val entryName: String = parts(0)
-    entryName match {
-      case "ByIndex" => ByIndex(parts(1).toInt)
-      case "ByLast" => ByLast()
-      case "ByRegex" => ByRegex(parts(1).r)
-      case "FindHonorific" => FindHonorific()
-      case _ => sys.error("Attempted to deserialize GenderDetectStrategy but no matching entry found.")
+    Option(s).map(_.split(delimiter)) match {
+      case Some(Array(ByIndexString, index)) if Try(index.toInt).isSuccess => ByIndex(index.toInt)
+      case Some(Array(ByLastString)) => ByLast()
+      case Some(Array(ByRegexString, regex)) if Try (regex.r).isSuccess => ByRegex(regex.r)
+      case Some(Array(FindHonorificString)) => FindHonorific()
+      case None => sys.error("Attempted to deserialize GenderDetectStrategy but found empty value")
+      case _ => sys.error(s"Attempted to deserialize GenderDetectStrategy but no matching entry found for value '$s'")
     }
   }
 

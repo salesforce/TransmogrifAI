@@ -36,7 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.NameDetectUtils
+import com.salesforce.op.utils.stages.{NameDetectStats, NameDetectUtils}
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
@@ -193,6 +193,13 @@ class HumanNameDetectorTest
     ).toText)
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
+    val metadataMap = model.getMetadata()
+    val metadata = HumanNameDetectorMetadata.fromMetadata(metadataMap)
+    println(metadata.genderResultsByStrategy)
+    val orderedGenderDetectStrategies = estimator.orderGenderStrategies(
+      NameDetectStats.empty.copy(genderResultsByStrategy = metadata.genderResultsByStrategy))
+    orderedGenderDetectStrategies.headOption shouldBe Some(GenderDetectStrategy.FindHonorific())
+
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender))
     identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))

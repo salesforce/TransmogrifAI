@@ -46,6 +46,7 @@ import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
 import scala.util.Try
+import scala.util.matching.Regex
 
 /**
  * Provides shared helper functions and variables for name identification and name to gender transformation.
@@ -95,7 +96,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
 
   private[op] def dictCheck(tokens: Seq[String], dict: NameDictionary): Double = {
     if (tokens.isEmpty) 0.0 else {
-      tokens.map({ token: String => if (dict contains token) 1 else 0}).sum.toDouble / tokens.length
+      tokens.map({ token: String => if (dict contains token) 1.0 else 0.0}).sum / tokens.length
     }
   }
 
@@ -113,11 +114,13 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
   ): String = {
     strategy match {
       case FindHonorific() =>
-        val matched = tokens filter { NameDetectUtils.AllHonorifics contains }
-        if (matched.length == 1) {
-          if (MaleHonorifics contains matched.head) Male else Female
+        tokens collect {
+          case v if MaleHonorifics.contains(v) => Male
+          case v if FemaleHonorifics.contains(v) => Female
+        } match {
+          case Seq(elem) => elem
+          case _ => GenderNA // Both no matches and more than one match should be NA
         }
-        else GenderNA
       case ByIndex(index) =>
         val nameToCheckGenderOf = tokens.lift(index).getOrElse("")
         genderDictCheck(nameToCheckGenderOf, genderDict)
@@ -144,11 +147,8 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
       val genderResult: String = identifyGender(text, tokens, strategy, genderDict)
-      strategy.toString -> GenderStats(
-        if (genderResult == Male) 1 else 0,
-        if (genderResult == Female) 1 else 0,
-        if (genderResult == GenderNA) 1 else 0
-      )
+      implicit def booleanToInt(v: Boolean): Int = if (v) 1 else 0
+      strategy.toString -> GenderStats(genderResult == Male, genderResult == Female, genderResult == GenderNA)
     } toMap
   }
 
@@ -208,7 +208,7 @@ private[op] object NameDetectUtils {
   import GenderDetectStrategy._
 
   type NameDictionary = Set[String]
-  val DefaultNameDictionary: NameDictionary = {
+  lazy val DefaultNameDictionary: NameDictionary = {
     val nameDictionary = collection.mutable.Set.empty[String]
     val dictionaryPath = "/Names_JRC_Combined.txt"
     val stream = getClass.getResourceAsStream(dictionaryPath)
@@ -223,7 +223,7 @@ private[op] object NameDetectUtils {
   // val DefaultNameDictionary: NameDictionary = DefaultGenderDictionary.value.keySet
 
   type GenderDictionary = Map[String, Double]
-  val DefaultGenderDictionary: GenderDictionary = {
+  lazy val DefaultGenderDictionary: GenderDictionary = {
     val genderDictionary = collection.mutable.Map.empty[String, Double]
     val dictionaryPath = "/GenderDictionary_USandUK.csv"
     val stream = getClass.getResourceAsStream(dictionaryPath)
@@ -261,8 +261,10 @@ private[op] object NameDetectUtils {
    * The second RegEx pattern will extract all text after both the first comma and the immediately next token,
    *   which accounts for patterns like `LastName, Honorific FirstName MiddleNames`
    */
+  val TextAfterFirstComma: Regex = """.*,(.*)""".r
+  val TextAfterFirstCommaAndNextToken: Regex = """.*,\s+.*?\s+(.*)""".r
   val GenderDetectStrategies: Seq[GenderDetectStrategy] = Seq(
-    FindHonorific(), ByIndex(0), ByLast(), ByRegex(""".*,(.*)""".r), ByRegex(""".*,\s+.*?\s+(.*)""".r)
+    FindHonorific(), ByIndex(0), ByLast(), ByRegex(TextAfterFirstComma), ByRegex(TextAfterFirstCommaAndNextToken)
   )
 }
 
