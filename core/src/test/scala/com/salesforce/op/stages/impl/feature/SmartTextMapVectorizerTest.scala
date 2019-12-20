@@ -585,6 +585,7 @@ class SmartTextMapVectorizerTest
   }
 
   it should "compute sensitive information in the metadata for one detected name column" in {
+    val prevLoggingLevels = getLoggingLevel // Used for resetting logging levels
     loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
@@ -617,6 +618,8 @@ class SmartTextMapVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
     assertSensitive(areaMapEstimator, newF8.name)
+
+    loggingLevel(prevLoggingLevels) // Reset logging levels
   }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
 }

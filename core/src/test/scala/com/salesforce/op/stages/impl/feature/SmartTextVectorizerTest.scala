@@ -459,6 +459,7 @@ class SmartTextVectorizerTest
   }
 
   it should "compute sensitive information in the metadata for one detected name column" in {
+    val prevLoggingLevels = getLoggingLevel // Used for resetting logging levels
     loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
@@ -481,6 +482,8 @@ class SmartTextVectorizerTest
       case None => fail("Sensitive information not found in the metadata.")
       case _ => fail("Wrong kind of sensitive information found in the metadata.")
     }
+
+    loggingLevel(prevLoggingLevels) // Reset logging levels
   }
 
   // it should "compute sensitive information in the metadata for multiple detected name columns" in {

@@ -79,7 +79,7 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
   it should "create metadata from a map" in {
     val info1 = sensitiveFeatureInfo
     val info2 = SensitiveFeatureInformation.Name(0.0, Seq(""), 0.0, 0.0, 0.0, "f2", Some("key"), actionTaken = true)
-    val map = Map("1" -> info1, "2" -> info2)
+    val map = Map("1" -> Seq(info1), "2" -> Seq(info2))
     val metadata = SensitiveFeatureInformation.toMetadata(map)
 
     metadata.contains("1") shouldBe true
