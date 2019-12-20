@@ -47,9 +47,11 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
 
   type OpVectorColumnTuple = (Seq[String], Seq[String], Option[String], Option[String], Option[String], Int)
   type FeatureHistoryTuple = (Seq[String], Seq[String])
-  // TODO: Extend these tests to work over all of the SensitiveFeatureInformation enums
-  type SensitiveTuple = (Boolean, Double, Seq[String], Double, Double, Double)
-  type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple, SensitiveTuple)
+
+  type SensitiveTuple = (SensitiveNameTuple, String, Option[String], Boolean)
+  type SensitiveNameTuple = (Double, Seq[String], Double, Double, Double)
+
+  type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple, Seq[SensitiveTuple])
 
   // AttributeGroup and Attribute require non-empty names
   val genName: Gen[String] = Gen.nonEmptyListOf(alphaNumChar).map(_.mkString)
@@ -75,21 +77,23 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   val arrVecColTupleGen: Gen[Array[OpVectorColumnTuple]] = Gen.containerOf[Array, OpVectorColumnTuple](vecColTupleGen)
 
   val sensitiveGen: Gen[SensitiveTuple] = for {
+    featureName <- genName
+    mapKey <- Gen.option(genName)
     actionTaken <- Gen.oneOf[Boolean](Seq(false, true))
     probName <- Gen.choose(0.0, 1.0)
-    firstNames <- Gen.containerOf[Seq, String](genName)
+    genderDetectResults <- Gen.containerOf[Seq, String](genName)
     probMale <- Gen.choose(0.0, 1.0)
     probFemale <- Gen.choose(0.0, 1.0 - probMale)
     probOther <- Gen.choose(0.0, 1.0 - probMale - probFemale)
   } yield {
-    (actionTaken, probName, firstNames, probMale, probFemale, probOther)
+    ((probName, genderDetectResults, probMale, probFemale, probOther), featureName, mapKey, actionTaken)
   }
 
   val vecGen: Gen[OpVectorTuple] = for {
     name <- genName
     arr <- arrVecColTupleGen
     histories <- featHistTupleGen
-    sensitiveCols <- sensitiveGen
+    sensitiveCols <- Gen.containerOf[Seq, SensitiveTuple](sensitiveGen)
   } yield {
     (name, arr, histories, sensitiveCols)
   }
@@ -102,13 +106,15 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
     columnsMeta.flatMap(v => v.parentFeatureName.map(p => p -> FeatureHistory(hist._1, hist._2))).toMap
 
   private def generateSensitiveFeatureInfo(
-    columnsMeta: Array[OpVectorColumnMetadata], sensitiveInfo: SensitiveTuple
-  ): Map[String, SensitiveFeatureInformation] = {
-    columnsMeta.flatMap(v => v.parentFeatureName.map(p => p ->
-      SensitiveFeatureInformation.Name(
-        sensitiveInfo._1, sensitiveInfo._2, sensitiveInfo._3, sensitiveInfo._4, sensitiveInfo._5, sensitiveInfo._6
-      )
-    )).toMap
+    columnsMeta: Array[OpVectorColumnMetadata], sensitiveInfoSeqRaw: Seq[SensitiveTuple]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    val sensitiveInfoSeq = sensitiveInfoSeqRaw map {
+      case ((probName, genderDetectResults, probMale, probFemale, probOther), featureName, mapKey, actionTaken) =>
+        SensitiveFeatureInformation.Name(
+          probName, genderDetectResults, probMale, probFemale, probOther, featureName, mapKey, actionTaken
+        )
+    }
+    columnsMeta.flatMap(v => v.parentFeatureName.map(p => p -> sensitiveInfoSeq)).toMap
   }
 
   private def checkTuples(tup: OpVectorColumnTuple): Boolean = tup._1.nonEmpty && tup._2.nonEmpty
@@ -135,7 +141,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
       case (outputName: String,
         columns: Array[OpVectorColumnTuple],
         hist: FeatureHistoryTuple,
-        sens: SensitiveTuple
+        sens: Seq[SensitiveTuple]
       ) if outputName.nonEmpty =>
         val cols = columns.filter(checkTuples)
         val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
@@ -153,7 +159,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
       case (outputName: String,
         columns: Array[OpVectorColumnTuple],
         hist: FeatureHistoryTuple,
-        sens: SensitiveTuple) =>
+        sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
@@ -197,7 +203,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
       case (outputName: String,
         columns: Array[OpVectorColumnTuple],
         hist: FeatureHistoryTuple,
-        sens: SensitiveTuple) =>
+        sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
@@ -217,14 +223,14 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
       outputName: String,
       columns: Array[OpVectorColumnTuple],
       hist: FeatureHistoryTuple,
-      sens: SensitiveTuple) =>
+      sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
       val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
       val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history, sensitive)
 
-      if (history.isEmpty && columnsMeta.nonEmpty ) {
+      if (history.isEmpty && columnsMeta.nonEmpty) {
         assertThrows[RuntimeException](vectorMeta.getColumnHistory())
       } else {
         val colHist = vectorMeta.getColumnHistory()
