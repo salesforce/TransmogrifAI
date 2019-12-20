@@ -53,7 +53,7 @@ class OpVectorMetadata private
   val name: String,
   col: Array[OpVectorColumnMetadata],
   val history: Map[String, FeatureHistory], // TODO fix map -> causes problems when multiple vectorizers used on feature
-  val sensitive: Map[String, SensitiveFeatureInformation] = Map.empty[String, SensitiveFeatureInformation]
+  val sensitive: Map[String, Seq[SensitiveFeatureInformation]] = Map.empty[String, Seq[SensitiveFeatureInformation]]
 ) {
 
   /**
@@ -207,7 +207,7 @@ object OpVectorMetadata {
 
     val sensitive =
       if (wrapped.underlyingMap(SensitiveKey).asInstanceOf[Metadata].isEmpty) {
-        Map.empty[String, SensitiveFeatureInformation]
+        Map.empty[String, Seq[SensitiveFeatureInformation]]
       }
       else SensitiveFeatureInformation.fromMetadataMap(field.metadata.getMetadata(SensitiveKey))
 
@@ -243,7 +243,7 @@ object OpVectorMetadata {
     name: String,
     columns: Array[OpVectorColumnMetadata],
     history: Map[String, FeatureHistory],
-    sensitive: Map[String, SensitiveFeatureInformation]
+    sensitive: Map[String, Seq[SensitiveFeatureInformation]]
   ): OpVectorMetadata = new OpVectorMetadata(name, columns, history, sensitive)
 
   /**

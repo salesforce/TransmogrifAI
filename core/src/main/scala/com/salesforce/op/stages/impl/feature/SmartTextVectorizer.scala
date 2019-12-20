@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.{SensitiveFeatureInformation, UID}
+import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
@@ -40,7 +40,7 @@ import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.SensitiveFeatureMode.Off
-import com.salesforce.op.utils.stages.{GenderStats, NameDetectFun, NameDetectStats}
+import com.salesforce.op.utils.stages.{NameDetectFun, NameDetectStats}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup, Tuple2Semigroup}
@@ -191,8 +191,7 @@ class SmartTextVectorizer[T <: Text]
     } else Array.empty[OpVectorColumnMetadata]
     val columns = categoricalColumns ++ textColumns
 
-    val sensitive: Map[String, SensitiveFeatureInformation] =
-      createSensitiveFeatureInformation(aggNameDetectStats, inN)
+    val sensitive = createSensitiveFeatureInformation(aggNameDetectStats, inN.map(_.name))
 
     OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }

@@ -699,7 +699,7 @@ case object ModelInsights {
           val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
           val sensitiveFeatureInformation = vectorInfo.flatMap(_.sensitive.get(fname)) match {
-            case Some(info) => Seq(info)
+            case Some(info) => info
             case _ => Seq.empty
           }
           FeatureInsights(
@@ -711,9 +711,10 @@ case object ModelInsights {
         // Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata
         vectorInfo match {
           case Some(v) =>
-            // Find keys where `actionTaken` is true
+            // Find features where `actionTaken` is true for all of the sensitive feature informations
             v.sensitive.collect {
-              case (fname, sensitiveFeatureInformation) if sensitiveFeatureInformation.actionTaken =>
+              case (fname, sensitiveFeatureInformation)
+                if sensitiveFeatureInformation.forall(_.actionTaken) =>
               val ftype = allFeatures.find(_.name == fname)
                 .map(_.typeName)
                 .getOrElse("")
@@ -723,7 +724,7 @@ case object ModelInsights {
               FeatureInsights(
                 featureName = fname, featureType = ftype, derivedFeatures = Seq.empty,
                 metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
-                sensitiveInformation = Seq(sensitiveFeatureInformation)
+                sensitiveInformation = sensitiveFeatureInformation
               )
             }
           case None => Seq.empty[FeatureInsights]

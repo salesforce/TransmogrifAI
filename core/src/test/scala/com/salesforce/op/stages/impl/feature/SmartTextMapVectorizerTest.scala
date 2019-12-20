@@ -40,6 +40,7 @@ import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
+import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -584,22 +585,24 @@ class SmartTextMapVectorizerTest
   }
 
   it should "compute sensitive information in the metadata for one detected name column" in {
-    def assertSensitive(estimator: SequenceEstimator[_, _]): Unit = {
+    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+    def assertSensitive(estimator: SequenceEstimator[_, _], fname: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
       println(sensitive)
-      sensitive.get("name") match {
-        case Some(SensitiveFeatureInformation.Name(
+      sensitive.get(fname) match {
+        case Some(Seq(SensitiveFeatureInformation.Name(
           probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
-        )) =>
-          actionTaken shouldBe true
+        ))) =>
           probName shouldBe 1.0
-          // TODO
-          // genderStrats shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+          genderDetectResults.length shouldBe NameDetectUtils.GenderDetectStrategies.length
           probMale shouldBe 0.5
           probFemale shouldBe 0.5
           probOther shouldBe 0.0
+          name shouldBe fname
+          mapKey shouldBe "name"
+          actionTaken shouldBe true
         case None => fail("Sensitive information not found in the metadata.")
-        case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+        case _ => fail("Wrong kind of sensitive information found in the metadata.")
       }
     }
 
@@ -607,14 +610,13 @@ class SmartTextMapVectorizerTest
     val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+    assertSensitive(mapEstimator, newF7.name)
 
     val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF8)
     val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
-
-    assertSensitive(mapEstimator)
-    assertSensitive(areaMapEstimator)
+    assertSensitive(areaMapEstimator, newF8.name)
   }
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
 }

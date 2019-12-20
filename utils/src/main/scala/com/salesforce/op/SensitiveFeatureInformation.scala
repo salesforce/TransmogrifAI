@@ -108,12 +108,12 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
   /**
    * Build metadata from Map of [[SensitiveFeatureInformation]] instances
    *
-   * @param map Map from feature name to [[SensitiveFeatureInformation]] of that feature
+   * @param map Map from feature name to Seq of [[SensitiveFeatureInformation]] about that feature
    * @return metadata representation
    */
-  def toMetadata(map: Map[String, SensitiveFeatureInformation]): Metadata = {
+  def toMetadata(map: Map[String, Seq[SensitiveFeatureInformation]]): Metadata = {
     val builder = new MetadataBuilder()
-    map.foreach { case (k, v) => builder.putMetadata(k, v.toMetadata) }
+    map.foreach { case (k, values) => values.foreach { v => builder.putMetadata(k, v.toMetadata) } }
     builder.build()
   }
 
@@ -123,9 +123,10 @@ case object SensitiveFeatureInformation extends Enum[SensitiveFeatureInformation
    * @param meta metadata containing a mapping from feature name to [[SensitiveFeatureInformation]]
    * @return map of that information
    */
-  def fromMetadataMap(meta: Metadata): Map[String, SensitiveFeatureInformation] = {
+  def fromMetadataMap(meta: Metadata): Map[String, Seq[SensitiveFeatureInformation]] = {
     val infoMap = meta.wrapped.underlyingMap
     infoMap.map { case (k, v) => k -> fromMetadata(v.asInstanceOf[Metadata]) }
+      .groupBy(_._1) map { case (name, listOfTuples) => name -> listOfTuples.values.toSeq }
   }
 
   /**

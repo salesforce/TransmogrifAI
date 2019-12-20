@@ -575,7 +575,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     },
     Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
     Map(
-      "f0" -> SensitiveFeatureInformation.Name(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false)
+      "f0" -> Seq(SensitiveFeatureInformation.Name(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false))
     )
   )
 
@@ -726,12 +726,12 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       },
       Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
       Map(
-        "f0" -> SensitiveFeatureInformation.Name(
+        "f0" -> Seq(SensitiveFeatureInformation.Name(
           0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false
-        ),
-        "f_notInMeta" -> SensitiveFeatureInformation.Name(
+        )),
+        "f_notInMeta" -> Seq(SensitiveFeatureInformation.Name(
           1.0, Seq.empty[String], 0.0, 0.0, 1.0, "f_notInMeta", None, true
-        )
+        ))
       )
     )
 

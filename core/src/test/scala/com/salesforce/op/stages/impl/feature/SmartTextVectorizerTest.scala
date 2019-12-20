@@ -39,6 +39,7 @@ import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
+import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -458,26 +459,27 @@ class SmartTextVectorizerTest
   }
 
   it should "compute sensitive information in the metadata for one detected name column" in {
+    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-    println(sensitive)
     sensitive.get("name") match {
-      case Some(SensitiveFeatureInformation.Name(
+      case Some(Seq(SensitiveFeatureInformation.Name(
         probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
-      )) =>
-        actionTaken shouldBe true
+      ))) =>
         probName shouldBe 1.0
-        // TODO
-        // genderDetectResults shouldBe Array("Best Index: 0", "Roxanne", "Ross", "Michael", "Michelle")
+        genderDetectResults.length shouldBe NameDetectUtils.GenderDetectStrategies.length
         probMale shouldBe 0.5
         probFemale shouldBe 0.5
         probOther shouldBe 0.0
+        name shouldBe newF3.name
+        mapKey shouldBe None
+        actionTaken shouldBe true
       case None => fail("Sensitive information not found in the metadata.")
-      case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+      case _ => fail("Wrong kind of sensitive information found in the metadata.")
     }
   }
 

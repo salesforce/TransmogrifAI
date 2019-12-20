@@ -34,7 +34,6 @@ import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.SensitiveFeatureInformation
-import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
@@ -44,7 +43,7 @@ import com.twitter.algebird.macros.caseclass
 import enumeratum.{Enum, EnumEntry}
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.internal.Logging
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, ParamValidators, Params}
+import org.apache.spark.ml.param._
 import org.apache.spark.sql.{Encoder, Encoders, SparkSession}
 
 import scala.io.Source
@@ -194,12 +193,22 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
 
   private[op] def createSensitiveFeatureInformation(
     aggNameDetectStats: Seq[NameDetectStats],
-    features: Seq[TransientFeature]
-  ): Map[String, SensitiveFeatureInformation] = {
-    aggNameDetectStats.zip(features) collect {
+    features: Seq[String]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    createSensitiveFeatureInformation(
+      features.zip(aggNameDetectStats) map { case (name, stats) => (name, None) -> stats } toMap
+    )
+  }
+
+  // TODO: Make documentation
+  private[op] def createSensitiveFeatureInformation(
+    nameDetectStatsMap: Map[(String, Option[String]), NameDetectStats]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    nameDetectStatsMap collect {
       // Only create SensitiveFeatureInformation for features detected as Sensitive unless debugging is enabled
       // In which case create SensitiveFeatureInformation for all features
-      case (stats: NameDetectStats, feature: TransientFeature) if log.isDebugEnabled || computeTreatAsName(stats) =>
+      case ((feature: String, key: Option[String]), stats: NameDetectStats)
+        if log.isDebugEnabled || computeTreatAsName(stats) =>
         val N = stats.dictCheckResult.count.toDouble
         val genderStrategies: Seq[(String, GenderStats)] = stats.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
         val (bestGenderStats: GenderStats, genderStratResults: Seq[String]) = genderStrategies match {
@@ -207,21 +216,21 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
             val bestGenderStats = first._2
             // Log all gender detection results only if debug is enabled
             val genderStratResults = (if (log.isDebugEnabled) first +: tail else Seq(first)) map {
-              case(strategyString, genderStats) => f"$strategyString: ${genderStats.numOther / N}%% unidentified"
+              case (strategyString, genderStats) => f"$strategyString: ${genderStats.numOther / N}%% unidentified"
             }
             (bestGenderStats, genderStratResults)
           case _ => sys.error("There ought to be gender strategies from name detection.")
         }
 
-        feature.name -> SensitiveFeatureInformation.Name(
+        feature -> SensitiveFeatureInformation.Name(
           probName = stats.dictCheckResult.value,
           genderDetectResults = genderStratResults,
           probMale = bestGenderStats.numMale.toDouble / N,
           probFemale = bestGenderStats.numFemale.toDouble / N,
           probOther = bestGenderStats.numOther.toDouble / N,
-          feature.name, None, actionTaken = shouldRemoveSensitive && computeTreatAsName(stats)
+          feature, key, actionTaken = shouldRemoveSensitive && computeTreatAsName(stats)
         )
-    } toMap
+    } groupBy (_._1) map { case (name, nameToStatsMap) => name -> nameToStatsMap.values.toSeq }
   }
 }
 

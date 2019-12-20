@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.{SensitiveFeatureInformation, UID}
+import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
@@ -97,7 +97,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
   private def makeVectorMetadata(
     args: SmartTextMapVectorizerModelArgs,
-    aggNameDetectStats: Array[NameDetectStats]
+    aggNameDetectStats: Array[Map[String, NameDetectStats]]
   ): OpVectorMetadata = {
     val categoricalColumns = if (args.categoricalFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
@@ -127,8 +127,12 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     } else Array.empty[OpVectorColumnMetadata]
     val columns = categoricalColumns ++ textColumns
 
-    val sensitive: Map[String, SensitiveFeatureInformation] =
-      createSensitiveFeatureInformation(aggNameDetectStats, inN)
+    val nameDetectStatsMap: Map[(String, Option[String]), NameDetectStats] =
+      inN.toSeq.zip(aggNameDetectStats) flatMap {
+        case (tf, mapFromKeyToNameDetectStats) => mapFromKeyToNameDetectStats map {
+          case (key, nameDetectStats) => (tf.name, Some(key)) -> nameDetectStats }
+      } toMap
+    val sensitive = createSensitiveFeatureInformation(nameDetectStatsMap)
 
     OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName), sensitive)
   }
@@ -198,7 +202,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 
-    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, Array.empty)
+    val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, aggregatedStats.map(_.nameDetectStats))
     setMetadata(vecMetadata.toMetadata)
 
     new SmartTextMapVectorizerModel[T](args = smartTextMapVectorizerModelArgs, operationName = operationName, uid = uid)
