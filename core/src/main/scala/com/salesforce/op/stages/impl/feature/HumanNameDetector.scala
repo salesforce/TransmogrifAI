@@ -34,6 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.stages.impl.MetadataLike
+import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages._
 import com.twitter.algebird.Operators._
 import org.apache.spark.sql._
@@ -54,7 +55,7 @@ import scala.reflect.runtime.universe.TypeTag
 class HumanNameDetector[T <: Text]
 (
   uid: String = UID[HumanNameDetector[T]],
-  operationName: String = "human name detector"
+  operationName: String = "humanNameDetect"
 )
 (
   implicit tti: TypeTag[T],
@@ -65,13 +66,12 @@ class HumanNameDetector[T <: Text]
 ) with NameDetectFun {
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
+    require(!dataset.isEmpty, "Input dataset cannot be empty")
+
     implicit val (nameDetectStatsEnc, nameDetectStatsMonoid) = (NameDetectStats.kryo, NameDetectStats.monoid)
     val mapFun: T#Value => NameDetectStats = makeMapFunction(dataset.sparkSession)
     val aggResults: NameDetectStats = dataset.map(mapFun).reduce(_ + _)
     val treatAsName = computeTreatAsName(aggResults)
-
-    val orderedGenderDetectStrategies =
-      if (treatAsName) orderGenderStrategies(aggResults) else Seq.empty[GenderDetectStrategy]
 
     val newMetadata = HumanNameDetectorMetadata(
       treatAsName, aggResults.dictCheckResult.value, aggResults.genderResultsByStrategy
@@ -79,6 +79,8 @@ class HumanNameDetector[T <: Text]
     val metaDataBuilder = new MetadataBuilder().withMetadata(getMetadata()).withMetadata(newMetadata)
     setMetadata(metaDataBuilder.build())
 
+    val orderedGenderDetectStrategies =
+      if (treatAsName) orderGenderStrategies(aggResults) else Seq.empty[GenderDetectStrategy]
     new HumanNameDetectorModel[T](uid, treatAsName, orderedGenderDetectStrategies)
   }
 }
@@ -89,7 +91,7 @@ class HumanNameDetectorModel[T <: Text]
   val treatAsName: Boolean,
   val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("human name detector", uid) with NameDetectFun {
+  extends UnaryModel[T, NameStats]("humanNameDetect", uid) with NameDetectFun {
 
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings.GenderNA
@@ -98,7 +100,7 @@ class HumanNameDetectorModel[T <: Text]
     val tokens = preProcess(input.value)
     if (treatAsName) {
       require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
-      // TODO: Figure out how to use a broadcast variable for the gender dictionary within a unary transformer
+      // Could figure out how to use a broadcast variable for the gender dictionary within a unary transformer
       val genders: Seq[String] = orderedGenderDetectStrategies map {
         identifyGender(input.value.getOrElse(""), tokens, _, NameDetectUtils.DefaultGenderDictionary)
       }
@@ -147,8 +149,11 @@ case object HumanNameDetectorMetadata {
       NameDetectUtils.GenderDetectStrategies map { strategy: GenderDetectStrategy =>
         val strategyString = strategy.toString
         val resultsArray = genderResultsMetadata.getDoubleArray(strategyString)
-        require(resultsArray.length == 3, "There must be exactly three values for each gender detection strategy.")
-        strategyString -> GenderStats(resultsArray(0).toInt, resultsArray(1).toInt, resultsArray(2).toInt)
+        require(resultsArray.length == 3,
+          "There must be exactly three values for each gender detection strategy: numMale, numFemale, and numOther.")
+        strategyString -> GenderStats(
+          numMale = resultsArray(0).toInt, numFemale = resultsArray(1).toInt, numOther = resultsArray(2).toInt
+        )
       } toMap
     }
     HumanNameDetectorMetadata(
