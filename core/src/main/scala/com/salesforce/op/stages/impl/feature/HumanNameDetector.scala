@@ -81,17 +81,18 @@ class HumanNameDetector[T <: Text]
 
     val orderedGenderDetectStrategies =
       if (treatAsName) orderGenderStrategies(aggResults) else Seq.empty[GenderDetectStrategy]
-    new HumanNameDetectorModel[T](uid, treatAsName, orderedGenderDetectStrategies)
+    new HumanNameDetectorModel[T](uid, operationName, treatAsName, orderedGenderDetectStrategies)
   }
 }
 
 class HumanNameDetectorModel[T <: Text]
 (
   override val uid: String,
+  operationName: String,
   val treatAsName: Boolean,
   val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("humanNameDetect", uid) with NameDetectFun {
+  extends UnaryModel[T, NameStats](operationName, uid) with NameDetectFun {
 
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings.GenderNA
