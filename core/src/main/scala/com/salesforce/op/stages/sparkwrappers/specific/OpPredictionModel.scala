@@ -56,7 +56,7 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
    * Predict label for the given features
    */
   @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
-    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
+    throw new RuntimeException("Could not find the wrapped Spark stage.")
   ).predict(_)
 
   /**
