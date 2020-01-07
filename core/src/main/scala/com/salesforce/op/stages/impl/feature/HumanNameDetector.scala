@@ -63,7 +63,7 @@ class HumanNameDetector[T <: Text]
 ) extends UnaryEstimator[T, NameStats](
   uid = uid,
   operationName = operationName
-) with NameDetectFun {
+) with NameDetectFun[T] {
 
   def fitFn(dataset: Dataset[T#Value]): HumanNameDetectorModel[T] = {
     require(!dataset.isEmpty, "Input dataset cannot be empty")
@@ -81,28 +81,29 @@ class HumanNameDetector[T <: Text]
 
     val orderedGenderDetectStrategies =
       if (treatAsName) orderGenderStrategies(aggResults) else Seq.empty[GenderDetectStrategy]
-    new HumanNameDetectorModel[T](uid, treatAsName, orderedGenderDetectStrategies)
+    new HumanNameDetectorModel[T](uid, operationName, treatAsName, orderedGenderDetectStrategies)
   }
 }
 
 class HumanNameDetectorModel[T <: Text]
 (
   override val uid: String,
+  operationName: String,
   val treatAsName: Boolean,
   val orderedGenderDetectStrategies: Seq[GenderDetectStrategy] = Seq.empty[GenderDetectStrategy]
 )(implicit tti: TypeTag[T])
-  extends UnaryModel[T, NameStats]("humanNameDetect", uid) with NameDetectFun {
+  extends UnaryModel[T, NameStats](operationName, uid) with NameDetectFun[T] {
 
   import NameStats.BooleanStrings._
   import NameStats.GenderStrings.GenderNA
   import NameStats.Keys._
   def transformFn: T => NameStats = (input: T) => {
-    val tokens = preProcess(input.value)
+    val tokens = preProcess(input)
     if (treatAsName) {
       require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
       // Could figure out how to use a broadcast variable for the gender dictionary within a unary transformer
       val genders: Seq[String] = orderedGenderDetectStrategies map {
-        identifyGender(input.value.getOrElse(""), tokens, _, NameDetectUtils.DefaultGenderDictionary)
+        identifyGender(input.value, tokens, _, NameDetectUtils.DefaultGenderDictionary)
       }
       val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
       NameStats(Map(

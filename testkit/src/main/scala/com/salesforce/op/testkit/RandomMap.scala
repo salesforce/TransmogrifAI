@@ -35,6 +35,7 @@ import scala.reflect.runtime.universe.WeakTypeTag
 import scala.util.Random
 import RandomMap._
 import com.salesforce.op.features.types._
+import com.salesforce.op.testkit.DataSources.{RandomFirstName, RandomLastName}
 
 /**
  * Generator of maps
@@ -157,6 +158,33 @@ object RandomMap {
   RandomMap[Long, M] =
     mapsOf[Long, M](valueGenerator.numbers.producer, minSize, maxSize, sources = Some(valueGenerator))
 
+  /**
+   * Produces random NameStats maps (custom maps with pre-defined keys/values with names and demographic info)
+   *
+   * @return a generator of NameStats maps; the keys will be limted to the set defined by NameStats.Keys
+   */
+  def ofNameStats(): RandomMap[String, NameStats] = {
+    def getRandomElement(list: Seq[String], random: Random): String =
+      list(random.nextInt(list.length))
+    val producer: Random => Seq[String] = rng => {
+      val firstName = RandomFirstName(rng)
+      val lastName = RandomLastName(rng)
+      Seq(
+        firstName + " " + lastName,
+        getRandomElement(Seq(NameStats.BooleanStrings.True, NameStats.BooleanStrings.False), rng),
+        firstName, lastName,
+        getRandomElement(Seq(
+          NameStats.GenderStrings.Male,
+          NameStats.GenderStrings.Female,
+          NameStats.GenderStrings.GenderNA,
+          NameStats.GenderStrings.GenderNotInferred
+        ), rng)
+      )
+    }
+    val values: RandomStream[Seq[String]] = RandomStream(producer = producer)
+    val keys: Int => String = NameStats.AllKeys
+    RandomMap[String, NameStats](values = values, keys = keys, sources = None)
+  }
 
   /**
    * Produces random maps of geolocation

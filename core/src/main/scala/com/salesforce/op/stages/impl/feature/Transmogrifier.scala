@@ -231,6 +231,10 @@ private[op] case object Transmogrifier {
           val (f, other) = castAs[StreetMap](g) // TODO make Street specific transformer
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
+        case t if t =:= weakTypeOf[NameStats] =>
+          val (f, other) = castAs[NameStats](g)
+          f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
+            others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[GeolocationMap] =>
           val (f, other) = castAs[GeolocationMap](g)
           f.vectorize(cleanKeys = CleanKeys, others = other, trackNulls = TrackNulls)

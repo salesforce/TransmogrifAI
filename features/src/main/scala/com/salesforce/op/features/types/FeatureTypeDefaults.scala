@@ -100,9 +100,8 @@ case object FeatureTypeDefaults {
   val CityMap = new t.CityMap(Map.empty)
   val PostalCodeMap = new t.PostalCodeMap(Map.empty)
   val StreetMap = new t.StreetMap(Map.empty)
-  val GeolocationMap = new t.GeolocationMap(Map.empty)
-
   val NameStats = new t.NameStats(Map.empty)
+  val GeolocationMap = new t.GeolocationMap(Map.empty)
 
   /**
    * Return a default value for specified feature type
@@ -146,6 +145,7 @@ case object FeatureTypeDefaults {
       case wt if wt =:= weakTypeOf[t.CityMap] => CityMap
       case wt if wt =:= weakTypeOf[t.PostalCodeMap] => PostalCodeMap
       case wt if wt =:= weakTypeOf[t.StreetMap] => StreetMap
+      case wt if wt =:= weakTypeOf[t.NameStats] => NameStats
       case wt if wt =:= weakTypeOf[t.GeolocationMap] => GeolocationMap
 
       // Numerics

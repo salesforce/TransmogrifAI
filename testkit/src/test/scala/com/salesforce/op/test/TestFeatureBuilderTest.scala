@@ -145,7 +145,7 @@ class TestFeatureBuilderTest extends FlatSpec with TestSparkContext with Feature
   it should "create a dataset with all random features" in {
     val numOfRows = 15
     val (ds, features) = TestFeatureBuilder.random(numOfRows = numOfRows)()
-    features.length shouldBe 51
+    features.length shouldBe 52
 
     ds.schema.fields.map(f => f.name -> f.dataType) should contain theSameElementsInOrderAs
       features.map(f => f.name -> FeatureSparkTypes.sparkTypeOf(f.wtt))

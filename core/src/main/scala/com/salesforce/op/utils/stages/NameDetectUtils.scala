@@ -53,32 +53,30 @@ import scala.util.matching.Regex
 /**
  * Provides shared helper functions and variables for name identification and name to gender transformation.
  */
-private[op] trait NameDetectFun extends Logging with NameDetectParams {
+private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams {
   import GenderDetectStrategy._
   import NameDetectUtils._
 
-  private[op] implicit def textValue2String[T <: Text](input: T#Value): String = input.getOrElse("")
-  private[op] implicit def string2Text[T <: Text](input: String): T#Value = input match {
-    case "" => Text.empty.value
-    case _ => Text(input).value
-  }
-
-  private[op] def preProcess(input: String): Seq[String] = {
-    TextTokenizer.tokenize(Text(input)).tokens.toArray
+  private[op] def preProcess(input: Text): Seq[String] = {
+    TextTokenizer.tokenize(input).tokens.toArray
   }
 
   private[op] def computeGuardCheckQuantities(
-    text: String,
+    input: T#Value,
     tokens: Seq[String],
     hllMonoid: HyperLogLogMonoid
   ): GuardCheckStats = {
-    val textLength = text.length
-    GuardCheckStats(
-      countBelowMaxNumTokens = if (tokens.length < $(guard_maxNumberOfTokens)) 1 else 0,
-      countAboveMinCharLength = if (textLength >= $(guard_minTextLength)) 1 else 0,
-      approxMomentsOfTextLength = Moments(textLength),
-      approxNumUnique = hllMonoid.create(text.getBytes)
-    )
+    input match {
+      case None => GuardCheckStats(0, 0, MomentsGroup.zero, hllMonoid.zero)
+      case Some(text) =>
+        val textLength = text.length
+        GuardCheckStats(
+          countBelowMaxNumTokens = if (tokens.length < $(guard_maxNumberOfTokens)) 1 else 0,
+          countAboveMinCharLength = if (textLength >= $(guard_minTextLength)) 1 else 0,
+          approxMomentsOfTextLength = Moments(textLength),
+          approxNumUnique = hllMonoid.create(text.getBytes)
+        )
+    }
   }
 
   private[op] def performGuardChecks(stats: GuardCheckStats, hllMonoid: HyperLogLogMonoid): Boolean = {
@@ -104,67 +102,71 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
     }
   }
 
-  private[op] def genderDictCheck(nameToCheckGenderOf: String, genderDict: GenderDictionary): String = {
-    genderDict.get(nameToCheckGenderOf).map(
+  private[op] def genderDictCheck(nameToCheckGenderOf: T#Value, genderDict: GenderDictionary): String = {
+    nameToCheckGenderOf.flatMap(genderDict.get).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
   }
 
   private[op] def identifyGender(
-    text: String,
+    input: T#Value,
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
     genderDict: GenderDictionary
   ): String = {
-    strategy match {
-      case FindHonorific() =>
-        tokens collect {
-          case v if MaleHonorifics.contains(v) => Male
-          case v if FemaleHonorifics.contains(v) => Female
-        } match {
-          case Seq(elem) => elem
-          case _ => GenderNA // Both no matches and more than one match should be NA
-        }
-      case ByIndex(index) =>
-        val nameToCheckGenderOf = tokens.lift(index).getOrElse("")
-        genderDictCheck(nameToCheckGenderOf, genderDict)
-      case ByLast() =>
-        val nameToCheckGenderOf = tokens.lastOption.getOrElse("")
-        genderDictCheck(nameToCheckGenderOf, genderDict)
-      case ByRegex(pattern) =>
-        text match {
-          case pattern(matchedGroup) =>
-            val nameToCheckGenderOf = preProcess(Some(matchedGroup)).headOption.getOrElse("")
+    input match {
+      case None => GenderNA
+      case Some(text) =>
+        strategy match {
+          case FindHonorific() =>
+            tokens collect {
+              case v if MaleHonorifics.contains(v) => Male
+              case v if FemaleHonorifics.contains(v) => Female
+            } match {
+              case Seq(elem) => elem
+              case _ => GenderNA // Both no matches and more than one match should be NA
+            }
+          case ByIndex(index) =>
+            val nameToCheckGenderOf = tokens.lift(index)
             genderDictCheck(nameToCheckGenderOf, genderDict)
-          case _ => GenderNA
+          case ByLast() =>
+            val nameToCheckGenderOf = tokens.lastOption
+            genderDictCheck(nameToCheckGenderOf, genderDict)
+          case ByRegex(pattern) =>
+            text match {
+              case pattern(matchedGroup) =>
+                val nameToCheckGenderOf = preProcess(Text(matchedGroup)).headOption
+                genderDictCheck(nameToCheckGenderOf, genderDict)
+              case _ => GenderNA
+            }
+          case _ =>
+            logError("Unimplemented gender detection strategy found")
+            GenderNA
         }
-      case _ =>
-        logError("Unimplemented gender detection strategy found")
-        GenderNA
     }
   }
 
   private[op] def computeGenderResultsByStrategy(
-    text: String,
+    input: T#Value,
     tokens: Seq[String],
     genderDict: GenderDictionary
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-      val genderResult: String = identifyGender(text, tokens, strategy, genderDict)
+      val genderResult: String = identifyGender(input, tokens, strategy, genderDict)
       implicit def booleanToInt(v: Boolean): Int = if (v) 1 else 0
       strategy.toString -> GenderStats(genderResult == Male, genderResult == Female, genderResult == GenderNA)
     } toMap
   }
 
   private[op] def computeResults(
-    input: String,
+    input: T#Value,
     nameDict: Broadcast[NameDictionary],
     genderDict: Broadcast[GenderDictionary],
     hll: HyperLogLogMonoid
   ): NameDetectStats = input match {
-    case "" if $(ignoreNulls) => NameDetectStats.empty
+    case None if $(ignoreNulls) => NameDetectStats.empty
     case _ =>
-      val tokens = preProcess(input)
+      val tokens = preProcess(Text(input))
       NameDetectStats(
         computeGuardCheckQuantities(input, tokens, hll),
         AveragedValue(1L, dictCheck(tokens, nameDict.value)),
@@ -172,8 +174,7 @@ private[op] trait NameDetectFun extends Logging with NameDetectParams {
       )
   }
 
-  type NameDetectMapFun[T <: Text] = T#Value => NameDetectStats
-  private[op] def makeMapFunction[T <: Text](spark: SparkSession): NameDetectMapFun[T] = {
+  private[op] def makeMapFunction(spark: SparkSession): T#Value => NameDetectStats = {
     val broadcastNameDict: Broadcast[NameDictionary] = spark.sparkContext.broadcast(DefaultNameDictionary)
     val broadcastGenderDict: Broadcast[GenderDictionary] = spark.sparkContext.broadcast(DefaultGenderDictionary)
     val hllMonoid = new HyperLogLogMonoid(NameDetectUtils.HLLBits)

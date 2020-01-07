@@ -75,7 +75,7 @@ class SmartTextVectorizer[T <: Text]
 ) with PivotParams with CleanTextFun with SaveOthersParams
   with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
   with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
-  with NameDetectFun {
+  with NameDetectFun[T] {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
   type StatsTuple = (TextStats, NameDetectStats)

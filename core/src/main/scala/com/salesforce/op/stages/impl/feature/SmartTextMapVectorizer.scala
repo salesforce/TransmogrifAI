@@ -68,19 +68,22 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams
-    with NameDetectFun {
+    with NameDetectFun[Text] {
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
 
   private def computeTextMapStats
   (
-    textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean, nameDetectMapFun: NameDetectMapFun[Text]
+    textMap: T#Value,
+    shouldCleanKeys: Boolean,
+    shouldCleanValues: Boolean,
+    nameDetectMapFun: Text#Value => NameDetectStats
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1))
     }
     val nameDetectStats = if (getSensitiveFeatureMode == Off) Map.empty[String, NameDetectStats]
-    else textMap.map{ case (k, v) => cleanTextFn(k, shouldCleanKeys) -> nameDetectMapFun(v) }
+    else textMap.map{ case (k, v) => cleanTextFn(k, shouldCleanKeys) -> nameDetectMapFun(Text(v).value) }
     TextMapStats(keyValueCounts, nameDetectStats)
   }
 
@@ -197,7 +200,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     )
     import dataset.sparkSession.implicits._
     dataset.map(_.map(
-      _.toSeq.map { case (k, v) => k -> (v, preProcess(v)) }
+      _.toSeq.map { case (k, v) => k -> (v, preProcess(Text(v))) }
     )).show(truncate = false)
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)

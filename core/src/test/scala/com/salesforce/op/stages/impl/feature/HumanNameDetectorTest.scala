@@ -36,7 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
-import com.salesforce.op.utils.stages.{NameDetectStats, NameDetectUtils}
+import com.salesforce.op.utils.stages.NameDetectUtils
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.types.Metadata
 import org.junit.runner.RunWith
@@ -305,12 +305,12 @@ class HumanNameDetectorTest
   }
 
   it should "produce the correct metadata" in {
-    val text = "Elizabeth Warren"
-    val (_, _, model, _) = identifyName(Seq(text).toText)
+    val text = Text("Elizabeth Warren")
+    val (_, _, model, _) = identifyName(Seq(text))
     val metadata: Metadata = model.getMetadata()
     metadata shouldBe HumanNameDetectorMetadata(treatAsName = true, predictedNameProb = 1.0,
       genderResultsByStrategy = estimator.computeGenderResultsByStrategy(
-        text, estimator.preProcess(text), NameDetectUtils.DefaultGenderDictionary)
+        text.value, estimator.preProcess(text), NameDetectUtils.DefaultGenderDictionary)
     ).toMetadata()
   }
 
