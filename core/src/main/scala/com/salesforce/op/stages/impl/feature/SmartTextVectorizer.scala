@@ -123,8 +123,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
     val (valueCounts, lengthCounts) = text match {
-      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1), Map(cleanTextFn(v, shouldCleanText).length -> 1))
-      case None => (Map.empty[String, Int], Map.empty[Int, Int])
+      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1L), Map(cleanTextFn(v, shouldCleanText).length -> 1L))
+      case None => (Map.empty[String, Long], Map.empty[Int, Long])
     }
     TextStats(valueCounts, lengthCounts)
   }
@@ -180,8 +180,8 @@ object SmartTextVectorizer {
  * @param lengthCounts counts of token lengths
  */
 private[op] case class TextStats(
-  valueCounts: Map[String, Int],
-  lengthCounts: Map[Int, Int]
+  valueCounts: Map[String, Long],
+  lengthCounts: Map[Int, Long]
 ) extends JsonLike {
 
   val lengthSize = lengthCounts.values.sum
@@ -193,17 +193,25 @@ private[op] case class TextStats(
 }
 
 private[op] object TextStats {
+  /**
+   * Helper function to add two maps subject to a max cardinality restriction on the number of unique values
+   *
+   * @param totalMap        Current accumulated map
+   * @param mapToAdd        Additional map to add the to accumulated one
+   * @param maxCardinality  Maximum number of unique keys to keep track of (stop counting once this is hit)
+   * @tparam T              Type parameter for the keys
+   * @return                Newly accumulated map subject to the key cardinality constraints
+   */
+  def additionHelper[T](totalMap: Map[T, Long], mapToAdd: Map[T, Long], maxCardinality: Int): Map[T, Long] = {
+    if (totalMap.size > maxCardinality) totalMap
+    else if (mapToAdd.size > maxCardinality) mapToAdd
+    else totalMap + mapToAdd
+  }
+
   def monoid(maxCardinality: Int): Monoid[TextStats] = new Monoid[TextStats] {
     override def plus(l: TextStats, r: TextStats): TextStats = {
-      val newValueCounts = if (l.valueCounts.size > maxCardinality) l.valueCounts
-        else if (r.valueCounts.size > maxCardinality) r.valueCounts
-        else l.valueCounts + r.valueCounts
-
-      val newLengthCounts = if (l.lengthCounts.size > maxCardinality) l.lengthCounts
-        else if (r.lengthCounts.size > maxCardinality) r.lengthCounts
-        else l.lengthCounts + r.lengthCounts
-
-
+      val newValueCounts = additionHelper(l.valueCounts, r.valueCounts, maxCardinality)
+      val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts, maxCardinality)
       TextStats(newValueCounts, newLengthCounts)
     }
 
