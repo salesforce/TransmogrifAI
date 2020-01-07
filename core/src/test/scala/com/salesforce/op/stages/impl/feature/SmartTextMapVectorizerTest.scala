@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.Feature
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -39,6 +40,8 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
+import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.stages.impl.feature.MapifyTransformer
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -72,6 +75,33 @@ class SmartTextMapVectorizerTest
       (TextAreaMap.empty, TextAreaMap.empty, TextArea.empty, TextArea.empty)
     )
   )
+
+  /*
+    Generate some more complicated input data to check things a little closer. There are four text fields with
+    different token distributions:
+
+    country: Uniformly distributed from a larger list of ~few hundred countries, should be hashed
+    categoricalText: Uniformly distributed from a small list of choices, should be pivoted (also has fixed lengths,
+      so serves as a test that the categorical check happens before the token length variance check)
+    textId: Uniformly distributed high cardinality Ids with fixed lengths, should be ignored
+    text: Uniformly distributed unicode strings with lengths ranging from 0-100, should be hashed
+   */
+  val countryData: Seq[Text] = RandomText.countries.withProbabilityOfEmpty(0.2).limit(1000)
+  val categoricalTextData: Seq[Text] = RandomText.textFromDomain(domain = List("A", "B", "C", "D", "E", "F"))
+    .withProbabilityOfEmpty(0.2).limit(1000)
+  // Generate List containing elements like 040231, 040232, ...
+  val textIdData: Seq[Text] = RandomText.textFromDomain(
+    domain = (1 to 1000).map(x => "%06d".format(40230 + x)).toList
+  ).withProbabilityOfEmpty(0.2).limit(1000)
+
+  val generatedData: Seq[(Text, Text, Text)] = countryData.zip(categoricalTextData).zip(textIdData).map {
+    case ((co, ca), id) => (co, ca, id)
+  }
+  val (rawDF, rawCountry, rawCategorical, rawTextId) = TestFeatureBuilder(
+    "country", "categorical", "textId", generatedData)
+  val mapTransformer = new MapifyTransformer[Text, TextMap, String]()
+  val rawMapFeat = mapTransformer.setInput(rawCountry, rawCategorical, rawTextId).getOutput()
+    .asInstanceOf[Feature[TextMap]]
 
   /**
    * Estimator instance to be tested
@@ -288,6 +318,41 @@ class SmartTextMapVectorizerTest
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
+  }
+
+  it should "detect and ignore ID-like features with low token length variance" in {
+    val topKCategorial = 3
+    val hashSize = 5
+    val featureVectorSize = (hashSize + 2) + (topKCategorial + 2) + 2
+
+    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(1).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0)
+      .setPrependFeatureName(true)
+      .setCleanKeys(false)
+      .setTrackNulls(true)
+      .setTrackTextLen(true)
+      .setHashSpaceStrategy(HashSpaceStrategy.Separate)
+      .setInput(rawMapFeat).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized).transform(rawDF)
+    val result = transformed.collect(smartMapVectorized)
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    transformed.show(10)
+
+    val meta = OpVectorMetadata(transformed.schema(smartMapVectorized.name))
+    meta.columns.foreach(println)
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("f2")) shouldBe true
+    meta.columns(4).indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe true
+    meta.columns.slice(5, 12).forall(_.grouping.contains("f1")) shouldBe true
+    meta.columns(10).descriptorValue.contains(OpVectorColumnMetadata.TextLenString) shouldBe true
+    meta.columns(11).indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe true
+    meta.columns.slice(12, 14).forall(_.grouping.contains("f3")) shouldBe true
+    meta.columns(12).descriptorValue.contains(OpVectorColumnMetadata.TextLenString) shouldBe true
+    meta.columns(13).indicatorValue.contains(OpVectorColumnMetadata.NullString) shouldBe true
   }
 
   it should "product the same result for shortcut" in {

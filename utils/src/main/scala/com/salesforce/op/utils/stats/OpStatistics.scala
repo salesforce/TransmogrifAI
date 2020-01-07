@@ -381,4 +381,48 @@ object OpStatistics {
     )
   }
 
+  /**
+   * Converts a map from value -> count to value -> probability by normalizing
+   *
+   * @param countMap  map from value -> count of that value
+   * @return          map from value -> fraction of time that value occurred
+   */
+  def countMapToPdf(countMap: Map[Int, Long]): Map[Int, Double] = {
+    val valueSum: Double = countMap.values.map(_.toDouble).sum
+    countMap.mapValues(_ / valueSum)
+  }
+
+  def poissonProb(lambda: Double, k: Int): Double = math.pow(lambda, k) * math.exp(-lambda) / (1 to k).product
+
+  /**
+   *
+   * @param countMap
+   */
+  def poissonCompare(countMap: Map[Int, Long]): Double = {
+    // val pdf = countMapToPdf(countMap)
+    val (mean, total) = countMap.foldLeft((0.0, 0.0))((acc, el) => (acc._1 + el._1 * el._2, acc._2 + el._2))
+
+    // Total sum of squares
+    val sst = countMap.foldLeft(0.0)((acc, el) => acc + el._2 * math.pow(mean - el._1, 2))
+    // Residual sum of squares
+    val ssRes = countMap.foldLeft(0.0)((acc, el) => acc + math.pow(total * poissonProb(mean, el._1) - el._2, 2))
+    // Regression sum of squares
+    val ssReg = countMap.foldLeft(0.0)((acc, el) => acc + el._2 * math.pow(mean - total * poissonProb(mean, el._1), 2))
+
+    val R2 = 1.0 - ssRes / sst
+    R2
+  }
+
+  /**
+   *
+   * @param countMap
+   */
+  def poissonComparePdf(countMap: Map[Int, Long]): Double = {
+    val pdf = countMapToPdf(countMap)
+    val mean = pdf.foldLeft(0.0)((acc, el) => acc + el._1 * el._2)
+    val chi2 = pdf.foldLeft(0.0)((acc, el) => acc + math.pow(poissonProb(mean, el._1) - el._2, 2))
+
+    chi2
+  }
+
 }

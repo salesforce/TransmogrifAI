@@ -221,12 +221,13 @@ class SmartTextVectorizerTest
     firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.foreach(println)
     meta.columns.length shouldBe featureVectorSize
-    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
-    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
-    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
-    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
-    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical")) shouldBe true
+    meta.columns.slice(5, 10).forall(x => x.parentFeatureName.contains("country") && x.grouping.isEmpty) shouldBe true
+    meta.columns.slice(10, 15).forall(x => x.parentFeatureName.contains("text") && x.grouping.isEmpty) shouldBe true
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString)) shouldBe true
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString)) shouldBe true
   }
 
   it should "fail with an error" in {

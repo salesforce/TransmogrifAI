@@ -204,4 +204,13 @@ class OpStatisticsTest extends FlatSpec with TestCommon with TestSparkContext {
     forAll(sparkRes.zip(opRes)) { case (sp, op) => math.abs((sp - op)/sp) should be < tol }
   }
 
+  it should "Correctly compare a count map to a Poisson distribution by computing the R-squared of how well the " +
+    "provided count map is fit by a maximum-likelihood Poisson distribution" in {
+    val m1 = Map(1 -> 100L, 2 -> 200L, 3 -> 300L, 4 -> 200L, 5 -> 100L, 6 -> 50L, 7 -> 10L)
+    val m2 = Map(1 -> 100L, 2 -> 100L, 3 -> 100L, 4 -> 100L, 5 -> 100L, 6 -> 100L, 7 -> 100L)
+    val m3 = Map.empty[Int, Long]
+
+    print(OpStatistics.poissonCompare(m1))
+  }
+
 }

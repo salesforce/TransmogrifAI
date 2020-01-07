@@ -83,10 +83,21 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val maxCard = $(maxCardinality)
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
+    // If the distribution of text lengths has a worse fit (eg. using maximum likelihood) than the threshold here,
+    // then we can assume that this is not being used for standard text, and instead contains numbers, IDs, or
+    // some other data type that shouldn't be hashed. Right now we will ignore fields that fall in this range
+    val minLengthPoissonR2 = 0.5
+
+    // Poisson distribution given by
+    // P(k) = lambda^k * exp(-lambda) / factorial(k)
+
+    // MLE fit given by setting lambda to the mean of the length distribution seen
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
+
+    // How much work is
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
       val vecMethod: TextVectorizationMethod = stats match {
@@ -217,8 +228,6 @@ private[op] object TextStats {
  * Arguments for [[SmartTextVectorizerModel]]
  *
  * @param vectorizationMethods method to use for text vectorization (either pivot, hashing, or ignoring)
- * @param isCategorical        is feature a categorical or not
- * @param isIgnorable          is a text feature that we think is ignorable? high cardinality + low length variance
  * @param topValues            top values to each feature
  * @param shouldCleanText      should clean text value
  * @param shouldTrackNulls     should track nulls
@@ -308,7 +317,7 @@ trait MinLengthStdDevParams extends Params {
     parent = this, name = "minLengthStdDev",
     doc = "minimum standard deviation of the lengths of tokens in a text field for it to be hashed instead " +
       "of ignored",
-    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = 100)
+    isValid = ParamValidators.inRange(lowerBound = 0, upperBound = Double.MaxValue)
   )
   final def setMinLengthStdDev(v: Double): this.type = set(minLengthStdDev, v)
   final def getMinLengthStdDev: Double = $(minLengthStdDev)
