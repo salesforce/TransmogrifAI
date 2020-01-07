@@ -232,7 +232,7 @@ private[op] case object Transmogrifier {
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[NameStats] =>
-          val (f, other) = castAs[NameStats](g) // TODO make NameStats specific transformer
+          val (f, other) = castAs[NameStats](g)
           f.vectorize(topK = TopK, minSupport = MinSupport, cleanText = CleanText, cleanKeys = CleanKeys,
             others = other, trackNulls = TrackNulls, maxPctCardinality = MaxPercentCardinality)
         case t if t =:= weakTypeOf[GeolocationMap] =>

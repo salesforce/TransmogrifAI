@@ -305,6 +305,14 @@ object NameStats {
     val LastName = "lastName"
     val Gender = "gender"
   }
+  // TODO: Use enumeratum for this
+  val AllKeys = Seq(
+    Keys.OriginalName,
+    Keys.IsNameIndicator,
+    Keys.FirstName,
+    Keys.LastName,
+    Keys.Gender
+  )
   object BooleanStrings {
     val True = "true"
     val False = "false"

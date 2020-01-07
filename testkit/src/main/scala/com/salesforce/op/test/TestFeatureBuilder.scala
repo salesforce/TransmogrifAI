@@ -350,6 +350,7 @@ case object TestFeatureBuilder {
       RandomText.postalCodes, 0, 5
     ).limit(numOfRows),
     streetMaps: => Seq[StreetMap] = RandomMap.of[Street, StreetMap](RandomText.streets, 0, 5).limit(numOfRows),
+    nameStats: => Seq[NameStats] = RandomMap.ofNameStats().limit(numOfRows),
     geoLocationMaps: => Seq[GeolocationMap] = RandomMap.ofGeolocations[UniformGeolocation](
       RandomList.ofGeolocations, 0, 5
     ).limit(numOfRows),
@@ -386,7 +387,7 @@ case object TestFeatureBuilder {
       dateTimeMaps, emailMaps, idMaps, integralMaps, multiPickListMaps,
       percentMaps, phoneMaps, pickListMaps, realMaps, textAreaMaps,
       textMaps, urlMaps, countryMaps, stateMaps, cityMaps,
-      postalCodeMaps, streetMaps, geoLocationMaps, binaries, currencies,
+      postalCodeMaps, streetMaps, nameStats, geoLocationMaps, binaries, currencies,
       dates, dateTimes, integrals, percents, reals, realNNs,
       multiPickLists, base64s, comboBoxes, emails, ids, phones,
       pickLists, texts, textAreas, urls, countries, states,
