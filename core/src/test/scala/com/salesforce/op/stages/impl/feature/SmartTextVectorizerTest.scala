@@ -458,7 +458,7 @@ class SmartTextVectorizerTest
     ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
   }
 
-  var biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
+  val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
@@ -558,15 +558,9 @@ class SmartTextVectorizerTest
     model.args.vectorizationMethods shouldBe Array(Pivot, Ignore)
   }
 
-  val prevLoggingLevels = getLoggingLevels
-  loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
-  this.biasEstimator = new SmartTextVectorizer()
-    .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
-    .setTopK(2).setPrependFeatureName(false)
-    .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-    .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
-    .setInput(f1, f2)
   it should "compute sensitive information in the metadata for one detected name column" in {
+    val prevLoggingLevels = getLoggingLevels
+    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
@@ -588,6 +582,7 @@ class SmartTextVectorizerTest
       case None => fail("Sensitive information not found in the metadata.")
       case _ => fail("Wrong kind of sensitive information found in the metadata.")
     }
+    loggingLevels(prevLoggingLevels) // Reset logging levels
   }
 
   // it should "compute sensitive information in the metadata for multiple detected name columns" in {
@@ -653,5 +648,4 @@ class SmartTextVectorizerTest
   //     }
   //   }
   // }
-  loggingLevels(prevLoggingLevels) // Reset logging levels
 }

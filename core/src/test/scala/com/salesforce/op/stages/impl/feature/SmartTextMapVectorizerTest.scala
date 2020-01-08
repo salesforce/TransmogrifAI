@@ -403,7 +403,6 @@ class SmartTextMapVectorizerTest
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
   }
 
-  /* TESTS FOR DETECTING SENSITIVE FEATURES BEGIN */
   lazy val (newInputData, features) = {
     val N = 5
 
@@ -488,7 +487,7 @@ class SmartTextMapVectorizerTest
     NameDetectUtils.DefaultNameDictionary.toList
   )
 
-  it should "detect a single name feature" in {
+  Spec[SmartTextMapVectorizer[OPMap[String]]] should "detect a single name feature" in {
     val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF7)
     val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
       .fit(newInputData)
@@ -584,8 +583,10 @@ class SmartTextMapVectorizerTest
     }
   }
 
-  loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
   it should "compute sensitive information in the metadata for one detected name column" in {
+    val prevLoggingLevels = getLoggingLevels
+    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
       println(sensitive)
@@ -599,7 +600,7 @@ class SmartTextMapVectorizerTest
           probFemale shouldBe 0.5
           probOther shouldBe 0.0
           name shouldBe fname
-          mapKey shouldBe "name"
+          mapKey shouldBe Some("name")
           actionTaken shouldBe true
         case None => fail("Sensitive information not found in the metadata.")
         case _ => fail("Wrong kind of sensitive information found in the metadata.")
@@ -617,8 +618,7 @@ class SmartTextMapVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
     assertSensitive(areaMapEstimator, newF8.name)
-  }
 
-  loggingLevel(Level.WARN) // TODO: Reset logging level
-  /* TESTS FOR DETECTING SENSITIVE FEATURES END */
+    loggingLevels(prevLoggingLevels) // Reset logging levels
+  }
 }
