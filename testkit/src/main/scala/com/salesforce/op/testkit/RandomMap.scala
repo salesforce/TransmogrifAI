@@ -171,18 +171,13 @@ object RandomMap {
       val lastName = RandomLastName(rng)
       Seq(
         firstName + " " + lastName,
-        getRandomElement(Seq(NameStats.BooleanStrings.True, NameStats.BooleanStrings.False), rng),
+        getRandomElement(NameStats.BooleanStrings.values.map(_.toString), rng),
         firstName, lastName,
-        getRandomElement(Seq(
-          NameStats.GenderStrings.Male,
-          NameStats.GenderStrings.Female,
-          NameStats.GenderStrings.GenderNA,
-          NameStats.GenderStrings.GenderNotInferred
-        ), rng)
+        getRandomElement(NameStats.GenderStrings.values.map(_.toString), rng)
       )
     }
     val values: RandomStream[Seq[String]] = RandomStream(producer = producer)
-    val keys: Int => String = NameStats.AllKeys
+    val keys: Int => String = NameStats.Keys.values.map(_.toString)
     RandomMap[String, NameStats](values = values, keys = keys, sources = None)
   }
 

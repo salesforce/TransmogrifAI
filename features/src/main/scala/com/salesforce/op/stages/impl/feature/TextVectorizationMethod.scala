@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Salesforce.com, Inc.
+ * Copyright (c) 2019, Salesforce.com, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,13 +30,17 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import enumeratum.{Enum, EnumEntry}
+import enumeratum._
 
-sealed trait SmartTextVectorizerAction extends EnumEntry with Serializable
-object SmartTextVectorizerAction extends Enum[SmartTextVectorizerAction] {
-  val values: Seq[SmartTextVectorizerAction] = findValues
 
-  case object Categorical extends SmartTextVectorizerAction
-  case object NonCategorical extends SmartTextVectorizerAction
-  case object Sensitive extends SmartTextVectorizerAction
+/**
+ * Methods of vectorizing text (eg. to be chosen by statistics computed in SmartTextVectorizer)
+ */
+sealed trait TextVectorizationMethod extends EnumEntry with Serializable
+
+object TextVectorizationMethod extends Enum[TextVectorizationMethod] {
+  val values = findValues
+  case object Pivot extends TextVectorizationMethod
+  case object Hash extends TextVectorizationMethod
+  case object Ignore extends TextVectorizationMethod
 }

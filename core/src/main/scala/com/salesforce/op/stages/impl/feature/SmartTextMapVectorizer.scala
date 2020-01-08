@@ -33,7 +33,7 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op.UID
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
-import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
@@ -80,7 +80,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     nameDetectMapFun: Text#Value => NameDetectStats
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
-      cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1))
+      cleanTextFn(k, shouldCleanKeys) ->
+        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1), Map(cleanTextFn(v, shouldCleanValues).length -> 1))
     }
     val nameDetectStats = if (getSensitiveFeatureMode == Off) Map.empty[String, NameDetectStats]
     else textMap.map{ case (k, v) => cleanTextFn(k, shouldCleanKeys) -> nameDetectMapFun(Text(v).value) }
@@ -149,8 +150,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       val featureInfoBeforeSensitive = textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
-        val whichAction = if (textStats.valueCounts.size <= maxCard) Categorical else NonCategorical
-        val topVals = if (whichAction == Categorical) {
+        val whichAction = if (textStats.valueCounts.size <= maxCard) Pivot else Hash
+        val topVals = if (whichAction == Pivot) {
           textStats.valueCounts
             .filter { case (_, count) => count >= minSup }
             .toSeq.sortBy(v => -v._2 -> v._1)
@@ -163,7 +164,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         case ((k, nameDetectStats), previousFeatureInfo) =>
         val treatAsName = computeTreatAsName(nameDetectStats)
         SmartTextFeatureInfo(key = k,
-          whichAction = if (treatAsName) Sensitive else previousFeatureInfo.whichAction,
+          whichAction = if (treatAsName) Ignore else previousFeatureInfo.whichAction,
           topValues = previousFeatureInfo.topValues
         )
       } else featureInfoBeforeSensitive
@@ -249,7 +250,7 @@ private[op] object TextMapStats {
 case class SmartTextFeatureInfo
 (
   key: String,
-  whichAction: SmartTextVectorizerAction,
+  whichAction: TextVectorizationMethod,
   topValues: Array[String]
 ) extends JsonLike
 
@@ -273,8 +274,8 @@ case class SmartTextMapVectorizerModelArgs
 ) extends JsonLike {
   val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
     featureInfoSeq
-      .filter { _.whichAction != Sensitive }
-      .partition { _.whichAction == Categorical }
+      .filter { _.whichAction != Ignore }
+      .partition { _.whichAction == Pivot }
   }.unzip
   val categoricalKeys: Seq[Seq[String]] = categoricalFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
   val textKeys: Seq[Seq[String]] = textFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))

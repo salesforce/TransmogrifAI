@@ -146,7 +146,7 @@ class HumanNameDetectorTest
     val (_, _, model, result) = identifyName(Seq("Alyssa").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
-    map.get(Gender) shouldBe Some(Female)
+    map.get(Gender.toString) shouldBe Some(Female.toString)
   }
 
   it should "identify which token is the first name in a single full name entry correctly" in {
@@ -159,7 +159,7 @@ class HumanNameDetectorTest
     val (_, _, model, result) = identifyName(Seq("Shelby Bouvet").toText)
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val map = result.collect().head(1).asInstanceOf[Map[String, String]]
-    map.get(Gender) shouldBe Some(Female)
+    map.get(Gender.toString) shouldBe Some(Female.toString)
   }
 
   it should "identify the gender of a multiple full name entries (with varying token lengths) correctly" in {
@@ -176,8 +176,15 @@ class HumanNameDetectorTest
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString)
+    )
   }
 
   it should "identify the gender of multiple full name entries by finding honorifics" in {
@@ -197,8 +204,15 @@ class HumanNameDetectorTest
       Some(GenderDetectStrategy.FindHonorific())
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString)
+    )
   }
 
   it should "not use the honorific strategy to find gender when there are multiple honorifics per entry" in {
@@ -229,8 +243,15 @@ class HumanNameDetectorTest
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString)
+    )
   }
 
   it should
@@ -252,8 +273,15 @@ class HumanNameDetectorTest
       Some(GenderDetectStrategy.ByRegex(NameDetectUtils.TextAfterFirstComma).entryName)
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString)
+    )
   }
 
   it should
@@ -272,8 +300,8 @@ class HumanNameDetectorTest
       Some(GenderDetectStrategy.ByRegex(NameDetectUtils.TextAfterFirstCommaAndNextToken).entryName)
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(Some(Male.toString), Some(Female.toString))
   }
 
   it should "use mixed strategies to detect gender" in {
@@ -290,8 +318,15 @@ class HumanNameDetectorTest
     // scalastyle:on
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
-    val identifiedGenders = resultingMaps.map(_.get(Gender))
-    identifiedGenders shouldBe Seq(Some(Male), Some(Female), Some(Male), Some(Female), Some(Male), Some(Female))
+    val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
+    identifiedGenders shouldBe Seq(
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString),
+      Some(Male.toString),
+      Some(Female.toString)
+    )
   }
 
   it should "ignore null values in calculating stats" in {

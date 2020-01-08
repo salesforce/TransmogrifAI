@@ -33,9 +33,9 @@ package com.salesforce.op.stages.impl.feature
 import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.testkit.RandomText
+import com.salesforce.op.testkit.{RandomReal, RandomText}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
@@ -63,14 +63,38 @@ class SmartTextVectorizerTest
     .setTopK(2).setPrependFeatureName(false)
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setInput(f1, f2)
-
-  val expectedResult: Seq[OPVector] = Seq(
+  val expectedResult = Seq(
     Vectors.sparse(9, Array(0, 4, 6), Array(1.0, 1.0, 1.0)),
     Vectors.sparse(9, Array(0, 8), Array(1.0, 1.0)),
     Vectors.sparse(9, Array(1, 6), Array(1.0, 1.0)),
     Vectors.sparse(9, Array(0, 6), Array(1.0, 2.0)),
     Vectors.sparse(9, Array(3, 8), Array(1.0, 1.0))
   ).map(_.toOPVector)
+
+  /*
+    Generate some more complicated input data to check things a little closer. There are four text fields with
+    different token distributions:
+
+    country: Uniformly distributed from a larger list of ~few hundred countries, should be hashed
+    categoricalText: Uniformly distributed from a small list of choices, should be pivoted (also has fixed lengths,
+      so serves as a test that the categorical check happens before the token length variance check)
+    textId: Uniformly distributed high cardinality Ids with fixed lengths, should be ignored
+    text: Uniformly distributed unicode strings with lengths ranging from 0-100, should be hashed
+   */
+  val countryData: Seq[Text] = RandomText.countries.withProbabilityOfEmpty(0.2).limit(1000)
+  val categoricalTextData: Seq[Text] = RandomText.textFromDomain(domain = List("A", "B", "C", "D", "E", "F"))
+    .withProbabilityOfEmpty(0.2).limit(1000)
+  // Generate List containing elements like 040231, 040232, ...
+  val textIdData: Seq[Text] = RandomText.textFromDomain(
+    domain = (1 to 1000).map(x => "%06d".format(40230 + x)).toList
+  ).withProbabilityOfEmpty(0.2).limit(1000)
+  val textData: Seq[Text] = RandomText.strings(minLen = 0, maxLen = 100).withProbabilityOfEmpty(0.2).limit(1000)
+  val generatedData: Seq[(Text, Text, Text, Text)] =
+    countryData.zip(categoricalTextData).zip(textIdData).zip(textData).map {
+      case (((co, ca), id), te) => (co, ca, id, te)
+    }
+  val (rawDF, rawCountry, rawCategorical, rawTextId, rawText) = TestFeatureBuilder(
+    "country", "categorical", "textId", "text", generatedData)
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
@@ -172,6 +196,40 @@ class SmartTextVectorizerTest
     val (regular, shortcut) = result.unzip
 
     regular shouldBe shortcut
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low token length variance" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial).setMinLengthStdDev(1.0)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
   it should "fail with an error" in {
@@ -379,16 +437,25 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
+    val l1 = TextStats(Map("hello" -> 1, "world" -> 2), Map(5 -> 3))
+    val r1 = TextStats(Map("hello" -> 1, "world" -> 1), Map(5 -> 2))
+    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3), Map(5 -> 5))
 
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-    val r2 = TextStats(Map("hello" -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
+    val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7))
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
+  }
+
+  it should "compute correct statistics on the length distributions" in {
+    val ts = TextStats(Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2))
+
+    ts.lengthSize shouldBe 5
+    ts.lengthMean shouldBe 4.0
+    ts.lengthVariance shouldBe 4.0
+    ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
   }
 
   /* TESTS FOR DETECTING SENSITIVE FEATURES BEGIN */
@@ -413,13 +480,13 @@ class SmartTextVectorizerTest
     NameDetectUtils.DefaultNameDictionary.toList
   )
 
-  it should "detect a single name feature" in {
+  Spec[SmartTextVectorizer[_]] should "detect a single name feature" in {
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
-    model.args.whichAction shouldBe Array(Sensitive)
+    model.args.vectorizationMethods shouldBe Array(Ignore)
   }
 
   it should "detect a single name feature and return empty vectors" in {
@@ -442,7 +509,7 @@ class SmartTextVectorizerTest
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newInputData.show()
-    model.args.whichAction shouldBe Array(Categorical, NonCategorical, Sensitive)
+    model.args.vectorizationMethods shouldBe Array(Pivot, Hash, Ignore)
   }
 
   it should "not create information in the vector for a single name column among other non-name Text columns" in {
@@ -481,7 +548,7 @@ class SmartTextVectorizerTest
       .fit(newNewInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     newNewInputData.show()
-    model.args.whichAction shouldBe Array(Categorical, Sensitive)
+    model.args.vectorizationMethods shouldBe Array(Pivot, Ignore)
   }
 
   loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
@@ -575,5 +642,4 @@ class SmartTextVectorizerTest
 
   loggingLevel(Level.WARN) // TODO: Reset logging level
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
-
 }

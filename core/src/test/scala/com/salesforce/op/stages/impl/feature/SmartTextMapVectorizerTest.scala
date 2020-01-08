@@ -34,7 +34,7 @@ import com.salesforce.op._
 import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types.{Text, _}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
-import com.salesforce.op.stages.impl.feature.SmartTextVectorizerAction._
+import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.OpVectorMetadata
@@ -99,22 +99,22 @@ class SmartTextMapVectorizerTest
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 2, "world" -> 1)),
-        "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 2)),
-        "f3" -> TextStats(Map("foo" -> 1))
+        "f1" -> TextStats(Map("hello" -> 2, "world" -> 1), Map(5 -> 3)),
+        "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 2), Map(5 -> 4)),
+        "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
       )),
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 1)),
-        "f2" -> TextStats(Map("ocean" -> 1, "other" -> 5))
+        "f1" -> TextStats(Map("hello" -> 1), Map(5 -> 1)),
+        "f2" -> TextStats(Map("ocean" -> 1, "other" -> 5), Map(5 -> 6))
       )),
       TextMapStats(Map(
-        "f2" -> TextStats(Map("other" -> 1))
+        "f2" -> TextStats(Map("other" -> 1), Map(5 -> 1))
       ))
     )
     TextMapStats.monoid(2).sumOption(data) shouldBe Some(TextMapStats(Map(
-      "f1" -> TextStats(Map("hello" -> 3, "world" -> 1)),
-      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5)),
-      "f3" -> TextStats(Map("foo" -> 1))
+      "f1" -> TextStats(Map("hello" -> 3, "world" -> 1), Map(5 -> 4)),
+      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5), Map(5 -> 11)),
+      "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
     )))
   }
 
@@ -493,13 +493,13 @@ class SmartTextMapVectorizerTest
     val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
-    mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Sensitive)
+    mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Ignore)
 
     val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF8)
     val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
-    areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Sensitive)
+    areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe Seq(Ignore)
   }
 
   it should "detect a single name feature and return empty vectors" in {
@@ -529,14 +529,14 @@ class SmartTextMapVectorizerTest
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
     println(mapModel.args.allFeatureInfo)
     mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
-      Array(Categorical, NonCategorical, Sensitive)
+      Array(Pivot, Hash, Ignore)
 
     val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
     val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
     areaMapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
-      Array(Categorical, NonCategorical, Sensitive)
+      Array(Pivot, Hash, Ignore)
   }
 
   it should "not create information in the vector for a single name column among other non-name Text columns" in {
