@@ -174,18 +174,20 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, textToPivot)
     } else Array.empty[OpVectorColumnMetadata]
 
-    val textColumns = if (allTextFeatures.nonEmpty) {
+    val textColumns = if (textToHash.nonEmpty) {
+      makeVectorColumnMetadata(textToHash, makeHashingParams())
+    } else Array.empty[OpVectorColumnMetadata]
+
+    val nullAndLenColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
-          allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
-          allTextFeatures.map(_.toColumnMetaData(isNull = true))
+        allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
+        allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
-          allTextFeatures.map(_.toColumnMetaData(isNull = true))
+        allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
-    val columns = categoricalColumns ++ textColumns
+    val columns = categoricalColumns ++ textColumns ++ nullAndLenColumns
 
     val sensitive = createSensitiveFeatureInformation(aggNameDetectStats, inN.map(_.name))
 
@@ -208,10 +210,7 @@ object SmartTextVectorizer {
  * @param valueCounts  counts of feature values
  * @param lengthCounts counts of token lengths
  */
-private[op] case class TextStats(
-  valueCounts: Map[String, Long],
-  lengthCounts: Map[Int, Long]
-) extends JsonLike {
+private[op] case class TextStats(valueCounts: Map[String, Long], lengthCounts: Map[Int, Long]) extends JsonLike {
 
   val lengthSize = lengthCounts.values.sum
   val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
