@@ -214,6 +214,7 @@ trait OpPipelineStageReadWriteFormats {
       EnumEntrySerializer.json4s[AnyValueTypes](AnyValueTypes) +
       EnumEntrySerializer.json4s[HashAlgorithm](HashAlgorithm) +
       EnumEntrySerializer.json4s[HashSpaceStrategy](HashSpaceStrategy) +
+      EnumEntrySerializer.json4s[TextVectorizationMethod](TextVectorizationMethod) +
       EnumEntrySerializer.json4s[ScalingType](ScalingType) +
       EnumEntrySerializer.json4s[TimePeriod](TimePeriod) +
       EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
