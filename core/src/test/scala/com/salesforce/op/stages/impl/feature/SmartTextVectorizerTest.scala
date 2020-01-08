@@ -537,12 +537,19 @@ class SmartTextVectorizerTest
 
     val (withNames, withoutNames) = result.unzip
 
+    // There should only be a single extra metadata entry for the null indicator of the (removed) name field
     OpVectorMetadata("OutputVector", newEstimator.getMetadata()).size shouldBe
       OpVectorMetadata("OutputVector", oldEstimator.getMetadata()).size + 1
 
-    // TODO: Update this test to check that only the first 9 entries in the `withNames` are the same
-    // and that the last set of entries is the null indicator
-    // withNames shouldBe withoutNames
+    // All of the entries in the vector
+    // (other than the last one corresponding to the null indicator for the removed name field)
+    // should be the same
+    // Note: Changing the order of vector information will fail this test
+    withNames.zip(withoutNames) foreach { case (withVector, withoutVector) =>
+      val withArray = withVector.value.toArray
+      val withoutArray = withoutVector.value.toArray :+ withArray.last
+      withArray shouldBe withoutArray
+    }
   }
 
   it should "not identify a single repeated name as Name" in {
