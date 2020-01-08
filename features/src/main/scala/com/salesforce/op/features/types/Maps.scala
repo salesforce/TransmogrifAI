@@ -293,35 +293,34 @@ object StreetMap {
 class NameStats(value: Map[String, String]) extends TextMap(value) {
   import NameStats.Keys._
 
-  def isName: Boolean = value.getOrElse(IsNameIndicator, "false") == "true"
-  def isMale: Boolean = value.getOrElse(Gender, "") == "male"
-  def isFemale: Boolean = value.getOrElse(Gender, "") == "female"
+  def isName: Boolean = value.getOrElse(IsName.toString, "false") == "true"
+  def isMale: Boolean = value.getOrElse(Gender.toString, "") == "male"
+  def isFemale: Boolean = value.getOrElse(Gender.toString, "") == "female"
 }
 object NameStats {
-  object Keys {
-    val OriginalName = "original"
-    val IsNameIndicator = "isName"
-    val FirstName = "firstName"
-    val LastName = "lastName"
-    val Gender = "gender"
+  import enumeratum._
+  sealed class Keys extends EnumEntry
+  case object Keys extends Enum[Keys] {
+    val values: Seq[Keys] = findValues
+    case object OriginalValue extends Keys
+    case object IsName        extends Keys
+    case object FirstName     extends Keys
+    case object LastName      extends Keys
+    case object Gender        extends Keys
   }
-  // TODO: Use enumeratum for this
-  val AllKeys = Seq(
-    Keys.OriginalName,
-    Keys.IsNameIndicator,
-    Keys.FirstName,
-    Keys.LastName,
-    Keys.Gender
-  )
-  object BooleanStrings {
-    val True = "true"
-    val False = "false"
+  sealed class BooleanStrings extends EnumEntry
+  case object BooleanStrings extends Enum[BooleanStrings] {
+    val values: Seq[BooleanStrings] = findValues
+    case object True  extends BooleanStrings
+    case object False extends BooleanStrings
   }
-  object GenderStrings {
-    val Male = "male"
-    val Female = "female"
-    val GenderNA = "NA"
-    val GenderNotInferred = "NotInferred"
+  sealed class GenderStrings extends EnumEntry
+  case object GenderStrings extends Enum[GenderStrings] {
+    val values: Seq[GenderStrings] = findValues
+    case object Male              extends GenderStrings
+    case object Female            extends GenderStrings
+    case object GenderNA          extends GenderStrings
+    case object GenderNotInferred extends GenderStrings
   }
 
   def apply(value: Map[String, String]): NameStats = new NameStats(value)

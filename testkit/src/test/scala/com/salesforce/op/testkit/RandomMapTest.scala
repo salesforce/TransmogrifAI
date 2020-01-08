@@ -304,18 +304,17 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
 
   Spec[Text, RandomMap[String, NameStats]] should "generate NameStats maps correctly" in {
     val sut = RandomMap.ofNameStats()
-    checkWithMapPredicate[String, NameStats](sut, minLen = NameStats.AllKeys.length, maxLen = NameStats.AllKeys.length,
+    checkWithMapPredicate[String, NameStats](sut,
+      minLen = NameStats.Keys.values.length,
+      maxLen = NameStats.Keys.values.length,
       predicate = { nameStats =>
-        val allKeysPresent = NameStats.AllKeys map { nameStats.value contains _ } forall identity
-        val validNameIndicatorEntries = Seq(NameStats.BooleanStrings.True, NameStats.BooleanStrings.False)
-          .map(Some(_))
-          .contains(nameStats.value.get(NameStats.Keys.IsNameIndicator))
-        val validGenderEntries = Seq(
-          NameStats.GenderStrings.Male,
-          NameStats.GenderStrings.Female,
-          NameStats.GenderStrings.GenderNA,
-          NameStats.GenderStrings.GenderNotInferred
-        ).map(Some(_)).contains(nameStats.value.get(NameStats.Keys.Gender))
+        val allKeysPresent = NameStats.Keys.values map { nameStats.value contains _.toString } forall identity
+        val validNameIndicatorEntries = NameStats.BooleanStrings.values
+          .map(enum => Some(enum.toString))
+          .contains(nameStats.value.get(NameStats.Keys.IsName.toString))
+        val validGenderEntries = NameStats.GenderStrings.values
+          .map(enum => Some(enum.toString))
+          .contains(nameStats.value.get(NameStats.Keys.Gender.toString))
         allKeysPresent & validNameIndicatorEntries & validGenderEntries
       }
     )

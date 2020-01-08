@@ -33,6 +33,7 @@ package com.salesforce.op.utils.stages
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
+import com.salesforce.op.features.types.NameStats.GenderStrings
 import com.salesforce.op.features.types.NameStats.GenderStrings._
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
@@ -69,8 +70,8 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
       case Some(text) =>
         val textLength = text.length
         GuardCheckStats(
-          countBelowMaxNumTokens = if (tokens.length < $(guard_maxNumberOfTokens)) 1 else 0,
-          countAboveMinCharLength = if (textLength >= $(guard_minTextLength)) 1 else 0,
+          countBelowMaxNumTokens = if (tokens.length < $(guardMaxNumberOfTokens)) 1 else 0,
+          countAboveMinCharLength = if (textLength >= $(guardMinTextLength)) 1 else 0,
           approxMomentsOfTextLength = Moments(textLength),
           approxNumUnique = hllMonoid.create(text.getBytes)
         )
@@ -81,15 +82,15 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     val N: Double = stats.approxMomentsOfTextLength.count.toDouble
     val checks = List(
       // check that in at least 3/4 of the texts there are no more than 10 tokens
-      (stats.countBelowMaxNumTokens / N) > $(guard_pctMaxNumberOfTokens),
+      (stats.countBelowMaxNumTokens / N) > $(guardPctMaxNumberOfTokens),
       // check that at least 3/4 of the texts are longer than 3 characters
-      (stats.countAboveMinCharLength / N) > $(guard_pctMinTextLength),
+      (stats.countAboveMinCharLength / N) > $(guardPctMinTextLength),
       // check that the standard deviation of the text length is greater than a small number
-      N < $(guard_minCountForStdDevCheck) ||
-        stats.approxMomentsOfTextLength.stddev > $(guard_minStdDev),
+      N < $(guardMinCountForStdDevCheck) ||
+        stats.approxMomentsOfTextLength.stddev > $(guardMinStdDev),
       // check that the number of unique entries is at least 10
-      N < $(guard_minCountForUniqueCheck) ||
-        hllMonoid.sizeOf(stats.approxNumUnique).estimate >= $(guard_minUniqueCheck)
+      N < $(guardMinCountForUniqueCheck) ||
+        hllMonoid.sizeOf(stats.approxNumUnique).estimate >= $(guardMinUniqueCheck)
     )
     checks.forall(identity)
   }
@@ -100,7 +101,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     }
   }
 
-  private[op] def genderDictCheck(nameToCheckGenderOf: T#Value, genderDict: GenderDictionary): String = {
+  private[op] def genderDictCheck(nameToCheckGenderOf: T#Value, genderDict: GenderDictionary): GenderStrings = {
     nameToCheckGenderOf.flatMap(genderDict.get).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
@@ -111,7 +112,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
     genderDict: GenderDictionary
-  ): String = {
+  ): GenderStrings = {
     input match {
       case None => GenderNA
       case Some(text) =>
@@ -150,7 +151,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     genderDict: GenderDictionary
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-      val genderResult: String = identifyGender(input, tokens, strategy, genderDict)
+      val genderResult: GenderStrings = identifyGender(input, tokens, strategy, genderDict)
       implicit def booleanToInt(v: Boolean): Int = if (v) 1 else 0
       strategy.toString -> GenderStats(genderResult == Male, genderResult == Female, genderResult == GenderNA)
     } toMap
@@ -345,88 +346,88 @@ private[op] trait NameDetectParams extends Params {
   setDefault(ignoreNulls, true)
   def setIgnoreNulls(value: Boolean): this.type = set(ignoreNulls, value)
 
-  val guard_maxNumberOfTokens = new IntParam(
+  val guardMaxNumberOfTokens = new IntParam(
     parent = this,
-    name = "guard_maxNumberOfTokens",
+    name = "guardMaxNumberOfTokens",
     doc =
       "maximum (exclusive) number of tokens per entry before not treating as name (helps exclude sentences/paragraphs)",
     isValid = (value: Int) => ParamValidators.gt(0)(value)
   )
-  setDefault(guard_maxNumberOfTokens, 10)
-  val guard_pctMaxNumberOfTokens = new DoubleParam(
+  setDefault(guardMaxNumberOfTokens, 10)
+  val guardPctMaxNumberOfTokens = new DoubleParam(
     parent = this,
-    name = "guard_pctMaxNumberOfTokens",
-    doc = "fraction of entries to have less than `guard_maxNumberOfTokens` in order to possibly treat as name",
+    name = "guardPctMaxNumberOfTokens",
+    doc = "fraction of entries to have less than `guardMaxNumberOfTokens` in order to possibly treat as name",
     isValid = (value: Double) => {
       ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
     }
   )
-  setDefault(guard_pctMaxNumberOfTokens, 0.75)
+  setDefault(guardPctMaxNumberOfTokens, 0.75)
 
-  val guard_minTextLength = new IntParam(
+  val guardMinTextLength = new IntParam(
     parent = this,
-    name = "guard_minTextLength",
+    name = "guardMinTextLength",
     doc = "minimum (inclusive) length per entry before not treating as name (helps exclude very short text)",
     isValid = (value: Int) => ParamValidators.gtEq(0)(value)
   )
-  setDefault(guard_minTextLength, 3)
-  val guard_pctMinTextLength = new DoubleParam(
+  setDefault(guardMinTextLength, 3)
+  val guardPctMinTextLength = new DoubleParam(
     parent = this,
-    name = "guard_pctMinTextLength",
-    doc = "fraction of entries to have more than `guard_minTextLength` in order to possibly treat as name",
+    name = "guardPctMinTextLength",
+    doc = "fraction of entries to have more than `guardMinTextLength` in order to possibly treat as name",
     isValid = (value: Double) => {
       ParamValidators.gt(0.0)(value) && ParamValidators.lt(1.0)(value)
     }
   )
-  setDefault(guard_pctMinTextLength, 0.75)
+  setDefault(guardPctMinTextLength, 0.75)
 
-  val guard_minCountForStdDevCheck = new IntParam(
+  val guardMinCountForStdDevCheck = new IntParam(
     parent = this,
-    name = "guard_minCountForStdDevCheck",
+    name = "guardMinCountForStdDevCheck",
     doc = "minimum (inclusive) number of entries before running standard deviation check",
     isValid = (value: Int) => ParamValidators.gtEq(0)(value)
   )
-  setDefault(guard_minCountForStdDevCheck, 10)
-  val guard_minStdDev = new DoubleParam(
+  setDefault(guardMinCountForStdDevCheck, 10)
+  val guardMinStdDev = new DoubleParam(
     parent = this,
-    name = "guard_minStdDev",
+    name = "guardMinStdDev",
     doc = "minimum (exclusive) standard deviation in order to possibly treat as name",
     isValid = (value: Double) => ParamValidators.gt(0.0)(value)
   )
-  setDefault(guard_minStdDev, 0.05)
+  setDefault(guardMinStdDev, 0.05)
 
-  val guard_minCountForUniqueCheck = new IntParam(
+  val guardMinCountForUniqueCheck = new IntParam(
     parent = this,
-    name = "guard_minCountForUniqueCheck",
+    name = "guardMinCountForUniqueCheck",
     doc = "minimum (inclusive) number of entries before running uniqueness check",
     isValid = (value: Int) => ParamValidators.gtEq(0)(value)
   )
-  setDefault(guard_minCountForUniqueCheck, 10)
-  val guard_minUniqueCheck = new IntParam(
+  setDefault(guardMinCountForUniqueCheck, 10)
+  val guardMinUniqueCheck = new IntParam(
     parent = this,
-    name = "guard_minUniqueCheck",
+    name = "guardMinUniqueCheck",
     doc = "minimum (inclusive) number of unique entries in order to possibly treat as name",
     isValid = (value: Int) => ParamValidators.gtEq(0)(value)
   )
-  setDefault(guard_minUniqueCheck, 10)
+  setDefault(guardMinUniqueCheck, 10)
 
   def setGuardCheckValues(
-    maxNumberOfTokens: Int = $(guard_maxNumberOfTokens),
-    pctMaxNumberOfTokens: Double = $(guard_pctMaxNumberOfTokens),
-    minTextLength: Int = $(guard_minTextLength),
-    pctMinTextLength: Double = $(guard_pctMinTextLength),
-    minCountForStdDevCheck: Int = $(guard_minCountForStdDevCheck),
-    minStdDev: Double = $(guard_minStdDev),
-    minCountForUniqueCheck: Int = $(guard_minCountForUniqueCheck),
-    minUniqueCheck: Int = $(guard_minUniqueCheck)
+    maxNumberOfTokens: Int = $(guardMaxNumberOfTokens),
+    pctMaxNumberOfTokens: Double = $(guardPctMaxNumberOfTokens),
+    minTextLength: Int = $(guardMinTextLength),
+    pctMinTextLength: Double = $(guardPctMinTextLength),
+    minCountForStdDevCheck: Int = $(guardMinCountForStdDevCheck),
+    minStdDev: Double = $(guardMinStdDev),
+    minCountForUniqueCheck: Int = $(guardMinCountForUniqueCheck),
+    minUniqueCheck: Int = $(guardMinUniqueCheck)
   ): this.type = {
-    set(guard_maxNumberOfTokens, maxNumberOfTokens)
-    set(guard_pctMaxNumberOfTokens, pctMaxNumberOfTokens)
-    set(guard_minTextLength, minTextLength)
-    set(guard_pctMinTextLength, pctMinTextLength)
-    set(guard_minCountForStdDevCheck, minCountForStdDevCheck)
-    set(guard_minStdDev, minStdDev)
-    set(guard_minCountForUniqueCheck, minCountForUniqueCheck)
-    set(guard_minUniqueCheck, minUniqueCheck)
+    set(guardMaxNumberOfTokens, maxNumberOfTokens)
+    set(guardPctMaxNumberOfTokens, pctMaxNumberOfTokens)
+    set(guardMinTextLength, minTextLength)
+    set(guardPctMinTextLength, pctMinTextLength)
+    set(guardMinCountForStdDevCheck, minCountForStdDevCheck)
+    set(guardMinStdDev, minStdDev)
+    set(guardMinCountForUniqueCheck, minCountForUniqueCheck)
+    set(guardMinUniqueCheck, minUniqueCheck)
   }
 }
