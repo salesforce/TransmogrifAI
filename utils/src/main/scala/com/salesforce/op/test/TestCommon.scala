@@ -54,7 +54,7 @@ trait TestCommon extends Matchers with Assertions {
   /**
    * Get logging level for all loggers
    */
-  def getLoggingLevel: List[Level] = {
+  def getLoggingLevel: Seq[Level] = {
     val loggers = Logger.getRootLogger :: LogManager.getCurrentLoggers.asScala.toList
     loggers.collect { case l: Logger => l.getLevel }
   }
@@ -70,7 +70,7 @@ trait TestCommon extends Matchers with Assertions {
   /**
    * Set logging level individually
    */
-  def loggingLevel(levels: List[Level]): Unit = {
+  def loggingLevel(levels: Seq[Level]): Unit = {
     val loggers = Logger.getRootLogger :: LogManager.getCurrentLoggers.asScala.toList
     loggers.collect { case l: Logger => l } zip levels foreach { case (logger, level) => logger.setLevel(level) }
   }

@@ -378,6 +378,19 @@ class SmartTextVectorizerTest
     }
   }
 
+  Spec[TextStats] should "aggregate correctly" in {
+    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
+    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
+    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
+
+    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+    val r2 = TextStats(Map("hello" -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
+
+    TextStats.monoid(2).plus(l1, r1) shouldBe expected1
+    TextStats.monoid(2).plus(l2, r2) shouldBe expected2
+  }
+
   /* TESTS FOR DETECTING SENSITIVE FEATURES BEGIN */
   val biasEstimator: SmartTextVectorizer[Text] = new SmartTextVectorizer()
     .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1)
@@ -458,9 +471,21 @@ class SmartTextVectorizerTest
     withNames shouldBe withoutNames
   }
 
+  it should "not identify a single repeated name as Name" in {
+    val (newNewInputData, newNewF1, newNewF2) = TestFeatureBuilder("Repeated Name", "Random Names",
+      Seq.fill(200)("Michael").toText zip
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(200).toSeq
+    )
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newNewF1, newNewF2)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newNewInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newNewInputData.show()
+    model.args.whichAction shouldBe Array(Categorical, Sensitive)
+  }
+
+  loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
   it should "compute sensitive information in the metadata for one detected name column" in {
-    val prevLoggingLevels = getLoggingLevel // Used for resetting logging levels
-    loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
@@ -482,8 +507,6 @@ class SmartTextVectorizerTest
       case None => fail("Sensitive information not found in the metadata.")
       case _ => fail("Wrong kind of sensitive information found in the metadata.")
     }
-
-    loggingLevel(prevLoggingLevels) // Reset logging levels
   }
 
   // it should "compute sensitive information in the metadata for multiple detected name columns" in {
@@ -550,31 +573,7 @@ class SmartTextVectorizerTest
   //   }
   // }
 
-  it should "not identify a single repeated name as Name" in {
-    val (newNewInputData, newNewF1, newNewF2) = TestFeatureBuilder("Repeated Name", "Random Names",
-      Seq.fill(200)("Michael").toText zip
-        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.0).take(200).toSeq
-    )
-    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newNewF1, newNewF2)
-    val model: SmartTextVectorizerModel[Text] = newEstimator
-      .fit(newNewInputData)
-      .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newNewInputData.show()
-    model.args.whichAction shouldBe Array(Categorical, Sensitive)
-  }
+  loggingLevel(Level.WARN) // TODO: Reset logging level
   /* TESTS FOR DETECTING SENSITIVE FEATURES END */
-
-  Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3))
-
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-    val r2 = TextStats(Map("hello" -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3))
-
-    TextStats.monoid(2).plus(l1, r1) shouldBe expected1
-    TextStats.monoid(2).plus(l2, r2) shouldBe expected2
-  }
 
 }
