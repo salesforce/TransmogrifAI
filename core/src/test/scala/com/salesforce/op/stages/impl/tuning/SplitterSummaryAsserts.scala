@@ -63,6 +63,8 @@ trait SplitterSummaryAsserts {
       meta.getString(SplitterSummary.ClassName) shouldBe classOf[DataCutterSummary].getName
       meta.getDoubleArray(ModelSelectorNames.LabelsKept).foreach(_ should be >= 0.0)
       meta.getDoubleArray(ModelSelectorNames.LabelsDropped).foreach(_ should be >= 0.0)
+      meta.getDouble(ModelSelectorNames.DownSample) should be >= 0.0
+      meta.getLong(ModelSelectorNames.PreSplitterDataCount) should be >= 0L
       meta.getLong(ModelSelectorNames.LabelsDroppedTotal) should be >= 0L
       assert(s)
     case x =>

@@ -220,7 +220,6 @@ private[op] case object FitStagesUtil {
     fittedTransformers: Seq[OPStage] = Seq.empty
   )(implicit spark: SparkSession): FittedDAG = {
     val alreadyFitted: ListBuffer[OPStage] = ListBuffer(fittedTransformers: _*)
-
     val (newTrain, newTest) =
       dag.foldLeft(train -> test) { case ((currTrain, currTest), stagesLayer) =>
         val index = stagesLayer.head._2

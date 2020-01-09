@@ -20,7 +20,7 @@
 
 package com.salesforce.op.stages.impl.tuning
 
-import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
 import org.apache.spark.ml.param.ParamMap
@@ -36,7 +36,7 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
 (
   val trainRatio: Double = ValidatorParamDefaults.TrainRatio,
   val seed: Long = ValidatorParamDefaults.Seed,
-  val evaluator: OpEvaluatorBase[_],
+  val evaluator: OpEvaluatorBase[_ <: EvaluationMetrics],
   val stratify: Boolean = ValidatorParamDefaults.Stratify,
   val parallelism: Int = ValidatorParamDefaults.Parallelism,
   val maxWait: Duration = ValidatorParamDefaults.MaxWait
@@ -79,7 +79,10 @@ private[op] class OpTrainValidationSplit[M <: Model[_], E <: Estimator[_]]
         label = label,
         features = features,
         splitter = splitter
-      )).getOrElse(trainingDataset, validationDataset)
+      )).getOrElse {
+        splitter.map(s => (s.validationPrepare(trainingDataset), validationDataset))
+          .getOrElse((trainingDataset, validationDataset))
+      }
     }
     implicit val ec: ExecutionContext = makeExecutionContext()
     val modelSummaries = getSummary(modelInfo, label = label, features = features, train = newTrain, test = newTest)

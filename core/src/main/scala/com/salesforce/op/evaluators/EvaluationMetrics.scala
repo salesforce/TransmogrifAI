@@ -99,6 +99,11 @@ sealed trait EvalMetric extends EnumEntry with Serializable {
    */
   def humanFriendlyName: String
 
+  /**
+   * Is this metric being larger better or is smaller better
+   */
+  def isLargerBetter: Boolean
+
 }
 
 /**
@@ -106,13 +111,13 @@ sealed trait EvalMetric extends EnumEntry with Serializable {
  */
 object EvalMetric {
 
-  def withNameInsensitive(name: String): EvalMetric = {
+  def withNameInsensitive(name: String, isLargerBetter: Boolean = true): EvalMetric = {
     BinaryClassEvalMetrics.withNameInsensitiveOption(name)
       .orElse(MultiClassEvalMetrics.withNameInsensitiveOption(name))
       .orElse(RegressionEvalMetrics.withNameInsensitiveOption(name))
       .orElse(ForecastEvalMetrics.withNameInsensitiveOption(name))
       .orElse(OpEvaluatorNames.withNameInsensitiveOption(name))
-      .getOrElse(OpEvaluatorNames.Custom(name, name))
+      .getOrElse(OpEvaluatorNames.Custom(name, name, isLargerBetter))
   }
 }
 
@@ -122,7 +127,8 @@ object EvalMetric {
 sealed abstract class ClassificationEvalMetric
 (
   val sparkEntryName: String,
-  val humanFriendlyName: String
+  val humanFriendlyName: String,
+  val isLargerBetter: Boolean
 ) extends EvalMetric
 
 /**
@@ -130,17 +136,17 @@ sealed abstract class ClassificationEvalMetric
  */
 object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC")
-  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under precision-recall")
-  case object TP extends ClassificationEvalMetric("TP", "true positive")
-  case object TN extends ClassificationEvalMetric("TN", "true negative")
-  case object FP extends ClassificationEvalMetric("FP", "false positive")
-  case object FN extends ClassificationEvalMetric("FN", "false negative")
-  case object BrierScore extends ClassificationEvalMetric("brierScore", "brier score")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision", true)
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall", true)
+  case object F1 extends ClassificationEvalMetric("f1", "f1", true)
+  case object Error extends ClassificationEvalMetric("accuracy", "error", false)
+  case object AuROC extends ClassificationEvalMetric("areaUnderROC", "area under ROC", true)
+  case object AuPR extends ClassificationEvalMetric("areaUnderPR", "area under precision-recall", true)
+  case object TP extends ClassificationEvalMetric("TP", "true positive", true)
+  case object TN extends ClassificationEvalMetric("TN", "true negative", true)
+  case object FP extends ClassificationEvalMetric("FP", "false positive", false)
+  case object FN extends ClassificationEvalMetric("FN", "false negative", false)
+  case object BrierScore extends ClassificationEvalMetric("brierScore", "brier score", false)
 }
 
 /**
@@ -148,11 +154,11 @@ object BinaryClassEvalMetrics extends Enum[ClassificationEvalMetric] {
  */
 object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
   val values = findValues
-  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision")
-  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall")
-  case object F1 extends ClassificationEvalMetric("f1", "f1")
-  case object Error extends ClassificationEvalMetric("accuracy", "error")
-  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics")
+  case object Precision extends ClassificationEvalMetric("weightedPrecision", "precision", true)
+  case object Recall extends ClassificationEvalMetric("weightedRecall", "recall", true)
+  case object F1 extends ClassificationEvalMetric("f1", "f1", true)
+  case object Error extends ClassificationEvalMetric("accuracy", "error", false)
+  case object ThresholdMetrics extends ClassificationEvalMetric("thresholdMetrics", "threshold metrics", true)
 }
 
 
@@ -162,7 +168,8 @@ object MultiClassEvalMetrics extends Enum[ClassificationEvalMetric] {
 sealed abstract class RegressionEvalMetric
 (
   val sparkEntryName: String,
-  val humanFriendlyName: String
+  val humanFriendlyName: String,
+  val isLargerBetter: Boolean
 ) extends EvalMetric
 
 /**
@@ -170,10 +177,10 @@ sealed abstract class RegressionEvalMetric
  */
 object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
   val values: Seq[RegressionEvalMetric] = findValues
-  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error")
-  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error")
-  case object R2 extends RegressionEvalMetric("r2", "r2")
-  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error")
+  case object RootMeanSquaredError extends RegressionEvalMetric("rmse", "root mean square error", false)
+  case object MeanSquaredError extends RegressionEvalMetric("mse", "mean square error", false)
+  case object R2 extends RegressionEvalMetric("r2", "r2", true)
+  case object MeanAbsoluteError extends RegressionEvalMetric("mae", "mean absolute error", false)
 }
 
 
@@ -183,15 +190,16 @@ object RegressionEvalMetrics extends Enum[RegressionEvalMetric] {
 sealed abstract class ForecastEvalMetric
 (
   val sparkEntryName: String,
-  val humanFriendlyName: String
+  val humanFriendlyName: String,
+  val isLargerBetter: Boolean
 ) extends EvalMetric
 
 
 object ForecastEvalMetrics extends Enum[ForecastEvalMetric] {
   val values: Seq[ForecastEvalMetric] = findValues
-  case object SMAPE extends ForecastEvalMetric("smape", "symmetric mean absolute percentage error")
-  case object MASE extends ForecastEvalMetric("mase", "mean absolute scaled error")
-  case object SeasonalError extends ForecastEvalMetric("seasonalError", "seasonal error")
+  case object SMAPE extends ForecastEvalMetric("smape", "symmetric mean absolute percentage error", false)
+  case object MASE extends ForecastEvalMetric("mase", "mean absolute scaled error", false)
+  case object SeasonalError extends ForecastEvalMetric("seasonalError", "seasonal error", false)
 }
 
 
@@ -201,7 +209,8 @@ object ForecastEvalMetrics extends Enum[ForecastEvalMetric] {
 sealed abstract class OpEvaluatorNames
 (
   val sparkEntryName: String,
-  val humanFriendlyName: String
+  val humanFriendlyName: String,
+  val isLargerBetter: Boolean // for default value
 ) extends EvalMetric
 
 /**
@@ -209,17 +218,21 @@ sealed abstract class OpEvaluatorNames
  */
 object OpEvaluatorNames extends Enum[OpEvaluatorNames] {
   val values: Seq[OpEvaluatorNames] = findValues
-  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metrics")
-  case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics")
-  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics")
-  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics")
-  case object Forecast extends OpEvaluatorNames("regForecast", "forecast evaluation metrics")
-  case class Custom(name: String, humanName: String) extends OpEvaluatorNames(name, humanName) {
+  case object Binary extends OpEvaluatorNames("binEval", "binary evaluation metrics", true)
+  case object BinScore extends OpEvaluatorNames("binScoreEval", "bin score evaluation metrics", false)
+  case object Multi extends OpEvaluatorNames("multiEval", "multiclass evaluation metrics", true)
+  case object Regression extends OpEvaluatorNames("regEval", "regression evaluation metrics", false)
+  case object Forecast extends OpEvaluatorNames("regForecast", "regression evaluation metrics", false)
+  case class Custom(name: String, humanName: String, largeBetter: Boolean) extends
+    OpEvaluatorNames(name, humanName, largeBetter) {
     override def entryName: String = name.toLowerCase
   }
+  def withName(name: String, isLargerBetter: Boolean): OpEvaluatorNames =
+    super.withNameOption(name).getOrElse(Custom(name, name, isLargerBetter))
+
+  def withNameInsensitive(name: String, isLargerBetter: Boolean): OpEvaluatorNames =
+    super.withNameInsensitiveOption(name).getOrElse(Custom(name, name, isLargerBetter))
+
   def withFriendlyNameInsensitive(name: String): Option[OpEvaluatorNames] =
     values.collectFirst { case n if n.humanFriendlyName.equalsIgnoreCase(name) => n }
-  override def withName(name: String): OpEvaluatorNames = Try(super.withName(name)).getOrElse(Custom(name, name))
-  override def withNameInsensitive(name: String): OpEvaluatorNames = super.withNameInsensitiveOption(name)
-    .getOrElse(Custom(name, name))
 }

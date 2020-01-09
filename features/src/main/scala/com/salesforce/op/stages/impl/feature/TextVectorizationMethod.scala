@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, Salesforce.com, Inc.
+ * Copyright (c) 2019, Salesforce.com, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,37 +28,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-package com.salesforce.op.stages.impl.evaluator
+package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.evaluators.{Evaluators, OpBinaryClassificationEvaluatorBase, OpMultiClassificationEvaluatorBase, SingleMetric}
-import com.twitter.algebird.AveragedValue
-import org.apache.spark.ml.linalg.Vector
-import org.apache.spark.sql.Dataset
-import com.salesforce.op.utils.spark.RichDataset.RichDataset
+import enumeratum._
+
 
 /**
- * Logarithmic Loss metric, implemented as both Binary and MultiClass evaluators
+ * Methods of vectorizing text (eg. to be chosen by statistics computed in SmartTextVectorizer)
  */
-object LogLoss {
+sealed trait TextVectorizationMethod extends EnumEntry with Serializable
 
-  private def logLossFun(ds: Dataset[(Double, Vector, Vector, Double)]): Double = {
-    import ds.sparkSession.implicits._
-    require(!ds.isEmpty, "Dataset is empty, log loss cannot be calculated")
-    val avg = ds.map { case (lbl, _, prob, _) =>
-      new AveragedValue(count = 1L, value = -math.log(prob.toArray(lbl.toInt)))
-    }.reduce(_ + _)
-    avg.value
-  }
-
-  def binaryLogLoss: OpBinaryClassificationEvaluatorBase[SingleMetric] = Evaluators.BinaryClassification.custom(
-    metricName = "BinarylogLoss",
-    largerBetter = false,
-    evaluateFn = logLossFun
-  )
-
-  def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
-    metricName = "MultiClasslogLoss",
-    largerBetter = false,
-    evaluateFn = logLossFun
-  )
+object TextVectorizationMethod extends Enum[TextVectorizationMethod] {
+  val values = findValues
+  case object Pivot extends TextVectorizationMethod
+  case object Hash extends TextVectorizationMethod
+  case object Ignore extends TextVectorizationMethod
 }
