@@ -309,10 +309,10 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
       maxLen = NameStats.Keys.values.length,
       predicate = { nameStats =>
         val allKeysPresent = NameStats.Keys.values map { nameStats.value contains _.toString } forall identity
-        val validNameIndicatorEntries = NameStats.BooleanStrings.values
+        val validNameIndicatorEntries = Seq(true.toString, false.toString)
           .map(enum => Some(enum.toString))
           .contains(nameStats.value.get(NameStats.Keys.IsName.toString))
-        val validGenderEntries = NameStats.GenderStrings.values
+        val validGenderEntries = NameStats.GenderValues.values
           .map(enum => Some(enum.toString))
           .contains(nameStats.value.get(NameStats.Keys.Gender.toString))
         allKeysPresent & validNameIndicatorEntries & validGenderEntries

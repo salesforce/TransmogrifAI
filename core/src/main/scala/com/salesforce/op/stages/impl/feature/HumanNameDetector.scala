@@ -31,7 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
-import com.salesforce.op.features.types.NameStats.GenderStrings
+import com.salesforce.op.features.types.NameStats.GenderValues
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.stages.impl.MetadataLike
@@ -95,20 +95,19 @@ class HumanNameDetectorModel[T <: Text]
 )(implicit tti: TypeTag[T])
   extends UnaryModel[T, NameStats](operationName, uid) with NameDetectFun[T] {
 
-  import NameStats.BooleanStrings._
-  import NameStats.GenderStrings.GenderNA
+  import NameStats.GenderValues.GenderNA
   import NameStats.Keys._
   def transformFn: T => NameStats = (input: T) => {
     val tokens = preProcess(input)
     if (treatAsName) {
       require(orderedGenderDetectStrategies.nonEmpty, "There must be a gender extraction strategy if treating as name.")
       // Could figure out how to use a broadcast variable for the gender dictionary within a unary transformer
-      val genders: Seq[GenderStrings] = orderedGenderDetectStrategies map {
+      val genders: Seq[GenderValues] = orderedGenderDetectStrategies map {
         identifyGender(input.value, tokens, _, NameDetectUtils.DefaultGenderDictionary)
       }
       val gender = genders.find(_ != GenderNA).getOrElse(GenderNA)
       val map: Map[String, String] = Map(
-        IsName.toString -> True.toString,
+        IsName.toString -> true.toString,
         OriginalValue.toString -> input.value.getOrElse(""),
         Gender.toString -> gender.toString
       )

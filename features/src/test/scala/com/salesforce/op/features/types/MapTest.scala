@@ -326,8 +326,8 @@ class MapTest extends FlatSpec with TestCommon {
     m shouldBe a[TextMap]
 
     Map(
-      NameStats.Keys.IsName.toString -> NameStats.BooleanStrings.True.toString,
-      NameStats.Keys.Gender.toString -> NameStats.GenderStrings.Female.toString
+      NameStats.Keys.IsName.toString -> true.toString,
+      NameStats.Keys.Gender.toString -> NameStats.GenderValues.Female.toString
     ).toNameStats shouldBe a[NameStats]
   }
 

@@ -308,19 +308,13 @@ object NameStats {
     case object LastName      extends Keys
     case object Gender        extends Keys
   }
-  sealed class BooleanStrings extends EnumEntry
-  case object BooleanStrings extends Enum[BooleanStrings] {
-    val values: Seq[BooleanStrings] = findValues
-    case object True  extends BooleanStrings
-    case object False extends BooleanStrings
-  }
-  sealed class GenderStrings extends EnumEntry
-  case object GenderStrings extends Enum[GenderStrings] {
-    val values: Seq[GenderStrings] = findValues
-    case object Male              extends GenderStrings
-    case object Female            extends GenderStrings
-    case object GenderNA          extends GenderStrings
-    case object GenderNotInferred extends GenderStrings
+  sealed class GenderValues extends EnumEntry
+  case object GenderValues extends Enum[GenderValues] {
+    val values: Seq[GenderValues] = findValues
+    case object Male              extends GenderValues
+    case object Female            extends GenderValues
+    case object GenderNA          extends GenderValues
+    case object GenderNotInferred extends GenderValues
   }
 
   def apply(value: Map[String, String]): NameStats = new NameStats(value)

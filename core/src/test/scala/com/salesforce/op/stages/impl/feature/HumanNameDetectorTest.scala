@@ -30,7 +30,7 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.NameStats.GenderStrings._
+import com.salesforce.op.features.types.NameStats.GenderValues._
 import com.salesforce.op.features.types.NameStats.Keys._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
