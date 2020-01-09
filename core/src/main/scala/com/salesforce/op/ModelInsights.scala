@@ -708,7 +708,11 @@ case object ModelInsights {
             sensitiveInformation = sensitiveFeatureInformation
           )
       }.toSeq ++ {
-        // Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata
+        /*
+          Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
+          With current TMOG settings, this will not happen unless null tracking is turned off since
+          null indicators are created for all text features, even ignored ones.
+        */
         vectorInfo match {
           case Some(v) =>
             // Find features where `actionTaken` is true for all of the sensitive feature informations

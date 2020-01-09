@@ -35,14 +35,22 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.sql.types.{Metadata, MetadataBuilder}
 import enumeratum._
 
-// TODO: Make documentation
+/**
+ * A base class for different SensitiveFeatureInformation (implemented as an enum)
+ * Currently, only Name types are supported but there are placeholders for other possibilities
+ * The following three params are required for every kind of SensitiveFeatureInformation
+ *
+ * @param name        the name of the raw feature
+ * @param key         optionally, the name of the key (if the raw feature is a Map type)
+ * @param actionTaken whether the handling of the raw feature changed b/c it was detected as sensitive
+ */
 sealed class SensitiveFeatureInformation
 (
   val name: String,
   val key: Option[String] = None,
   val actionTaken: Boolean = false
 ) extends EnumEntry with JsonLike {
-  // TODO: Add an extra val for map keys
+
   /**
    * Convert to Spark metadata
    *

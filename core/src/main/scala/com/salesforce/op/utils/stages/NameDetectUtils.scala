@@ -204,7 +204,20 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     )
   }
 
-  // TODO: Make documentation
+  /**
+   * Creates a Map from feature name to SensitiveFeatureInformation objects.
+   * Notes:
+   * - Seq[SensitiveFeatureInformation] of length greater than one are only created for Map feature types
+   * - Non-empty Seq[SensitiveFeatureInformation] are created for features _not_ detected as sensitive only when
+   *   debugging is turned on
+   * - Each createdSensitiveFeatureInformation will only contain information about _all_ the gender detection
+   *   strategies only if debugging is turned on; Otherwise, only stats from the best performing strategy are created
+   *
+   * @param nameDetectStatsMap map where the keys are the feature name and optionally the key name
+   *                           (if the base feature is a map) and the values are the NameDetectStats aggregator
+   *                           from a reduce over all of the rows
+   * @return Map from feature name to (many) SensitiveFeatureInformation objects
+   */
   private[op] def createSensitiveFeatureInformation(
     nameDetectStatsMap: Map[(String, Option[String]), NameDetectStats]
   ): Map[String, Seq[SensitiveFeatureInformation]] = {
