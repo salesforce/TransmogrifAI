@@ -35,7 +35,7 @@ import com.salesforce.op.features._
 import com.salesforce.op.features.types._
 import com.salesforce.op.filters._
 import com.salesforce.op.stages._
-import com.salesforce.op.stages.impl.feature.TransmogrifierDefaults
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats, TransmogrifierDefaults}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.selector._
 import com.salesforce.op.stages.impl.tuning.{DataBalancerSummary, DataCutterSummary, DataSplitterSummary}
@@ -46,6 +46,8 @@ import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.table.Alignment._
 import com.salesforce.op.utils.table.Table
+import com.twitter.algebird.Operators._
+import com.twitter.algebird.Moments
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoost.RichBooster
 import ml.dmlc.xgboost4j.scala.spark.{XGBoostClassificationModel, XGBoostRegressionModel}
 import org.apache.spark.ml.classification._
@@ -393,6 +395,7 @@ case object ModelInsights {
 
   val SerializationFormats: Formats = {
     val typeHints = FullTypeHints(List(
+      classOf[FeatureDistribution], classOf[Moments], classOf[TextStats],
       classOf[Continuous], classOf[Discrete],
       classOf[DataBalancerSummary], classOf[DataCutterSummary], classOf[DataSplitterSummary],
       classOf[SingleMetric], classOf[MultiMetrics], classOf[BinaryClassificationMetrics],
@@ -441,53 +444,81 @@ case object ModelInsights {
     blacklistedMapKeys: Map[String, Set[String]],
     rawFeatureFilterResults: RawFeatureFilterResults
   ): ModelInsights = {
-    val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
-    val sanityChecker = sanityCheckers.lastOption
-    val checkerSummary = sanityChecker.map(s => SanityCheckerSummary.fromMetadata(s.getMetadata().getSummaryMetadata()))
-    log.info(
-      s"Found ${sanityCheckers.length} sanity checkers will " +
-        s"${sanityChecker.map("use results from the last checker:" + _.uid + "to").getOrElse("not")}" +
-        s" to fill in model insights"
-    )
 
+    // TODO support other model types?
     val models = stages.collect{
       case s: SelectedModel => s
       case s: OpPredictorWrapperModel[_] => s
-    } // TODO support other model types?
-    val model = models.lastOption
+      case s: SelectedCombinerModel => s
+    }
+    val model = models.flatMap{
+      case s: SelectedCombinerModel if s.strategy == CombinationStrategy.Best =>
+        val originF = if (s.weight1 > 0.5) s.getInputFeature[Prediction](1) else s.getInputFeature[Prediction](2)
+        models.find( m => originF.exists(_.originStage.uid == m.uid) )
+      case s => Option(s)
+    }.lastOption
+
     log.info(
       s"Found ${models.length} models will " +
         s"${model.map("use results from the last model:" + _.uid + "to").getOrElse("not")}" +
         s" to fill in model insights"
     )
 
-    val label = model.map(_.getInputFeature[RealNN](0)).orElse(sanityChecker.map(_.getInputFeature[RealNN](0))).flatten
+    val modelInputStages: Set[String] = model.map { m =>
+      val stages = m.getInputFeatures().map(_.parentStages().toOption.map(_.keySet.map(_.uid)))
+      val uid = stages.collect{ case Some(uids) => uids }
+      uid.fold(Set.empty)(_ + _)
+    }.getOrElse(Set.empty)
+
+    val sanityCheckers = stages.collect { case s: SanityCheckerModel => s }
+    val sanityCheckersForModel = sanityCheckers.filter(s => modelInputStages.contains(s.uid) &&
+      model.exists(_.getInputFeature[RealNN](0) == s.getInputFeature[RealNN](0))).toSeq
+
+    val sanityChecker = if (sanityCheckersForModel.nonEmpty) sanityCheckersForModel else sanityCheckers.lastOption.toSeq
+    val checkerSummary = if (sanityChecker.nonEmpty) {
+      Option(SanityCheckerSummary.flatten(
+        sanityChecker.map(s => SanityCheckerSummary.fromMetadata(s.getMetadata().getSummaryMetadata()))
+      ))
+    } else None
+
+    log.info(
+      s"Found ${sanityCheckers.length} sanity checkers" +
+        s"${sanityChecker.map("will preferentially use results from checkers in model path:" + _.uid +
+          " to fill in model insights")}"
+    )
+
+
+    val label = model.map(_.getInputFeature[RealNN](0))
+      .orElse(sanityChecker.lastOption.map(_.getInputFeature[RealNN](0))).flatten
     log.info(s"Found ${label.map(_.name + " as label").getOrElse("no label")} to fill in model insights")
 
     // Recover the vector metadata
     val vectorInput: Option[OpVectorMetadata] = {
       def makeMeta(s: => OpPipelineStageParams) = Try(OpVectorMetadata(s.getInputSchema().last)).toOption
 
-      sanityChecker
-        // first try out to get vector metadata from sanity checker
-        .flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s)))
-        // fall back to model selector stage metadata
-        .orElse(model.flatMap(m => makeMeta(m.parent.asInstanceOf[ModelSelector[_, _]])))
-        // finally try to get it from the last vector stage
-        .orElse(
-        stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
-          .map(v => OpVectorMetadata(v.getOutputFeatureName, v.getMetadata()))
-      )
+      if (sanityChecker.nonEmpty) { // first try out to get vector metadata from sanity checker
+        Option(OpVectorMetadata.flatten("",
+          sanityChecker.flatMap(s => makeMeta(s.parent.asInstanceOf[SanityChecker]).orElse(makeMeta(s))))
+        )
+      } else {
+        model.flatMap(m => makeMeta(m)) // fall back to model selector stage metadata
+          .orElse( // finally try to get it from the last vector stage
+          stages.filter(_.getOutput().isSubtypeOf[OPVector]).lastOption
+            .map(v => OpVectorMetadata(v.getOutputFeatureName, v.getMetadata()))
+        )
+      }
     }
     log.info(
       s"Found ${vectorInput.map(_.name + " as feature vector").getOrElse("no feature vector")}" +
         s" to fill in model insights"
     )
 
+    val labelSummary = getLabelSummary(label, checkerSummary)
+
     ModelInsights(
-      label = getLabelSummary(label, checkerSummary),
+      label = labelSummary,
       features = getFeatureInsights(vectorInput, checkerSummary, model, rawFeatures,
-        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults),
+        blacklistedFeatures, blacklistedMapKeys, rawFeatureFilterResults, labelSummary),
       selectedModelInfo = getModelInfo(model),
       trainingParams = trainingParams,
       stageInfo = RawFeatureFilterConfig.toStageInfo(rawFeatureFilterResults.rawFeatureFilterConfig)
@@ -537,7 +568,8 @@ case object ModelInsights {
     rawFeatures: Array[features.OPFeature],
     blacklistedFeatures: Array[features.OPFeature],
     blacklistedMapKeys: Map[String, Set[String]],
-    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults()
+    rawFeatureFilterResults: RawFeatureFilterResults = RawFeatureFilterResults(),
+    label: LabelSummary
   ): Seq[FeatureInsights] = {
     val featureInsights = (vectorInfo, summary) match {
       case (Some(v), Some(s)) =>
@@ -557,6 +589,42 @@ case object ModelInsights {
             case _ => None
           }
           val keptIndex = indexInToIndexKept.get(h.index)
+          val featureStd = math.sqrt(getIfExists(h.index, s.featuresStatistics.variance).getOrElse(1.0))
+          val sparkFtrContrib = keptIndex
+            .map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty)
+          val defaultLabelStd = 1.0
+          val labelStd = label.distribution match {
+            case Some(Continuous(_, _, _, variance)) =>
+              if (variance == 0) {
+                log.warn("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
+                defaultLabelStd
+              }
+              else math.sqrt(variance)
+            case Some(Discrete(domain, prob)) =>
+              // mean = sum (x_i * p_i)
+              val mean = (domain zip prob).foldLeft(0.0) {
+                case (weightSum, (d, p)) => weightSum + d.toDouble * p
+              }
+              // variance = sum (x_i - mu)^2 * p_i
+              val discreteVariance = (domain zip prob).foldLeft(0.0) {
+                case (sqweightSum, (d, p)) => sqweightSum + (d.toDouble - mean) * (d.toDouble - mean) * p
+              }
+              if (discreteVariance == 0) {
+                log.warn("The standard deviation of the label is zero, " +
+                  "so the coefficients and intercepts of the model will be zeros, training is not needed.")
+                defaultLabelStd
+              }
+              else math.sqrt(discreteVariance)
+            case Some(_) => {
+              log.warn("Failing to perform weight descaling because distribution is unsupported.")
+              defaultLabelStd
+            }
+            case None => {
+              log.warn("Label does not exist, please check your data")
+              defaultLabelStd
+            }
+          }
 
           h.parentFeatureOrigins ->
             Insights(
@@ -579,7 +647,8 @@ case object ModelInsights {
                 case _ => Map.empty[String, Double]
               },
               contribution =
-                keptIndex.map(i => contributions.map(_.applyOrElse(i, (_: Int) => 0.0))).getOrElse(Seq.empty),
+                descaleLRContrib(model, sparkFtrContrib, featureStd, labelStd).getOrElse(sparkFtrContrib),
+
               min = getIfExists(h.index, s.featuresStatistics.min),
               max = getIfExists(h.index, s.featuresStatistics.max),
               mean = getIfExists(h.index, s.featuresStatistics.mean),
@@ -597,7 +666,7 @@ case object ModelInsights {
             contribution =
               contributions.map(_.applyOrElse(h.index, (_: Int) => 0.0)) // nothing dropped without sanity check
           )
-      }
+        }
       case (None, _) => Seq.empty
     }
 
@@ -647,6 +716,36 @@ case object ModelInsights {
     }
   }
 
+  private[op] def descaleLRContrib(
+    model: Option[Model[_]],
+    sparkFtrContrib: Seq[Double],
+    featureStd: Double,
+    labelStd: Double): Option[Seq[Double]] = {
+    val stage = model.flatMap {
+      case m: SparkWrapperParams[_] => m.getSparkMlStage()
+      case _ => None
+    }
+    stage.collect {
+      case m: LogisticRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // scale entire feature contribution vector
+          // See https://think-lab.github.io/d/205/
+          // § 4.5.2 Standardized Interpretations, An Introduction to Categorical Data Analysis, Alan Agresti
+          sparkFtrContrib.map(_ * featureStd)
+        }
+        else sparkFtrContrib
+      case m: LinearRegressionModel =>
+        if (m.getStandardization && sparkFtrContrib.nonEmpty) {
+          // need to also divide by labelStd for linear regression
+          // See https://u.demog.berkeley.edu/~andrew/teaching/standard_coeff.pdf
+          // See https://en.wikipedia.org/wiki/Standardized_coefficient
+          sparkFtrContrib.map(_ * featureStd / labelStd)
+        }
+        else sparkFtrContrib
+      case _ => sparkFtrContrib
+    }
+  }
+
   private[op] def getModelContributions
   (model: Option[Model[_]], featureVectorSize: Option[Int] = None): Seq[Seq[Double]] = {
     val stage = model.flatMap {
@@ -674,6 +773,8 @@ case object ModelInsights {
   private def getModelInfo(model: Option[Model[_]]): Option[ModelSelectorSummary] = {
     model match {
       case Some(m: SelectedModel) =>
+        Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
+      case Some(m: SelectedCombinerModel) =>
         Try(ModelSelectorSummary.fromMetadata(m.getMetadata().getSummaryMetadata())).toOption
       case _ => None
     }

@@ -30,6 +30,7 @@
 
 package com.salesforce.op.dsl
 
+
 import java.time.LocalDateTime
 
 import com.salesforce.op.dsl.RichMapFeatureLambdas._
@@ -1100,9 +1101,10 @@ trait RichMapFeature {
      * @return prediction, rawPrediction, probability
      */
     def tupled(): (FeatureLike[RealNN], FeatureLike[OPVector], FeatureLike[OPVector]) = {
-      (f.map[RealNN](predictionToRealNN),
-        f.map[OPVector](predictionToRaw),
-        f.map[OPVector](predictionToProbability)
+      import RichMapFeatureLambdas._
+      (f.map[RealNN](new PredictionToRealNN),
+        f.map[OPVector](new PredictionToRaw),
+        f.map[OPVector](new PredictionToProbability)
       )
     }
 
@@ -1123,11 +1125,17 @@ trait RichMapFeature {
 
 object RichMapFeatureLambdas {
 
-  def predictionToRealNN: Prediction => RealNN = _.prediction.toRealNN
+  class PredictionToRealNN extends Function1[Prediction, RealNN] with Serializable {
+    def apply(p: Prediction): RealNN = p.prediction.toRealNN
+  }
 
-  def predictionToRaw: Prediction => OPVector = p => Vectors.dense(p.rawPrediction).toOPVector
+  class PredictionToRaw extends Function1[Prediction, OPVector] with Serializable {
+    def apply(p: Prediction): OPVector = Vectors.dense(p.rawPrediction).toOPVector
+  }
 
-  def predictionToProbability: Prediction => OPVector = p => Vectors.dense(p.probability).toOPVector
+  class PredictionToProbability extends Function1[Prediction, OPVector] with Serializable {
+    def apply(p: Prediction): OPVector = Vectors.dense(p.probability).toOPVector
+  }
 
 }
 

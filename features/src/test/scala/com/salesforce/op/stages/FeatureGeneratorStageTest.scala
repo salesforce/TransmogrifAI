@@ -31,16 +31,21 @@
 package com.salesforce.op.stages
 
 import com.salesforce.op.aggregators.{CutOffTime, Event, MonoidAggregatorDefaults}
-import com.salesforce.op.features.Feature
-import com.salesforce.op.features.types.{FeatureType, FeatureTypeSparkConverter}
+import com.salesforce.op.features.{Feature, FeatureBuilder}
+import com.salesforce.op.features.types._
 import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
 import com.salesforce.op.utils.spark.RichRow._
 import org.apache.spark.sql.Row
-import org.junit.runner.RunWith
+import org.json4s.{DefaultFormats, JValue}
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.json4s.JValue
+import org.json4s.JsonAST.{JInt, JObject}
+import org.json4s.JsonDSL._
+import org.junit.runner.RunWith
 
 import scala.reflect.runtime.universe.WeakTypeTag
+import scala.util.Try
 
 
 @RunWith(classOf[JUnitRunner])
@@ -77,6 +82,18 @@ class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
     assertAggregateFeatures(recovered)
   }
 
+  it should "serialize to/from json with a parametrized extract function" in {
+    val multiplier = 10
+    val multiplied = FeatureBuilder.Integral[Int].extract(new IntMultiplyExtractor(multiplier)).asPredictor
+    val featureGenerator = multiplied.originStage
+    val featureGenJson = featureGenerator.write.asInstanceOf[OpPipelineStageWriter].writeToJsonString("")
+    val recoveredStage = new OpPipelineStageReader(Seq.empty).loadFromJsonString(featureGenJson, "")
+    recoveredStage shouldBe a[FeatureGeneratorStage[_, _]]
+    val extractFn = recoveredStage.asInstanceOf[FeatureGeneratorStage[Int, Integral]].extractFn
+    extractFn shouldBe a[IntMultiplyExtractor]
+    extractFn.apply(7) shouldBe 70.toIntegral
+  }
+
   def assertExtractFeatures(fgs: FeaturesAndGenerators): Unit = {
     for {(feature, featureGenerator) <- fgs} {
       rows.map { row =>
@@ -102,4 +119,19 @@ class FeatureGeneratorStageTest extends FlatSpec with TestSparkContext {
     }
   }
 
+}
+
+@ReaderWriter(classOf[IntMultiplyExtractorReadWrite])
+class IntMultiplyExtractor(val multiplier: Int) extends Function1[Int, Integral] {
+  def apply(i: Int): Integral = (i * multiplier).toIntegral
+}
+
+class IntMultiplyExtractorReadWrite extends ValueReaderWriter[IntMultiplyExtractor] {
+  implicit val formats = DefaultFormats
+  def read(valueClass: Class[IntMultiplyExtractor], json: JValue): Try[IntMultiplyExtractor] = Try {
+    new IntMultiplyExtractor((json \ "multiplier").extract[Int])
+  }
+  def write(value: IntMultiplyExtractor): Try[JValue] = Try {
+    "multiplier" -> JInt(value.multiplier)
+  }
 }

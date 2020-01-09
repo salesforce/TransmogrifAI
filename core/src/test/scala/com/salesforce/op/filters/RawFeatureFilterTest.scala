@@ -174,6 +174,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val filter = new RawFeatureFilter(simpleReader, Some(dataReader), 10, 0.2, 1.0,
       Double.PositiveInfinity, 1.0, 1.0)
     val (rawFeatureFilterMetrics, _, _, _) = filter.getFeaturesToExclude(trainSummaries, scoreSummaries, Map.empty)
+    rawFeatureFilterMetrics.map(_.name) shouldBe Seq("A", "B", "C", "C", "D", "D")
+    rawFeatureFilterMetrics.map(_.key) shouldBe Seq(None, None, Some("1"), Some("2"), Some("1"), Some("2"))
     rawFeatureFilterMetrics.map(_.trainingFillRate) shouldEqual List(0.9, 0.0, 0.9, 0.05, 0.1, 0.05)
     rawFeatureFilterMetrics.map(_.trainingNullLabelAbsoluteCorr) shouldEqual List.fill(6)(None)
     rawFeatureFilterMetrics.map(_.scoringFillRate) shouldEqual
@@ -203,6 +205,8 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     excludedTrainMK.keySet shouldEqual Set("C")
     excludedTrainMK.head._2 shouldEqual Set("2")
     exclusionReasons.filter(_.trainingUnfilledState).map { _.name}.toSet shouldEqual Set("B", "C", "D")
+    exclusionReasons.map(_.name) shouldBe Seq("A", "B", "C", "C", "D", "D")
+    exclusionReasons.map(_.key) shouldBe Seq(None, None, Some("1"), Some("2"), Some("1"), Some("2"))
   }
 
   it should "correctly determine which features to exclude based on the stats of training and scoring fill rate" in {

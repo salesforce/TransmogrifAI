@@ -21,11 +21,10 @@
 package com.salesforce.op.stages.impl.tuning
 
 import com.github.fommil.netlib.BLAS
-import com.salesforce.op.evaluators.OpEvaluatorBase
+import com.salesforce.op.evaluators.{EvaluationMetrics, OpEvaluatorBase}
 import com.salesforce.op.stages.OPStage
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames
 import com.salesforce.op.utils.stages.FitStagesUtil._
-import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.{Estimator, Model}
@@ -33,6 +32,8 @@ import org.apache.spark.mllib.util.MLUtils
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
 import org.apache.spark.util.SparkThreadUtils
+import com.twitter.algebird._
+import com.twitter.algebird.Operators._
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
@@ -42,30 +43,45 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
 (
   val numFolds: Int = ValidatorParamDefaults.NumFolds,
   val seed: Long = ValidatorParamDefaults.Seed,
-  val evaluator: OpEvaluatorBase[_],
+  val evaluator: OpEvaluatorBase[_ <: EvaluationMetrics],
   val stratify: Boolean = ValidatorParamDefaults.Stratify,
-  val parallelism: Int = ValidatorParamDefaults.Parallelism
+  val parallelism: Int = ValidatorParamDefaults.Parallelism,
+  val maxWait: Duration = ValidatorParamDefaults.MaxWait
 ) extends OpValidator[M, E] {
 
   val validationName: String = ModelSelectorNames.CrossValResults
-  private val blas = BLAS.getInstance()
 
   override def getParams(): Map[String, Any] = Map("numFolds" -> numFolds, "seed" -> seed,
     "evaluator" -> evaluator.name.humanFriendlyName, "stratify" -> stratify, "parallelism" -> parallelism)
 
+  private implicit val doubleSemigroup = Semigroup.from[Double](_ + _)
+  private implicit val mapDoubleMonoid = Monoid.mapMonoid[String, Double](doubleSemigroup)
+
+  /**
+   * Should be called only on instances of the same model
+   */
   private def findBestModel(
     folds: Seq[ValidatedModel[E]]
   ): ValidatedModel[E] = {
-    val metrics = folds.map(_.metrics).reduce(_ + _)
-    blas.dscal(metrics.length, 1.0 / numFolds, metrics, 1)
-    val ValidatedModel(est, _, _, grid) = folds.head
-    log.info(s"Average cross-validation for $est metrics: {}", metrics.toSeq.mkString(","))
-    val (bestMetric, bestIndex) =
-      if (evaluator.isLargerBetter) metrics.zipWithIndex.maxBy(_._1)
-      else metrics.zipWithIndex.minBy(_._1)
-    log.info(s"Best set of parameters:\n${grid(bestIndex)}")
+
+    val gridCounts = folds.flatMap(_.grids.map(_ -> 1)).sumByKey
+    val (_, maxFolds) = gridCounts.maxBy{ case (_, count) => count }
+    val gridsIn = gridCounts.filter{ case (_, foldCount) => foldCount == maxFolds }.keySet
+
+    val gridMetrics = folds.flatMap{
+      f => f.grids.zip(f.metrics).collect { case (pm, met) if gridsIn.contains(pm) => (pm, met / maxFolds) }
+    }.sumByKey
+
+    val ((bestGrid, bestMetric), bestIndex) =
+      if (evaluator.isLargerBetter) gridMetrics.zipWithIndex.maxBy{ case ((_, metric), _) => metric}
+      else gridMetrics.zipWithIndex.minBy{ case ((_, metric), _) => metric}
+
+    val ValidatedModel(est, _, _, _) = folds.head
+    log.info(s"Average cross-validation for $est metrics: {}", gridMetrics.mkString(","))
+    log.info(s"Best set of parameters:\n$bestGrid")
     log.info(s"Best cross-validation metric: $bestMetric.")
-    ValidatedModel(est, bestIndex, metrics, grid)
+    val (grid, metrics) = gridMetrics.unzip
+    ValidatedModel(est, bestIndex, metrics.toArray, grid.toArray)
   }
 
   private[op] override def validate[T](
@@ -109,13 +125,16 @@ private[op] class OpCrossValidation[M <: Model[_], E <: Estimator[_]]
               dag = d, training = training, validation = validation,
               label = label, features = features, splitter = splitter
             )
-          ).getOrElse(training -> validation)
+          ).getOrElse{
+            splitter.map(s => (s.validationPrepare(training), validation))
+              .getOrElse((training, validation))
+          }
           getSummary(modelInfo = modelInfo, label = label, features = features, train = newTrain, test = newTest)
         }
       }
     }
     // Await for all the evaluations to complete
-    val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), Duration.Inf)
+    val modelSummaries = SparkThreadUtils.utils.awaitResult(Future.sequence(modelSummariesFuts.toSeq), maxWait)
 
     // Find the best model & return it
     val groupedSummary = modelSummaries.flatten.groupBy(_.model).map { case (_, folds) => findBestModel(folds) }.toArray

@@ -39,7 +39,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
+import com.twitter.algebird.Monoid
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -72,7 +72,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
-      cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1))
+      cleanTextFn(k, shouldCleanKeys) ->
+        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1), Map(cleanTextFn(v, shouldCleanValues).length -> 1))
     }
     TextMapStats(keyValueCounts)
   }
@@ -156,7 +157,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
 
-    implicit val testStatsSG: Semigroup[TextMapStats] = TextMapStats.semiGroup(maxCard)
+    implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
       _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues)).toArray
     )
@@ -186,9 +187,9 @@ private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) exte
 
 private[op] object TextMapStats {
 
-  def semiGroup(maxCardinality: Int): Semigroup[TextMapStats] = {
-    implicit val testStatsSG: Semigroup[TextStats] = TextStats.semiGroup(maxCardinality)
-    caseclass.semigroup[TextMapStats]
+  def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
+    caseclass.monoid[TextMapStats]
   }
 
 }

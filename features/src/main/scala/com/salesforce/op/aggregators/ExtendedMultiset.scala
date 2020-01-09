@@ -41,7 +41,7 @@ import com.twitter.algebird._
  * However, order does not matter, so {a, a, b} and {a, b, a} are the same multiset.
  */
 trait ExtendedMultiset extends MapMonoid[String, Long] with Group[Map[String, Long]] {
-  override def negate(kv: Map[String, Long]): Map[String, Long] = kv.mapValues { v => -v }
+  override def negate(kv: Map[String, Long]): Map[String, Long] = kv.map { case (k, v) => k -> -v }
 
   override def minus(x: Map[String, Long], y: Map[String, Long]): Map[String, Long] = {
     val keys = x.keySet ++ y.keySet

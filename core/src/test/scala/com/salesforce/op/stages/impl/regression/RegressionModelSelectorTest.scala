@@ -36,32 +36,43 @@ import com.salesforce.op.features.{Feature, FeatureBuilder}
 import com.salesforce.op.stages.impl.CompareParamGrid
 import com.salesforce.op.stages.impl.regression.{RegressionModelsToTry => RMT}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.ModelSelectorSummary
-import com.salesforce.op.stages.impl.tuning.BestEstimator
-import com.salesforce.op.test.TestSparkContext
+import com.salesforce.op.stages.impl.selector.{DefaultSelectorParams, ModelSelectorSummary}
+import com.salesforce.op.stages.impl.tuning.{BestEstimator, DataSplitter}
+import com.salesforce.op.test.{TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.testkit.{RandomReal, RandomVector}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import ml.dmlc.xgboost4j.scala.spark.OpXGBoostQuietLogging
+import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
-import org.apache.spark.ml.param.ParamPair
+import org.apache.spark.ml.param.{ParamMap, ParamPair}
 import org.apache.spark.ml.tuning.ParamGridBuilder
 import org.apache.spark.sql.Encoders
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.junit.runner.RunWith
+import org.scalacheck.Gen
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.prop.Checkers
+
+import scala.concurrent.TimeoutException
+import scala.concurrent.duration.Duration
+import scala.util.Random
 
 
 @RunWith(classOf[JUnitRunner])
 class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
-  with CompareParamGrid with OpXGBoostQuietLogging {
+  with CompareParamGrid with OpXGBoostQuietLogging with Checkers {
   val seed = 1234L
   val stageNames = "label_prediction"
+  val dataCount = 200
 
   import spark.implicits._
 
-  val rawData: Seq[(Double, Vector)] = List.range(0, 100, 1).map(i =>
-    (i.toDouble, Vectors.dense(2 * i, 4 * i)))
+  val rand = new Random(seed)
+
+  val rawData: Seq[(Double, Vector)] = List.range(-100, 100, 1).map(i =>
+    (i.toDouble, Vectors.dense(2 * i, 4 * i + 5, rand.nextFloat())))
 
   val data = sc.parallelize(rawData).toDF("label", "features")
 
@@ -114,9 +125,32 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
   it should "set the data splitting params correctly" in {
     val modelSelector = RegressionModelSelector()
-    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L)
+    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L).setMaxTrainingSample(1000)
+
     modelSelector.splitter.get.getSeed shouldBe 11L
     modelSelector.splitter.get.getReserveTestFraction shouldBe 0.1
+    modelSelector.splitter.get.getMaxTrainingSample shouldBe 1000
+  }
+
+  it should "down-sample when the training set is greater than the maxTrainingSample" in {
+
+    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
+    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+    val maxTrainingSample = 100
+    val sampleF = maxTrainingSample / dataCount.toDouble
+    val downSampleFraction = math.min(sampleF, 1.0)
+    val dataSplitter = DataSplitter(maxTrainingSample = maxTrainingSample, seed = seed, reserveTestFraction = 0.0)
+    val modelSelector =
+      RegressionModelSelector.withTrainValidationSplit(
+        modelTypesToUse = Seq(RMT.OpLinearRegression),
+        dataSplitter = Option(dataSplitter),
+        seed = seed)
+    val model = modelSelector.setInput(label, features).fit(data)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+
+    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction")
+
+    modelDownSampleFraction shouldBe downSampleFraction
   }
 
   it should "split into training and test" in {
@@ -213,6 +247,92 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     justScores.length shouldEqual transformedData.count()
   }
 
+  it should "fit and predict even when some models fail" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression,
+          RegressionModelsToTry.OpGeneralizedLinearRegression)
+      )
+      .setInput(label, features)
+
+
+    val model = testEstimator.fit(data)
+    model.evaluateModel(data)
+
+    // evaluation metrics from train set should be in metadata
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+    metaData.validationResults.size shouldBe 40
+  }
+
+
+  it should "fit and predict even when some parameter settings fail for one of the models" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RMT.OpGeneralizedLinearRegression)
+      )
+      .setInput(label, features)
+
+
+    val model = testEstimator.fit(data)
+    model.evaluateModel(data)
+
+    // evaluation metrics from train set should be in metadata
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    RegressionEvalMetrics.values.foreach(metric =>
+      assert(metaData.trainEvaluation.toJson(false).contains(s"${metric.entryName}"),
+        s"Metric ${metric.entryName} is not present in metadata: " + metaData)
+    )
+    metaData.validationResults.size shouldBe 32
+  }
+
+
+  it should "fail when all models fail due to inappropriate data" in {
+
+    val glr = new OpGeneralizedLinearRegression()
+    // GLR poisson cannot take negative values so will fail this test
+    val glrParams = new ParamGridBuilder()
+      .addGrid(glr.family, Seq("poisson"))
+      .addGrid(glr.maxIter, DefaultSelectorParams.MaxIterLin)
+      .build()
+
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelsAndParameters = Seq(glr -> glrParams)
+      )
+      .setInput(label, features)
+
+
+    intercept[SparkException](testEstimator.fit(data))
+  }
+
+  it should "fail when maxWait is set too low" in {
+    val testEstimator = RegressionModelSelector
+      .withCrossValidation(
+        numFolds = 4,
+        validationMetric = Evaluators.Regression.mse(),
+        seed = 10L,
+        modelTypesToUse = Seq(RegressionModelsToTry.OpLinearRegression),
+        maxWait = Duration(1L, "microsecond")
+      )
+      .setInput(label, features)
+
+
+    intercept[TimeoutException](testEstimator.fit(data))
+  }
+
   it should "fit and predict with a train validation split even if there is no split between training and test" in {
     val testEstimator =
       RegressionModelSelector
@@ -248,7 +368,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)
@@ -271,7 +391,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
 
     val medianAbsoluteError = Evaluators.Regression.custom(
       metricName = "median absolute error",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = ds => {
         val medAE = ds.map { case (lbl, prediction) => math.abs(prediction - lbl) }
         val median = medAE.stat.approxQuantile(medAE.columns.head, Array(0.5), 0.25)
@@ -321,7 +441,7 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val fitted = modelSelector.fit(data)
 
     fitted.modelStageIn.parent.extractParamMap().toSeq
-      .collect{ case p: ParamPair[_] if p.param.name == "cacheNodeIds" => p.value }.head shouldBe myParam
+      .collect { case p: ParamPair[_] if p.param.name == "cacheNodeIds" => p.value }.head shouldBe myParam
 
     val meta = ModelSelectorSummary.fromMetadata(fitted.getMetadata().getSummaryMetadata())
     meta.bestModelName shouldBe myEstimatorName
@@ -331,5 +451,79 @@ class RegressionModelSelectorTest extends FlatSpec with TestSparkContext
     val res = scores.zip(labels)
       .map { case (score: Prediction, label: RealNN) => math.abs(score.prediction - label.v.get) }.sum
     assert(res <= scores.length, "prediction failed")
+  }
+
+
+  import org.scalacheck.Prop
+
+  val rowInteger = Gen.choose(500, 1000)
+  val columnInteger = Gen.choose(10, 50)
+
+  val selector = RegressionModelSelector.withCrossValidation(modelTypesToUse =
+    Seq(RegressionModelsToTry.OpGeneralizedLinearRegression,
+      RegressionModelsToTry.OpRandomForestRegressor,
+      RegressionModelsToTry.OpLinearRegression),
+    numFolds = 5
+  )
+  // Property based tests where the dataset is randomly generated
+  ignore should "pick Linear Regression or GLM when the response a linear combination of predictors" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(_.value.toArray.sum.toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
+          val modelName = model.getSparkMlStage().get.toString()
+          modelName.contains("linReg") || modelName.contains("glm")
+        }
+      }
+    })
+  }
+
+  ignore should "pick RandomForest when the response a decision stump of a predictor" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(v => {
+            val head = v.value(0)
+            if (head > 1.0) 1000.0 else 500.0
+          }.toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
+          val modelName = model.getSparkMlStage().get.toString()
+          modelName.contains("rfr")
+        }
+      }
+    })
+  }
+
+  ignore should "pick GLM when the response a the exponential of a linear combination of the predictors" in {
+    check(Prop.forAllNoShrink(rowInteger) { n =>
+      Prop.forAllNoShrink(columnInteger) { p =>
+        Prop.collect(n, p) {
+
+          val vectors = RandomVector.dense(RandomReal.exponential(mean = 1.0), p).take(n).toSeq
+          val labels = vectors.map(v => math.exp(v.value.toArray.sum).toRealNN)
+          val (data, features, label) = TestFeatureBuilder("features", "response", vectors.zip(labels))
+          val response = label.copy(isResponse = true)
+
+          val modelSelector = selector.copy(ParamMap.empty).setInput(response, features)
+          val model = modelSelector.fit(data)
+          val modelName = model.getSparkMlStage().get.toString()
+          modelName.contains("glm")
+        }
+      }
+    })
   }
 }

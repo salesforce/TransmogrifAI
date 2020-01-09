@@ -52,13 +52,13 @@ object LogLoss {
 
   def binaryLogLoss: OpBinaryClassificationEvaluatorBase[SingleMetric] = Evaluators.BinaryClassification.custom(
     metricName = "BinarylogLoss",
-    isLargerBetter = false,
+    largerBetter = false,
     evaluateFn = logLossFun
   )
 
   def multiLogLoss: OpMultiClassificationEvaluatorBase[SingleMetric] = Evaluators.MultiClassification.custom(
     metricName = "MultiClasslogLoss",
-    isLargerBetter = false,
+    largerBetter = false,
     evaluateFn = logLossFun
   )
 }

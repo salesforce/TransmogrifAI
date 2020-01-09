@@ -100,6 +100,8 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     .drop("txtLabel")
     .select("label", "features")
 
+  val datacount = data.count().toDouble
+
   val stageNames = Array("label_prediction", "label_rawPrediction", "label_probability")
 
   val (label, Array(features: Feature[OPVector]@unchecked)) = FeatureBuilder.fromDataFrame[RealNN](
@@ -134,6 +136,39 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpNaiveBayes.entryName) shouldBe true
     modelSelector.models.exists(_._1.getClass.getSimpleName == MTT.OpXGBoostClassifier.entryName) shouldBe true
   }
+
+  it should "set the data splitting params correctly" in {
+    val modelSelector = MultiClassificationModelSelector()
+    modelSelector.splitter.get.setReserveTestFraction(0.1).setSeed(11L).setMaxTrainingSample(1000)
+
+    modelSelector.splitter.get.getSeed shouldBe 11L
+    modelSelector.splitter.get.getReserveTestFraction shouldBe 0.1
+    modelSelector.splitter.get.getMaxTrainingSample shouldBe 1000
+  }
+
+  it should "down-sample when the training set is greater than the maxTrainingSample" in {
+
+    implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
+    implicit val e1 = Encoders.tuple(Encoders.scalaDouble, vectorEncoder)
+    val dataCount = data.count().toDouble
+    val maxTrainingSample = (dataCount / 1.2).toInt
+    val sampleF = maxTrainingSample / dataCount
+    val downSampleFraction = math.min(sampleF, 1.0)
+    val dataCutter = DataCutter(seed = 42, maxTrainingSample = maxTrainingSample)
+    val modelSelector =
+      MultiClassificationModelSelector
+        .withTrainValidationSplit(
+          modelTypesToUse = Seq(MTT.OpLogisticRegression),
+          splitter = Option(dataCutter),
+          seed = 10L
+        )
+    val model = modelSelector.setInput(label, features).fit(data)
+    val metaData = ModelSelectorSummary.fromMetadata(model.getMetadata().getSummaryMetadata())
+    val modelDownSampleFraction = metaData.dataPrepParameters("downSampleFraction" )
+
+    modelDownSampleFraction shouldBe downSampleFraction
+  }
+
 
   it should "split into training and test" in {
     implicit val vectorEncoder: org.apache.spark.sql.Encoder[Vector] = ExpressionEncoder()
@@ -239,7 +274,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val crossEntropy = Evaluators.MultiClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 
@@ -268,7 +303,7 @@ class MultiClassificationModelSelectorTest extends FlatSpec with TestSparkContex
 
     val crossEntropy = Evaluators.MultiClassification.custom(
       metricName = "cross entropy",
-      isLargerBetter = false,
+      largerBetter = false,
       evaluateFn = crossEntropyFun
     )
 

@@ -58,7 +58,6 @@ import org.slf4j.LoggerFactory
 private[op] class OpMultiClassificationEvaluator
 (
   override val name: EvalMetric = OpEvaluatorNames.Multi,
-  override val isLargerBetter: Boolean = true,
   override val uid: String = UID[OpMultiClassificationEvaluator]
 ) extends OpMultiClassificationEvaluatorBase[MultiClassificationMetrics](uid) {
 
@@ -232,10 +231,10 @@ private[op] class OpMultiClassificationEvaluator
     ThresholdMetrics(
       topNs = topNs,
       thresholds = thresholds,
-      correctCounts = agg.mapValues { case (cor, _) => cor.toSeq },
-      incorrectCounts = agg.mapValues { case (_, incor) => incor.toSeq },
-      noPredictionCounts = agg.mapValues { case (cor, incor) =>
-        (Array.fill(nThresholds)(nRows) + cor.map(-_) + incor.map(-_)).toSeq
+      correctCounts = agg.map { case (k, (cor, _)) => k -> cor.toSeq },
+      incorrectCounts = agg.map { case (k, (_, incor)) => k -> incor.toSeq },
+      noPredictionCounts = agg.map { case (k, (cor, incor)) =>
+        k -> (Array.fill(nThresholds)(nRows) + cor.map(-_) + incor.map(-_)).toSeq
       }
     )
   }

@@ -50,7 +50,7 @@ class OpVectorMetadata private
 (
   val name: String,
   col: Array[OpVectorColumnMetadata],
-  val history: Map[String, FeatureHistory]
+  val history: Map[String, FeatureHistory] // TODO fix map -> causes problems when multiple vectorizers used on feature
 ) {
 
   /**

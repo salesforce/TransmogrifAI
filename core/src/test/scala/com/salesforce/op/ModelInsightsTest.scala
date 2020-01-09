@@ -30,22 +30,27 @@
 
 package com.salesforce.op
 
-import com.salesforce.op.features.types._
-import com.salesforce.op.features.{Feature, FeatureDistributionType}
+import com.salesforce.op.evaluators._
+import com.salesforce.op.features.types.{Real, _}
+import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.SelectedModel
 import com.salesforce.op.stages.impl.selector.ValidationType._
+import com.salesforce.op.stages.impl.selector.{SelectedCombinerModel, SelectedModel, SelectedModelCombiner}
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
-import com.salesforce.op.test.PassengerSparkFixtureTest
+import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
+import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.twitter.algebird.Moments
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
-import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
 
@@ -95,9 +100,86 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     .setInput(label, features)
     .getOutput()
 
+
+  val smallFeatureVariance = 10.0
+  val mediumFeatureVariance = 1.0
+  val bigFeatureVariance = 100.0
+  val smallNorm = RandomReal.normal[Real](0.0, smallFeatureVariance).limit(1000)
+  val mediumNorm = RandomReal.normal[Real](10, mediumFeatureVariance).limit(1000)
+  val bigNorm = RandomReal.normal[Real](10000.0, bigFeatureVariance).limit(1000)
+  val noise = RandomReal.normal[Real](0.0, 100.0).limit(1000)
+  // make a simple linear combination of the features (with noise), pass through sigmoid function and binarize
+  // to make labels for logistic reg toy data
+  def binarize(x: Double): Int = {
+    val sigmoid = 1.0 / (1.0 + math.exp(-x))
+    if (sigmoid > 0.5) 1 else 0
+  }
+  val logisticRegLabel = (smallNorm, mediumNorm, noise)
+    .zipped.map(_.toDouble.get * 10 + _.toDouble.get + _.toDouble.get).map(binarize(_)).map(RealNN(_))
+  // toy label for linear reg is a sum of two scaled Normals, hence we also know its standard deviation
+  val linearRegLabel = (smallNorm, bigNorm)
+    .zipped.map(_.toDouble.get * 5000 + _.toDouble.get).map(RealNN(_))
+  val labelStd = math.sqrt(5000 * 5000 * smallFeatureVariance + bigFeatureVariance)
+  def twoFeatureDF(feature1: List[Real], feature2: List[Real], label: List[RealNN]):
+  (Feature[RealNN], FeatureLike[OPVector], DataFrame) = {
+    val generatedData = feature1.zip(feature2).zip(label).map {
+      case ((f1, f2), label) => (f1, f2, label)
+    }
+    val (rawDF, raw1, raw2, rawLabel) = TestFeatureBuilder("feature1", "feature2", "label", generatedData)
+    val labelData = rawLabel.copy(isResponse = true)
+    val featureVector = raw1
+      .vectorize(fillValue = 0, fillWithMean = true, trackNulls = false, others = Array(raw2))
+    val checkedFeatures = labelData.sanityCheck(featureVector, removeBadFeatures = false)
+    return (labelData, checkedFeatures, rawDF)
+  }
+
+  val linRegDF = twoFeatureDF(smallNorm, bigNorm, linearRegLabel)
+  val logRegDF = twoFeatureDF(smallNorm, mediumNorm, logisticRegLabel)
+
+  val unstandardizedLinpred = new OpLinearRegression().setStandardization(false)
+    .setInput(linRegDF._1, linRegDF._2).getOutput()
+
+  val standardizedLinpred = new OpLinearRegression().setStandardization(true)
+    .setInput(linRegDF._1, linRegDF._2).getOutput()
+
+  val unstandardizedLogpred = new OpLogisticRegression().setStandardization(false)
+    .setInput(logRegDF._1, logRegDF._2).getOutput()
+
+  val standardizedLogpred = new OpLogisticRegression().setStandardization(true)
+    .setInput(logRegDF._1, logRegDF._2).getOutput()
+
+  def getFeatureImp(standardizedModel: FeatureLike[Prediction],
+    unstandardizedModel: FeatureLike[Prediction], DF: DataFrame): Array[Double] = {
+    lazy val workFlow = new OpWorkflow()
+      .setResultFeatures(standardizedModel, unstandardizedModel).setInputDataset(DF)
+    lazy val model = workFlow.train()
+    val unstandardizedFtImp = model.modelInsights(unstandardizedModel)
+      .features.map(_.derivedFeatures.map(_.contribution))
+    val standardizedFtImp = model.modelInsights(standardizedModel)
+      .features.map(_.derivedFeatures.map(_.contribution))
+    val descaledsmallCoeff = standardizedFtImp.flatten.flatten.head
+    val originalsmallCoeff = unstandardizedFtImp.flatten.flatten.head
+    val descaledbigCoeff = standardizedFtImp.flatten.flatten.last
+    val orginalbigCoeff = unstandardizedFtImp.flatten.flatten.last
+    return Array(descaledsmallCoeff, originalsmallCoeff, descaledbigCoeff, orginalbigCoeff)
+  }
+
+  def getFeatureMomentsAndCard(inputModel: FeatureLike[Prediction],
+    DF: DataFrame): (Map[String, Moments], Map[String, TextStats]) = {
+    lazy val workFlow = new OpWorkflow().setResultFeatures(inputModel).setInputDataset(DF)
+    lazy val dummyReader = workFlow.getReader()
+    lazy val workFlowRFF = workFlow.withRawFeatureFilter(Some(dummyReader), None)
+    lazy val model = workFlowRFF.train()
+    val insights = model.modelInsights(inputModel)
+    val featureMoments = insights.features.map(f => f.featureName -> f.distributions.head.moments.get).toMap
+    val featureCardinality = insights.features.map(f => f.featureName -> f.distributions.head.cardEstimate.get).toMap
+    featureMoments -> featureCardinality
+  }
+
   val params = new OpParams()
 
-  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred).setParameters(params).setReader(dataReader)
+  lazy val workflow = new OpWorkflow().setResultFeatures(predLin, pred)
+    .setParameters(params).setReader(dataReader)
 
   lazy val workflowModel = workflow.train()
 
@@ -280,12 +362,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly pull out model contributions when passed a selected model" in {
-    val reg = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel])
-    )
-    val lin = ModelInsights.getModelContributions(
-      Option(workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel])
-    )
+    val predLinMod = workflowModel.getOriginStageOf(predLin).asInstanceOf[SelectedModel]
+    val reg = ModelInsights.getModelContributions(Option(predLinMod))
+
+    val linMod = workflowModel.getOriginStageOf(pred).asInstanceOf[SelectedModel]
+    val lin = ModelInsights.getModelContributions(Option(linMod))
     reg.size shouldBe 1
     reg.head.size shouldBe 21
 
@@ -331,16 +412,16 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       case Failure(e) => fail(e)
       case Success(deser) =>
         insights.label shouldEqual deser.label
-        insights.features.zip(deser.features).foreach{
+        insights.features.zip(deser.features).foreach {
           case (i, o) =>
             i.featureName shouldEqual o.featureName
             i.featureType shouldEqual o.featureType
-            i.derivedFeatures.zip(o.derivedFeatures).foreach{ case (ii, io) => ii.corr shouldEqual io.corr }
+            i.derivedFeatures.zip(o.derivedFeatures).foreach { case (ii, io) => ii.corr shouldEqual io.corr }
             RawFeatureFilterResultsComparison.compareSeqMetrics(i.metrics, o.metrics)
             RawFeatureFilterResultsComparison.compareSeqDistributions(i.distributions, o.distributions)
             RawFeatureFilterResultsComparison.compareSeqExclusionReasons(i.exclusionReasons, o.exclusionReasons)
         }
-        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach{
+        insights.selectedModelInfo.toSeq.zip(deser.selectedModelInfo.toSeq).foreach {
           case (o, i) =>
             o.validationType shouldEqual i.validationType
             o.validationParameters.keySet shouldEqual i.validationParameters.keySet
@@ -351,7 +432,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             o.bestModelUID shouldEqual i.bestModelUID
             o.bestModelName shouldEqual i.bestModelName
             o.bestModelType shouldEqual i.bestModelType
-            o.validationResults.zip(i.validationResults).foreach{
+            o.validationResults.zip(i.validationResults).foreach {
               case (ov, iv) => ov.metricValues shouldEqual iv.metricValues
                 ov.modelParameters.keySet shouldEqual iv.modelParameters.keySet
             }
@@ -421,7 +502,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
             paramsMapI("correlationType") shouldEqual paramsMapD("correlationType")
             paramsMapI("jsDivergenceProtectedFeatures") shouldEqual paramsMapD("jsDivergenceProtectedFeatures")
             paramsMapI("protectedFeatures") shouldEqual paramsMapD("protectedFeatures")
-          }
+        }
     }
   }
 
@@ -463,7 +544,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         supports = Array(1.0)
       ), CategoricalGroupStats(
         group = "f0_f0_f2",
-        categoricalFeatures = Array( "f0_f0_f3_2"),
+        categoricalFeatures = Array("f0_f0_f3_2"),
         contingencyMatrix = Map("0" -> Array(11.0, 12.0), "1" -> Array(12.0, 12.0), "2" -> Array(13.0, 12.0)),
         cramersV = 6.3,
         pointwiseMutualInfo = Map("0" -> Array(7.3), "1" -> Array(8.3), "2" -> Array(9.3)),
@@ -509,9 +590,11 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   }
 
   it should "correctly extract the FeatureInsights from the sanity checker summary and vector metadata" in {
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
     val featureInsights = ModelInsights.getFeatureInsights(
       Option(meta), Option(summary), None, Array(f1, f0), Array.empty, Map.empty[String, Set[String]],
-      RawFeatureFilterResults()
+      RawFeatureFilterResults(), labelSum
     )
     featureInsights.size shouldBe 2
 
@@ -651,5 +734,166 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       f.variance.isEmpty shouldBe true
       f.cramersV.isEmpty shouldBe true
     }
+  }
+
+  val tol = 0.1
+  it should "correctly return the descaled coefficient for linear regression, " +
+    "when standardization is on" in {
+
+    // Since 5000 & 1 are always returned as the coefficients of the model
+    // trained on unstandardized data and we can analytically calculate
+    // the scaled version of them by the linear regression formula, the coefficients
+    // of the model trained on standardized data should be within a small distance of the analytical formula.
+
+    // difference between the real coefficient and the analytical formula
+    val coeffs = getFeatureImp(standardizedLinpred, unstandardizedLinpred, linRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd - descaledbigCoeff)
+    val bigCoeffSum = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) / labelStd + descaledbigCoeff)
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd - descaledsmallCoeff)
+    val smallCoeffSum = math.abs(originalsmallCoeff * math.sqrt(bigFeatureVariance) / labelStd + descaledsmallCoeff)
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
+  }
+
+  it should "correctly return the descaled coefficient for logistic regression, " +
+    "when standardization is on" in {
+    val coeffs = getFeatureImp(standardizedLogpred, unstandardizedLogpred, logRegDF._3)
+    val descaledsmallCoeff = coeffs(0)
+    val originalsmallCoeff = coeffs(1)
+    val descaledbigCoeff = coeffs(2)
+    val orginalbigCoeff = coeffs(3)
+    // difference between the real coefficient and the analytical formula
+    val absError = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) - descaledbigCoeff)
+    val bigCoeffSum = math.abs(orginalbigCoeff * math.sqrt(smallFeatureVariance) + descaledbigCoeff)
+    val absError2 = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) - descaledsmallCoeff)
+    val smallCoeffSum = math.abs(originalsmallCoeff * math.sqrt(mediumFeatureVariance) + descaledsmallCoeff)
+    absError should be < tol * bigCoeffSum / 2
+    absError2 should be < tol * smallCoeffSum / 2
+  }
+
+  it should "correctly return moments calculation and cardinality calculation for numeric features" in {
+
+    import spark.implicits._
+    val df = linRegDF._3
+    val meanTol = 0.01
+    val varTol = 0.01
+    val (moments, cardinality) = getFeatureMomentsAndCard(standardizedLinpred, linRegDF._3)
+
+    // Go through each feature and check that the mean, variance, and unique counts match the data
+    moments.foreach { case (featureName, value) => {
+      value.count shouldBe 1000
+      val (expectedMean, expectedVariance) =
+        df.select(avg(featureName), variance(featureName)).as[(Double, Double)].collect().head
+      math.abs((value.mean - expectedMean) / expectedMean) < meanTol shouldBe true
+      math.abs((value.variance - expectedVariance) / expectedVariance) < varTol shouldBe true
+    }
+    }
+
+    cardinality.foreach { case (featureName, value) =>
+        val actualUniques = df.select(featureName).as[Double].distinct.collect.toSet
+        actualUniques should contain allElementsOf value.valueCounts.keySet.map(_.toDouble)
+    }
+  }
+
+  it should "return correct insights when a model combiner equal is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Equal)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val insights = workflowModel.modelInsights(predComb)
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.map(_.featureName).toSet shouldBe
+      Set(genderPL, age, height, description, weight, numericMap).map(_.name)
+    insights.features.foreach(_.derivedFeatures.foreach(_.contribution shouldBe Seq()))
+    insights.features.foreach(_.derivedFeatures.foreach(_.variance.nonEmpty shouldBe true))
+  }
+
+  it should "return correct insights when a model combiner best is used as the final feature" in {
+    val predComb = new SelectedModelCombiner().setCombinationStrategy(CombinationStrategy.Best)
+      .setInput(label, pred, predWithMaps).getOutput()
+    val workflowModel = new OpWorkflow().setResultFeatures(pred, predComb)
+      .setParameters(params).setReader(dataReader).train()
+    val predModel = workflowModel.getOriginStageOf(predComb).asInstanceOf[SelectedCombinerModel]
+    val winner = if (predModel.weight1 > 0.5) pred else predWithMaps
+    val insights = workflowModel.modelInsights(predComb)
+    val insightsWin = workflowModel.modelInsights(winner)
+
+    insights.selectedModelInfo.nonEmpty shouldBe true
+    insights.features.map(_.featureName).toSet shouldBe insightsWin.features.map(_.featureName).toSet
+    insights.features.zip(insightsWin.features).foreach{
+      case (c, w) => c.derivedFeatures.zip(w.derivedFeatures)
+        .foreach{ case (c1, w1) => c1.contribution shouldBe w1.contribution }
+    }
+  }
+
+  it should "return default & custom metrics when having multiple binary classification metrics in model insights" in {
+    val prediction = BinaryClassificationModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(
+          Evaluators.BinaryClassification.custom(metricName = "second", evaluateFn = _ => 0.0),
+          Evaluators.BinaryClassification.custom(metricName = "third", evaluateFn = _ => 1.0)
+        ),
+        splitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, checked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Binary.humanFriendlyName -> classOf[BinaryClassificationMetrics],
+      OpEvaluatorNames.BinScore.humanFriendlyName -> classOf[BinaryClassificationBinMetrics],
+      "second" -> classOf[SingleMetric],
+      "third" -> classOf[SingleMetric]
+    )
+  }
+
+  it should
+    "return default & custom metrics when having multiple multi-class classification metrics in model insights" in {
+    val prediction = MultiClassificationModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(Evaluators.MultiClassification.custom(metricName = "second", evaluateFn = _ => 0.0)),
+        splitter = Option(DataCutter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, checked)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Multi.humanFriendlyName -> classOf[MultiClassificationMetrics],
+      "second" -> classOf[SingleMetric]
+    )
+  }
+
+  it should "return default & custom metrics when having multiple regression metrics in model insights" in {
+    val prediction = RegressionModelSelector
+      .withCrossValidation(seed = 42,
+        trainTestEvaluators = Seq(Evaluators.Regression.custom(metricName = "second", evaluateFn = _ => 0.0)),
+        dataSplitter = Option(DataSplitter(seed = 42, reserveTestFraction = 0.1)),
+        modelsAndParameters = models)
+      .setInput(label, features)
+      .getOutput()
+    val workflow = new OpWorkflow().setResultFeatures(prediction).setParameters(params).setReader(dataReader)
+    val workflowModel = workflow.train()
+    val insights = workflowModel.modelInsights(prediction)
+    val trainEval = insights.selectedModelInfo.get.trainEvaluation
+    trainEval shouldBe a[MultiMetrics]
+    val trainMetric = trainEval.asInstanceOf[MultiMetrics].metrics
+    trainMetric.map { case (metricName, metric) => metricName -> metric.getClass } should contain theSameElementsAs Seq(
+      OpEvaluatorNames.Regression.humanFriendlyName -> classOf[RegressionMetrics],
+      "second" -> classOf[SingleMetric]
+    )
   }
 }
