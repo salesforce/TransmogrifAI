@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
+import com.salesforce.op.features.Feature
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
@@ -592,67 +593,85 @@ class SmartTextVectorizerTest
     loggingLevels(prevLoggingLevels) // Reset logging levels
   }
 
-  // it should "compute sensitive information in the metadata for multiple detected name columns" in {
-  //   val numFeatures = 5
-  //   val (ds, untypedFeatures) = TestFeatureBuilder(
-  //     1 to numFeatures map {_ =>
-  //       NameDictionaryGroundTruth.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
-  //   )
-  //   val features = untypedFeatures.map(_.asInstanceOf[Feature[Text]])
-  //   for {i <- 1 to numFeatures} {
-  //     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(features.slice(0, i): _*)
-  //     val model: SmartTextVectorizerModel[Text] = newEstimator
-  //       .fit(ds)
-  //       .asInstanceOf[SmartTextVectorizerModel[Text]]
-  //     newEstimator.guardCheckResults match {
-  //       case Some(results) => results.length shouldBe i
-  //       case None => fail("Guard check results were not generated")
-  //     }
-  //     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-  //     for {j <- 1 to i} {
-  //       sensitive.get(s"f$j") match {
-  //         case Some(SensitiveFeatureInformation.Name(_, probName, _, probMale, probFemale, probOther)) =>
-  //           println((probName, probMale, probFemale, probOther))
-  //           // following test values are sensitive to name dictionary and randomness
-  //           probName should be > 0.0
-  //           probName should be <= 1.0
-  //           probMale should be <= 1.0
-  //           probFemale should be <= 1.0
-  //           probOther should be <= 1.0
-  //           (probMale + probFemale + probOther) - 1.0 should be < 0.01
-  //         case None =>
-  //           println(sensitive)
-  //           fail("Sensitive information not found in the metadata.")
-  //         case Some(_) =>
-  //           println(sensitive)
-  //           fail("Wrong kind of sensitive information found in the metadata.")
-  //       }
-  //     }
-  //   }
-  // }
-  //
-  // it should "compute sensitive information in the metadata for all columns" in {
-  //   val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
-  //   val model: SmartTextVectorizerModel[Text] = newEstimator
-  //     .fit(newInputData)
-  //     .asInstanceOf[SmartTextVectorizerModel[Text]]
-  //   newInputData.show()
-  //   val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-  //   println(sensitive)
-  //   newInputData.columns foreach { name: String =>
-  //     sensitive contains name shouldBe true
-  //     sensitive get name match {
-  //       case Some(
-  //         SensitiveFeatureInformation.Name(actionTaken, _, _, _, _, _)
-  //       ) =>
-  //         if (name == newF3.name) {
-  //           actionTaken shouldBe true
-  //         } else {
-  //           actionTaken shouldBe false
-  //         }
-  //       case None => fail("Sensitive information not found in the metadata.")
-  //       case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
-  //     }
-  //   }
-  // }
+  it should "compute sensitive information in the metadata for multiple detected name columns" in {
+    val numFeatures = 5
+    val (ds, untypedFeatures) = TestFeatureBuilder(
+      1 to numFeatures map {_ =>
+        NameDictionaryGroundTruth.withProbabilityOfEmpty(0.15).take(50).toSeq} : _*
+    )
+    val features = untypedFeatures.map(_.asInstanceOf[Feature[Text]])
+    for {i <- 1 to numFeatures} {
+      val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(features.slice(0, i): _*)
+      val model: SmartTextVectorizerModel[Text] = newEstimator
+        .fit(ds)
+        .asInstanceOf[SmartTextVectorizerModel[Text]]
+
+      val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+      for {j <- 1 to i} {
+        sensitive.get(s"f$j") match {
+          case Some(Seq(SensitiveFeatureInformation.Name(
+            probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+          ))) =>
+            probName should be > 0.0
+            probName should be <= 1.0
+            probMale should be <= 1.0
+            probFemale should be <= 1.0
+            probOther should be <= 1.0
+            (probMale + probFemale + probOther) - 1.0 should be < 0.01
+
+            genderDetectResults.length shouldBe 1 // because debugging is off
+            name shouldBe s"f$j"
+            mapKey shouldBe None
+            actionTaken shouldBe true
+          case None =>
+            fail("Sensitive information not found in the metadata.")
+          case Some(_) =>
+            fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+    }
+  }
+
+  it should "compute sensitive information in the metadata for all columns only when debugging is on" in {
+    val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+    val model: SmartTextVectorizerModel[Text] = newEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextVectorizerModel[Text]]
+    newInputData.show()
+    val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+    println(sensitive)
+    newInputData.columns foreach { fname: String =>
+      if (fname == newF3.name) {
+        sensitive contains fname shouldBe true
+      } else {
+        sensitive contains fname shouldBe false
+      }
+    }
+
+    {
+      val prevLoggingLevels = getLoggingLevels
+      loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+      val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
+      val model: SmartTextVectorizerModel[Text] = newEstimator
+        .fit(newInputData)
+        .asInstanceOf[SmartTextVectorizerModel[Text]]
+      newInputData.show()
+      val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
+      println(sensitive)
+      newInputData.columns foreach { fname: String =>
+        sensitive contains fname shouldBe true
+        sensitive get fname match {
+          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, name, _, actionTaken))) =>
+            if (name == newF3.name) {
+              actionTaken shouldBe true
+            } else {
+              actionTaken shouldBe false
+            }
+          case None => fail("Sensitive information not found in the metadata.")
+          case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+      loggingLevels(prevLoggingLevels) // Reset logging levels
+    }
+  }
 }
