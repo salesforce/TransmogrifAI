@@ -33,8 +33,8 @@ package com.salesforce.op.utils.stages
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
-import com.salesforce.op.features.types.NameStats.GenderValues
-import com.salesforce.op.features.types.NameStats.GenderValues._
+import com.salesforce.op.features.types.NameStats.GenderValue
+import com.salesforce.op.features.types.NameStats.GenderValue._
 import com.salesforce.op.features.types.Text
 import com.salesforce.op.stages.impl.feature.{GenderDetectStrategy, TextTokenizer}
 import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
@@ -101,7 +101,17 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     }
   }
 
-  private[op] def genderDictCheck(nameToCheckGenderOf: T#Value, genderDict: GenderDictionary): GenderValues = {
+  private[op] def findHonorific(tokens: Seq[String]): GenderValue = {
+    tokens collect {
+      case v if MaleHonorifics.contains(v) => Male
+      case v if FemaleHonorifics.contains(v) => Female
+    } match {
+      case Seq(elem) => elem
+      case _ => GenderNA // Both no matches and more than one match should be NA
+    }
+  }
+
+  private[op] def genderDictCheck(nameToCheckGenderOf: T#Value, genderDict: GenderDictionary): GenderValue = {
     nameToCheckGenderOf.flatMap(genderDict.get).map(
       probMale => if (probMale >= 0.5) Male else Female
     ).getOrElse(GenderNA)
@@ -112,19 +122,12 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     tokens: Seq[String],
     strategy: GenderDetectStrategy,
     genderDict: GenderDictionary
-  ): GenderValues = {
+  ): GenderValue = {
     input match {
       case None => GenderNA
       case Some(text) =>
         strategy match {
-          case FindHonorific() =>
-            tokens collect {
-              case v if MaleHonorifics.contains(v) => Male
-              case v if FemaleHonorifics.contains(v) => Female
-            } match {
-              case Seq(elem) => elem
-              case _ => GenderNA // Both no matches and more than one match should be NA
-            }
+          case FindHonorific() => findHonorific(tokens)
           case ByIndex(index) =>
             val nameToCheckGenderOf = tokens.lift(index)
             genderDictCheck(nameToCheckGenderOf, genderDict)
@@ -151,7 +154,7 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
     genderDict: GenderDictionary
   ): Map[String, GenderStats] = {
     GenderDetectStrategies map { strategy: GenderDetectStrategy =>
-      val genderResult: GenderValues = identifyGender(input, tokens, strategy, genderDict)
+      val genderResult: GenderValue = identifyGender(input, tokens, strategy, genderDict)
       implicit def booleanToInt(v: Boolean): Int = if (v) 1 else 0
       strategy.toString -> GenderStats(genderResult == Male, genderResult == Female, genderResult == GenderNA)
     } toMap

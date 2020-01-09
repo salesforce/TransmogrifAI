@@ -291,7 +291,7 @@ object StreetMap {
  * - "gender"
  */
 class NameStats(value: Map[String, String]) extends TextMap(value) {
-  import NameStats.Keys._
+  import NameStats.Key._
 
   def isName: Boolean = value.getOrElse(IsName.toString, "false") == "true"
   def isMale: Boolean = value.getOrElse(Gender.toString, "") == "male"
@@ -299,22 +299,22 @@ class NameStats(value: Map[String, String]) extends TextMap(value) {
 }
 object NameStats {
   import enumeratum._
-  sealed class Keys extends EnumEntry
-  case object Keys extends Enum[Keys] {
-    val values: Seq[Keys] = findValues
-    case object OriginalValue extends Keys
-    case object IsName        extends Keys
-    case object FirstName     extends Keys
-    case object LastName      extends Keys
-    case object Gender        extends Keys
+  sealed class Key extends EnumEntry
+  case object Key extends Enum[Key] {
+    val values: Seq[Key] = findValues
+    case object OriginalValue extends Key
+    case object IsName        extends Key
+    case object FirstName     extends Key
+    case object LastName      extends Key
+    case object Gender        extends Key
   }
-  sealed class GenderValues extends EnumEntry
-  case object GenderValues extends Enum[GenderValues] {
-    val values: Seq[GenderValues] = findValues
-    case object Male              extends GenderValues
-    case object Female            extends GenderValues
-    case object GenderNA          extends GenderValues
-    case object GenderNotInferred extends GenderValues
+  sealed class GenderValue extends EnumEntry
+  case object GenderValue extends Enum[GenderValue] {
+    val values: Seq[GenderValue] = findValues
+    case object Male              extends GenderValue
+    case object Female            extends GenderValue
+    case object GenderNA          extends GenderValue
+    case object GenderNotInferred extends GenderValue
   }
 
   def apply(value: Map[String, String]): NameStats = new NameStats(value)

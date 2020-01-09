@@ -30,8 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.NameStats.GenderValues._
-import com.salesforce.op.features.types.NameStats.Keys._
+import com.salesforce.op.features.types.NameStats.GenderValue._
+import com.salesforce.op.features.types.NameStats.Key._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
