@@ -62,7 +62,7 @@ case object DataSplitter {
  *
  * @param uid
  */
-class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) with DataSplitterParams {
+class DataSplitter(uid: String = UID[DataSplitter]) extends Splitter(uid = uid) with SplitterParams {
 
   /**
    * Function to set the down sampling fraction and parameters before passing into the validation step
