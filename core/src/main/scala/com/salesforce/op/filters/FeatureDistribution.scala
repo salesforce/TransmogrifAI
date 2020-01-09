@@ -40,7 +40,7 @@ import com.twitter.algebird._
 import com.twitter.algebird.Operators._
 import org.apache.spark.mllib.feature.HashingTF
 import org.json4s.jackson.Serialization
-import org.json4s.{DefaultFormats, Formats}
+import org.json4s.{DefaultFormats, FieldSerializer, Formats}
 
 import scala.util.Try
 
@@ -192,8 +192,13 @@ object FeatureDistribution {
     override def plus(l: FeatureDistribution, r: FeatureDistribution): FeatureDistribution = l.reduce(r)
   }
 
+  val FeatureDistributionSerializer = FieldSerializer[FeatureDistribution](
+    FieldSerializer.ignore("cardEstimate")
+  )
+
   implicit val formats: Formats = DefaultFormats +
-    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType)
+    EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType) +
+    FeatureDistributionSerializer
 
   /**
    * Feature distributions to json
@@ -277,11 +282,11 @@ object FeatureDistribution {
    * @return TextStats object containing a Map from a value to its frequency (histogram)
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
-    val population = values match {
-      case Left(seq) => seq
-      case Right(seq) => seq.map(_.toString)
-    }
-    TextStats(population.groupBy(identity).map{case (key, value) => (key, value.size)})
+    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty)
+  }
+
+  private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
+    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size.toLong }
   }
 
   /**

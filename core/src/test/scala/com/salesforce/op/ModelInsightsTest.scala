@@ -31,30 +31,28 @@
 package com.salesforce.op
 
 import com.salesforce.op.evaluators._
-import com.salesforce.op.features.types._
+import com.salesforce.op.features.types.{Real, _}
 import com.salesforce.op.features.{Feature, FeatureDistributionType, FeatureLike}
 import com.salesforce.op.filters._
 import com.salesforce.op.stages.impl.classification._
+import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
 import com.salesforce.op.stages.impl.preparators._
 import com.salesforce.op.stages.impl.regression.{OpLinearRegression, OpXGBoostRegressor, RegressionModelSelector}
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.EstimatorType
-import com.salesforce.op.stages.impl.selector.{SelectedModelCombiner, SelectedCombinerModel, SelectedModel}
 import com.salesforce.op.stages.impl.selector.ValidationType._
+import com.salesforce.op.stages.impl.selector.{SelectedCombinerModel, SelectedModel, SelectedModelCombiner}
 import com.salesforce.op.stages.impl.tuning.{DataCutter, DataSplitter}
 import com.salesforce.op.test.{PassengerSparkFixtureTest, TestFeatureBuilder}
 import com.salesforce.op.testkit.RandomReal
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
+import com.twitter.algebird.Moments
 import org.apache.spark.ml.param.ParamMap
 import org.apache.spark.ml.tuning.ParamGridBuilder
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.functions._
 import org.junit.runner.RunWith
-import com.salesforce.op.features.types.Real
-import com.salesforce.op.stages.impl.feature.{CombinationStrategy, TextStats}
-import com.twitter.algebird.Moments
-import org.apache.spark.sql.{DataFrame, Dataset}
-import org.scalactic.Equality
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import org.apache.spark.sql.functions._
 
 import scala.util.{Failure, Success}
 
@@ -175,7 +173,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     val insights = model.modelInsights(inputModel)
     val featureMoments = insights.features.map(f => f.featureName -> f.distributions.head.moments.get).toMap
     val featureCardinality = insights.features.map(f => f.featureName -> f.distributions.head.cardEstimate.get).toMap
-    return (featureMoments, featureCardinality)
+    featureMoments -> featureCardinality
   }
 
   val params = new OpParams()
@@ -795,10 +793,9 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
     }
 
-    cardinality.foreach { case (featureName, value) => {
-      val actualUniques = df.select(featureName).as[Double].collect().toSet
-      value.valueCounts.keySet.map(_.toDouble).subsetOf(actualUniques) shouldBe true
-    }
+    cardinality.foreach { case (featureName, value) =>
+        val actualUniques = df.select(featureName).as[Double].distinct.collect.toSet
+        actualUniques should contain allElementsOf value.valueCounts.keySet.map(_.toDouble)
     }
   }
 
