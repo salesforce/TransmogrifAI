@@ -485,13 +485,11 @@ class SmartTextVectorizerTest
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newInputData.show()
     model.args.vectorizationMethods shouldBe Array(Ignore)
   }
 
   it should "detect a single name feature and return empty vectors" in {
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF3)
-    newInputData.show()
 
     val smartVectorized = newEstimator.getOutput()
     val transformed = new OpWorkflow()
@@ -514,13 +512,10 @@ class SmartTextVectorizerTest
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newInputData.show()
     model.args.vectorizationMethods shouldBe Array(Pivot, Hash, Ignore)
   }
 
   it should "not create information in the vector for a single name column among other non-name Text columns" in {
-    newInputData.show()
-
     val newEstimator: SmartTextVectorizer[Text] = biasEstimator.setInput(newF1, newF2, newF3)
     val withNamesVectorized = newEstimator.getOutput()
 
@@ -562,7 +557,6 @@ class SmartTextVectorizerTest
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newNewInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newNewInputData.show()
     model.args.vectorizationMethods shouldBe Array(Pivot, Ignore)
   }
 
@@ -573,7 +567,6 @@ class SmartTextVectorizerTest
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newInputData.show()
     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
     sensitive.get("name") match {
       case Some(Seq(SensitiveFeatureInformation.Name(
@@ -637,9 +630,7 @@ class SmartTextVectorizerTest
     val model: SmartTextVectorizerModel[Text] = newEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextVectorizerModel[Text]]
-    newInputData.show()
     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-    println(sensitive)
     newInputData.columns foreach { fname: String =>
       if (fname == newF3.name) {
         sensitive contains fname shouldBe true
@@ -655,9 +646,7 @@ class SmartTextVectorizerTest
       val model: SmartTextVectorizerModel[Text] = newEstimator
         .fit(newInputData)
         .asInstanceOf[SmartTextVectorizerModel[Text]]
-      newInputData.show()
       val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
-      println(sensitive)
       newInputData.columns foreach { fname: String =>
         sensitive contains fname shouldBe true
         sensitive get fname match {
