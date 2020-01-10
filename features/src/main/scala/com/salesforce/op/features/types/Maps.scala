@@ -283,19 +283,15 @@ object StreetMap {
 /**
  * Name representation - map containing information related to a particular name.
  *
- * @param value map of keys to values, where keys are one of the following:
- * - "original"
- * - "isName"
- * - "firstName"
- * - "lastName"
- * - "gender"
+ * @param value map of keys to values, where the keys are defined by NameStats.Key
  */
 class NameStats(value: Map[String, String]) extends TextMap(value) {
   import NameStats.Key._
+  import NameStats.GenderValue.{Male, Female}
 
-  def isName: Boolean = value.getOrElse(IsName.toString, "false") == "true"
-  def isMale: Boolean = value.getOrElse(Gender.toString, "") == "male"
-  def isFemale: Boolean = value.getOrElse(Gender.toString, "") == "female"
+  def isName: Boolean = (value.getOrElse(IsName.toString, false.toString) compareToIgnoreCase true.toString) == 0
+  def isMale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Male.toString) == 0
+  def isFemale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Female.toString) == 0
 }
 object NameStats {
   import enumeratum._
