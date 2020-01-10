@@ -49,8 +49,6 @@ trait AttributeAsserts {
     for {
       (x, i) <- output.zipWithIndex
       _ = withClue(s"Output vector $i and expectedNominal arrays are not of the same length:") {
-        println(s"x.value.size: ${x.value.size}")
-        println(s"expectedNominal.length: ${expectedNominal.length}")
         x.value.size shouldBe expectedNominal.length
       }
       (value, nominal) <- x.value.toArray.zip(expectedNominal)
