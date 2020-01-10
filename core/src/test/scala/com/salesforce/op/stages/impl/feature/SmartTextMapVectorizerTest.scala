@@ -436,7 +436,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      // .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(1.0)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -454,10 +454,9 @@ class SmartTextMapVectorizerTest
      */
     val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
     val firstRes = result.head
-    // firstRes.v.size shouldBe featureVectorSize
+    firstRes.v.size shouldBe featureVectorSize
 
     val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
-    meta.columns.foreach(println)
     meta.columns.length shouldBe featureVectorSize
     meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
     meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
