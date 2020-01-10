@@ -283,44 +283,34 @@ object StreetMap {
 /**
  * Name representation - map containing information related to a particular name.
  *
- * @param value map of keys to values, where keys are one of the following:
- * - "original"
- * - "isName"
- * - "firstName"
- * - "lastName"
- * - "gender"
+ * @param value map of keys to values, where the keys are defined by NameStats.Key
  */
 class NameStats(value: Map[String, String]) extends TextMap(value) {
-  import NameStats.Keys._
+  import NameStats.Key._
+  import NameStats.GenderValue.{Male, Female}
 
-  def isName: Boolean = value.getOrElse(IsName.toString, "false") == "true"
-  def isMale: Boolean = value.getOrElse(Gender.toString, "") == "male"
-  def isFemale: Boolean = value.getOrElse(Gender.toString, "") == "female"
+  def isName: Boolean = (value.getOrElse(IsName.toString, false.toString) compareToIgnoreCase true.toString) == 0
+  def isMale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Male.toString) == 0
+  def isFemale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Female.toString) == 0
 }
 object NameStats {
   import enumeratum._
-  sealed class Keys extends EnumEntry
-  case object Keys extends Enum[Keys] {
-    val values: Seq[Keys] = findValues
-    case object OriginalValue extends Keys
-    case object IsName        extends Keys
-    case object FirstName     extends Keys
-    case object LastName      extends Keys
-    case object Gender        extends Keys
+  sealed class Key extends EnumEntry
+  case object Key extends Enum[Key] {
+    val values: Seq[Key] = findValues
+    case object OriginalValue extends Key
+    case object IsName        extends Key
+    case object FirstName     extends Key
+    case object LastName      extends Key
+    case object Gender        extends Key
   }
-  sealed class BooleanStrings extends EnumEntry
-  case object BooleanStrings extends Enum[BooleanStrings] {
-    val values: Seq[BooleanStrings] = findValues
-    case object True  extends BooleanStrings
-    case object False extends BooleanStrings
-  }
-  sealed class GenderStrings extends EnumEntry
-  case object GenderStrings extends Enum[GenderStrings] {
-    val values: Seq[GenderStrings] = findValues
-    case object Male              extends GenderStrings
-    case object Female            extends GenderStrings
-    case object GenderNA          extends GenderStrings
-    case object GenderNotInferred extends GenderStrings
+  sealed class GenderValue extends EnumEntry
+  case object GenderValue extends Enum[GenderValue] {
+    val values: Seq[GenderValue] = findValues
+    case object Male              extends GenderValue
+    case object Female            extends GenderValue
+    case object GenderNA          extends GenderValue
+    case object GenderNotInferred extends GenderValue
   }
 
   def apply(value: Map[String, String]): NameStats = new NameStats(value)

@@ -135,8 +135,8 @@ class FeatureTypeTest extends PropSpec with PropertyChecks with TestCommon {
     PostalCodeMap(Map("a" -> "94071")),
     StreetMap(Map("a" -> "Emerson Ave")),
     NameStats(Map(
-      NameStats.Keys.IsName.toString -> NameStats.BooleanStrings.True.toString,
-      NameStats.Keys.Gender.toString -> NameStats.GenderStrings.Female.toString
+      NameStats.Key.IsName.toString -> true.toString,
+      NameStats.Key.Gender.toString -> NameStats.GenderValue.Female.toString
     )),
     GeolocationMap(Map("a" -> Seq(1.0, 1.0, 1.0))),
     Prediction(1.0, Array(0.0, 1.0), Array(2.0, 3.0)),

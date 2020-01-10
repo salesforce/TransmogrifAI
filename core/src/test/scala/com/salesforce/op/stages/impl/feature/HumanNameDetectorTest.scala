@@ -30,8 +30,8 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.salesforce.op.features.types.NameStats.GenderStrings._
-import com.salesforce.op.features.types.NameStats.Keys._
+import com.salesforce.op.features.types.NameStats.GenderValue._
+import com.salesforce.op.features.types.NameStats.Key._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
@@ -177,14 +177,7 @@ class HumanNameDetectorTest
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString)
-    )
+    identifiedGenders shouldBe Seq(Male, Female, Male, Female, Male, Female).map(v => Some(v.toString))
   }
 
   it should "identify the gender of multiple full name entries by finding honorifics" in {
@@ -205,14 +198,7 @@ class HumanNameDetectorTest
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString)
-    )
+    identifiedGenders shouldBe Seq(Male, Female, Male, Female, Male, Female).map(v => Some(v.toString))
   }
 
   it should "not use the honorific strategy to find gender when there are multiple honorifics per entry" in {
@@ -244,14 +230,7 @@ class HumanNameDetectorTest
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString)
-    )
+    identifiedGenders shouldBe Seq(Male, Female, Male, Female, Male, Female).map(v => Some(v.toString))
   }
 
   it should
@@ -274,14 +253,7 @@ class HumanNameDetectorTest
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString)
-    )
+    identifiedGenders shouldBe Seq(Male, Female, Male, Female, Male, Female).map(v => Some(v.toString))
   }
 
   it should
@@ -301,7 +273,7 @@ class HumanNameDetectorTest
 
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(Some(Male.toString), Some(Female.toString))
+    identifiedGenders shouldBe Seq(Male, Female).map(v => Some(v.toString))
   }
 
   it should "use mixed strategies to detect gender" in {
@@ -319,14 +291,7 @@ class HumanNameDetectorTest
     model.asInstanceOf[HumanNameDetectorModel[Text]].treatAsName shouldBe true
     val resultingMaps = result.collect().toSeq.map(row => row.get(1)).asInstanceOf[Seq[Map[String, String]]]
     val identifiedGenders = resultingMaps.map(_.get(Gender.toString))
-    identifiedGenders shouldBe Seq(
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString),
-      Some(Male.toString),
-      Some(Female.toString)
-    )
+    identifiedGenders shouldBe Seq(Male, Female, Male, Female, Male, Female).map(v => Some(v.toString))
   }
 
   it should "ignore null values in calculating stats" in {

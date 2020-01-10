@@ -305,16 +305,16 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
   Spec[Text, RandomMap[String, NameStats]] should "generate NameStats maps correctly" in {
     val sut = RandomMap.ofNameStats()
     checkWithMapPredicate[String, NameStats](sut,
-      minLen = NameStats.Keys.values.length,
-      maxLen = NameStats.Keys.values.length,
+      minLen = NameStats.Key.values.length,
+      maxLen = NameStats.Key.values.length,
       predicate = { nameStats =>
-        val allKeysPresent = NameStats.Keys.values map { nameStats.value contains _.toString } forall identity
-        val validNameIndicatorEntries = NameStats.BooleanStrings.values
+        val allKeysPresent = NameStats.Key.values map { nameStats.value contains _.toString } forall identity
+        val validNameIndicatorEntries = Seq(true, false)
+          .map(bool => Some(bool.toString))
+          .contains(nameStats.value.get(NameStats.Key.IsName.toString))
+        val validGenderEntries = NameStats.GenderValue.values
           .map(enum => Some(enum.toString))
-          .contains(nameStats.value.get(NameStats.Keys.IsName.toString))
-        val validGenderEntries = NameStats.GenderStrings.values
-          .map(enum => Some(enum.toString))
-          .contains(nameStats.value.get(NameStats.Keys.Gender.toString))
+          .contains(nameStats.value.get(NameStats.Key.Gender.toString))
         allKeysPresent & validNameIndicatorEntries & validGenderEntries
       }
     )
