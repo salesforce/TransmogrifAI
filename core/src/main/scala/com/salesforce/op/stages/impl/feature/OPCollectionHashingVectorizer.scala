@@ -314,32 +314,38 @@ private[op] trait MapHashingFun extends HashingFun {
 
   protected def makeVectorColumnMetadata
   (
+    hashFeatures: Array[TransientFeature],
+    ignoreFeatures: Array[TransientFeature],
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    allKeys: Seq[Seq[String]],
+    hashKeys: Seq[Seq[String]],
+    ignoreKeys: Seq[Seq[String]],
     shouldTrackNulls: Boolean,
     shouldTrackLen: Boolean
   ): Array[OpVectorColumnMetadata] = {
     val numHashes = params.numFeatures
-    val numFeatures = allKeys.map(_.length).sum
+    val numFeatures = hashKeys.map(_.length).sum
     val hashColumns =
       if (isSharedHashSpace(params, Some(numFeatures))) {
         (0 until numHashes).map { i =>
           OpVectorColumnMetadata(
-            parentFeatureName = features.map(_.name),
-            parentFeatureType = features.map(_.typeName),
+            parentFeatureName = hashFeatures.map(_.name),
+            parentFeatureType = hashFeatures.map(_.typeName),
             grouping = None,
             indicatorValue = None
           )
         }.toArray
       } else {
         for {
-          (keys, f) <- allKeys.toArray.zip(features)
+          (keys, f) <- hashKeys.toArray.zip(hashFeatures)
           key <- keys
           i <- 0 until numHashes
         } yield f.toColumnMetaData().copy(grouping = Option(key))
       }
 
+    // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
+    val allKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }
+    // val allFeatures =
     val nullColumns = if (shouldTrackNulls) {
       for {
         (keys, f) <- allKeys.toArray.zip(features)

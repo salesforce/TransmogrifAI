@@ -39,7 +39,7 @@ import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Monoid
+import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -63,7 +63,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
-    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams {
+    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams {
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 
@@ -73,7 +73,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       cleanTextFn(k, shouldCleanKeys) ->
-        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1), Map(cleanTextFn(v, shouldCleanValues).length -> 1))
+        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L), Map(cleanTextFn(v, shouldCleanValues).length -> 1L))
     }
     TextMapStats(keyValueCounts)
   }
@@ -104,9 +104,11 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       )
     } else Array.empty[OpVectorColumnMetadata]
 
-    val textColumns = if (args.textFeatureInfo.flatten.nonEmpty) {
+
+    /*
+    val hashedTextColumns = if (args.hashFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
-        inN.toSeq.zip(args.textFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
+        inN.toSeq.zip(args.hashFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
       val allKeys = mapFeatureInfo.map(_.map(_.key))
       makeVectorColumnMetadata(
         features = mapFeatures.toArray,
@@ -117,12 +119,58 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       )
     } else Array.empty[OpVectorColumnMetadata]
 
-    val columns = categoricalColumns ++ textColumns
+    val ignoredTextColumns = if (args.ignoreFeatureInfo.flatten.nonEmpty) {
+      val (mapFeatures, mapFeatureInfo) =
+        inN.toSeq.zip(args.ignoreFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
+      val allKeys = mapFeatureInfo.map(_.map(_.key))
+      makeVectorColumnMetadata(
+        features = mapFeatures.toArray,
+        params = makeHashingParams(),
+        allKeys = allKeys,
+        shouldTrackNulls = args.shouldTrackNulls,
+        shouldTrackLen = $(trackTextLen)
+      )
+    } else Array.empty[OpVectorColumnMetadata]
+      */
+
+    val allTextFeatureInfo = args.hashFeatureInfo.zip(args.ignoreFeatureInfo).map{ case (h, i) => h ++ i }
+    val allTextColumns = if (allTextFeatureInfo.flatten.nonEmpty) {
+      val (mapFeatures, mapFeatureInfo) =
+        inN.toSeq.zip(allTextFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
+      val allKeys = mapFeatureInfo.map(_.map(_.key))
+
+      val hashKeys = args.hashFeatureInfo.map(
+        _.filter(_.vectorizationMethod == TextVectorizationMethod.Hash).map(_.key)
+      )
+      val ignoreKeys = args.ignoreFeatureInfo.map(
+        _.filter(_.vectorizationMethod == TextVectorizationMethod.Ignore).map(_.key)
+      )
+      val hashFeatures = inN.toSeq.zip(args.hashFeatureInfo).filter{
+        case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty
+      }.unzip._1
+      val ignoreFeatures = inN.toSeq.zip(args.ignoreFeatureInfo).filter{
+        case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty
+      }.unzip._1
+
+      makeVectorColumnMetadata(
+        hashFeatures = hashFeatures.toArray,
+        ignoreFeatures = ignoreFeatures.toArray,
+        features = mapFeatures.toArray,
+        params = makeHashingParams(),
+        hashKeys = hashKeys,
+        ignoreKeys = ignoreKeys,
+        shouldTrackNulls = args.shouldTrackNulls,
+        shouldTrackLen = $(trackTextLen)
+      )
+    } else Array.empty[OpVectorColumnMetadata]
+
+    val columns = categoricalColumns ++ allTextColumns
     OpVectorMetadata(getOutputFeatureName, columns, Transmogrifier.inputFeaturesToHistory(inN, stageName))
   }
 
   def makeSmartTextMapVectorizerModelArgs(aggregatedStats: Array[TextMapStats]): SmartTextMapVectorizerModelArgs = {
     val maxCard = $(maxCardinality)
+    val minLenStdDev = $(minLengthStdDev)
     val minSup = $(minSupport)
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
@@ -130,14 +178,18 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
-        val isCat = textStats.valueCounts.size <= maxCard
-        val topVals = if (isCat) {
+        val vecMethod: TextVectorizationMethod = textStats match {
+          case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
+          case _ if textStats.lengthStdDev <= minLenStdDev => TextVectorizationMethod.Ignore
+          case _ => TextVectorizationMethod.Hash
+        }
+        val topVals = if (vecMethod == TextVectorizationMethod.Pivot) {
           textStats.valueCounts
             .filter { case (_, count) => count >= minSup }
             .toSeq.sortBy(v => -v._2 -> v._1)
             .take($(topK)).map(_._1).toArray
         } else Array.empty[String]
-        SmartTextFeatureInfo(key = k, isCategorical = isCat, topValues = topVals)
+        SmartTextFeatureInfo(key = k, vectorizationMethod = vecMethod, topValues = topVals)
       }
     }
 
@@ -197,11 +249,15 @@ private[op] object TextMapStats {
 /**
  * Info about each feature within a text map
  *
- * @param key           name of a feature
- * @param isCategorical indicate whether a feature is categorical or not
- * @param topValues     most common values of a feature (only for categoricals)
+ * @param key                   name of a feature
+ * @param vectorizationMethod   method to use for text vectorization (either pivot, hashing, or ignoring)
+ * @param topValues             most common values of a feature (only for categoricals)
  */
-case class SmartTextFeatureInfo(key: String, isCategorical: Boolean, topValues: Array[String]) extends JsonLike
+case class SmartTextFeatureInfo(
+  key: String,
+  vectorizationMethod: TextVectorizationMethod,
+  topValues: Array[String]
+) extends JsonLike
 
 
 /**
@@ -221,11 +277,20 @@ case class SmartTextMapVectorizerModelArgs
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
-  val (categoricalFeatureInfo, textFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
-    featureInfoSeq.partition{_ .isCategorical }
-  }.unzip
-  val categoricalKeys = categoricalFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
-  val textKeys = textFeatureInfo.map(featureInfoSeq => featureInfoSeq.map(_.key))
+  val (categoricalFeatureInfo, hashFeatureInfo, ignoreFeatureInfo) = allFeatureInfo.map{ featureInfoSeq =>
+    val groups = featureInfoSeq.groupBy(_.vectorizationMethod)
+    val catGroup = groups.getOrElse(TextVectorizationMethod.Pivot, Seq.empty)
+    val hashGroup = groups.getOrElse(TextVectorizationMethod.Hash, Seq.empty)
+    val ignoreGroup = groups.getOrElse(TextVectorizationMethod.Ignore, Seq.empty)
+
+    (catGroup, hashGroup, ignoreGroup)
+  }.unzip3
+
+  val categoricalKeys = categoricalFeatureInfo.map(_.map(_.key))
+  val hashKeys = hashFeatureInfo.map(_.map(_.key))
+  val ignoreKeys = ignoreFeatureInfo.map(_.map(_.key))
+
+  val textKeys = hashKeys.zip(ignoreKeys).map{ case (hk, ik) => hk ++ ik }
 }
 
 
@@ -248,32 +313,46 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
   )
 
   private def partitionRow(row: Seq[OPMap[String]]):
-  (Seq[OPMap[String]], Seq[Seq[String]], Seq[OPMap[String]], Seq[Seq[String]]) = {
+  (Seq[OPMap[String]], Seq[Seq[String]], Seq[OPMap[String]], Seq[Seq[String]], Seq[OPMap[String]], Seq[Seq[String]]) = {
     val (rowCategorical, keysCategorical) =
       row.view.zip(args.categoricalKeys).collect { case (elements, keys) if keys.nonEmpty =>
         val filtered = elements.value.filter { case (k, v) => keys.contains(k) }
         (TextMap(filtered), keys)
       }.unzip
 
-    val (rowText, keysText) =
-      row.view.zip(args.textKeys).collect { case (elements, keys) if keys.nonEmpty =>
+    val (rowHashedText, keysHashedText) =
+      row.view.zip(args.hashKeys).collect { case (elements, keys) if keys.nonEmpty =>
         val filtered = elements.value.filter { case (k, v) => keys.contains(k) }
         (TextMap(filtered), keys)
       }.unzip
 
-    (rowCategorical.toList, keysCategorical.toList, rowText.toList, keysText.toList)
+    val (rowIgnoredText, keysIgnoredText) =
+      row.view.zip(args.ignoreKeys).collect { case (elements, keys) if keys.nonEmpty =>
+        val filtered = elements.value.filter { case (k, v) => keys.contains(k) }
+        (TextMap(filtered), keys)
+      }.unzip
+
+    (rowCategorical.toList, keysCategorical.toList, rowHashedText.toList, keysHashedText.toList,
+      rowIgnoredText.toList, keysIgnoredText.toList)
   }
 
   def transformFn: Seq[T] => OPVector = row => {
-    val (rowCategorical, keysCategorical, rowText, keysText) = partitionRow(row)
+    implicit val textListMonoid: Monoid[TextList] = TextList.monoid
+
+    val (rowCategorical, keysCategorical, rowHash, keysHash, rowIgnore, keysIgnore) = partitionRow(row)
+    val keysText = keysHash + keysIgnore // Go algebird!
     val categoricalVector = categoricalPivotFn(rowCategorical)
-    val rowTextTokenized = rowText.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
-    val textVector = hash(rowTextTokenized, keysText, args.hashingParams)
+
+    val rowHashTokenized = rowHash.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
+    val rowIgnoreTokenized = rowIgnore.map(_.value.map { case (k, v) => k -> tokenize(v.toText).tokens })
+    val rowTextTokenized = rowHashTokenized + rowIgnoreTokenized // Go go algebird!
+    val hashVector = hash(rowHashTokenized, keysHash, args.hashingParams)
+
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) getNullIndicatorsVector(keysText, rowTextTokenized) else OPVector.empty
     val textLenVector = if ($(trackTextLen)) getLenVector(keysText, rowTextTokenized) else OPVector.empty
 
-    categoricalVector.combine(textVector, textLenVector, textNullIndicatorsVector)
+    categoricalVector.combine(hashVector, textLenVector, textNullIndicatorsVector)
   }
 
   private def getNullIndicatorsVector(keysSeq: Seq[Seq[String]], inputs: Seq[Map[String, TextList]]): OPVector = {
