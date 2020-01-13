@@ -104,58 +104,30 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       )
     } else Array.empty[OpVectorColumnMetadata]
 
-
-    /*
-    val hashedTextColumns = if (args.hashFeatureInfo.flatten.nonEmpty) {
-      val (mapFeatures, mapFeatureInfo) =
-        inN.toSeq.zip(args.hashFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
-      val allKeys = mapFeatureInfo.map(_.map(_.key))
-      makeVectorColumnMetadata(
-        features = mapFeatures.toArray,
-        params = makeHashingParams(),
-        allKeys = allKeys,
-        shouldTrackNulls = args.shouldTrackNulls,
-        shouldTrackLen = $(trackTextLen)
-      )
-    } else Array.empty[OpVectorColumnMetadata]
-
-    val ignoredTextColumns = if (args.ignoreFeatureInfo.flatten.nonEmpty) {
-      val (mapFeatures, mapFeatureInfo) =
-        inN.toSeq.zip(args.ignoreFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
-      val allKeys = mapFeatureInfo.map(_.map(_.key))
-      makeVectorColumnMetadata(
-        features = mapFeatures.toArray,
-        params = makeHashingParams(),
-        allKeys = allKeys,
-        shouldTrackNulls = args.shouldTrackNulls,
-        shouldTrackLen = $(trackTextLen)
-      )
-    } else Array.empty[OpVectorColumnMetadata]
-      */
-
     val allTextFeatureInfo = args.hashFeatureInfo.zip(args.ignoreFeatureInfo).map{ case (h, i) => h ++ i }
     val allTextColumns = if (allTextFeatureInfo.flatten.nonEmpty) {
       val (mapFeatures, mapFeatureInfo) =
         inN.toSeq.zip(allTextFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
       val allKeys = mapFeatureInfo.map(_.map(_.key))
 
+      // Careful when zipping sequences like hashKeys (length and hashFeatures
       val hashKeys = args.hashFeatureInfo.map(
         _.filter(_.vectorizationMethod == TextVectorizationMethod.Hash).map(_.key)
       )
       val ignoreKeys = args.ignoreFeatureInfo.map(
         _.filter(_.vectorizationMethod == TextVectorizationMethod.Ignore).map(_.key)
       )
-      val hashFeatures = inN.toSeq.zip(args.hashFeatureInfo).filter{
+
+      val hashFeatures = inN.toSeq.zip(args.hashFeatureInfo).filter {
         case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty
-      }.unzip._1
+      }.map(_._1)
       val ignoreFeatures = inN.toSeq.zip(args.ignoreFeatureInfo).filter{
         case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty
-      }.unzip._1
+      }.map(_._1)
 
       makeVectorColumnMetadata(
         hashFeatures = hashFeatures.toArray,
         ignoreFeatures = ignoreFeatures.toArray,
-        features = mapFeatures.toArray,
         params = makeHashingParams(),
         hashKeys = hashKeys,
         ignoreKeys = ignoreKeys,
@@ -348,6 +320,7 @@ final class SmartTextMapVectorizerModel[T <: OPMap[String]] private[op]
     val rowTextTokenized = rowHashTokenized + rowIgnoreTokenized // Go go algebird!
     val hashVector = hash(rowHashTokenized, keysHash, args.hashingParams)
 
+    // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
     val textNullIndicatorsVector =
       if (args.shouldTrackNulls) getNullIndicatorsVector(keysText, rowTextTokenized) else OPVector.empty
     val textLenVector = if ($(trackTextLen)) getLenVector(keysText, rowTextTokenized) else OPVector.empty

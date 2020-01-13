@@ -316,7 +316,6 @@ private[op] trait MapHashingFun extends HashingFun {
   (
     hashFeatures: Array[TransientFeature],
     ignoreFeatures: Array[TransientFeature],
-    features: Array[TransientFeature],
     params: HashingFunctionParams,
     hashKeys: Seq[Seq[String]],
     ignoreKeys: Seq[Seq[String]],
@@ -337,25 +336,27 @@ private[op] trait MapHashingFun extends HashingFun {
         }.toArray
       } else {
         for {
-          (keys, f) <- hashKeys.toArray.zip(hashFeatures)
+          // Need to filter out empty key sequences since the hashFeatures only contain a map feature if one of their
+          // keys is to be hashed, but hashKeys contains a sequence per map (whether it's empty or not)
+          (keys, f) <- hashKeys.filter(_.nonEmpty).zip(hashFeatures)
           key <- keys
           i <- 0 until numHashes
         } yield f.toColumnMetaData().copy(grouping = Option(key))
-      }
+      }.toArray
 
     // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
-    val allKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }
-    // val allFeatures =
+    val allTextKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }
+    val allTextFeatures = hashFeatures ++ ignoreFeatures
     val nullColumns = if (shouldTrackNulls) {
       for {
-        (keys, f) <- allKeys.toArray.zip(features)
+        (keys, f) <- allTextKeys.toArray.zip(allTextFeatures)
         key <- keys
       } yield f.toColumnMetaData(isNull = true).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
     val lenColumns = if (shouldTrackLen) {
       for {
-        (keys, f) <- allKeys.toArray.zip(features)
+        (keys, f) <- allTextKeys.toArray.zip(allTextFeatures)
         key <- keys
       } yield f.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
