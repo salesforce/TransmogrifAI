@@ -36,7 +36,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.testkit.{RandomReal, RandomText}
+import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}

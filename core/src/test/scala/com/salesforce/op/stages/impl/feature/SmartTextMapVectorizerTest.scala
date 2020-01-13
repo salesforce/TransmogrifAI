@@ -36,7 +36,6 @@ import com.salesforce.op.features.types.{Text, _}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.TextVectorizationMethod._
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.{NameDetectUtils, SensitiveFeatureMode}
@@ -412,7 +411,7 @@ class SmartTextMapVectorizerTest
     val baseNames = Seq("Michael", "Michelle", "Roxanne", "Ross").toText :+ Text.empty
 
     def convertToMap(texts: Seq[Text]): Map[String, String] = texts.map(_.value).zipWithIndex.collect {
-      case (Some(text), index) => (if (index == 3) "name" else s"text${index + 1}") -> text } toMap
+      case (Some(text), index) => (if (index == 2) "name" else s"text${index + 1}") -> text } toMap
     val textMap1: Seq[TextMap] = (baseText1, baseText2, baseNames).zipped.map {
       case (a, b, c) => TextMap(convertToMap(Seq(a, b, c)))
     }
@@ -482,10 +481,6 @@ class SmartTextMapVectorizerTest
     .setHashSpaceStrategy(HashSpaceStrategy.Shared)
     .setSensitiveFeatureMode(SensitiveFeatureMode.DetectAndRemove)
     .setInput(newF5, newF6)
-
-  private lazy val NameDictionaryGroundTruth: RandomText[Text] = RandomText.textFromDomain(
-    NameDetectUtils.DefaultNameDictionary.toList
-  )
 
   Spec[SmartTextMapVectorizer[OPMap[String]]] should "detect a single name feature" in {
     val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF7)
@@ -620,5 +615,117 @@ class SmartTextMapVectorizerTest
     assertSensitive(areaMapEstimator, newF8.name)
 
     loggingLevels(prevLoggingLevels) // Reset logging levels
+  }
+
+  it should "compute sensitive information in the metadata for multiple detected name columns" in {
+    def assertSensitive(estimator: SequenceEstimator[_, _], fname: String, fMapKey: String): Unit = {
+      val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
+      println(sensitive)
+      sensitive.get(fname) match {
+        case Some(Seq(SensitiveFeatureInformation.Name(
+          probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+        ))) =>
+          probName should be > 0.0
+          probName should be <= 1.0
+          probMale should be <= 1.0
+          probFemale should be <= 1.0
+          probOther should be <= 1.0
+          (probMale + probFemale + probOther) - 1.0 should be < 0.01
+
+          genderDetectResults.length shouldBe 1 // because debugging is off
+          name shouldBe fname
+          mapKey shouldBe Some(fMapKey)
+          actionTaken shouldBe true
+        case None => fail("Sensitive information not found in the metadata.")
+        case _ => fail("Wrong kind of sensitive information found in the metadata.")
+      }
+    }
+
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4, newF7)
+    val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+    assertSensitive(mapEstimator, newF3.name, "name")
+    assertSensitive(mapEstimator, newF7.name, "name")
+
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6, newF8)
+    val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+    assertSensitive(areaMapEstimator, newF5.name, "name")
+    assertSensitive(areaMapEstimator, newF8.name, "name")
+  }
+
+  it should "compute sensitive information in the metadata for all columns only when debugging is on" in {
+    val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4, newF7)
+    val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+    val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6, newF8)
+    val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+      .fit(newInputData)
+      .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+
+    val mapSensitive = OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).sensitive
+    val areaMapSensitive = OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).sensitive
+
+    val sensitiveCols = Seq(newF3, newF7, newF5, newF8).map(_.name)
+    Seq(newF3, newF4, newF7).map(_.name) foreach { fname: String =>
+      if (sensitiveCols contains fname) {
+        mapSensitive contains fname shouldBe true
+      } else {
+        mapSensitive contains fname shouldBe false
+      }
+    }
+    Seq(newF5, newF6, newF8).map(_.name) foreach { fname: String =>
+      if (sensitiveCols contains fname) {
+        areaMapSensitive contains fname shouldBe true
+      } else {
+        areaMapSensitive contains fname shouldBe false
+      }
+    }
+
+    {
+      val prevLoggingLevels = getLoggingLevels
+      loggingLevel(Level.DEBUG) // Changes SensitiveFeatureInformation creation logic
+      val mapEstimator: SmartTextMapVectorizer[TextMap] = biasMapEstimator.setInput(newF3, newF4, newF7)
+      val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
+        .fit(newInputData)
+        .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
+      val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6, newF8)
+      val areaMapModel: SmartTextMapVectorizerModel[TextAreaMap] = areaMapEstimator
+        .fit(newInputData)
+        .asInstanceOf[SmartTextMapVectorizerModel[TextAreaMap]]
+
+      val mapSensitive = OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).sensitive
+      val areaMapSensitive = OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).sensitive
+      Seq(newF3, newF7).map(_.name) foreach { fname: String =>
+        mapSensitive contains fname shouldBe true
+        mapSensitive get fname match {
+          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, _, _, actionTaken))) =>
+            if (sensitiveCols contains fname) {
+              actionTaken shouldBe true
+            } else {
+              actionTaken shouldBe false
+            }
+          case None => fail("Sensitive information not found in the metadata.")
+          case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+      Seq(newF5, newF8).map(_.name) foreach { fname: String =>
+        areaMapSensitive contains fname shouldBe true
+        areaMapSensitive get fname match {
+          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, _, _, actionTaken))) =>
+            if (sensitiveCols contains fname) {
+              actionTaken shouldBe true
+            } else {
+              actionTaken shouldBe false
+            }
+          case None => fail("Sensitive information not found in the metadata.")
+          case Some(_) => fail("Wrong kind of sensitive information found in the metadata.")
+        }
+      }
+      loggingLevels(prevLoggingLevels) // Reset logging levels
+    }
   }
 }
