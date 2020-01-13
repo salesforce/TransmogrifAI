@@ -447,7 +447,6 @@ class SmartTextMapVectorizerTest
     )
     TestFeatureBuilder(allFeatures: _*)
   }
-  newInputData.show(truncate = false)
 
   val newF0: Feature[Text] = features(0).asInstanceOf[Feature[Text]]
   val newF1: Feature[Text] = features(1).asInstanceOf[Feature[Text]]
@@ -521,7 +520,6 @@ class SmartTextMapVectorizerTest
     val mapModel: SmartTextMapVectorizerModel[TextMap] = mapEstimator
       .fit(newInputData)
       .asInstanceOf[SmartTextMapVectorizerModel[TextMap]]
-    println(mapModel.args.allFeatureInfo)
     mapModel.args.allFeatureInfo.flatMap(_.map(_.whichAction)) shouldBe
       Array(Pivot, Hash, Ignore)
 
@@ -584,7 +582,6 @@ class SmartTextMapVectorizerTest
 
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
-      println(sensitive)
       sensitive.get(fname) match {
         case Some(Seq(SensitiveFeatureInformation.Name(
           probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
@@ -620,7 +617,6 @@ class SmartTextMapVectorizerTest
   it should "compute sensitive information in the metadata for multiple detected name columns" in {
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String, fMapKey: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
-      println(sensitive)
       sensitive.get(fname) match {
         case Some(Seq(SensitiveFeatureInformation.Name(
           probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken

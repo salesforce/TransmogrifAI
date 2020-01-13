@@ -194,16 +194,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
-    // TODO: Delete the following debugging tests
-    println(
-      aggregatedStats.flatMap(_.nameDetectStats.toSeq.map { case (k, v) => f"$k -> ${v.toString}" })
-        .mkString(",")
-    )
-    import dataset.sparkSession.implicits._
-    dataset.map(_.map(
-      _.toSeq.map { case (k, v) => k -> (v, preProcess(Text(v))) }
-    )).show(truncate = false)
-
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 
     val vecMetadata = makeVectorMetadata(smartTextMapVectorizerModelArgs, aggregatedStats.map(_.nameDetectStats))
