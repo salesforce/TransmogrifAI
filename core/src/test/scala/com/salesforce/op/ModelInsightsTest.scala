@@ -574,7 +574,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
         indicatorValue = Option(name)
       )
     },
-    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
+    Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
+    Map(
+      "f0" -> Seq(SensitiveFeatureInformation.Name(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false))
+    )
   )
 
   it should "correctly extract the LabelSummary from the label and sanity checker info" in {
@@ -623,6 +626,18 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f0In.featureName shouldBe "f0"
     f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
+    f0In.sensitiveInformation match {
+      case Seq(SensitiveFeatureInformation.Name(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+      )) =>
+        actionTaken shouldBe false
+        probName shouldBe 0.0
+        genderDetectResults shouldBe Seq.empty[String]
+        probMale shouldBe 0.0
+        probFemale shouldBe 0.0
+        probOther shouldBe 1.0
+      case _ => fail("SensitiveFeatureInformation was not found.")
+    }
 
     val f0InDer2 = f0In.derivedFeatures.head
     f0InDer2.derivedFeatureName shouldBe "f0_f0_f2_1"
@@ -688,6 +703,62 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
   it should "not include raw feature distribution information when RawFeatureFilter is not used" in {
     val insights = workflowModel.modelInsights(pred)
     insights.features.foreach(f => f.distributions shouldBe empty)
+  }
+
+  it should
+    """include sensitive feature information
+      |even for sensitive features that are removed from output vector and output vector metadata""".stripMargin in {
+    // Copy metadata from above but add new feature that was removed in vectorizing to sensitive info
+    val f_notInMeta = Feature[Text]("f_notInMeta", false, null, Seq(), "test")
+    val newMeta = OpVectorMetadata(
+      "fv",
+      OpVectorColumnMetadata(
+        parentFeatureName = Seq("f1"),
+        parentFeatureType = Seq(classOf[Real].getName),
+        grouping = None,
+        indicatorValue = None
+      ) +: Array("f2", "f3").map { name =>
+        OpVectorColumnMetadata(
+          parentFeatureName = Seq("f0"),
+          parentFeatureType = Seq(classOf[PickList].getName),
+          grouping = Option("f0"),
+          indicatorValue = Option(name)
+        )
+      },
+      Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
+      Map(
+        "f0" -> Seq(SensitiveFeatureInformation.Name(
+          0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false
+        )),
+        "f_notInMeta" -> Seq(SensitiveFeatureInformation.Name(
+          1.0, Seq.empty[String], 0.0, 0.0, 1.0, "f_notInMeta", None, true
+        ))
+      )
+    )
+
+    val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
+
+    val featureInsights = ModelInsights.getFeatureInsights(
+      Option(newMeta), Option(summary), None, Array(f1, f0, f_notInMeta), Array.empty, Map.empty[String, Set[String]],
+      RawFeatureFilterResults(), labelSum
+    )
+    featureInsights.size shouldBe 3
+    val f_notInMeta_butInInsights = featureInsights.find(_.featureName == "f_notInMeta").get
+    f_notInMeta_butInInsights.featureName shouldBe "f_notInMeta"
+    f_notInMeta_butInInsights.featureType shouldBe classOf[Text].getName
+    f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
+    f_notInMeta_butInInsights.sensitiveInformation match {
+      case Seq(SensitiveFeatureInformation.Name(
+        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+      )) =>
+        actionTaken shouldBe true
+        probName shouldBe 1.0
+        genderDetectResults shouldBe Seq.empty[String]
+        probMale shouldBe 0.0
+        probFemale shouldBe 0.0
+        probOther shouldBe 1.0
+      case _ => fail("SensitiveFeatureInformation was not found.")
+    }
   }
 
   it should "return model insights for xgboost classification" in {
@@ -794,8 +865,8 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     }
 
     cardinality.foreach { case (featureName, value) =>
-        val actualUniques = df.select(featureName).as[Double].distinct.collect.toSet
-        actualUniques should contain allElementsOf value.valueCounts.keySet.map(_.toDouble)
+      val actualUniques = df.select(featureName).as[Double].distinct.collect.toSet
+      actualUniques should contain allElementsOf value.valueCounts.keySet.map(_.toDouble)
     }
   }
 
