@@ -150,6 +150,7 @@ case object UnionConcatStateMap extends UnionConcatTextMap[StateMap](separator =
 case object UnionConcatCityMap extends UnionConcatTextMap[CityMap](separator = ",")
 case object UnionConcatPostalCodeMap extends UnionConcatTextMap[PostalCodeMap](separator = ",")
 case object UnionConcatStreetMap extends UnionConcatTextMap[StreetMap](separator = ",")
+case object UnionConcatNameStats extends UnionConcatTextMap[NameStats](separator = ",")
 
 
 /**

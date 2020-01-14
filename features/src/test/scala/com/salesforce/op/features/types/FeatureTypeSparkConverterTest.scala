@@ -39,6 +39,7 @@ import org.scalatest.PropSpec
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.{PropertyChecks, TableFor1}
 
+
 import scala.collection.mutable.{WrappedArray => MWrappedArray}
 import scala.concurrent.duration._
 
@@ -83,6 +84,11 @@ class FeatureTypeSparkConverterTest
     Map("1" -> 3L, "2" -> 4L).toIntegralMap -> Map("1" -> 3L, "2" -> 4L),
     Map("1" -> "one", "2" -> "two").toTextMap -> Map("1" -> "one", "2" -> "two"),
     Map("1" -> Set("a", "b")).toMultiPickListMap -> Map("1" -> MWrappedArray.make(Array("a", "b"))),
+    Map(NameStats.Key.IsName.toString -> true.toString,
+      NameStats.Key.Gender.toString -> NameStats.GenderValue.Female.toString
+    ).toNameStats -> Map(NameStats.Key.IsName.toString -> true.toString,
+      NameStats.Key.Gender.toString -> NameStats.GenderValue.Female.toString
+    ),
     Map("1" -> Seq(1.0, 5.0, 6.0)).toGeolocationMap -> Map("1" -> MWrappedArray.make(Array(1.0, 5.0, 6.0)))
   )
 

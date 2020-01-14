@@ -247,6 +247,7 @@ package object types extends FeatureTypeSparkConverters {
     def toCityMap: CityMap = new CityMap(v)
     def toPostalCodeMap: PostalCodeMap = new PostalCodeMap(v)
     def toStreetMap: StreetMap = new StreetMap(v)
+    def toNameStats: NameStats = new NameStats(v)
   }
   implicit class MapSetConversions(val v: Map[String, Set[String]]) extends AnyVal {
     def toMultiPickListMap: MultiPickListMap = new MultiPickListMap(v)
