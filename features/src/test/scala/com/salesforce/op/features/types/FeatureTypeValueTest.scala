@@ -165,6 +165,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
       checkVals(CityMap(x), x)
       checkVals(PostalCodeMap(x), x)
       checkVals(StreetMap(x), x)
+      checkVals(NameStats(x), x)
     }
     forAll(setMapGen) { x => checkVals(MultiPickListMap(x), x) }
     forAll(geoMapGen) { x => checkVals(GeolocationMap(x), x) }

@@ -155,6 +155,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
   private val cityMapTestSeq = textMapBase.map(new CityMap(_))
   private val postalCodeMapTestSeq = textMapBase.map(new PostalCodeMap(_))
   private val streetMapTestSeq = textMapBase.map(new StreetMap(_))
+  private val nameStatsTestSeq = textMapBase.map(new NameStats(_))
 
   private val multiPickListMapTestSeq = stringSetMapBase.map(new MultiPickListMap(_))
 
@@ -506,6 +507,7 @@ class MonoidAggregatorDefaultsTest extends FlatSpec with TestCommon {
     assertDefaultAggr(cityMapTestSeq, expectedCommaRes)
     assertDefaultAggr(postalCodeMapTestSeq, expectedCommaRes)
     assertDefaultAggr(streetMapTestSeq, expectedCommaRes)
+    assertDefaultAggr(nameStatsTestSeq, expectedCommaRes)
   }
 
   Spec(UnionBinaryMap.getClass) should "work" in {
