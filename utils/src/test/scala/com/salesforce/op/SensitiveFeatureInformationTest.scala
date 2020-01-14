@@ -85,7 +85,7 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
     metadata.contains("1") shouldBe true
     metadata.contains("2") shouldBe true
 
-    val f1 = metadata.getMetadata("1")
+    val f1 = metadata.getMetadataArray("1").head
     f1.contains(SensitiveFeatureInformation.NameKey) shouldBe true
     f1.contains(SensitiveFeatureInformation.MapKeyKey) shouldBe true
     f1.contains(SensitiveFeatureInformation.TypeKey) shouldBe true
@@ -99,7 +99,7 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
     f1.getDouble(SensitiveFeatureInformation.Name.ProbFemaleKey) shouldBe probFemale
     f1.getDouble(SensitiveFeatureInformation.Name.ProbOtherKey) shouldBe probOther
 
-    val f2 = metadata.getMetadata("2")
+    val f2 = metadata.getMetadataArray("2").head
     f2.contains(SensitiveFeatureInformation.NameKey) shouldBe true
     f2.contains(SensitiveFeatureInformation.MapKeyKey) shouldBe true
     f2.contains(SensitiveFeatureInformation.TypeKey) shouldBe true
@@ -119,16 +119,16 @@ class SensitiveFeatureInformationTest extends FlatSpec with TestCommon {
     val info2 = SensitiveFeatureInformation.Name(0.0, Seq(""), 0.0, 0.0, 0.0, "f2", Some("key"), actionTaken = true)
 
     val mapMetadata = new MetadataBuilder()
-      .putMetadata("1", info1.toMetadata)
-      .putMetadata("2", info2.toMetadata)
+      .putMetadataArray("1", Array(info1.toMetadata))
+      .putMetadataArray("2", Array(info2.toMetadata))
       .build()
 
     val map = SensitiveFeatureInformation.fromMetadataMap(mapMetadata)
 
     map.contains("1") shouldBe true
-    map("1") shouldBe info1
+    map("1") shouldBe Array(info1)
     map.contains("2") shouldBe true
-    map("2") shouldBe info2
+    map("2") shouldBe Array(info2)
   }
 }
 
