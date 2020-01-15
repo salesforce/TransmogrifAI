@@ -110,7 +110,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         inN.toSeq.zip(allTextFeatureInfo).filter{ case (tf, featureInfoSeq) => featureInfoSeq.nonEmpty }.unzip
       val allKeys = mapFeatureInfo.map(_.map(_.key))
 
-      // Careful when zipping sequences like hashKeys (lengtht and hashFeatures
+      // Careful when zipping sequences like hashKeys (length = number of maps, always) and
+      // hashFeatures (length <= number of maps, depending on which ones contain keys to hash)
       val hashKeys = args.hashFeatureInfo.map(
         _.filter(_.vectorizationMethod == TextVectorizationMethod.Hash).map(_.key)
       )
