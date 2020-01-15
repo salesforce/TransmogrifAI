@@ -153,7 +153,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
         val vecMethod: TextVectorizationMethod = textStats match {
           case _ if textStats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
-          case _ if textStats.lengthStdDev <= minLenStdDev => TextVectorizationMethod.Ignore
+          case _ if textStats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
           case _ => TextVectorizationMethod.Hash
         }
         val topVals = if (vecMethod == TextVectorizationMethod.Pivot) {
