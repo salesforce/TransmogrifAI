@@ -314,42 +314,49 @@ private[op] trait MapHashingFun extends HashingFun {
 
   protected def makeVectorColumnMetadata
   (
-    features: Array[TransientFeature],
+    hashFeatures: Array[TransientFeature],
+    ignoreFeatures: Array[TransientFeature],
     params: HashingFunctionParams,
-    allKeys: Seq[Seq[String]],
+    hashKeys: Seq[Seq[String]],
+    ignoreKeys: Seq[Seq[String]],
     shouldTrackNulls: Boolean,
     shouldTrackLen: Boolean
   ): Array[OpVectorColumnMetadata] = {
     val numHashes = params.numFeatures
-    val numFeatures = allKeys.map(_.length).sum
+    val numFeatures = hashKeys.map(_.length).sum
     val hashColumns =
       if (isSharedHashSpace(params, Some(numFeatures))) {
         (0 until numHashes).map { i =>
           OpVectorColumnMetadata(
-            parentFeatureName = features.map(_.name),
-            parentFeatureType = features.map(_.typeName),
+            parentFeatureName = hashFeatures.map(_.name),
+            parentFeatureType = hashFeatures.map(_.typeName),
             grouping = None,
             indicatorValue = None
           )
         }.toArray
       } else {
         for {
-          (keys, f) <- allKeys.toArray.zip(features)
+          // Need to filter out empty key sequences since the hashFeatures only contain a map feature if one of their
+          // keys is to be hashed, but hashKeys contains a sequence per map (whether it's empty or not)
+          (keys, f) <- hashKeys.filter(_.nonEmpty).zip(hashFeatures)
           key <- keys
           i <- 0 until numHashes
         } yield f.toColumnMetaData().copy(grouping = Option(key))
-      }
+      }.toArray
 
+    // All columns get null tracking or text length tracking, whether their contents are hashed or ignored
+    val allTextKeys = hashKeys.zip(ignoreKeys).map{ case(h, i) => h ++ i }
+    val allTextFeatures = hashFeatures ++ ignoreFeatures
     val nullColumns = if (shouldTrackNulls) {
       for {
-        (keys, f) <- allKeys.toArray.zip(features)
+        (keys, f) <- allTextKeys.toArray.zip(allTextFeatures)
         key <- keys
       } yield f.toColumnMetaData(isNull = true).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]
 
     val lenColumns = if (shouldTrackLen) {
       for {
-        (keys, f) <- allKeys.toArray.zip(features)
+        (keys, f) <- allTextKeys.toArray.zip(allTextFeatures)
         key <- keys
       } yield f.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString).copy(grouping = Option(key))
     } else Array.empty[OpVectorColumnMetadata]

@@ -225,8 +225,6 @@ private[op] object TextStats {
  * Arguments for [[SmartTextVectorizerModel]]
  *
  * @param vectorizationMethods method to use for text vectorization (either pivot, hashing, or ignoring)
- * @param isCategorical        is feature a categorical or not
- * @param isIgnorable          is a text feature that we think is ignorable? high cardinality + low length variance
  * @param topValues            top values to each feature
  * @param shouldCleanText      should clean text value
  * @param shouldTrackNulls     should track nulls
