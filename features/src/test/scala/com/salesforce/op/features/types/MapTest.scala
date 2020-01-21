@@ -31,9 +31,11 @@
 package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
+import com.salesforce.op.testkit.RandomMap
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+
 import scala.reflect.runtime.universe._
 
 
@@ -315,6 +317,32 @@ class MapTest extends FlatSpec with TestCommon {
     m shouldBe a[MultiResponse]
 
     Map("aaa" -> Set("b")).toMultiPickListMap shouldBe a[MultiPickListMap]
+  }
+
+  /* NameStats tests */
+  Spec[NameStats] should "extend correct base classes and have a working shortcut" in {
+    val m = new NameStats(Map.empty[String, String])
+    m shouldBe a[FeatureType]
+    m shouldBe a[OPCollection]
+    m shouldBe a[OPMap[_]]
+    m shouldBe a[TextMap]
+
+    Map(
+      NameStats.Key.IsName.toString -> true.toString,
+      NameStats.Key.Gender.toString -> NameStats.GenderValue.Female.toString
+    ).toNameStats shouldBe a[NameStats]
+  }
+
+  Spec[NameStats] should "have working helper functions" in {
+    val nameStatsSeq = RandomMap.ofNameStats() take 50
+    nameStatsSeq forall { nameStats =>
+      val workingIsName = nameStats.value
+        .get(NameStats.Key.IsName.toString)
+        .map(_ == true.toString)
+        .contains(nameStats.isName)
+      val workingGenderHelpers = nameStats.isMale || nameStats.isFemale
+      workingIsName && workingGenderHelpers
+    }
   }
 
   /* Prediction tests */

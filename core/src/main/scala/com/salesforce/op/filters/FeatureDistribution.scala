@@ -282,11 +282,11 @@ object FeatureDistribution {
    * @return TextStats object containing a Map from a value to its frequency (histogram)
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
-    TextStats(countStringValues(values.left.getOrElse(values.right.get)))
+    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty)
   }
 
-  private def countStringValues[T](seq: Seq[T]): Map[String, Int] = {
-    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size }
+  private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
+    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size.toLong }
   }
 
   /**

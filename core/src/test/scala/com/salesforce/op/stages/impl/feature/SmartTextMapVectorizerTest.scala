@@ -32,13 +32,14 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op._
 import com.salesforce.op.stages.base.sequence.SequenceModel
-import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder, TestSparkContext}
+import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
+import com.salesforce.op.testkit.RandomText
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -73,6 +74,44 @@ class SmartTextMapVectorizerTest
     )
   )
 
+  /*
+    Generate some more complicated input data to check things a little closer. There are four text fields with
+    different token distributions:
+
+    country: Uniformly distributed from a larger list of ~few hundred countries, should be hashed
+    categoricalText: Uniformly distributed from a small list of choices, should be pivoted (also has fixed lengths,
+      so serves as a test that the categorical check happens before the token length variance check)
+    textId: Uniformly distributed high cardinality Ids with fixed lengths, should be ignored
+    text: Uniformly distributed unicode strings with lengths ranging from 0-100, should be hashed
+   */
+  val countryData: Seq[Text] = RandomText.countries.withProbabilityOfEmpty(0.2).limit(1000)
+  val categoricalTextData: Seq[Text] = RandomText.textFromDomain(domain = List("A", "B", "C", "D", "E", "F"))
+    .withProbabilityOfEmpty(0.2).limit(1000)
+  // Generate List containing elements like 040231, 040232, ...
+  val textIdData: Seq[Text] = RandomText.textFromDomain(
+    domain = (1 to 1000).map(x => "%06d".format(40230 + x)).toList
+  ).withProbabilityOfEmpty(0.2).limit(1000)
+  val textData: Seq[Text] = RandomText.strings(minLen = 0, maxLen = 100).withProbabilityOfEmpty(0.2).limit(1000)
+  val generatedData: Seq[(Text, Text, Text, Text)] =
+    countryData.zip(categoricalTextData).zip(textIdData).zip(textData).map {
+      case (((co, ca), id), te) => (co, ca, id, te)
+    }
+
+  def mapifyText(textSeq: Seq[Text]): TextMap = {
+    textSeq.zipWithIndex.flatMap {
+      case (t, i) => t.value.map(tv => "f" + i.toString -> tv)
+    }.toMap.toTextMap
+  }
+  val mapData = generatedData.map { case (t1, t2, t3, t4) => mapifyText(Seq(t1, t2, t3, t4)) }
+  val (rawDF, rawTextMap) = TestFeatureBuilder("textMap", mapData)
+
+  // Do the same thing with the data spread across many maps to test that they get combined correctly as well
+  val mapDataSeparate = generatedData.map {
+    case (t1, t2, t3, t4) => (mapifyText(Seq(t1, t2)), mapifyText(Seq(t3)), mapifyText(Seq(t4)))
+  }
+  val (rawDFSeparateMaps, rawTextMap1, rawTextMap2, rawTextMap3) =
+    TestFeatureBuilder("textMap1", "textMap2", "textMap3", mapDataSeparate)
+
   /**
    * Estimator instance to be tested
    */
@@ -94,22 +133,22 @@ class SmartTextMapVectorizerTest
   Spec[TextMapStats] should "provide a proper semigroup" in {
     val data = Seq(
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 2, "world" -> 1)),
-        "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 2)),
-        "f3" -> TextStats(Map("foo" -> 1))
+        "f1" -> TextStats(Map("hello" -> 2, "world" -> 1), Map(5 -> 3)),
+        "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 2), Map(5 -> 4)),
+        "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
       )),
       TextMapStats(Map(
-        "f1" -> TextStats(Map("hello" -> 1)),
-        "f2" -> TextStats(Map("ocean" -> 1, "other" -> 5))
+        "f1" -> TextStats(Map("hello" -> 1), Map(5 -> 1)),
+        "f2" -> TextStats(Map("ocean" -> 1, "other" -> 5), Map(5 -> 6))
       )),
       TextMapStats(Map(
-        "f2" -> TextStats(Map("other" -> 1))
+        "f2" -> TextStats(Map("other" -> 1), Map(5 -> 1))
       ))
     )
     TextMapStats.monoid(2).sumOption(data) shouldBe Some(TextMapStats(Map(
-      "f1" -> TextStats(Map("hello" -> 3, "world" -> 1)),
-      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5)),
-      "f3" -> TextStats(Map("foo" -> 1))
+      "f1" -> TextStats(Map("hello" -> 3, "world" -> 1), Map(5 -> 4)),
+      "f2" -> TextStats(Map("hello" -> 2, "ocean" -> 3, "other" -> 5), Map(5 -> 11)),
+      "f3" -> TextStats(Map("foo" -> 1), Map(3 -> 1))
     )))
   }
 
@@ -396,6 +435,78 @@ class SmartTextMapVectorizerTest
     }
 
     result.foreach { case (vec1, vec2) => vec1 shouldBe vec2 }
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low token length variance " +
+    "when data is in a single TextMap" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low token length variance " +
+    "when data is in many TextMaps" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDFSeparateMaps)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
   }
 
 }
