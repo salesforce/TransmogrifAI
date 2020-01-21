@@ -115,7 +115,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if isName && shouldRemoveSensitive => TextVectorizationMethod.Ignore
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
-        case _ if stats.lengthStdDev <= minLenStdDev => TextVectorizationMethod.Ignore
+        case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
         case _ => TextVectorizationMethod.Hash
       }
       val topValues = stats.valueCounts
