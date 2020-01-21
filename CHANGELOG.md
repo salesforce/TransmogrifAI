@@ -14,7 +14,8 @@ New features / updates:
 - Add property-based tests for regression model selection [#427](https://github.com/salesforce/TransmogrifAI/pull/427)
 - Add option to calculate LOCO for dates/texts by leaving out their entire vector [#418](https://github.com/salesforce/TransmogrifAI/pull/418)
 - Add Chinese and Korean examples to TextTokenizerTest [#442](https://github.com/salesforce/TransmogrifAI/pull/442)
-- Add support for ignoring text that looks like IDs in SmartTextVectorizer [#448](https://github.com/salesforce/TransmogrifAI/pull/448)
+- Add support for ignoring text that looks like IDs in SmartTextVectorizer [#448](https://github.com/salesforce/TransmogrifAI/pull/448), [#455](https://github.com/salesforce/TransmogrifAI/pull/455)
+- Add a unary estimator for detecting names in text fields and transforming to likely gender [#445](https://github.com/salesforce/TransmogrifAI/pull/445)
 
 Dependency updates (all in [#402](https://github.com/salesforce/TransmogrifAI/pull/402)):
 - Update Apache Spark version to 2.4.4 
