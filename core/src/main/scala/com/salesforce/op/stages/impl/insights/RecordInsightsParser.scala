@@ -78,7 +78,9 @@ object RecordInsightsParser {
    */
   def parseInsights(insights: TextMap): Map[OpVectorColumnHistory, Insights] = {
     implicit val formats: DefaultFormats = DefaultFormats
-    insights.value.map { case (k, v) => OpVectorColumnHistory.fromJson(k) ->
+    insights.value.filterKeys(_ != "time").map { case (k, v) => OpVectorColumnHistory.fromJson(k) ->
       parse(v).extract[Seq[Seq[Double]]].map( s => s.head.toInt -> s(1)) }
   }
+
+  def parseTime(insights: TextMap): Double = insights.value("time").toDouble
 }

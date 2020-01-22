@@ -97,16 +97,23 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
   // scalastyle:on
   describe(Spec[RecordInsightsLOCO[_]]) {
     it("should work with randomly generated features and binary logistic regression") {
-      val features = RandomVector.sparse(RandomReal.normal(), 40).limit(1000)
-      val labels = RandomIntegral.integrals(0, 2).limit(1000).map(_.value.get.toRealNN)
+      val features = RandomVector.sparse(RandomReal.normal(), 400).limit(10000)
+      val labels = RandomIntegral.integrals(0, 2).limit(10000).map(_.value.get.toRealNN)
       val (df, f1, l1) = TestFeatureBuilder("features", "labels", features.zip(labels))
       val l1r = l1.copy(isResponse = true)
-      val dfWithMeta = addMetaData(df, "features", 40)
+      val dfWithMeta = addMetaData(df, "features", 400)
       val sparkModel = new OpLogisticRegression().setInput(l1r, f1).fit(df)
 
       // val model = sparkModel.getSparkMlStage().get
-      val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
-      val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+      var insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1)
+      val data = insightsTransformer.transform(dfWithMeta)
+      val insights = data.collect(insightsTransformer.getOutput()).map(_.value.filterKeys(_ != "time").toTextMap)
+      import data.sqlContext.implicits._
+      data.select(insightsTransformer.getOutput()).show()
+      val time = data.select(insightsTransformer.getOutput())
+        .map { case m => RecordInsightsParser.parseTime(m.getAs[Map[String, String]](0).toTextMap) }
+      time.show()
+      println(time.describe())
 
       insights.foreach(_.value.size shouldBe 20)
       val parsed = insights.map(RecordInsightsParser.parseInsights)
@@ -125,6 +132,8 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       val insightsTransformer = new RecordInsightsLOCO(sparkModel).setInput(f1).setTopK(2)
 
       val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+        .map(_.value.filterKeys(_ != "time").toTextMap)
+
       insights.foreach(_.value.size shouldBe 2)
       val parsed = insights.map(RecordInsightsParser.parseInsights)
       parsed.map(_.count { case (_, v) => v.exists(_._1 == 5) } shouldBe 0) // no 6th column of insights
@@ -147,6 +156,8 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
 
       val insightsTransformer = new RecordInsightsLOCO(model).setInput(f1)
       val insights = insightsTransformer.transform(dfWithMeta).collect(insightsTransformer.getOutput())
+        .map(_.value.filterKeys(_ != "time").toTextMap)
+
       insights.foreach(_.value.size shouldBe 20)
       val parsed = insights.map(RecordInsightsParser.parseInsights)
       parsed.foreach(_.values.foreach(i => i.foreach(v => v._1 shouldBe 0))) // has only one pred column
@@ -162,6 +173,7 @@ class RecordInsightsLOCOTest extends FunSpec with TestSparkContext with RecordIn
       val transformer = new RecordInsightsLOCO(sparkModel).setInput(featureVector)
 
       val insights = transformer.setTopK(1).transform(testDataMeta).collect(transformer.getOutput())
+
       val parsed = insights.map(RecordInsightsParser.parseInsights)
       // the highest corr that value that is not zero should be the top feature
       parsed.foreach { case in =>

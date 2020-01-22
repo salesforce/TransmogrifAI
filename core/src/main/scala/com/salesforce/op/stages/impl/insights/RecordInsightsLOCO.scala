@@ -31,6 +31,7 @@
 package com.salesforce.op.stages.impl.insights
 
 import com.salesforce.op.UID
+import com.salesforce.op.features.FeatureSparkTypes
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.unary.UnaryTransformer
 import com.salesforce.op.stages.impl.feature.TimePeriod
@@ -44,6 +45,10 @@ import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml.Model
 import org.apache.spark.ml.linalg.SparseVector
 import org.apache.spark.ml.param.{IntParam, Param, Params}
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.MetadataBuilder
+import org.apache.spark.sql.{DataFrame, Dataset}
+import org.apache.spark.util.LongAccumulator
 
 import scala.collection.mutable
 
@@ -244,6 +249,8 @@ class RecordInsightsLOCO[T <: Model[T]]
   }
 
   override def transformFn: OPVector => TextMap = features => {
+    val t1 = System.currentTimeMillis()
+
     val baseResult = modelApply(labelDummy, features)
     val baseScore = baseResult.score
 
@@ -267,9 +274,13 @@ class RecordInsightsLOCO[T <: Model[T]]
     }
 
     val allIndices = featuresSparse.indices
-    top.map { case LOCOValue(i, _, diffs) =>
+    val results = top.map { case LOCOValue(i, _, diffs) =>
       RecordInsightsParser.insightToText(featureInfo(allIndices(i)), diffs)
-    }.toMap.toTextMap
+    }.toMap
+    val t2 = System.currentTimeMillis()
+
+    val diff = t2 - t1
+    (results + ("time" -> diff.toString)).toTextMap
   }
 
 }
