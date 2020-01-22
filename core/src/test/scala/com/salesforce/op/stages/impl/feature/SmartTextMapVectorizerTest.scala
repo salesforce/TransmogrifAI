@@ -540,9 +540,14 @@ class SmartTextMapVectorizerTest
       case (a, b) => TextAreaMap(convertToMap(Seq(a, b)))
     }
 
-    val nameTextMap: Seq[TextMap] = baseNames.map(_.value).collect { case Some(text) => TextMap(Map("name" -> text)) }
-    val nameTextAreaMap: Seq[TextAreaMap] =
-      baseNames.map(_.value).collect { case Some(text) => TextAreaMap(Map("name" -> text)) }
+    val nameTextMap: Seq[TextMap] = baseNames.map(_.value match {
+      case Some(text) => TextMap(Map("name" -> text))
+      case None => TextMap(Map.empty)
+    })
+    val nameTextAreaMap: Seq[TextAreaMap] = baseNames.map(_.value match {
+      case Some(text) => TextAreaMap(Map("name" -> text))
+      case None => TextAreaMap(Map.empty)
+    })
 
     val allFeatures = Seq(
       baseText1,       // f0
@@ -617,14 +622,21 @@ class SmartTextMapVectorizerTest
       .setResultFeatures(smartVectorized, smartAreaVectorized).transform(newInputData)
     val result1 = transformed.collect(smartVectorized)
     val result2 = transformed.collect(smartAreaVectorized)
-    val (smart1, expected1) = result1.map(smartVector => smartVector -> OPVector.empty).unzip
-    val (smart2, expected2) = result2.map(smartVector => smartVector -> OPVector.empty).unzip
 
-    smart1 shouldBe expected1
-    smart2 shouldBe expected2
+    // The only entries in the output should be null indicators
+    val expected = Seq(
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(0.0)),
+      Vectors.dense(Array(1.0))
+    ).map(_.toOPVector)
 
-    OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe 0
-    OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe 0
+    result1 shouldBe expected
+    result2 shouldBe expected
+
+    OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe 1
+    OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe 1
   }
 
   it should "detect a single name column among other non-name Text columns" in {
@@ -660,10 +672,19 @@ class SmartTextMapVectorizerTest
       val result = transformed.collect(mapOutput, withoutNamesOutput)
       val (withNames, withoutNames) = result.unzip
 
+      // There should only be a single extra metadata entry for the null indicator of the (removed) name field
       OpVectorMetadata("OutputVector", mapEstimator.getMetadata()).size shouldBe
-        OpVectorMetadata("OutputVector", withoutNamesEstimator.getMetadata()).size
+        OpVectorMetadata("OutputVector", withoutNamesEstimator.getMetadata()).size + 1
 
-      withNames shouldBe withoutNames
+      // All of the entries in the vector
+      // (other than the last one corresponding to the null indicator for the removed name field)
+      // should be the same
+      // Note: Changing the order of vector information will fail this test
+      withNames.zip(withoutNames) foreach { case (withVector, withoutVector) =>
+        val withArray = withVector.value.toArray
+        val withoutArray = withoutVector.value.toArray :+ withArray.last
+        withArray shouldBe withoutArray
+      }
     }
     {
       val areaMapEstimator: SmartTextMapVectorizer[TextAreaMap] = biasAreaMapEstimator.setInput(newF5, newF6)
@@ -682,9 +703,13 @@ class SmartTextMapVectorizerTest
       val (withNames, withoutNames) = result.unzip
 
       OpVectorMetadata("OutputVector", areaMapEstimator.getMetadata()).size shouldBe
-        OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size
+        OpVectorMetadata("OutputVector", oldMapEstimator.getMetadata()).size + 1
 
-      withNames shouldBe withoutNames
+      withNames.zip(withoutNames) foreach { case (withVector, withoutVector) =>
+        val withArray = withVector.value.toArray
+        val withoutArray = withoutVector.value.toArray :+ withArray.last
+        withArray shouldBe withoutArray
+      }
     }
   }
 
