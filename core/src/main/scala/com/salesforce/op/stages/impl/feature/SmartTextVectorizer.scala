@@ -179,7 +179,8 @@ object SmartTextVectorizer {
  * @param valueCounts  counts of feature values
  * @param lengthCounts counts of token lengths
  */
-private[op] case class TextStats(
+private[op] case class TextStats
+(
   valueCounts: Map[String, Long],
   lengthCounts: Map[Int, Long]
 ) extends JsonLike {
@@ -225,8 +226,6 @@ private[op] object TextStats {
  * Arguments for [[SmartTextVectorizerModel]]
  *
  * @param vectorizationMethods method to use for text vectorization (either pivot, hashing, or ignoring)
- * @param isCategorical        is feature a categorical or not
- * @param isIgnorable          is a text feature that we think is ignorable? high cardinality + low length variance
  * @param topValues            top values to each feature
  * @param shouldCleanText      should clean text value
  * @param shouldTrackNulls     should track nulls
