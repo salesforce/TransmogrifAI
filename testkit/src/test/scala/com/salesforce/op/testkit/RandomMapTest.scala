@@ -86,6 +86,41 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
     (sut take samples.length map (_.value.toMap) toList) shouldBe samples
   }
 
+  private def checkWithMapPredicate[D, T <: OPMap[D]](
+    sut: RandomMap[D, T],
+    minLen: Int, maxLen: Int,
+    predicate: (T => Boolean) = (_: T) => true,
+    samples: List[Map[String, D]] = Nil
+  ) = {
+    sut reset rngSeed
+
+    val found = sut.next
+    sut reset rngSeed
+    val foundAfterReseed = sut.next
+    withClue(s"generator reset did not work for $sut") {
+      foundAfterReseed shouldBe found
+    }
+
+    sut reset rngSeed
+
+    def segment = sut take numTries
+
+    segment count (_.value.size < minLen) shouldBe 0
+    segment count (_.value.size > maxLen) shouldBe 0
+
+    def number(key: String) = try {
+      key dropWhile (!Character.isDigit(_)) toInt
+    } catch {
+      case _: Exception => 0
+    }
+
+    segment foreach (map => predicate(map) shouldBe true)
+    sut reset rngSeed + 1
+    (sut take samples.length map (_.value.toMap) toList) shouldBe samples
+    sut reset rngSeed + 1
+    (sut take samples.length map (_.value.toMap) toList) shouldBe samples
+  }
+
   Spec[Text, RandomMap[String, TextMap]] should "generate maps of texts" in {
     val sut = RandomMap.of[Text, TextMap](RandomText.strings(2, 5), 0, 4)
     check[String, TextMap](sut, 0, 4, s => s.length >= 2 && s.length < 5)
@@ -264,6 +299,24 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
         Map(),
         Map("k0" -> "Harding Avenue")
       )
+    )
+  }
+
+  Spec[Text, RandomMap[String, NameStats]] should "generate NameStats maps correctly" in {
+    val sut = RandomMap.ofNameStats()
+    checkWithMapPredicate[String, NameStats](sut,
+      minLen = NameStats.Key.values.length,
+      maxLen = NameStats.Key.values.length,
+      predicate = { nameStats =>
+        val allKeysPresent = NameStats.Key.values map { nameStats.value contains _.toString } forall identity
+        val validNameIndicatorEntries = Seq(true, false)
+          .map(bool => Some(bool.toString))
+          .contains(nameStats.value.get(NameStats.Key.IsName.toString))
+        val validGenderEntries = NameStats.GenderValue.values
+          .map(enum => Some(enum.toString))
+          .contains(nameStats.value.get(NameStats.Key.Gender.toString))
+        allKeysPresent & validNameIndicatorEntries & validGenderEntries
+      }
     )
   }
 

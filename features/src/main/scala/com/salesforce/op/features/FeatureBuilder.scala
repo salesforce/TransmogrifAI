@@ -80,6 +80,7 @@ object FeatureBuilder {
   def CityMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, CityMap] = CityMap(name.value)
   def PostalCodeMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, PostalCodeMap] = PostalCodeMap(name.value)
   def StreetMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, StreetMap] = StreetMap(name.value)
+  def NameStats[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, NameStats] = NameStats(name.value)
   def GeolocationMap[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, GeolocationMap] = GeolocationMap(name.value)
   def Prediction[I: WeakTypeTag](implicit name: sourcecode.Name): FeatureBuilder[I, Prediction] = Prediction(name.value)
 
@@ -144,6 +145,7 @@ object FeatureBuilder {
   def CityMap[I: WeakTypeTag](name: String): FeatureBuilder[I, CityMap] = FeatureBuilder[I, CityMap](name = name)
   def PostalCodeMap[I: WeakTypeTag](name: String): FeatureBuilder[I, PostalCodeMap] = FeatureBuilder[I, PostalCodeMap](name = name)
   def StreetMap[I: WeakTypeTag](name: String): FeatureBuilder[I, StreetMap] = FeatureBuilder[I, StreetMap](name = name)
+  def NameStats[I: WeakTypeTag](name: String): FeatureBuilder[I, NameStats] = FeatureBuilder[I, NameStats](name = name)
   def GeolocationMap[I: WeakTypeTag](name: String): FeatureBuilder[I, GeolocationMap] = FeatureBuilder[I, GeolocationMap](name = name)
   def Prediction[I: WeakTypeTag](name: String): FeatureBuilder[I, Prediction] = FeatureBuilder[I, Prediction](name = name)
 

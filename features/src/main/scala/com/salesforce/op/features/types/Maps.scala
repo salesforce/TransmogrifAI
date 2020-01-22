@@ -281,6 +281,43 @@ object StreetMap {
 }
 
 /**
+ * Name representation - map containing information related to a particular name.
+ *
+ * @param value map of keys to values, where the keys are defined by NameStats.Key
+ */
+class NameStats(value: Map[String, String]) extends TextMap(value) {
+  import NameStats.Key._
+  import NameStats.GenderValue.{Male, Female}
+
+  def isName: Boolean = (value.getOrElse(IsName.toString, false.toString) compareToIgnoreCase true.toString) == 0
+  def isMale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Male.toString) == 0
+  def isFemale: Boolean = (value.getOrElse(Gender.toString, "") compareToIgnoreCase Female.toString) == 0
+}
+object NameStats {
+  import enumeratum._
+  sealed class Key extends EnumEntry
+  case object Key extends Enum[Key] {
+    val values: Seq[Key] = findValues
+    case object OriginalValue extends Key
+    case object IsName        extends Key
+    case object FirstName     extends Key
+    case object LastName      extends Key
+    case object Gender        extends Key
+  }
+  sealed class GenderValue extends EnumEntry
+  case object GenderValue extends Enum[GenderValue] {
+    val values: Seq[GenderValue] = findValues
+    case object Male              extends GenderValue
+    case object Female            extends GenderValue
+    case object GenderNA          extends GenderValue
+    case object GenderNotInferred extends GenderValue
+  }
+
+  def apply(value: Map[String, String]): NameStats = new NameStats(value)
+  def empty: NameStats = FeatureTypeDefaults.NameStats
+}
+
+/**
  * Map of geolocation values
  *
  * @param value map of geolocation values

@@ -76,6 +76,7 @@ class FeatureTypeFactoryTest
     FeatureTypeFactory[CityMap](),
     FeatureTypeFactory[PostalCodeMap](),
     FeatureTypeFactory[StreetMap](),
+    FeatureTypeFactory[NameStats](),
     FeatureTypeFactory[GeolocationMap](),
     FeatureTypeFactory[Prediction](),
     // Numerics
