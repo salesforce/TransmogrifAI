@@ -550,9 +550,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
     textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
     timePeriod: Option[TimePeriod] = None,
     minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault,
-    finalFeatureRetentionPolicy: ResultFeatureRetention = ResultFeatureRetention.Strict
+    resultFeatureRetentionPolicy: ResultFeatureRetention = ResultFeatureRetention.Strict
   ): this.type = {
-    resultFeaturePolicy = finalFeatureRetentionPolicy
+    resultFeaturePolicy = resultFeatureRetentionPolicy
     val training = trainingReader.orElse(reader).map(_.asInstanceOf[Reader[T]])
     require(training.nonEmpty, "Reader for training data must be provided either in withRawFeatureFilter or directly" +
       "as the reader for the workflow")

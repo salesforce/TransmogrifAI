@@ -219,7 +219,7 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   it should "allow the removal of some final features with the retention policy is set to allow it" in {
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed, weight)
-      .withRawFeatureFilter(Option(dataReader), None, finalFeatureRetentionPolicy = ResultFeatureRetention.AtLeastOne)
+      .withRawFeatureFilter(Option(dataReader), None, resultFeatureRetentionPolicy = ResultFeatureRetention.AtLeastOne)
 
     wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     wf.getResultFeatures().map(_.name) shouldEqual Seq(weight).map(_.name)
