@@ -101,6 +101,7 @@ case object FeatureTypeDefaults {
   val CityMap = new t.CityMap(Map.empty)
   val PostalCodeMap = new t.PostalCodeMap(Map.empty)
   val StreetMap = new t.StreetMap(Map.empty)
+  val NameStats = new t.NameStats(Map.empty)
   val GeolocationMap = new t.GeolocationMap(Map.empty)
 
   /**

@@ -112,6 +112,7 @@ case object FeatureSparkTypes {
   val CityMap = mapType(City)
   val PostalCodeMap = mapType(PostalCode)
   val StreetMap = mapType(Street)
+  val NameStats = mapType(Text)
   val GeolocationMap = mapType(Geolocation)
   val Prediction = mapType(Real)
 
@@ -158,6 +159,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.CityMap] => CityMap
     case wt if wt =:= weakTypeOf[t.PostalCodeMap] => PostalCodeMap
     case wt if wt =:= weakTypeOf[t.StreetMap] => StreetMap
+    case wt if wt =:= weakTypeOf[t.NameStats] => NameStats
     case wt if wt =:= weakTypeOf[t.GeolocationMap] => GeolocationMap
     case wt if wt =:= weakTypeOf[t.Prediction] => Prediction
 

@@ -13,7 +13,7 @@ plugins {
     id 'org.scoverage' version '2.5.0'
     id 'net.minecrell.licenser' version '0.4.1'
     id 'com.github.jk1.dependency-license-report' version '0.5.0'
-    id 'com.github.johnrengelman.shadow' version '4.0.4'
+    id 'com.github.johnrengelman.shadow' version '5.0.0'
 }
 
 allprojects {
@@ -82,7 +82,7 @@ configure(allProjs) {
         reflectionsVersion = '0.9.11'
         collectionsVersion = '3.2.2'
         optimaizeLangDetectorVersion = '0.0.1'
-        tikaVersion = '1.16'
+        tikaVersion = '1.22'
         sparkTestingBaseVersion = '2.3.1_0.10.0'
         sourceCodeVersion = '0.1.3'
         pegdownVersion = '1.4.2'
@@ -163,7 +163,7 @@ configure(allProjs) {
 
     jar {
         manifest.attributes "Main-Class": "$mainClassName"
-        baseName = "${rootProject.name}"
+        baseName = "$rootProject.name"
     }
     if (System.getenv("CI") != 'true') {
         jar.dependsOn(createVersionProperties)
@@ -230,7 +230,7 @@ configure(allProjs) {
 
     shadowJar {
         zip64 = true
-        exclude 'META-INF/maven/**'
+        exclude 'META-INF/**'
         baseName = jar.baseName
     }
     shadowJar.dependsOn(createVersionProperties)
