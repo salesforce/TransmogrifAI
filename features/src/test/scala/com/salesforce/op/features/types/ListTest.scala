@@ -89,5 +89,19 @@ class ListTest extends FlatSpec with TestCommon {
     List(12237834L, 4890489839L).toDateTimeList shouldBe a[DateTimeList]
   }
 
+  /* MapList tests */
+  Spec[MapList] should "extend OPList[TextMap]" in {
+    val myMapList = new MapList(List.empty[TextMap])
+    myMapList shouldBe a[FeatureType]
+    myMapList shouldBe a[OPCollection]
+    myMapList shouldBe a[OPList[_]]
+    myMapList shouldBe a[MapList]
+  }
+  it should "compare values correctly" in {
+    val myTextMap = TextMap( Map("speaker"->"Agent", "text"->"Hello!") )
+    new MapList( List(myTextMap, TextMap.empty) ) shouldBe new MapList( List(myTextMap, TextMap.empty))
+    new MapList( List(myTextMap, TextMap.empty) ) should not be new MapList( List(TextMap.empty, myTextMap))
+    FeatureTypeDefaults.MapList shouldBe MapList(List.empty[TextMap])
+  }
 
 }
