@@ -293,7 +293,6 @@ object FeatureType {
     classOf[CityMap] -> typeTag[CityMap],
     classOf[PostalCodeMap] -> typeTag[PostalCodeMap],
     classOf[StreetMap] -> typeTag[StreetMap],
-    classOf[NameStats] -> typeTag[NameStats],
     classOf[GeolocationMap] -> typeTag[GeolocationMap],
     classOf[Prediction] -> typeTag[Prediction],
     // Numerics

@@ -30,8 +30,6 @@
 
 package com.salesforce.op.features.types
 
-import com.twitter.algebird.{Monoid, SeqMonoid}
-
 /**
  * A list of text values
  *
@@ -43,13 +41,6 @@ class TextList(val value: Seq[String]) extends OPList[String] {
 object TextList {
   def apply(value: Seq[String]): TextList = new TextList(value)
   def empty: TextList = FeatureTypeDefaults.TextList
-
-  def monoid: Monoid[TextList] = new Monoid[TextList] {
-    override def zero = TextList.empty
-    override def plus(left: TextList, right: TextList): TextList = {
-      TextList(left.value ++ right.value)
-    }
-  }
 }
 
 /**
@@ -76,5 +67,14 @@ class DateTimeList(value: Seq[Long]) extends DateList(value) {
 object DateTimeList {
   def apply(value: Seq[Long]): DateTimeList = new DateTimeList(value)
   def empty: DateTimeList = FeatureTypeDefaults.DateTimeList
+}
+
+/**
+ * A list of map values
+ */
+class MapList(val value: Seq[TextMap]) extends OPList[TextMap]
+object MapList {
+  def apply(value: Seq[TextMap]): MapList = new MapList(value)
+  def empty: MapList = FeatureTypeDefaults.MapList
 }
 

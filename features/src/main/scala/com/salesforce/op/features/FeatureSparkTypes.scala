@@ -112,9 +112,11 @@ case object FeatureSparkTypes {
   val CityMap = mapType(City)
   val PostalCodeMap = mapType(PostalCode)
   val StreetMap = mapType(Street)
-  val NameStats = mapType(Text)
   val GeolocationMap = mapType(Geolocation)
   val Prediction = mapType(Real)
+
+  // List
+  val MapList = ArrayType(TextMap, containsNull = true )
 
   /**
    * Spark type of a feature type
@@ -131,6 +133,7 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.DateList] => DateList
     case wt if wt =:= weakTypeOf[t.DateTimeList] => DateTimeList
     case wt if wt =:= weakTypeOf[t.Geolocation] => Geolocation
+    case wt if wt =:= weakTypeOf[t.MapList] => MapList
 
     // Maps
     case wt if wt =:= weakTypeOf[t.Base64Map] => Base64Map
@@ -155,7 +158,6 @@ case object FeatureSparkTypes {
     case wt if wt =:= weakTypeOf[t.CityMap] => CityMap
     case wt if wt =:= weakTypeOf[t.PostalCodeMap] => PostalCodeMap
     case wt if wt =:= weakTypeOf[t.StreetMap] => StreetMap
-    case wt if wt =:= weakTypeOf[t.NameStats] => NameStats
     case wt if wt =:= weakTypeOf[t.GeolocationMap] => GeolocationMap
     case wt if wt =:= weakTypeOf[t.Prediction] => Prediction
 

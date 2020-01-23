@@ -90,6 +90,9 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.DateTimeList else new DateTimeList(value.asInstanceOf[Seq[Long]])
       case t if t =:= weakTypeOf[Geolocation] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.Geolocation else new Geolocation(value.asInstanceOf[Seq[Double]])
+      case t if t =:= weakTypeOf[MapList] => (value: Any) =>
+        if (value == null) FeatureTypeDefaults.MapList else new MapList(value.asInstanceOf[Seq[TextMap]])
+
 
       // Maps
       case t if t =:= weakTypeOf[Base64Map] => (value: Any) =>
@@ -110,8 +113,6 @@ case object FeatureTypeFactory {
         if (value == null) FeatureTypeDefaults.IDMap else new IDMap(value.asInstanceOf[Map[String, String]])
       case t if t =:= weakTypeOf[IntegralMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.IntegralMap else new IntegralMap(value.asInstanceOf[Map[String, Long]])
-      case t if t =:= weakTypeOf[NameStats] => (value: Any) =>
-        if (value == null) FeatureTypeDefaults.NameStats else new NameStats(value.asInstanceOf[Map[String, String]])
       case t if t =:= weakTypeOf[MultiPickListMap] => (value: Any) =>
         if (value == null) FeatureTypeDefaults.MultiPickListMap
         else new MultiPickListMap(value.asInstanceOf[Map[String, Set[String]]])

@@ -73,6 +73,7 @@ case object FeatureTypeDefaults {
   val DateList = new t.DateList(Seq.empty)
   val DateTimeList = new t.DateTimeList(Seq.empty)
   val Geolocation = new t.Geolocation(Seq.empty)
+  val MapList = new t.MapList(Seq.empty)
 
   // Sets
   val MultiPickList = new t.MultiPickList(Set.empty)
@@ -100,7 +101,6 @@ case object FeatureTypeDefaults {
   val CityMap = new t.CityMap(Map.empty)
   val PostalCodeMap = new t.PostalCodeMap(Map.empty)
   val StreetMap = new t.StreetMap(Map.empty)
-  val NameStats = new t.NameStats(Map.empty)
   val GeolocationMap = new t.GeolocationMap(Map.empty)
 
   /**
@@ -121,6 +121,7 @@ case object FeatureTypeDefaults {
       case wt if wt =:= weakTypeOf[t.DateList] => DateList
       case wt if wt =:= weakTypeOf[t.DateTimeList] => DateTimeList
       case wt if wt =:= weakTypeOf[t.Geolocation] => Geolocation
+      case wt if wt =:= weakTypeOf[t.MapList] => MapList
 
       // Maps
       case wt if wt =:= weakTypeOf[t.Base64Map] => Base64Map
@@ -145,7 +146,6 @@ case object FeatureTypeDefaults {
       case wt if wt =:= weakTypeOf[t.CityMap] => CityMap
       case wt if wt =:= weakTypeOf[t.PostalCodeMap] => PostalCodeMap
       case wt if wt =:= weakTypeOf[t.StreetMap] => StreetMap
-      case wt if wt =:= weakTypeOf[t.NameStats] => NameStats
       case wt if wt =:= weakTypeOf[t.GeolocationMap] => GeolocationMap
 
       // Numerics
