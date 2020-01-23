@@ -152,6 +152,9 @@ case object FirstPostalCodeMap extends FirstAggregator[PostalCodeMap]
 case object LastStreetMap extends LastAggregator[StreetMap]
 case object FirstStreetMap extends FirstAggregator[StreetMap]
 
+case object LastNameStats extends LastAggregator[NameStats]
+case object FirstNameStats extends FirstAggregator[NameStats]
+
 case object LastGeolocationMap extends LastAggregator[GeolocationMap]
 case object FirstGeolocationMap extends FirstAggregator[GeolocationMap]
 

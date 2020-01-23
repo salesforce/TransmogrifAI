@@ -32,6 +32,8 @@ package com.salesforce.op.features.types
 
 import com.salesforce.op.test.TestCommon
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.twitter.algebird.Monoid
+import com.twitter.algebird.Operators._
 import org.apache.lucene.geo.GeoUtils
 import org.apache.spark.ml.linalg.DenseVector
 import org.junit.runner.RunWith
@@ -125,8 +127,14 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
   }
 
   property("OPList types should correctly wrap their corresponding types") {
+    implicit val textListMonoid: Monoid[TextList] = TextList.monoid
+
     forAll(geoGen) { x => checkVals(Geolocation(x), x) }
-    forAll(textListGen) { x => checkVals(TextList(x), x) }
+    forAll(textListGen) { x =>
+      checkVals(TextList(x), x)
+      val tl = TextList(x)
+      tl + tl shouldBe TextList(x ++ x) // Test the monoid too
+    }
     forAll(longListGen) { x =>
       checkVals(DateList(x), x)
       checkVals(DateTimeList(x), x)
@@ -165,6 +173,7 @@ class FeatureTypeValueTest extends PropSpec with PropertyChecks with TestCommon 
       checkVals(CityMap(x), x)
       checkVals(PostalCodeMap(x), x)
       checkVals(StreetMap(x), x)
+      checkVals(NameStats(x), x)
     }
     forAll(setMapGen) { x => checkVals(MultiPickListMap(x), x) }
     forAll(geoMapGen) { x => checkVals(GeolocationMap(x), x) }

@@ -84,6 +84,7 @@ object MonoidAggregatorDefaults {
       case wt if wt =:= weakTypeOf[CityMap] => UnionConcatCityMap
       case wt if wt =:= weakTypeOf[PostalCodeMap] => UnionConcatPostalCodeMap
       case wt if wt =:= weakTypeOf[StreetMap] => UnionConcatStreetMap
+      case wt if wt =:= weakTypeOf[NameStats] => UnionConcatNameStats
       case wt if wt =:= weakTypeOf[GeolocationMap] => UnionGeolocationMidpointMap
       case wt if wt =:= weakTypeOf[Prediction] => UnionMeanPredicition
 

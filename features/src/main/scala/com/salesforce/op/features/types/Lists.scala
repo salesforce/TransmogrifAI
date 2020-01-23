@@ -30,6 +30,8 @@
 
 package com.salesforce.op.features.types
 
+import com.twitter.algebird.{Monoid, SeqMonoid}
+
 /**
  * A list of text values
  *
@@ -41,6 +43,13 @@ class TextList(val value: Seq[String]) extends OPList[String] {
 object TextList {
   def apply(value: Seq[String]): TextList = new TextList(value)
   def empty: TextList = FeatureTypeDefaults.TextList
+
+  def monoid: Monoid[TextList] = new Monoid[TextList] {
+    override def zero = TextList.empty
+    override def plus(left: TextList, right: TextList): TextList = {
+      TextList(left.value ++ right.value)
+    }
+  }
 }
 
 /**

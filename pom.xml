@@ -244,7 +244,7 @@
             <artifactId>spark-sql_2.11</artifactId>
             <version>2.3.2</version>
             <scope>compile</scope>
-        </dependency>>
+        </dependency>
         <dependency>
             <groupId>org.apache.avro</groupId>
             <artifactId>avro</artifactId>
