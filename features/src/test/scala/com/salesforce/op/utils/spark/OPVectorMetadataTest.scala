@@ -110,7 +110,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   ): Map[String, Seq[SensitiveFeatureInformation]] = {
     val sensitiveInfoSeq = sensitiveInfoSeqRaw map {
       case ((probName, genderDetectResults, probMale, probFemale, probOther), featureName, mapKey, actionTaken) =>
-        SensitiveFeatureInformation.Name(
+        SensitiveNameInformation(
           probName, genderDetectResults, probMale, probFemale, probOther, featureName, mapKey, actionTaken
         )
     }

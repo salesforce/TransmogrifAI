@@ -576,7 +576,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     },
     Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
     Map(
-      "f0" -> Seq(SensitiveFeatureInformation.Name(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false))
+      "f0" -> Seq(SensitiveNameInformation(0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false))
     )
   )
 
@@ -627,7 +627,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f0In.featureType shouldBe classOf[PickList].getName
     f0In.derivedFeatures.size shouldBe 2
     f0In.sensitiveInformation match {
-      case Seq(SensitiveFeatureInformation.Name(
+      case Seq(SensitiveNameInformation(
         probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
       )) =>
         actionTaken shouldBe false
@@ -727,10 +727,10 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
       },
       Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
       Map(
-        "f0" -> Seq(SensitiveFeatureInformation.Name(
+        "f0" -> Seq(SensitiveNameInformation(
           0.0, Seq.empty[String], 0.0, 0.0, 1.0, "f0", None, false
         )),
-        "f_notInMeta" -> Seq(SensitiveFeatureInformation.Name(
+        "f_notInMeta" -> Seq(SensitiveNameInformation(
           1.0, Seq.empty[String], 0.0, 0.0, 1.0, "f_notInMeta", None, true
         ))
       )
@@ -748,7 +748,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f_notInMeta_butInInsights.featureType shouldBe classOf[Text].getName
     f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
     f_notInMeta_butInInsights.sensitiveInformation match {
-      case Seq(SensitiveFeatureInformation.Name(
+      case Seq(SensitiveNameInformation(
         probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
       )) =>
         actionTaken shouldBe true
