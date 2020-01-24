@@ -92,7 +92,9 @@ object SensitiveFeatureInformation {
       case SensitiveNameInformation.EntryName =>
         SensitiveNameInformation(
           meta.getDouble(SensitiveNameInformation.ProbNameKey),
-          meta.getStringArray(SensitiveNameInformation.GenderDetectStratsKey),
+          meta.getMetadataArray(
+            SensitiveNameInformation.GenderDetectStratsKey
+          ).map(GenderDetectionResults.fromMetadata),
           meta.getDouble(SensitiveNameInformation.ProbMaleKey),
           meta.getDouble(SensitiveNameInformation.ProbFemaleKey),
           meta.getDouble(SensitiveNameInformation.ProbOtherKey),
@@ -112,7 +114,7 @@ object SensitiveFeatureInformation {
 case class SensitiveNameInformation
 (
   probName: Double,
-  genderDetectResults: Seq[String],
+  genderDetectResults: Seq[GenderDetectionResults],
   probMale: Double,
   probFemale: Double,
   probOther: Double,
@@ -128,7 +130,7 @@ case class SensitiveNameInformation
       .putBoolean(SensitiveFeatureInformation.ActionTakenKey, actionTaken)
       .putString(SensitiveFeatureInformation.TypeKey, this.EntryName)
       .putDouble(SensitiveNameInformation.ProbNameKey, probName)
-      .putStringArray(SensitiveNameInformation.GenderDetectStratsKey, genderDetectResults.toArray)
+      .putMetadataArray(SensitiveNameInformation.GenderDetectStratsKey, genderDetectResults.toArray.map(_.toMetadata))
       .putDouble(SensitiveNameInformation.ProbMaleKey, probMale)
       .putDouble(SensitiveNameInformation.ProbFemaleKey, probFemale)
       .putDouble(SensitiveNameInformation.ProbOtherKey, probOther)
@@ -145,5 +147,18 @@ case object SensitiveNameInformation {
   val ProbOtherKey = "ProbOther"
 }
 
-// TODO: Use this everywhere
-case class GenderDetectionResults(strategyString: String, pctUnidentified: Double) extends JsonLike
+case class GenderDetectionResults(strategyString: String, pctUnidentified: Double) extends JsonLike {
+  def toMetadata: Metadata = {
+    new MetadataBuilder()
+      .putString(GenderDetectionResults.StrategyStringKey, strategyString)
+      .putDouble(GenderDetectionResults.PctUnidentifiedKey, pctUnidentified)
+      .build()
+  }
+}
+case object GenderDetectionResults {
+  val StrategyStringKey = "strategyString"
+  val PctUnidentifiedKey = "pctUnidentified"
+  def fromMetadata(meta: Metadata): GenderDetectionResults = {
+    GenderDetectionResults(meta.getString(StrategyStringKey), meta.getDouble(PctUnidentifiedKey))
+  }
+}

@@ -30,7 +30,7 @@
 
 package com.salesforce.op.utils.spark
 
-import com.salesforce.op.{FeatureHistory, SensitiveFeatureInformation}
+import com.salesforce.op.{FeatureHistory, GenderDetectionResults, SensitiveFeatureInformation, SensitiveNameInformation}
 import com.salesforce.op.features.types.{DateTime, Email, FeatureType, OPMap, PickList, Prediction, Real, RealMap, TextAreaMap}
 import com.salesforce.op.test.TestCommon
 import org.apache.spark.sql.types.Metadata
@@ -49,7 +49,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   type FeatureHistoryTuple = (Seq[String], Seq[String])
 
   type SensitiveTuple = (SensitiveNameTuple, String, Option[String], Boolean)
-  type SensitiveNameTuple = (Double, Seq[String], Double, Double, Double)
+  type SensitiveNameTuple = (Double, Seq[String], Seq[Double], Double, Double, Double)
 
   type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple, Seq[SensitiveTuple])
 
@@ -81,12 +81,13 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
     mapKey <- Gen.option(genName)
     actionTaken <- Gen.oneOf[Boolean](Seq(false, true))
     probName <- Gen.choose(0.0, 1.0)
-    genderDetectResults <- Gen.containerOf[Seq, String](genName)
+    genderDetectNames <- Gen.containerOf[Seq, String](genName)
+    genderDetectNums <- Gen.containerOf[Seq, Double](Gen.choose(0.0, 1.0))
     probMale <- Gen.choose(0.0, 1.0)
     probFemale <- Gen.choose(0.0, 1.0 - probMale)
     probOther <- Gen.choose(0.0, 1.0 - probMale - probFemale)
   } yield {
-    ((probName, genderDetectResults, probMale, probFemale, probOther), featureName, mapKey, actionTaken)
+    ((probName, genderDetectNames, genderDetectNums, probMale, probFemale, probOther), featureName, mapKey, actionTaken)
   }
 
   val vecGen: Gen[OpVectorTuple] = for {
@@ -109,7 +110,12 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
     columnsMeta: Array[OpVectorColumnMetadata], sensitiveInfoSeqRaw: Seq[SensitiveTuple]
   ): Map[String, Seq[SensitiveFeatureInformation]] = {
     val sensitiveInfoSeq = sensitiveInfoSeqRaw map {
-      case ((probName, genderDetectResults, probMale, probFemale, probOther), featureName, mapKey, actionTaken) =>
+      case (
+        (probName, genderDetectNames, genderDetectNums, probMale, probFemale, probOther),
+        featureName, mapKey, actionTaken) =>
+        val genderDetectResults = genderDetectNames.zip(genderDetectNums).map {
+          case (name, pct) => GenderDetectionResults(name, pct)
+        }
         SensitiveNameInformation(
           probName, genderDetectResults, probMale, probFemale, probOther, featureName, mapKey, actionTaken
         )
