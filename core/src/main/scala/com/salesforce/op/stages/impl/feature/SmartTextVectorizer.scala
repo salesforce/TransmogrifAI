@@ -211,7 +211,6 @@ object SmartTextVectorizer {
  * @param lengthCounts counts of token lengths
  */
 private[op] case class TextStats(valueCounts: Map[String, Long], lengthCounts: Map[Int, Long]) extends JsonLike {
-
   val lengthSize = lengthCounts.values.sum
   val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
   val lengthVariance: Double = lengthCounts.foldLeft(0.0)(
