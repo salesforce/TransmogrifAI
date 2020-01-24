@@ -720,7 +720,7 @@ class SmartTextMapVectorizerTest
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
       sensitive.get(fname) match {
-        case Some(Seq(SensitiveFeatureInformation.Name(
+        case Some(Seq(SensitiveNameInformation(
           probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
         ))) =>
           probName shouldBe 1.0
@@ -755,7 +755,7 @@ class SmartTextMapVectorizerTest
     def assertSensitive(estimator: SequenceEstimator[_, _], fname: String, fMapKey: String): Unit = {
       val sensitive = OpVectorMetadata("OutputVector", estimator.getMetadata()).sensitive
       sensitive.get(fname) match {
-        case Some(Seq(SensitiveFeatureInformation.Name(
+        case Some(Seq(SensitiveNameInformation(
           probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
         ))) =>
           probName should be > 0.0
@@ -835,7 +835,7 @@ class SmartTextMapVectorizerTest
       Seq(newF3, newF7).map(_.name) foreach { fname: String =>
         mapSensitive contains fname shouldBe true
         mapSensitive get fname match {
-          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, _, _, actionTaken))) =>
+          case Some(Seq(SensitiveNameInformation(_, _, _, _, _, _, _, actionTaken))) =>
             if (sensitiveCols contains fname) {
               actionTaken shouldBe true
             } else {
@@ -848,7 +848,7 @@ class SmartTextMapVectorizerTest
       Seq(newF5, newF8).map(_.name) foreach { fname: String =>
         areaMapSensitive contains fname shouldBe true
         areaMapSensitive get fname match {
-          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, _, _, actionTaken))) =>
+          case Some(Seq(SensitiveNameInformation(_, _, _, _, _, _, _, actionTaken))) =>
             if (sensitiveCols contains fname) {
               actionTaken shouldBe true
             } else {

@@ -569,7 +569,7 @@ class SmartTextVectorizerTest
       .asInstanceOf[SmartTextVectorizerModel[Text]]
     val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
     sensitive.get("name") match {
-      case Some(Seq(SensitiveFeatureInformation.Name(
+      case Some(Seq(SensitiveNameInformation(
         probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
       ))) =>
         probName shouldBe 1.0
@@ -602,7 +602,7 @@ class SmartTextVectorizerTest
       val sensitive = OpVectorMetadata("OutputVector", newEstimator.getMetadata()).sensitive
       for {j <- 1 to i} {
         sensitive.get(s"f$j") match {
-          case Some(Seq(SensitiveFeatureInformation.Name(
+          case Some(Seq(SensitiveNameInformation(
             probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
           ))) =>
             probName should be > 0.0
@@ -650,7 +650,7 @@ class SmartTextVectorizerTest
       newInputData.columns foreach { fname: String =>
         sensitive contains fname shouldBe true
         sensitive get fname match {
-          case Some(Seq(SensitiveFeatureInformation.Name(_, _, _, _, _, name, _, actionTaken))) =>
+          case Some(Seq(SensitiveNameInformation(_, _, _, _, _, name, _, actionTaken))) =>
             if (name == newF3.name) {
               actionTaken shouldBe true
             } else {

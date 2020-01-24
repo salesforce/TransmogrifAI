@@ -33,7 +33,7 @@ package com.salesforce.op.utils.stages
 import com.fasterxml.jackson.core.JsonGenerator
 import com.fasterxml.jackson.databind.SerializerProvider
 import com.fasterxml.jackson.databind.ser.std.StdSerializer
-import com.salesforce.op.SensitiveFeatureInformation
+import com.salesforce.op.{GenderDetectionResults, SensitiveFeatureInformation, SensitiveNameInformation}
 import com.salesforce.op.features.types.NameStats.GenderValue
 import com.salesforce.op.features.types.NameStats.GenderValue._
 import com.salesforce.op.features.types.Text
@@ -231,18 +231,18 @@ private[op] trait NameDetectFun[T <: Text] extends Logging with NameDetectParams
         if log.isDebugEnabled || computeTreatAsName(stats) =>
         val N = stats.dictCheckResult.count.toDouble
         val genderStrategies: Seq[(String, GenderStats)] = stats.genderResultsByStrategy.toSeq.sortBy(_._2.numOther)
-        val (bestGenderStats: GenderStats, genderStratResults: Seq[String]) = genderStrategies match {
+        val (bestGenderStats: GenderStats, genderStratResults: Seq[GenderDetectionResults]) = genderStrategies match {
           case first +: tail =>
             val bestGenderStats = first._2
             // Log all gender detection results only if debug is enabled
             val genderStratResults = (if (log.isDebugEnabled) first +: tail else Seq(first)) map {
-              case (strategyString, genderStats) => f"$strategyString: ${genderStats.numOther / N}%% unidentified"
+              case (strategyString, genderStats) => GenderDetectionResults(strategyString, genderStats.numOther / N)
             }
             (bestGenderStats, genderStratResults)
           case _ => sys.error("There ought to be gender strategies from name detection.")
         }
 
-        feature -> SensitiveFeatureInformation.Name(
+        feature -> SensitiveNameInformation(
           probName = stats.dictCheckResult.value,
           genderDetectResults = genderStratResults,
           probMale = bestGenderStats.numMale.toDouble / N,
