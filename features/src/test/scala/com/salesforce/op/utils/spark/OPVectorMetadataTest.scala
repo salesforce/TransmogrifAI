@@ -76,7 +76,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   )
   val arrVecColTupleGen: Gen[Array[OpVectorColumnTuple]] = Gen.containerOf[Array, OpVectorColumnTuple](vecColTupleGen)
 
-  val sensitiveGen: Gen[SensitiveTuple] = for {
+  val sensitiveNameGen: Gen[SensitiveTuple] = for {
     featureName <- genName
     mapKey <- Gen.option(genName)
     actionTaken <- Gen.oneOf[Boolean](Seq(false, true))
@@ -94,7 +94,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
     name <- genName
     arr <- arrVecColTupleGen
     histories <- featHistTupleGen
-    sensitiveCols <- Gen.containerOf[Seq, SensitiveTuple](sensitiveGen)
+    sensitiveCols <- Gen.containerOf[Seq, SensitiveTuple](sensitiveNameGen)
   } yield {
     (name, arr, histories, sensitiveCols)
   }

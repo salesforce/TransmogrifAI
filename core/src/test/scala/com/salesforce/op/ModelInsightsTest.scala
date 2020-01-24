@@ -576,7 +576,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     },
     Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
     Map(
-      "f0" -> Seq(SensitiveNameInformation(0.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f0", None, false))
+      "f0" -> Seq(SensitiveNameInformation(0.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f0", None))
     )
   )
 
@@ -709,32 +709,33 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     """include sensitive feature information
       |even for sensitive features that are removed from output vector and output vector metadata""".stripMargin in {
     // Copy metadata from above but add new feature that was removed in vectorizing to sensitive info
-    val f_notInMeta = Feature[Text]("f_notInMeta", false, null, Seq(), "test")
-    val newMeta = OpVectorMetadata(
-      "fv",
+    val f_notInMeta = Feature[Text]("f_notInMeta", isResponse = false, null, Seq(), "test")
+    val newFeatureName = "fv"
+    val newColumnMeta = OpVectorColumnMetadata(
+      parentFeatureName = Seq("f1"),
+      parentFeatureType = Seq(classOf[Real].getName),
+      grouping = None,
+      indicatorValue = None
+    ) +: Array("f2", "f3").map { name =>
       OpVectorColumnMetadata(
-        parentFeatureName = Seq("f1"),
-        parentFeatureType = Seq(classOf[Real].getName),
-        grouping = None,
-        indicatorValue = None
-      ) +: Array("f2", "f3").map { name =>
-        OpVectorColumnMetadata(
-          parentFeatureName = Seq("f0"),
-          parentFeatureType = Seq(classOf[PickList].getName),
-          grouping = Option("f0"),
-          indicatorValue = Option(name)
-        )
-      },
-      Seq("f1", "f0").map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap,
-      Map(
-        "f0" -> Seq(SensitiveNameInformation(
-          0.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f0", None, false
-        )),
-        "f_notInMeta" -> Seq(SensitiveNameInformation(
-          1.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f_notInMeta", None, true
-        ))
+        parentFeatureName = Seq("f0"),
+        parentFeatureType = Seq(classOf[PickList].getName),
+        grouping = Option("f0"),
+        indicatorValue = Option(name)
       )
+    }
+    val newFeatureHistory = Seq("f1", "f0").map(
+      name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())
+    ).toMap
+    val newSensitiveInfo = Map(
+      "f0" -> Seq(SensitiveNameInformation(
+        0.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f0", None
+      )),
+      "f_notInMeta" -> Seq(SensitiveNameInformation(
+        1.0, Seq.empty[GenderDetectionResults], 0.0, 0.0, 1.0, "f_notInMeta", None, actionTaken = true
+      ))
     )
+    val newMeta = OpVectorMetadata(newFeatureName, newColumnMeta, newFeatureHistory, newSensitiveInfo)
 
     val labelSum = ModelInsights.getLabelSummary(Option(lbl), Option(summary))
 
@@ -749,7 +750,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     f_notInMeta_butInInsights.derivedFeatures.size shouldBe 0
     f_notInMeta_butInInsights.sensitiveInformation match {
       case Seq(SensitiveNameInformation(
-        probName, genderDetectResults, probMale, probFemale, probOther, name, mapKey, actionTaken
+        probName, genderDetectResults, probMale, probFemale, probOther, _, _, actionTaken
       )) =>
         actionTaken shouldBe true
         probName shouldBe 1.0
