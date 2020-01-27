@@ -272,6 +272,7 @@ trait FeatureTypeSparkConverters {
   implicit val CityMapConverter = FeatureTypeSparkConverter[CityMap]()
   implicit val PostalCodeMapConverter = FeatureTypeSparkConverter[PostalCodeMap]()
   implicit val StreetMapConverter = FeatureTypeSparkConverter[StreetMap]()
+  implicit val NameStatsConverter = FeatureTypeSparkConverter[NameStats]()
   implicit val GeolocationMapConverter = FeatureTypeSparkConverter[GeolocationMap]()
   implicit val PredictionConverter = FeatureTypeSparkConverter[Prediction]()
 }
