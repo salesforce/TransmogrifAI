@@ -333,7 +333,7 @@ case class Discrete(domain: Seq[String], prob: Seq[Double]) extends LabelInfo
  * @param metrics          sequence containing metrics computed in RawFeatureFilter
  * @param distributions    distribution information for the raw feature (if calculated in RawFeatureFilter)
  * @param exclusionReasons exclusion reasons for the raw feature (if calculated in RawFeatureFilter)
- *
+ * @param sensitiveInformation derived information about sensitive field checks (if performed)
  */
 case class FeatureInsights
 (
@@ -342,7 +342,8 @@ case class FeatureInsights
   derivedFeatures: Seq[Insights],
   metrics: Seq[RawFeatureFilterMetrics] = Seq.empty,
   distributions: Seq[FeatureDistribution] = Seq.empty,
-  exclusionReasons: Seq[ExclusionReasons] = Seq.empty
+  exclusionReasons: Seq[ExclusionReasons] = Seq.empty,
+  sensitiveInformation: Seq[SensitiveFeatureInformation] = Seq.empty
 )
 
 /**
@@ -697,8 +698,41 @@ case object ModelInsights {
           val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
           val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
           val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
-          FeatureInsights(featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
-            metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons)
+          val sensitiveFeatureInformation = vectorInfo.flatMap(_.sensitive.get(fname)) match {
+            case Some(info) => info
+            case _ => Seq.empty
+          }
+          FeatureInsights(
+            featureName = fname, featureType = ftype, derivedFeatures = seq.map(_._2),
+            metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
+            sensitiveInformation = sensitiveFeatureInformation
+          )
+      }.toSeq ++ {
+        /*
+          Add FeatureInsights for removed sensitive fields that do not have a column in OpVectorMetadata.
+          With current TMOG settings, this will not happen unless null tracking is turned off since
+          null indicators are created for all text features, even ignored ones.
+        */
+        vectorInfo match {
+          case Some(v) =>
+            // Find features where `actionTaken` is true for all of the sensitive feature informations
+            v.sensitive.collect {
+              case (fname, sensitiveFeatureInformation)
+                if sensitiveFeatureInformation.forall(_.actionTaken) =>
+              val ftype = allFeatures.find(_.name == fname)
+                .map(_.typeName)
+                .getOrElse("")
+              val metrics = rawFeatureFilterResults.rawFeatureFilterMetrics.filter(_.name == fname)
+              val distributions = rawFeatureFilterResults.rawFeatureDistributions.filter(_.name == fname)
+              val exclusionReasons = rawFeatureFilterResults.exclusionReasons.filter(_.name == fname)
+              FeatureInsights(
+                featureName = fname, featureType = ftype, derivedFeatures = Seq.empty,
+                metrics = metrics, distributions = distributions, exclusionReasons = exclusionReasons,
+                sensitiveInformation = sensitiveFeatureInformation
+              )
+            }
+          case None => Seq.empty[FeatureInsights]
+        }
       }.toSeq
   }
 
