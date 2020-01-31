@@ -30,7 +30,7 @@
 
 package com.salesforce.op.filters
 
-import com.twitter.algebird.Monoid
+import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid}
 
 /**
  * Class used to get summaries of prepared features to determine distribution binning strategy
@@ -40,16 +40,16 @@ import com.twitter.algebird.Monoid
  * @param sum   sum of values for double, total number of tokens for text
  * @param count number of doubles for double, number of texts for text
  */
-case class Summary(min: Double, max: Double, sum: Double, count: Double)
+case class Summary(min: Double, max: Double, sum: Double, count: Double, hll: HLL)
 
 case object Summary {
 
-  val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0)
-
+  implicit val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
+  val empty: Summary = Summary(Double.PositiveInfinity, Double.NegativeInfinity, 0.0, 0.0, hllMonoid.zero)
   implicit val monoid: Monoid[Summary] = new Monoid[Summary] {
     override def zero = Summary.empty
     override def plus(l: Summary, r: Summary) = Summary(
-      math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count
+      math.min(l.min, r.min), math.max(l.max, r.max), l.sum + r.sum, l.count + r.count, l.hll + r.hll
     )
   }
 
@@ -59,8 +59,8 @@ case object Summary {
    */
   def apply(preppedFeature: ProcessedSeq): Summary = {
     preppedFeature match {
-      case Left(v) => Summary(v.size, v.size, v.size, 1.0)
-      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0)))
+      case Left(v) => Summary(v.size, v.size, v.size, 1.0, v.map(d => hllMonoid.create(d.getBytes)).reduce(_+_))
+      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0, hllMonoid.create(Array(d.toByte)))))
     }
   }
 }

@@ -592,14 +592,14 @@ object RawFeatureFilter {
     //  // To catch categoricals
     //  if (max < MaxTokenLowerLimit) bins
     //  else math.min(math.max(bins, sum / AvgBinValue), MaxBins).toInt()
-    bins
+    (summary.hll.estimatedSize/20).toInt
   }
 
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
   val MaxCardinality = 500
-
+  val hllbits = 12
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 
