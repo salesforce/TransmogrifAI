@@ -47,13 +47,14 @@ import scala.util.{Failure, Success}
 @RunWith(classOf[JUnitRunner])
 class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest with FiltersTestData {
 
+  val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
+
   Spec[FeatureDistribution] should "be correctly created for features" in {
     val features = Array(survived, age, gender, height, weight).map(TransientFeature.apply)
     val values: Array[(Boolean, ProcessedSeq)] = Array(
       (false, Right(Seq(1.0))), (true, Right(Seq.empty[Double])), (false, Left(Seq("male", "female"))),
       (true, Left(Seq.empty[String])), (false, Right(Seq(1.0, 3.0, 5.0)))
     )
-    val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
 
     val summaries =
       Array(Summary(0.0, 1.0, 6.0, 10, hllMonoid.zero), Summary(-1.6, 10.6, 3.0, 10, hllMonoid.zero),
@@ -92,7 +93,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
     val values: Array[(Boolean, ProcessedSeq)] = Array(
       (false, Left(RandomText.strings(1, 10).take(10000).toSeq.flatMap(_.value)))
     )
-    val summary = Array(Summary(1000.0, 50000.0, 70000.0, 10))
+    val summary = Array(Summary(1000.0, 50000.0, 70000.0, 10, hllMonoid.zero))
     val bins = 100
     val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
     val processedSeqs: Array[Option[ProcessedSeq]] = values.map { case (isEmpty, processed) =>
@@ -115,9 +116,9 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       Map("A" -> Right(Seq(1.0)), "B" -> Right(Seq(1.0))),
       Map("B" -> Right(Seq(0.0))))
     val summaries = Array(
-      Map("A" -> Summary(0.0, 2.0, 100.0, 10), "B" -> Summary(0.0, 5.0, 10.0, 10)),
-      Map("A" -> Summary(-1.6, 10.6, 30.0, 10), "B" -> Summary(0.0, 3.0, 11.0, 10)),
-      Map("B" -> Summary(0.0, 0.0, 0.0, 10)))
+      Map("A" -> Summary(0.0, 2.0, 100.0, 10, hllMonoid.zero), "B" -> Summary(0.0, 5.0, 10.0, 10, hllMonoid.zero)),
+      Map("A" -> Summary(-1.6, 10.6, 30.0, 10, hllMonoid.zero), "B" -> Summary(0.0, 3.0, 11.0, 10, hllMonoid.zero)),
+      Map("B" -> Summary(0.0, 0.0, 0.0, 10, hllMonoid.zero)))
     val bins = 10
     val distribs = features.map(_.name).zip(summaries).zip(values).flatMap { case ((name, summaryMaps), valueMaps) =>
       summaryMaps.map { case (key, summary) =>

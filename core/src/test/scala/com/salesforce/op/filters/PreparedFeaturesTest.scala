@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Tuple2Semigroup
+import com.twitter.algebird.{HyperLogLogMonoid, Tuple2Semigroup}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -55,25 +55,32 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
     val (responseSummaries2, predictorSummaries2) = preparedFeatures2.summaries
     val (responseSummaries3, predictorSummaries3) = preparedFeatures3.summaries
+    val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
 
+    println(responseSummaries1)
     responseSummaries1 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(1.0, 1.0, 1.0, 1), responseKey2 -> Summary(0.5, 0.5, 0.5, 1))
+      Seq(responseKey1 -> Summary(1.0, 1.0, 1.0, 1, hllMonoid.zero),
+        responseKey2 -> Summary(0.5, 0.5, 0.5, 1, hllMonoid.zero))
+    println(predictorSummaries1)
     predictorSummaries1 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.0, 0.0, 2), predictorKey2A -> Summary(2.0, 2.0, 2.0, 1),
-        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
+      Seq(predictorKey1 -> Summary(0.0, 0.0, 0.0, 2, hllMonoid.zero),
+        predictorKey2A -> Summary(2.0, 2.0, 2.0, 1, hllMonoid.zero),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1, hllMonoid.zero))
     responseSummaries2 should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 0.0, 0.0, 1))
+      Seq(responseKey1 -> Summary(0.0, 0.0, 0.0, 1, hllMonoid.zero))
     predictorSummaries2 should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.4, 0.5, 0.9, 2))
+      Seq(predictorKey1 -> Summary(0.4, 0.5, 0.9, 2, hllMonoid.zero))
     responseSummaries3 should contain theSameElementsAs
-      Seq(responseKey2 -> Summary(-0.5, -0.5, -0.5, 1))
+      Seq(responseKey2 -> Summary(-0.5, -0.5, -0.5, 1, hllMonoid.zero))
     predictorSummaries3 should contain theSameElementsAs
-      Seq(predictorKey2A -> Summary(1.0, 1.0, 1.0, 1))
+      Seq(predictorKey2A -> Summary(1.0, 1.0, 1.0, 1, hllMonoid.zero))
     allResponseSummaries should contain theSameElementsAs
-      Seq(responseKey1 -> Summary(0.0, 1.0, 1.0, 2), responseKey2 -> Summary(-0.5, 0.5, 0.0, 2))
+      Seq(responseKey1 -> Summary(0.0, 1.0, 1.0, 2, hllMonoid.zero),
+        responseKey2 -> Summary(-0.5, 0.5, 0.0, 2, hllMonoid.zero))
     allPredictorSummaries should contain theSameElementsAs
-      Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4), predictorKey2A -> Summary(1.0, 2.0, 3.0, 2),
-        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
+      Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4, hllMonoid.zero),
+        predictorKey2A -> Summary(1.0, 2.0, 3.0, 2, hllMonoid.zero),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1, hllMonoid.zero))
   }
 
   it should "produce summaries that are serializable" in {
