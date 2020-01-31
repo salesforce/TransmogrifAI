@@ -30,6 +30,7 @@
 
 package com.salesforce.op.filters
 
+import breeze.linalg.max
 import com.salesforce.op.OpParams
 import com.salesforce.op.features.types._
 import com.salesforce.op.features.{FeatureDistributionType, OPFeature, TransientFeature}
@@ -592,7 +593,7 @@ object RawFeatureFilter {
     //  // To catch categoricals
     //  if (max < MaxTokenLowerLimit) bins
     //  else math.min(math.max(bins, sum / AvgBinValue), MaxBins).toInt()
-    (summary.hll.estimatedSize/20).toInt
+    max((summary.hll.estimatedSize/20).toInt, bins)
   }
 
   // If there are not enough rows in the scoring set, we should not perform comparisons between the training and
