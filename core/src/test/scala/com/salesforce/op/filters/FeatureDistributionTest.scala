@@ -35,7 +35,7 @@ import com.salesforce.op.stages.impl.feature.TextStats
 import com.salesforce.op.test.PassengerSparkFixtureTest
 import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.json.EnumEntrySerializer
-import com.twitter.algebird.Moments
+import com.twitter.algebird.{HyperLogLogMonoid, Moments}
 import org.json4s.DefaultFormats
 import org.json4s.jackson.Serialization
 import org.junit.runner.RunWith
@@ -53,9 +53,12 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       (false, Right(Seq(1.0))), (true, Right(Seq.empty[Double])), (false, Left(Seq("male", "female"))),
       (true, Left(Seq.empty[String])), (false, Right(Seq(1.0, 3.0, 5.0)))
     )
+    val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
+
     val summaries =
-      Array(Summary(0.0, 1.0, 6.0, 10), Summary(-1.6, 10.6, 3.0, 10),
-        Summary(0.0, 3.0, 7.0, 10), Summary(0.0, 0.0, 5.0, 10), Summary(1.0, 5.0, 10.0, 10))
+      Array(Summary(0.0, 1.0, 6.0, 10, hllMonoid.zero), Summary(-1.6, 10.6, 3.0, 10, hllMonoid.zero),
+        Summary(0.0, 3.0, 7.0, 10, hllMonoid.zero), Summary(0.0, 0.0, 5.0, 10, hllMonoid.zero),
+        Summary(1.0, 5.0, 10.0, 10, hllMonoid.zero))
     val bins = 10
 
     val featureKeys: Array[FeatureKey] = features.map(f => (f.name, None))
