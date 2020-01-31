@@ -60,7 +60,7 @@ case object Summary {
   def apply(preppedFeature: ProcessedSeq): Summary = {
     preppedFeature match {
       case Left(v) => Summary(v.size, v.size, v.size, 1.0, v.map(d => hllMonoid.create(d.getBytes)).reduce(_ + _))
-      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0, hllMonoid.create(Array(d.toByte)))))
+      case Right(v) => monoid.sum(v.map(d => Summary(d, d, d, 1.0, hllMonoid.create(d.toString.getBytes))))
     }
   }
 }
