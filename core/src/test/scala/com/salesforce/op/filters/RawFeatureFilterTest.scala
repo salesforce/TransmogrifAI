@@ -40,7 +40,6 @@ import com.salesforce.op.test._
 import com.salesforce.op.testkit.{RandomData, _}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.{OpParams, OpWorkflow}
-import com.twitter.algebird.HyperLogLogMonoid
 import com.twitter.algebird.Operators._
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{Dataset, Row, SparkSession}
@@ -75,7 +74,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     testSummary.get.max shouldBe 1
     testSummary.get.sum shouldBe 1
     testSummary.get.count shouldBe 2
-    testSummary.get.hll.estimatedSize shouldBe 2.0
+    testSummary.get.hll.estimatedSize.toInt shouldBe 2.0
     allFeatureInfo.responseDistributions.size shouldBe 1
     allFeatureInfo.predictorSummaries.size shouldBe 12
     allFeatureInfo.predictorDistributions.size shouldBe 12
