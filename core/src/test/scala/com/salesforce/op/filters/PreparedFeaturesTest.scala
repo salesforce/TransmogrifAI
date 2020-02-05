@@ -64,59 +64,59 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
 
     compareSummary(
-      responseSummaries1.get(responseKey1).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      responseSummaries1.get(responseKey1).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
     ) shouldBe true
 
     compareSummary(
-      responseSummaries1.get(responseKey2).get, Summary(0.5, 0.5, 0.5, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      responseSummaries1.get(responseKey2).get, Summary(0.5, 0.5, 0.5, 1, SparseHLL(12, Map(2273 -> Max(2))))
     ) shouldBe true
 
     compareSummary(
-      predictorSummaries1.get(predictorKey1).get, Summary(0.0, 0.0, 0.0, 2, SparseHLL(12,Map(2273 -> Max(2))))
+      predictorSummaries1.get(predictorKey1).get, Summary(0.0, 0.0, 0.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
     ) shouldBe true
 
     compareSummary(
-      predictorSummaries1.get(predictorKey2A).get, Summary(2.0, 2.0, 2.0, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      predictorSummaries1.get(predictorKey2A).get, Summary(2.0, 2.0, 2.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
     ) shouldBe true
 
     compareSummary(
-      predictorSummaries1.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12,Map(2273 -> Max(1))))
+      predictorSummaries1.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(1))))
     ) shouldBe true
 
     compareSummary(
-      responseSummaries2.get(responseKey1).get, Summary(0.0, 0.0, 0.0, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      responseSummaries2.get(responseKey1).get, Summary(0.0, 0.0, 0.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
     ) shouldBe true
 
     compareSummary(
-      predictorSummaries2.get(predictorKey1).get, Summary(0.4, 0.5, 0.9, 2, SparseHLL(12,Map(2273 -> Max(2))))
+      predictorSummaries2.get(predictorKey1).get, Summary(0.4, 0.5, 0.9, 2, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      responseSummaries3.get(responseKey2).get, Summary(-0.5, -0.5, -0.5, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      responseSummaries3.get(responseKey2).get, Summary(-0.5, -0.5, -0.5, 1, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      predictorSummaries3.get(predictorKey2A).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      predictorSummaries3.get(predictorKey2A).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      allResponseSummaries.get(responseKey1).get,  Summary(0.0, 1.0, 1.0, 2, SparseHLL(12,Map(2273 -> Max(2))))
+      allResponseSummaries.get(responseKey1).get,  Summary(0.0, 1.0, 1.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      allResponseSummaries.get(responseKey2).get, Summary(-0.5, 0.5, 0.0, 2, SparseHLL(12,Map(2273 -> Max(2))))
+      allResponseSummaries.get(responseKey2).get, Summary(-0.5, 0.5, 0.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      allPredictorSummaries.get(predictorKey1).get, Summary(0.0, 0.5, 0.9, 4, SparseHLL(12,Map(2273 -> Max(2))))
+      allPredictorSummaries.get(predictorKey1).get, Summary(0.0, 0.5, 0.9, 4, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      allPredictorSummaries.get(predictorKey2A).get, Summary(1.0, 2.0, 3.0, 2, SparseHLL(12,Map(2273 -> Max(2))))
+      allPredictorSummaries.get(predictorKey2A).get, Summary(1.0, 2.0, 3.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
-      allPredictorSummaries.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12,Map(2273 -> Max(2))))
+      allPredictorSummaries.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
     )
   }
 
