@@ -100,7 +100,7 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
     )
 
     compareSummary(
-      allResponseSummaries.get(responseKey1).get,  Summary(0.0, 1.0, 1.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
+      allResponseSummaries.get(responseKey1).get, Summary(0.0, 1.0, 1.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
     )
 
     compareSummary(
