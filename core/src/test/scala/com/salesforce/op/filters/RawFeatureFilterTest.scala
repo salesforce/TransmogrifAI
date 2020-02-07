@@ -69,11 +69,7 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     val allFeatureInfo = filter.computeFeatureStats(passengersDataSet, features, FeatureDistributionType.Training)
 
     allFeatureInfo.responseSummaries.size shouldBe 1
-    val testSummary = allFeatureInfo.responseSummaries.headOption.map(_._2)
-    testSummary.get.min shouldBe 0
-    testSummary.get.max shouldBe 1
-    testSummary.get.sum shouldBe 1
-    testSummary.get.count shouldBe 2
+    allFeatureInfo.responseSummaries.headOption.map(_._2) shouldEqual Option(Summary(0, 1, 1, 2))
     allFeatureInfo.responseDistributions.size shouldBe 1
     allFeatureInfo.predictorSummaries.size shouldBe 12
     allFeatureInfo.predictorDistributions.size shouldBe 12
