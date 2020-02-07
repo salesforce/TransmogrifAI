@@ -201,8 +201,10 @@ private[op] trait HashingFun {
   /**
    * HashingTF instance
    */
-  protected def hashingTF(params: HashingFunctionParams): HashingTF = {
-    new HashingTF(numFeatures = params.numFeatures)
+  protected def hashingTF(params: HashingFunctionParams, adaptiveHash: Option[Int] = None): HashingTF = {
+    new HashingTF(numFeatures =
+      if (adaptiveHash.isDefined) adaptiveHash.get else params.numFeatures
+    )
       .setBinary(params.binaryFreq)
       .setHashAlgorithm(params.hashAlgorithm.toString.toLowerCase)
   }
@@ -244,7 +246,8 @@ private[op] trait HashingFun {
   protected def hash[T <: OPCollection](
     in: Seq[T],
     features: Array[TransientFeature],
-    params: HashingFunctionParams
+    params: HashingFunctionParams,
+    hashSizes: Seq[Option[Int]] = Seq(None)
   ): OPVector = {
     if (in.isEmpty) OPVector.empty
     else {
@@ -258,15 +261,14 @@ private[op] trait HashingFun {
           prepared = prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
           p <- prepared
         } allElements.append(p)
-
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        val hashedVecs =
-          fNameHashesWithInputs.map { case (featureNameHash, el) =>
-            hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
-          }
-        combine(hashedVecs).toOPVector
+        val hashers = hashSizes.map(x => hashingTF(params, x))
+        combine(hashers.zip(in).map(
+          x => x._1.transform(
+            prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+          ).asML)).toOPVector
       }
     }
   }

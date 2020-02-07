@@ -98,7 +98,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
-      val adaptiveHashSize = stats.hll.estimatedSize.toInt
+      val adaptiveHashSize = (stats.hll.estimatedSize / 20).toInt
 
       (vecMethod, topValues, adaptiveHashSize)
 
@@ -275,15 +275,22 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     (row: Seq[Text]) => {
-      val groups = row.toArray.zip(args.vectorizationMethods).groupBy(_._2)
+      // val groups = row.toArray.zip(args.vectorizationMethods).groupBy(_._2)
+      val groups =
+        (row.toArray, args.vectorizationMethods, args.adaptiveHashSizes)
+          .zipped.groupBy(_._2) map {case (key, value) => (key, value.toArray)}
+
       val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
       val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
-      val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
+      val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty)
 
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
-      val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
+      val textTokens: Seq[TextList] = textToHash.map(x => tokenize(x._1).tokens)
+      val adaptiveHashSizes: Seq[Option[Int]] = textToHash.map(x => Some(x._3))
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
-      val textVector: OPVector = hash[TextList](textTokens, getTextTransientFeatures, args.hashingParams)
+      val textVector: OPVector = hash[TextList](
+        textTokens, getTextTransientFeatures, args.hashingParams, adaptiveHashSizes
+      )
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
       } else OPVector.empty
