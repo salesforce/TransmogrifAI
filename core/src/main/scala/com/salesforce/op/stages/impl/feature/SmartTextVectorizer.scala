@@ -32,16 +32,15 @@ package com.salesforce.op.stages.impl.feature
 
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
-import com.salesforce.op.features.types.{OPVector, Text, TextList, VectorConversions, SeqDoubleConversions}
+import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
 import com.salesforce.op.utils.json.JsonLike
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.Monoid
+import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.Semigroup
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.{Dataset, Encoder}
@@ -88,7 +87,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
+    val (vectorizationMethods, topValues, adaptiveHashSizes) = aggregatedStats.map { stats =>
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
@@ -98,13 +97,18 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .filter { case (_, count) => count >= $(minSupport) }
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
-      (vecMethod, topValues)
-    }.unzip
+
+      val adaptiveHashSize = stats.hll.estimatedSize.toInt
+
+      (vecMethod, topValues, adaptiveHashSize)
+
+    }.unzip3
 
     val smartTextParams = SmartTextVectorizerModelArgs(
       vectorizationMethods = vectorizationMethods,
       topValues = topValues,
       shouldCleanText = shouldCleanText,
+      adaptiveHashSizes = adaptiveHashSizes,
       shouldTrackNulls = $(trackNulls),
       hashingParams = makeHashingParams()
     )
@@ -122,11 +126,16 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
-    val (valueCounts, lengthCounts) = text match {
-      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1L), Map(cleanTextFn(v, shouldCleanText).length -> 1L))
+    val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
+    val (valueCounts, lengthCounts, hll) = text match {
+      case Some(v) => (
+        Map(cleanTextFn(v, shouldCleanText) -> 1L),
+        Map(cleanTextFn(v, shouldCleanText).length -> 1L),
+        hllMonoid.create(v.getBytes)
+      )
       case None => (Map.empty[String, Long], Map.empty[Int, Long])
     }
-    TextStats(valueCounts, lengthCounts)
+    TextStats(valueCounts, lengthCounts, hll)
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
@@ -166,6 +175,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
 object SmartTextVectorizer {
   val MaxCardinality: Int = 100
+  val hllbits = 12
   val MinTextLengthStdDev: Double = 0
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
@@ -182,7 +192,8 @@ object SmartTextVectorizer {
 private[op] case class TextStats
 (
   valueCounts: Map[String, Long],
-  lengthCounts: Map[Int, Long]
+  lengthCounts: Map[Int, Long],
+  hll: HLL
 ) extends JsonLike {
 
   val lengthSize = lengthCounts.values.sum
@@ -191,6 +202,7 @@ private[op] case class TextStats
     (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
   )
   val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
+  val cardinality: Int = hll.estimatedSize.toInt
 }
 
 private[op] object TextStats {
@@ -213,13 +225,14 @@ private[op] object TextStats {
     override def plus(l: TextStats, r: TextStats): TextStats = {
       val newValueCounts = additionHelper(l.valueCounts, r.valueCounts, maxCardinality)
       val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts, maxCardinality)
-      TextStats(newValueCounts, newLengthCounts)
+      val newHll = l.hll + r.hll
+      TextStats(newValueCounts, newLengthCounts, newHll)
     }
 
     override def zero: TextStats = TextStats.empty
   }
-
-  def empty: TextStats = TextStats(Map.empty, Map.empty)
+  implicit val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
+  def empty: TextStats = TextStats(Map.empty, Map.empty, hllMonoid.zero)
 }
 
 /**
@@ -237,6 +250,7 @@ case class SmartTextVectorizerModelArgs
   topValues: Array[Seq[String]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
+  adaptiveHashSizes: Array[Int],
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] = {

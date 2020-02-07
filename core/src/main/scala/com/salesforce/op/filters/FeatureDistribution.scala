@@ -33,7 +33,7 @@ package com.salesforce.op.filters
 import java.util.Objects
 
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, SmartTextVectorizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird._
@@ -282,7 +282,8 @@ object FeatureDistribution {
    * @return TextStats object containing a Map from a value to its frequency (histogram)
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
-    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty)
+    val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
+    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty, hllMonoid.zero)
   }
 
   private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
