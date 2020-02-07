@@ -37,7 +37,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.test.{Passenger, PassengerSparkFixtureTest}
 import com.twitter.algebird.Operators._
-import com.twitter.algebird.{HyperLogLogMonoid, Max, SparseHLL, Tuple2Semigroup}
+import com.twitter.algebird.Tuple2Semigroup
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.sql.DataFrame
 import org.junit.runner.RunWith
@@ -51,74 +51,30 @@ class PreparedFeaturesTest extends FlatSpec with PassengerSparkFixtureTest {
 
   import PreparedFeaturesTestData._
 
-//  def compareSummary(s1: Summary, s2: Summary): Boolean = {
-//    (s1.hll.estimatedSize.toInt == s2.hll.estimatedSize.toInt) &&
-//      (s1.count == s2.count) && (s1.max == s2.max) && (s1.min == s2.min) &&
-//      (s1.sum == s2.sum)
-//  }
+  Spec[PreparedFeatures] should "produce correct summaries" in {
+    val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
+    val (responseSummaries2, predictorSummaries2) = preparedFeatures2.summaries
+    val (responseSummaries3, predictorSummaries3) = preparedFeatures3.summaries
 
-//  Spec[PreparedFeatures] should "produce correct summaries" in {
-//    val (responseSummaries1, predictorSummaries1) = preparedFeatures1.summaries
-//    val (responseSummaries2, predictorSummaries2) = preparedFeatures2.summaries
-//    val (responseSummaries3, predictorSummaries3) = preparedFeatures3.summaries
-//    val hllMonoid = new HyperLogLogMonoid(RawFeatureFilter.hllbits)
-//
-//    compareSummary(
-//      responseSummaries1.get(responseKey1).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      responseSummaries1.get(responseKey2).get, Summary(0.5, 0.5, 0.5, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      predictorSummaries1.get(predictorKey1).get, Summary(0.0, 0.0, 0.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      predictorSummaries1.get(predictorKey2A).get, Summary(2.0, 2.0, 2.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      predictorSummaries1.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(1))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      responseSummaries2.get(responseKey1).get, Summary(0.0, 0.0, 0.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    ) shouldBe true
-//
-//    compareSummary(
-//      predictorSummaries2.get(predictorKey1).get, Summary(0.4, 0.5, 0.9, 2, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      responseSummaries3.get(responseKey2).get, Summary(-0.5, -0.5, -0.5, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      predictorSummaries3.get(predictorKey2A).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      allResponseSummaries.get(responseKey1).get, Summary(0.0, 1.0, 1.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      allResponseSummaries.get(responseKey2).get, Summary(-0.5, 0.5, 0.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      allPredictorSummaries.get(predictorKey1).get, Summary(0.0, 0.5, 0.9, 4, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      allPredictorSummaries.get(predictorKey2A).get, Summary(1.0, 2.0, 3.0, 2, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//
-//    compareSummary(
-//      allPredictorSummaries.get(predictorKey2B).get, Summary(1.0, 1.0, 1.0, 1, SparseHLL(12, Map(2273 -> Max(2))))
-//    )
-//  }
+    responseSummaries1 should contain theSameElementsAs
+      Seq(responseKey1 -> Summary(1.0, 1.0, 1.0, 1), responseKey2 -> Summary(0.5, 0.5, 0.5, 1))
+    predictorSummaries1 should contain theSameElementsAs
+      Seq(predictorKey1 -> Summary(0.0, 0.0, 0.0, 2), predictorKey2A -> Summary(2.0, 2.0, 2.0, 1),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
+    responseSummaries2 should contain theSameElementsAs
+      Seq(responseKey1 -> Summary(0.0, 0.0, 0.0, 1))
+    predictorSummaries2 should contain theSameElementsAs
+      Seq(predictorKey1 -> Summary(0.4, 0.5, 0.9, 2))
+    responseSummaries3 should contain theSameElementsAs
+      Seq(responseKey2 -> Summary(-0.5, -0.5, -0.5, 1))
+    predictorSummaries3 should contain theSameElementsAs
+      Seq(predictorKey2A -> Summary(1.0, 1.0, 1.0, 1))
+    allResponseSummaries should contain theSameElementsAs
+      Seq(responseKey1 -> Summary(0.0, 1.0, 1.0, 2), responseKey2 -> Summary(-0.5, 0.5, 0.0, 2))
+    allPredictorSummaries should contain theSameElementsAs
+      Seq(predictorKey1 -> Summary(0.0, 0.5, 0.9, 4), predictorKey2A -> Summary(1.0, 2.0, 3.0, 2),
+        predictorKey2B -> Summary(1.0, 1.0, 1.0, 1))
+  }
 
   it should "produce summaries that are serializable" in {
     Try(spark.sparkContext.makeRDD(allPreparedFeatures).map(_.summaries).reduce(_ + _)) match {
