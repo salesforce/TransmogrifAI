@@ -98,7 +98,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
-      val adaptiveHashSize = (stats.hll.estimatedSize / 20).toInt
+      val adaptiveHashSize = math.max((stats.hll.estimatedSize / 20).toInt, $(numFeatures))
 
       (vecMethod, topValues, adaptiveHashSize)
 
