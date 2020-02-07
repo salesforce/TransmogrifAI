@@ -74,7 +74,6 @@ class RawFeatureFilterTest extends FlatSpec with PassengerSparkFixtureTest with 
     testSummary.get.max shouldBe 1
     testSummary.get.sum shouldBe 1
     testSummary.get.count shouldBe 2
-    testSummary.get.hll.estimatedSize.toInt shouldBe 2.0
     allFeatureInfo.responseDistributions.size shouldBe 1
     allFeatureInfo.predictorSummaries.size shouldBe 12
     allFeatureInfo.predictorDistributions.size shouldBe 12
