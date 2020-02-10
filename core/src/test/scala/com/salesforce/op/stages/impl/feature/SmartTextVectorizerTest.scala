@@ -434,20 +434,35 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(Map("hello" -> 1, "world" -> 2), Map(5 -> 3))
-    val r1 = TextStats(Map("hello" -> 1, "world" -> 1), Map(5 -> 2))
-    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3), Map(5 -> 5))
+    val l1 = TextStats(
+      Map("hello" -> 1, "world" -> 2), Map(5 -> 3), TextStats.hllMonoid.zero
+    )
+    val r1 = TextStats(
+      Map("hello" -> 1, "world" -> 1), Map(5 -> 2), TextStats.hllMonoid.zero
+    )
+    val expected1 = TextStats(
+      Map("hello" -> 2, "world" -> 3), Map(5 -> 5), TextStats.hllMonoid.zero
+    )
 
-    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
-    val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
-    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7))
+    val l2 = TextStats(
+      Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6), TextStats.hllMonoid.zero
+    )
+    val r2 = TextStats(
+      Map("hello" -> 1), Map(5 -> 1), TextStats.hllMonoid.zero
+    )
+    val expected2 = TextStats(
+      Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7), TextStats.hllMonoid.zero
+    )
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
   }
 
   it should "compute correct statistics on the length distributions" in {
-    val ts = TextStats(Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2))
+    val ts = TextStats(
+      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
+    )
+
 
     ts.lengthSize shouldBe 5
     ts.lengthMean shouldBe 4.0
