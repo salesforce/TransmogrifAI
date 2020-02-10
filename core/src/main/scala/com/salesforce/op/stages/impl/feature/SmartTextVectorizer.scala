@@ -43,7 +43,7 @@ import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
@@ -63,7 +63,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams with MinLengthStdDevParams {
 
-  private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
+  private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
 
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),

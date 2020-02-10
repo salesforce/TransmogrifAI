@@ -282,8 +282,7 @@ object FeatureDistribution {
    * @return TextStats object containing a Map from a value to its frequency (histogram)
    */
   private def cardinalityValues(values: ProcessedSeq): TextStats = {
-    val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
-    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty, hllMonoid.zero)
+    TextStats(countStringValues(values.left.getOrElse(values.right.get)), Map.empty)
   }
 
   private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
