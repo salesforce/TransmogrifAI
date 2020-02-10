@@ -193,7 +193,7 @@ private[op] case class TextStats
 (
   valueCounts: Map[String, Long],
   lengthCounts: Map[Int, Long],
-  hll: HLL = new HyperLogLogMonoid(SmartTextVectorizer.hllbits).zero
+  hll: HLL
 ) extends JsonLike {
 
   val lengthSize = lengthCounts.values.sum
@@ -231,7 +231,7 @@ private[op] object TextStats {
 
     override def zero: TextStats = TextStats.empty
   }
-  implicit val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
+  val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
   def empty: TextStats = TextStats(Map.empty, Map.empty, hllMonoid.zero)
 }
 
