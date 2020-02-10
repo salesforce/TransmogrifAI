@@ -126,14 +126,13 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
-    val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
     val (valueCounts, lengthCounts, hll) = text match {
       case Some(v) => (
         Map(cleanTextFn(v, shouldCleanText) -> 1L),
         Map(cleanTextFn(v, shouldCleanText).length -> 1L),
-        hllMonoid.create(v.getBytes)
+        TextStats.hllMonoid.create(v.getBytes)
       )
-      case None => (Map.empty[String, Long], Map.empty[Int, Long], hllMonoid.zero)
+      case None => (Map.empty[String, Long], Map.empty[Int, Long], TextStats.hllMonoid.zero)
     }
     TextStats(valueCounts, lengthCounts, hll)
   }
