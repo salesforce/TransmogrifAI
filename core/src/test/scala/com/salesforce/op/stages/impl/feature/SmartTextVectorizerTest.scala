@@ -35,7 +35,7 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomReal, RandomText}
-import com.salesforce.op.utils.json.{JsonUtils, TestDouble}
+import com.salesforce.op.utils.json.{JsonUtils}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
