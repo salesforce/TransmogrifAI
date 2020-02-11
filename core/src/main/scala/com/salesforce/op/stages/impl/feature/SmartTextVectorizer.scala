@@ -208,23 +208,9 @@ private[op] case class TextStats
   val cardinality: Int = hll.estimatedSize.toInt
 
   override def toJson(pretty: Boolean): String = {
-
-    val serializer = new StdSerializer[HLL](classOf[HLL]) {
-      override def serialize(value: HLL, gen: JsonGenerator, provider: SerializerProvider): Unit = {
-        val bytes: Array[Byte] = HyperLogLog.toBytes(value)
-        val encoded = Base64.encodeBase64(bytes)
-        encoded.toString
-      }
-    }
-    val deserializer = new StdDeserializer[HLL](classOf[HLL]) {
-      override def deserialize(p: JsonParser, ctxt: DeserializationContext): HLL = {
-        val bytes: Array[Byte] = p.getBinaryValue()
-        val decoded = Base64.decodeBase64(bytes)
-        HyperLogLog.fromBytes(decoded)
-      }
-    }
-
-    JsonUtils.toJsonString(this, pretty = pretty, Seq(SerDes[HLL](classOf[HLL], serializer, deserializer)))
+    val bytes: Array[Byte] = HyperLogLog.toBytes(hll)
+    val encoded = Base64.encodeBase64(bytes)
+    encoded.toString
   }
 }
 
