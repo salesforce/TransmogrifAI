@@ -35,11 +35,14 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomReal, RandomText}
+import com.salesforce.op.utils.json.{JsonUtils, TestDouble}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+
+import scala.util.{Failure, Success}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -468,6 +471,23 @@ class SmartTextVectorizerTest
     ts.lengthMean shouldBe 4.0
     ts.lengthVariance shouldBe 4.0
     ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
+  }
+
+  it should "correctly serialize and deserialize text stats" in {
+    val ts = TextStats(
+      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
+    )
+
+    val jsonValue = JsonUtils.fromString(ts.toJson()).get
+
+    JsonUtils.fromString[TextStats](jsonValue) match {
+      case Failure(e) => fail(e)
+      case Success(r) => {
+        r.valueCounts shouldBe Map("hello" -> 2, "joe" -> 2, "woof" -> 1)
+        r.lengthCounts shouldBe Map(3 -> 2, 4 -> 1, 5 -> 2)
+        r.hll.estimatedSize.toInt shouldBe 0
+      }
+    }
   }
 
 }
