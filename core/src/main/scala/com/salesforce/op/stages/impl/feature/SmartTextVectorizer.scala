@@ -30,19 +30,23 @@
 
 package com.salesforce.op.stages.impl.feature
 
+import com.fasterxml.jackson.core.{JsonGenerator, JsonParser}
+import com.fasterxml.jackson.databind.{DeserializationContext, SerializerProvider}
+import com.fasterxml.jackson.databind.deser.std.StdDeserializer
+import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
-import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.{HLL, HyperLogLogMonoid, Monoid, Semigroup}
+import com.twitter.algebird.{HLL, HyperLogLog, HyperLogLogMonoid, Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.commons.codec.binary.Base64
 import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.ClassTag
@@ -202,6 +206,26 @@ private[op] case class TextStats
   )
   val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
   val cardinality: Int = hll.estimatedSize.toInt
+
+  override def toJson(pretty: Boolean): String = {
+
+    val serializer = new StdSerializer[HLL](classOf[HLL]) {
+      override def serialize(value: HLL, gen: JsonGenerator, provider: SerializerProvider): Unit = {
+        val bytes: Array[Byte] = HyperLogLog.toBytes(value)
+        val encoded = Base64.encodeBase64(bytes)
+        encoded.toString
+      }
+    }
+    val deserializer = new StdDeserializer[HLL](classOf[HLL]) {
+      override def deserialize(p: JsonParser, ctxt: DeserializationContext): HLL = {
+        val bytes: Array[Byte] = p.getBinaryValue()
+        val decoded = Base64.decodeBase64(bytes)
+        HyperLogLog.fromBytes(decoded)
+      }
+    }
+
+    JsonUtils.toJsonString(this, pretty = pretty, Seq(SerDes[HLL](classOf[HLL], serializer, deserializer)))
+  }
 }
 
 private[op] object TextStats {
