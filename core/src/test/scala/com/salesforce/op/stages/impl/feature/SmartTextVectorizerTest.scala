@@ -473,21 +473,4 @@ class SmartTextVectorizerTest
     ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
   }
 
-  it should "correctly serialize and deserialize text stats" in {
-    val ts = TextStats(
-      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
-    )
-
-    val jsonValue = JsonUtils.fromString(ts.toJson()).get
-
-    JsonUtils.fromString[TextStats](jsonValue) match {
-      case Failure(e) => fail(e)
-      case Success(r) => {
-        r.valueCounts shouldBe Map("hello" -> 2, "joe" -> 2, "woof" -> 1)
-        r.lengthCounts shouldBe Map(3 -> 2, 4 -> 1, 5 -> 2)
-        r.hll.estimatedSize.toInt shouldBe 0
-      }
-    }
-  }
-
 }

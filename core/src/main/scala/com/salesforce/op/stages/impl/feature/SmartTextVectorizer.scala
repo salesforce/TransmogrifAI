@@ -206,12 +206,6 @@ private[op] case class TextStats
   )
   val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
   val cardinality: Int = hll.estimatedSize.toInt
-
-  override def toJson(pretty: Boolean): String = {
-    val bytes: Array[Byte] = HyperLogLog.toBytes(hll)
-    val encoded = Base64.encodeBase64(bytes)
-    encoded.toString
-  }
 }
 
 private[op] object TextStats {
