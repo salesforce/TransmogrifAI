@@ -473,4 +473,11 @@ class SmartTextVectorizerTest
     ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
   }
 
+  it should "serialize TextStats" in {
+    val ts = TextStats(
+      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
+    )
+    println(ts.toJson())
+  }
+
 }
