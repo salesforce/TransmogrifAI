@@ -135,10 +135,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
     val (valueCounts, lengthCounts) = text match {
-      case Some(v) => (
-        Map(cleanTextFn(v, shouldCleanText) -> 1L),
-        Map(cleanTextFn(v, shouldCleanText).length -> 1L)
-      )
+      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1L), Map(cleanTextFn(v, shouldCleanText).length -> 1L))
       case None => (Map.empty[String, Long], Map.empty[Int, Long])
     }
     TextStats(valueCounts, lengthCounts)
