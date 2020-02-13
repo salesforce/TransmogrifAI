@@ -43,7 +43,7 @@ import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
-import org.apache.spark.sql.{Encoders}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.serializer.KryoSerializer
 import org.apache.spark.sql.{Dataset, Encoder}
 import scala.reflect.ClassTag
@@ -65,8 +65,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
     with MinLengthStdDevParams with MaxPctCardinalityFun {
 
-  private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
-
+  private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
     prependFeatureName = $(prependFeatureName),
@@ -109,7 +108,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val (uniqueCountHLLs, _) = countUniques(dataset, size = inN.length, bits = SmartTextVectorizer.hllBits)
     val adaptiveHashSizes = uniqueCountHLLs.map(
-      x=> Some(math.max((x.estimatedSize / 20).toInt, $(numFeatures)))
+      x => Some(math.max((x.estimatedSize / 20).toInt, $(numFeatures)))
     )
 
     val smartTextParams = SmartTextVectorizerModelArgs(
