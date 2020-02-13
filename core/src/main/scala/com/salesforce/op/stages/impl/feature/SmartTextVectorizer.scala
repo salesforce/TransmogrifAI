@@ -30,25 +30,22 @@
 
 package com.salesforce.op.stages.impl.feature
 
-import com.fasterxml.jackson.core.{JsonGenerator, JsonParser}
-import com.fasterxml.jackson.databind.{DeserializationContext, SerializerProvider}
-import com.fasterxml.jackson.databind.deser.std.StdDeserializer
-import com.fasterxml.jackson.databind.ser.std.StdSerializer
 import com.salesforce.op.UID
 import com.salesforce.op.features.TransientFeature
 import com.salesforce.op.features.types.{OPVector, SeqDoubleConversions, Text, TextList, VectorConversions}
 import com.salesforce.op.stages.base.sequence.{SequenceEstimator, SequenceModel}
 import com.salesforce.op.stages.impl.feature.VectorizerUtils._
-import com.salesforce.op.utils.json.{JsonLike, JsonUtils, SerDes}
+import com.salesforce.op.utils.json.JsonLike
+import com.salesforce.op.utils.reflection.ReflectionUtils
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import com.twitter.algebird.{HLL, HyperLogLog, HyperLogLogMonoid, Monoid, Semigroup}
+import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import org.apache.spark.ml.param._
-import org.apache.commons.codec.binary.Base64
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
-
+import org.apache.spark.sql.{Encoders}
+import org.apache.spark.serializer.KryoSerializer
+import org.apache.spark.sql.{Dataset, Encoder}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe.TypeTag
 
@@ -65,7 +62,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   extends SequenceEstimator[T, OPVector](operationName = "smartTxtVec", uid = uid)
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
-    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams with MinLengthStdDevParams {
+    with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
+    with MinLengthStdDevParams with MaxPctCardinalityFun {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
 
@@ -91,7 +89,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (vectorizationMethods, topValues, adaptiveHashSizes) = aggregatedStats.map { stats =>
+    val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
@@ -102,17 +100,23 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
-      val adaptiveHashSize = math.max((stats.hll.estimatedSize / 20).toInt, $(numFeatures))
+      (vecMethod, topValues)
 
-      (vecMethod, topValues, adaptiveHashSize)
+    }.unzip
 
-    }.unzip3
+    implicit val classTag: ClassTag[T#Value] = ReflectionUtils.classTagForWeakTypeTag[T#Value]
+    implicit val kryo = new KryoSerializer(dataset.sparkSession.sparkContext.getConf)
+
+    val (uniqueCountHLLs, _) = countUniques(dataset, size = inN.length, bits = SmartTextVectorizer.hllBits)
+    val adaptiveHashSizes = uniqueCountHLLs.map(
+      x=> Some(math.max((x.estimatedSize / 20).toInt, $(numFeatures)))
+    )
 
     val smartTextParams = SmartTextVectorizerModelArgs(
       vectorizationMethods = vectorizationMethods,
       topValues = topValues,
-      shouldCleanText = shouldCleanText,
       adaptiveHashSizes = adaptiveHashSizes,
+      shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
       hashingParams = makeHashingParams()
     )
@@ -130,15 +134,14 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 
   private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
-    val (valueCounts, lengthCounts, hll) = text match {
+    val (valueCounts, lengthCounts) = text match {
       case Some(v) => (
         Map(cleanTextFn(v, shouldCleanText) -> 1L),
-        Map(cleanTextFn(v, shouldCleanText).length -> 1L),
-        TextStats.hllMonoid.create(v.getBytes)
+        Map(cleanTextFn(v, shouldCleanText).length -> 1L)
       )
-      case None => (Map.empty[String, Long], Map.empty[Int, Long], TextStats.hllMonoid.zero)
+      case None => (Map.empty[String, Long], Map.empty[Int, Long])
     }
-    TextStats(valueCounts, lengthCounts, hll)
+    TextStats(valueCounts, lengthCounts)
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
@@ -178,8 +181,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
 object SmartTextVectorizer {
   val MaxCardinality: Int = 100
-  val hllbits = 12
   val MinTextLengthStdDev: Double = 0
+  val hllBits: Int = 12
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
@@ -195,8 +198,7 @@ object SmartTextVectorizer {
 private[op] case class TextStats
 (
   valueCounts: Map[String, Long],
-  lengthCounts: Map[Int, Long],
-  hll: HLL
+  lengthCounts: Map[Int, Long]
 ) extends JsonLike {
 
   val lengthSize = lengthCounts.values.sum
@@ -205,7 +207,6 @@ private[op] case class TextStats
     (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
   )
   val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
-  val cardinality: Int = hll.estimatedSize.toInt
 }
 
 private[op] object TextStats {
@@ -228,14 +229,12 @@ private[op] object TextStats {
     override def plus(l: TextStats, r: TextStats): TextStats = {
       val newValueCounts = additionHelper(l.valueCounts, r.valueCounts, maxCardinality)
       val newLengthCounts = additionHelper(l.lengthCounts, r.lengthCounts, maxCardinality)
-      val newHll = l.hll + r.hll
-      TextStats(newValueCounts, newLengthCounts, newHll)
+      TextStats(newValueCounts, newLengthCounts)
     }
 
     override def zero: TextStats = TextStats.empty
   }
-  val hllMonoid = new HyperLogLogMonoid(SmartTextVectorizer.hllbits)
-  def empty: TextStats = TextStats(Map.empty, Map.empty, hllMonoid.zero)
+  def empty: TextStats = TextStats(Map.empty, Map.empty)
 }
 
 /**
@@ -251,9 +250,9 @@ case class SmartTextVectorizerModelArgs
 (
   vectorizationMethods: Array[TextVectorizationMethod],
   topValues: Array[Seq[String]],
+  adaptiveHashSizes: Seq[Option[Int]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
-  adaptiveHashSizes: Array[Int],
   hashingParams: HashingFunctionParams
 ) extends JsonLike {
   def categoricalTopValues: Array[Seq[String]] = {
@@ -286,13 +285,11 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
       val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty)
-
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
       val textTokens: Seq[TextList] = textToHash.map(x => tokenize(x._1).tokens)
-      val adaptiveHashSizes: Seq[Option[Int]] = textToHash.map(x => Some(x._3))
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](
-        textTokens, getTextTransientFeatures, args.hashingParams, adaptiveHashSizes
+        textTokens, getTextTransientFeatures, args.hashingParams, args.adaptiveHashSizes
       )
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)

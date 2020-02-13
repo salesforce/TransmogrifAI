@@ -35,14 +35,11 @@ import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.testkit.{RandomReal, RandomText}
-import com.salesforce.op.utils.json.{JsonUtils}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-
-import scala.util.{Failure, Success}
 
 
 @RunWith(classOf[JUnitRunner])
@@ -437,47 +434,25 @@ class SmartTextVectorizerTest
   }
 
   Spec[TextStats] should "aggregate correctly" in {
-    val l1 = TextStats(
-      Map("hello" -> 1, "world" -> 2), Map(5 -> 3), TextStats.hllMonoid.zero
-    )
-    val r1 = TextStats(
-      Map("hello" -> 1, "world" -> 1), Map(5 -> 2), TextStats.hllMonoid.zero
-    )
-    val expected1 = TextStats(
-      Map("hello" -> 2, "world" -> 3), Map(5 -> 5), TextStats.hllMonoid.zero
-    )
+    val l1 = TextStats(Map("hello" -> 1, "world" -> 2), Map(5 -> 3))
+    val r1 = TextStats(Map("hello" -> 1, "world" -> 1), Map(5 -> 2))
+    val expected1 = TextStats(Map("hello" -> 2, "world" -> 3), Map(5 -> 5))
 
-    val l2 = TextStats(
-      Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6), TextStats.hllMonoid.zero
-    )
-    val r2 = TextStats(
-      Map("hello" -> 1), Map(5 -> 1), TextStats.hllMonoid.zero
-    )
-    val expected2 = TextStats(
-      Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7), TextStats.hllMonoid.zero
-    )
+    val l2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 6))
+    val r2 = TextStats(Map("hello" -> 1), Map(5 -> 1))
+    val expected2 = TextStats(Map("hello" -> 1, "world" -> 2, "ocean" -> 3), Map(5 -> 7))
 
     TextStats.monoid(2).plus(l1, r1) shouldBe expected1
     TextStats.monoid(2).plus(l2, r2) shouldBe expected2
   }
 
   it should "compute correct statistics on the length distributions" in {
-    val ts = TextStats(
-      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
-    )
-
+    val ts = TextStats(Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2))
 
     ts.lengthSize shouldBe 5
     ts.lengthMean shouldBe 4.0
     ts.lengthVariance shouldBe 4.0
     ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
-  }
-
-  it should "serialize TextStats" in {
-    val ts = TextStats(
-      Map("hello" -> 2, "joe" -> 2, "woof" -> 1), Map(3 -> 2, 4 -> 1, 5 -> 2), TextStats.hllMonoid.zero
-    )
-    println(ts.toJson())
   }
 
 }
