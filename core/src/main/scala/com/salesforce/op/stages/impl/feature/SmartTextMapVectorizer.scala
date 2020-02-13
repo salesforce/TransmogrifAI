@@ -41,7 +41,8 @@ import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.macros.caseclass
-import org.apache.spark.sql.{Dataset, Encoder, Encoders}
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.{Dataset, Encoder}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -64,7 +65,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams {
 
-  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
+  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 
   private def computeTextMapStats
   (
@@ -72,9 +73,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       cleanTextFn(k, shouldCleanKeys) ->
-        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L),
-          Map(cleanTextFn(v, shouldCleanValues).length -> 1L),
-          TextStats.hllMonoid.zero)
+        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L), Map(cleanTextFn(v, shouldCleanValues).length -> 1L))
     }
     TextMapStats(keyValueCounts)
   }
