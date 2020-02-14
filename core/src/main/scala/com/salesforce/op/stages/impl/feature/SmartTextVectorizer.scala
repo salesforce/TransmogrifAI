@@ -130,7 +130,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       case Some(v) => (
         Map(cleanTextFn(v, shouldCleanText) -> 1L),
         Map(cleanTextFn(v, shouldCleanText).length -> 1L),
-        tokenize(Text(v)).tokens.value.map(x => TextStats.hllMonoid.create(x.getBytes)).reduce(_ + _)
+        tokenize(Text(v))
+          .tokens.value
+          .map(x => TextStats.hllMonoid.create(x.getBytes))
+          .reduceOption(_ + _).getOrElse(TextStats.hllMonoid.zero)
       )
       case None => (Map.empty[String, Long], Map.empty[Int, Long], TextStats.hllMonoid.zero)
     }
