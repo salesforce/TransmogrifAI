@@ -73,7 +73,11 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   ): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       cleanTextFn(k, shouldCleanKeys) ->
-        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L), Map(cleanTextFn(v, shouldCleanValues).length -> 1L))
+        TextStats(
+          Map(cleanTextFn(v, shouldCleanValues) -> 1L),
+          Map(cleanTextFn(v, shouldCleanValues).length -> 1L),
+          tokenize(Text(v)).tokens.value.map(x => TextStats.hllMonoid.create(x.getBytes)).reduce(_ + _)
+        )
     }
     TextMapStats(keyValueCounts)
   }
