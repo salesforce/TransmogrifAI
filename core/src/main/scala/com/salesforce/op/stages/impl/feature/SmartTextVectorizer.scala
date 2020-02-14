@@ -63,7 +63,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
-    with MinLengthStdDevParams with MaxPctCardinalityFun {
+    with MinLengthStdDevParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = ExpressionEncoder[Array[TextStats]]()
   private def makeHashingParams() = HashingFunctionParams(
@@ -83,6 +83,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val maxCard = $(maxCardinality)
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
+    val shouldAdaptiveHash = $(adaptiveHash)
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
@@ -100,9 +101,9 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .take($(topK)).map(_._1)
 
       val adaptiveHashSize =
-        if (SmartTextVectorizer.adaptiveHash)
+        if (shouldAdaptiveHash)
         Some((stats.hll.estimatedSize / 20).toInt)
-        else Some($(numFeatures))
+        else None
       (vecMethod, topValues, adaptiveHashSize)
 
     }.unzip3
@@ -338,4 +339,14 @@ trait MinLengthStdDevParams extends Params {
   final def setMinLengthStdDev(v: Double): this.type = set(minLengthStdDev, v)
   final def getMinLengthStdDev: Double = $(minLengthStdDev)
   setDefault(minLengthStdDev -> SmartTextVectorizer.MinTextLengthStdDev)
+}
+
+trait AdaptiveHashParams extends Params {
+  final val adaptiveHash = new BooleanParam(
+    parent = this, name = "adaptiveHash",
+    doc = "If true we will adaptively set the hash space for each text feature, otherwise we will use the default"
+  )
+  final def setAdaptiveHash(v: Boolean): this.type = set(adaptiveHash, v)
+  final def getAdaptiveHash: Boolean = $(adaptiveHash)
+  setDefault(adaptiveHash -> SmartTextVectorizer.adaptiveHash)
 }
