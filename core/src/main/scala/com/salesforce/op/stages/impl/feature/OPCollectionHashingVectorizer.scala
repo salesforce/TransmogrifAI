@@ -264,11 +264,20 @@ private[op] trait HashingFun {
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        val hashers = hashSizes.map(x => hashingTF(params, x))
-        combine(hashers.zip(in).map(
-          x => x._1.transform(
-            prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
-          ).asML)).toOPVector
+        if (SmartTextVectorizer.adaptiveHash) {
+          val hashers = hashSizes.map(x => hashingTF(params, x))
+          combine(hashers.zip(in).map(
+            x => x._1.transform(
+              prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+            ).asML)).toOPVector
+        }
+        else {
+          val hashedVecs =
+            fNameHashesWithInputs.map { case (featureNameHash, el) =>
+              hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
+            }
+          combine(hashedVecs).toOPVector
+        }
       }
     }
   }

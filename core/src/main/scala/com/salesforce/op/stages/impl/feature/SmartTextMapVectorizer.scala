@@ -42,7 +42,7 @@ import com.twitter.algebird.Operators._
 import com.twitter.algebird.{Monoid, Semigroup}
 import com.twitter.algebird.macros.caseclass
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.{Dataset, Encoder}
+import org.apache.spark.sql.{Dataset, Encoder, Encoders}
 
 import scala.reflect.runtime.universe.TypeTag
 
@@ -65,7 +65,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
     with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams {
 
-  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
+  private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
 
   private def computeTextMapStats
   (
