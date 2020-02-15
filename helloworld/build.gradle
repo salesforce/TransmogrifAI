@@ -37,7 +37,7 @@ ext {
     scalaVersion = '2.11'
     scalaVersionRevision = '12'
     junitVersion = '4.12'
-    sparkVersion = '2.4.5'
+    sparkVersion = '2.4.4'
     scalatestVersion = '3.0.0'
     transmogrifaiVersion ='0.6.1'
     collectionsVersion = '3.2.2'
