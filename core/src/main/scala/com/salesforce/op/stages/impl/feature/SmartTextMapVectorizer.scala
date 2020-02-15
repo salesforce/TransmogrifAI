@@ -76,7 +76,9 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         TextStats(
           Map(cleanTextFn(v, shouldCleanValues) -> 1L),
           Map(cleanTextFn(v, shouldCleanValues).length -> 1L),
-          tokenize(Text(v)).tokens.value.map(x => TextStats.hllMonoid.create(x.getBytes)).reduce(_ + _)
+          tokenize(Text(v)).tokens.value.map(
+            x => TextStats.hllMonoid.create(x.getBytes))
+            .reduceOption(_ + _).getOrElse(TextStats.hllMonoid.zero)
         )
     }
     TextMapStats(keyValueCounts)
