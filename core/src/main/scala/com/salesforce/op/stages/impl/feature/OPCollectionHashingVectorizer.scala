@@ -264,7 +264,7 @@ private[op] trait HashingFun {
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        if (SmartTextVectorizer.adaptiveHash) {
+        if (hashSizes.forall(_.isDefined)) {
           val hashers = hashSizes.map(x => hashingTF(params, x))
           combine(hashers.zip(in).map(
             x => x._1.transform(
