@@ -62,7 +62,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with HashingFun with OneHotFun with MaxCardinalityParams
-    with MinLengthStdDevParams with AdaptiveHashParams {
+    with MinLengthStdDevParams with AdaptiveHashParams with AdaptiveHashCollisionParams {
 
   private implicit val textStatsSeqEnc: Encoder[Array[TextStats]] = Encoders.kryo[Array[TextStats]]
   private def makeHashingParams() = HashingFunctionParams(
@@ -99,7 +99,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
-      val adaptiveHashSize = if (shouldAdaptiveHash) Some((stats.hll.estimatedSize / 20).toInt) else None
+      val adaptiveHashSize =
+        if (shouldAdaptiveHash) {
+          Some((stats.hll.estimatedSize / $(adaptiveHashCollision) ).toInt)
+        }
+        else None
       (vecMethod, topValues, adaptiveHashSize)
 
     }.unzip3
@@ -180,6 +184,7 @@ object SmartTextVectorizer {
   val MinTextLengthStdDev: Double = 0
   val hllBits: Int = 12
   val adaptiveHash: Boolean = false
+  val adaptiveHashCollision: Int = 20
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
@@ -348,4 +353,14 @@ trait AdaptiveHashParams extends Params {
   final def setAdaptiveHash(v: Boolean): this.type = set(adaptiveHash, v)
   final def getAdaptiveHash: Boolean = $(adaptiveHash)
   setDefault(adaptiveHash -> SmartTextVectorizer.adaptiveHash)
+}
+
+trait AdaptiveHashCollisionParams extends Params {
+  final val adaptiveHashCollision = new IntParam(
+    parent = this, name = "adaptiveHash",
+    doc = "If adaptiveHash is true we set tolerable threshold for hash collison"
+  )
+  final def setAdaptiveHashCollision(v: Int): this.type = set(adaptiveHashCollision, v)
+  final def getAdaptiveHashCollision: Int = $(adaptiveHashCollision)
+  setDefault(adaptiveHashCollision -> SmartTextVectorizer.adaptiveHashCollision)
 }
