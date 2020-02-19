@@ -7,7 +7,7 @@ dependencies {
     testCompile("org.apache.avro:avro-mapred:$avroVersion:$hadoopVersion") { exclude group: 'org.mortbay.jetty', module: 'servlet-api' }
 
     // Spark Avro
-    compile ("com.databricks:spark-avro_$scalaVersion:$sparkAvroVersion") { exclude group: "org.apache.avro", module: "avro" }
+    compile "org.apache.spark:spark-avro_$scalaVersion:$sparkVersion"
 
     // Jackson Yaml
     compile ("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion") { exclude group: "com.fasterxml.jackson.core" }
