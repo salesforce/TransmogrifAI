@@ -379,7 +379,8 @@ private[op] trait MapHashingFun extends HashingFun {
   (
     inputs: Seq[Map[String, TextList]],
     allKeys: Seq[Seq[String]],
-    params: HashingFunctionParams
+    params: HashingFunctionParams,
+    hashSizes: Seq[Option[Int]] = Seq(None)
   ): OPVector = {
     if (inputs.isEmpty) OPVector.empty
     else {

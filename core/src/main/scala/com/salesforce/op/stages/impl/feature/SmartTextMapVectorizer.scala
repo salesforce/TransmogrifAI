@@ -63,7 +63,8 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     with PivotParams with CleanTextFun with SaveOthersParams
     with TrackNullsParam with MinSupportParam with TextTokenizerParams with TrackTextLenParam
     with HashingVectorizerParams with MapHashingFun with OneHotFun with MapStringPivotHelper
-    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams {
+    with MapVectorizerFuns[String, OPMap[String]] with MaxCardinalityParams with MinLengthStdDevParams
+    with AdaptiveHashParams with AdaptiveHashCollisionParams {
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = Encoders.kryo[Array[TextMapStats]]
 
@@ -154,6 +155,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
     val shouldTrackNulls = $(trackNulls)
+    val shouldAdaptiveHash = $(adaptiveHash)
 
     val allFeatureInfo = aggregatedStats.toSeq.map { textMapStats =>
       textMapStats.keyValueCounts.toSeq.map { case (k, textStats) =>
@@ -168,7 +170,17 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
             .toSeq.sortBy(v => -v._2 -> v._1)
             .take($(topK)).map(_._1).toArray
         } else Array.empty[String]
-        SmartTextFeatureInfo(key = k, vectorizationMethod = vecMethod, topValues = topVals)
+        val adaptiveHashSize =
+          if (shouldAdaptiveHash) {
+            Some((textStats.hll.estimatedSize / $(adaptiveHashCollision) ).toInt)
+          }
+          else None
+        SmartTextFeatureInfo(
+          key = k,
+          vectorizationMethod = vecMethod,
+          topValues = topVals,
+          adaptiveHashSize = adaptiveHashSize
+        )
       }
     }
 
@@ -236,7 +248,8 @@ case class SmartTextFeatureInfo
 (
   key: String,
   vectorizationMethod: TextVectorizationMethod,
-  topValues: Array[String]
+  topValues: Array[String],
+  adaptiveHashSize: Option[Int] = None
 ) extends JsonLike
 
 
@@ -269,6 +282,7 @@ case class SmartTextMapVectorizerModelArgs
   // Seq[Seq[String]] corresponding to the keys in each map that are treated with each vectorization type
   val categoricalKeys = categoricalFeatureInfo.map(_.map(_.key))
   val hashKeys = hashFeatureInfo.map(_.map(_.key))
+  val adaptiveHashSizes = hashFeatureInfo.map(_.map(_.adaptiveHashSize))
   val ignoreKeys = ignoreFeatureInfo.map(_.map(_.key))
 
   // Combined keys for hashed and ignored features (everything that's not pivoted)

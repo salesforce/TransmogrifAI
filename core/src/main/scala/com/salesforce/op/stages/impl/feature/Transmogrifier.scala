@@ -72,6 +72,7 @@ private[op] trait TransmogrifierDefaults {
   val TrackNulls: Boolean = true
   val TrackInvalid: Boolean = false
   val TrackTextLen: Boolean = false
+  val AdaptiveHash: Boolean = SmartTextVectorizer.adaptiveHash
   val MinDocFrequency: Int = 0
   val MaxPercentCardinality = OpOneHotVectorizer.MaxPctCardinality
   // Default is to fill missing Geolocations with the mean, but if fillWithConstant is chosen, use this
