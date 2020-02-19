@@ -52,9 +52,12 @@ abstract class OpPredictionModel[T <: PredictionModel[Vector, T]]
   operationName: String
 ) extends OpPredictorWrapperModel[T](uid = uid, operationName = operationName, sparkModel = sparkModel) {
 
-  protected def predictMirror: MethodMirror
-
-  protected def predict(features: Vector): Double = predictMirror.apply(features).asInstanceOf[Double]
+  /**
+   * Predict label for the given features
+   */
+  @transient protected lazy val predict: Vector => Double = getSparkMlStage().getOrElse(
+    throw new RuntimeException(s"Could not find the wrapped Spark stage.")
+  ).predict(_)
 
   /**
    * Function used to convert input to output
