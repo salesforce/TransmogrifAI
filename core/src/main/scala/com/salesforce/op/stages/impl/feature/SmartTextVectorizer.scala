@@ -83,6 +83,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val minLenStdDev = $(minLengthStdDev)
     val shouldCleanText = $(cleanText)
     val shouldAdaptiveHash = $(adaptiveHash)
+    val adaptiveHashCol = $(adaptiveHashCollision)
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
@@ -101,7 +102,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
       val adaptiveHashSize =
         if (shouldAdaptiveHash) {
-          Some((stats.hll.estimatedSize / $(adaptiveHashCollision) ).toInt)
+          Some((stats.hll.estimatedSize / adaptiveHashCol).toInt)
         }
         else None
       (vecMethod, topValues, adaptiveHashSize)
