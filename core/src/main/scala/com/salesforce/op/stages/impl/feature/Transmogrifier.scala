@@ -85,6 +85,8 @@ private[op] trait TransmogrifierDefaults {
   val AutoDetectLanguage: Boolean = TextTokenizer.AutoDetectLanguage
   val MinTokenLength: Int = TextTokenizer.MinTokenLength
   val ToLowercase: Boolean = TextTokenizer.ToLowercase
+  val AdaptiveHash: Boolean = SmartTextVectorizer.AdaptiveHash
+  val AdaptiveHashCollision: Int = SmartTextVectorizer.AdaptiveHashCollision
 }
 
 private[op] object TransmogrifierDefaults extends TransmogrifierDefaults
