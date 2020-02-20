@@ -358,7 +358,7 @@ trait AdaptiveHashParams extends Params {
 
 trait AdaptiveHashCollisionParams extends Params {
   final val adaptiveHashCollision = new IntParam(
-    parent = this, name = "adaptiveHash",
+    parent = this, name = "adaptiveHashCollision",
     doc = "If adaptiveHash is true we set tolerable threshold for hash collison"
   )
   final def setAdaptiveHashCollision(v: Int): this.type = set(adaptiveHashCollision, v)
