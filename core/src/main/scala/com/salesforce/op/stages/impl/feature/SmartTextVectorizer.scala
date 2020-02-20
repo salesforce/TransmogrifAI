@@ -184,8 +184,8 @@ object SmartTextVectorizer {
   val MaxCardinality: Int = 100
   val MinTextLengthStdDev: Double = 0
   val hllBits: Int = 12
-  val adaptiveHash: Boolean = false
-  val adaptiveHashCollision: Int = 20
+  val AdaptiveHash: Boolean = false
+  val AdaptiveHashCollision: Int = 20
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
@@ -353,7 +353,7 @@ trait AdaptiveHashParams extends Params {
   )
   final def setAdaptiveHash(v: Boolean): this.type = set(adaptiveHash, v)
   final def getAdaptiveHash: Boolean = $(adaptiveHash)
-  setDefault(adaptiveHash -> SmartTextVectorizer.adaptiveHash)
+  setDefault(adaptiveHash -> SmartTextVectorizer.AdaptiveHash)
 }
 
 trait AdaptiveHashCollisionParams extends Params {
@@ -363,5 +363,5 @@ trait AdaptiveHashCollisionParams extends Params {
   )
   final def setAdaptiveHashCollision(v: Int): this.type = set(adaptiveHashCollision, v)
   final def getAdaptiveHashCollision: Int = $(adaptiveHashCollision)
-  setDefault(adaptiveHashCollision -> SmartTextVectorizer.adaptiveHashCollision)
+  setDefault(adaptiveHashCollision -> SmartTextVectorizer.AdaptiveHashCollision)
 }
