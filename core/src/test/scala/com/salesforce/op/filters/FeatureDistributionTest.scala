@@ -249,23 +249,23 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       "requirement failed: Name must match to compare or combine feature distributions: A != boo"
   }
 
-  it should "not serialize cardEstimate field" in {
-    val cardEstimate = "cardEstimate"
-    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
-      Array.empty, Some(Moments(1.0)), Some(TextStats(
-        Map("foo" -> 1, "bar" ->2), Map.empty, TextStats.hllMonoid.zero
-      )),
-      FeatureDistributionType.Scoring)
-    val featureDistributions = Seq(fd1, fd1.copy(cardEstimate = None))
-
-    FeatureDistribution.toJson(featureDistributions) shouldNot include (cardEstimate)
-
-    // deserialization from json with and without cardEstimate works
-    val jsonWithCardEstimate = Serialization.write(featureDistributions)(DefaultFormats +
-      EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType))
-    jsonWithCardEstimate should fullyMatch regex Seq(cardEstimate).mkString(".*", ".*", ".*")
-    jsonWithCardEstimate shouldNot fullyMatch regex Seq.fill(2)(cardEstimate).mkString(".*", ".*", ".*")
-
-    FeatureDistribution.fromJson(jsonWithCardEstimate) shouldBe Success(featureDistributions)
-  }
+//  it should "not serialize cardEstimate field" in {
+//    val cardEstimate = "cardEstimate"
+//    val fd1 = FeatureDistribution("A", None, 10, 1, Array(1, 4, 0, 0, 6),
+//      Array.empty, Some(Moments(1.0)), Some(TextStats(
+//        Map("foo" -> 1, "bar" ->2), Map.empty, TextStats.hllMonoid.zero
+//      )),
+//      FeatureDistributionType.Scoring)
+//    val featureDistributions = Seq(fd1, fd1.copy(cardEstimate = None))
+//
+//    FeatureDistribution.toJson(featureDistributions) shouldNot include (cardEstimate)
+//
+//    // deserialization from json with and without cardEstimate works
+//    val jsonWithCardEstimate = Serialization.write(featureDistributions)(DefaultFormats +
+//      EnumEntrySerializer.json4s[FeatureDistributionType](FeatureDistributionType))
+//    jsonWithCardEstimate should fullyMatch regex Seq(cardEstimate).mkString(".*", ".*", ".*")
+//    jsonWithCardEstimate shouldNot fullyMatch regex Seq.fill(2)(cardEstimate).mkString(".*", ".*", ".*")
+//
+//    FeatureDistribution.fromJson(jsonWithCardEstimate) shouldBe Success(featureDistributions)
+//  }
 }
