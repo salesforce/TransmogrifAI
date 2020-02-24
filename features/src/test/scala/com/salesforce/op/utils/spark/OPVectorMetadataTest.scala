@@ -30,7 +30,7 @@
 
 package com.salesforce.op.utils.spark
 
-import com.salesforce.op.FeatureHistory
+import com.salesforce.op.{FeatureHistory, GenderDetectionResults, SensitiveFeatureInformation, SensitiveNameInformation}
 import com.salesforce.op.features.types.{DateTime, Email, FeatureType, OPMap, PickList, Prediction, Real, RealMap, TextAreaMap}
 import com.salesforce.op.test.TestCommon
 import org.apache.spark.sql.types.Metadata
@@ -47,7 +47,11 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
 
   type OpVectorColumnTuple = (Seq[String], Seq[String], Option[String], Option[String], Option[String], Int)
   type FeatureHistoryTuple = (Seq[String], Seq[String])
-  type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple)
+
+  type SensitiveTuple = (SensitiveNameTuple, String, Option[String], Boolean)
+  type SensitiveNameTuple = (Double, Seq[String], Seq[Double], Double, Double, Double)
+
+  type OpVectorTuple = (String, Array[OpVectorColumnTuple], FeatureHistoryTuple, Seq[SensitiveTuple])
 
   // AttributeGroup and Attribute require non-empty names
   val genName: Gen[String] = Gen.nonEmptyListOf(alphaNumChar).map(_.mkString)
@@ -72,24 +76,57 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   )
   val arrVecColTupleGen: Gen[Array[OpVectorColumnTuple]] = Gen.containerOf[Array, OpVectorColumnTuple](vecColTupleGen)
 
+  val sensitiveNameGen: Gen[SensitiveTuple] = for {
+    featureName <- genName
+    mapKey <- Gen.option(genName)
+    actionTaken <- Gen.oneOf[Boolean](Seq(false, true))
+    probName <- Gen.choose(0.0, 1.0)
+    genderDetectNames <- Gen.containerOf[Seq, String](genName)
+    genderDetectNums <- Gen.containerOf[Seq, Double](Gen.choose(0.0, 1.0))
+    probMale <- Gen.choose(0.0, 1.0)
+    probFemale <- Gen.choose(0.0, 1.0 - probMale)
+    probOther <- Gen.choose(0.0, 1.0 - probMale - probFemale)
+  } yield {
+    ((probName, genderDetectNames, genderDetectNums, probMale, probFemale, probOther), featureName, mapKey, actionTaken)
+  }
+
   val vecGen: Gen[OpVectorTuple] = for {
     name <- genName
     arr <- arrVecColTupleGen
     histories <- featHistTupleGen
+    sensitiveCols <- Gen.containerOf[Seq, SensitiveTuple](sensitiveNameGen)
   } yield {
-    (name, arr, histories)
+    (name, arr, histories, sensitiveCols)
   }
 
   val seqVecGen: Gen[Seq[OpVectorTuple]] = Gen.containerOf[Seq, OpVectorTuple](vecGen)
 
-  private def generateHistory(columnsMeta: Array[OpVectorColumnMetadata], hist: (Seq[String], Seq[String])) =
+  private def generateHistory(
+    columnsMeta: Array[OpVectorColumnMetadata], hist: (Seq[String], Seq[String])
+  ): Map[String, FeatureHistory] =
     columnsMeta.flatMap(v => v.parentFeatureName.map(p => p -> FeatureHistory(hist._1, hist._2))).toMap
 
-  private def checkTuples(tup: OpVectorColumnTuple) = tup._1.nonEmpty && tup._2.nonEmpty
+  private def generateSensitiveFeatureInfo(
+    columnsMeta: Array[OpVectorColumnMetadata], sensitiveInfoSeqRaw: Seq[SensitiveTuple]
+  ): Map[String, Seq[SensitiveFeatureInformation]] = {
+    val sensitiveInfoSeq = sensitiveInfoSeqRaw map {
+      case (
+        (probName, genderDetectNames, genderDetectNums, probMale, probFemale, probOther),
+        featureName, mapKey, actionTaken) =>
+        val genderDetectResults = genderDetectNames.zip(genderDetectNums).map {
+          case (name, pct) => GenderDetectionResults(name, pct)
+        }
+        SensitiveNameInformation(
+          probName, genderDetectResults, probMale, probFemale, probOther, featureName, mapKey, actionTaken
+        )
+    }
+    columnsMeta.flatMap(v => v.parentFeatureName.map(p => p -> sensitiveInfoSeq)).toMap
+  }
 
+  private def checkTuples(tup: OpVectorColumnTuple): Boolean = tup._1.nonEmpty && tup._2.nonEmpty
 
   property("column metadata stays the same when serialized to spark metadata") {
-    forAll(vecColTupleGen) { (vct: OpVectorColumnTuple) =>
+    forAll(vecColTupleGen) { vct: OpVectorColumnTuple =>
       if (checkTuples(vct)) {
         val columnMeta = OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5)
         columnMeta shouldEqual OpVectorColumnMetadata.fromMetadata(columnMeta.toMetadata()).head
@@ -98,7 +135,7 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   }
 
   property("column metadata cannot be created with empty parents or feature types") {
-    forAll(vecColTupleGen) { (vct: OpVectorColumnTuple) =>
+    forAll(vecColTupleGen) { vct: OpVectorColumnTuple =>
       if (!checkTuples(vct)) {
         assertThrows[IllegalArgumentException] { OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5) }
       }
@@ -106,22 +143,34 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   }
 
   property("vector metadata stays the same when serialized to spark metadata") {
-    forAll(vecGen) { case (outputName: String, columns: Array[OpVectorColumnTuple], hist: FeatureHistoryTuple) =>
-      val cols = columns.filter(checkTuples)
-      val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
-      val history = generateHistory(columnsMeta, hist)
-      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history)
-      val field = vectorMeta.toStructField()
-      vectorMeta shouldEqual OpVectorMetadata(field)
+    forAll(vecGen) {
+      case (outputName: String,
+        columns: Array[OpVectorColumnTuple],
+        hist: FeatureHistoryTuple,
+        sens: Seq[SensitiveTuple]
+      ) if outputName.nonEmpty =>
+        val cols = columns.filter(checkTuples)
+        val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
+        val history = generateHistory(columnsMeta, hist)
+        val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
+        val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history, sensitive)
+        val field = vectorMeta.toStructField()
+        vectorMeta shouldEqual OpVectorMetadata(field)
+      case _ => true shouldEqual true
     }
   }
 
   property("vector metadata properly finds indices of its columns") {
-    forAll(vecGen) { case (outputName: String, columns: Array[OpVectorColumnTuple], hist: FeatureHistoryTuple) =>
+    forAll(vecGen) {
+      case (outputName: String,
+        columns: Array[OpVectorColumnTuple],
+        hist: FeatureHistoryTuple,
+        sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
-      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history)
+      val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
+      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history, sensitive)
       for {(col, i) <- vectorMeta.columns.zipWithIndex} {
         vectorMeta.index(col) shouldEqual i
       }
@@ -139,13 +188,14 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   }
 
   property("vector metadata flattens correctly") {
-    forAll(seqVecGen) { (vectors: Seq[OpVectorTuple]) =>
+    forAll(seqVecGen) { vectors: Seq[OpVectorTuple] =>
       val vecs = vectors.map {
-        case (outputName, columns, hist) =>
+        case (outputName, columns, hist, sens) =>
           val cols = columns.filter(checkTuples)
           val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
           val history = generateHistory(columnsMeta, hist)
-          OpVectorMetadata(outputName, columnsMeta, history)
+          val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
+          OpVectorMetadata(outputName, columnsMeta, history, sensitive)
       }
       val flattened = OpVectorMetadata.flatten("out", vecs)
       flattened.size shouldEqual vecs.map(_.size).sum
@@ -155,12 +205,16 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
   }
 
   property("vector metadata should properly serialize to and from spark metadata") {
-    forAll(vecGen) { case (outputName: String, columns: Array[OpVectorColumnTuple], hist: FeatureHistoryTuple) =>
+    forAll(vecGen) {
+      case (outputName: String,
+        columns: Array[OpVectorColumnTuple],
+        hist: FeatureHistoryTuple,
+        sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
-
-      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history)
+      val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
+      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history, sensitive)
 
       val vectorMetaFromSerialized = OpVectorMetadata(vectorMeta.name, vectorMeta.toMetadata)
       vectorMeta.name shouldEqual vectorMetaFromSerialized.name
@@ -171,13 +225,18 @@ class OPVectorMetadataTest extends PropSpec with TestCommon with PropertyChecks 
 
 
   property("vector metadata should generate feature history correctly") {
-    forAll(vecGen) { case (outputName: String, columns: Array[OpVectorColumnTuple], hist: FeatureHistoryTuple) =>
+    forAll(vecGen) { case (
+      outputName: String,
+      columns: Array[OpVectorColumnTuple],
+      hist: FeatureHistoryTuple,
+      sens: Seq[SensitiveTuple]) =>
       val cols = columns.filter(checkTuples)
       val columnsMeta = cols.map(vct => OpVectorColumnMetadata(vct._1, vct._2, vct._3, vct._4, vct._5))
       val history = generateHistory(columnsMeta, hist)
+      val sensitive = generateSensitiveFeatureInfo(columnsMeta, sens)
+      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history, sensitive)
 
-      val vectorMeta = OpVectorMetadata(outputName, columnsMeta, history)
-      if (history.isEmpty && columnsMeta.nonEmpty ) {
+      if (history.isEmpty && columnsMeta.nonEmpty) {
         assertThrows[RuntimeException](vectorMeta.getColumnHistory())
       } else {
         val colHist = vectorMeta.getColumnHistory()

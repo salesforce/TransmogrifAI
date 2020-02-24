@@ -92,7 +92,7 @@ private[stages] abstract class OpPipelineStageReaderWriterTest
     schema shouldBe stage.getInputSchema()
   }
   it should "write input features" in {
-    val jArray = ((stageJson \ FN.ParamMap.entryName) \ "inputFeatures").extract[JArray]
+    val jArray = (extractParams(stageJson) \ "inputFeatures").extract[JArray]
     jArray.values should have length expectedFeaturesLength
     val obj = jArray(0).extract[JObject]
     obj.values.keys shouldBe Set("name", "isResponse", "isRaw", "uid", "typeName", "stages", "originFeatures")

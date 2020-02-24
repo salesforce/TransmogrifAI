@@ -206,9 +206,6 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
   }
 
   it should "throw an error when it is not possible to remove blacklisted features" in {
-    val fv = Seq(age, gender, height, weight, description, boarded, stringMap, numericMap, booleanMap).transmogrify()
-    val survivedNum = survived.occurs()
-    val pred = BinaryClassificationModelSelector().setInput(survivedNum, fv).getOutput()
     val wf = new OpWorkflow()
       .setResultFeatures(whyNotNormed)
       .withRawFeatureFilter(Option(dataReader), None)
@@ -217,6 +214,15 @@ class OpWorkflowTest extends FlatSpec with PassengerSparkFixtureTest {
       wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
     )
     error.getMessage.contains("creation of required result feature (height-weight_4-stagesApplied_Real")
+  }
+
+  it should "allow the removal of some final features with the retention policy is set to allow it" in {
+    val wf = new OpWorkflow()
+      .setResultFeatures(whyNotNormed, weight)
+      .withRawFeatureFilter(Option(dataReader), None, resultFeatureRetentionPolicy = ResultFeatureRetention.AtLeastOne)
+
+    wf.setBlacklist(Array(age, gender, height, description, stringMap, numericMap), Seq.empty)
+    wf.getResultFeatures().map(_.name) shouldEqual Seq(weight).map(_.name)
   }
 
   it should "be able to compute a partial dataset in both workflow and workflow model" in {
