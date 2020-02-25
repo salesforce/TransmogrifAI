@@ -35,12 +35,9 @@ import org.apache.spark.sql.SparkSession
 object JobGroupUtil {
   /**
    * Sets the Spark job group for a wrapped code block. The job group is cleared afterwards.
-   *
-   * @param groupId ID of the job group
-   * @param description Description for the job group
    */
-  def withJobGroup[R](groupId: String, description: String)(block: => R)(implicit spark: SparkSession): R = {
-    spark.sparkContext.setJobGroup(groupId, description)
+  def withJobGroup[R](jobGroup: JobGroup)(block: => R)(implicit spark: SparkSession): R = {
+    spark.sparkContext.setJobGroup(jobGroup.toString, jobGroup.entryDescription)
     val result = block
     spark.sparkContext.clearJobGroup()
     result

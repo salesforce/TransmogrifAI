@@ -30,27 +30,14 @@
 
 package com.salesforce.op.utils.spark
 
-import org.junit.runner.RunWith
-import org.scalatest.FlatSpec
-import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.test.{TestCommon, TestSparkContext}
+import enumeratum.{Enum, EnumEntry}
 
-@RunWith(classOf[JUnitRunner])
-class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
+sealed abstract class JobGroup(val entryDescription: String)
+  extends EnumEntry with Serializable
 
-  "JobGroupUtil" should "be able to set a job group ID around a code block" in {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
-      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
-    }
-    spark.sparkContext.statusTracker.getJobIdsForGroup("ReadAndFilter") should not be empty
-  }
-
-  it should "reset the job group ID after a code block" in {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
-      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
-    }
-    spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
-    // Ensure that the last `.collect()` was not tagged with "ReadAndFilter"
-    spark.sparkContext.statusTracker.getJobIdsForGroup(null) should not be empty
-  }
+object JobGroup extends Enum[JobGroup] {
+  val values = findValues
+  case object ReadAndFilter extends JobGroup("Data reading and filtering")
+  case object FeatureEngineering extends JobGroup("Feature engineering")
+  case object CrossValidation extends JobGroup("Cross-validation")
 }
