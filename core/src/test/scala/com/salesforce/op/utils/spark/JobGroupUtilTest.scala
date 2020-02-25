@@ -33,15 +33,24 @@ package com.salesforce.op.utils.spark
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
-import com.salesforce.op.test.TestCommon
-import com.salesforce.op.utils.spark.JobGroupUtil
+import com.salesforce.op.test.{TestCommon, TestSparkContext}
 
 @RunWith(classOf[JUnitRunner])
 class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
-  Spec[JobGroupUtil] should "be able to set a job group ID around a code block" in {
+
+  "JobGroupUtil" should "be able to set a job group ID around a code block" in {
     JobGroupUtil.withJobGroup("myGroupId", "My description") {
-      spark.sparkContext.statusTracker.getActiveJobIds() should contain ("myGroupId")
+      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
     }
-    spark.sparkContext.statusTracker.getActiveJobIds() should not contain ("myGroupId")
+    spark.sparkContext.statusTracker.getJobIdsForGroup("myGroupId") should not be empty
+  }
+
+  it should "reset the job group ID after a code block" in {
+    JobGroupUtil.withJobGroup("myGroupId", "My description") {
+      spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
+    }
+    spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
+    // Ensure that the last `.collect()` was not tagged with "myGroupId"
+    spark.sparkContext.statusTracker.getJobIdsForGroup(null) should not be empty
   }
 }
