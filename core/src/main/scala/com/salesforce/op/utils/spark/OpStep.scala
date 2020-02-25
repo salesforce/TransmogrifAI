@@ -32,12 +32,16 @@ package com.salesforce.op.utils.spark
 
 import enumeratum.{Enum, EnumEntry}
 
-sealed abstract class JobGroup(val entryDescription: String)
+sealed abstract class OpStep(val entryDescription: String)
   extends EnumEntry with Serializable
 
-object JobGroup extends Enum[JobGroup] {
+object OpStep extends Enum[OpStep] {
   val values = findValues
-  case object ReadAndFilter extends JobGroup("Data reading and filtering")
-  case object FeatureEngineering extends JobGroup("Feature engineering")
-  case object CrossValidation extends JobGroup("Cross-validation")
+  case object CrossValidation extends OpStep("Cross-validation")
+  case object DataReadingAndFiltering extends OpStep("Data reading and filtering")
+  case object FeatureEngineering extends OpStep("Feature engineering")
+  case object LoadingModel extends OpStep("Loading model")
+  case object SavingMetrics extends OpStep("Saving metrics")
+  case object SavingModel extends OpStep("Saving model")
+  case object SavingScores extends OpStep("Saving scores")
 }

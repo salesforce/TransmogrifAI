@@ -40,7 +40,7 @@ import com.salesforce.op.readers.{Reader, StreamingReader}
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.{EnumEntrySerializer, JsonLike, JsonUtils}
 import com.salesforce.op.utils.spark.RichRDD._
-import com.salesforce.op.utils.spark.{AppMetrics, OpSparkListener}
+import com.salesforce.op.utils.spark.{AppMetrics, OpStep, JobGroupUtil, OpSparkListener}
 import com.salesforce.op.utils.version.VersionInfo
 import enumeratum._
 import org.apache.hadoop.io.compress.CompressionCodec
@@ -166,16 +166,18 @@ class OpWorkflowRunner
 
     val modelSummary = workflowModel.summary()
 
-    for {
-      location <- params.metricsLocation
-      metrics = spark.sparkContext.parallelize(Seq(modelSummary), 1)
-      jobConf = {
-        val conf = new JobConf(spark.sparkContext.hadoopConfiguration)
-        conf.set("mapred.output.compress", params.metricsCompress.getOrElse(false).toString)
-        conf
-      }
-      metricCodecClass = params.metricsCodec.map(Class.forName(_).asInstanceOf[Class[_ <: CompressionCodec]])
-    } metrics.saveAsTextFile(location, metricCodecClass, jobConf)
+    JobGroupUtil.withJobGroup(OpStep.SavingMetrics) {
+      for {
+        location <- params.metricsLocation
+        metrics = spark.sparkContext.parallelize(Seq(modelSummary), 1)
+        jobConf = {
+          val conf = new JobConf(spark.sparkContext.hadoopConfiguration)
+          conf.set("mapred.output.compress", params.metricsCompress.getOrElse(false).toString)
+          conf
+        }
+        metricCodecClass = params.metricsCodec.map(Class.forName(_).asInstanceOf[Class[_ <: CompressionCodec]])
+      } metrics.saveAsTextFile(location, metricCodecClass, jobConf)
+    }
 
     new TrainResult(modelSummary)
   }

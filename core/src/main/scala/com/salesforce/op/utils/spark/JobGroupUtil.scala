@@ -36,8 +36,8 @@ object JobGroupUtil {
   /**
    * Sets the Spark job group for a wrapped code block. The job group is cleared afterwards.
    */
-  def withJobGroup[R](jobGroup: JobGroup)(block: => R)(implicit spark: SparkSession): R = {
-    spark.sparkContext.setJobGroup(jobGroup.toString, jobGroup.entryDescription)
+  def withJobGroup[R](step: OpStep)(block: => R)(implicit spark: SparkSession): R = {
+    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
     val result = block
     spark.sparkContext.clearJobGroup()
     result

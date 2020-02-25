@@ -38,7 +38,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.{JobGroup, JobGroupUtil}
+import com.salesforce.op.utils.spark.{OpStep, JobGroupUtil}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
@@ -233,7 +233,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       (reader, rawFeatureFilter) match {
         case (None, None) => throw new IllegalArgumentException(
           "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
@@ -440,7 +440,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           log.info("Estimate best Model with CV/TS. Stages included in CV are: {}, {}",
             during.flatMap(_.map(_._1.stageName)).mkString(", "), modelSelector.uid: Any
           )
-          modelSelector.findBestEstimator(trainFixed, Option(during))
+          JobGroupUtil.withJobGroup(OpStep.CrossValidation) {
+            modelSelector.findBestEstimator(trainFixed, Option(during))
+          }
           val remainingDAG: StagesDAG = (during :+ (Array(modelSelector -> distance): Layer)) ++ after
 
           log.info("Applying DAG after CV/TS. Stages: {}", remainingDAG.flatMap(_.map(_._1.stageName)).mkString(", "))
@@ -483,7 +485,11 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @param path to the trained workflow model
    * @return workflow model
    */
-  def loadModel(path: String): OpWorkflowModel = new OpWorkflowModelReader(Some(this)).load(path)
+  def loadModel(path: String)(implicit spark: SparkSession): OpWorkflowModel = {
+    JobGroupUtil.withJobGroup(OpStep.LoadingModel) {
+      new OpWorkflowModelReader(Some(this)).load(path)
+    }
+  }
 
   /**
    * Returns a dataframe containing all the columns generated up to and including the feature input
