@@ -35,6 +35,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
+import com.salesforce.op.utils.spark.{JobGroup, JobGroupUtil}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -91,9 +92,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    require(reader.nonEmpty, "Data reader must be set")
-    checkReadersAndFeatures()
-    reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+      require(reader.nonEmpty, "Data reader must be set")
+      checkReadersAndFeatures()
+      reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
+    }
   }
 
   /**

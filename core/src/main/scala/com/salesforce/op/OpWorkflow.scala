@@ -38,6 +38,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
+import com.salesforce.op.utils.spark.{JobGroup, JobGroupUtil}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}
@@ -232,28 +233,30 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    (reader, rawFeatureFilter) match {
-      case (None, None) => throw new IllegalArgumentException(
-        "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
-      case (Some(r), None) =>
-        checkReadersAndFeatures()
-        r.generateDataFrame(rawFeatures, parameters).persist()
-      case (rd, Some(rf)) =>
-        rd match {
-          case None => setReader(rf.trainingReader)
-          case Some(r) => if (r != rf.trainingReader) log.warn(
-            "Workflow data reader and RawFeatureFilter training reader do not match! " +
-              "The RawFeatureFilter training reader will be used to generate the data for training")
-        }
-        checkReadersAndFeatures()
+    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+      (reader, rawFeatureFilter) match {
+        case (None, None) => throw new IllegalArgumentException(
+          "Data reader must be set either directly on the workflow or through the RawFeatureFilter")
+        case (Some(r), None) =>
+          checkReadersAndFeatures()
+          r.generateDataFrame(rawFeatures, parameters).persist()
+        case (rd, Some(rf)) =>
+          rd match {
+            case None => setReader(rf.trainingReader)
+            case Some(r) => if (r != rf.trainingReader) log.warn(
+              "Workflow data reader and RawFeatureFilter training reader do not match! " +
+                "The RawFeatureFilter training reader will be used to generate the data for training")
+          }
+          checkReadersAndFeatures()
 
-        val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
-          rf.generateFilteredRaw(rawFeatures, parameters)
+          val FilteredRawData(cleanedData, featuresToDrop, mapKeysToDrop, rawFeatureFilterResults) =
+            rf.generateFilteredRaw(rawFeatures, parameters)
 
-        setRawFeatureFilterResults(rawFeatureFilterResults)
-        setBlacklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
-        setBlacklistMapKeys(mapKeysToDrop)
-        cleanedData
+          setRawFeatureFilterResults(rawFeatureFilterResults)
+          setBlacklist(featuresToDrop, rawFeatureFilterResults.rawFeatureDistributions)
+          setBlacklistMapKeys(mapKeysToDrop)
+          cleanedData
+      }
     }
   }
 
