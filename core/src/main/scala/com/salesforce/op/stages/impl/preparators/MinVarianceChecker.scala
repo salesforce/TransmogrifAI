@@ -67,7 +67,7 @@ trait MinVarianceCheckerParams extends Params {
 
   final val minVariance = new DoubleParam(
     parent = this, name = "minVariance",
-    doc = "Minimum amount of variance allowed for each feature and label"
+    doc = "Minimum amount of variance allowed for each feature"
   )
 
   def setMinVariance(value: Double): this.type = set(minVariance, value)
@@ -227,6 +227,6 @@ final class MinVarianceCheckerModel private[op]
 }
 
 object MinVarianceChecker {
-  val MinVariance = 1E-5
   val RemoveBadFeatures = false
+  val MinVariance = 1E-5
 }
