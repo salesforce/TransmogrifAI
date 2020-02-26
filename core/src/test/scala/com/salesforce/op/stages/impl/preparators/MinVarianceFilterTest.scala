@@ -35,18 +35,17 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-import com.salesforce.op.stages.impl.feature.{HashSpaceStrategy, RealNNVectorizer, SmartTextMapVectorizer, _}
+import com.salesforce.op.stages.impl.feature.RealNNVectorizer
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
-import org.apache.spark.SparkException
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
 import org.apache.spark.sql.{DataFrame, Row}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-case class SanityCheckDataTest
+case class MinVarianceFilterDataTest
 (
   name: String,
   age: Double,
@@ -67,10 +66,10 @@ case class TextRawData
 )
 
 @RunWith(classOf[JUnitRunner])
-class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
+class MinVarianceCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
   BinaryEstimator[RealNN, OPVector, OPVector]] {
 
-  override def specName: String = Spec[SanityChecker]
+  override def specName: String = Spec[MinVarianceFilter]
 
   // loggingLevel(Level.INFO)
 
@@ -141,18 +140,18 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   val targetLabel = targetLabelNoResponse.copy(isResponse = true)
 
   val inputData = testData
-  val estimator = new SanityChecker().setRemoveBadFeatures(false).setInput(targetLabel, featureVector)
+  val estimator = new MinVarianceChecker().setRemoveBadFeatures(false).setInput(targetLabel, featureVector)
   val expectedResult = testData.select(featureVector.name).collect()
     .map(_.getAs[Vector](0).toOPVector).toSeq
 
-  Spec[SanityChecker] should "remove trouble features" in {
+  Spec[MinVarianceChecker] should "remove trouble features" in {
     val checked = targetLabel.sanityCheck(featureVector,
       maxCorrelation = 0.99, minVariance = 0.0, checkSample = 1.0, removeBadFeatures = true)
     val outputColName = checked.name
 
-    checked.originStage shouldBe a[SanityChecker]
+    checked.originStage shouldBe a[MinVarianceChecker]
 
-    val model = checked.originStage.asInstanceOf[SanityChecker].fit(testData)
+    val model = checked.originStage.asInstanceOf[MinVarianceChecker].fit(testData)
     val featuresToDrop = Seq(featureNames(0), featureNames(3), featureNames(4))
     validateEstimatorOutput(outputColName, model, featuresToDrop, targetLabel.name)
 
@@ -163,7 +162,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   it should "not allow setting invalid param values" in {
-    val checker = new SanityChecker()
+    val checker = new MinVarianceChecker()
     the[IllegalArgumentException] thrownBy checker.setCheckSample(-1.0)
     the[IllegalArgumentException] thrownBy checker.setCheckSample(0.0)
     the[IllegalArgumentException] thrownBy checker.setCheckSample(2.0)
@@ -176,33 +175,33 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   it should "have proper default values for all params" in {
-    val checker = new SanityChecker()
-    checker.getOrDefault(checker.sampleLowerLimit) shouldBe SanityChecker.SampleLowerLimit
-    checker.getOrDefault(checker.sampleUpperLimit) shouldBe SanityChecker.SampleUpperLimit
-    checker.getOrDefault(checker.checkSample) shouldBe SanityChecker.CheckSample
-    checker.getOrDefault(checker.maxCorrelation) shouldBe SanityChecker.MaxCorrelation
-    checker.getOrDefault(checker.minVariance) shouldBe SanityChecker.MinVariance
-    checker.getOrDefault(checker.minCorrelation) shouldBe SanityChecker.MinCorrelation
+    val checker = new MinVarianceChecker()
+    checker.getOrDefault(checker.sampleLowerLimit) shouldBe MinVarianceChecker.SampleLowerLimit
+    checker.getOrDefault(checker.sampleUpperLimit) shouldBe MinVarianceChecker.SampleUpperLimit
+    checker.getOrDefault(checker.checkSample) shouldBe MinVarianceChecker.CheckSample
+    checker.getOrDefault(checker.maxCorrelation) shouldBe MinVarianceChecker.MaxCorrelation
+    checker.getOrDefault(checker.minVariance) shouldBe MinVarianceChecker.MinVariance
+    checker.getOrDefault(checker.minCorrelation) shouldBe MinVarianceChecker.MinCorrelation
     checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
-    checker.getOrDefault(checker.removeBadFeatures) shouldBe SanityChecker.RemoveBadFeatures
+    checker.getOrDefault(checker.removeBadFeatures) shouldBe MinVarianceChecker.RemoveBadFeatures
   }
 
   it should "consume the output from an OP vectorizer and remove trouble features accordingly" in {
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
 
-    val outputColName = sanityChecker
+    val outputColName = MinVarianceChecker
       .setMaxCorrelation(.99)
       .setMinVariance(0.0)
       .setCheckSample(1.0)
       .setRemoveBadFeatures(true)
       .setInput(targetLabel, featureVector).getOutput().name
 
-    val model = sanityChecker.fit(testData)
+    val model = MinVarianceChecker.fit(testData)
     validateEstimatorOutput(outputColName, model, featuresToDrop, targetLabel.name)
 
     val transformedData = model.transform(testData)
     val metadata: Metadata = getMetadata(outputColName, transformedData)
-    val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
+    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
     val outputColumns = OpVectorMetadata(transformedData.schema(outputColName))
     targetLabel.name +: testMetadata.columns.map(_.makeColName()) should
       contain theSameElementsAs summary.names
@@ -214,15 +213,15 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   it should "not remove trouble features" in {
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
 
-    val outputColName = sanityChecker
+    val outputColName = MinVarianceChecker
       .setMaxCorrelation(.99)
       .setMinVariance(0.0)
       .setCheckSample(1.0)
       .setInput(targetLabel, featureVector).getOutput().name
 
-    val model = sanityChecker.fit(testData)
+    val model = MinVarianceChecker.fit(testData)
     validateEstimatorOutput(outputColName, model, Seq(), targetLabel.name)
 
     val transformedData = model.transform(testData)
@@ -233,22 +232,22 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   }
 
   it should "fail when not enough data to run" in {
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
 
-    val outputColName = sanityChecker
+    val outputColName = MinVarianceChecker
       .setMaxCorrelation(.99)
       .setMinVariance(0.0)
       .setCheckSample(0.000001)
       .setRemoveBadFeatures(true)
       .setInput(targetLabel, featureVector).getOutput().name
 
-    val result = sanityChecker.fit(testData)
+    val result = MinVarianceChecker.fit(testData)
     succeed
   }
 
   it should "fail when features are defined incorrectly" in {
     the[IllegalArgumentException] thrownBy {
-      new SanityChecker().setInput(targetLabel.copy(isResponse = true), featureVector.copy(isResponse = true))
+      new MinVarianceChecker().setInput(targetLabel.copy(isResponse = true), featureVector.copy(isResponse = true))
     } should have message "The feature vector should not contain any response features."
   }
 
@@ -264,13 +263,13 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     )
 
     val f1r = f1.copy(isResponse = true)
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
       .setInput(f1r, f2)
       .setRemoveBadFeatures(true)
       .setCheckSample(1.0)
-    val output = sanityChecker.getOutput()
+    val output = MinVarianceChecker.getOutput()
     assertThrows[IllegalArgumentException] {
-      sanityChecker.fit(data).transform(data)
+      MinVarianceChecker.fit(data).transform(data)
     }
   }
 
@@ -289,7 +288,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     // and checking for an error.
     // We cannot use a non-zero sample limit since the Spark sampling algorithm
     // is not deterministic and does not guarantee exactly the supplied sampling fraction
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
       .setInput(f1r, f2)
       .setRemoveBadFeatures(true)
       .setCheckSample(0.99999)
@@ -297,7 +296,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setSampleUpperLimit(0)
 
     the[IllegalArgumentException] thrownBy {
-      sanityChecker.fit(data)
+      MinVarianceChecker.fit(data)
     } should have message "requirement failed: Sample size cannot be zero"
   }
 
@@ -313,35 +312,35 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val vectorized = feature.vectorize()
     val dataVectorized = vectorized.originStage.asInstanceOf[RealNNVectorizer].transform(data)
 
-    def getFeatureCorrelationFor(sanityChecker: SanityChecker): Double = {
-      val model = sanityChecker.fit(dataVectorized)
+    def getFeatureCorrelationFor(MinVarianceChecker: MinVarianceChecker): Double = {
+      val model = MinVarianceChecker.fit(dataVectorized)
 
       val summaryMeta = model.getMetadata().getSummaryMetadata()
       val correlations = summaryMeta
-        .getMetadata(SanityCheckerNames.CorrelationsWLabel)
-        .getDoubleArray(SanityCheckerNames.Values)
+        .getMetadata(MinVarianceCheckerNames.CorrelationsWLabel)
+        .getDoubleArray(MinVarianceCheckerNames.Values)
       correlations(0)
     }
 
-    val sanityCheckerSpearman = new SanityChecker()
+    val MinVarianceCheckerSpearman = new MinVarianceChecker()
       .setInput(label, vectorized)
       .setCorrelationType(CorrelationType.Spearman)
       .setCheckSample(0.99999)
 
-    val sanityCheckerPearson = new SanityChecker()
+    val MinVarianceCheckerPearson = new MinVarianceChecker()
       .setInput(label, vectorized)
       .setCorrelationType(CorrelationType.Pearson)
       .setCheckSample(0.99999)
 
     assert(
-      getFeatureCorrelationFor(sanityCheckerSpearman) > getFeatureCorrelationFor(sanityCheckerPearson)
+      getFeatureCorrelationFor(MinVarianceCheckerSpearman) > getFeatureCorrelationFor(MinVarianceCheckerPearson)
     )
   }
 
   it should "throw an error if all of the features are removed" in {
-    val sanityChecker = new SanityChecker()
+    val MinVarianceChecker = new MinVarianceChecker()
 
-    val outputColName = sanityChecker
+    val outputColName = MinVarianceChecker
       .setMaxCorrelation(.000001)
       .setMinVariance(1000)
       .setCheckSample(0.999999)
@@ -349,234 +348,9 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
       .setInput(targetLabel, featureVector).getOutput().name
 
     the[RuntimeException] thrownBy {
-      sanityChecker.fit(testData)
+      MinVarianceChecker.fit(testData)
     } should have message
       "requirement failed: The sanity checker has dropped all of your features, check your input data quality"
-  }
-
-  it should "remove individual text hash features independently" in {
-    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
-      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
-      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-      .setInput(textMap).getOutput()
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, smartMapVectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
-    val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
-      "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
-    val featuresWithNaNCorr = Seq("textMap_7")
-
-    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
-  }
-
-  it should "remove text hash features as groups" in {
-    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
-      .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
-      .setHashSpaceStrategy(HashSpaceStrategy.Separate)
-      .setInput(textMap).getOutput()
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, smartMapVectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq("textMap_color_0", "textMap_color_1", "textMap_color_2", "textMap_color_3",
-      "textMap_fruit_4", "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
-      "textMap_beverage_8", "textMap_beverage_9",
-      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13"
-    )
-    val featuresWithCorr = Seq("textMap_color_0", "textMap_color_3",
-      "textMap_fruit_5", "textMap_fruit_6", "textMap_fruit_7",
-      "textMap_beverage_10", "textMap_beverage_11",
-      "textMap_color_NullIndicatorValue_12", "textMap_fruit_NullIndicatorValue_13",
-      "textMap_beverage_NullIndicatorValue_14"
-    )
-    val featuresWithNaNCorr = Seq("textMap_color_1", "textMap_color_2", "textMap_fruit_4",
-      "textMap_beverage_8", "textMap_beverage_9"
-    )
-
-    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
-  }
-
-  it should "not calculate correlations on hashed text features if asked not to (using SmartTextVectorizer)" in {
-    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
-      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
-      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-      .setInput(textMap).getOutput()
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setCorrelationExclusion(CorrelationExclusion.HashedText)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, smartMapVectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq("textMap_7", "textMap_color_NullIndicatorValue_8")
-    val expectedFeatNames = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
-      "textMap_6", "textMap_7", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
-    val featuresWithCorr = Seq("textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
-    val featuresWithNaNCorr = Seq.empty[String]
-
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
-  }
-
-  it should "not calculate correlations on hashed text features if asked not to (using vectorizer)" in {
-
-    val vectorized = textMap.vectorize(cleanText = TransmogrifierDefaults.CleanText)
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setCorrelationExclusion(CorrelationExclusion.HashedText)
-      .setMinVariance(-0.1)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, vectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq("textMap_color_NullIndicatorValue_513")
-    val expectedFeatNames = (0 until 512).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-        "textMap_fruit_NullIndicatorValue_514")
-    val featuresWithCorr = Seq("textMap_beverage_NullIndicatorValue_512", "textMap_color_NullIndicatorValue_513",
-      "textMap_fruit_NullIndicatorValue_514"
-    )
-    val featuresWithNaNCorr = Seq.empty[String]
-
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
-  }
-
-  it should "only calculate correlations between feature and the label if requested" in {
-    val smartMapVectorized = new SmartTextMapVectorizer[TextMap]()
-      .setMaxCardinality(2).setNumFeatures(8).setMinSupport(1).setTopK(2).setPrependFeatureName(true)
-      .setHashSpaceStrategy(HashSpaceStrategy.Shared)
-      .setInput(textMap).getOutput()
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(true)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(true)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, smartMapVectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(smartMapVectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq("textMap_4", "textMap_7", "textMap_color_NullIndicatorValue_8")
-    val featuresWithCorr = Seq("textMap_0", "textMap_1", "textMap_2", "textMap_3", "textMap_4", "textMap_5",
-      "textMap_6", "textMap_color_NullIndicatorValue_8", "textMap_fruit_NullIndicatorValue_9",
-      "textMap_beverage_NullIndicatorValue_10"
-    )
-    val featuresWithNaNCorr = Seq("textMap_7")
-
-    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
-  }
-
-  it should "not fail when calculating feature-label correlations on a 5k element feature vector" in {
-    val numHashes = 5000
-
-    val vectorized = textMap.vectorize(
-      shouldPrependFeatureName = TransmogrifierDefaults.PrependFeatureName,
-      cleanText = false,
-      cleanKeys = TransmogrifierDefaults.CleanKeys,
-      others = Array.empty,
-      trackNulls = TransmogrifierDefaults.TrackNulls,
-      numHashes = numHashes
-    )
-
-    val checkedFeatures = new SanityChecker()
-      .setCheckSample(1.0)
-      .setRemoveBadFeatures(false)
-      .setRemoveFeatureGroup(true)
-      .setProtectTextSharedHash(true)
-      .setFeatureLabelCorrOnly(true)
-      .setMinVariance(-0.1)
-      .setMinCorrelation(0.0)
-      .setMaxCorrelation(0.8)
-      .setMaxCramersV(0.8)
-      .setInput(targetResponse, vectorized)
-      .getOutput()
-
-    checkedFeatures.originStage shouldBe a[SanityChecker]
-
-    val transformed = new OpWorkflow().setResultFeatures(vectorized, checkedFeatures).transform(textData)
-
-    val featuresToDrop = Seq.empty[String]
-    val totalFeatures = (0 until numHashes).map(i => "textMap_" + i.toString) ++
-      Seq("textMap_beverage_NullIndicatorValue_" + numHashes.toString,
-        "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
-        "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
-    val featuresWithCorr = Seq("textMap_8", "textMap_89", "textMap_294", "textMap_706", "textMap_971",
-      "textMap_1364", "textMap_1633", "textMap_2382", "textMap_2527", "textMap_3159", "textMap_3491",
-      "textMap_3804", "textMap_beverage_NullIndicatorValue_" + numHashes.toString,
-      "textMap_color_NullIndicatorValue_" + (numHashes + 1).toString,
-      "textMap_fruit_NullIndicatorValue_" + (numHashes + 2).toString)
-    val featuresWithNaNCorr = totalFeatures.filterNot(featuresWithCorr.contains)
-
-
-    val expectedFeatNames = featuresWithCorr ++ featuresWithNaNCorr
-    validateTransformerOutput(checkedFeatures.name, transformed, expectedFeatNames, featuresWithCorr,
-      featuresToDrop, featuresWithNaNCorr)
   }
 
   it should "not fail when maps have the same keys" in {
@@ -591,7 +365,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
     val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
     output.select(checked.name).count() shouldBe 12
-    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    val meta = MinVarianceCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
     meta.dropped.size shouldBe 0
     meta.categoricalStats.size shouldBe 10
     meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
@@ -603,7 +377,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
     val output = new OpWorkflow().setResultFeatures(checked).transform(textData)
     output.select(checked.name).count() shouldBe 12
-    val meta = SanityCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
+    val meta = MinVarianceCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
     meta.dropped.size shouldBe 0
     meta.categoricalStats.size shouldBe 4
     meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
@@ -612,7 +386,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
   private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
     expectedFeaturesToDrop: Seq[String], label: String): Unit = {
     val metadata = model.getMetadata()
-    val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
+    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
     val toDropFeatureNames = summary.dropped
     val inFeatureNames = summary.names
 
@@ -639,7 +413,7 @@ class SanityCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OP
     }
 
     val metadata: Metadata = getMetadata(outputColName, transformedData)
-    val summary = SanityCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
+    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
 
     summary.names.slice(0, summary.names.size - 1) should
       contain theSameElementsAs expectedFeatNames

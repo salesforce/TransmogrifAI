@@ -48,7 +48,7 @@ import org.slf4j.impl.Log4jLoggerAdapter
 import scala.util.Try
 
 
-trait MinVarianceCheckerParams extends Params {
+trait MinVarianceFilterParams extends Params {
 
   final val logLevel = new Param[String](
     parent = this, name = "logLevel",
@@ -77,17 +77,17 @@ trait MinVarianceCheckerParams extends Params {
   def getMinVariance: Double = $(minVariance)
 
   setDefault(
-    removeBadFeatures -> MinVarianceChecker.RemoveBadFeatures,
-    minVariance -> MinVarianceChecker.MinVariance
+    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
+    minVariance -> MinVarianceFilter.MinVariance
   )
 }
 
-class MinVarianceChecker
+class MinVarianceFilter
 (
-  operationName: String = classOf[MinVarianceChecker].getSimpleName,
-  uid: String = UID[MinVarianceChecker]
+  operationName: String = classOf[MinVarianceFilter].getSimpleName,
+  uid: String = UID[MinVarianceFilter]
 ) extends UnaryEstimator[OPVector, OPVector](operationName = operationName, uid = uid)
-  with MinVarianceCheckerParams {
+  with MinVarianceFilterParams {
 
   private def makeColumnStatistics
   (
@@ -209,9 +209,9 @@ class MinVarianceChecker
     vectorRows.unpersist(blocking = false)
 
     require(indicesToKeep.length > 0,
-      "The minimum variance checker has dropped all of your features, check your input data or your threshold")
+      "The minimum variance filter has dropped all of your features, check your input data or your threshold")
 
-    new MinVarianceCheckerModel(
+    new MinVarianceFilterModel(
       indicesToKeep = indicesToKeep,
       removeBadFeatures = removeBad,
       operationName = operationName,
@@ -220,7 +220,7 @@ class MinVarianceChecker
   }
 }
 
-final class MinVarianceCheckerModel private[op]
+final class MinVarianceFilterModel private[op]
 (
   val indicesToKeep: Array[Int],
   val removeBadFeatures: Boolean,
@@ -241,7 +241,7 @@ final class MinVarianceCheckerModel private[op]
   }
 }
 
-object MinVarianceChecker {
+object MinVarianceFilter {
   val RemoveBadFeatures = false
   val MinVariance = 1E-5
 }
