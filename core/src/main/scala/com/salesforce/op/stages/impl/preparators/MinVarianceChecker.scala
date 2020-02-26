@@ -82,8 +82,8 @@ trait MinVarianceCheckerParams extends Params {
 
 class MinVarianceChecker
 (
-  operationName: String = classOf[UnsupervisedSanityChecker].getSimpleName,
-  uid: String = UID[UnsupervisedSanityChecker]
+  operationName: String = classOf[MinVarianceChecker].getSimpleName,
+  uid: String = UID[MinVarianceChecker]
 ) extends UnaryEstimator[OPVector, OPVector](operationName = operationName, uid = uid)
   with MinVarianceCheckerParams {
 
