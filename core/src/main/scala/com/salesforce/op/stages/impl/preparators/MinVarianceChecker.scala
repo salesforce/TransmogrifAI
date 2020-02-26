@@ -35,12 +35,14 @@ import com.salesforce.op.features.types.{OPVector, VectorConversions}
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.log4j.{Level, LogManager}
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
 import org.apache.spark.mllib.linalg.{Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.types.MetadataBuilder
 import org.slf4j.impl.Log4jLoggerAdapter
 
 import scala.util.Try
@@ -190,6 +192,19 @@ class MinVarianceChecker
     val toDropSet = toDropFeatures.flatMap(_.column).toSet
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
+
+    val outputMeta = OpVectorMetadata(getOutputFeatureName, outputFeatures, vectorMeta.history)
+
+    val summaryMetadata = {
+      val featuresStatistics = new SummaryStatistics(colStats, sample = 1.0)
+      val summaryMeta = new MetadataBuilder()
+      summaryMeta.putStringArray(SanityCheckerNames.Dropped, toDropFeatures.map(_.name))
+      summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata())
+      summaryMeta.putStringArray(SanityCheckerNames.Names, featureNames)
+      summaryMeta.build()
+    }
+
+    setMetadata(outputMeta.toMetadata.withSummaryMetadata(summaryMetadata))
 
     vectorRows.unpersist(blocking = false)
 
