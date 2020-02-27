@@ -31,11 +31,9 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op._
-import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
-import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
-import com.salesforce.op.stages.impl.feature.RealNNVectorizer
+import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
@@ -45,56 +43,37 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-case class MinVarianceFilterDataTest
-(
-  name: String,
-  age: Double,
-  height: Double,
-  height_null: Double,
-  isBlueEyed: Double,
-  gender: Double,
-  testFeatNegCor: Double
-)
-
-case class SCDataTest(label: RealNN, features: OPVector)
-
-case class TextRawData
+case class UnlabeledTextRawData
 (
   id: String,
-  target: Double,
   textMap: Map[String, String]
 )
 
 @RunWith(classOf[JUnitRunner])
-class MinVarianceCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealNN, OPVector, OPVector],
-  BinaryEstimator[RealNN, OPVector, OPVector]] {
+class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVector, OPVector],
+  UnaryEstimator[OPVector, OPVector]] {
 
   override def specName: String = Spec[MinVarianceFilter]
 
-  // loggingLevel(Level.INFO)
-
   private val textRawData = Seq(
-    TextRawData("0", 1.0, Map("color" -> "red", "fruit" -> "berry", "beverage" -> "tea")),
-    TextRawData("1", 1.0, Map("color" -> "orange", "fruit" -> "berry", "beverage" -> "coffee")),
-    TextRawData("2", 1.0, Map("color" -> "yello", "fruit" -> "berry", "beverage" -> "water")),
-    TextRawData("3", 1.0, Map("color" -> "green", "fruit" -> "berry")),
-    TextRawData("4", 1.0, Map("color" -> "blue", "fruit" -> "berry")),
-    TextRawData("5", 1.0, Map("color" -> "indigo", "fruit" -> "berry")),
-    TextRawData("6", 0.0, Map("fruit" -> "peach")),
-    TextRawData("7", 0.0, Map("fruit" -> "peach")),
-    TextRawData("8", 0.0, Map("fruit" -> "mango")),
-    TextRawData("9", 0.0, Map("beverage" -> "tea")),
-    TextRawData("10", 0.0, Map("beverage" -> "coffee")),
-    TextRawData("11", 0.0, Map("beverage" -> "water"))
-  ).map( textRawData => (
+    UnlabeledTextRawData("0", Map("color" -> "red", "fruit" -> "berry", "beverage" -> "tea")),
+    UnlabeledTextRawData("1", Map("color" -> "orange", "fruit" -> "berry", "beverage" -> "coffee")),
+    UnlabeledTextRawData("2", Map("color" -> "yello", "fruit" -> "berry", "beverage" -> "water")),
+    UnlabeledTextRawData("3", Map("color" -> "green", "fruit" -> "berry")),
+    UnlabeledTextRawData("4", Map("color" -> "blue", "fruit" -> "berry")),
+    UnlabeledTextRawData("5", Map("color" -> "indigo", "fruit" -> "berry")),
+    UnlabeledTextRawData("6", Map("fruit" -> "peach")),
+    UnlabeledTextRawData("7", Map("fruit" -> "peach")),
+    UnlabeledTextRawData("8", Map("fruit" -> "mango")),
+    UnlabeledTextRawData("9", Map("beverage" -> "tea")),
+    UnlabeledTextRawData("10", Map("beverage" -> "coffee")),
+    UnlabeledTextRawData("11", Map("beverage" -> "water"))
+  ).map(textRawData => (
     textRawData.id.toText,
-    textRawData.target.toRealNN,
     textRawData.textMap.toTextMap
   ))
 
-  val (textData, id, target, textMap) = TestFeatureBuilder("id", "target", "textMap", textRawData)
-  val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
-
+  val (textData, id, textMap) = TestFeatureBuilder("id", "textMap", textRawData)
   // scalastyle:off
   private val data = Seq(
     SanityCheckDataTest("alex",     32,  5.0,  0,  1,  0.5,  0),
@@ -104,14 +83,11 @@ class MinVarianceCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealN
     SanityCheckDataTest("diana",    32,  5.4,  1,  0,  0,  0.1),
     SanityCheckDataTest("max",      32,  5.4,  1,  0,  0,  0.1)
   ).map(data =>
-    (
-      data.isBlueEyed.toRealNN,
-      Seq(data.age, data.height, data.height_null, data.gender, data.testFeatNegCor).toOPVector
-    )
+    Seq(data.age, data.height, data.height_null, data.gender, data.testFeatNegCor).toOPVector
   )
   // scalastyle:on
 
-  val (testDataNoMeta, targetLabelNoResponse, featureVector) = TestFeatureBuilder("isBlueEye", "features", data)
+  val (testDataNoMeta, featureVector) = TestFeatureBuilder("features", data)
 
   val testMetadata = OpVectorMetadata(
     featureVector.name,
@@ -124,302 +100,188 @@ class MinVarianceCheckerTest extends OpEstimatorSpec[OPVector, BinaryModel[RealN
       )
     },
     Seq("age", "height", "height_null", "gender", "testFeatNegCor")
-      .map( name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
+      .map(name => name -> FeatureHistory(originFeatures = Seq(name), stages = Seq())).toMap
   )
 
   val featureNames = testMetadata.columns.map(_.makeColName())
-  val featuresToDrop = Seq(featureNames(0), featureNames(3), featureNames(4))
-  val expectedCorrFeatNames = featureNames.tail
-  val expectedCorrFeatNamesIsNan = Seq(featureNames(0))
+  val expectedNamesFeatsDropped = Seq(featureNames(0), featureNames(3), featureNames(4))
+  val expectedNamesFeatsKept = Seq(featureNames(1), featureNames(2))
 
   val testData = testDataNoMeta.select(
-    testDataNoMeta(targetLabelNoResponse.name),
     testDataNoMeta(featureVector.name).as(featureVector.name, testMetadata.toMetadata)
   )
 
-  val targetLabel = targetLabelNoResponse.copy(isResponse = true)
-
   val inputData = testData
-  val estimator = new MinVarianceChecker().setRemoveBadFeatures(false).setInput(targetLabel, featureVector)
+  val estimator = new MinVarianceFilter().setRemoveBadFeatures(false).setInput(featureVector)
   val expectedResult = testData.select(featureVector.name).collect()
     .map(_.getAs[Vector](0).toOPVector).toSeq
 
-  Spec[MinVarianceChecker] should "remove trouble features" in {
-    val checked = targetLabel.sanityCheck(featureVector,
-      maxCorrelation = 0.99, minVariance = 0.0, checkSample = 1.0, removeBadFeatures = true)
+  Spec[MinVarianceFilter] should "remove features" in {
+    val checked = featureVector.minVariance(minVariance = 0.1, removeBadFeatures = true)
     val outputColName = checked.name
 
-    checked.originStage shouldBe a[MinVarianceChecker]
+    checked.originStage shouldBe a[MinVarianceFilter]
 
-    val model = checked.originStage.asInstanceOf[MinVarianceChecker].fit(testData)
-    val featuresToDrop = Seq(featureNames(0), featureNames(3), featureNames(4))
-    validateEstimatorOutput(outputColName, model, featuresToDrop, targetLabel.name)
+    val model = checked.originStage.asInstanceOf[MinVarianceFilter].fit(testData)
+    validateEstimatorOutput(outputColName, model, expectedNamesFeatsDropped)
 
     val transformedData = model.transform(testData)
-    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
-      featuresToDrop, expectedCorrFeatNamesIsNan)
-  }
-
-  it should "not allow setting invalid param values" in {
-    val checker = new MinVarianceChecker()
-    the[IllegalArgumentException] thrownBy checker.setCheckSample(-1.0)
-    the[IllegalArgumentException] thrownBy checker.setCheckSample(0.0)
-    the[IllegalArgumentException] thrownBy checker.setCheckSample(2.0)
-    the[IllegalArgumentException] thrownBy checker.setMinCorrelation(-1.0)
-    the[IllegalArgumentException] thrownBy checker.setMinCorrelation(2.0)
-    the[IllegalArgumentException] thrownBy checker.setMaxCorrelation(-1.0)
-    the[IllegalArgumentException] thrownBy checker.setMaxCorrelation(2.0)
-    the[IllegalArgumentException] thrownBy checker.setSampleUpperLimit(-1)
-    the[IllegalArgumentException] thrownBy checker.setSampleLowerLimit(-1)
+    validateTransformerOutput(outputColName, transformedData, expectedNamesFeatsKept,
+      expectedNamesFeatsDropped)
   }
 
   it should "have proper default values for all params" in {
-    val checker = new MinVarianceChecker()
-    checker.getOrDefault(checker.sampleLowerLimit) shouldBe MinVarianceChecker.SampleLowerLimit
-    checker.getOrDefault(checker.sampleUpperLimit) shouldBe MinVarianceChecker.SampleUpperLimit
-    checker.getOrDefault(checker.checkSample) shouldBe MinVarianceChecker.CheckSample
-    checker.getOrDefault(checker.maxCorrelation) shouldBe MinVarianceChecker.MaxCorrelation
-    checker.getOrDefault(checker.minVariance) shouldBe MinVarianceChecker.MinVariance
-    checker.getOrDefault(checker.minCorrelation) shouldBe MinVarianceChecker.MinCorrelation
-    checker.getOrDefault(checker.correlationType) shouldBe CorrelationType.Pearson.entryName
-    checker.getOrDefault(checker.removeBadFeatures) shouldBe MinVarianceChecker.RemoveBadFeatures
+    val filter = new MinVarianceFilter()
+    filter.getOrDefault(filter.minVariance) shouldBe MinVarianceFilter.MinVariance
+    filter.getOrDefault(filter.removeBadFeatures) shouldBe MinVarianceFilter.RemoveBadFeatures
   }
 
   it should "consume the output from an OP vectorizer and remove trouble features accordingly" in {
-    val MinVarianceChecker = new MinVarianceChecker()
-
-    val outputColName = MinVarianceChecker
-      .setMaxCorrelation(.99)
-      .setMinVariance(0.0)
-      .setCheckSample(1.0)
+    val minVarianceFilter = new MinVarianceFilter()
+    val outputColName = minVarianceFilter
+      .setMinVariance(0.1)
       .setRemoveBadFeatures(true)
-      .setInput(targetLabel, featureVector).getOutput().name
+      .setInput(featureVector).getOutput().name
 
-    val model = MinVarianceChecker.fit(testData)
-    validateEstimatorOutput(outputColName, model, featuresToDrop, targetLabel.name)
+    val model = minVarianceFilter.fit(testData)
+    validateEstimatorOutput(outputColName, model, expectedNamesFeatsDropped)
 
     val transformedData = model.transform(testData)
     val metadata: Metadata = getMetadata(outputColName, transformedData)
-    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
+    val summary = metadata.getSummaryMetadata()
+    val wrapped = summary.wrapped
+    val toDropFeatureNames = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq
+    val allFeatureNames = wrapped.getArray[String](SanityCheckerNames.Names).toSeq
     val outputColumns = OpVectorMetadata(transformedData.schema(outputColName))
-    targetLabel.name +: testMetadata.columns.map(_.makeColName()) should
-      contain theSameElementsAs summary.names
-    outputColumns.columns.length + summary.dropped.length shouldEqual testMetadata.columns.length
+    testMetadata.columns.map(_.makeColName()) should contain theSameElementsAs allFeatureNames
+    outputColumns.columns.length + toDropFeatureNames.length shouldEqual testMetadata.columns.length
 
-    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
-      featuresToDrop, expectedCorrFeatNamesIsNan)
   }
 
   it should "not remove trouble features" in {
-    val MinVarianceChecker = new MinVarianceChecker()
-
-    val outputColName = MinVarianceChecker
-      .setMaxCorrelation(.99)
-      .setMinVariance(0.0)
-      .setCheckSample(1.0)
-      .setInput(targetLabel, featureVector).getOutput().name
-
-    val model = MinVarianceChecker.fit(testData)
-    validateEstimatorOutput(outputColName, model, Seq(), targetLabel.name)
+    val minVarianceFilter = new MinVarianceFilter()
+    val outputColName = minVarianceFilter
+      .setMinVariance(0.1)
+      .setRemoveBadFeatures(false)
+      .setInput(featureVector).getOutput().name
+    val model = minVarianceFilter.fit(testData)
+    validateEstimatorOutput(outputColName, model, Seq.empty)
 
     val transformedData = model.transform(testData)
-
-    val expectedFeatNames = expectedCorrFeatNames ++ expectedCorrFeatNamesIsNan
-    validateTransformerOutput(outputColName, transformedData, expectedFeatNames, expectedCorrFeatNames,
-      Seq(), expectedCorrFeatNamesIsNan)
+    validateTransformerOutput(outputColName, transformedData, featureNames, Seq.empty)
   }
 
-  it should "fail when not enough data to run" in {
-    val MinVarianceChecker = new MinVarianceChecker()
-
-    val outputColName = MinVarianceChecker
-      .setMaxCorrelation(.99)
-      .setMinVariance(0.0)
-      .setCheckSample(0.000001)
-      .setRemoveBadFeatures(true)
-      .setInput(targetLabel, featureVector).getOutput().name
-
-    val result = MinVarianceChecker.fit(testData)
-    succeed
-  }
-
-  it should "fail when features are defined incorrectly" in {
-    the[IllegalArgumentException] thrownBy {
-      new MinVarianceChecker().setInput(targetLabel.copy(isResponse = true), featureVector.copy(isResponse = true))
-    } should have message "The feature vector should not contain any response features."
-  }
-
-  it should "not be robust to missing metadata or partial metadata on inputs" in {
-
-    val (data, f1, f2) = TestFeatureBuilder[RealNN, OPVector]("label", "features",
-      Seq((RealNN(32), Vectors.dense(5.0, 1, 1, 0).toOPVector),
-        (RealNN(32), Vectors.dense(4.0, 0, 0, 1).toOPVector),
-        (RealNN(34), Vectors.dense(6.0, 1, 1, 0).toOPVector),
-        (RealNN(32), Vectors.dense(5.5, 1, 1, 0).toOPVector),
-        (RealNN(30), Vectors.dense(5.4, 0, 0, 1).toOPVector),
-        (RealNN(32), Vectors.dense(5.4, 0, 0, 1).toOPVector))
+  it should "fail when input dataset is empty" in {
+    val emptyData = Seq.empty[SanityCheckDataTest].map(data =>
+      Seq(data.age, data.height, data.height_null, data.gender, data.testFeatNegCor).toOPVector
     )
 
-    val f1r = f1.copy(isResponse = true)
-    val MinVarianceChecker = new MinVarianceChecker()
-      .setInput(f1r, f2)
+    val (emptyDataNoMeta, emptyFeatureVector) = TestFeatureBuilder("features", emptyData)
+    val minVarianceFilter = new MinVarianceFilter()
+      .setMinVariance(0.1)
       .setRemoveBadFeatures(true)
-      .setCheckSample(1.0)
-    val output = MinVarianceChecker.getOutput()
-    assertThrows[IllegalArgumentException] {
-      MinVarianceChecker.fit(data).transform(data)
-    }
-  }
+      .setInput(emptyFeatureVector)
 
-  it should "correctly limit the sample size if requested to" in {
-    val (data, f1, f2) = TestFeatureBuilder[RealNN, OPVector]("label", "features",
-      Seq((RealNN(32), Vectors.dense(5.0, 1, 1, 0).toOPVector),
-        (RealNN(32), Vectors.dense(4.0, 0, 0, 1).toOPVector),
-        (RealNN(34), Vectors.dense(6.0, 1, 1, 0).toOPVector),
-        (RealNN(32), Vectors.dense(5.5, 1, 1, 0).toOPVector),
-        (RealNN(30), Vectors.dense(5.4, 0, 0, 1).toOPVector),
-        (RealNN(32), Vectors.dense(5.4, 0, 0, 1).toOPVector))
+    val emptyTestData = emptyDataNoMeta.select(
+      emptyDataNoMeta(emptyFeatureVector.name).as(emptyFeatureVector.name, testMetadata.toMetadata)
     )
 
-    val f1r = f1.copy(isResponse = true)
-    // Check that setSampleUpperLimit works by limiting the sample size to 0 (deterministic)
-    // and checking for an error.
-    // We cannot use a non-zero sample limit since the Spark sampling algorithm
-    // is not deterministic and does not guarantee exactly the supplied sampling fraction
-    val MinVarianceChecker = new MinVarianceChecker()
-      .setInput(f1r, f2)
-      .setRemoveBadFeatures(true)
-      .setCheckSample(0.99999)
-      .setSampleLowerLimit(0)
-      .setSampleUpperLimit(0)
-
     the[IllegalArgumentException] thrownBy {
-      MinVarianceChecker.fit(data)
+      minVarianceFilter.fit(emptyTestData)
     } should have message "requirement failed: Sample size cannot be zero"
   }
 
-  it should "compute higher spearman correlation for monotonic, nonlinear functions than pearson" in {
-    val x = 1.0 to 20.0 by 1.0
-    val xSquare = x.map(Math.pow(_, 5))
-    val (data, labelNoResponse, feature) = TestFeatureBuilder[RealNN, RealNN]("label", "feature",
-      x.map(_.toRealNN).zip(xSquare.map(_.toRealNN))
+  it should "not be robust to missing metadata or partial metadata on inputs" in {
+    val (data, f1) = TestFeatureBuilder[OPVector]("features",
+      Seq(Vectors.dense(5.0, 1, 1, 0)).map(_.toOPVector)
     )
 
-    val label = labelNoResponse.copy(isResponse = true)
-
-    val vectorized = feature.vectorize()
-    val dataVectorized = vectorized.originStage.asInstanceOf[RealNNVectorizer].transform(data)
-
-    def getFeatureCorrelationFor(MinVarianceChecker: MinVarianceChecker): Double = {
-      val model = MinVarianceChecker.fit(dataVectorized)
-
-      val summaryMeta = model.getMetadata().getSummaryMetadata()
-      val correlations = summaryMeta
-        .getMetadata(MinVarianceCheckerNames.CorrelationsWLabel)
-        .getDoubleArray(MinVarianceCheckerNames.Values)
-      correlations(0)
+    val f1c = f1.copy()
+    val minVarianceFilter = new MinVarianceFilter().setInput(f1c)
+    assertThrows[IllegalArgumentException] {
+      minVarianceFilter.fit(data).transform(data)
     }
-
-    val MinVarianceCheckerSpearman = new MinVarianceChecker()
-      .setInput(label, vectorized)
-      .setCorrelationType(CorrelationType.Spearman)
-      .setCheckSample(0.99999)
-
-    val MinVarianceCheckerPearson = new MinVarianceChecker()
-      .setInput(label, vectorized)
-      .setCorrelationType(CorrelationType.Pearson)
-      .setCheckSample(0.99999)
-
-    assert(
-      getFeatureCorrelationFor(MinVarianceCheckerSpearman) > getFeatureCorrelationFor(MinVarianceCheckerPearson)
-    )
   }
 
   it should "throw an error if all of the features are removed" in {
-    val MinVarianceChecker = new MinVarianceChecker()
-
-    val outputColName = MinVarianceChecker
-      .setMaxCorrelation(.000001)
+    val minVarianceFilter = new MinVarianceFilter()
       .setMinVariance(1000)
-      .setCheckSample(0.999999)
       .setRemoveBadFeatures(true)
-      .setInput(targetLabel, featureVector).getOutput().name
+      .setInput(featureVector)
 
     the[RuntimeException] thrownBy {
-      MinVarianceChecker.fit(testData)
+      minVarianceFilter.fit(testData)
     } should have message
-      "requirement failed: The sanity checker has dropped all of your features, check your input data quality"
+      "requirement failed: The minimum variance filter has dropped all of your features, " +
+        "check your input data or your threshold"
   }
 
   it should "not fail when maps have the same keys" in {
-    val mapData = textRawData.map{
-      case (i, t, tm) => (i, t, tm.value.toPickListMap, tm.value.toPickListMap,
-        tm.value.map{ case (k, v) => k -> math.random }.toRealMap)
+    val mapData = textRawData.map {
+      case (i, tm) => (i, tm.value.toPickListMap, tm.value.toPickListMap,
+        tm.value.map { case (k, _) => k -> math.random }.toRealMap)
     }
-    val (mapDataFrame, id, target, plMap1, plMap2, doubleMap) = TestFeatureBuilder(
-      "id", "target", "textMap1", "textMap2", "doubleMap", mapData)
-    val targetResponse: FeatureLike[RealNN] = target.copy(isResponse = true)
-    val features = Seq(id, target, plMap1, plMap2, doubleMap).transmogrify()
-    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
-    val output = new OpWorkflow().setResultFeatures(checked).transform(mapDataFrame)
-    output.select(checked.name).count() shouldBe 12
-    val meta = MinVarianceCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
-    meta.dropped.size shouldBe 0
-    meta.categoricalStats.size shouldBe 10
-    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
+    val (mapDataFrame, id, plMap1, plMap2, doubleMap) = TestFeatureBuilder(
+      "id", "textMap1", "textMap2", "doubleMap", mapData)
+    val features = Seq(id, plMap1, plMap2, doubleMap).transmogrify()
+    val filtered = features.minVariance()
+    val output = new OpWorkflow().setResultFeatures(filtered).transform(mapDataFrame)
+    output.select(filtered.name).count() shouldBe 12
+
+    val metadata = filtered.originStage.getMetadata()
+    val summary = metadata.getSummaryMetadata()
+    val wrapped = summary.wrapped
+    val numDropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq.size
+
+    numDropped shouldBe 0
   }
 
   it should "produce the same statistics if the same transformation is applied twice" in {
     val plMap = textMap.map[PickListMap](_.value.toPickListMap)
-    val features = Seq(id, target, plMap, plMap).transmogrify()
-    val checked = targetResponse.sanityCheck(features, categoricalLabel = Option(true))
-    val output = new OpWorkflow().setResultFeatures(checked).transform(textData)
-    output.select(checked.name).count() shouldBe 12
-    val meta = MinVarianceCheckerSummary.fromMetadata(checked.originStage.getMetadata().getSummaryMetadata())
-    meta.dropped.size shouldBe 0
-    meta.categoricalStats.size shouldBe 4
-    meta.categoricalStats.foreach(_.contingencyMatrix("0").length shouldBe 2)
+    val features = Seq(id, plMap, plMap).transmogrify()
+    val filtered = features.minVariance()
+    val output = new OpWorkflow().setResultFeatures(filtered).transform(textData)
+    output.select(filtered.name).count() shouldBe 12
+
+    val metadata = filtered.originStage.getMetadata()
+    val summary = metadata.getSummaryMetadata()
+    val wrapped = summary.wrapped
+    val numDropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq.size
+
+    numDropped shouldBe 0
   }
 
-  private def validateEstimatorOutput(outputColName: String, model: BinaryModel[RealNN, OPVector, OPVector],
-    expectedFeaturesToDrop: Seq[String], label: String): Unit = {
+  private def validateEstimatorOutput
+  (
+    outputColName: String,
+    model: UnaryModel[OPVector, OPVector],
+    expectedFeaturesToDrop: Seq[String]
+  ): Unit = {
     val metadata = model.getMetadata()
-    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
-    val toDropFeatureNames = summary.dropped
-    val inFeatureNames = summary.names
-
+    val summary = metadata.getSummaryMetadata()
+    val wrapped = summary.wrapped
+    val toDropFeatureNames = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq
+    val allFeatureNames = wrapped.getArray[String](SanityCheckerNames.Names).toSeq
+    val stats = wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics).wrapped
+    val minVariance = stats.getArray[Double](SanityCheckerNames.Variance).min
     val featuresKept = OpVectorMetadata(outputColName, metadata).columns.length
 
     toDropFeatureNames should contain theSameElementsAs expectedFeaturesToDrop
-    featuresKept equals inFeatureNames.toSet.diff(toDropFeatureNames.toSet).size
-    summary.names.last shouldEqual label
-    summary.featuresStatistics.max.last shouldBe 1 // this is max on label column
-    summary.featuresStatistics.mean.last shouldBe 0.5 // this is mean on label column
+    featuresKept equals allFeatureNames.toSet.diff(toDropFeatureNames.toSet).size
+    minVariance shouldBe 0.0
   }
 
-  private def validateTransformerOutput(
+  private def validateTransformerOutput
+  (
     outputColName: String,
     transformedData: DataFrame,
     expectedFeatNames: Seq[String],
-    expectedCorrFeatNames: Seq[String],
-    expectedFeaturesToDrop: Seq[String],
-    expectedCorrFeatNamesIsNan: Seq[String]
+    expectedFeaturesToDrop: Seq[String]
   ): Unit = {
+    val expectedLength = expectedFeatNames.length - expectedFeaturesToDrop.length
     transformedData.select(outputColName).collect().foreach { case Row(features: Vector) =>
-      features.toArray.length equals
-        (expectedCorrFeatNames.length + expectedCorrFeatNamesIsNan.length - expectedFeaturesToDrop.length)
+      features.toArray.length equals expectedLength
     }
-
-    val metadata: Metadata = getMetadata(outputColName, transformedData)
-    val summary = MinVarianceCheckerSummary.fromMetadata(metadata.getSummaryMetadata())
-
-    summary.names.slice(0, summary.names.size - 1) should
-      contain theSameElementsAs expectedFeatNames
-    summary.correlationsWLabel.nanCorrs should contain theSameElementsAs expectedCorrFeatNamesIsNan
-    summary.correlationsWLabel.featuresIn should contain theSameElementsAs expectedCorrFeatNames
-    summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
   }
 
   private def getMetadata(outputColName: String, transformedData: DataFrame): Metadata = {

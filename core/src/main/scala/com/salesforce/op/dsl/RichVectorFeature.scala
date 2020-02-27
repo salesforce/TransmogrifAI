@@ -35,6 +35,7 @@ import com.salesforce.op.features.FeatureLike
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.impl.classification.{Impurity, OpRandomForestClassifier}
 import com.salesforce.op.stages.impl.feature.{DropIndicesByTransformer, OpLDA}
+import com.salesforce.op.stages.impl.preparators.MinVarianceFilter
 import com.salesforce.op.stages.sparkwrappers.specific.OpEstimatorWrapper
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.feature.{IDF, IDFModel}
@@ -74,7 +75,8 @@ trait RichVectorFeature {
      * @param thresholds
      * @return
      */
-    def randomForest(
+    def randomForest
+    (
       label: FeatureLike[RealNN],
       maxDepth: Int = 5,
       maxBins: Int = 32,
@@ -132,6 +134,7 @@ trait RichVectorFeature {
      * Allows columns to be dropped from a feature vector based on properties of the
      * metadata about what is contained in each column (will work only on vectors)
      * created with [[OpVectorMetadata]]
+     *
      * @param matchFn function that goes from [[OpVectorColumnMetadata]] to boolean for dropping
      *                columns (cases that evaluate to true will be dropped)
      * @return new Vector with columns removed by function
@@ -139,6 +142,19 @@ trait RichVectorFeature {
     def dropIndicesBy(matchFn: OpVectorColumnMetadata => Boolean): FeatureLike[OPVector] = {
       new DropIndicesByTransformer(matchFn = matchFn).setInput(f).getOutput()
     }
+
+    def minVariance
+    (
+      minVariance: Double = MinVarianceFilter.MinVariance,
+      removeBadFeatures: Boolean = MinVarianceFilter.RemoveBadFeatures
+    ): FeatureLike[OPVector] = {
+      val filter = new MinVarianceFilter()
+      filter.setInput(f)
+        .setMinVariance(minVariance)
+        .setRemoveBadFeatures(removeBadFeatures)
+        .getOutput()
+    }
+
   }
 
 }

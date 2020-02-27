@@ -82,6 +82,17 @@ trait MinVarianceFilterParams extends Params {
   )
 }
 
+/**
+ * The MinVarianceFilter checks that computed features have a minimum variance
+ *
+ * Like SanityChecker, the Estimator step outputs statistics on incoming data, as well as the
+ * names of features which should be dropped from the feature vector. And the transformer step
+ * applies the action of actually removing the low variance features from the feature vector
+ *
+ * Two distinctions from SanityChecker:
+ * (1) no label column as input; and
+ * (2) only filters features by variance
+ */
 class MinVarianceFilter
 (
   operationName: String = classOf[MinVarianceFilter].getSimpleName,
@@ -166,7 +177,7 @@ class MinVarianceFilter
     val count = colStats.count
     require(count > 0, "Sample size cannot be zero")
 
-    val featureSize = vectorRows.first().size - 1
+    val featureSize = vectorRows.first().size
     require(featureSize > 0, "Feature vector passed in is empty, check your vectorizers")
 
     // handle any possible serialization errors if users give us wrong metadata
