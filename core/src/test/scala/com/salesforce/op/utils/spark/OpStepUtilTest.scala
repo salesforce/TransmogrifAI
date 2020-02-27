@@ -36,17 +36,17 @@ import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.test.{TestCommon, TestSparkContext}
 
 @RunWith(classOf[JUnitRunner])
-class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
+class OpStepUtilTest extends FlatSpec with TestCommon with TestSparkContext {
 
   "JobGroupUtil" should "be able to set a job group ID around a code block" in {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
     }
     spark.sparkContext.statusTracker.getJobIdsForGroup("ReadAndFilter") should not be empty
   }
 
   it should "reset the job group ID after a code block" in {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
     }
     spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()

@@ -108,7 +108,7 @@ private[op] trait OpWorkflowCore {
 
   /**
    * Whether the cross-validation/train-validation-split will be done at workflow level
-   *g c
+   *
    * @return true if the cross-validation  will be done at workflow level, false otherwise
    */
   final def isWorkflowCV: Boolean = isWorkflowCVEnabled
