@@ -44,4 +44,5 @@ object OpStep extends Enum[OpStep] {
   case object SavingMetrics extends OpStep("Saving metrics")
   case object SavingModel extends OpStep("Saving model")
   case object SavingScores extends OpStep("Saving scores")
+  case object Scoring extends OpStep("Scoring")
 }
