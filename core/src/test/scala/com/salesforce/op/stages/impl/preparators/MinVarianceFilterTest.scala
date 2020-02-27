@@ -31,11 +31,11 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op._
+import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.MetadataParam
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.{Vector, Vectors}
 import org.apache.spark.sql.types.Metadata
@@ -148,13 +148,10 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
 
     val transformedData = model.transform(testData)
     val metadata: Metadata = getMetadata(outputColName, transformedData)
-    val summary = metadata.getSummaryMetadata()
-    val wrapped = summary.wrapped
-    val toDropFeatureNames = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq
-    val allFeatureNames = wrapped.getArray[String](SanityCheckerNames.Names).toSeq
+    val summary = MinVarianceSummary.fromMetadata(metadata.getSummaryMetadata())
     val outputColumns = OpVectorMetadata(transformedData.schema(outputColName))
-    testMetadata.columns.map(_.makeColName()) should contain theSameElementsAs allFeatureNames
-    outputColumns.columns.length + toDropFeatureNames.length shouldEqual testMetadata.columns.length
+    testMetadata.columns.map(_.makeColName()) should contain theSameElementsAs summary.names
+    outputColumns.columns.length + summary.dropped.length shouldEqual testMetadata.columns.length
 
   }
 
@@ -229,11 +226,8 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     output.select(filtered.name).count() shouldBe 12
 
     val metadata = filtered.originStage.getMetadata()
-    val summary = metadata.getSummaryMetadata()
-    val wrapped = summary.wrapped
-    val numDropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq.size
-
-    numDropped shouldBe 0
+    val summary = MinVarianceSummary.fromMetadata(metadata.getSummaryMetadata())
+    summary.dropped.size shouldBe 0
   }
 
   it should "produce the same statistics if the same transformation is applied twice" in {
@@ -244,11 +238,8 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     output.select(filtered.name).count() shouldBe 12
 
     val metadata = filtered.originStage.getMetadata()
-    val summary = metadata.getSummaryMetadata()
-    val wrapped = summary.wrapped
-    val numDropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq.size
-
-    numDropped shouldBe 0
+    val summary = MinVarianceSummary.fromMetadata(metadata.getSummaryMetadata())
+    summary.dropped.size shouldBe 0
   }
 
   private def validateEstimatorOutput
@@ -258,17 +249,12 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     expectedFeaturesToDrop: Seq[String]
   ): Unit = {
     val metadata = model.getMetadata()
-    val summary = metadata.getSummaryMetadata()
-    val wrapped = summary.wrapped
-    val toDropFeatureNames = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq
-    val allFeatureNames = wrapped.getArray[String](SanityCheckerNames.Names).toSeq
-    val stats = wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics).wrapped
-    val minVariance = stats.getArray[Double](SanityCheckerNames.Variance).min
+    val summary = MinVarianceSummary.fromMetadata(metadata.getSummaryMetadata())
     val featuresKept = OpVectorMetadata(outputColName, metadata).columns.length
 
-    toDropFeatureNames should contain theSameElementsAs expectedFeaturesToDrop
-    featuresKept equals allFeatureNames.toSet.diff(toDropFeatureNames.toSet).size
-    minVariance shouldBe 0.0
+    summary.dropped should contain theSameElementsAs expectedFeaturesToDrop
+    featuresKept equals summary.names.toSet.diff(summary.dropped.toSet).size
+    summary.featuresStatistics.variance.min shouldBe 0.0
   }
 
   private def validateTransformerOutput

@@ -143,6 +143,13 @@ trait RichVectorFeature {
       new DropIndicesByTransformer(matchFn = matchFn).setInput(f).getOutput()
     }
 
+    /**
+     * Apply filter that removes computed features that have variance <= `minVariance``
+     *
+     * @param minVariance
+     * @param removeBadFeatures
+     * @return
+     */
     def minVariance
     (
       minVariance: Double = MinVarianceFilter.MinVariance,
