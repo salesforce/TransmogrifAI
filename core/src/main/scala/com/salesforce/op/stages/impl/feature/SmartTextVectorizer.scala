@@ -165,12 +165,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     val textColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes) ++
           allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
-        makeVectorColumnMetadata(textToHash, makeHashingParams()) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
