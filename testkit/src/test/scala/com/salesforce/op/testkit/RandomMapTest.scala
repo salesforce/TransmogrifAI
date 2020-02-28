@@ -441,9 +441,9 @@ class RandomMapTest extends FlatSpec with TestCommon with Assertions {
     val sut = RandomMap.ofReals[Real, RealMap](normal, 1, 4) withKeys (i => "" + ('a' + i).toChar)
     check[Double, RealMap](sut, 1, 3,
       samples = List(
-        Map("a" -> 7.316950747539536),
-        Map("a" -> 8.551071347894734),
-        Map("a" -> 4.123931454830942, "b" -> 4.102477333817849, "c" -> 3.5256736614304987)
+        Map("a" -> 3.3573821018748577),
+        Map("a" -> 6.155000792586161),
+        Map("a" -> 4.006348243684868, "b" -> 5.683036228303376, "c" -> 5.832671498716051)
       )
     )
   }

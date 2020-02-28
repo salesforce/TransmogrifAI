@@ -257,7 +257,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(5.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2
@@ -309,7 +309,7 @@ class ModelInsightsTest extends FlatSpec with PassengerSparkFixtureTest with Dou
     insights.label.rawFeatureName shouldBe Seq(survived.name)
     insights.label.rawFeatureType shouldBe Seq(survived.typeName)
     insights.label.stagesApplied.size shouldBe 1
-    insights.label.sampleSize shouldBe Some(5.0)
+    insights.label.sampleSize shouldBe Some(4.0)
     insights.features.size shouldBe 5
     insights.features.map(_.featureName).toSet shouldEqual rawNames
     ageInsights.derivedFeatures.size shouldBe 2

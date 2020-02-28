@@ -38,6 +38,7 @@ import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
+import org.scalactic.TolerantNumerics
 
 
 @RunWith(classOf[JUnitRunner])
@@ -54,8 +55,8 @@ class OpWord2VecTest extends FlatSpec with TestSparkContext {
   lazy val (testData, _) = TestFeatureBuilder(data.tail)
 
   lazy val expected = data.tail.zip(Seq(
-    Vectors.dense(-0.029884086549282075, -0.055613189935684204, 0.04186216294765473).toOPVector,
-    Vectors.dense(-0.0026281912411962234, -0.016138136386871338, 0.010740748473576136).toOPVector,
+    Vectors.dense(0.00522359311580658, -2.3424625396728516E-4, -0.031033356487751008).toOPVector,
+    Vectors.dense(0.009147255548409053, -0.023099809885025024, -0.018267663461821418).toOPVector,
     Vectors.dense(0.0, 0.0, 0.0).toOPVector
   )).toArray
 

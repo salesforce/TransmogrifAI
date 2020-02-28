@@ -63,7 +63,7 @@ configure(allProjs) {
 
     ext {
         scalaVersion = '2.12'
-        scalaVersionRevision = '8'
+        scalaVersionRevision = '10'
         scalaTestVersion = '3.0.5'
         scalaCheckVersion = '1.14.0'
         junitVersion = '4.12'
