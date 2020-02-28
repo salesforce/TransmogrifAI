@@ -31,15 +31,15 @@
 package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op.UID
-import com.salesforce.op.features.types.{OPVector, VectorConversions}
+import com.salesforce.op.features.types.OPVector
 import com.salesforce.op.stages.base.unary.{UnaryEstimator, UnaryModel}
+import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.log4j.{Level, LogManager}
-import org.apache.spark.ml.linalg.{DenseVector, SparseVector, Vectors => NewVectors}
+import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
 import org.apache.spark.mllib.linalg.{Vector => OldVector, Vectors => OldVectors}
-import org.apache.spark.mllib.stat.{MultivariateStatisticalSummary, Statistics}
+import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
@@ -99,63 +99,6 @@ class MinVarianceFilter
 ) extends UnaryEstimator[OPVector, OPVector](operationName = operationName, uid = uid)
   with MinVarianceFilterParams {
 
-  private def makeColumnStatistics
-  (
-    metaCols: Seq[OpVectorColumnMetadata],
-    statsSummary: MultivariateStatisticalSummary
-  ): Array[ColumnStatistics] = {
-    val means = statsSummary.mean
-    val maxs = statsSummary.max
-    val mins = statsSummary.min
-    val count = statsSummary.count
-    val variances = statsSummary.variance
-    val featuresStats = metaCols.map {
-      col =>
-        val i = col.index
-        val name = col.makeColName()
-        ColumnStatistics(
-          name = name,
-          column = Some(col),
-          isLabel = false,
-          count = count,
-          mean = means(i),
-          min = mins(i),
-          max = maxs(i),
-          variance = variances(i),
-          corrLabel = None,
-          cramersV = None,
-          parentCorr = None,
-          parentCramersV = None,
-          maxRuleConfidences = Seq.empty,
-          supports = Seq.empty
-        )
-    }
-    featuresStats.toArray
-  }
-
-  private def getFeaturesToDrop(stats: Array[ColumnStatistics]): Array[ColumnStatistics] = {
-    val minVar = $(minVariance)
-    // Including dummy params in reasonsToRemove to allow re-use of `ColumnStatistics`
-    for {
-      col <- stats
-      reasons = col.reasonsToRemove(
-        minVariance = minVar,
-        minCorrelation = 0.0,
-        maxCorrelation = 1.0,
-        maxCramersV = 1.0,
-        maxRuleConfidence = 1.0,
-        minRequiredRuleSupport = 1.0,
-        removeFeatureGroup = false,
-        protectTextSharedHash = true,
-        removedGroups = Seq.empty
-      )
-      if reasons.nonEmpty
-    } yield {
-      logWarning(s"Removing ${col.name} due to: ${reasons.mkString(",")}")
-      col
-    }
-  }
-
   override def fitFn(data: Dataset[OPVector#Value]): UnaryModel[OPVector, OPVector] = {
     // Set the desired log level
     if (isSet(logLevel)) {
@@ -194,11 +137,14 @@ class MinVarianceFilter
     val featureNames = vectorMetaColumns.map(_.makeColName())
 
     logInfo("Logging all statistics")
-    val stats = makeColumnStatistics(vectorMetaColumns, colStats)
+//    val stats = makeColumnStatistics(vectorMetaColumns, colStats)
+    val stats = FeatureFilterUtils.makeColumnStatistics(vectorMetaColumns, colStats)
     stats.foreach { stat => logInfo(stat.toString) }
 
     logInfo("Calculating features to remove")
-    val toDropFeatures = if (removeBad) getFeaturesToDrop(stats) else Array.empty[ColumnStatistics]
+    val (toDropFeatures, warnings) = if (removeBad) {
+      FeatureFilterUtils.getFeaturesToDrop(stats, $(minVariance)).unzip
+    } else (Array.empty[ColumnStatistics], Array.empty[String])
     val toDropSet = toDropFeatures.flatMap(_.column).toSet
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
@@ -235,17 +181,7 @@ final class MinVarianceFilterModel private[op]
   uid: String
 ) extends UnaryModel[OPVector, OPVector](operationName = operationName, uid = uid) {
 
-  def transformFn: OPVector => OPVector = feature => {
-    if (!removeBadFeatures) feature
-    else {
-      val vals = new Array[Double](indicesToKeep.length)
-      feature.value.foreachActive((i, v) => {
-        val k = indicesToKeep.indexOf(i)
-        if (k >= 0) vals(k) = v
-      })
-      NewVectors.dense(vals).compressed.toOPVector
-    }
-  }
+  def transformFn: OPVector => OPVector = FeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)
 }
 
 object MinVarianceFilter {
