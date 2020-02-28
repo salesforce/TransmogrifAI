@@ -30,12 +30,51 @@
 
 package com.salesforce.op.stages.impl.preparators
 
-import com.salesforce.op.features.types.{OPVector, VectorConversions, Text, TextArea, TextAreaMap, TextMap}
+import com.salesforce.op.features.types.{OPVector, Text, TextArea, TextAreaMap, TextMap, VectorConversions}
 import com.salesforce.op.utils.spark.OpVectorColumnMetadata
+import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.{Vectors => NewVectors}
+import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
 
-object FeatureFilterUtils {
+import scala.util.Try
+
+
+trait DerivedFeatureFilterParams extends Params {
+
+  final val logLevel = new Param[String](
+    parent = this, name = "logLevel",
+    doc = "sets log level (INFO, WARN, ERROR, DEBUG etc.)",
+    isValid = (s: String) => Try(Level.toLevel(s)).isSuccess
+  )
+
+  private[op] def setLogLevel(level: Level): this.type = set(logLevel, level.toString)
+
+  final val removeBadFeatures = new BooleanParam(
+    parent = this, name = "removeBadFeatures",
+    doc = "If set to true, this will automatically remove all the bad features from the feature vector"
+  )
+
+  def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
+
+  def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
+
+  final val minVariance = new DoubleParam(
+    parent = this, name = "minVariance",
+    doc = "Minimum amount of variance allowed for each feature"
+  )
+
+  def setMinVariance(value: Double): this.type = set(minVariance, value)
+
+  def getMinVariance: Double = $(minVariance)
+
+  setDefault(
+    removeBadFeatures -> DerivedFeatureFilter.RemoveBadFeatures,
+    minVariance -> DerivedFeatureFilter.MinVariance
+  )
+}
+
+object DerivedFeatureFilterUtils {
 
   /**
    * Builds an Array of ColumnStatistics objects containing all the data we calculate for each column (eg. mean,
@@ -345,3 +384,9 @@ private[op] case class ColumnStatistics
   }
 
 }
+
+object DerivedFeatureFilter {
+  val RemoveBadFeatures = false
+  val MinVariance = 1E-5
+}
+

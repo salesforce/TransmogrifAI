@@ -53,17 +53,9 @@ import org.slf4j.impl.Log4jLoggerAdapter
 import scala.collection.mutable.ArrayBuffer
 import scala.math.min
 import scala.reflect.runtime.universe._
-import scala.util.Try
 
 
-trait SanityCheckerParams extends Params {
-
-  final val logLevel = new Param[String](
-    parent = this, name = "logLevel",
-    doc = "sets log level (INFO, WARN, ERROR, DEBUG etc.)",
-    isValid = (s: String) => Try(Level.toLevel(s)).isSuccess
-  )
-  private[op] def setLogLevel(level: Level): this.type = set(logLevel, level.toString)
+trait SanityCheckerParams extends DerivedFeatureFilterParams {
 
   final val sampleLowerLimit = new IntParam(
     parent = this, name = "sampleLowerLimit",
@@ -99,13 +91,6 @@ trait SanityCheckerParams extends Params {
   def setSampleSeed(value: Long): this.type = set(sampleSeed, value)
   def getSampleSeed: Long = $(sampleSeed)
 
-  final val removeBadFeatures = new BooleanParam(
-    parent = this, name = "removeBadFeatures",
-    doc = "If set to true, this will automatically remove all the bad features from the feature vector"
-  )
-  def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
-  def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
-
   final val maxCorrelation = new DoubleParam(
     parent = this, name = "maxCorrelation",
     doc = "Maximum correlation (absolute value) allowed between a feature in the feature vector and the label",
@@ -128,13 +113,6 @@ trait SanityCheckerParams extends Params {
   )
   def setCorrelationType(value: CorrelationType): this.type = set(correlationType, value.entryName)
   def getCorrelationType: CorrelationType = CorrelationType.withNameInsensitive($(correlationType))
-
-  final val minVariance = new DoubleParam(
-    parent = this, name = "minVariance",
-    doc = "Minimum amount of variance allowed for each feature and label"
-  )
-  def setMinVariance(value: Double): this.type = set(minVariance, value)
-  def getMinVariance: Double = $(minVariance)
 
   final val maxCramersV = new DoubleParam(
     parent = this, name = "maxCramersV",
@@ -242,7 +220,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
   }
-  
+
   /**
    * Calculates an Array of CategoricalGroupStats objects, each one corresponding to a single categorical feature.
    *
@@ -483,7 +461,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
       }
 
     logInfo("Logging all statistics")
-    val stats = FeatureFilterUtils.makeColumnStatistics(
+    val stats = DerivedFeatureFilterUtils.makeColumnStatistics(
       vectorMetaColumns,
       colStats,
       Option((in1.name, featureSize)), // label column goes at end of vector
@@ -495,7 +473,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
 
     logInfo("Calculating features to remove")
     val (toDropFeatures, warnings) = if (removeBad) {
-      FeatureFilterUtils.getFeaturesToDrop(
+      DerivedFeatureFilterUtils.getFeaturesToDrop(
         stats,
         $(minVariance),
         $(minCorrelation),
@@ -507,7 +485,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
         $(protectTextSharedHash)
       ).unzip
     } else (Array.empty[ColumnStatistics], Array.empty[String])
-
     warnings.foreach { warning => logWarning(warning) }
 
     val toDropSet = toDropFeatures.flatMap(_.column).toSet
@@ -556,7 +533,7 @@ final class SanityCheckerModel private[op]
    * The SanityChecker's core 'transformer' function, which removes the features recommended to be removed.
    */
   def transformFn: (RealNN, OPVector) => OPVector = (label, feature) => {
-    FeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)(feature)
+    DerivedFeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)(feature)
   }
 }
 
@@ -580,10 +557,6 @@ object SanityChecker {
 
   def SampleSeed: Long = util.Random.nextLong() // scalastyle:off method.name
 }
-
-
-
-
 
 /**
  * Represents a kind of correlation coefficient.

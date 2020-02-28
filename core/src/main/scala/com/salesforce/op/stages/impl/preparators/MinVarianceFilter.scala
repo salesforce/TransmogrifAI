@@ -37,49 +37,12 @@ import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.log4j.{Level, LogManager}
 import org.apache.spark.ml.linalg.{DenseVector, SparseVector}
-import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
 import org.apache.spark.mllib.linalg.{Vector => OldVector, Vectors => OldVectors}
 import org.apache.spark.mllib.stat.Statistics
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
-import scala.util.Try
-
-
-trait MinVarianceFilterParams extends Params {
-
-  final val logLevel = new Param[String](
-    parent = this, name = "logLevel",
-    doc = "sets log level (INFO, WARN, ERROR, DEBUG etc.)",
-    isValid = (s: String) => Try(Level.toLevel(s)).isSuccess
-  )
-
-  private[op] def setLogLevel(level: Level): this.type = set(logLevel, level.toString)
-
-  final val removeBadFeatures = new BooleanParam(
-    parent = this, name = "removeBadFeatures",
-    doc = "If set to true, this will automatically remove all the bad features from the feature vector"
-  )
-
-  def setRemoveBadFeatures(value: Boolean): this.type = set(removeBadFeatures, value)
-
-  def getRemoveBadFeatures: Boolean = $(removeBadFeatures)
-
-  final val minVariance = new DoubleParam(
-    parent = this, name = "minVariance",
-    doc = "Minimum amount of variance allowed for each feature"
-  )
-
-  def setMinVariance(value: Double): this.type = set(minVariance, value)
-
-  def getMinVariance: Double = $(minVariance)
-
-  setDefault(
-    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
-    minVariance -> MinVarianceFilter.MinVariance
-  )
-}
 
 /**
  * The MinVarianceFilter checks that computed features have a minimum variance
@@ -92,6 +55,15 @@ trait MinVarianceFilterParams extends Params {
  * (1) no label column as input; and
  * (2) only filters features by variance
  */
+
+
+trait MinVarianceFilterParams extends DerivedFeatureFilterParams {
+  setDefault(
+    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
+    minVariance -> MinVarianceFilter.MinVariance
+  )
+}
+
 class MinVarianceFilter
 (
   operationName: String = classOf[MinVarianceFilter].getSimpleName,
@@ -137,14 +109,15 @@ class MinVarianceFilter
     val featureNames = vectorMetaColumns.map(_.makeColName())
 
     logInfo("Logging all statistics")
-//    val stats = makeColumnStatistics(vectorMetaColumns, colStats)
-    val stats = FeatureFilterUtils.makeColumnStatistics(vectorMetaColumns, colStats)
+    val stats = DerivedFeatureFilterUtils.makeColumnStatistics(vectorMetaColumns, colStats)
     stats.foreach { stat => logInfo(stat.toString) }
 
     logInfo("Calculating features to remove")
     val (toDropFeatures, warnings) = if (removeBad) {
-      FeatureFilterUtils.getFeaturesToDrop(stats, $(minVariance)).unzip
+      DerivedFeatureFilterUtils.getFeaturesToDrop(stats, $(minVariance)).unzip
     } else (Array.empty[ColumnStatistics], Array.empty[String])
+    warnings.foreach { warning => logWarning(warning) }
+
     val toDropSet = toDropFeatures.flatMap(_.column).toSet
     val outputFeatures = vectorMetaColumns.filterNot { col => toDropSet.contains(col) }
     val indicesToKeep = outputFeatures.map(_.index)
@@ -181,7 +154,7 @@ final class MinVarianceFilterModel private[op]
   uid: String
 ) extends UnaryModel[OPVector, OPVector](operationName = operationName, uid = uid) {
 
-  def transformFn: OPVector => OPVector = FeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)
+  def transformFn: OPVector => OPVector = DerivedFeatureFilterUtils.removeFeatures(indicesToKeep, removeBadFeatures)
 }
 
 object MinVarianceFilter {
