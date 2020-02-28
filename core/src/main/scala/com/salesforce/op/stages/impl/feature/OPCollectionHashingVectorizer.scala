@@ -212,7 +212,7 @@ private[op] trait HashingFun {
   protected def makeVectorColumnMetadata(
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Seq[Option[Int]] = Seq(None)
+    hashSizes: Array[Option[Int]] = Array(None)
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
@@ -227,8 +227,8 @@ private[op] trait HashingFun {
       }.toArray
     } else {
       if (hashSizes.forall(_.isDefined)) {
-        val featureAndSizes = features zip hashSizes.flatten.toArray
-        featureAndSizes.map(x => Array.fill(x._2)(x._1.toColumnMetaData())).flatten
+        val featureAndSizes = features zip hashSizes.flatten
+        featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
       }
       else {
         for {
@@ -255,7 +255,7 @@ private[op] trait HashingFun {
     in: Seq[T],
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Seq[Option[Int]] = Seq(None)
+    hashSizes: Array[Option[Int]] = Array(None)
   ): OPVector = {
     if (in.isEmpty) OPVector.empty
     else {

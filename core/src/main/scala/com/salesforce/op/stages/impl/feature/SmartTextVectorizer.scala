@@ -257,7 +257,7 @@ case class SmartTextVectorizerModelArgs
 (
   vectorizationMethods: Array[TextVectorizationMethod],
   topValues: Array[Seq[String]],
-  adaptiveHashSizes: Seq[Option[Int]],
+  adaptiveHashSizes: Array[Option[Int]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams
