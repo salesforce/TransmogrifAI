@@ -242,51 +242,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     super.onSetInput()
     CheckIsResponseValues(in1, in2)
   }
-
-  private def getFeaturesToDrop(stats: Array[ColumnStatistics]): Array[ColumnStatistics] = {
-    val minVar = $(minVariance)
-    val minCorr = $(minCorrelation)
-    val maxCorr = $(maxCorrelation)
-    val maxCramV = $(maxCramersV)
-    val maxRuleConf = $(maxRuleConfidence)
-    val minReqRuleSupport = $(minRequiredRuleSupport)
-    val removeFromParent = $(removeFeatureGroup)
-    val textSharedHashProtected = $(protectTextSharedHash)
-
-    // Calculate groups to remove separately. This is for more complicated checks where you can't determine whether
-    // to remove a feature from a single column stats (eg. associate rule confidence/support check)
-    val groupByGroups = stats.groupBy(_.column.flatMap(_.featureGroup()))
-    val ruleConfGroupsToDrop = groupByGroups.toSeq.flatMap{
-      case (Some(group), colStats) =>
-        val colsToRemove = colStats.filter(f =>
-          f.maxRuleConfidences.zip(f.supports).exists{
-            case (maxConf, sup) => (maxConf > maxRuleConf) && (sup > minReqRuleSupport)
-          })
-        if (colsToRemove.nonEmpty) Option(group) else None
-
-      case _ => None
-    }
-
-    for {
-      col <- stats
-      reasons = col.reasonsToRemove(
-        minVariance = minVar,
-        minCorrelation = minCorr,
-        maxCorrelation = maxCorr,
-        maxCramersV = maxCramV,
-        maxRuleConfidence = maxRuleConf,
-        minRequiredRuleSupport = minReqRuleSupport,
-        removeFeatureGroup = removeFromParent,
-        protectTextSharedHash = textSharedHashProtected,
-        removedGroups = ruleConfGroupsToDrop
-      )
-      if reasons.nonEmpty
-    } yield {
-      logWarning(s"Removing ${col.name} due to: ${reasons.mkString(",")}")
-      col
-    }
-  }
-
+  
   /**
    * Calculates an Array of CategoricalGroupStats objects, each one corresponding to a single categorical feature.
    *
