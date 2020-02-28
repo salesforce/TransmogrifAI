@@ -212,7 +212,7 @@ private[op] trait HashingFun {
   protected def makeVectorColumnMetadata(
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Array[Option[Int]] = Array(None)
+    hashSizes: Array[Option[Int]]
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
@@ -226,8 +226,9 @@ private[op] trait HashingFun {
         )
       }.toArray
     } else {
-      if (hashSizes.forall(_.isDefined)) {
-        val featureAndSizes = features zip hashSizes.flatten
+      if (hashSizes.forall(_.isDefined) && hashSizes.size == features.size) {
+        val hashSizeInt = hashSizes.flatten
+        val featureAndSizes = features.zip(hashSizeInt)
         featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
       }
       else {
@@ -244,7 +245,7 @@ private[op] trait HashingFun {
     params: HashingFunctionParams,
     outputName: String
   ): OpVectorMetadata = {
-    val cols = makeVectorColumnMetadata(features, params)
+    val cols = makeVectorColumnMetadata(features, params, Array(None))
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(features, stageName))
   }
 
