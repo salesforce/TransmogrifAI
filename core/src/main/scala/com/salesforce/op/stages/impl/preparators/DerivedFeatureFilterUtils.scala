@@ -32,10 +32,12 @@ package com.salesforce.op.stages.impl.preparators
 
 import com.salesforce.op.features.types.{OPVector, Text, TextArea, TextAreaMap, TextMap, VectorConversions}
 import com.salesforce.op.utils.spark.OpVectorColumnMetadata
+import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.log4j.Level
 import org.apache.spark.ml.linalg.{Vectors => NewVectors}
 import org.apache.spark.ml.param.{BooleanParam, DoubleParam, Param, Params}
 import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
+import org.apache.spark.sql.types.Metadata
 
 import scala.util.Try
 
@@ -266,7 +268,6 @@ object DerivedFeatureFilterUtils {
       NewVectors.dense(vals).compressed.toOPVector
     }
   }
-
 }
 
 /**
@@ -382,7 +383,32 @@ private[op] case class ColumnStatistics
       cramersV.fold("") { corr => s"\n$description $name has $corr cramersV with label" } +
       parentCramersV.fold("") { corr => s"\n$description $name has parent feature $corr cramersV with label" }
   }
+}
 
+trait DerivedFeatureFilterNames {
+  val FeaturesStatistics = "statistics"
+  val Dropped = "featuresDropped"
+  val Names: String = "names"
+  val Count = "count"
+  val SampleFraction = "sampleFraction"
+  val Mean = "mean"
+  val Max = "max"
+  val Min = "min"
+  val Variance = "variance"
+}
+
+trait DerivedFeatureFilterSummary extends DerivedFeatureFilterNames {
+  def statisticsFromMetadata(meta: Metadata): SummaryStatistics = {
+    val wrapped = meta.wrapped
+    SummaryStatistics(
+      count = wrapped.get[Double](Count),
+      sampleFraction = wrapped.get[Double](SampleFraction),
+      max = wrapped.getArray[Double](Max).toSeq,
+      min = wrapped.getArray[Double](Min).toSeq,
+      mean = wrapped.getArray[Double](Mean).toSeq,
+      variance = wrapped.getArray[Double](Variance).toSeq
+    )
+  }
 }
 
 object DerivedFeatureFilter {

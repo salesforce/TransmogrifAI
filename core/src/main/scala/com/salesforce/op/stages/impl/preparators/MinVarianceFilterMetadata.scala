@@ -60,26 +60,16 @@ case class MinVarianceSummary
    */
   def toMetadata(skipUnsupported: Boolean): Metadata = {
     val summaryMeta = new MetadataBuilder()
-    summaryMeta.putStringArray(SanityCheckerNames.Dropped, dropped.toArray)
-    summaryMeta.putMetadata(SanityCheckerNames.FeaturesStatistics, featuresStatistics.toMetadata(skipUnsupported))
-    summaryMeta.putStringArray(SanityCheckerNames.Names, names.toArray)
+    summaryMeta.putStringArray(MinVarianceNames.Dropped, dropped.toArray)
+    summaryMeta.putMetadata(MinVarianceNames.FeaturesStatistics, featuresStatistics.toMetadata(skipUnsupported))
+    summaryMeta.putStringArray(MinVarianceNames.Names, names.toArray)
     summaryMeta.build()
   }
 }
 
-case object MinVarianceSummary {
-  private def statisticsFromMetadata(meta: Metadata): SummaryStatistics = {
-    val wrapped = meta.wrapped
-    SummaryStatistics(
-      count = wrapped.get[Double](SanityCheckerNames.Count),
-      sampleFraction = wrapped.get[Double](SanityCheckerNames.SampleFraction),
-      max = wrapped.getArray[Double](SanityCheckerNames.Max).toSeq,
-      min = wrapped.getArray[Double](SanityCheckerNames.Min).toSeq,
-      mean = wrapped.getArray[Double](SanityCheckerNames.Mean).toSeq,
-      variance = wrapped.getArray[Double](SanityCheckerNames.Variance).toSeq
-    )
-  }
+case object MinVarianceNames extends DerivedFeatureFilterNames
 
+case object MinVarianceSummary extends DerivedFeatureFilterSummary {
   /**
    * Converts metadata into instance of MinVarianceSummary
    *
@@ -90,14 +80,13 @@ case object MinVarianceSummary {
     val wrapped = meta.wrapped
     Try {
       MinVarianceSummary(
-        dropped = wrapped.getArray[String](SanityCheckerNames.Dropped).toSeq,
-        featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](SanityCheckerNames.FeaturesStatistics)),
-        names = wrapped.getArray[String](SanityCheckerNames.Names).toSeq
+        dropped = wrapped.getArray[String](MinVarianceNames.Dropped).toSeq,
+        featuresStatistics = statisticsFromMetadata(wrapped.get[Metadata](MinVarianceNames.FeaturesStatistics)),
+        names = wrapped.getArray[String](MinVarianceNames.Names).toSeq
       )
     } match {
       case Success(summary) => summary
       case Failure(_) => throw new IllegalArgumentException(s"failed to parse MinVarianceSummary from $meta")
     }
   }
-
 }

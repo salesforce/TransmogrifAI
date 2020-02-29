@@ -44,6 +44,13 @@ import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
 
+trait MinVarianceFilterParams extends DerivedFeatureFilterParams {
+  setDefault(
+    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
+    minVariance -> MinVarianceFilter.MinVariance
+  )
+}
+
 /**
  * The MinVarianceFilter checks that computed features have a minimum variance
  *
@@ -55,15 +62,6 @@ import org.slf4j.impl.Log4jLoggerAdapter
  * (1) no label column as input; and
  * (2) only filters features by variance
  */
-
-
-trait MinVarianceFilterParams extends DerivedFeatureFilterParams {
-  setDefault(
-    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
-    minVariance -> MinVarianceFilter.MinVariance
-  )
-}
-
 class MinVarianceFilter
 (
   operationName: String = classOf[MinVarianceFilter].getSimpleName,
