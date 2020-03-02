@@ -100,6 +100,10 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
+      println("<<<<<<<<<<<<<<<<")
+      println(shouldAdaptiveHash)
+      println(">>>>>>>>>>>>>>>>")
+
       val adaptiveHashSize =
         if (shouldAdaptiveHash) {
           Some((stats.hll.estimatedSize / adaptiveHashCol).toInt)
@@ -162,6 +166,11 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val categoricalColumns = if (textToPivot.nonEmpty) {
       makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, textToPivot)
     } else Array.empty[OpVectorColumnMetadata]
+
+    val testMetadata = makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes)
+    println("<<<<<<<<<<<<<<<<")
+    println(testMetadata.size)
+    println(">>>>>>>>>>>>>>>>")
 
     val textColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {

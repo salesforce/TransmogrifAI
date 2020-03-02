@@ -191,6 +191,9 @@ private[op] trait HashingFun {
   protected def isSharedHashSpace(p: HashingFunctionParams, numFeatures: Option[Int] = None): Boolean = {
     val numHashes = p.numFeatures
     val numOfFeatures = numFeatures.getOrElse(p.numInputs)
+    println(">>>>>>>>>>>>>>>>> Total hash space")
+    println(numHashes * numOfFeatures)
+    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
     p.hashSpaceStrategy match {
       case HashSpaceStrategy.Shared => true
       case HashSpaceStrategy.Separate => false
@@ -202,9 +205,7 @@ private[op] trait HashingFun {
    * HashingTF instance
    */
   protected def hashingTF(params: HashingFunctionParams, adaptiveHash: Option[Int] = None): HashingTF = {
-    new HashingTF(numFeatures =
-      if (adaptiveHash.isDefined) adaptiveHash.get else params.numFeatures
-    )
+    new HashingTF(numFeatures = adaptiveHash.getOrElse(params.numFeatures))
       .setBinary(params.binaryFreq)
       .setHashAlgorithm(params.hashAlgorithm.toString.toLowerCase)
   }
@@ -216,6 +217,9 @@ private[op] trait HashingFun {
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
+      println(">>>>>>>>>>>>>>>>>>>>>>")
+      println("it should not get here")
+      println("<<<<<<<<<<<<<<<<<<<<<<")
       val allNames = features.map(_.name)
       (0 until numFeatures).map { i =>
         OpVectorColumnMetadata(
@@ -227,11 +231,17 @@ private[op] trait HashingFun {
       }.toArray
     } else {
       if (hashSizes.forall(_.isDefined) && hashSizes.size == features.size) {
+        println("If it gets here, print the expected size of hash space")
         val hashSizeInt = hashSizes.flatten
+        println(hashSizeInt.foldLeft(0.0)(_ + _))
+        println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
         val featureAndSizes = features.zip(hashSizeInt)
         featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
       }
       else {
+        println("This is where it should go")
+        println(numFeatures * features.size)
+        println(">>>>>>>>>>>>>>>>>>>>>>>>>>")
         for {
         f <- features
         i <- 0 until numFeatures
@@ -264,6 +274,9 @@ private[op] trait HashingFun {
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
 
       if (isSharedHashSpace(params)) {
+        println(">>>>>>>>>>>>>>>>>>>>>>>")
+        println("But definitely not here")
+        println("<<<<<<<<<<<<<<<<<<<<<<<")
         val allElements = ArrayBuffer.empty[Any]
         for {
           (featureNameHash, el) <- fNameHashesWithInputs
@@ -274,6 +287,9 @@ private[op] trait HashingFun {
       }
       else {
         if (hashSizes.forall(_.isDefined)) {
+          println(">>>>>>>>>>>>>>>>>>>>>")
+          println(hashSizes)
+          println("Does it get here ????")
           val hashers = hashSizes.map(x => hashingTF(params, x))
           combine(hashers.zip(in).map(
             x => x._1.transform(
@@ -281,6 +297,9 @@ private[op] trait HashingFun {
             ).asML)).toOPVector
         }
         else {
+          println(">>>>>>>>>>>>>>>>>>>>>>")
+          println("Or here instead???????")
+          println("<<<<<<<<<<<<<<<<<<<<<<")
           val hashedVecs =
             fNameHashesWithInputs.map { case (featureNameHash, el) =>
               hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
