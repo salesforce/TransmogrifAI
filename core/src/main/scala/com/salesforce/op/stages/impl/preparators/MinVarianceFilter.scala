@@ -76,13 +76,13 @@ class MinVarianceFilter
     }
     val removeBad = $(removeBadFeatures)
 
-    logInfo("Getting vector rows")
+    logDebug("Getting vector rows")
     val vectorRows: RDD[OldVector] = data.rdd.map {
       case sparse: SparseVector => OldVectors.sparse(sparse.size, sparse.indices, sparse.values)
       case dense: DenseVector => OldVectors.dense(dense.toArray)
     }.persist()
 
-    logInfo("Calculating columns stats")
+    logDebug("Calculating columns stats")
     val colStats = Statistics.colStats(vectorRows)
     val count = colStats.count
     require(count > 0, "Sample size cannot be zero")
@@ -104,11 +104,11 @@ class MinVarianceFilter
     val vectorMetaColumns = vectorMeta.columns
     val featureNames = vectorMetaColumns.map(_.makeColName())
 
-    logInfo("Logging all statistics")
+    logDebug("Logging all statistics")
     val stats = DerivedFeatureFilterUtils.makeColumnStatistics(vectorMetaColumns, colStats)
-    stats.foreach { stat => logInfo(stat.toString) }
+    stats.foreach { stat => logDebug(stat.toString) }
 
-    logInfo("Calculating features to remove")
+    logDebug("Calculating features to remove")
     val (toDropFeatures, warnings) = if (removeBad) {
       DerivedFeatureFilterUtils.getFeaturesToDrop(stats, $(minVariance)).unzip
     } else (Array.empty[ColumnStatistics], Array.empty[String])
