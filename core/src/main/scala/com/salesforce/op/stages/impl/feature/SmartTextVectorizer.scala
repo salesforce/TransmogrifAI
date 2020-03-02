@@ -301,7 +301,7 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](
-        textTokens, getTextTransientFeatures, args.hashingParams, adaptiveHashSizes
+        textTokens, getTextTransientFeatures, args.hashingParams, Some(adaptiveHashSizes)
       )
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)

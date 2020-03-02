@@ -257,7 +257,7 @@ private[op] trait HashingFun {
     in: Seq[T],
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Array[Int]
+    hashSizes: Option[Array[Int]] = None
   ): OPVector = {
     if (in.isEmpty) OPVector.empty
     else {
@@ -274,12 +274,22 @@ private[op] trait HashingFun {
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        require(hashSizes.size == features.size)
-        val hashers = hashSizes.map(x => hashingTF(params, Some(x)))
-        combine(hashers.zip(in).map(
-          x => x._1.transform(
-            prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
-          ).asML)).toOPVector
+        hashSizes match {
+          case Some(arraySizes) =>
+            require(arraySizes.size == features.size)
+            val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
+            combine(hashers.zip(in).map(
+              x => x._1.transform(
+                prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+              ).asML)).toOPVector
+
+          case None =>
+            val hashedVecs =
+              fNameHashesWithInputs.map { case (featureNameHash, el) =>
+                hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
+              }
+            combine(hashedVecs).toOPVector
+        }
       }
     }
   }
