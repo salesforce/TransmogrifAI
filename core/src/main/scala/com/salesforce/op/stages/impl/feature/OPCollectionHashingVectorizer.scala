@@ -288,7 +288,10 @@ private[op] trait HashingFun {
       else {
         if (hashSizes.forall(_.isDefined)) {
           println(">>>>>>>>>>>>>>>>>>>>>")
-          println(hashSizes)
+          println(hashSizes.flatten)
+          println(hashSizes.size)
+          println(hashSizes.forall(_.isDefined))
+          println()
           println("Does it get here ????")
           val hashers = hashSizes.map(x => hashingTF(params, x))
           combine(hashers.zip(in).map(
