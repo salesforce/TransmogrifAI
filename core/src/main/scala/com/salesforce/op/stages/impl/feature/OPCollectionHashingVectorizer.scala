@@ -213,7 +213,7 @@ private[op] trait HashingFun {
   protected def makeVectorColumnMetadata(
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Array[Option[Int]]
+    hashSizes: Option[Array[Int]]
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
@@ -230,22 +230,16 @@ private[op] trait HashingFun {
         )
       }.toArray
     } else {
-      if (hashSizes.forall(_.isDefined) && hashSizes.size == features.size) {
-        println("If it gets here, print the expected size of hash space")
-        val hashSizeInt = hashSizes.flatten
-        println(hashSizeInt.foldLeft(0.0)(_ + _))
-        println(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        val featureAndSizes = features.zip(hashSizeInt)
-        featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
-      }
-      else {
-        println("This is where it should go")
-        println(numFeatures * features.size)
-        println(">>>>>>>>>>>>>>>>>>>>>>>>>>")
-        for {
-        f <- features
-        i <- 0 until numFeatures
-        } yield f.toColumnMetaData()
+      hashSizes match {
+        case Some(x) =>
+          require(x.size == features.size)
+          val featureAndSizes = features.zip(x)
+          featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
+        case None =>
+          for {
+          f <- features
+          i <- 0 until numFeatures
+          } yield f.toColumnMetaData()
       }
     }
   }
@@ -255,7 +249,7 @@ private[op] trait HashingFun {
     params: HashingFunctionParams,
     outputName: String
   ): OpVectorMetadata = {
-    val cols = makeVectorColumnMetadata(features, params, Array(None))
+    val cols = makeVectorColumnMetadata(features, params, None)
     OpVectorMetadata(outputName, cols, Transmogrifier.inputFeaturesToHistory(features, stageName))
   }
 
@@ -266,7 +260,7 @@ private[op] trait HashingFun {
     in: Seq[T],
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Array[Option[Int]] = Array(None)
+    hashSizes: Option[Array[Int]] = None
   ): OPVector = {
     if (in.isEmpty) OPVector.empty
     else {
@@ -286,28 +280,20 @@ private[op] trait HashingFun {
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        if (hashSizes.forall(_.isDefined)) {
-          println(">>>>>>>>>>>>>>>>>>>>>")
-          println(hashSizes.flatten)
-          println(hashSizes.size)
-          println(hashSizes.forall(_.isDefined))
-          println()
-          println("Does it get here ????")
-          val hashers = hashSizes.map(x => hashingTF(params, x))
-          combine(hashers.zip(in).map(
-            x => x._1.transform(
-              prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
-            ).asML)).toOPVector
-        }
-        else {
-          println(">>>>>>>>>>>>>>>>>>>>>>")
-          println("Or here instead???????")
-          println("<<<<<<<<<<<<<<<<<<<<<<")
-          val hashedVecs =
-            fNameHashesWithInputs.map { case (featureNameHash, el) =>
-              hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
-            }
-          combine(hashedVecs).toOPVector
+        hashSizes match {
+          case Some(arraySizes) =>
+            val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
+            combine(hashers.zip(in).map(
+              x => x._1.transform(
+                prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+              ).asML)).toOPVector
+
+          case None =>
+            val hashedVecs =
+              fNameHashesWithInputs.map { case (featureNameHash, el) =>
+                hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
+              }
+            combine(hashedVecs).toOPVector
         }
       }
     }

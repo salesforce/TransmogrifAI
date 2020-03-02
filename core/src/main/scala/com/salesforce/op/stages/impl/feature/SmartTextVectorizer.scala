@@ -89,7 +89,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
-    val (vectorizationMethods, topValues, adaptiveHashSizes) = aggregatedStats.map { stats =>
+    val (vectorizationMethods, topValues, hashSizes) = aggregatedStats.map { stats =>
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot
         case _ if stats.lengthStdDev < minLenStdDev => TextVectorizationMethod.Ignore
@@ -100,15 +100,8 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .toSeq.sortBy(v => -v._2 -> v._1)
         .take($(topK)).map(_._1)
 
-      println("<<<<<<<<<<<<<<<<")
-      println(shouldAdaptiveHash)
-      println(">>>>>>>>>>>>>>>>")
-
       val adaptiveHashSize =
-        if (shouldAdaptiveHash) {
-          Some((stats.hll.estimatedSize / adaptiveHashCol).toInt)
-        }
-        else None
+        (stats.hll.estimatedSize / adaptiveHashCol).toInt
       (vecMethod, topValues, adaptiveHashSize)
 
     }.unzip3
@@ -116,7 +109,7 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val smartTextParams = SmartTextVectorizerModelArgs(
       vectorizationMethods = vectorizationMethods,
       topValues = topValues,
-      adaptiveHashSizes = adaptiveHashSizes,
+      adaptiveHashSizes = if (shouldAdaptiveHash) Some(hashSizes) else None,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
       hashingParams = makeHashingParams()
@@ -266,7 +259,7 @@ case class SmartTextVectorizerModelArgs
 (
   vectorizationMethods: Array[TextVectorizationMethod],
   topValues: Array[Seq[String]],
-  adaptiveHashSizes: Array[Option[Int]],
+  adaptiveHashSizes: Option[Array[Int]],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams
