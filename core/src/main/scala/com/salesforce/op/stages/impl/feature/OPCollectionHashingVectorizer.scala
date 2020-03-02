@@ -217,9 +217,6 @@ private[op] trait HashingFun {
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
     if (isSharedHashSpace(params)) {
-      println(">>>>>>>>>>>>>>>>>>>>>>")
-      println("it should not get here")
-      println("<<<<<<<<<<<<<<<<<<<<<<")
       val allNames = features.map(_.name)
       (0 until numFeatures).map { i =>
         OpVectorColumnMetadata(
@@ -260,7 +257,7 @@ private[op] trait HashingFun {
     in: Seq[T],
     features: Array[TransientFeature],
     params: HashingFunctionParams,
-    hashSizes: Option[Array[Int]] = None
+    hashSizes: Array[Int]
   ): OPVector = {
     if (in.isEmpty) OPVector.empty
     else {
@@ -268,9 +265,6 @@ private[op] trait HashingFun {
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
 
       if (isSharedHashSpace(params)) {
-        println(">>>>>>>>>>>>>>>>>>>>>>>")
-        println("But definitely not here")
-        println("<<<<<<<<<<<<<<<<<<<<<<<")
         val allElements = ArrayBuffer.empty[Any]
         for {
           (featureNameHash, el) <- fNameHashesWithInputs
@@ -280,21 +274,12 @@ private[op] trait HashingFun {
         hasher.transform(allElements).asML.toOPVector
       }
       else {
-        hashSizes match {
-          case Some(arraySizes) =>
-            val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
-            combine(hashers.zip(in).map(
-              x => x._1.transform(
-                prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
-              ).asML)).toOPVector
-
-          case None =>
-            val hashedVecs =
-              fNameHashesWithInputs.map { case (featureNameHash, el) =>
-                hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
-              }
-            combine(hashedVecs).toOPVector
-        }
+        require(hashSizes.size == features.size)
+        val hashers = hashSizes.map(x => hashingTF(params, Some(x)))
+        combine(hashers.zip(in).map(
+          x => x._1.transform(
+            prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+          ).asML)).toOPVector
       }
     }
   }

@@ -106,10 +106,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
 
     }.unzip3
 
+    val numRawTextFeataure = vectorizationMethods.size
+    val defaultHashSizes = Array.fill(numRawTextFeataure)($(numFeatures))
     val smartTextParams = SmartTextVectorizerModelArgs(
       vectorizationMethods = vectorizationMethods,
       topValues = topValues,
-      adaptiveHashSizes = if (shouldAdaptiveHash) Some(hashSizes) else None,
+      adaptiveHashSizes = if (shouldAdaptiveHash) hashSizes else defaultHashSizes,
       shouldCleanText = shouldCleanText,
       shouldTrackNulls = $(trackNulls),
       hashingParams = makeHashingParams()
@@ -145,10 +147,15 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
     require(inN.length == smartTextParams.vectorizationMethods.length)
 
-    val groups = inN.toArray.zip(smartTextParams.vectorizationMethods).groupBy(_._2)
+    val groups = inN.toArray
+      .zip(smartTextParams.vectorizationMethods)
+      .zip(smartTextParams.adaptiveHashSizes)
+      .map{case ((a, b), c) => (a, b, c)}
+      .groupBy(_._2)
     val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
     val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
     val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
+    val adaptiveHashSizes = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._3)
     val allTextFeatures = textToHash ++ textToIgnore
 
     // build metadata describing output
@@ -160,19 +167,14 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       makeVectorColumnMetadata(shouldTrackNulls, unseen, smartTextParams.categoricalTopValues, textToPivot)
     } else Array.empty[OpVectorColumnMetadata]
 
-    val testMetadata = makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes)
-    println("<<<<<<<<<<<<<<<<")
-    println(testMetadata.size)
-    println(">>>>>>>>>>>>>>>>")
-
     val textColumns = if (allTextFeatures.nonEmpty) {
       if (shouldTrackLen) {
-        makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), Some(adaptiveHashSizes)) ++
           allTextFeatures.map(_.toColumnMetaData(descriptorValue = OpVectorColumnMetadata.TextLenString)) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
       else {
-        makeVectorColumnMetadata(textToHash, makeHashingParams(), smartTextParams.adaptiveHashSizes) ++
+        makeVectorColumnMetadata(textToHash, makeHashingParams(), Some(adaptiveHashSizes)) ++
           allTextFeatures.map(_.toColumnMetaData(isNull = true))
       }
     } else Array.empty[OpVectorColumnMetadata]
@@ -259,7 +261,7 @@ case class SmartTextVectorizerModelArgs
 (
   vectorizationMethods: Array[TextVectorizationMethod],
   topValues: Array[Seq[String]],
-  adaptiveHashSizes: Option[Array[Int]],
+  adaptiveHashSizes: Array[Int],
   shouldCleanText: Boolean,
   shouldTrackNulls: Boolean,
   hashingParams: HashingFunctionParams
@@ -286,15 +288,20 @@ final class SmartTextVectorizerModel[T <: Text] private[op]
       shouldTrackNulls = args.shouldTrackNulls
     )
     (row: Seq[Text]) => {
-      val groups = row.toArray.zip(args.vectorizationMethods).groupBy(_._2)
+      val groups = row.toArray
+        .zip(args.vectorizationMethods)
+        .zip(args.adaptiveHashSizes)
+        .map{case ((a, b), c) => (a, b, c)}
+        .groupBy(_._2)
       val textToPivot = groups.getOrElse(TextVectorizationMethod.Pivot, Array.empty).map(_._1)
       val textToIgnore = groups.getOrElse(TextVectorizationMethod.Ignore, Array.empty).map(_._1)
       val textToHash = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._1)
+      val adaptiveHashSizes = groups.getOrElse(TextVectorizationMethod.Hash, Array.empty).map(_._3)
       val categoricalVector: OPVector = categoricalPivotFn(textToPivot)
       val textTokens: Seq[TextList] = textToHash.map(tokenize(_).tokens)
       val ignorableTextTokens: Seq[TextList] = textToIgnore.map(tokenize(_).tokens)
       val textVector: OPVector = hash[TextList](
-        textTokens, getTextTransientFeatures, args.hashingParams, args.adaptiveHashSizes
+        textTokens, getTextTransientFeatures, args.hashingParams, adaptiveHashSizes
       )
       val textNullIndicatorsVector = if (args.shouldTrackNulls) {
         getNullIndicatorsVector(textTokens ++ ignorableTextTokens)
