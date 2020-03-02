@@ -44,13 +44,6 @@ import org.apache.spark.sql.Dataset
 import org.slf4j.impl.Log4jLoggerAdapter
 
 
-trait MinVarianceFilterParams extends DerivedFeatureFilterParams {
-  setDefault(
-    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
-    minVariance -> MinVarianceFilter.MinVariance
-  )
-}
-
 /**
  * The MinVarianceFilter checks that computed features have a minimum variance
  *
@@ -67,7 +60,12 @@ class MinVarianceFilter
   operationName: String = classOf[MinVarianceFilter].getSimpleName,
   uid: String = UID[MinVarianceFilter]
 ) extends UnaryEstimator[OPVector, OPVector](operationName = operationName, uid = uid)
-  with MinVarianceFilterParams {
+  with DerivedFeatureFilterParams {
+
+  setDefault(
+    removeBadFeatures -> MinVarianceFilter.RemoveBadFeatures,
+    minVariance -> MinVarianceFilter.MinVariance
+  )
 
   override def fitFn(data: Dataset[OPVector#Value]): UnaryModel[OPVector, OPVector] = {
     // Set the desired log level

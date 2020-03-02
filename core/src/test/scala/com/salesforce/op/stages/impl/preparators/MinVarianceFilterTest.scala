@@ -43,11 +43,6 @@ import org.apache.spark.sql.{DataFrame, Row}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-case class UnlabeledTextRawData
-(
-  id: String,
-  textMap: Map[String, String]
-)
 
 @RunWith(classOf[JUnitRunner])
 class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVector, OPVector],
@@ -117,7 +112,7 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     .map(_.getAs[Vector](0).toOPVector).toSeq
 
   Spec[MinVarianceFilter] should "remove features" in {
-    val checked = featureVector.minVariance(minVariance = 0.1, removeBadFeatures = true)
+    val checked = featureVector.filterMinVariance(minVariance = 0.1, removeBadFeatures = true)
     val outputColName = checked.name
 
     checked.originStage shouldBe a[MinVarianceFilter]
@@ -221,7 +216,7 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     val (mapDataFrame, id, plMap1, plMap2, doubleMap) = TestFeatureBuilder(
       "id", "textMap1", "textMap2", "doubleMap", mapData)
     val features = Seq(id, plMap1, plMap2, doubleMap).transmogrify()
-    val filtered = features.minVariance()
+    val filtered = features.filterMinVariance()
     val output = new OpWorkflow().setResultFeatures(filtered).transform(mapDataFrame)
     output.select(filtered.name).count() shouldBe 12
 
@@ -233,7 +228,7 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
   it should "produce the same statistics if the same transformation is applied twice" in {
     val plMap = textMap.map[PickListMap](_.value.toPickListMap)
     val features = Seq(id, plMap, plMap).transmogrify()
-    val filtered = features.minVariance()
+    val filtered = features.filterMinVariance()
     val output = new OpWorkflow().setResultFeatures(filtered).transform(textData)
     output.select(filtered.name).count() shouldBe 12
 
@@ -285,3 +280,9 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
     jsonDecodedMeta
   }
 }
+
+case class UnlabeledTextRawData
+(
+  id: String,
+  textMap: Map[String, String]
+)

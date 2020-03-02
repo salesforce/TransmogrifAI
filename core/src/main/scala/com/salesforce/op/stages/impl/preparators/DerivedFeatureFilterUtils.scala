@@ -206,6 +206,23 @@ object DerivedFeatureFilterUtils {
     columnStatistics
   }
 
+  /**
+   * Identifies which features to drop based on input exclusion criteria, and returns
+   * array of dropped columns, with messages for logging why columns were dropped
+   *
+   * @param stats                  ColumnStatistics containing multivariate statistics computed by Spark
+   * @param minVariance            Min variance for dropping features
+   * @param minCorrelation         Min correlation with label for dropping features
+   * @param maxCorrelation         Max correlation with label for dropping features
+   * @param maxCramersV            Max Cramer's V for dropping categorical features
+   * @param maxRuleConfidence      Max allowed confidence of association rules for dropping features
+   * @param minRequiredRuleSupport Threshold for association rule
+   * @param removeFeatureGroup     Whether to remove features descended from parent feature with derived features
+   *                               that meet exclusion criteria
+   * @param protectTextSharedHash  Whether individual hash is dropped or kept independently of related null
+   *                               indicators or other hashes
+   * @return columns to drop, with exclusion reasons
+   */
   def getFeaturesToDrop
   (
     stats: Array[ColumnStatistics],
@@ -253,6 +270,14 @@ object DerivedFeatureFilterUtils {
     }
   }
 
+  /**
+   * Transformation used in derived feature filters. If `removeBadFeatures` true, then this does nothing
+   * (it is just identity); otherwise, returns feature without bad features
+   *
+   * @param indicesToKeep     column indices of derived features to keep
+   * @param removeBadFeatures whether to remove any features
+   * @return
+   */
   def removeFeatures
   (
     indicesToKeep: Array[Int],

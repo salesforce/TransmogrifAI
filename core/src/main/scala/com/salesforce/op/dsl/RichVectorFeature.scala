@@ -150,7 +150,7 @@ trait RichVectorFeature {
      * @param removeBadFeatures
      * @return
      */
-    def minVariance
+    def filterMinVariance
     (
       minVariance: Double = MinVarianceFilter.MinVariance,
       removeBadFeatures: Boolean = MinVarianceFilter.RemoveBadFeatures

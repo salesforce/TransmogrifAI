@@ -30,6 +30,7 @@
 
 package com.salesforce.op.stages.impl.preparators
 
+import com.salesforce.op.stages.impl.preparators.MinVarianceSummary.statisticsFromMetadata
 import com.salesforce.op.test.TestSparkContext
 import com.salesforce.op.utils.spark.RichMetadata._
 import org.apache.spark.sql.types.Metadata
@@ -67,10 +68,18 @@ class MinVarianceFilterMetadataTest extends FlatSpec with TestSparkContext {
   it should "convert to and from JSON and give the same values" in {
     val meta = summary.toMetadata()
     val json = meta.wrapped.prettyJson
-    val recovered = Metadata.fromJson(json)
+    val recovered = Metadata.fromJson(json).wrapped
+    val dropped = recovered.getArray[String](MinVarianceNames.Dropped).toSeq
+    val stats = statisticsFromMetadata(recovered.get[Metadata](MinVarianceNames.FeaturesStatistics))
+    val names = recovered.getArray[String](MinVarianceNames.Names).toSeq
 
-    // recovered shouldBe meta
-    recovered.hashCode() shouldEqual summary.toMetadata().hashCode()
+    dropped should contain theSameElementsAs summary.dropped
+    stats.count shouldBe summary.featuresStatistics.count
+    stats.max should contain theSameElementsAs summary.featuresStatistics.max
+    stats.min should contain theSameElementsAs summary.featuresStatistics.min
+    stats.mean should contain theSameElementsAs summary.featuresStatistics.mean
+    stats.variance should contain theSameElementsAs summary.featuresStatistics.variance
+    names should contain theSameElementsAs summary.names
   }
 
 }
