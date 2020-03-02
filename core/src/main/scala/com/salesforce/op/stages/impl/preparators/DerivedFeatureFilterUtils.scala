@@ -89,7 +89,7 @@ object DerivedFeatureFilterUtils {
    * @param corrIndices       Indices that we actually compute correlations for (eg. can ignore hashed text features)
    * @param categoricalStats  Array of CategoricalGroupStats for each group of feature vector indices corresponding
    *                          to a categorical feature
-   * @return
+   * @return Array of ColumnStatistics objects, one for each column in `metaCols`
    */
   def makeColumnStatistics
   (
@@ -276,7 +276,7 @@ object DerivedFeatureFilterUtils {
    *
    * @param indicesToKeep     column indices of derived features to keep
    * @param removeBadFeatures whether to remove any features
-   * @return
+   * @return [[OPVector]] with bad features dropped if `removeBadFeatures` true
    */
   def removeFeatures
   (
