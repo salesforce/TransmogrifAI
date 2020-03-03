@@ -37,6 +37,7 @@ import com.salesforce.op.test.{TestFeatureBuilder, TestOpVectorMetadataBuilder, 
 import com.salesforce.op.utils.spark.OpVectorMetadata
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.ml.linalg.Vectors
+import org.apache.spark.sql.Row
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.{Assertions, FlatSpec, Matchers}
@@ -142,7 +143,6 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     transformedValuesMean.map(_.get(2)) shouldEqual expectedMean.map(_._3)
     transformedValuesMean.map(_.get(3)) shouldEqual expectedMean.map(_._4)
   }
-
 
   it should "keep track of null values if wanted, using fillWithConstant " in {
 
@@ -292,5 +292,27 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     transformedValuesConstant.map(_.get(1)) shouldEqual expectedZero.map(_._2)
     transformedValuesConstant.map(_.get(2)) shouldEqual expectedZero.map(_._3)
     transformedValuesConstant.map(_.get(3)) shouldEqual expectedZero.map(_._4)
+  }
+
+  it should "work on an empty dataset" in {
+    val (testData, inA, inB, inC) = TestFeatureBuilder("inA", "inB", "inC", Seq.empty[(Real, Real, Real)])
+
+    val testModel = testVectorizer.fit(testData)
+    val testDataTransformed = testModel.transform(testData)
+
+    val expected = Array.empty[Row]
+
+    expected shouldBe testDataTransformed.collect(testModel.getOutput())
+
+  }
+
+  it should "return a new column for isMin" in {
+
+    val testModel = testVectorizer.fit(testData)
+    val testDataTransformed = testModel.transform(testData)
+
+    val expected = Array.empty[Row]
+
+    expected shouldBe testDataTransformed.collect(testModel.getOutput())
   }
 }
