@@ -310,7 +310,8 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     val testModel = testVectorizer.setTrackMins(true).setTrackNulls(false).fit(testData)
     val testDataTransformed = testModel.transform(testData)
 
-    val fields = testDataTransformed.select(testVectorizer.getOutputFeatureName).schema.fields
-    fields.size shouldBe testVectorizer.getInputFeatures().size * 2
+    val vec = testDataTransformed.select(testVectorizer.getOutputFeatureName)
+      .first.getAs[OPVector#Value](0)
+    vec.size shouldBe testVectorizer.getInputFeatures().length * 2
   }
 }

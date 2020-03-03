@@ -54,7 +54,9 @@ class RealVectorizer[T <: Real]
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
     with VectorizerDefaults with TrackNullsParam {
 
-  def setTrackMins(bool: Boolean): this.type = this
+  def setTrackMins(v: Boolean): this.type = set(trackNulls, v)
+
+  var trackMins: Boolean = false
 
 
   final val fillValue = new DoubleParam(this, "fillValue", "default value for FillWithConstant")
