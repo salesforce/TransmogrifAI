@@ -307,9 +307,10 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
   }
 
   it should "return a new column values for isMin" in {
-    val testModel = testVectorizer.setTrackMins(true).fit(testData)
+    val testModel = testVectorizer.setTrackMins(true).setTrackNulls(false).fit(testData)
     val testDataTransformed = testModel.transform(testData)
 
-    val actual = testDataTransformed.schema(testModel.getOutput())
+    val fields = testDataTransformed.select(testVectorizer.getOutputFeatureName).schema.fields
+    fields.size shouldBe testVectorizer.getInputFeatures().size * 2
   }
 }
