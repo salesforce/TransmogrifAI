@@ -54,7 +54,10 @@ class RealVectorizer[T <: Real]
   extends SequenceEstimator[T, OPVector](operationName = operationName, uid = uid)
     with VectorizerDefaults with TrackNullsParam {
 
-  def setTrackMins(v: Boolean): this.type = set(trackNulls, v)
+  def setTrackMins(v: Boolean): this.type = {
+    trackMins = true
+    this
+  }
 
   var trackMins: Boolean = false
 
@@ -95,7 +98,7 @@ class RealVectorizer[T <: Real]
 
     val fillValues = if ($(withConstant)) constants() else means(dataset)
     new RealVectorizerModel[T](
-      fillValues = fillValues, trackNulls = $(trackNulls), operationName = operationName, uid = uid)
+      fillValues = fillValues, trackNulls = $(trackNulls), trackMins = trackMins, operationName = operationName, uid = uid)
   }
 
 }
@@ -105,6 +108,7 @@ final class RealVectorizerModel[T <: Real] private[op]
   val fillValues: Seq[Double],
   val trackNulls: Boolean,
   operationName: String,
+  val trackMins: Boolean,
   uid: String
 )(implicit tti: TypeTag[T])
   extends SequenceModel[T, OPVector](operationName = operationName, uid = uid)
@@ -112,13 +116,17 @@ final class RealVectorizerModel[T <: Real] private[op]
 
   def transformFn: Seq[T] => OPVector = row => {
     val replaced =
-      if (!trackNulls) {
+      if (trackMins) {
         row.zip(fillValues).
-          map { case (r, m) => r.value.getOrElse(m) }
+          flatMap { case (r, m) => r.value.getOrElse(m) :: booleanToDouble(r.isEmpty) :: Nil }
+      }
+      else if (trackNulls) {
+        row.zip(fillValues).
+          flatMap { case (r, m) => r.value.getOrElse(m) :: booleanToDouble(r.isEmpty) :: Nil }
       }
       else {
         row.zip(fillValues).
-          flatMap { case (r, m) => r.value.getOrElse(m) :: booleanToDouble(r.isEmpty) :: Nil }
+          map { case (r, m) => r.value.getOrElse(m) }
       }
     Vectors.dense(replaced.toArray).toOPVector
   }
