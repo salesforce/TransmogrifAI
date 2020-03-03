@@ -98,7 +98,8 @@ class RealVectorizer[T <: Real]
 
     val fillValues = if ($(withConstant)) constants() else means(dataset)
     new RealVectorizerModel[T](
-      fillValues = fillValues, trackNulls = $(trackNulls), trackMins = trackMins, operationName = operationName, uid = uid)
+      fillValues = fillValues, trackNulls = $(trackNulls), trackMins = trackMins, operationName = operationName,
+      uid = uid)
   }
 
 }
@@ -118,7 +119,7 @@ final class RealVectorizerModel[T <: Real] private[op]
     val replaced =
       if (trackMins) {
         row.zip(fillValues).
-          flatMap { case (r, m) => r.value.getOrElse(m) :: booleanToDouble(r.isEmpty) :: Nil }
+          flatMap { case (r, m) => r.value.getOrElse(m) :: 1.0 :: Nil }
       }
       else if (trackNulls) {
         row.zip(fillValues).

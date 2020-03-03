@@ -314,4 +314,20 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
 
     vec.value.size shouldBe testVectorizer.getInputFeatures().length * 2
   }
+
+  it should "return the right min indicator columns" in {
+    val (testData, inA) = TestFeatureBuilder("inA",
+      Seq[(Real)]((Real(4.0)))
+    )
+    val expected = Array(
+      (4.0, Vectors.dense(4.0, 1.0))
+    )
+    val testVectorizer = new RealVectorizer().setInput(inA)
+    val testModel = testVectorizer.setTrackMins(true).setTrackNulls(false).fit(testData)
+    val testDataTransformed = testModel.transform(testData)
+
+    val vec = testDataTransformed.collect()
+    vec.map(_.get(0)) shouldEqual expected.map(_._1)
+    vec.map(_.get(1)) shouldEqual expected.map(_._2)
+  }
 }
