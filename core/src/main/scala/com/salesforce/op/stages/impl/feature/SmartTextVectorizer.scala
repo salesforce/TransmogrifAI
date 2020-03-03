@@ -85,7 +85,9 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     val shouldCleanText = $(cleanText)
 
     implicit val testStatsMonoid: Semigroup[TextStats] = TextStats.monoid(maxCard)
-    val valueStats: Dataset[Array[TextStats]] = dataset.map(_.map(computeTextStats(_, shouldCleanText)).toArray)
+    val valueStats: Dataset[Array[TextStats]] = dataset.map(
+      _.map(SmartTextVectorizer.computeTextStats(_, shouldCleanText, maxCard)).toArray
+    )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
@@ -119,14 +121,6 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
       .setMinTokenLength(getMinTokenLength)
       .setToLowercase(getToLowercase)
       .setTrackTextLen($(trackTextLen))
-  }
-
-  private def computeTextStats(text: T#Value, shouldCleanText: Boolean): TextStats = {
-    val (valueCounts, lengthCounts) = text match {
-      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1L), Map(cleanTextFn(v, shouldCleanText).length -> 1L))
-      case None => (Map.empty[String, Long], Map.empty[Int, Long])
-    }
-    TextStats(valueCounts, lengthCounts)
   }
 
   private def makeVectorMetadata(smartTextParams: SmartTextVectorizerModelArgs): OpVectorMetadata = {
@@ -164,12 +158,30 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
   }
 }
 
-object SmartTextVectorizer {
+object SmartTextVectorizer extends CleanTextFun {
   val MaxCardinality: Int = 100
   val MinTextLengthStdDev: Double = 0
+
   private[op] def partition[T: ClassTag](input: Array[T], condition: Array[Boolean]): (Array[T], Array[T]) = {
     val all = input.zip(condition)
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
+  }
+
+  private[op] def computeTextStats[T <: Text : TypeTag](
+    text: T#Value,
+    shouldCleanText: Boolean,
+    maxCardinality: Int
+  ): TextStats = {
+    // Go through each token in text and start appending it to a TextStats instance
+    val lengthsMap: Map[Int, Long] = TextTokenizer.tokenizeString(text).tokens.value
+      .foldLeft(Map.empty[Int, Long])(
+        (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
+      )
+    val (valueCounts, lengthCounts) = text match {
+      case Some(v) => (Map(cleanTextFn(v, shouldCleanText) -> 1L), lengthsMap)
+      case None => (Map.empty[String, Long], Map.empty[Int, Long])
+    }
+    TextStats(valueCounts, lengthCounts)
   }
 }
 
