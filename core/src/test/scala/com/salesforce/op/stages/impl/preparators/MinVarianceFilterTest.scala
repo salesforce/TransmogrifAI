@@ -71,12 +71,12 @@ class MinVarianceFilterTest extends OpEstimatorSpec[OPVector, UnaryModel[OPVecto
   val (textData, id, textMap) = TestFeatureBuilder("id", "textMap", textRawData)
   // scalastyle:off
   private val data = Seq(
-    SanityCheckDataTest("alex", 32, 5.0, 0, 1, 0.5, 0),
-    SanityCheckDataTest("alice", 32, 4.0, 1, 0, 0, 0.1),
-    SanityCheckDataTest("bob", 32, 6.0, 1, 1, 0.5, 0),
-    SanityCheckDataTest("charles", 32, 5.5, 0, 1, 0.5, 0),
-    SanityCheckDataTest("diana", 32, 5.4, 1, 0, 0, 0.1),
-    SanityCheckDataTest("max", 32, 5.4, 1, 0, 0, 0.1)
+    SanityCheckDataTest("alex",     32,  5.0,  0,  1,  0.5,  0),
+    SanityCheckDataTest("alice",    32,  4.0,  1,  0,  0,  0.1),
+    SanityCheckDataTest("bob",      32,  6.0,  1,  1,  0.5,  0),
+    SanityCheckDataTest("charles",  32,  5.5,  0,  1,  0.5,  0),
+    SanityCheckDataTest("diana",    32,  5.4,  1,  0,  0,  0.1),
+    SanityCheckDataTest("max",      32,  5.4,  1,  0,  0,  0.1)
   ).map(data =>
     Seq(data.age, data.height, data.height_null, data.gender, data.testFeatNegCor).toOPVector
   )
