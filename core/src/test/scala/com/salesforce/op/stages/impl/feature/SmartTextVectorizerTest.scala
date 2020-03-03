@@ -93,6 +93,8 @@ class SmartTextVectorizerTest
   val (rawDF, rawCountry, rawCategorical, rawTextId, rawText) = TestFeatureBuilder(
     "country", "categorical", "textId", "text", generatedData)
 
+  val stringData: Option[String] = Some("I have got a lovely bunch of coconuts. Here they are all standing in a row.")
+
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
       .setMaxCardinality(2).setNumFeatures(4).setMinSupport(1).setTopK(2).setPrependFeatureName(false)
@@ -200,7 +202,7 @@ class SmartTextVectorizerTest
     val hashSize = 5
 
     val smartVectorized = new SmartTextVectorizer()
-      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial).setMinLengthStdDev(1.0)
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial).setMinLengthStdDev(0.5)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawCountry, rawCategorical, rawTextId, rawText).getOutput()
@@ -431,6 +433,52 @@ class SmartTextVectorizerTest
         col.indicatorValue shouldBe Option(OpVectorColumnMetadata.NullString)
       }
     }
+  }
+
+  it should "tokenize text correctly using the shortcut" in {
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
+    tokens.value should contain theSameElementsAs Seq("got", "lovely", "bunch", "coconuts", "standing", "row")
+  }
+
+  it should "turn a Text value into a corresponding TextStats instance with cleaning" in {
+    val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = true, maxCardinality = 50)
+
+    res.valueCounts.size shouldBe 1
+    res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
+
+    res.lengthCounts.size shouldBe 4
+    res.lengthCounts should contain (6 -> 1L)
+    res.lengthCounts should contain (3 -> 2L)
+    res.lengthCounts should contain (5 -> 1L)
+    res.lengthCounts should contain (8 -> 2L)
+  }
+
+  it should "turn a Text value into a corresponding TextStats instance without cleaning" in {
+    val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = false, maxCardinality = 50)
+
+    res.valueCounts.size shouldBe 1
+    res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+
+    res.lengthCounts.size shouldBe 4
+    res.lengthCounts should contain (6 -> 1L)
+    res.lengthCounts should contain (3 -> 2L)
+    res.lengthCounts should contain (5 -> 1L)
+    res.lengthCounts should contain (8 -> 2L)
+  }
+
+  it should "turn a Text value into a corresponding TextStats instance that respects maxCardinality" in {
+    val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = false, maxCardinality = 2)
+
+    res.valueCounts.size shouldBe 1
+    res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+
+    // MaxCardinality will stop counting as soon as the lengths are > maxCardinality, so the length counts will
+    // have maxCardinality + 1 elements, however they will stop being appended to even if future elements have
+    // the same key.
+    res.lengthCounts.size shouldBe 3
+    res.lengthCounts should contain (6 -> 1L)
+    res.lengthCounts should contain (3 -> 1L)
+    res.lengthCounts should contain (5 -> 1L)
   }
 
   Spec[TextStats] should "aggregate correctly" in {
