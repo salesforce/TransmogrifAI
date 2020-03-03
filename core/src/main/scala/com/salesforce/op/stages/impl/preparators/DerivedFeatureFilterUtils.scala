@@ -276,7 +276,7 @@ object DerivedFeatureFilterUtils {
    *
    * @param indicesToKeep     column indices of derived features to keep
    * @param removeBadFeatures whether to remove any features
-   * @return [[OPVector]] with bad features dropped if `removeBadFeatures` true
+   * @return [[OPVector]] with bad features dropped if `removeBadFeatures` is true
    */
   def removeFeatures
   (
