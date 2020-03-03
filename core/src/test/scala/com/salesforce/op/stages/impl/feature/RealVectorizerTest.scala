@@ -330,4 +330,21 @@ class RealVectorizerTest extends FlatSpec with TestSparkContext with AttributeAs
     vec.map(_.get(0)) shouldEqual expected.map(_._1)
     vec.map(_.get(1)) shouldEqual expected.map(_._2)
   }
+
+  it should "do the same test above but with 2 rows" in {
+    val (testData, inA) = TestFeatureBuilder("inA",
+      Seq[(Real)](Real(4.0), Real(2.0))
+    )
+    val expected = Array(
+      (4.0, Vectors.dense(4.0, 0.0)),
+      (2.0, Vectors.dense(2.0, 1.0))
+    )
+    val testVectorizer = new RealVectorizer().setInput(inA)
+    val testModel = testVectorizer.setTrackMins(true).setTrackNulls(false).fit(testData)
+    val testDataTransformed = testModel.transform(testData)
+
+    val vec = testDataTransformed.collect()
+    vec.map(_.get(0)) shouldEqual expected.map(_._1)
+    vec.map(_.get(1)) shouldEqual expected.map(_._2)
+  }
 }
