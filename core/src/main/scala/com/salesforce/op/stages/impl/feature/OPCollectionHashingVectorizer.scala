@@ -191,9 +191,6 @@ private[op] trait HashingFun {
   protected def isSharedHashSpace(p: HashingFunctionParams, numFeatures: Option[Int] = None): Boolean = {
     val numHashes = p.numFeatures
     val numOfFeatures = numFeatures.getOrElse(p.numInputs)
-    println(">>>>>>>>>>>>>>>>> Total hash space")
-    println(numHashes * numOfFeatures)
-    println("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
     p.hashSpaceStrategy match {
       case HashSpaceStrategy.Shared => true
       case HashSpaceStrategy.Separate => false
@@ -216,28 +213,29 @@ private[op] trait HashingFun {
     hashSizes: Option[Array[Int]]
   ): Array[OpVectorColumnMetadata] = {
     val numFeatures = params.numFeatures
-    if (isSharedHashSpace(params)) {
-      val allNames = features.map(_.name)
-      (0 until numFeatures).map { i =>
-        OpVectorColumnMetadata(
-          parentFeatureName = features.map(_.name),
-          parentFeatureType = features.map(_.typeName),
-          grouping = None,
-          indicatorValue = None
-        )
-      }.toArray
-    } else {
-      hashSizes match {
-        case Some(x) =>
-          require(x.size == features.size)
-          val featureAndSizes = features.zip(x)
-          featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
-        case None =>
+    hashSizes match {
+      case Some(x) =>
+        require(x.size == features.size)
+        val featureAndSizes = features.zip(x)
+        featureAndSizes.flatMap(x => Array.fill(x._2)(x._1.toColumnMetaData()))
+      case None =>
+        if (isSharedHashSpace(params)) {
+          val allNames = features.map(_.name)
+          (0 until numFeatures).map { i =>
+            OpVectorColumnMetadata(
+              parentFeatureName = features.map(_.name),
+              parentFeatureType = features.map(_.typeName),
+              grouping = None,
+              indicatorValue = None
+            )
+          }.toArray
+        }
+        else {
           for {
-          f <- features
-          i <- 0 until numFeatures
+            f <- features
+            i <- 0 until numFeatures
           } yield f.toColumnMetaData()
-      }
+        }
     }
   }
 
@@ -263,33 +261,32 @@ private[op] trait HashingFun {
     else {
       val hasher = hashingTF(params)
       val fNameHashesWithInputs = features.map(f => hasher.indexOf(f.name)).zip(in)
+      hashSizes match {
+        case Some(arraySizes) =>
+          require(arraySizes.size == features.size)
+          val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
+          combine(hashers.zip(in).map(
+            x => x._1.transform(
+              prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
+            ).asML)).toOPVector
 
-      if (isSharedHashSpace(params)) {
-        val allElements = ArrayBuffer.empty[Any]
-        for {
-          (featureNameHash, el) <- fNameHashesWithInputs
-          prepared = prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
-          p <- prepared
-        } allElements.append(p)
-        hasher.transform(allElements).asML.toOPVector
-      }
-      else {
-        hashSizes match {
-          case Some(arraySizes) =>
-            require(arraySizes.size == features.size)
-            val hashers = arraySizes.map(x => hashingTF(params, Some(x)))
-            combine(hashers.zip(in).map(
-              x => x._1.transform(
-                prepare[T](x._2, params.hashWithIndex, params.prependFeatureName, 0)
-              ).asML)).toOPVector
-
-          case None =>
+        case None =>
+          if (isSharedHashSpace(params)) {
+            val allElements = ArrayBuffer.empty[Any]
+            for {
+              (featureNameHash, el) <- fNameHashesWithInputs
+              prepared = prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)
+              p <- prepared
+            } allElements.append(p)
+            hasher.transform(allElements).asML.toOPVector
+          }
+          else {
             val hashedVecs =
               fNameHashesWithInputs.map { case (featureNameHash, el) =>
                 hasher.transform(prepare[T](el, params.hashWithIndex, params.prependFeatureName, featureNameHash)).asML
               }
             combine(hashedVecs).toOPVector
-        }
+          }
       }
     }
   }
