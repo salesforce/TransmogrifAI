@@ -140,7 +140,7 @@ object TextTokenizer {
   /**
    * Language wise sentence tokenization
    *
-   * @param textString          text to tokenize (in Option[String] form)
+   * @param textString          text to tokenize (in String form)
    * @param languageDetector    language detector instance
    * @param analyzer            text analyzer instance
    * @param sentenceSplitter    sentence splitter instance
@@ -152,7 +152,7 @@ object TextTokenizer {
    * @return detected language and sentence tokens
    */
   def tokenizeString(
-    textString: Option[String],
+    textString: String,
     languageDetector: LanguageDetector = LanguageDetector,
     analyzer: TextAnalyzer = Analyzer,
     sentenceSplitter: Option[SentenceSplitter] = None,
@@ -162,25 +162,62 @@ object TextTokenizer {
     toLowercase: Boolean = ToLowercase,
     minTokenLength: Int = MinTokenLength
   ): TextTokenizerResult = {
-    textString match {
-      case Some(txt) =>
-        val language =
-          if (!autoDetectLanguage) defaultLanguage
-          else {
-            languageDetector
-              .detectLanguages(txt)
-              .collectFirst { case (lang, confidence) if confidence > autoDetectThreshold => lang }
-              .getOrElse(defaultLanguage)
-          }
-        val lowerTxt = if (toLowercase) txt.toLowerCase else txt
+    val language =
+      if (!autoDetectLanguage) defaultLanguage
+      else {
+        languageDetector
+          .detectLanguages(textString)
+          .collectFirst { case (lang, confidence) if confidence > autoDetectThreshold => lang }
+          .getOrElse(defaultLanguage)
+      }
+    val lowerTxt = if (toLowercase) textString.toLowerCase else textString
 
-        val sentences = sentenceSplitter.map(_.getSentences(lowerTxt, language))
-          .getOrElse(Seq(lowerTxt))
-          .map { sentence =>
-            val tokens = analyzer.analyze(sentence, language)
-            tokens.filter(_.length >= minTokenLength).toTextList
-          }
-        TextTokenizerResult(language, sentences)
+    val sentences = sentenceSplitter.map(_.getSentences(lowerTxt, language))
+      .getOrElse(Seq(lowerTxt))
+      .map { sentence =>
+        val tokens = analyzer.analyze(sentence, language)
+        tokens.filter(_.length >= minTokenLength).toTextList
+      }
+    TextTokenizerResult(language, sentences)
+  }
+
+  /**
+   * Language wise sentence tokenization
+   *
+   * @param textStringOpt       text to tokenize (in Option[String] form)
+   * @param languageDetector    language detector instance
+   * @param analyzer            text analyzer instance
+   * @param sentenceSplitter    sentence splitter instance
+   * @param autoDetectLanguage  whether to attempt language detection
+   * @param defaultLanguage     default language
+   * @param autoDetectThreshold language detection threshold
+   * @param toLowercase         whether to convert all characters to lowercase before tokenizing
+   * @param minTokenLength      minimum token length
+   * @return detected language and sentence tokens
+   */
+  def tokenizeStringOpt(
+    textStringOpt: Option[String],
+    languageDetector: LanguageDetector = LanguageDetector,
+    analyzer: TextAnalyzer = Analyzer,
+    sentenceSplitter: Option[SentenceSplitter] = None,
+    autoDetectLanguage: Boolean = AutoDetectLanguage,
+    defaultLanguage: Language = DefaultLanguage,
+    autoDetectThreshold: Double = AutoDetectThreshold,
+    toLowercase: Boolean = ToLowercase,
+    minTokenLength: Int = MinTokenLength
+  ): TextTokenizerResult = {
+    textStringOpt match {
+      case Some(txt) => tokenizeString(
+        txt,
+        languageDetector,
+        analyzer,
+        sentenceSplitter,
+        autoDetectLanguage,
+        defaultLanguage,
+        autoDetectThreshold,
+        toLowercase,
+        minTokenLength
+      )
       case None => TextTokenizerResult(defaultLanguage, Seq(TextList.empty))
     }
   }
@@ -210,20 +247,17 @@ object TextTokenizer {
     toLowercase: Boolean = ToLowercase,
     minTokenLength: Int = MinTokenLength
   ): TextTokenizerResult = {
-    text match {
-      case SomeValue(Some(txt)) => tokenizeString(
-          Some(txt),
-          languageDetector,
-          analyzer,
-          sentenceSplitter,
-          autoDetectLanguage,
-          defaultLanguage,
-          autoDetectThreshold,
-          toLowercase,
-          minTokenLength
-        )
-      case _ => TextTokenizerResult(defaultLanguage, Seq(TextList.empty))
-    }
+    tokenizeStringOpt(
+      text.value,
+      languageDetector,
+      analyzer,
+      sentenceSplitter,
+      autoDetectLanguage,
+      defaultLanguage,
+      autoDetectThreshold,
+      toLowercase,
+      minTokenLength
+    )
   }
 
   /**

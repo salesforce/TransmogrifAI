@@ -173,7 +173,7 @@ object SmartTextVectorizer extends CleanTextFun {
     maxCardinality: Int
   ): TextStats = {
     // Go through each token in text and start appending it to a TextStats instance
-    val lengthsMap: Map[Int, Long] = TextTokenizer.tokenizeString(text).tokens.value
+    val lengthsMap: Map[Int, Long] = TextTokenizer.tokenizeStringOpt(text).tokens.value
       .foldLeft(Map.empty[Int, Long])(
         (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
       )

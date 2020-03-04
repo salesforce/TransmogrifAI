@@ -67,17 +67,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
   private implicit val textMapStatsSeqEnc: Encoder[Array[TextMapStats]] = ExpressionEncoder[Array[TextMapStats]]()
 
-  private def computeTextMapStats
-  (
-    textMap: T#Value, shouldCleanKeys: Boolean, shouldCleanValues: Boolean
-  ): TextMapStats = {
-    val keyValueCounts = textMap.map{ case (k, v) =>
-      cleanTextFn(k, shouldCleanKeys) ->
-        TextStats(Map(cleanTextFn(v, shouldCleanValues) -> 1L), Map(cleanTextFn(v, shouldCleanValues).length -> 1L))
-    }
-    TextMapStats(keyValueCounts)
-  }
-
   private def makeHashingParams() = HashingFunctionParams(
     hashWithIndex = $(hashWithIndex),
     prependFeatureName = $(prependFeatureName),
@@ -184,7 +173,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(computeTextMapStats(_, shouldCleanKeys, shouldCleanValues)).toArray
+      _.map(SmartTextMapVectorizer.computeTextMapStats(_, maxCard, shouldCleanKeys, shouldCleanValues)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
@@ -200,6 +189,26 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       .setMinTokenLength(getMinTokenLength)
       .setToLowercase(getToLowercase)
       .setTrackTextLen($(trackTextLen))
+  }
+}
+
+object SmartTextMapVectorizer extends CleanTextFun {
+
+  private[op] def computeTextMapStats[T <:  OPMap[String]](
+    textMap: T#Value,
+    maxCardinality: Int,
+    shouldCleanKeys: Boolean,
+    shouldCleanValues: Boolean
+  )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
+    val keyValueCounts = textMap.map{ case (k, v) =>
+      val cleanedText = cleanTextFn(v, shouldCleanValues)
+      val lengthsMap: Map[Int, Long] = TextTokenizer.tokenizeString(cleanedText).tokens.value
+        .foldLeft(Map.empty[Int, Long])(
+          (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
+        )
+      cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanedText -> 1L), lengthsMap)
+    }
+    TextMapStats(keyValueCounts)
   }
 }
 

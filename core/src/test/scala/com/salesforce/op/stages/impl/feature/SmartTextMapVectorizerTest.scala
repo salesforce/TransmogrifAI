@@ -444,7 +444,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -480,7 +480,7 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(1.0)
+      .setMinLengthStdDev(0.5)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
