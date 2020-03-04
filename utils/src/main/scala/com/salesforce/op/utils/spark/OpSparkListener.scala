@@ -147,7 +147,7 @@ class OpSparkListener
 
 object OpSparkListener {
   private val SPARK_JOB_GROUP_ID = "spark.jobGroup.id"
-  private val DEFAULT_GROUP_ID = "other"
+  val DEFAULT_GROUP_ID: String = "other"
 }
 
 trait MetricJsonLike extends JsonLike {
