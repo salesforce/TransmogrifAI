@@ -435,38 +435,56 @@ class SmartTextVectorizerTest
     }
   }
 
-  it should "tokenize text correctly using the shortcut" in {
+  it should "tokenize text correctly using the shortcut used in computeTextStats" in {
     val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
     tokens.value should contain theSameElementsAs Seq("got", "lovely", "bunch", "coconuts", "standing", "row")
   }
 
-  it should "turn a Text value into a corresponding TextStats instance with cleaning" in {
+  it should "turn a string into a corresponding TextStats instance with cleaning" in {
     val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = true, maxCardinality = 50)
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
     res.valueCounts.size shouldBe 1
     res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
 
-    res.lengthCounts.size shouldBe 4
+    res.lengthCounts.size shouldBe tokens.value.map(_.length).distinct.length
     res.lengthCounts should contain (6 -> 1L)
     res.lengthCounts should contain (3 -> 2L)
     res.lengthCounts should contain (5 -> 1L)
     res.lengthCounts should contain (8 -> 2L)
+
+    // Check derived quantities
+    val lengthSeq = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
+    val expectedLengthMean = lengthSeq.sum / 6.0
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / 6.0
+    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
+    res.lengthSize shouldBe lengthSeq.length
+    println((res.lengthMean -  expectedLengthMean) / expectedLengthMean)
+    println((res.lengthVariance -  expectedLengthVariance) / expectedLengthVariance)
+    println((res.lengthStdDev -  expectedLengthStdDev) / expectedLengthStdDev)
+    println()
+    println(res.lengthVariance, expectedLengthVariance)
+    (res.lengthMean - expectedLengthMean) / expectedLengthMean < 1e-12 shouldBe true
+    (res.lengthVariance - expectedLengthVariance) / expectedLengthVariance < 1e-12 shouldBe true
+    (res.lengthStdDev - expectedLengthStdDev) / expectedLengthStdDev < 1e-12 shouldBe true
   }
 
-  it should "turn a Text value into a corresponding TextStats instance without cleaning" in {
+  it should "turn a string into a corresponding TextStats instance without cleaning" in {
     val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = false, maxCardinality = 50)
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
     res.valueCounts.size shouldBe 1
     res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
 
-    res.lengthCounts.size shouldBe 4
+    res.lengthCounts.size shouldBe tokens.value.map(_.length).distinct.length
     res.lengthCounts should contain (6 -> 1L)
     res.lengthCounts should contain (3 -> 2L)
     res.lengthCounts should contain (5 -> 1L)
     res.lengthCounts should contain (8 -> 2L)
   }
 
-  it should "turn a Text value into a corresponding TextStats instance that respects maxCardinality" in {
+  it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
+    val tinyCard = 2
     val res = SmartTextVectorizer.computeTextStats(stringData, shouldCleanText = false, maxCardinality = 2)
 
     res.valueCounts.size shouldBe 1
@@ -475,7 +493,7 @@ class SmartTextVectorizerTest
     // MaxCardinality will stop counting as soon as the lengths are > maxCardinality, so the length counts will
     // have maxCardinality + 1 elements, however they will stop being appended to even if future elements have
     // the same key.
-    res.lengthCounts.size shouldBe 3
+    res.lengthCounts.size shouldBe tinyCard + 1
     res.lengthCounts should contain (6 -> 1L)
     res.lengthCounts should contain (3 -> 1L)
     res.lengthCounts should contain (5 -> 1L)
@@ -499,8 +517,8 @@ class SmartTextVectorizerTest
 
     ts.lengthSize shouldBe 5
     ts.lengthMean shouldBe 4.0
-    ts.lengthVariance shouldBe 4.0
-    ts.lengthStdDev shouldBe 2.0 / math.sqrt(5.0)
+    ts.lengthVariance shouldBe 0.8
+    ts.lengthStdDev shouldBe math.sqrt(0.8)
   }
 
 }

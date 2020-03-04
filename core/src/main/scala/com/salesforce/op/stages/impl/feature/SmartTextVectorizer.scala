@@ -201,8 +201,8 @@ private[op] case class TextStats
   val lengthMean: Double = lengthCounts.foldLeft(0.0)((acc, el) => acc + el._1 * el._2) / lengthSize
   val lengthVariance: Double = lengthCounts.foldLeft(0.0)(
     (acc, el) => acc + el._2 * (el._1 - lengthMean) * (el._1 - lengthMean)
-  )
-  val lengthStdDev: Double = math.sqrt(lengthVariance / lengthSize)
+  ) / lengthSize
+  val lengthStdDev: Double = math.sqrt(lengthVariance)
 }
 
 private[op] object TextStats {
