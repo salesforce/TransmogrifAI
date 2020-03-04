@@ -151,9 +151,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val (BestEstimator(name, estimator, summary), splitterSummary, datasetWithID) = bestEstimator.map { e =>
       val PrevalidationVal(summary, dataOpt) = prepareForValidation(data, labelColName)
       (e, summary, dataOpt.getOrElse(data))
-    }.getOrElse {
-      findBestEstimator(data.toDF())
-    }
+    }.getOrElse { findBestEstimator(data.toDF()) }
 
     val preparedData = splitter.map(_.validationPrepare(datasetWithID)).getOrElse(datasetWithID)
     val bestModel = estimator.fit(preparedData).asInstanceOf[M]
@@ -187,14 +185,19 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
     val meta = metadataSummary.toMetadata(skipUnsupported = true)
     setMetadata(meta.toSummaryMetadata())
 
-    val model = new SelectedModel(bestModel.asInstanceOf[ModelType], outputsColNamesMap, uid = uid, operationName = operationName)
+    val selectedModel = new SelectedModel(
+      bestModel.asInstanceOf[ModelType],
+      outputsColNamesMap,
+      uid = uid,
+      operationName = operationName
+    )
       .setInput(in1.asFeatureLike[RealNN], in2.asFeatureLike[OPVector])
       .setParent(this)
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
     JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
-    model
+    selectedModel
   }
 
 }

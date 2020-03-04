@@ -76,6 +76,7 @@ class OpSparkListener
     val now = DateTimeUtils.now().getMillis
     (now, now, now)
   }
+  private var jobGroup = OpSparkListener.DEFAULT_GROUP_ID
   private val stageMetrics = ArrayBuffer.empty[StageMetrics]
   private var cumulativeStageMetrics: CumulativeStageMetrics = CumulativeStageMetrics.zero
 
@@ -114,13 +115,14 @@ class OpSparkListener
     cumulativeStageMetrics = CumulativeStageMetrics.plus(cumulativeStageMetrics, sm)
 
     if (logStageMetrics) {
-      log.info("{},STAGE:{},MEMORY_SPILLED_BYTES:{},GC_TIME_MS:{},STAGE_TIME_MS:{}",
-        logPrefix, si.name, tm.memoryBytesSpilled.toString, tm.jvmGCTime.toString, tm.executorRunTime.toString
+      log.info("{},STAGE:{},MEMORY_SPILLED_BYTES:{},GC_TIME_MS:{},STAGE_TIME_MS:{},JOB_GROUP:{}",
+        logPrefix, si.name, tm.memoryBytesSpilled.toString, tm.jvmGCTime.toString, tm.executorRunTime.toString, jobGroup
       )
     }
   }
 
   override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
+    jobGroup = jobStart.properties.getProperty(OpSparkListener.SPARK_JOB_GROUP_ID, OpSparkListener.DEFAULT_GROUP_ID)
     jobStartTime = jobStart.time
   }
 
@@ -141,6 +143,11 @@ class OpSparkListener
     log.info("{},APP_TIME_MS:{}", logPrefix.toString, appEndTime - appStartTime: Any)
   }
 
+}
+
+object OpSparkListener {
+  private val SPARK_JOB_GROUP_ID = "spark.jobGroup.id"
+  private val DEFAULT_GROUP_ID = "other"
 }
 
 trait MetricJsonLike extends JsonLike {
