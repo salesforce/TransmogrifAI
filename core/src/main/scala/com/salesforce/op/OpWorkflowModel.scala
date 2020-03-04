@@ -35,7 +35,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
-import com.salesforce.op.utils.spark.{JobGroup, JobGroupUtil}
+import com.salesforce.op.utils.spark.{OpStep, JobGroupUtil}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -92,7 +92,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @return Dataframe with all the features generated + persisted
    */
   protected def generateRawData()(implicit spark: SparkSession): DataFrame = {
-    JobGroupUtil.withJobGroup(JobGroup.ReadAndFilter) {
+    JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       require(reader.nonEmpty, "Data reader must be set")
       checkReadersAndFeatures()
       reader.get.generateDataFrame(rawFeatures, parameters).persist() // don't want to redo this
@@ -220,8 +220,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param path      path to save the model
    * @param overwrite should overwrite if the path exists
    */
-  def save(path: String, overwrite: Boolean = true): Unit =
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+  def save(path: String, overwrite: Boolean = true)(implicit spark: SparkSession): Unit = {
+    JobGroupUtil.withJobGroup(OpStep.SavingModel) {
+      OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+    }
+  }
 
   /**
    * Gets the fitted stage that generates the input feature
@@ -345,19 +348,23 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       // Generate the dataframe with raw features
       val rawData: DataFrame = generateRawData()
 
-      // Apply the transformations DAG on raw data
-      val transformedData: DataFrame = applyTransformationsDAG(rawData, dag, persistEveryKStages)
+      val transformedData = JobGroupUtil.withJobGroup(OpStep.Scoring) {
+        // Apply the transformations DAG on raw data
+        applyTransformationsDAG(rawData, dag, persistEveryKStages)
+      }
 
       // Save the scores
-      val (scores, metrics) = saveScores(
-        path = path,
-        keepRawFeatures = keepRawFeatures,
-        keepIntermediateFeatures = keepIntermediateFeatures,
-        transformedData = transformedData,
-        persistScores = persistScores,
-        evaluator = evaluator,
-        metricsPath = metricsPath
-      )
+      val (scores, metrics) = JobGroupUtil.withJobGroup(OpStep.SavingScores) {
+        saveScores(
+          path = path,
+          keepRawFeatures = keepRawFeatures,
+          keepIntermediateFeatures = keepIntermediateFeatures,
+          transformedData = transformedData,
+          persistScores = persistScores,
+          evaluator = evaluator,
+          metricsPath = metricsPath
+        )
+      }
       // Unpersist raw data, since it's not needed anymore
       rawData.unpersist()
       scores -> metrics
