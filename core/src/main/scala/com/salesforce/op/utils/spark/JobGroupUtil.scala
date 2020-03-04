@@ -42,4 +42,11 @@ object JobGroupUtil {
     spark.sparkContext.clearJobGroup()
     result
   }
+
+  /**
+   * Indefinitely sets the Spark job group.
+   */
+  def setJobGroup(step: OpStep)(implicit spark: SparkSession): Unit = {
+    spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
+  }
 }

@@ -443,6 +443,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           JobGroupUtil.withJobGroup(OpStep.CrossValidation) {
             modelSelector.findBestEstimator(trainFixed, Option(during))
           }
+          JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
           val remainingDAG: StagesDAG = (during :+ (Array(modelSelector -> distance): Layer)) ++ after
 
           log.info("Applying DAG after CV/TS. Stages: {}", remainingDAG.flatMap(_.map(_._1.stageName)).mkString(", "))
