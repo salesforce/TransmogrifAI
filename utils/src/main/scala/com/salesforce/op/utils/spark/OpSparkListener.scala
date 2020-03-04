@@ -72,11 +72,11 @@ class OpSparkListener
 
   private lazy val log = LoggerFactory.getLogger(classOf[OpSparkListener])
 
+  protected var jobGroup: String = OpSparkListener.DEFAULT_GROUP_ID
   private var (jobStartTime, appStartTime, appEndTime) = {
     val now = DateTimeUtils.now().getMillis
     (now, now, now)
   }
-  private var jobGroup = OpSparkListener.DEFAULT_GROUP_ID
   private val stageMetrics = ArrayBuffer.empty[StageMetrics]
   private var cumulativeStageMetrics: CumulativeStageMetrics = CumulativeStageMetrics.zero
 
