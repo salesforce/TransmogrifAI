@@ -112,6 +112,12 @@ class SmartTextMapVectorizerTest
   val (rawDFSeparateMaps, rawTextMap1, rawTextMap2, rawTextMap3) =
     TestFeatureBuilder("textMap1", "textMap2", "textMap3", mapDataSeparate)
 
+  val textMapData = Map(
+    "f1" -> "I have got a lovely bunch of coconuts. Here they are all standing in a row.",
+    "f2" -> "Olly wolly polly woggy ump bump fizz!"
+  )
+  val tokensMap = textMapData.mapValues(s => TextTokenizer.tokenizeString(s).tokens)
+
   /**
    * Estimator instance to be tested
    */
@@ -507,6 +513,95 @@ class SmartTextMapVectorizerTest
     meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
     meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
     meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "create a TextStats object from text that makes sense" in {
+    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+      textMapData,
+      maxCardinality = 100,
+      shouldCleanKeys = false,
+      shouldCleanValues = false
+    )
+
+    // Check sizes
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+      ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 2L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (8 -> 2L)
+    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+  }
+
+  it should "create a TextStats with the correct derived quantites" in {
+    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+      textMapData,
+      maxCardinality = 100,
+      shouldCleanKeys = false,
+      shouldCleanValues = false
+    )
+
+    // Check derived quantities
+    val lengthSeq1 = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
+    val expectedLengthMean1 = lengthSeq1.sum / 6.0
+    val expectedLengthVariance1 = lengthSeq1.map(x => math.pow((x - expectedLengthMean1), 2)).sum / 6.0
+    val expectedLengthStdDev1 = math.sqrt(expectedLengthVariance1)
+    res.keyValueCounts("f1").lengthSize shouldBe lengthSeq1.length
+    (res.keyValueCounts("f1").lengthMean - expectedLengthMean1) / expectedLengthMean1 < 1e-12 shouldBe true
+    (res.keyValueCounts("f1").lengthVariance - expectedLengthVariance1) / expectedLengthVariance1 < 1e-12 shouldBe true
+    (res.keyValueCounts("f1").lengthStdDev - expectedLengthStdDev1) / expectedLengthStdDev1 < 1e-12 shouldBe true
+
+    val lengthSeq2 = Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong)
+    val expectedLengthMean2 = lengthSeq2.sum / 6.0
+    val expectedLengthVariance2 = lengthSeq2.map(x => math.pow((x - expectedLengthMean2), 2)).sum / 6.0
+    val expectedLengthStdDev2 = math.sqrt(expectedLengthVariance2)
+    res.keyValueCounts("f2").lengthSize shouldBe lengthSeq2.length
+    (res.keyValueCounts("f2").lengthMean - expectedLengthMean2) / expectedLengthMean2 < 1e-12 shouldBe true
+    (res.keyValueCounts("f2").lengthVariance - expectedLengthVariance2) / expectedLengthVariance2 < 1e-12 shouldBe true
+    (res.keyValueCounts("f2").lengthStdDev - expectedLengthStdDev2) / expectedLengthStdDev2 < 1e-12 shouldBe true
+  }
+
+  it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
+    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+      textMapData,
+      maxCardinality = 2,
+      shouldCleanKeys = false,
+      shouldCleanValues = false
+    )
+
+    // Check lengths
+    res.keyValueCounts.size shouldBe 2 // Two keys in textMapData
+    res.keyValueCounts.keySet should contain theSameElementsAs Seq("f1", "f2")
+
+    // Check value counts
+    res.keyValueCounts("f1").valueCounts.size shouldBe 1
+    res.keyValueCounts("f1").valueCounts should contain
+    ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.keyValueCounts("f2").valueCounts.size shouldBe 1
+    res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
+
+    // Check token length counts
+    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
+    res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
+    res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
   }
 
 }

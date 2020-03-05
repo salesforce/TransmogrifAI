@@ -460,11 +460,6 @@ class SmartTextVectorizerTest
     val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / 6.0
     val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
     res.lengthSize shouldBe lengthSeq.length
-    println((res.lengthMean -  expectedLengthMean) / expectedLengthMean)
-    println((res.lengthVariance -  expectedLengthVariance) / expectedLengthVariance)
-    println((res.lengthStdDev -  expectedLengthStdDev) / expectedLengthStdDev)
-    println()
-    println(res.lengthVariance, expectedLengthVariance)
     (res.lengthMean - expectedLengthMean) / expectedLengthMean < 1e-12 shouldBe true
     (res.lengthVariance - expectedLengthVariance) / expectedLengthVariance < 1e-12 shouldBe true
     (res.lengthStdDev - expectedLengthStdDev) / expectedLengthStdDev < 1e-12 shouldBe true
