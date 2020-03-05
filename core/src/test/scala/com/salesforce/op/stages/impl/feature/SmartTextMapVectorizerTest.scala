@@ -40,6 +40,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
+import org.scalatest.Assertion
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -117,6 +118,7 @@ class SmartTextMapVectorizerTest
     "f2" -> "Olly wolly polly woggy ump bump fizz!"
   )
   val tokensMap = textMapData.mapValues(s => TextTokenizer.tokenizeString(s).tokens)
+  val tol = 1e-12 // Tolerance for comparing real numbers
 
   /**
    * Estimator instance to be tested
@@ -556,22 +558,23 @@ class SmartTextMapVectorizerTest
 
     // Check derived quantities
     val lengthSeq1 = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
-    val expectedLengthMean1 = lengthSeq1.sum / 6.0
-    val expectedLengthVariance1 = lengthSeq1.map(x => math.pow((x - expectedLengthMean1), 2)).sum / 6.0
+    val expectedLengthMean1 = lengthSeq1.sum.toDouble / lengthSeq1.length
+    val expectedLengthVariance1 = lengthSeq1.map(x => math.pow((x - expectedLengthMean1), 2)).sum / lengthSeq1.length
     val expectedLengthStdDev1 = math.sqrt(expectedLengthVariance1)
     res.keyValueCounts("f1").lengthSize shouldBe lengthSeq1.length
-    (res.keyValueCounts("f1").lengthMean - expectedLengthMean1) / expectedLengthMean1 < 1e-12 shouldBe true
-    (res.keyValueCounts("f1").lengthVariance - expectedLengthVariance1) / expectedLengthVariance1 < 1e-12 shouldBe true
-    (res.keyValueCounts("f1").lengthStdDev - expectedLengthStdDev1) / expectedLengthStdDev1 < 1e-12 shouldBe true
+    compareWithTol(res.keyValueCounts("f1").lengthMean, expectedLengthMean1, tol)
+    compareWithTol(res.keyValueCounts("f1").lengthVariance, expectedLengthVariance1, tol)
+    compareWithTol(res.keyValueCounts("f1").lengthStdDev, expectedLengthStdDev1, tol)
 
     val lengthSeq2 = Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong)
-    val expectedLengthMean2 = lengthSeq2.sum / 6.0
-    val expectedLengthVariance2 = lengthSeq2.map(x => math.pow((x - expectedLengthMean2), 2)).sum / 6.0
+    val expectedLengthMean2 = lengthSeq2.sum.toDouble / lengthSeq2.length
+    val expectedLengthVariance2 = lengthSeq2.map(x => math.pow((x - expectedLengthMean2), 2)).sum / lengthSeq2.length
     val expectedLengthStdDev2 = math.sqrt(expectedLengthVariance2)
+
     res.keyValueCounts("f2").lengthSize shouldBe lengthSeq2.length
-    (res.keyValueCounts("f2").lengthMean - expectedLengthMean2) / expectedLengthMean2 < 1e-12 shouldBe true
-    (res.keyValueCounts("f2").lengthVariance - expectedLengthVariance2) / expectedLengthVariance2 < 1e-12 shouldBe true
-    (res.keyValueCounts("f2").lengthStdDev - expectedLengthStdDev2) / expectedLengthStdDev2 < 1e-12 shouldBe true
+    compareWithTol(res.keyValueCounts("f2").lengthMean, expectedLengthMean2, tol)
+    compareWithTol(res.keyValueCounts("f2").lengthVariance, expectedLengthVariance2, tol)
+    compareWithTol(res.keyValueCounts("f2").lengthStdDev, expectedLengthStdDev2, tol)
   }
 
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
@@ -594,14 +597,13 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts("f2").valueCounts should contain ("Olly wolly polly woggy ump bump fizz!" -> 1)
 
     // Check token length counts
-    res.keyValueCounts("f1").lengthCounts.size shouldBe tokensMap("f1").value.map(_.length).distinct.length
+    res.keyValueCounts("f1").lengthCounts.size shouldBe 3
     res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
     res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
     res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
-    res.keyValueCounts("f2").lengthCounts.size shouldBe tokensMap("f2").value.map(_.length).distinct.length
-    res.keyValueCounts("f2").lengthCounts should contain (4 -> 3L)
+    res.keyValueCounts("f2").lengthCounts.size shouldBe 3
+    res.keyValueCounts("f2").lengthCounts should contain (4 -> 1L)
     res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
     res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
   }
-
 }

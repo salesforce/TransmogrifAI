@@ -95,6 +95,7 @@ class SmartTextVectorizerTest
 
   val stringOptData: Option[String] = Some("I have got a lovely bunch of coconuts. " +
     "Here they are all standing in a row.")
+  val tol = 1e-12 // Tolerance for comparing real numbers
 
   it should "detect one categorical and one non-categorical text feature" in {
     val smartVectorized = new SmartTextVectorizer()
@@ -456,13 +457,13 @@ class SmartTextVectorizerTest
 
     // Check derived quantities
     val lengthSeq = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
-    val expectedLengthMean = lengthSeq.sum / 6.0
-    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / 6.0
+    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
     val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
     res.lengthSize shouldBe lengthSeq.length
-    (res.lengthMean - expectedLengthMean) / expectedLengthMean < 1e-12 shouldBe true
-    (res.lengthVariance - expectedLengthVariance) / expectedLengthVariance < 1e-12 shouldBe true
-    (res.lengthStdDev - expectedLengthStdDev) / expectedLengthStdDev < 1e-12 shouldBe true
+    compareWithTol(res.lengthMean, expectedLengthMean, tol)
+    compareWithTol(res.lengthVariance, expectedLengthVariance, tol)
+    compareWithTol(res.lengthStdDev, expectedLengthStdDev, tol)
   }
 
   it should "turn a string into a corresponding TextStats instance without cleaning" in {
