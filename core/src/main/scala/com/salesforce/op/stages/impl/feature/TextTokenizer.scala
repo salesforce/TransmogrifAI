@@ -207,17 +207,8 @@ object TextTokenizer {
     minTokenLength: Int = MinTokenLength
   ): TextTokenizerResult = {
     textStringOpt match {
-      case Some(txt) => tokenizeString(
-        txt,
-        languageDetector,
-        analyzer,
-        sentenceSplitter,
-        autoDetectLanguage,
-        defaultLanguage,
-        autoDetectThreshold,
-        toLowercase,
-        minTokenLength
-      )
+      case Some(txt) => tokenizeString(txt, languageDetector, analyzer, sentenceSplitter, autoDetectLanguage,
+        defaultLanguage, autoDetectThreshold, toLowercase, minTokenLength)
       case None => TextTokenizerResult(defaultLanguage, Seq(TextList.empty))
     }
   }
@@ -246,19 +237,8 @@ object TextTokenizer {
     autoDetectThreshold: Double = AutoDetectThreshold,
     toLowercase: Boolean = ToLowercase,
     minTokenLength: Int = MinTokenLength
-  ): TextTokenizerResult = {
-    tokenizeStringOpt(
-      text.value,
-      languageDetector,
-      analyzer,
-      sentenceSplitter,
-      autoDetectLanguage,
-      defaultLanguage,
-      autoDetectThreshold,
-      toLowercase,
-      minTokenLength
-    )
-  }
+  ): TextTokenizerResult = tokenizeStringOpt(text.value, languageDetector, analyzer, sentenceSplitter,
+    autoDetectLanguage, defaultLanguage, autoDetectThreshold, toLowercase, minTokenLength)
 
   /**
    * Text tokenization result

@@ -40,7 +40,6 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
-import org.scalatest.Assertion
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -520,9 +519,9 @@ class SmartTextMapVectorizerTest
   it should "create a TextStats object from text that makes sense" in {
     val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
       textMapData,
-      maxCardinality = 100,
       shouldCleanKeys = false,
-      shouldCleanValues = false
+      shouldCleanValues = false,
+      maxCardinality = 100
     )
 
     // Check sizes
@@ -551,9 +550,9 @@ class SmartTextMapVectorizerTest
   it should "create a TextStats with the correct derived quantites" in {
     val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
       textMapData,
-      maxCardinality = 100,
       shouldCleanKeys = false,
-      shouldCleanValues = false
+      shouldCleanValues = false,
+      maxCardinality = 100
     )
 
     // Check derived quantities
@@ -580,9 +579,9 @@ class SmartTextMapVectorizerTest
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
     val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
       textMapData,
-      maxCardinality = 2,
       shouldCleanKeys = false,
-      shouldCleanValues = false
+      shouldCleanValues = false,
+      maxCardinality = 2
     )
 
     // Check lengths

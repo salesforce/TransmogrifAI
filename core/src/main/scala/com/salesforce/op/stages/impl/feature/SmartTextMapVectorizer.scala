@@ -173,7 +173,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(SmartTextMapVectorizer.computeTextMapStats(_, maxCard, shouldCleanKeys, shouldCleanValues)).toArray
+      _.map(SmartTextMapVectorizer.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
@@ -196,9 +196,9 @@ object SmartTextMapVectorizer extends CleanTextFun {
 
   private[op] def computeTextMapStats[T <:  OPMap[String]](
     textMap: T#Value,
-    maxCardinality: Int,
     shouldCleanKeys: Boolean,
-    shouldCleanValues: Boolean
+    shouldCleanValues: Boolean,
+    maxCardinality: Int
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
     val keyValueCounts = textMap.map{ case (k, v) =>
       val cleanedText = cleanTextFn(v, shouldCleanValues)
