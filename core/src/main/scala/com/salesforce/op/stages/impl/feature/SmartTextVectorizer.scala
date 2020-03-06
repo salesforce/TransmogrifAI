@@ -167,6 +167,15 @@ object SmartTextVectorizer extends CleanTextFun {
     (all.collect { case (item, true) => item }, all.collect { case (item, false) => item })
   }
 
+  /**
+   * Computes a TextStats instance from a Text entry
+   *
+   * @param text            Text value (eg. entry in a dataframe)
+   * @param shouldCleanText Whether or not the text should be cleaned
+   * @param maxCardinality  Max cardinality to keep track of in maps (relevant for the text length distribution here)
+   * @tparam T              Feature type that the text value is coming from
+   * @return                TextStats instance with value and length counts filled out appropriately
+   */
   private[op] def computeTextStats[T <: Text : TypeTag](
     text: T#Value,
     shouldCleanText: Boolean,

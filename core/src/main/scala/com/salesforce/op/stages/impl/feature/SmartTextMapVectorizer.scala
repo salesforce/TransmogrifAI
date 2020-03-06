@@ -194,6 +194,16 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
 object SmartTextMapVectorizer extends CleanTextFun {
 
+  /**
+   * Computes a TextMapStats instance from a text map entry
+   *
+   * @param textMap            Text value (eg. entry in a dataframe)
+   * @param shouldCleanKeys    Whether or not the keys (feature names) should be cleaned
+   * @param shouldCleanValues  Whether or not the values (the actual text) should be cleaned
+   * @param maxCardinality     Max cardinality to keep track of in maps (relevant for the text length distribution here)
+   * @tparam T                 Feature type that the text map value is coming from
+   * @return                   TextMapStats instance with value and length counts filled out appropriately for each key
+   */
   private[op] def computeTextMapStats[T <:  OPMap[String]](
     textMap: T#Value,
     shouldCleanKeys: Boolean,

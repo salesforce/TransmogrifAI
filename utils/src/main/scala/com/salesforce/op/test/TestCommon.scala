@@ -143,9 +143,9 @@ trait TestCommon extends Matchers with Assertions {
   def compareWithTol(actual: Double, expected: Double, tol: Double): Assertion =
     withClue(s"Real number comparison failure! Actual: $actual, Expected: $expected \n") {
       if (expected != 0) {
-        math.abs((actual - expected) / expected) < tol shouldBe true
+        math.abs((actual - expected) / expected) should be < tol
       }
-      else math.abs(actual - expected) < tol shouldBe true
+      else math.abs(actual - expected) should be < tol
     }
 
 }
