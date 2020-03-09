@@ -361,10 +361,10 @@ class SanityChecker(uid: String = UID[SanityChecker])
     val sampleFraction = fraction(dataCount)
     val sampleData: RDD[(Double, OPVector#Value)] = {
       if (sampleFraction < 1.0) {
-        logDebug(s"Sampling the data for Sanity Checker with sample $sampleFraction and seed $sampSeed")
+        logInfo(s"Sampling the data for Sanity Checker with sample $sampleFraction and seed $sampSeed")
         data.sample(withReplacement = false, fraction = sampleFraction, seed = sampSeed).rdd
       } else {
-        logDebug(s"NOT sampling the data for Sanity Checker, since the calculated check sample is $sampleFraction")
+        logInfo(s"NOT sampling the data for Sanity Checker, since the calculated check sample is $sampleFraction")
         data.rdd
       }
     } map {
@@ -375,7 +375,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
     }
     sampleData.persist()
 
-    logDebug("Getting vector rows")
+    logInfo("Getting vector rows")
     val vectorRows: RDD[OldVector] = sampleData.map {
       case (0.0, sparse: SparseVector) =>
         OldVectors.sparse(sparse.size + 1, sparse.indices, sparse.values)
@@ -385,7 +385,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         OldVectors.dense(dense.toArray :+ label)
     }.persist()
 
-    logDebug("Calculating columns stats")
+    logInfo("Calculating columns stats")
     val colStats = Statistics.colStats(vectorRows)
     val count = colStats.count
     require(count > 0, "Sample size cannot be zero")
@@ -423,7 +423,7 @@ class SanityChecker(uid: String = UID[SanityChecker])
         .map(f => f.index)
       val localCorrIndices = (0 until featureSize + 1).diff(hashedIndices).toArray
 
-      logDebug(s"Ignoring correlations for hashed text features - out of $featureSize feature vector elements, using " +
+      logInfo(s"Ignoring correlations for hashed text features - out of $featureSize feature vector elements, using " +
         s"${localCorrIndices.length} elements in the correlation matrix calculation")
 
       // Exclude feature vector entries coming from hashed text features if requested
@@ -456,11 +456,11 @@ class SanityChecker(uid: String = UID[SanityChecker])
       if (isDefined(categoricalLabel) && !$(categoricalLabel)) {
         Array.empty[CategoricalGroupStats]
       } else {
-        logDebug("Attempting to calculate Cramer's V between each categorical feature and the label")
+        logInfo("Attempting to calculate Cramer's V between each categorical feature and the label")
         categoricalTests(count, featureSize, vectorMetaColumns, sampleData)
       }
 
-    logDebug("Logging all statistics")
+    logInfo("Logging all statistics")
     val stats = DerivedFeatureFilterUtils.makeColumnStatistics(
       vectorMetaColumns,
       colStats,
@@ -469,9 +469,9 @@ class SanityChecker(uid: String = UID[SanityChecker])
       corrIndices,
       categoricalStats
     )
-    stats.foreach { stat => logDebug(stat.toString) }
+    stats.foreach { stat => logInfo(stat.toString) }
 
-    logDebug("Calculating features to remove")
+    logInfo("Calculating features to remove")
     val (toDropFeatures, warnings) = if (removeBad) {
       DerivedFeatureFilterUtils.getFeaturesToDrop(
         stats,
