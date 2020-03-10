@@ -326,26 +326,28 @@ private[op] trait OpWorkflowCore {
   protected def applyTransformationsDAG(
     rawData: DataFrame, dag: StagesDAG, persistEveryKStages: Int
   )(implicit spark: SparkSession): DataFrame = {
-    // A holder for the last persisted rdd
-    var lastPersisted: Option[DataFrame] = None
-    if (dag.exists(_.exists(_._1.isInstanceOf[Estimator[_]]))) {
-      throw new IllegalArgumentException("Cannot apply transformations to DAG that contains estimators")
-    }
-
-    // Apply stages layer by layer
-    dag.foldLeft(rawData) { case (df, stagesLayer) =>
-      // Apply all OP stages
-      val opStages = stagesLayer.collect { case (s: OpTransformer, _) => s }
-      val dfTransformed: DataFrame = FitStagesUtil.applyOpTransformations(opStages, df)
-
-      lastPersisted.foreach(_.unpersist())
-      lastPersisted = Some(dfTransformed)
-
-      // Apply all non OP stages (ex. Spark wrapping stages etc)
-      val sparkStages = stagesLayer.collect {
-        case (s: Transformer, _) if !s.isInstanceOf[OpTransformer] => s.asInstanceOf[Transformer]
+    JobGroupUtil.withJobGroup(OpStep.Scoring) {
+      // A holder for the last persisted rdd
+      var lastPersisted: Option[DataFrame] = None
+      if (dag.exists(_.exists(_._1.isInstanceOf[Estimator[_]]))) {
+        throw new IllegalArgumentException("Cannot apply transformations to DAG that contains estimators")
       }
-      FitStagesUtil.applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
+
+      // Apply stages layer by layer
+      dag.foldLeft(rawData) { case (df, stagesLayer) =>
+        // Apply all OP stages
+        val opStages = stagesLayer.collect { case (s: OpTransformer, _) => s }
+        val dfTransformed: DataFrame = FitStagesUtil.applyOpTransformations(opStages, df)
+
+        lastPersisted.foreach(_.unpersist())
+        lastPersisted = Some(dfTransformed)
+
+        // Apply all non OP stages (ex. Spark wrapping stages etc)
+        val sparkStages = stagesLayer.collect {
+          case (s: Transformer, _) if !s.isInstanceOf[OpTransformer] => s.asInstanceOf[Transformer]
+        }
+        FitStagesUtil.applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
+      }
     }
   }
 

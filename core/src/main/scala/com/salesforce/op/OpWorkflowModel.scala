@@ -348,23 +348,19 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       // Generate the dataframe with raw features
       val rawData: DataFrame = generateRawData()
 
-      val transformedData = JobGroupUtil.withJobGroup(OpStep.Scoring) {
-        // Apply the transformations DAG on raw data
-        applyTransformationsDAG(rawData, dag, persistEveryKStages)
-      }
+      // Apply the transformations DAG on raw data
+      val transformedData = applyTransformationsDAG(rawData, dag, persistEveryKStages)
 
       // Save the scores
-      val (scores, metrics) = JobGroupUtil.withJobGroup(OpStep.SavingScores) {
-        saveScores(
-          path = path,
-          keepRawFeatures = keepRawFeatures,
-          keepIntermediateFeatures = keepIntermediateFeatures,
-          transformedData = transformedData,
-          persistScores = persistScores,
-          evaluator = evaluator,
-          metricsPath = metricsPath
-        )
-      }
+      val (scores, metrics) = saveScores(
+        path = path,
+        keepRawFeatures = keepRawFeatures,
+        keepIntermediateFeatures = keepIntermediateFeatures,
+        transformedData = transformedData,
+        persistScores = persistScores,
+        evaluator = evaluator,
+        metricsPath = metricsPath
+      )
       // Unpersist raw data, since it's not needed anymore
       rawData.unpersist()
       scores -> metrics
@@ -396,11 +392,13 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )(implicit spark: SparkSession): (DataFrame, Option[EvaluationMetrics]) = {
 
     // Evaluate and save the metrics
-    val metrics = for {
-      ev <- evaluator
-      res = ev.evaluateAll(transformedData)
-      _ = metricsPath.foreach(spark.sparkContext.parallelize(Seq(res.toJson()), 1).saveAsTextFile(_))
-    } yield res
+    val metrics = JobGroupUtil.withJobGroup(OpStep.Metrics) {
+      for {
+        ev <- evaluator
+        res = ev.evaluateAll(transformedData)
+        _ = metricsPath.foreach(spark.sparkContext.parallelize(Seq(res.toJson()), 1).saveAsTextFile(_))
+      } yield res
+    }
 
     // Pick which features to return (always force the key and result features to be included)
     val featuresToKeep: Array[String] = (keepRawFeatures, keepIntermediateFeatures) match {
@@ -426,7 +424,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     if (persistScores) scores.persist()
 
     // Save the scores if a path was provided
-    path.foreach(scores.saveAvro(_))
+    JobGroupUtil.withJobGroup(OpStep.SavingScores) {
+      path.foreach(scores.saveAvro(_))
+    }
 
     scores -> metrics
   }
