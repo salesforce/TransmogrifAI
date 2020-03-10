@@ -128,9 +128,9 @@ class OpSparkListener
 
   override def onJobEnd(jobEnd: SparkListenerJobEnd): Unit = {
     val result = jobEnd.jobResult.getClass.getSimpleName.stripSuffix("$")
-    log.info("{},JOB_ID:{},RESULT:{},JOB_TIME_MS:{}",
+    log.info("{},JOB_ID:{},RESULT:{},JOB_TIME_MS:{},JOB_GROUP:{}",
       logPrefix, jobEnd.jobId.toString, result,
-      (jobEnd.time - jobStartTime).toString
+      (jobEnd.time - jobStartTime).toString, jobGroup
     )
   }
 
