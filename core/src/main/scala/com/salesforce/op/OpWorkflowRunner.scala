@@ -171,7 +171,7 @@ class OpWorkflowRunner
 
     val modelSummary = workflowModel.summary()
 
-    JobGroupUtil.withJobGroup(OpStep.SavingMetrics) {
+    JobGroupUtil.withJobGroup(OpStep.Metrics) {
       for {
         location <- params.metricsLocation
         metrics = spark.sparkContext.parallelize(Seq(modelSummary), 1)
