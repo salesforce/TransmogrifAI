@@ -114,7 +114,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     } else {
       val fittedFeature = feature.copyWithNewStages(stages)
       val dag = FitStagesUtil.computeDAG(Array(fittedFeature))
-      applyTransformationsDAG(generateRawData(), dag, persistEveryKStages)
+      JobGroupUtil.withJobGroup(OpStep.Scoring) {
+        applyTransformationsDAG(generateRawData(), dag, persistEveryKStages)
+      }
     }
   }
 

@@ -37,6 +37,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.filters.{FeatureDistribution, RawFeatureFilterResults}
 import com.salesforce.op.readers.{CustomReader, Reader, ReaderKey}
 import com.salesforce.op.stages.{FeatureGeneratorStage, OPStage, OpTransformer}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.ml._
@@ -305,8 +306,12 @@ private[op] trait OpWorkflowCore {
    */
   def computeDataUpTo(feature: OPFeature, path: String)
     (implicit spark: SparkSession): Unit = {
-    val df = computeDataUpTo(feature)
-    df.saveAvro(path)
+    val df = JobGroupUtil.withJobGroup(OpStep.Scoring) {
+      computeDataUpTo(feature)
+    }
+    JobGroupUtil.withJobGroup(OpStep.SavingScores) {
+      df.saveAvro(path)
+    }
   }
 
   /**
