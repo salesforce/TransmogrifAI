@@ -163,9 +163,7 @@ class OpWorkflowRunner
   protected def train(params: OpParams)(implicit spark: SparkSession): OpWorkflowRunnerResult = {
     val workflowModel = workflow.setReader(trainingReader).train()
 
-    JobGroupUtil.withJobGroup(OpStep.SavingModel) {
-      workflowModel.save(params.modelLocation.get)
-    }
+    workflowModel.save(params.modelLocation.get)
 
     val modelSummary = workflowModel.summary()
 

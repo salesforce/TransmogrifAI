@@ -221,7 +221,9 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param overwrite should overwrite if the path exists
    */
   def save(path: String, overwrite: Boolean = true)(implicit spark: SparkSession): Unit = {
-    OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+    JobGroupUtil.withJobGroup(OpStep.SavingModel) {
+      OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
+    }
   }
 
   /**
