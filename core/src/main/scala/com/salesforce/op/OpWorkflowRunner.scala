@@ -161,8 +161,6 @@ class OpWorkflowRunner
    * @return TrainResult
    */
   protected def train(params: OpParams)(implicit spark: SparkSession): OpWorkflowRunnerResult = {
-    // Set job group indefinitely, as it will be changed several times inside the workflow anyway.
-    JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
     val workflowModel = workflow.setReader(trainingReader).train()
 
     JobGroupUtil.withJobGroup(OpStep.SavingModel) {

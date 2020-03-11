@@ -385,6 +385,9 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
   protected def fitStages(data: DataFrame, stagesToFit: Array[OPStage], persistEveryKStages: Int)
     (implicit spark: SparkSession): Array[OPStage] = {
 
+    // Set job group indefinitely, as it will be changed several times inside the workflow anyway.
+    JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
+
     // TODO may want to make workflow take an optional reserve fraction
     val splitters = stagesToFit.collect { case s: ModelSelector[_, _] => s.splitter }.flatten
     val splitter = splitters.reduceOption { (a, b) =>
