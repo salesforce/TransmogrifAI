@@ -221,7 +221,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
    * @param overwrite should overwrite if the path exists
    */
   def save(path: String, overwrite: Boolean = true)(implicit spark: SparkSession): Unit = {
-    JobGroupUtil.withJobGroup(OpStep.SavingModel) {
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
       OpWorkflowModelWriter.save(this, path = path, overwrite = overwrite)
     }
   }
@@ -396,13 +396,11 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )(implicit spark: SparkSession): (DataFrame, Option[EvaluationMetrics]) = {
 
     // Evaluate and save the metrics
-    val metrics = JobGroupUtil.withJobGroup(OpStep.Metrics) {
-      for {
-        ev <- evaluator
-        res = ev.evaluateAll(transformedData)
-        _ = metricsPath.foreach(spark.sparkContext.parallelize(Seq(res.toJson()), 1).saveAsTextFile(_))
-      } yield res
-    }
+    for {
+      ev <- evaluator
+      res = ev.evaluateAll(transformedData)
+      _ = metricsPath.foreach(spark.sparkContext.parallelize(Seq(res.toJson()), 1).saveAsTextFile(_))
+    } yield res
 
     // Pick which features to return (always force the key and result features to be included)
     val featuresToKeep: Array[String] = (keepRawFeatures, keepIntermediateFeatures) match {

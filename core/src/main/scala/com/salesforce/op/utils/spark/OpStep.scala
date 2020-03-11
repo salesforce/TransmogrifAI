@@ -40,10 +40,7 @@ object OpStep extends Enum[OpStep] {
   case object CrossValidation extends OpStep("Cross-validation")
   case object DataReadingAndFiltering extends OpStep("Data reading and filtering")
   case object FeatureEngineering extends OpStep("Feature engineering")
-  case object LoadingModel extends OpStep("Loading model")
-  case object SanityChecker extends OpStep("Running sanity checker")
-  case object Metrics extends OpStep("Calculating and saving metrics")
-  case object SavingModel extends OpStep("Saving model")
-  case object SavingScores extends OpStep("Saving scores")
+  case object ModelIO extends OpStep("Model loading / saving")
+  case object SavingScores extends OpStep("Scores saving")
   case object Scoring extends OpStep("Scoring")
 }

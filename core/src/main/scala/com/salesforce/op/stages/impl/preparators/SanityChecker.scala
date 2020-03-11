@@ -541,7 +541,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
     }
 
     implicit val spark = data.sparkSession
-    JobGroupUtil.setJobGroup(OpStep.SanityChecker)
     val sampSeed = $(sampleSeed)
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)

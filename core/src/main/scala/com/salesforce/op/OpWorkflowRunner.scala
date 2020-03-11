@@ -167,18 +167,16 @@ class OpWorkflowRunner
 
     val modelSummary = workflowModel.summary()
 
-    JobGroupUtil.withJobGroup(OpStep.Metrics) {
-      for {
-        location <- params.metricsLocation
-        metrics = spark.sparkContext.parallelize(Seq(modelSummary), 1)
-        jobConf = {
-          val conf = new JobConf(spark.sparkContext.hadoopConfiguration)
-          conf.set("mapred.output.compress", params.metricsCompress.getOrElse(false).toString)
-          conf
-        }
-        metricCodecClass = params.metricsCodec.map(Class.forName(_).asInstanceOf[Class[_ <: CompressionCodec]])
-      } metrics.saveAsTextFile(location, metricCodecClass, jobConf)
-    }
+    for {
+      location <- params.metricsLocation
+      metrics = spark.sparkContext.parallelize(Seq(modelSummary), 1)
+      jobConf = {
+        val conf = new JobConf(spark.sparkContext.hadoopConfiguration)
+        conf.set("mapred.output.compress", params.metricsCompress.getOrElse(false).toString)
+        conf
+      }
+      metricCodecClass = params.metricsCodec.map(Class.forName(_).asInstanceOf[Class[_ <: CompressionCodec]])
+    } metrics.saveAsTextFile(location, metricCodecClass, jobConf)
 
     new TrainResult(modelSummary)
   }

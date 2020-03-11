@@ -490,7 +490,7 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
    * @return workflow model
    */
   def loadModel(path: String)(implicit spark: SparkSession): OpWorkflowModel = {
-    JobGroupUtil.withJobGroup(OpStep.LoadingModel) {
+    JobGroupUtil.withJobGroup(OpStep.ModelIO) {
       new OpWorkflowModelReader(Some(this)).load(path)
     }
   }
