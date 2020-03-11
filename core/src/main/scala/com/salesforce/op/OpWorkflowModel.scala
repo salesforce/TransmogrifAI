@@ -396,7 +396,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
   )(implicit spark: SparkSession): (DataFrame, Option[EvaluationMetrics]) = {
 
     // Evaluate and save the metrics
-    for {
+    val metrics = for {
       ev <- evaluator
       res = ev.evaluateAll(transformedData)
       _ = metricsPath.foreach(spark.sparkContext.parallelize(Seq(res.toJson()), 1).saveAsTextFile(_))
