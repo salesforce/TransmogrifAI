@@ -256,9 +256,7 @@ class OpWorkflowRunner
         // Set input rdd for the workflow to score
         workflowModel.setInputRDD[Any](rdd, reader.key)(reader.wtt.asInstanceOf[WeakTypeTag[Any]])
         val path = writePath(start) // Prepare write path
-        JobGroupUtil.withJobGroup(OpStep.Scoring) {
-          scoreFn(path) // Score & save it
-        }
+        scoreFn(path) // Score & save it
         log.info("Scored a records batch in {}ms. Saved scores to {}", DateTimeUtils.now().getMillis - start, path)
       }
     })

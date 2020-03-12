@@ -306,9 +306,7 @@ private[op] trait OpWorkflowCore {
    */
   def computeDataUpTo(feature: OPFeature, path: String)
     (implicit spark: SparkSession): Unit = {
-    val df = JobGroupUtil.withJobGroup(OpStep.Scoring) {
-      computeDataUpTo(feature)
-    }
+    val df = computeDataUpTo(feature)
     JobGroupUtil.withJobGroup(OpStep.SavingScores) {
       df.saveAvro(path)
     }
@@ -326,28 +324,26 @@ private[op] trait OpWorkflowCore {
   protected def applyTransformationsDAG(
     rawData: DataFrame, dag: StagesDAG, persistEveryKStages: Int
   )(implicit spark: SparkSession): DataFrame = {
-    JobGroupUtil.withJobGroup(OpStep.Scoring) {
-      // A holder for the last persisted rdd
-      var lastPersisted: Option[DataFrame] = None
-      if (dag.exists(_.exists(_._1.isInstanceOf[Estimator[_]]))) {
-        throw new IllegalArgumentException("Cannot apply transformations to DAG that contains estimators")
+    // A holder for the last persisted rdd
+    var lastPersisted: Option[DataFrame] = None
+    if (dag.exists(_.exists(_._1.isInstanceOf[Estimator[_]]))) {
+      throw new IllegalArgumentException("Cannot apply transformations to DAG that contains estimators")
+    }
+
+    // Apply stages layer by layer
+    dag.foldLeft(rawData) { case (df, stagesLayer) =>
+      // Apply all OP stages
+      val opStages = stagesLayer.collect { case (s: OpTransformer, _) => s }
+      val dfTransformed: DataFrame = FitStagesUtil.applyOpTransformations(opStages, df)
+
+      lastPersisted.foreach(_.unpersist())
+      lastPersisted = Some(dfTransformed)
+
+      // Apply all non OP stages (ex. Spark wrapping stages etc)
+      val sparkStages = stagesLayer.collect {
+        case (s: Transformer, _) if !s.isInstanceOf[OpTransformer] => s.asInstanceOf[Transformer]
       }
-
-      // Apply stages layer by layer
-      dag.foldLeft(rawData) { case (df, stagesLayer) =>
-        // Apply all OP stages
-        val opStages = stagesLayer.collect { case (s: OpTransformer, _) => s }
-        val dfTransformed: DataFrame = FitStagesUtil.applyOpTransformations(opStages, df)
-
-        lastPersisted.foreach(_.unpersist())
-        lastPersisted = Some(dfTransformed)
-
-        // Apply all non OP stages (ex. Spark wrapping stages etc)
-        val sparkStages = stagesLayer.collect {
-          case (s: Transformer, _) if !s.isInstanceOf[OpTransformer] => s.asInstanceOf[Transformer]
-        }
-        FitStagesUtil.applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
-      }
+      FitStagesUtil.applySparkTransformations(dfTransformed, sparkStages, persistEveryKStages)
     }
   }
 

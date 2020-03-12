@@ -265,14 +265,12 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     persistEveryKStages: Int = OpWorkflowModel.PersistEveryKStages,
     persistScores: Boolean = OpWorkflowModel.PersistScores
   )(implicit spark: SparkSession): DataFrame = {
-    val (scores, _) = JobGroupUtil.withJobGroup(OpStep.Scoring) {
-      scoreFn(
-        keepRawFeatures = keepRawFeatures,
-        keepIntermediateFeatures = keepIntermediateFeatures,
-        persistEveryKStages = persistEveryKStages,
-        persistScores = persistScores
-      )(spark)(path)
-    }
+    val (scores, _) = scoreFn(
+      keepRawFeatures = keepRawFeatures,
+      keepIntermediateFeatures = keepIntermediateFeatures,
+      persistEveryKStages = persistEveryKStages,
+      persistScores = persistScores
+    )(spark)(path)
     scores
   }
 
@@ -306,16 +304,14 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     persistScores: Boolean = OpWorkflowModel.PersistScores,
     metricsPath: Option[String] = None
   )(implicit spark: SparkSession): (DataFrame, EvaluationMetrics) = {
-    val (scores, metrics) = JobGroupUtil.withJobGroup(OpStep.Scoring) {
-      scoreFn(
-        keepRawFeatures = keepRawFeatures,
-        keepIntermediateFeatures = keepIntermediateFeatures,
-        persistEveryKStages = persistEveryKStages,
-        persistScores = persistScores,
-        evaluator = Option(evaluator),
-        metricsPath = metricsPath
-      )(spark)(path)
-    }
+    val (scores, metrics) = scoreFn(
+      keepRawFeatures = keepRawFeatures,
+      keepIntermediateFeatures = keepIntermediateFeatures,
+      persistEveryKStages = persistEveryKStages,
+      persistScores = persistScores,
+      evaluator = Option(evaluator),
+      metricsPath = metricsPath
+    )(spark)(path)
     scores -> metrics.get
   }
 

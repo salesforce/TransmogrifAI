@@ -196,6 +196,7 @@ E <: Estimator[_] with OpPipelineStage2[RealNN, OPVector, Prediction]]
       .setMetadata(getMetadata())
       .setOutputFeatureName(getOutputFeatureName)
       .setEvaluators(evaluators)
+    // Reset the job group to feature engineering.
     JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
     selectedModel
   }
