@@ -691,7 +691,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
       operationName = operationName,
       uid = uid
     )
-    JobGroupUtil.setJobGroup(OpStep.FeatureEngineering)
     scModel
   }
 }
