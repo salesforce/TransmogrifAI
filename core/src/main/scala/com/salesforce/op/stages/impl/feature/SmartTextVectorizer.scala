@@ -101,7 +101,12 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
         .take($(topK)).map(_._1)
 
       val adaptiveHashSize =
-        (stats.hll.estimatedSize / adaptiveHashCol).toInt
+        if (stats.hll.estimatedSize <= 3000) {
+          stats.hll.estimatedSize.toInt
+        }
+        else {
+          math.max((stats.hll.estimatedSize / adaptiveHashCol).toInt, 3000)
+        }
       (vecMethod, topValues, adaptiveHashSize)
 
     }.unzip3
