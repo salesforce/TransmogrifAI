@@ -105,16 +105,14 @@ private[op] case object FitStagesUtil {
       }
       val transforms = opStages.map(_.transformRow)
       val transformed: RDD[Row] =
-        JobGroupUtil.withJobGroup(OpStep.Scoring) {
-          df.rdd.map { (row: Row) =>
-            val values = new Array[Any](row.length + transforms.length)
-            var i = 0
-            while (i < values.length) {
-              values(i) = if (i < row.length) row.get(i) else transforms(i - row.length)(row)
-              i += 1
-            }
-            Row.fromSeq(values)
+        df.rdd.map { (row: Row) =>
+          val values = new Array[Any](row.length + transforms.length)
+          var i = 0
+          while (i < values.length) {
+            values(i) = if (i < row.length) row.get(i) else transforms(i - row.length)(row)
+            i += 1
           }
+          Row.fromSeq(values)
         }
 
       spark.createDataFrame(transformed, newSchema).persist()
