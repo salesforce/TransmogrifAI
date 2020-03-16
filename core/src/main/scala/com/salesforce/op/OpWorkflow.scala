@@ -403,28 +403,34 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
 
     // doing regular workflow fit without workflow level CV
     if (!isWorkflowCV) {
-      FitStagesUtil.fitAndTransformDAG(
-        dag = dag,
-        train = train,
-        test = test,
-        hasTest = hasTest,
-        indexOfLastEstimator = indexOfLastEstimator,
-        persistEveryKStages = persistEveryKStages
-      ).transformers
+      // The cross-validation job group is handled in the appropriate Estimator
+      JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+        FitStagesUtil.fitAndTransformDAG(
+          dag = dag,
+          train = train,
+          test = test,
+          hasTest = hasTest,
+          indexOfLastEstimator = indexOfLastEstimator,
+          persistEveryKStages = persistEveryKStages
+        ).transformers
+      }
     } else {
       // doing workflow level CV/TS
       // Extract Model Selector and Split the DAG into
       val CutDAG(modelSelectorOpt, before, during, after) = FitStagesUtil.cutDAG(dag)
 
       log.info("Applying initial DAG before CV/TS. Stages: {}", before.flatMap(_.map(_._1.stageName)).mkString(", "))
-      val FittedDAG(beforeTrain, beforeTest, beforeTransformers) = FitStagesUtil.fitAndTransformDAG(
-        dag = before,
-        train = train,
-        test = test,
-        hasTest = hasTest,
-        indexOfLastEstimator = indexOfLastEstimator,
-        persistEveryKStages = persistEveryKStages
-      )
+      val FittedDAG(beforeTrain, beforeTest, beforeTransformers) =
+        JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+          FitStagesUtil.fitAndTransformDAG(
+            dag = before,
+            train = train,
+            test = test,
+            hasTest = hasTest,
+            indexOfLastEstimator = indexOfLastEstimator,
+            persistEveryKStages = persistEveryKStages
+          )
+        }
 
       // Break up catalyst (cause it chokes) by converting into rdd, persisting it and then back to dataframe
       val (trainRDD, testRDD) = (beforeTrain.rdd.persist(), beforeTest.rdd.persist())
@@ -446,15 +452,17 @@ class OpWorkflow(val uid: String = UID[OpWorkflow]) extends OpWorkflowCore {
           val remainingDAG: StagesDAG = (during :+ (Array(modelSelector -> distance): Layer)) ++ after
 
           log.info("Applying DAG after CV/TS. Stages: {}", remainingDAG.flatMap(_.map(_._1.stageName)).mkString(", "))
-          val fitted = FitStagesUtil.fitAndTransformDAG(
-            dag = remainingDAG,
-            train = trainFixed,
-            test = testFixed,
-            hasTest = hasTest,
-            indexOfLastEstimator = indexOfLastEstimator,
-            persistEveryKStages = persistEveryKStages,
-            fittedTransformers = beforeTransformers
-          ).transformers
+          val fitted = JobGroupUtil.withJobGroup(OpStep.FeatureEngineering) {
+            FitStagesUtil.fitAndTransformDAG(
+              dag = remainingDAG,
+              train = trainFixed,
+              test = testFixed,
+              hasTest = hasTest,
+              indexOfLastEstimator = indexOfLastEstimator,
+              persistEveryKStages = persistEveryKStages,
+              fittedTransformers = beforeTransformers
+            ).transformers
+          }
           trainRDD.unpersist()
           testRDD.unpersist()
           fitted
