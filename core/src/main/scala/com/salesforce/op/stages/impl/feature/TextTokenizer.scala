@@ -151,7 +151,7 @@ object TextTokenizer {
    * @param minTokenLength      minimum token length
    * @return detected language and sentence tokens
    */
-  def tokenizeString(
+  private[op] def tokenizeString(
     textString: String,
     languageDetector: LanguageDetector = LanguageDetector,
     analyzer: TextAnalyzer = Analyzer,
@@ -195,7 +195,7 @@ object TextTokenizer {
    * @param minTokenLength      minimum token length
    * @return detected language and sentence tokens
    */
-  def tokenizeStringOpt(
+  private[op] def tokenizeStringOpt(
     textStringOpt: Option[String],
     languageDetector: LanguageDetector = LanguageDetector,
     analyzer: TextAnalyzer = Analyzer,
