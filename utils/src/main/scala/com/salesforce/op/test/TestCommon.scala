@@ -132,7 +132,7 @@ trait TestCommon extends Matchers with Assertions {
 
   /**
    * Compares two real numbers using relative difference with a tolerance.
-   * It uses relative differences unless the expected value is zero, in which case it uses absolution differences.
+   * It uses relative differences unless the expected value is zero, in which case it uses absolute differences.
    *
    * @param actual    Actual value produced
    * @param expected  Expected value
