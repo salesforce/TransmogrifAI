@@ -269,7 +269,7 @@ object FeatureDistribution {
    */
   private def momentsValues(values: ProcessedSeq): Moments = {
     val population = values match {
-      case Left(seq) => seq.map(x => x.length.toDouble)
+      case Left(seq) => seq.map(_.length.toDouble)
       case Right(seq) => seq
     }
     MomentsGroup.sum(population.map(x => Moments(x)))
@@ -290,7 +290,7 @@ object FeatureDistribution {
       case Right(doubleSeq) => doubleSeq.map(_.toString)
     }
     stringVals.foldLeft(TextStats.empty)((acc, el) => acc + SmartTextVectorizer.computeTextStats(
-      Option(el), shouldCleanText = false, maxCardinality = RawFeatureFilter.MaxCardinality)
+      Option(el), shouldCleanText = true, maxCardinality = RawFeatureFilter.MaxCardinality)
     )
   }
 
