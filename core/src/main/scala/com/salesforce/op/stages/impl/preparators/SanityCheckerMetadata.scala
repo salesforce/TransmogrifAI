@@ -42,7 +42,7 @@ import scala.util.{Failure, Success, Try}
 /**
  * Contains all names for sanity checker metadata
  */
-case object SanityCheckerNames {
+case object SanityCheckerNames extends DerivedFeatureFilterNames {
   val CorrelationsWLabel: String = "correlationsWithLabel"
   val CorrelationsWLabelIsNaN: String = "correlationsWithLabelIsNaN"
   val CorrelationType: String = "correlationType"
@@ -57,28 +57,19 @@ case object SanityCheckerNames {
   val MaxRuleConfidence: String = "maxRuleConfidence"
   val Support: String = "support"
   val CountMatrix: String = "countMatrix"
-  val Names: String = "names"
   val FeaturesIn: String = "features"
   val Values: String = "values"
-  val FeaturesStatistics = "statistics"
-  val Dropped = "featuresDropped"
-  val Mean = "mean"
-  val Max = "max"
-  val Min = "min"
-  val Count = "count"
-  val SampleFraction = "sampleFraction"
   val NumNonZeros = "numNonZeros"
-  val Variance = "variance"
   val NumNull = "number of nulls"
 }
 
 /**
  * Case class to convert to and from [[SanityChecker]] summary metadata
  *
- * @param correlationsWLabel      feature correlations with label
- * @param dropped                 features dropped for label leakage
- * @param featuresStatistics      stats on features
- * @param names                   names of features passed in
+ * @param correlationsWLabel feature correlations with label
+ * @param dropped            features dropped for label leakage
+ * @param featuresStatistics stats on features
+ * @param names              names of features passed in
  * @param categoricalStats
  */
 case class SanityCheckerSummary
@@ -90,7 +81,8 @@ case class SanityCheckerSummary
   categoricalStats: Array[CategoricalGroupStats]
 ) extends MetadataLike {
 
-  private[op] def this(
+  private[op] def this
+  (
     stats: Array[ColumnStatistics],
     catStats: Array[CategoricalGroupStats],
     dropped: Seq[String],
@@ -272,7 +264,7 @@ case class CategoricalStats
     meta.putMetadata(SanityCheckerNames.PointwiseMutualInfoAgainstLabel,
       pointwiseMutualInfos.toMetadata(skipUnsupported))
     val countMeta = new MetadataBuilder()
-    counts.map{ case (k, v) => countMeta.putDoubleArray(k, v)}
+    counts.map { case (k, v) => countMeta.putDoubleArray(k, v) }
     meta.putMetadata(SanityCheckerNames.CountMatrix, countMeta.build())
     meta.build()
   }
