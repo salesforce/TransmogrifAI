@@ -170,10 +170,12 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
     val maxCard = $(maxCardinality)
     val shouldCleanKeys = $(cleanKeys)
     val shouldCleanValues = $(cleanText)
+    val shouldTokenize = $(tokenizeForLengths)
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(SmartTextMapVectorizer.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, maxCard)).toArray
+      _.map(SmartTextMapVectorizer.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
+        maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
 
@@ -200,6 +202,7 @@ object SmartTextMapVectorizer extends CleanTextFun {
    * @param textMap            Text value (eg. entry in a dataframe)
    * @param shouldCleanKeys    Whether or not the keys (feature names) should be cleaned
    * @param shouldCleanValues  Whether or not the values (the actual text) should be cleaned
+   * @param shouldTokenize     Whether or not to tokenize the values for the length distribution
    * @param maxCardinality     Max cardinality to keep track of in maps (relevant for the text length distribution here)
    * @tparam T                 Feature type that the text map value is coming from
    * @return                   TextMapStats instance with value and length counts filled out appropriately for each key
@@ -208,14 +211,18 @@ object SmartTextMapVectorizer extends CleanTextFun {
     textMap: T#Value,
     shouldCleanKeys: Boolean,
     shouldCleanValues: Boolean,
+    shouldTokenize: Boolean,
     maxCardinality: Int
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
-    val keyValueCounts = textMap.map{ case (k, v) =>
+    val keyValueCounts = textMap.map { case (k, v) =>
       val cleanedText = cleanTextFn(v, shouldCleanValues)
-      val lengthsMap: Map[Int, Long] = TextTokenizer.tokenizeString(cleanedText).tokens.value
-        .foldLeft(Map.empty[Int, Long])(
-          (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
-        )
+
+      val lengthsMap: Map[Int, Long] = if (shouldTokenize) {
+        TextTokenizer.tokenizeString(cleanedText).tokens.value
+          .foldLeft(Map.empty[Int, Long])(
+            (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
+          )
+      } else Map(v.length -> 1L)
       cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanedText -> 1L), lengthsMap)
     }
     TextMapStats(keyValueCounts)

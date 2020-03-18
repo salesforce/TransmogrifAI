@@ -521,6 +521,7 @@ class SmartTextMapVectorizerTest
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
+      shouldTokenize = true,
       maxCardinality = 100
     )
 
@@ -552,6 +553,7 @@ class SmartTextMapVectorizerTest
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
+      shouldTokenize = true,
       maxCardinality = 100
     )
 
@@ -581,6 +583,7 @@ class SmartTextMapVectorizerTest
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
+      shouldTokenize = true,
       maxCardinality = 2
     )
 

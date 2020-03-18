@@ -88,6 +88,7 @@ private[filters] case class PreparedFeatures
    *                                Input arguments are [[Summary]] and number of bins to use in
    *                                computing feature distributions (histograms for numerics, hashes for strings).
    *                                Output is the bins for the text features.
+   * @param tokenizeForLengths      whether or not to tokenize strings before computing length distribution
    * @param featureDistributionType feature distribution type: training or scoring
    * @return a pair consisting of response and predictor feature distributions (in this order)
    */
@@ -96,6 +97,7 @@ private[filters] case class PreparedFeatures
     predictorSummaries: Array[(FeatureKey, Summary)],
     bins: Int,
     textBinsFormula: (Summary, Int) => Int,
+    tokenizeForLengths: Boolean,
     featureDistributionType: FeatureDistributionType
   ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
 
@@ -109,6 +111,7 @@ private[filters] case class PreparedFeatures
         value = features.get(featureKey),
         bins = bins,
         textBinsFormula = textBinsFormula,
+        tokenizeForLengths = tokenizeForLengths,
         `type` = featureDistributionType
       )
     }

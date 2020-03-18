@@ -222,14 +222,16 @@ object FeatureDistribution {
   /**
    * Facilitates feature distribution retrieval from computed feature summaries
    *
-   * @param featureKey      feature key
-   * @param summary         feature summary
-   * @param value           optional processed sequence
-   * @param bins            number of histogram bins
-   * @param textBinsFormula formula to compute the text features bin size.
-   *                        Input arguments are [[Summary]] and number of bins to use in computing feature distributions
-   *                        (histograms for numerics, hashes for strings). Output is the bins for the text features.
-   * @param `type`          feature distribution type: training or scoring
+   * @param featureKey          feature key
+   * @param summary             feature summary
+   * @param value               optional processed sequence
+   * @param bins                number of histogram bins
+   * @param textBinsFormula     formula to compute the text features bin size.
+   *                            Input arguments are [[Summary]] and number of bins to use in computing feature
+   *                            distributions (histograms for numerics, hashes for strings). Output is the bins for
+   *                            the text features.
+   * @param tokenizeForLengths  whether or not to tokenize strings before computing length distribution
+   * @param `type`              feature distribution type: training or scoring
    * @return feature distribution given the provided information
    */
   private[op] def fromSummary(
@@ -238,6 +240,7 @@ object FeatureDistribution {
     value: Option[ProcessedSeq],
     bins: Int,
     textBinsFormula: (Summary, Int) => Int,
+    tokenizeForLengths: Boolean,
     `type`: FeatureDistributionType
   ): FeatureDistribution = {
     val (name, key) = featureKey
@@ -246,7 +249,7 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val moments = value.map(momentsValues)
-    val cardEstimate = value.map(cardinalityValues)
+    val cardEstimate = value.map(cardinalityValues(_, tokenizeForLengths))
 
     FeatureDistribution(
       name = name,
@@ -279,10 +282,11 @@ object FeatureDistribution {
    * Function to track frequency of the first $(MaxCardinality) unique values
    * (number for numeric features, token for text features)
    *
-   * @param values          values to track distribution / frequency
-   * @return TextStats object containing a Map from a value to its frequency (histogram)
+   * @param values              values to track distribution / frequency
+   * @param tokenizeForLengths  whether or not to tokenize strings before computing length distribution
+   * @return TextStats object   containing a Map from a value to its frequency (histogram)
    */
-  private def cardinalityValues(values: ProcessedSeq): TextStats = {
+  private def cardinalityValues(values: ProcessedSeq, tokenizeForLengths: Boolean): TextStats = {
     implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
 
     val stringVals = values match {
@@ -290,7 +294,10 @@ object FeatureDistribution {
       case Right(doubleSeq) => doubleSeq.map(_.toString)
     }
     stringVals.foldLeft(TextStats.empty)((acc, el) => acc + SmartTextVectorizer.computeTextStats(
-      Option(el), shouldCleanText = true, maxCardinality = RawFeatureFilter.MaxCardinality)
+      Option(el),
+      shouldCleanText = true,
+      shouldTokenize = tokenizeForLengths,
+      maxCardinality = RawFeatureFilter.MaxCardinality)
     )
   }
 

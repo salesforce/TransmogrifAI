@@ -443,7 +443,8 @@ class SmartTextVectorizerTest
   }
 
   it should "turn a string into a corresponding TextStats instance with cleaning" in {
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = true, maxCardinality = 50)
+    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = true, shouldTokenize = true,
+      maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeStringOpt(stringOptData).tokens
 
     res.valueCounts.size shouldBe 1
@@ -467,7 +468,8 @@ class SmartTextVectorizerTest
   }
 
   it should "turn a string into a corresponding TextStats instance without cleaning" in {
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, maxCardinality = 50)
+    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, shouldTokenize = true,
+      maxCardinality = 50)
     val tokens: TextList = TextTokenizer.tokenizeStringOpt(stringOptData).tokens
 
     res.valueCounts.size shouldBe 1
@@ -482,7 +484,8 @@ class SmartTextVectorizerTest
 
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
     val tinyCard = 2
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, maxCardinality = 2)
+    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, shouldTokenize = true,
+      maxCardinality = 2)
 
     res.valueCounts.size shouldBe 1
     res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)

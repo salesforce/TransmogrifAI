@@ -63,7 +63,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       if (isEmpty) None else Option(processed)
     }
     val distribs = featureKeys.zip(summaries).zip(processedSeqs).map { case ((key, summary), seq) =>
-      FeatureDistribution.fromSummary(key, summary, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
+      FeatureDistribution.fromSummary(key, summary, seq, bins, (_, bins) => bins, tokenizeForLengths = true,
+        FeatureDistributionType.Training)
     }
     distribs.foreach{ d =>
       d.key shouldBe None
@@ -96,7 +97,8 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       if (isEmpty) None else Option(processed)
     }
     val distribs = featureKeys.zip(summary).zip(processedSeqs).map { case ((key, summ), seq) =>
-      FeatureDistribution.fromSummary(key, summ, seq, bins, (_, bins) => bins, FeatureDistributionType.Training)
+      FeatureDistribution.fromSummary(key, summ, seq, bins, (_, bins) => bins, tokenizeForLengths = true,
+        FeatureDistributionType.Training)
     }
 
     distribs(0).distribution.length shouldBe 100
@@ -120,7 +122,7 @@ class FeatureDistributionTest extends FlatSpec with PassengerSparkFixtureTest wi
       summaryMaps.map { case (key, summary) =>
         val featureKey = (name, Option(key))
         FeatureDistribution.fromSummary(featureKey, summary, valueMaps.get(key),
-          bins, (_, bins) => bins, FeatureDistributionType.Scoring)
+          bins, (_, bins) => bins, tokenizeForLengths = true, FeatureDistributionType.Scoring)
       }
     }
 

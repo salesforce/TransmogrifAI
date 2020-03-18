@@ -80,6 +80,8 @@ import scala.util.Failure
  *                                      Input arguments are [[Summary]] and number of bins to use in computing feature
  *                                      distributions (histograms for numerics, hashes for strings).
  *                                      Output is the bins for the text features.
+ * @param tokenizeForLengths            Whether or not to tokenize text data when calculating length distributions
+ *                                      in the TextStats part of the feature distributions
  * @param timePeriod                    Time period used to apply circulate date transformation for date features, if
  *                                      not specified will use regular numeric feature transformation
  * @param minScoringRows                Minimum row threshold for scoring set comparisons to be used in checks. If
@@ -101,6 +103,7 @@ class RawFeatureFilter[T]
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
+  val tokenizeForLengths: Boolean = RawFeatureFilter.TokenizeForLengths,
   val timePeriod: Option[TimePeriod] = None,
   val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
 ) extends Serializable {
@@ -173,6 +176,7 @@ class RawFeatureFilter[T]
           predictorSummaries = predictorSummariesArr,
           bins = bins,
           textBinsFormula = textBinsFormula,
+          tokenizeForLengths = tokenizeForLengths,
           featureDistributionType
         )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
@@ -599,7 +603,8 @@ object RawFeatureFilter {
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
   val MaxCardinality = 500
-
+  // Whether or not to tokenize string data when calculating length distributions in TextStats
+  val TokenizeForLengths = true
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 
