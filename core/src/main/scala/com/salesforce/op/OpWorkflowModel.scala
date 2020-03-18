@@ -349,7 +349,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
       val rawData: DataFrame = generateRawData()
 
       // Apply the transformations DAG on raw data
-      val transformedData = applyTransformationsDAG(rawData, dag, persistEveryKStages)
+      val transformedData: DataFrame = applyTransformationsDAG(rawData, dag, persistEveryKStages)
 
       // Save the scores
       val (scores, metrics) = saveScores(

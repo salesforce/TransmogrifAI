@@ -40,7 +40,7 @@ import com.salesforce.op.readers.{Reader, StreamingReader}
 import com.salesforce.op.utils.date.DateTimeUtils
 import com.salesforce.op.utils.json.{EnumEntrySerializer, JsonLike, JsonUtils}
 import com.salesforce.op.utils.spark.RichRDD._
-import com.salesforce.op.utils.spark.{AppMetrics, OpStep, JobGroupUtil, OpSparkListener}
+import com.salesforce.op.utils.spark.{AppMetrics, OpSparkListener}
 import com.salesforce.op.utils.version.VersionInfo
 import enumeratum._
 import org.apache.hadoop.io.compress.CompressionCodec
@@ -162,7 +162,6 @@ class OpWorkflowRunner
    */
   protected def train(params: OpParams)(implicit spark: SparkSession): OpWorkflowRunnerResult = {
     val workflowModel = workflow.setReader(trainingReader).train()
-
     workflowModel.save(params.modelLocation.get)
 
     val modelSummary = workflowModel.summary()

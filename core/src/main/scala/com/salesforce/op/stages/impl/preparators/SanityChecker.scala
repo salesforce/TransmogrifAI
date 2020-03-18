@@ -36,7 +36,7 @@ import com.salesforce.op.stages.AllowLabelAsInput
 import com.salesforce.op.stages.base.binary.{BinaryEstimator, BinaryModel}
 import com.salesforce.op.stages.impl.CheckIsResponseValues
 import com.salesforce.op.utils.spark.RichMetadata._
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep, OpVectorColumnMetadata, OpVectorMetadata}
+import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import com.salesforce.op.utils.stats.OpStatistics
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird.Operators._
@@ -539,8 +539,6 @@ class SanityChecker(uid: String = UID[SanityChecker])
         LogManager.getLogger(l.getName).setLevel(Level.toLevel($(logLevel)))
       }
     }
-
-    implicit val spark = data.sparkSession
     val sampSeed = $(sampleSeed)
     val removeBad = $(removeBadFeatures)
     val corrType = $(correlationType)
@@ -685,13 +683,12 @@ class SanityChecker(uid: String = UID[SanityChecker])
     require(indicesToKeep.length > 0,
       "The sanity checker has dropped all of your features, check your input data quality")
 
-    val scModel = new SanityCheckerModel(
+    new SanityCheckerModel(
       indicesToKeep = indicesToKeep,
       removeBadFeatures = removeBad,
       operationName = operationName,
       uid = uid
     )
-    scModel
   }
 }
 

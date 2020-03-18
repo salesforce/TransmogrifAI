@@ -34,7 +34,6 @@ import com.salesforce.op.features.OPFeature
 import com.salesforce.op.stages.impl.selector.ModelSelectorNames.{EstimatorType, ModelType}
 import com.salesforce.op.stages.impl.selector.{HasTestEval, ModelSelector, ModelSelectorNames}
 import com.salesforce.op.stages.{OPStage, OpTransformer}
-import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.{OpWorkflow, OpWorkflowModel}
 import org.apache.spark.ml.{Estimator, Model, Transformer}
 import org.apache.spark.rdd.RDD
