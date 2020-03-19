@@ -38,7 +38,7 @@ import com.salesforce.op.test.{TestCommon, TestSparkContext}
 @RunWith(classOf[JUnitRunner])
 class JobGroupUtilTest extends FlatSpec with TestCommon with TestSparkContext {
 
-  "JobGroupUtil" should "be able to set a job group ID around a code block" in {
+  Spec(JobGroupUtil.getClass) should "be able to set a job group ID around a code block" in {
     JobGroupUtil.withJobGroup(OpStep.DataReadingAndFiltering) {
       spark.sparkContext.parallelize(Seq(1, 2, 3, 4, 5)).collect()
     }
