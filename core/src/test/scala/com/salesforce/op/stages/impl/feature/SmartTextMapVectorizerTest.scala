@@ -452,7 +452,43 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(0.5)
+      .setMinLengthStdDev(0.5).setTokenizeForLengths(true)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDF)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in a single TextMap" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTokenizeForLengths(false)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap).getOutput()
@@ -488,7 +524,43 @@ class SmartTextMapVectorizerTest
 
     val smartVectorized = new SmartTextMapVectorizer()
       .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
-      .setMinLengthStdDev(0.5)
+      .setMinLengthStdDev(0.5).setTokenizeForLengths(true)
+      .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
+      .setTrackNulls(true).setTrackTextLen(true)
+      .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
+
+    val transformed = new OpWorkflow().setResultFeatures(smartVectorized).transform(rawDFSeparateMaps)
+    val result = transformed.collect(smartVectorized)
+
+    /*
+      Feature vector should have 16 components, corresponding to two hashed text fields, one categorical field, and
+      one ignored text field.
+
+      Hashed text: (5 hash buckets + 1 length + 1 null indicator) = 7 elements
+      Categorical: (3 topK + 1 other + 1 null indicator) = 5 elements
+      Ignored text: (1 length + 1 null indicator) = 2 elements
+     */
+    val featureVectorSize = 2 * (hashSize + 2) + (topKCategorial + 2) + 2
+    val firstRes = result.head
+    firstRes.v.size shouldBe featureVectorSize
+
+    val meta = OpVectorMetadata(transformed.schema(smartVectorized.name))
+    meta.columns.length shouldBe featureVectorSize
+    meta.columns.slice(0, 5).forall(_.grouping.contains("categorical"))
+    meta.columns.slice(5, 10).forall(_.grouping.contains("country"))
+    meta.columns.slice(10, 15).forall(_.grouping.contains("text"))
+    meta.columns.slice(15, 18).forall(_.descriptorValue.contains(OpVectorColumnMetadata.TextLenString))
+    meta.columns.slice(18, 21).forall(_.indicatorValue.contains(OpVectorColumnMetadata.NullString))
+  }
+
+  it should "detect and ignore fields that looks like machine-generated IDs by having a low value length variance " +
+    "when data is in many TextMaps" in {
+    val topKCategorial = 3
+    val hashSize = 5
+
+    val smartVectorized = new SmartTextMapVectorizer()
+      .setMaxCardinality(10).setNumFeatures(hashSize).setMinSupport(10).setTopK(topKCategorial)
+      .setMinLengthStdDev(1.0).setTokenizeForLengths(false)
       .setAutoDetectLanguage(false).setMinTokenLength(1).setToLowercase(false)
       .setTrackNulls(true).setTrackTextLen(true)
       .setInput(rawTextMap1, rawTextMap2, rawTextMap3).getOutput()
