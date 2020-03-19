@@ -38,7 +38,7 @@ import com.salesforce.op.stages.impl.feature.TimePeriod
 import com.salesforce.op.stages.impl.preparators.CorrelationType
 import com.salesforce.op.stages.impl.selector.ModelSelector
 import com.salesforce.op.utils.reflection.ReflectionUtils
-import com.salesforce.op.utils.spark.{OpStep, JobGroupUtil}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.stages.FitStagesUtil
 import com.salesforce.op.utils.stages.FitStagesUtil.{CutDAG, FittedDAG, Layer, StagesDAG}

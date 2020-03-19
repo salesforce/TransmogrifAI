@@ -35,7 +35,7 @@ import com.salesforce.op.features.types.FeatureType
 import com.salesforce.op.features.{Feature, FeatureLike, OPFeature}
 import com.salesforce.op.readers.DataFrameFieldNames._
 import com.salesforce.op.stages.{OPStage, OpPipelineStage, OpTransformer}
-import com.salesforce.op.utils.spark.{OpStep, JobGroupUtil}
+import com.salesforce.op.utils.spark.{JobGroupUtil, OpStep}
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.RichMetadata._
 import com.salesforce.op.utils.stages.FitStagesUtil
@@ -422,7 +422,7 @@ class OpWorkflowModel(val uid: String = UID[OpWorkflowModel], val trainingParams
     if (persistScores) scores.persist()
 
     // Save the scores if a path was provided
-    JobGroupUtil.withJobGroup(OpStep.SavingScores) {
+    JobGroupUtil.withJobGroup(OpStep.ResultsSaving) {
       path.foreach(scores.saveAvro(_))
     }
 

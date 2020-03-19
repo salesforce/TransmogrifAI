@@ -41,5 +41,6 @@ object OpStep extends Enum[OpStep] {
   case object DataReadingAndFiltering extends OpStep("Data reading and filtering")
   case object FeatureEngineering extends OpStep("Feature engineering")
   case object ModelIO extends OpStep("Model loading / saving")
-  case object SavingScores extends OpStep("Scores saving")
+  case object Other extends OpStep("Other")
+  case object ResultsSaving extends OpStep("Results saving")
 }

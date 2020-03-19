@@ -72,7 +72,7 @@ class OpSparkListener
 
   private lazy val log = LoggerFactory.getLogger(classOf[OpSparkListener])
 
-  protected var jobGroup: String = OpSparkListener.DEFAULT_GROUP_ID
+  protected var jobGroup: String = OpStep.Other.toString
   private var (jobStartTime, appStartTime, appEndTime) = {
     val now = DateTimeUtils.now().getMillis
     (now, now, now)
@@ -122,7 +122,7 @@ class OpSparkListener
   }
 
   override def onJobStart(jobStart: SparkListenerJobStart): Unit = {
-    jobGroup = jobStart.properties.getProperty(OpSparkListener.SPARK_JOB_GROUP_ID, OpSparkListener.DEFAULT_GROUP_ID)
+    jobGroup = jobStart.properties.getProperty(OpSparkListener.SPARK_JOB_GROUP_ID, OpStep.Other.toString)
     jobStartTime = jobStart.time
   }
 
@@ -147,7 +147,6 @@ class OpSparkListener
 
 object OpSparkListener {
   private val SPARK_JOB_GROUP_ID = "spark.jobGroup.id"
-  val DEFAULT_GROUP_ID: String = "other"
 }
 
 trait MetricJsonLike extends JsonLike {

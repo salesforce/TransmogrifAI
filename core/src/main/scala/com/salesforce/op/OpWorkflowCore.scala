@@ -307,7 +307,7 @@ private[op] trait OpWorkflowCore {
   def computeDataUpTo(feature: OPFeature, path: String)
     (implicit spark: SparkSession): Unit = {
     val df = computeDataUpTo(feature)
-    JobGroupUtil.withJobGroup(OpStep.SavingScores) {
+    JobGroupUtil.withJobGroup(OpStep.ResultsSaving) {
       df.saveAvro(path)
     }
   }
