@@ -34,11 +34,12 @@ import com.salesforce.op._
 import com.salesforce.op.features.types._
 import com.salesforce.op.stages.base.sequence.SequenceModel
 import com.salesforce.op.test.{OpEstimatorSpec, TestFeatureBuilder}
-import com.salesforce.op.testkit.{RandomReal, RandomText}
+import com.salesforce.op.testkit.RandomText
 import com.salesforce.op.utils.spark.RichDataset._
 import com.salesforce.op.utils.spark.{OpVectorColumnMetadata, OpVectorMetadata}
 import org.apache.spark.ml.linalg.Vectors
 import org.junit.runner.RunWith
+import org.scalatest.Assertion
 import org.scalatest.junit.JUnitRunner
 
 
@@ -93,8 +94,8 @@ class SmartTextVectorizerTest
   val (rawDF, rawCountry, rawCategorical, rawTextId, rawText) = TestFeatureBuilder(
     "country", "categorical", "textId", "text", generatedData)
 
-  val stringOptData: Option[String] = Some("I have got a lovely bunch of coconuts. " +
-    "Here they are all standing in a row.")
+  val stringData: String = "I have got a LovEly buncH of cOcOnuts. " +
+    "Here they are ALL standing in a row."
   val tol = 1e-12 // Tolerance for comparing real numbers
 
   it should "detect one categorical and one non-categorical text feature" in {
@@ -438,14 +439,14 @@ class SmartTextVectorizerTest
   }
 
   it should "tokenize text correctly using the shortcut used in computeTextStats" in {
-    val tokens: TextList = TextTokenizer.tokenizeStringOpt(stringOptData).tokens
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
     tokens.value should contain theSameElementsAs Seq("got", "lovely", "bunch", "coconuts", "standing", "row")
   }
 
   it should "turn a string into a corresponding TextStats instance with cleaning" in {
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = true, shouldTokenize = true,
+    val res = TextStats.textStatsFromString(stringData, shouldCleanText = true, shouldTokenize = true,
       maxCardinality = 50)
-    val tokens: TextList = TextTokenizer.tokenizeStringOpt(stringOptData).tokens
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
     res.valueCounts.size shouldBe 1
     res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
@@ -456,39 +457,33 @@ class SmartTextVectorizerTest
     res.lengthCounts should contain (5 -> 1L)
     res.lengthCounts should contain (8 -> 2L)
 
-    // Check derived quantities
-    val lengthSeq = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
-    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
-    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
-    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
-    res.lengthSize shouldBe lengthSeq.length
-    compareWithTol(res.lengthMean, expectedLengthMean, tol)
-    compareWithTol(res.lengthVariance, expectedLengthVariance, tol)
-    compareWithTol(res.lengthStdDev, expectedLengthStdDev, tol)
+    checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
 
   it should "turn a string into a corresponding TextStats instance without cleaning" in {
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, shouldTokenize = true,
+    val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
       maxCardinality = 50)
-    val tokens: TextList = TextTokenizer.tokenizeStringOpt(stringOptData).tokens
+    val tokens: TextList = TextTokenizer.tokenizeString(stringData).tokens
 
     res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.valueCounts should contain ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
 
     res.lengthCounts.size shouldBe tokens.value.map(_.length).distinct.length
     res.lengthCounts should contain (6 -> 1L)
     res.lengthCounts should contain (3 -> 2L)
     res.lengthCounts should contain (5 -> 1L)
     res.lengthCounts should contain (8 -> 2L)
+
+    checkDerivedQuantities(res, Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
   }
 
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
     val tinyCard = 2
-    val res = SmartTextVectorizer.computeTextStats(stringOptData, shouldCleanText = false, shouldTokenize = true,
+    val res = TextStats.textStatsFromString(stringData, shouldCleanText = false, shouldTokenize = true,
       maxCardinality = 2)
 
     res.valueCounts.size shouldBe 1
-    res.valueCounts should contain ("I have got a lovely bunch of coconuts. Here they are all standing in a row." -> 1)
+    res.valueCounts should contain ("I have got a LovEly buncH of cOcOnuts. Here they are ALL standing in a row." -> 1)
 
     // MaxCardinality will stop counting as soon as the lengths are > maxCardinality, so the length counts will
     // have maxCardinality + 1 elements, however they will stop being appended to even if future elements have
@@ -497,6 +492,38 @@ class SmartTextVectorizerTest
     res.lengthCounts should contain (6 -> 1L)
     res.lengthCounts should contain (3 -> 1L)
     res.lengthCounts should contain (5 -> 1L)
+
+    checkDerivedQuantities(res, Seq(6, 3, 5).map(_.toLong))
+  }
+
+  it should "allow toggling of tokenization for calculating the length distribution" in {
+    val res = TextStats.textStatsFromString(stringData, shouldCleanText = true, shouldTokenize = false,
+      maxCardinality = 50)
+
+    res.valueCounts.size shouldBe 1
+    res.valueCounts should contain ("IHaveGotALovelyBunchOfCoconutsHereTheyAreAllStandingInARow" -> 1)
+    res.lengthCounts.size shouldBe 1
+    res.lengthCounts should contain (58 -> 1L)
+
+    checkDerivedQuantities(res, Seq(58).map(_.toLong))
+  }
+
+  /**
+   * Set of tests to check that the derived quantities calculated on the length distribution in TextStats
+   * match the actual length distributions of the tokens.
+   *
+   * @param res       TextStats result to compare
+   * @param lengthSeq Expected length sequence
+   * @return          Assertions on derived quantities in TextStats
+   */
+  private[op] def checkDerivedQuantities(res: TextStats, lengthSeq: Seq[Long]): Assertion = {
+    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
+    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
+    res.lengthSize shouldBe lengthSeq.length
+    compareWithTol(res.lengthMean, expectedLengthMean, tol)
+    compareWithTol(res.lengthVariance, expectedLengthVariance, tol)
+    compareWithTol(res.lengthStdDev, expectedLengthStdDev, tol)
   }
 
   Spec[TextStats] should "aggregate correctly" in {

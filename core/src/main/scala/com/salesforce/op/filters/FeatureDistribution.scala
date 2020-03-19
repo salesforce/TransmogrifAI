@@ -293,8 +293,8 @@ object FeatureDistribution {
       case Left(stringSeq) => stringSeq
       case Right(doubleSeq) => doubleSeq.map(_.toString)
     }
-    stringVals.foldLeft(TextStats.empty)((acc, el) => acc + SmartTextVectorizer.computeTextStats(
-      Option(el),
+    stringVals.foldLeft(TextStats.empty)((acc, el) => acc + TextStats.textStatsFromString(
+      textString = el,
       shouldCleanText = true,
       shouldTokenize = tokenizeForLengths,
       maxCardinality = RawFeatureFilter.MaxCardinality)

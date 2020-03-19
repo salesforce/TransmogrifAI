@@ -40,6 +40,7 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import com.salesforce.op.features.types._
 import com.salesforce.op.testkit.RandomText
+import org.scalatest.Assertion
 
 @RunWith(classOf[JUnitRunner])
 class SmartTextMapVectorizerTest
@@ -517,7 +518,7 @@ class SmartTextMapVectorizerTest
   }
 
   it should "create a TextStats object from text that makes sense" in {
-    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+    val res = TextMapStats.computeTextMapStats[TextMap](
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
@@ -548,8 +549,8 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
   }
 
-  it should "create a TextStats with the correct derived quantites" in {
-    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+  it should "create a TextStats with the correct derived quantities" in {
+    val res = TextMapStats.computeTextMapStats[TextMap](
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
@@ -557,29 +558,12 @@ class SmartTextMapVectorizerTest
       maxCardinality = 100
     )
 
-    // Check derived quantities
-    val lengthSeq1 = Seq(6, 3, 3, 5, 8, 8).map(_.toLong)
-    val expectedLengthMean1 = lengthSeq1.sum.toDouble / lengthSeq1.length
-    val expectedLengthVariance1 = lengthSeq1.map(x => math.pow((x - expectedLengthMean1), 2)).sum / lengthSeq1.length
-    val expectedLengthStdDev1 = math.sqrt(expectedLengthVariance1)
-    res.keyValueCounts("f1").lengthSize shouldBe lengthSeq1.length
-    compareWithTol(res.keyValueCounts("f1").lengthMean, expectedLengthMean1, tol)
-    compareWithTol(res.keyValueCounts("f1").lengthVariance, expectedLengthVariance1, tol)
-    compareWithTol(res.keyValueCounts("f1").lengthStdDev, expectedLengthStdDev1, tol)
-
-    val lengthSeq2 = Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong)
-    val expectedLengthMean2 = lengthSeq2.sum.toDouble / lengthSeq2.length
-    val expectedLengthVariance2 = lengthSeq2.map(x => math.pow((x - expectedLengthMean2), 2)).sum / lengthSeq2.length
-    val expectedLengthStdDev2 = math.sqrt(expectedLengthVariance2)
-
-    res.keyValueCounts("f2").lengthSize shouldBe lengthSeq2.length
-    compareWithTol(res.keyValueCounts("f2").lengthMean, expectedLengthMean2, tol)
-    compareWithTol(res.keyValueCounts("f2").lengthVariance, expectedLengthVariance2, tol)
-    compareWithTol(res.keyValueCounts("f2").lengthStdDev, expectedLengthStdDev2, tol)
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 3, 5, 8, 8).map(_.toLong))
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3, 4, 4).map(_.toLong))
   }
 
   it should "turn a string into a corresponding TextStats instance that respects maxCardinality" in {
-    val res = SmartTextMapVectorizer.computeTextMapStats[TextMap](
+    val res = TextMapStats.computeTextMapStats[TextMap](
       textMapData,
       shouldCleanKeys = false,
       shouldCleanValues = false,
@@ -603,9 +587,32 @@ class SmartTextMapVectorizerTest
     res.keyValueCounts("f1").lengthCounts should contain (6 -> 1L)
     res.keyValueCounts("f1").lengthCounts should contain (3 -> 1L)
     res.keyValueCounts("f1").lengthCounts should contain (5 -> 1L)
+    checkDerivedQuantities(res, "f1", Seq(6, 3, 5).map(_.toLong))
+
     res.keyValueCounts("f2").lengthCounts.size shouldBe 3
     res.keyValueCounts("f2").lengthCounts should contain (4 -> 1L)
     res.keyValueCounts("f2").lengthCounts should contain (5 -> 3L)
     res.keyValueCounts("f2").lengthCounts should contain (3 -> 1L)
+    checkDerivedQuantities(res, "f2", Seq(4, 5, 5, 5, 3).map(_.toLong))
+  }
+
+  /**
+   * Set of tests to check that the derived quantities calculated on the length distribution in TextMapStats (for
+   * a single key) match the actual length distributions of the tokens.
+   *
+   * @param res       TextMapStats result to compare
+   * @param key       key to use for comparisons
+   * @param lengthSeq Expected length sequence
+   * @return          Assertions on derived quantities in TextStats
+   */
+  private[op] def checkDerivedQuantities(res: TextMapStats, key: String, lengthSeq: Seq[Long]): Assertion = {
+    val expectedLengthMean = lengthSeq.sum.toDouble / lengthSeq.length
+    val expectedLengthVariance = lengthSeq.map(x => math.pow((x - expectedLengthMean), 2)).sum / lengthSeq.length
+    val expectedLengthStdDev = math.sqrt(expectedLengthVariance)
+
+    res.keyValueCounts(key).lengthSize shouldBe lengthSeq.length
+    compareWithTol(res.keyValueCounts(key).lengthMean, expectedLengthMean, tol)
+    compareWithTol(res.keyValueCounts(key).lengthVariance, expectedLengthVariance, tol)
+    compareWithTol(res.keyValueCounts(key).lengthStdDev, expectedLengthStdDev, tol)
   }
 }

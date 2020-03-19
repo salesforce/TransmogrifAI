@@ -174,7 +174,7 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
 
     implicit val testStatsMonoid: Monoid[TextMapStats] = TextMapStats.monoid(maxCard)
     val valueStats: Dataset[Array[TextMapStats]] = dataset.map(
-      _.map(SmartTextMapVectorizer.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
+      _.map(TextMapStats.computeTextMapStats(_, shouldCleanKeys, shouldCleanValues, shouldTokenize,
         maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
@@ -194,7 +194,19 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
   }
 }
 
-object SmartTextMapVectorizer extends CleanTextFun {
+/**
+ * Summary statistics of a text feature
+ *
+ * @param keyValueCounts counts of feature values
+ */
+private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) extends JsonLike
+
+private[op] object TextMapStats extends CleanTextFun {
+
+  def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
+    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
+    caseclass.monoid[TextMapStats]
+  }
 
   /**
    * Computes a TextMapStats instance from a text map entry
@@ -214,33 +226,10 @@ object SmartTextMapVectorizer extends CleanTextFun {
     shouldTokenize: Boolean,
     maxCardinality: Int
   )(implicit tti: TypeTag[T], ttiv: TypeTag[T#Value]): TextMapStats = {
-    val keyValueCounts = textMap.map { case (k, v) =>
-      val cleanedText = cleanTextFn(v, shouldCleanValues)
-
-      val lengthsMap: Map[Int, Long] = if (shouldTokenize) {
-        TextTokenizer.tokenizeString(cleanedText).tokens.value
-          .foldLeft(Map.empty[Int, Long])(
-            (acc, el) => TextStats.additionHelper(acc, Map(el.length -> 1L), maxCardinality)
-          )
-      } else Map(v.length -> 1L)
-      cleanTextFn(k, shouldCleanKeys) -> TextStats(Map(cleanedText -> 1L), lengthsMap)
+    val keyValueCounts = textMap.map { case (k, v) => cleanTextFn(k, shouldCleanKeys) ->
+      TextStats.textStatsFromString(v, shouldCleanValues, shouldTokenize, maxCardinality)
     }
     TextMapStats(keyValueCounts)
-  }
-}
-
-/**
- * Summary statistics of a text feature
- *
- * @param keyValueCounts counts of feature values
- */
-private[op] case class TextMapStats(keyValueCounts: Map[String, TextStats]) extends JsonLike
-
-private[op] object TextMapStats {
-
-  def monoid(maxCardinality: Int): Monoid[TextMapStats] = {
-    implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(maxCardinality)
-    caseclass.monoid[TextMapStats]
   }
 
 }
