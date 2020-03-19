@@ -33,8 +33,7 @@ package com.salesforce.op.filters
 import java.util.Objects
 
 import com.salesforce.op.features.{FeatureDistributionLike, FeatureDistributionType}
-import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats,
-  SmartTextVectorizer}
+import com.salesforce.op.stages.impl.feature.{HashAlgorithm, Inclusion, NumericBucketizer, TextStats}
 import com.salesforce.op.utils.json.EnumEntrySerializer
 import com.twitter.algebird.Monoid._
 import com.twitter.algebird._
@@ -301,10 +300,6 @@ object FeatureDistribution {
       shouldTokenize = tokenizeForLengths,
       maxCardinality = RawFeatureFilter.MaxCardinality)
     )
-  }
-
-  private def countStringValues[T](seq: Seq[T]): Map[String, Long] = {
-    seq.groupBy(identity).map { case (k, valSeq) => k.toString -> valSeq.size.toLong }
   }
 
   /**
