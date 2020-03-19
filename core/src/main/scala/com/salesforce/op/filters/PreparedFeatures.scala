@@ -169,8 +169,7 @@ private[filters] object PreparedFeatures {
       case SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
       case SomeValue(v: SparseVector) => Map((name, None) -> Right(v.indices.map(_.toDouble).toSeq))
       case ft@SomeValue(_) => ft match {
-        // case v: Text => Map((name, None) -> Left(v.value.toSeq.flatMap(tokenize)))
-        case v: Text => Map((name, None) -> Left(v.value.toSeq))
+        case v: Text => Map((name, None) -> Left(v.value.toSeq.flatMap(tokenize)))
         case v: Date => Map((name, None) -> Right(v.value.map(prepareDateValue(_, timePeriod)).toSeq))
         case v: OPNumeric[_] => Map((name, None) -> Right(v.toDouble.toSeq))
         case v: Geolocation => Map((name, None) -> Right(v.value))
