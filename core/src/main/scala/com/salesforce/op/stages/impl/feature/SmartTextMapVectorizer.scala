@@ -155,6 +155,18 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
       }
     }
 
+    logInfo(s"TextStats for features used in SmartTextMapVectorizer:")
+    inN.map(_.name).zip(aggregatedStats).zip(allFeatureInfo).foreach { case ((mapName, mapStats), featInfo) =>
+      logInfo(s"FeatureMap: $mapName")
+      mapStats.keyValueCounts.zip(featInfo).foreach { case ((name, stats), info) =>
+        logInfo(s"Key: $name")
+        logInfo(s"LengthCounts: ${stats.lengthCounts}")
+        logInfo(s"LengthMean: ${stats.lengthMean}")
+        logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
+        logInfo(s"Vectorization method: ${info.vectorizationMethod}")
+      }
+    }
+
     SmartTextMapVectorizerModelArgs(
       allFeatureInfo = allFeatureInfo,
       shouldCleanKeys = shouldCleanKeys,
@@ -178,17 +190,6 @@ class SmartTextMapVectorizer[T <: OPMap[String]]
         maxCard)).toArray
     )
     val aggregatedStats: Array[TextMapStats] = valueStats.reduce(_ + _)
-
-    logInfo(s"TextStats for features used in SmartTextMapVectorizer:")
-    inN.map(_.name).zip(aggregatedStats).foreach { case(mapName, mapStats) =>
-      logInfo(s"FeatureMap: $mapName")
-      mapStats.keyValueCounts.foreach { case(name, stats) =>
-        logInfo(s"Key: $name")
-        logInfo(s"LengthCounts: ${stats.lengthCounts}")
-        logInfo(s"LengthMean: ${stats.lengthMean}")
-        logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
-      }
-    }
 
     val smartTextMapVectorizerModelArgs = makeSmartTextMapVectorizerModelArgs(aggregatedStats)
 
