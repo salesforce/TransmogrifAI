@@ -32,9 +32,15 @@ package com.salesforce.op.utils.spark
 
 import org.apache.spark.sql.SparkSession
 
+/**
+ * Convenience methods for working with Spark's job groups.
+ */
 object JobGroupUtil {
   /**
-   * Sets the Spark job group for a wrapped code block. The job group is cleared afterwards.
+   * Sets the Spark job group name and description for a wrapped code block.
+   * The job group is cleared afterwards.
+   *
+   * @param step The OpStep with which to the mark the Spark job group
    */
   def withJobGroup[R](step: OpStep)(block: => R)(implicit spark: SparkSession): R = {
     spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
@@ -44,7 +50,9 @@ object JobGroupUtil {
   }
 
   /**
-   * Indefinitely sets the Spark job group.
+   * Indefinitely sets the Spark job group name and description.
+   *
+   * @param step The OpStep with which to the mark the Spark job group
    */
   def setJobGroup(step: OpStep)(implicit spark: SparkSession): Unit = {
     spark.sparkContext.setJobGroup(step.toString, step.entryDescription)
