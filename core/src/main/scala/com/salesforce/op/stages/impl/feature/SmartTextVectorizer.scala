@@ -91,6 +91,14 @@ class SmartTextVectorizer[T <: Text](uid: String = UID[SmartTextVectorizer[T]])(
     )
     val aggregatedStats: Array[TextStats] = valueStats.reduce(_ + _)
 
+    logInfo(s"TextStats for features used in SmartTextVectorizer:")
+    inN.map(_.name).zip(aggregatedStats).foreach { case(name, stats) =>
+      logInfo(s"Feature: $name")
+      logInfo(s"LengthCounts: ${stats.lengthCounts}")
+      logInfo(s"LengthMean: ${stats.lengthMean}")
+      logInfo(s"LengthStdDev: ${stats.lengthStdDev}")
+    }
+
     val (vectorizationMethods, topValues) = aggregatedStats.map { stats =>
       val vecMethod: TextVectorizationMethod = stats match {
         case _ if stats.valueCounts.size <= maxCard => TextVectorizationMethod.Pivot

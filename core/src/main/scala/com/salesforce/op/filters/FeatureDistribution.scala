@@ -230,7 +230,6 @@ object FeatureDistribution {
    *                            Input arguments are [[Summary]] and number of bins to use in computing feature
    *                            distributions (histograms for numerics, hashes for strings). Output is the bins for
    *                            the text features.
-   * @param tokenizeForLengths  whether or not to tokenize strings before computing length distribution
    * @param `type`              feature distribution type: training or scoring
    * @return feature distribution given the provided information
    */
@@ -240,7 +239,6 @@ object FeatureDistribution {
     value: Option[ProcessedSeq],
     bins: Int,
     textBinsFormula: (Summary, Int) => Int,
-    tokenizeForLengths: Boolean,
     `type`: FeatureDistributionType
   ): FeatureDistribution = {
     val (name, key) = featureKey
@@ -249,7 +247,8 @@ object FeatureDistribution {
         .getOrElse(1L -> (Array(summary.min, summary.max, summary.sum, summary.count) -> new Array[Double](bins)))
 
     val moments = value.map(momentsValues)
-    val cardEstimate = value.map(cardinalityValues(_, tokenizeForLengths))
+    // Tokenization is already done during prep phase, so we can skip text cleaning and tokenization here (for now)
+    val cardEstimate = value.map(cardinalityValues(_, shouldCleanText = false, tokenizeForLengths = false))
 
     FeatureDistribution(
       name = name,
@@ -280,13 +279,16 @@ object FeatureDistribution {
 
   /**
    * Function to track frequency of the first $(MaxCardinality) unique values
-   * (number for numeric features, token for text features)
+   * (number for numeric features, token for text features). Note that shouldCleanText and tokenizeForLengths are
+   * exposed, but not relevant yet because tokenization always happens before this, during data preparation.
    *
    * @param values              values to track distribution / frequency
+   * @param shouldCleanText     whether or not to clean text for TextStats calculation
    * @param tokenizeForLengths  whether or not to tokenize strings before computing length distribution
    * @return TextStats object   containing a Map from a value to its frequency (histogram)
    */
-  private def cardinalityValues(values: ProcessedSeq, tokenizeForLengths: Boolean): TextStats = {
+  private def cardinalityValues(values: ProcessedSeq, shouldCleanText: Boolean,
+    tokenizeForLengths: Boolean): TextStats = {
     implicit val testStatsMonoid: Monoid[TextStats] = TextStats.monoid(RawFeatureFilter.MaxCardinality)
 
     val stringVals = values match {
@@ -295,7 +297,7 @@ object FeatureDistribution {
     }
     stringVals.foldLeft(TextStats.empty)((acc, el) => acc + TextStats.textStatsFromString(
       textString = el,
-      shouldCleanText = true,
+      shouldCleanText = shouldCleanText,
       shouldTokenize = tokenizeForLengths,
       maxCardinality = RawFeatureFilter.MaxCardinality)
     )

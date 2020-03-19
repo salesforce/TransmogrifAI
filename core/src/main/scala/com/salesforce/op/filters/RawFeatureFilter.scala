@@ -103,7 +103,6 @@ class RawFeatureFilter[T]
   val jsDivergenceProtectedFeatures: Set[String] = Set.empty,
   val protectedFeatures: Set[String] = Set.empty,
   val textBinsFormula: (Summary, Int) => Int = RawFeatureFilter.textBinsFormula,
-  val tokenizeForLengths: Boolean = RawFeatureFilter.TokenizeForLengths,
   val timePeriod: Option[TimePeriod] = None,
   val minScoringRows: Int = RawFeatureFilter.minScoringRowsDefault
 ) extends Serializable {
@@ -176,7 +175,6 @@ class RawFeatureFilter[T]
           predictorSummaries = predictorSummariesArr,
           bins = bins,
           textBinsFormula = textBinsFormula,
-          tokenizeForLengths = tokenizeForLengths,
           featureDistributionType
         )).reduce(_ + _)
     val correlationInfo: Map[FeatureKey, Map[FeatureKey, Double]] =
@@ -603,8 +601,6 @@ object RawFeatureFilter {
   // scoring sets since they will not be reliable. Currently, this is set to the same as the minimum training size.
   val minScoringRowsDefault = 500
   val MaxCardinality = 500
-  // Whether or not to tokenize string data when calculating length distributions in TextStats
-  val TokenizeForLengths = true
 
   val stageName = classOf[RawFeatureFilter[_]].getSimpleName
 

@@ -88,7 +88,6 @@ private[filters] case class PreparedFeatures
    *                                Input arguments are [[Summary]] and number of bins to use in
    *                                computing feature distributions (histograms for numerics, hashes for strings).
    *                                Output is the bins for the text features.
-   * @param tokenizeForLengths      whether or not to tokenize strings before computing length distribution
    * @param featureDistributionType feature distribution type: training or scoring
    * @return a pair consisting of response and predictor feature distributions (in this order)
    */
@@ -97,7 +96,6 @@ private[filters] case class PreparedFeatures
     predictorSummaries: Array[(FeatureKey, Summary)],
     bins: Int,
     textBinsFormula: (Summary, Int) => Int,
-    tokenizeForLengths: Boolean,
     featureDistributionType: FeatureDistributionType
   ): (Array[FeatureDistribution], Array[FeatureDistribution]) = {
 
@@ -111,7 +109,6 @@ private[filters] case class PreparedFeatures
         value = features.get(featureKey),
         bins = bins,
         textBinsFormula = textBinsFormula,
-        tokenizeForLengths = tokenizeForLengths,
         `type` = featureDistributionType
       )
     }
@@ -172,7 +169,8 @@ private[filters] object PreparedFeatures {
       case SomeValue(v: DenseVector) => Map((name, None) -> Right(v.toArray.toSeq))
       case SomeValue(v: SparseVector) => Map((name, None) -> Right(v.indices.map(_.toDouble).toSeq))
       case ft@SomeValue(_) => ft match {
-        case v: Text => Map((name, None) -> Left(v.value.toSeq.flatMap(tokenize)))
+        // case v: Text => Map((name, None) -> Left(v.value.toSeq.flatMap(tokenize)))
+        case v: Text => Map((name, None) -> Left(v.value.toSeq))
         case v: Date => Map((name, None) -> Right(v.value.map(prepareDateValue(_, timePeriod)).toSeq))
         case v: OPNumeric[_] => Map((name, None) -> Right(v.toDouble.toSeq))
         case v: Geolocation => Map((name, None) -> Right(v.value))
